@@ -71,6 +71,7 @@ if TYPE_CHECKING:
     from victor.agent.tool_pipeline import ToolPipeline, PipelineExecutionResult
     from victor.agent.tool_selection import ToolSelector
     from victor.agent.budget_manager import BudgetManager
+    from victor.agent.tool_executor import ToolExecutionResult
     from victor.storage.cache.tool_cache import ToolCache
     from victor.tools.base import BaseTool, ToolRegistry
     from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
@@ -667,18 +668,14 @@ class ToolCoordinator:
                 return cached, True, None
 
         retry_enabled = self._config.retry_enabled
-        max_attempts = (
-            self._config.max_retry_attempts if retry_enabled else 1
-        )
+        max_attempts = self._config.max_retry_attempts if retry_enabled else 1
         base_delay = self._config.retry_base_delay
         max_delay = self._config.retry_max_delay
 
         last_error = None
         for attempt in range(max_attempts):
             try:
-                result = await self._pipeline._execute_single_tool(
-                    tool_name, tool_args, context
-                )
+                result = await self._pipeline._execute_single_tool(tool_name, tool_args, context)
 
                 if result.success:
                     # Cache successful result

@@ -252,7 +252,11 @@ class PlanCommand(BaseSlashCommand):
 
         # Get current plan from agent using public interface
         conversation_controller = getattr(ctx.agent, "conversation_controller", None)
-        current_plan = getattr(conversation_controller, "current_plan", None) if conversation_controller else None
+        current_plan = (
+            getattr(conversation_controller, "current_plan", None)
+            if conversation_controller
+            else None
+        )
 
         if not current_plan:
             # Check if there's a plan in conversation context using public interface
@@ -373,7 +377,11 @@ class PlanCommand(BaseSlashCommand):
     def _show_plan(self, ctx: CommandContext) -> None:
         """Show the current plan."""
         conversation_controller = getattr(ctx.agent, "conversation_controller", None)
-        current_plan = getattr(conversation_controller, "current_plan", None) if conversation_controller else None
+        current_plan = (
+            getattr(conversation_controller, "current_plan", None)
+            if conversation_controller
+            else None
+        )
 
         if not current_plan:
             # Use public interface for conversation controller and current_plan

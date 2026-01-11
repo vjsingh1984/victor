@@ -125,24 +125,16 @@ class WorkflowProfiler:
 
         # Calculate workflow-level aggregates
         total_duration = sum(
-            max(
-                node_stats[node_id].p99_duration
-                for node_id in node_stats
-            )
-            for _ in executions
+            max(node_stats[node_id].p99_duration for node_id in node_stats) for _ in executions
         ) / len(executions)
 
         total_cost = sum(stats.total_cost for stats in node_stats.values())
 
         total_tokens = sum(
-            stats.avg_input_tokens + stats.avg_output_tokens
-            for stats in node_stats.values()
+            stats.avg_input_tokens + stats.avg_output_tokens for stats in node_stats.values()
         )
 
-        success_rate = np.mean([
-            exec.get("success", True)
-            for exec in executions
-        ])
+        success_rate = np.mean([exec.get("success", True) for exec in executions])
 
         profile = WorkflowProfile(
             workflow_id=workflow_id,
@@ -223,39 +215,33 @@ class WorkflowProfiler:
         Returns:
             Dictionary mapping node IDs to statistics
         """
-        node_data = defaultdict(lambda: {
-            "durations": [],
-            "input_tokens": [],
-            "output_tokens": [],
-            "costs": [],
-            "successes": [],
-            "errors": defaultdict(int),
-            "tool_calls": defaultdict(lambda: {
-                "count": 0,
-                "cost": 0,
-            }),
-        })
+        node_data = defaultdict(
+            lambda: {
+                "durations": [],
+                "input_tokens": [],
+                "output_tokens": [],
+                "costs": [],
+                "successes": [],
+                "errors": defaultdict(int),
+                "tool_calls": defaultdict(
+                    lambda: {
+                        "count": 0,
+                        "cost": 0,
+                    }
+                ),
+            }
+        )
 
         # Aggregate data across executions
         for exec_data in executions:
             node_metrics = exec_data.get("node_metrics", {})
 
             for node_id, metrics in node_metrics.items():
-                node_data[node_id]["durations"].append(
-                    metrics.get("duration", 0)
-                )
-                node_data[node_id]["input_tokens"].append(
-                    metrics.get("input_tokens", 0)
-                )
-                node_data[node_id]["output_tokens"].append(
-                    metrics.get("output_tokens", 0)
-                )
-                node_data[node_id]["costs"].append(
-                    metrics.get("cost", 0)
-                )
-                node_data[node_id]["successes"].append(
-                    metrics.get("success", True)
-                )
+                node_data[node_id]["durations"].append(metrics.get("duration", 0))
+                node_data[node_id]["input_tokens"].append(metrics.get("input_tokens", 0))
+                node_data[node_id]["output_tokens"].append(metrics.get("output_tokens", 0))
+                node_data[node_id]["costs"].append(metrics.get("cost", 0))
+                node_data[node_id]["successes"].append(metrics.get("success", True))
 
                 # Track errors
                 if not metrics.get("success", True):
@@ -264,10 +250,10 @@ class WorkflowProfiler:
 
                 # Track tool calls
                 for tool_name, tool_stats in metrics.get("tools", {}).items():
-                    node_data[node_id]["tool_calls"][tool_name]["count"] += \
-                        tool_stats.get("count", 0)
-                    node_data[node_id]["tool_calls"][tool_name]["cost"] += \
-                        tool_stats.get("cost", 0)
+                    node_data[node_id]["tool_calls"][tool_name]["count"] += tool_stats.get(
+                        "count", 0
+                    )
+                    node_data[node_id]["tool_calls"][tool_name]["cost"] += tool_stats.get("cost", 0)
 
         # Calculate statistics
         node_stats = {}
@@ -321,90 +307,96 @@ class WorkflowProfiler:
             return bottlenecks
 
         # Calculate median duration
-        median_duration = np.median([
-            stats.avg_duration for stats in node_stats.values()
-        ])
+        median_duration = np.median([stats.avg_duration for stats in node_stats.values()])
 
         total_cost = sum(stats.total_cost for stats in node_stats.values())
 
         # Detect slow nodes
         for node_id, stats in node_stats.items():
             if stats.avg_duration > self.slow_threshold_multiplier * median_duration:
-                bottlenecks.append(Bottleneck(
-                    type=BottleneckType.SLOW_NODE,
-                    severity=BottleneckSeverity.HIGH,
-                    node_id=node_id,
-                    metric="duration",
-                    value=stats.avg_duration,
-                    threshold=self.slow_threshold_multiplier * median_duration,
-                    suggestion=f"Node '{node_id}' is {stats.avg_duration / median_duration:.1f}x slower than median. "
-                               f"Consider parallelization or breaking into smaller nodes.",
-                    confidence=0.9,
-                ))
+                bottlenecks.append(
+                    Bottleneck(
+                        type=BottleneckType.SLOW_NODE,
+                        severity=BottleneckSeverity.HIGH,
+                        node_id=node_id,
+                        metric="duration",
+                        value=stats.avg_duration,
+                        threshold=self.slow_threshold_multiplier * median_duration,
+                        suggestion=f"Node '{node_id}' is {stats.avg_duration / median_duration:.1f}x slower than median. "
+                        f"Consider parallelization or breaking into smaller nodes.",
+                        confidence=0.9,
+                    )
+                )
 
             # Check for dominant nodes
             if median_duration > 0:
-                contribution = stats.avg_duration / sum(
-                    s.avg_duration for s in node_stats.values()
-                )
+                contribution = stats.avg_duration / sum(s.avg_duration for s in node_stats.values())
                 if contribution > 0.20:
-                    bottlenecks.append(Bottleneck(
-                        type=BottleneckType.DOMINANT_NODE,
-                        severity=BottleneckSeverity.MEDIUM,
-                        node_id=node_id,
-                        metric="time_contribution",
-                        value=contribution * 100,
-                        threshold=20.0,
-                        suggestion=f"Node '{node_id}' consumes {contribution*100:.1f}% of workflow time. "
-                                   f"Consider optimization or parallelization.",
-                        confidence=0.8,
-                    ))
+                    bottlenecks.append(
+                        Bottleneck(
+                            type=BottleneckType.DOMINANT_NODE,
+                            severity=BottleneckSeverity.MEDIUM,
+                            node_id=node_id,
+                            metric="time_contribution",
+                            value=contribution * 100,
+                            threshold=20.0,
+                            suggestion=f"Node '{node_id}' consumes {contribution*100:.1f}% of workflow time. "
+                            f"Consider optimization or parallelization.",
+                            confidence=0.8,
+                        )
+                    )
 
             # Detect failing nodes
             if stats.success_rate < self.success_rate_threshold:
-                bottlenecks.append(Bottleneck(
-                    type=BottleneckType.UNRELIABLE_NODE,
-                    severity=BottleneckSeverity.HIGH,
-                    node_id=node_id,
-                    metric="success_rate",
-                    value=stats.success_rate * 100,
-                    threshold=self.success_rate_threshold * 100,
-                    suggestion=f"Node '{node_id}' success rate {stats.success_rate*100:.1f}% is below threshold. "
-                               f"Review error handling or consider pruning.",
-                    confidence=0.95,
-                ))
+                bottlenecks.append(
+                    Bottleneck(
+                        type=BottleneckType.UNRELIABLE_NODE,
+                        severity=BottleneckSeverity.HIGH,
+                        node_id=node_id,
+                        metric="success_rate",
+                        value=stats.success_rate * 100,
+                        threshold=self.success_rate_threshold * 100,
+                        suggestion=f"Node '{node_id}' success rate {stats.success_rate*100:.1f}% is below threshold. "
+                        f"Review error handling or consider pruning.",
+                        confidence=0.95,
+                    )
+                )
 
             # Detect expensive tools
             for tool_id, tool_data in stats.tool_calls.items():
                 tool_cost = tool_data.get("cost", 0)
                 if total_cost > 0 and tool_cost / total_cost > self.expensive_tool_threshold:
-                    bottlenecks.append(Bottleneck(
-                        type=BottleneckType.EXPENSIVE_TOOL,
-                        severity=BottleneckSeverity.MEDIUM,
-                        tool_id=tool_id,
-                        metric="cost_contribution",
-                        value=tool_cost / total_cost * 100,
-                        threshold=self.expensive_tool_threshold * 100,
-                        suggestion=f"Tool '{tool_id}' in node '{node_id}' consumes {tool_cost/total_cost*100:.1f}% of cost. "
-                                   f"Consider cheaper alternative or caching.",
-                        confidence=0.85,
-                    ))
+                    bottlenecks.append(
+                        Bottleneck(
+                            type=BottleneckType.EXPENSIVE_TOOL,
+                            severity=BottleneckSeverity.MEDIUM,
+                            tool_id=tool_id,
+                            metric="cost_contribution",
+                            value=tool_cost / total_cost * 100,
+                            threshold=self.expensive_tool_threshold * 100,
+                            suggestion=f"Tool '{tool_id}' in node '{node_id}' consumes {tool_cost/total_cost*100:.1f}% of cost. "
+                            f"Consider cheaper alternative or caching.",
+                            confidence=0.85,
+                        )
+                    )
 
             # Detect missing caching
             if stats.token_efficiency > 0.8:  # High consistency suggests deterministic
                 # Check if caching is not enabled (simplified check)
                 if not any("cache" in str(k).lower() for k in stats.tool_calls.keys()):
-                    bottlenecks.append(Bottleneck(
-                        type=BottleneckType.MISSING_CACHING,
-                        severity=BottleneckSeverity.LOW,
-                        node_id=node_id,
-                        metric="determinism",
-                        value=stats.token_efficiency * 100,
-                        threshold=80.0,
-                        suggestion=f"Node '{node_id}' shows high token efficiency ({stats.token_efficiency:.2f}), "
-                                   f"suggesting deterministic operations. Consider enabling caching.",
-                        confidence=0.7,
-                    ))
+                    bottlenecks.append(
+                        Bottleneck(
+                            type=BottleneckType.MISSING_CACHING,
+                            severity=BottleneckSeverity.LOW,
+                            node_id=node_id,
+                            metric="determinism",
+                            value=stats.token_efficiency * 100,
+                            threshold=80.0,
+                            suggestion=f"Node '{node_id}' shows high token efficiency ({stats.token_efficiency:.2f}), "
+                            f"suggesting deterministic operations. Consider enabling caching.",
+                            confidence=0.7,
+                        )
+                    )
 
         return bottlenecks
 
@@ -430,31 +422,35 @@ class WorkflowProfiler:
                 if bottleneck.node_id:
                     stats = node_stats.get(bottleneck.node_id)
                     if stats:
-                        opportunities.append(OptimizationOpportunity(
-                            strategy_type=OptimizationStrategyType.PRUNING,
-                            target=bottleneck.node_id,
-                            description=f"Remove consistently failing node '{bottleneck.node_id}' "
-                                       f"(success rate: {stats.success_rate:.1%})",
-                            expected_improvement=1.0 - stats.success_rate,
-                            risk_level=BottleneckSeverity.HIGH,
-                            estimated_cost_reduction=stats.total_cost,
-                            estimated_duration_reduction=stats.avg_duration,
-                            confidence=0.6,
-                        ))
+                        opportunities.append(
+                            OptimizationOpportunity(
+                                strategy_type=OptimizationStrategyType.PRUNING,
+                                target=bottleneck.node_id,
+                                description=f"Remove consistently failing node '{bottleneck.node_id}' "
+                                f"(success rate: {stats.success_rate:.1%})",
+                                expected_improvement=1.0 - stats.success_rate,
+                                risk_level=BottleneckSeverity.HIGH,
+                                estimated_cost_reduction=stats.total_cost,
+                                estimated_duration_reduction=stats.avg_duration,
+                                confidence=0.6,
+                            )
+                        )
 
             elif bottleneck.type == BottleneckType.EXPENSIVE_TOOL:
                 # Tool selection opportunity
                 if bottleneck.tool_id:
                     cost_reduction = bottleneck.value * 0.5  # Estimate 50% reduction
-                    opportunities.append(OptimizationOpportunity(
-                        strategy_type=OptimizationStrategyType.TOOL_SELECTION,
-                        target=bottleneck.tool_id,
-                        description=f"Substitute expensive tool '{bottleneck.tool_id}' with cheaper alternative",
-                        expected_improvement=cost_reduction / 100,
-                        risk_level=BottleneckSeverity.LOW,
-                        estimated_cost_reduction=cost_reduction / 100,
-                        confidence=0.7,
-                    ))
+                    opportunities.append(
+                        OptimizationOpportunity(
+                            strategy_type=OptimizationStrategyType.TOOL_SELECTION,
+                            target=bottleneck.tool_id,
+                            description=f"Substitute expensive tool '{bottleneck.tool_id}' with cheaper alternative",
+                            expected_improvement=cost_reduction / 100,
+                            risk_level=BottleneckSeverity.LOW,
+                            estimated_cost_reduction=cost_reduction / 100,
+                            confidence=0.7,
+                        )
+                    )
 
             elif bottleneck.type in [BottleneckType.SLOW_NODE, BottleneckType.DOMINANT_NODE]:
                 # Parallelization opportunity
@@ -462,15 +458,20 @@ class WorkflowProfiler:
                     # Estimate potential speedup from parallelization
                     # (simplified - actual analysis would check dependencies)
                     speedup = 2.0  # Assume 2x speedup potential
-                    opportunities.append(OptimizationOpportunity(
-                        strategy_type=OptimizationStrategyType.PARALLELIZATION,
-                        target=bottleneck.node_id,
-                        description=f"Parallelize independent nodes including '{bottleneck.node_id}'",
-                        expected_improvement=(speedup - 1) / speedup,
-                        risk_level=BottleneckSeverity.MEDIUM,
-                        estimated_duration_reduction=bottleneck.value * (speedup - 1) / speedup / 100,
-                        confidence=0.6,
-                    ))
+                    opportunities.append(
+                        OptimizationOpportunity(
+                            strategy_type=OptimizationStrategyType.PARALLELIZATION,
+                            target=bottleneck.node_id,
+                            description=f"Parallelize independent nodes including '{bottleneck.node_id}'",
+                            expected_improvement=(speedup - 1) / speedup,
+                            risk_level=BottleneckSeverity.MEDIUM,
+                            estimated_duration_reduction=bottleneck.value
+                            * (speedup - 1)
+                            / speedup
+                            / 100,
+                            confidence=0.6,
+                        )
+                    )
 
             elif bottleneck.type == BottleneckType.MISSING_CACHING:
                 # Caching opportunity
@@ -479,17 +480,21 @@ class WorkflowProfiler:
                     if stats:
                         hit_rate = 0.75  # Estimate 75% hit rate
                         speedup = 1 / (hit_rate * 0.01 + (1 - hit_rate))  # Cache is 100x faster
-                        opportunities.append(OptimizationOpportunity(
-                            strategy_type=OptimizationStrategyType.CACHING,
-                            target=bottleneck.node_id,
-                            description=f"Enable caching for deterministic node '{bottleneck.node_id}' "
-                                       f"(estimated {hit_rate:.0%} hit rate, {speedup:.1f}x speedup)",
-                            expected_improvement=(speedup - 1) / speedup,
-                            risk_level=BottleneckSeverity.LOW,
-                            estimated_duration_reduction=stats.avg_duration * (speedup - 1) / speedup,
-                            estimated_cost_reduction=stats.total_cost * hit_rate,
-                            confidence=0.8,
-                        ))
+                        opportunities.append(
+                            OptimizationOpportunity(
+                                strategy_type=OptimizationStrategyType.CACHING,
+                                target=bottleneck.node_id,
+                                description=f"Enable caching for deterministic node '{bottleneck.node_id}' "
+                                f"(estimated {hit_rate:.0%} hit rate, {speedup:.1f}x speedup)",
+                                expected_improvement=(speedup - 1) / speedup,
+                                risk_level=BottleneckSeverity.LOW,
+                                estimated_duration_reduction=stats.avg_duration
+                                * (speedup - 1)
+                                / speedup,
+                                estimated_cost_reduction=stats.total_cost * hit_rate,
+                                confidence=0.8,
+                            )
+                        )
 
         # Sort by expected improvement
         opportunities.sort(key=lambda o: o.expected_improvement, reverse=True)

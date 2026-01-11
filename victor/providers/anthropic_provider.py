@@ -59,19 +59,25 @@ class AnthropicProvider(BaseProvider):
         if not resolved_key:
             try:
                 from victor.config.api_keys import get_api_key
+
                 resolved_key = get_api_key("anthropic") or ""
             except ImportError:
                 pass
 
         if not resolved_key:
             import logging
+
             logging.getLogger(__name__).warning(
                 "Anthropic API key not provided. Set ANTHROPIC_API_KEY environment variable, "
                 "use 'victor keys --set anthropic --keyring', or pass api_key parameter."
             )
 
         super().__init__(
-            api_key=resolved_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs
+            api_key=resolved_key,
+            base_url=base_url,
+            timeout=timeout,
+            max_retries=max_retries,
+            **kwargs,
         )
         self.client = AsyncAnthropic(
             api_key=resolved_key,

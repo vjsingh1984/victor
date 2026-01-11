@@ -168,35 +168,46 @@ class OptimizationValidator:
 
         # Check 1: Risk level validation
         if optimization.risk_level.value == "critical":
-            violations.append(ConstraintViolation(
-                type="risk_level",
-                description="Critical risk level optimizations require manual review",
-                severity="CRITICAL",
-            ))
+            violations.append(
+                ConstraintViolation(
+                    type="risk_level",
+                    description="Critical risk level optimizations require manual review",
+                    severity="CRITICAL",
+                )
+            )
 
         # Check 2: Confidence threshold
         if optimization.confidence < 0.5:
-            violations.append(ConstraintViolation(
-                type="low_confidence",
-                description=f"Low confidence ({optimization.confidence:.1%}) in optimization",
-                severity="MEDIUM",
-            ))
+            violations.append(
+                ConstraintViolation(
+                    type="low_confidence",
+                    description=f"Low confidence ({optimization.confidence:.1%}) in optimization",
+                    severity="MEDIUM",
+                )
+            )
 
         # Check 3: Expected improvement validation
         if optimization.expected_improvement < 0.05:  # Less than 5%
-            violations.append(ConstraintViolation(
-                type="minimal_improvement",
-                description=f"Expected improvement ({optimization.expected_improvement:.1%}) is too small",
-                severity="LOW",
-            ))
+            violations.append(
+                ConstraintViolation(
+                    type="minimal_improvement",
+                    description=f"Expected improvement ({optimization.expected_improvement:.1%}) is too small",
+                    severity="LOW",
+                )
+            )
 
         # Check 4: Cost-benefit analysis
-        if optimization.estimated_cost_reduction < 0 and optimization.estimated_duration_reduction < 0:
-            violations.append(ConstraintViolation(
-                type="no_benefit",
-                description="Optimization increases both cost and duration",
-                severity="HIGH",
-            ))
+        if (
+            optimization.estimated_cost_reduction < 0
+            and optimization.estimated_duration_reduction < 0
+        ):
+            violations.append(
+                ConstraintViolation(
+                    type="no_benefit",
+                    description="Optimization increases both cost and duration",
+                    severity="HIGH",
+                )
+            )
 
         # Check 5: Strategy-specific validation
         strategy_violations = self._validate_strategy(optimization, profile)
@@ -204,15 +215,11 @@ class OptimizationValidator:
 
         # Check 6: Custom constraints
         if constraints:
-            constraint_violations = self._check_constraints(
-                optimization, constraints
-            )
+            constraint_violations = self._check_constraints(optimization, constraints)
             violations.extend(constraint_violations)
 
         # Determine overall validity
-        is_valid = not any(
-            v.severity in ("CRITICAL", "HIGH") for v in violations
-        )
+        is_valid = not any(v.severity in ("CRITICAL", "HIGH") for v in violations)
 
         # Estimate performance improvements
         speedup = 1.0 + optimization.estimated_duration_reduction
@@ -266,12 +273,14 @@ class OptimizationValidator:
             if node_id in profile.node_stats:
                 node_stats = profile.node_stats[node_id]
                 if node_stats.success_rate > 0.9:
-                    violations.append(ConstraintViolation(
-                        type="pruning_high_success",
-                        description=f"Node '{node_id}' has high success rate ({node_stats.success_rate:.1%}), "
-                                   f"pruning may not be beneficial",
-                        severity="MEDIUM",
-                    ))
+                    violations.append(
+                        ConstraintViolation(
+                            type="pruning_high_success",
+                            description=f"Node '{node_id}' has high success rate ({node_stats.success_rate:.1%}), "
+                            f"pruning may not be beneficial",
+                            severity="MEDIUM",
+                        )
+                    )
 
         # Parallelization strategy: Check dependencies
         elif optimization.strategy_type.value == "parallelization":
@@ -313,12 +322,14 @@ class OptimizationValidator:
         if "max_cost_increase" in constraints:
             max_cost = constraints["max_cost_increase"]
             if optimization.estimated_cost_reduction < -max_cost:
-                violations.append(ConstraintViolation(
-                    type="cost_constraint",
-                    description=f"Cost increase exceeds maximum allowed: "
-                               f"{-optimization.estimated_cost_reduction:.1%} > {max_cost:.1%}",
-                    severity="HIGH",
-                ))
+                violations.append(
+                    ConstraintViolation(
+                        type="cost_constraint",
+                        description=f"Cost increase exceeds maximum allowed: "
+                        f"{-optimization.estimated_cost_reduction:.1%} > {max_cost:.1%}",
+                        severity="HIGH",
+                    )
+                )
 
         # Risk level constraint
         if "max_risk_level" in constraints:
@@ -328,12 +339,14 @@ class OptimizationValidator:
             max_risk_idx = risk_levels.index(max_risk)
 
             if current_risk_idx > max_risk_idx:
-                violations.append(ConstraintViolation(
-                    type="risk_constraint",
-                    description=f"Risk level ({optimization.risk_level.value}) exceeds "
-                               f"maximum allowed ({max_risk})",
-                    severity="HIGH",
-                ))
+                violations.append(
+                    ConstraintViolation(
+                        type="risk_constraint",
+                        description=f"Risk level ({optimization.risk_level.value}) exceeds "
+                        f"maximum allowed ({max_risk})",
+                        severity="HIGH",
+                    )
+                )
 
         return violations
 

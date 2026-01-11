@@ -122,6 +122,7 @@ class VertexAIProvider(BaseProvider):
         if not resolved_key:
             try:
                 from victor.config.api_keys import get_api_key
+
                 resolved_key = get_api_key("vertex") or get_api_key("gcp") or ""
             except ImportError:
                 pass

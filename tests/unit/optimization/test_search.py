@@ -182,6 +182,7 @@ class TestHillClimbingOptimizer:
 
     def test_evaluate_config_custom_scoring(self, optimizer, sample_profile):
         """Test custom scoring function."""
+
         def custom_score(variant):
             return 42.0
 

@@ -226,9 +226,7 @@ class DebugProtocolHandler:
 
         return await handler(message)
 
-    async def _handle_set_breakpoints(
-        self, message: DebugMessage
-    ) -> DebugMessage:
+    async def _handle_set_breakpoints(self, message: DebugMessage) -> DebugMessage:
         """Handle SET_BREAKPOINTS message.
 
         Args:
@@ -251,9 +249,7 @@ class DebugProtocolHandler:
             request_id=message.request_id,
         )
 
-    async def _handle_clear_breakpoints(
-        self, message: DebugMessage
-    ) -> DebugMessage:
+    async def _handle_clear_breakpoints(self, message: DebugMessage) -> DebugMessage:
         """Handle CLEAR_BREAKPOINTS message.
 
         Args:
@@ -368,9 +364,7 @@ class DebugProtocolHandler:
             request_id=message.request_id,
         )
 
-    async def _handle_inspect_state(
-        self, message: DebugMessage
-    ) -> DebugMessage:
+    async def _handle_inspect_state(self, message: DebugMessage) -> DebugMessage:
         """Handle INSPECT_STATE message.
 
         Args:

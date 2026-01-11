@@ -303,9 +303,7 @@ class TestDevOpsVerticalCapabilities:
         orchestrator = MockOrchestrator()
 
         # Apply deployment safety
-        cap_provider.apply_deployment_safety(
-            orchestrator, require_approval_for_production=True
-        )
+        cap_provider.apply_deployment_safety(orchestrator, require_approval_for_production=True)
 
         assert orchestrator.safety_config is not None
         assert "deployment" in orchestrator.safety_config
@@ -808,6 +806,7 @@ class TestCapabilityProviderLazyLoading:
 
         # Verify it's the right type
         from victor.research.capabilities import ResearchCapabilityProvider
+
         assert isinstance(cap_provider, ResearchCapabilityProvider)
 
     def test_devops_lazy_loading(self):
@@ -818,6 +817,7 @@ class TestCapabilityProviderLazyLoading:
         assert cap_provider is not None
 
         from victor.devops.capabilities import DevOpsCapabilityProvider
+
         assert isinstance(cap_provider, DevOpsCapabilityProvider)
 
     def test_dataanalysis_lazy_loading(self):
@@ -828,6 +828,7 @@ class TestCapabilityProviderLazyLoading:
         assert cap_provider is not None
 
         from victor.dataanalysis.capabilities import DataAnalysisCapabilityProvider
+
         assert isinstance(cap_provider, DataAnalysisCapabilityProvider)
 
     def test_fresh_instance_each_call(self):

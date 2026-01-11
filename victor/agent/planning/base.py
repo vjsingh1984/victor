@@ -306,9 +306,7 @@ class ExecutionPlan:
         completed = sum(1 for s in self.steps if s.status == StepStatus.COMPLETED)
         return (completed / len(self.steps)) * 100
 
-    def to_markdown(
-        self, presentation: Optional["PresentationProtocol"] = None
-    ) -> str:
+    def to_markdown(self, presentation: Optional["PresentationProtocol"] = None) -> str:
         """Convert plan to markdown format for display/approval.
 
         Args:

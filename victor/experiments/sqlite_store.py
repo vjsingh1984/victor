@@ -72,9 +72,7 @@ class SQLiteStorage:
     def _get_connection(self) -> sqlite3.Connection:
         """Get thread-local database connection."""
         if not hasattr(self._local, "conn"):
-            self._local.conn = sqlite3.connect(
-                str(self.db_path), check_same_thread=False
-            )
+            self._local.conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
             self._local.conn.row_factory = sqlite3.Row
         return self._local.conn
 
@@ -169,27 +167,15 @@ class SQLiteStorage:
         )
 
         # Create indexes for performance
-        cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_experiments_status ON experiments(status)"
-        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_experiments_status ON experiments(status)")
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_experiments_created ON experiments(created_at)"
         )
-        cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_runs_experiment ON runs(experiment_id)"
-        )
-        cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status)"
-        )
-        cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_metrics_run ON metrics(run_id)"
-        )
-        cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_metrics_key ON metrics(key)"
-        )
-        cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_artifacts_run ON artifacts(run_id)"
-        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_runs_experiment ON runs(experiment_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_metrics_run ON metrics(run_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_metrics_key ON metrics(key)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_artifacts_run ON artifacts(run_id)")
 
         conn.commit()
 
@@ -241,9 +227,7 @@ class SQLiteStorage:
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        cursor.execute(
-            "SELECT * FROM experiments WHERE experiment_id = ?", (experiment_id,)
-        )
+        cursor.execute("SELECT * FROM experiments WHERE experiment_id = ?", (experiment_id,))
         row = cursor.fetchone()
 
         if row is None:
@@ -289,16 +273,12 @@ class SQLiteStorage:
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        cursor.execute(
-            "DELETE FROM experiments WHERE experiment_id = ?", (experiment_id,)
-        )
+        cursor.execute("DELETE FROM experiments WHERE experiment_id = ?", (experiment_id,))
         conn.commit()
 
         return cursor.rowcount > 0
 
-    def list_experiments(
-        self, query: Optional[ExperimentQuery] = None
-    ) -> List[Experiment]:
+    def list_experiments(self, query: Optional[ExperimentQuery] = None) -> List[Experiment]:
         """List experiments with optional filtering."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -324,7 +304,9 @@ class SQLiteStorage:
                 sql += f" AND ({' OR '.join(tag_conditions)})"
 
             # Sorting
-            order_column = query.sort_by if query.sort_by in ["name", "created_at", "status"] else "created_at"
+            order_column = (
+                query.sort_by if query.sort_by in ["name", "created_at", "status"] else "created_at"
+            )
             order_direction = query.sort_order.upper()
             sql += f" ORDER BY {order_column} {order_direction}"
 
@@ -466,9 +448,7 @@ class SQLiteStorage:
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        cursor.execute(
-            "SELECT * FROM metrics WHERE run_id = ? ORDER BY timestamp", (run_id,)
-        )
+        cursor.execute("SELECT * FROM metrics WHERE run_id = ? ORDER BY timestamp", (run_id,))
         rows = cursor.fetchall()
 
         return [
@@ -556,9 +536,7 @@ class SQLiteStorage:
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        cursor.execute(
-            "SELECT * FROM artifacts WHERE artifact_id = ?", (artifact_id,)
-        )
+        cursor.execute("SELECT * FROM artifacts WHERE artifact_id = ?", (artifact_id,))
         row = cursor.fetchone()
 
         if row is None:
@@ -595,7 +573,9 @@ class SQLiteStorage:
             workflow_name=row["workflow_name"],
             vertical=row["vertical"] or "coding",
             started_at=datetime.fromisoformat(row["started_at"]) if row["started_at"] else None,
-            completed_at=datetime.fromisoformat(row["completed_at"]) if row["completed_at"] else None,
+            completed_at=(
+                datetime.fromisoformat(row["completed_at"]) if row["completed_at"] else None
+            ),
         )
 
     def _row_to_run(self, row: sqlite3.Row) -> Run:
@@ -606,7 +586,9 @@ class SQLiteStorage:
             name=row["name"],
             status=row["status"],
             started_at=datetime.fromisoformat(row["started_at"]),
-            completed_at=datetime.fromisoformat(row["completed_at"]) if row["completed_at"] else None,
+            completed_at=(
+                datetime.fromisoformat(row["completed_at"]) if row["completed_at"] else None
+            ),
             metrics_summary=json.loads(row["metrics_summary"]) if row["metrics_summary"] else {},
             parameters=json.loads(row["parameters"]) if row["parameters"] else {},
             error_message=row["error_message"],

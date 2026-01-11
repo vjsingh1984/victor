@@ -27,7 +27,6 @@ as part of the SOLID refactoring initiative.
 """
 
 import logging
-import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
@@ -288,9 +287,7 @@ class MetricsCoordinator:
         """
         self._metrics_collector.record_tool_execution(tool_name, success, elapsed_ms)
 
-    def on_tool_start(
-        self, tool_name: str, arguments: Dict[str, Any], iteration: int = 0
-    ) -> None:
+    def on_tool_start(self, tool_name: str, arguments: Dict[str, Any], iteration: int = 0) -> None:
         """Callback when tool execution starts (from ToolPipeline).
 
         Args:

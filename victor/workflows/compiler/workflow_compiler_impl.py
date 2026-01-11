@@ -122,7 +122,7 @@ class WorkflowCompilerImpl:
         yaml_def = self._yaml_loader.load(source, workflow_name=workflow_name)
 
         # If we got a dict of workflows (no workflow_name specified), use the first one
-        if isinstance(yaml_def, dict) and not hasattr(yaml_def, 'nodes'):
+        if isinstance(yaml_def, dict) and not hasattr(yaml_def, "nodes"):
             if len(yaml_def) == 1:
                 yaml_def = next(iter(yaml_def.values()))
             else:

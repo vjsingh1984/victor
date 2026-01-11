@@ -321,8 +321,10 @@ class SubAgent(IAgent):
         # Set disable_embeddings flag for workflow service mode
         if self.config.disable_embeddings:
             gear_icon = self._presentation.icon("gear", with_color=False)
-            logger.debug(f"   {gear_icon}  Setting disable_embeddings=True for {self.config.role.value} sub-agent")
-            if hasattr(orchestrator, '_session_state_manager'):
+            logger.debug(
+                f"   {gear_icon}  Setting disable_embeddings=True for {self.config.role.value} sub-agent"
+            )
+            if hasattr(orchestrator, "_session_state_manager"):
                 orchestrator._session_state_manager.execution_state.disable_embeddings = True
 
         # Set role-specific system prompt
@@ -405,7 +407,9 @@ class SubAgent(IAgent):
         success_icon = self._presentation.icon("success", with_color=False)
         error_icon = self._presentation.icon("error", with_color=False)
 
-        logger.debug(f"   {refresh_icon} Starting execution with retry logic (max {max_attempts} attempts)")
+        logger.debug(
+            f"   {refresh_icon} Starting execution with retry logic (max {max_attempts} attempts)"
+        )
 
         for attempt in range(1, max_attempts + 1):
             try:
@@ -416,7 +420,9 @@ class SubAgent(IAgent):
                 response = await self.orchestrator.chat(self.config.task)
 
                 if attempt > 1:
-                    logger.debug(f"   {success_icon} Retry attempt {attempt}/{max_attempts} succeeded!")
+                    logger.debug(
+                        f"   {success_icon} Retry attempt {attempt}/{max_attempts} succeeded!"
+                    )
 
                 return response
 
@@ -451,7 +457,9 @@ class SubAgent(IAgent):
 
             except Exception as e:
                 # Non-retriable error, raise immediately
-                logger.error(f"Sub-agent {self.config.role.value}: Non-retriable error: {type(e).__name__}: {e}")
+                logger.error(
+                    f"Sub-agent {self.config.role.value}: Non-retriable error: {type(e).__name__}: {e}"
+                )
                 raise
 
         # All retries exhausted

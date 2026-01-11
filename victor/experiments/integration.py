@@ -132,9 +132,7 @@ class WorkflowExperimentTracker:
             params=params or {},
         )
 
-        logger.info(
-            f"Started tracking workflow '{workflow_name}' as run {run.run_id}"
-        )
+        logger.info(f"Started tracking workflow '{workflow_name}' as run {run.run_id}")
 
         return run
 

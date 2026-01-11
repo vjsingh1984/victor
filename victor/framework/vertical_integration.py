@@ -1128,6 +1128,7 @@ class VerticalIntegrationPipeline:
                 # For dynamically loaded modules, try module.__file__
                 if hasattr(vertical, "__module__"):
                     import sys
+
                     module_name = vertical.__module__
                     if module_name in sys.modules:
                         module = sys.modules[module_name]
@@ -1174,6 +1175,7 @@ class VerticalIntegrationPipeline:
             # First, try to get file hash from module
             if hasattr(vertical, "__module__"):
                 import sys
+
                 module_name = vertical.__module__
 
                 # Try to get module from sys.modules first
@@ -1183,6 +1185,7 @@ class VerticalIntegrationPipeline:
                 if not module:
                     try:
                         import inspect
+
                         # Get module from class using inspect
                         module = inspect.getmodule(vertical)
                     except Exception:
@@ -1296,7 +1299,13 @@ class VerticalIntegrationPipeline:
             # Enforce TTL by storing timestamp
             if not hasattr(self, "_cache_timestamps"):
                 self._cache_timestamps: Dict[str, float] = {}
-            self._cache_timestamps[cache_key] = asyncio.get_event_loop().time()
+            # Use event loop time if available, otherwise use wall clock time
+            try:
+                self._cache_timestamps[cache_key] = asyncio.get_event_loop().time()
+            except RuntimeError:
+                # No event loop running, fall back to wall clock time
+                import time
+                self._cache_timestamps[cache_key] = time.time()
 
             logger.debug(f"Cached integration result: {cache_key}")
 
@@ -1372,7 +1381,7 @@ class VerticalIntegrationPipeline:
             for handler in self._step_registry.get_ordered_handlers():
                 try:
                     # Check if handler has async apply method
-                    if hasattr(handler, 'apply_async'):
+                    if hasattr(handler, "apply_async"):
                         await handler.apply_async(
                             orchestrator,
                             vertical_cls,
@@ -1436,9 +1445,9 @@ class VerticalIntegrationPipeline:
 
             # Independent handlers (read-only, no side effects)
             if handler_type in [
-                'ToolStepHandler',
-                'PromptStepHandler',
-                'SafetyStepHandler',
+                "ToolStepHandler",
+                "PromptStepHandler",
+                "SafetyStepHandler",
             ]:
                 independent.append(handler)
             else:
@@ -1475,9 +1484,7 @@ class VerticalIntegrationPipeline:
 
         # Execute independent handlers in parallel
         if independent:
-            logger.debug(
-                f"Executing {len(independent)} independent handlers in parallel"
-            )
+            logger.debug(f"Executing {len(independent)} independent handlers in parallel")
 
             tasks = [
                 self._run_handler_async(h, orchestrator, vertical, context, result)
@@ -1502,14 +1509,10 @@ class VerticalIntegrationPipeline:
 
         # Execute dependent handlers sequentially
         if dependent:
-            logger.debug(
-                f"Executing {len(dependent)} dependent handlers sequentially"
-            )
+            logger.debug(f"Executing {len(dependent)} dependent handlers sequentially")
 
             for handler in dependent:
-                await self._run_handler_async(
-                    handler, orchestrator, vertical, context, result
-                )
+                await self._run_handler_async(handler, orchestrator, vertical, context, result)
 
     async def _run_handler_async(
         self,
@@ -1533,7 +1536,7 @@ class VerticalIntegrationPipeline:
         """
         try:
             # Check if handler has async apply method
-            if hasattr(handler, 'apply_async'):
+            if hasattr(handler, "apply_async"):
                 await handler.apply_async(
                     orchestrator,
                     vertical,
@@ -1544,6 +1547,7 @@ class VerticalIntegrationPipeline:
             else:
                 # Run sync handler in thread pool to avoid blocking
                 import asyncio
+
                 loop = asyncio.get_event_loop()
                 await loop.run_in_executor(
                     None,
@@ -1553,7 +1557,7 @@ class VerticalIntegrationPipeline:
                         context,
                         result,
                         strict_mode=self._strict_mode,
-                    )
+                    ),
                 )
         except Exception as e:
             if self._strict_mode:

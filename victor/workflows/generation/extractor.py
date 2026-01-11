@@ -440,9 +440,11 @@ class RequirementExtractor:
             extraction_method="llm",
             model=self._orchestrator.current_model,
             extraction_time=extraction_time,
-            confidence=sum(confidence_scores.values()) / len(confidence_scores)
-            if confidence_scores
-            else 0.0,
+            confidence=(
+                sum(confidence_scores.values()) / len(confidence_scores)
+                if confidence_scores
+                else 0.0
+            ),
         )
 
         # Add metadata and confidence scores
@@ -456,9 +458,7 @@ class RequirementExtractor:
 
         return requirements
 
-    def _build_extraction_prompt(
-        self, description: str, context: Optional[Dict[str, Any]]
-    ) -> str:
+    def _build_extraction_prompt(self, description: str, context: Optional[Dict[str, Any]]) -> str:
         """Build the extraction prompt.
 
         Args:
@@ -567,12 +567,12 @@ Do not include any explanatory text outside the JSON structure."""
 
         loops = [
             LoopRequirement(
-                loop_id=l["loop_id"],
-                task_to_repeat=l["task_to_repeat"],
-                exit_condition=l["exit_condition"],
-                max_iterations=l.get("max_iterations", 3),
+                loop_id=loop_data["loop_id"],
+                task_to_repeat=loop_data["task_to_repeat"],
+                exit_condition=loop_data["exit_condition"],
+                max_iterations=loop_data.get("max_iterations", 3),
             )
-            for l in structural_data.get("loops", [])
+            for loop_data in structural_data.get("loops", [])
         ]
 
         structural = StructuralRequirements(
@@ -644,9 +644,7 @@ Do not include any explanatory text outside the JSON structure."""
         # Functional confidence: based on task completeness
         if requirements.functional.tasks:
             complete_tasks = sum(
-                1
-                for t in requirements.functional.tasks
-                if t.description and t.task_type
+                1 for t in requirements.functional.tasks if t.description and t.task_type
             )
             scores["functional"] = complete_tasks / len(requirements.functional.tasks)
         else:

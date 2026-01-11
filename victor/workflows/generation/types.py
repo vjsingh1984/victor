@@ -67,7 +67,12 @@ class ErrorSeverity(Enum):
 
     def __lt__(self, other: "ErrorSeverity") -> bool:
         """Compare severity for sorting."""
-        order = [ErrorSeverity.CRITICAL, ErrorSeverity.ERROR, ErrorSeverity.WARNING, ErrorSeverity.INFO]
+        order = [
+            ErrorSeverity.CRITICAL,
+            ErrorSeverity.ERROR,
+            ErrorSeverity.WARNING,
+            ErrorSeverity.INFO,
+        ]
         return order.index(self) < order.index(other)
 
     def __str__(self) -> str:
@@ -184,10 +189,7 @@ class WorkflowGenerationValidationResult:
     def all_errors(self) -> List[WorkflowValidationError]:
         """Get all errors from all categories."""
         return (
-            self.schema_errors +
-            self.structure_errors +
-            self.semantic_errors +
-            self.security_errors
+            self.schema_errors + self.structure_errors + self.semantic_errors + self.security_errors
         )
 
     @property
@@ -198,12 +200,7 @@ class WorkflowGenerationValidationResult:
     @property
     def error_count(self) -> Dict[str, int]:
         """Get count of errors by severity."""
-        counts = {
-            "critical": 0,
-            "error": 0,
-            "warning": 0,
-            "info": 0
-        }
+        counts = {"critical": 0, "error": 0, "warning": 0, "info": 0}
         for error in self.all_errors:
             counts[error.severity.value] += 1
         return counts
@@ -270,7 +267,8 @@ class WorkflowGenerationValidationResult:
         if "nodes[" in location:
             # Extract from "nodes[node_id]" or "nodes[0].field"
             import re
-            match = re.search(r'nodes\[([^\]]+)\]', location)
+
+            match = re.search(r"nodes\[([^\]]+)\]", location)
             if match:
                 return match.group(1)
         return "workflow"  # Workflow-level error
@@ -345,7 +343,9 @@ class RefinementResult:
             "convergence_achieved": self.convergence_achieved,
             "original_error_count": len(self.original_errors),
             "remaining_error_count": len(self.remaining_errors),
-            "validation_result": self.validation_result.to_dict() if self.validation_result else None,
+            "validation_result": (
+                self.validation_result.to_dict() if self.validation_result else None
+            ),
         }
 
 

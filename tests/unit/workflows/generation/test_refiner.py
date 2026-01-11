@@ -49,11 +49,11 @@ class TestSchemaRefiner:
             "nodes": [
                 {
                     "id": "agent1",
-                    "type": "agent"
+                    "type": "agent",
                     # Missing 'role' and 'goal'
                 }
             ],
-            "entry_point": "agent1"
+            "entry_point": "agent1",
         }
 
         errors = [
@@ -62,7 +62,7 @@ class TestSchemaRefiner:
                 severity=ErrorSeverity.ERROR,
                 message="Missing required field: 'role'",
                 location="nodes[agent1]",
-                suggestion="Add 'role' field"
+                suggestion="Add 'role' field",
             )
         ]
 
@@ -82,10 +82,10 @@ class TestSchemaRefiner:
                     "type": "agent",
                     "role": "executor",
                     "goal": "Task",
-                    "tool_budget": "15"  # String instead of int
+                    "tool_budget": "15",  # String instead of int
                 }
             ],
-            "entry_point": "agent1"
+            "entry_point": "agent1",
         }
 
         errors = [
@@ -94,7 +94,7 @@ class TestSchemaRefiner:
                 severity=ErrorSeverity.ERROR,
                 message="tool_budget must be integer, got str",
                 location="nodes[agent1].tool_budget",
-                suggestion="Convert to integer"
+                suggestion="Convert to integer",
             )
         ]
 
@@ -116,10 +116,10 @@ class TestSchemaRefiner:
                     "type": "agent",
                     "role": "executor",
                     "goal": "Task",
-                    "tool_budget": 1000  # Out of range
+                    "tool_budget": 1000,  # Out of range
                 }
             ],
-            "entry_point": "agent1"
+            "entry_point": "agent1",
         }
 
         errors = [
@@ -128,7 +128,7 @@ class TestSchemaRefiner:
                 severity=ErrorSeverity.ERROR,
                 message="tool_budget 1000 out of range [1, 500]",
                 location="nodes[agent1].tool_budget",
-                suggestion="Clamp to valid range"
+                suggestion="Clamp to valid range",
             )
         ]
 
@@ -148,10 +148,10 @@ class TestSchemaRefiner:
                     "id": "agent1",
                     "type": "agent",
                     "role": "developer",  # Invalid role
-                    "goal": "Task"
+                    "goal": "Task",
                 }
             ],
-            "entry_point": "agent1"
+            "entry_point": "agent1",
         }
 
         errors = [
@@ -160,7 +160,7 @@ class TestSchemaRefiner:
                 severity=ErrorSeverity.ERROR,
                 message="Invalid agent role: 'developer'",
                 location="nodes[agent1].role",
-                suggestion="Use valid role"
+                suggestion="Use valid role",
             )
         ]
 
@@ -181,12 +181,10 @@ class TestStructureRefiner:
         workflow = {
             "nodes": [
                 {"id": "start", "type": "agent", "role": "executor", "goal": "Start"},
-                {"id": "orphan", "type": "agent", "role": "executor", "goal": "Orphan"}
+                {"id": "orphan", "type": "agent", "role": "executor", "goal": "Orphan"},
             ],
-            "edges": [
-                {"source": "start", "target": "__end__"}
-            ],
-            "entry_point": "start"
+            "edges": [{"source": "start", "target": "__end__"}],
+            "entry_point": "start",
         }
 
         errors = [
@@ -195,7 +193,7 @@ class TestStructureRefiner:
                 severity=ErrorSeverity.ERROR,
                 message="Node 'orphan' is not reachable from entry point 'start'",
                 location="nodes[orphan]",
-                suggestion="Remove orphan or add edge"
+                suggestion="Remove orphan or add edge",
             )
         ]
 
@@ -210,9 +208,7 @@ class TestStructureRefiner:
         refiner = StructureRefiner(conservative=True)
 
         workflow = {
-            "nodes": [
-                {"id": "node1", "type": "agent", "role": "executor", "goal": "Task 1"}
-            ]
+            "nodes": [{"id": "node1", "type": "agent", "role": "executor", "goal": "Task 1"}]
         }
 
         errors = [
@@ -221,7 +217,7 @@ class TestStructureRefiner:
                 severity=ErrorSeverity.ERROR,
                 message="Entry point 'missing' not found",
                 location="workflow.entry_point",
-                suggestion="Set to valid node ID"
+                suggestion="Set to valid node ID",
             )
         ]
 
@@ -245,10 +241,10 @@ class TestSemanticRefiner:
                     "type": "agent",
                     "role": "executor",
                     "goal": "Task",
-                    "tools": ["valid_tool", "unknown_tool"]
+                    "tools": ["valid_tool", "unknown_tool"],
                 }
             ],
-            "entry_point": "agent1"
+            "entry_point": "agent1",
         }
 
         errors = [
@@ -257,7 +253,7 @@ class TestSemanticRefiner:
                 severity=ErrorSeverity.ERROR,
                 message="Tool 'unknown_tool' not found in registry",
                 location="nodes[agent1].tools",
-                suggestion="Remove unknown tool"
+                suggestion="Remove unknown tool",
             )
         ]
 
@@ -276,10 +272,10 @@ class TestSemanticRefiner:
                     "id": "agent1",
                     "type": "agent",
                     "role": "coder",  # Invalid
-                    "goal": "Code something"
+                    "goal": "Code something",
                 }
             ],
-            "entry_point": "agent1"
+            "entry_point": "agent1",
         }
 
         errors = [
@@ -288,7 +284,7 @@ class TestSemanticRefiner:
                 severity=ErrorSeverity.ERROR,
                 message="Invalid role: 'coder'",
                 location="nodes[agent1].role",
-                suggestion="Use valid role"
+                suggestion="Use valid role",
             )
         ]
 
@@ -312,17 +308,17 @@ class TestSecurityRefiner:
                     "type": "agent",
                     "role": "executor",
                     "goal": "Task",
-                    "tool_budget": 60
+                    "tool_budget": 60,
                 },
                 {
                     "id": "agent2",
                     "type": "agent",
                     "role": "executor",
                     "goal": "Task",
-                    "tool_budget": 60
-                }
+                    "tool_budget": 60,
+                },
             ],
-            "entry_point": "agent1"
+            "entry_point": "agent1",
         }
 
         errors = [
@@ -331,14 +327,16 @@ class TestSecurityRefiner:
                 severity=ErrorSeverity.ERROR,
                 message="Total tool budget 120 exceeds limit 100",
                 location="workflow",
-                suggestion="Reduce budgets"
+                suggestion="Reduce budgets",
             )
         ]
 
         refined, fixes = refiner.refine(workflow, errors)
 
         assert len(fixes) > 0
-        total_budget = sum(n.get("tool_budget", 0) for n in refined["nodes"] if n.get("type") == "agent")
+        total_budget = sum(
+            n.get("tool_budget", 0) for n in refined["nodes"] if n.get("type") == "agent"
+        )
         assert total_budget <= 100
 
 
@@ -357,10 +355,10 @@ class TestWorkflowRefiner:
                     "type": "agent",
                     "role": "executor",  # Valid role
                     "goal": "Task",
-                    "tool_budget": 15
+                    "tool_budget": 15,
                 }
             ],
-            "entry_point": "agent1"
+            "entry_point": "agent1",
         }
 
         result = validator.validate(workflow)
@@ -379,12 +377,10 @@ class TestWorkflowRefiner:
         workflow = {
             "nodes": [
                 {"id": "start", "type": "agent", "role": "executor", "goal": "Start"},
-                {"id": "orphan", "type": "agent", "role": "executor", "goal": "Orphan"}
+                {"id": "orphan", "type": "agent", "role": "executor", "goal": "Orphan"},
             ],
-            "edges": [
-                {"source": "start", "target": "__end__"}
-            ],
-            "entry_point": "start"
+            "edges": [{"source": "start", "target": "__end__"}],
+            "entry_point": "start",
         }
 
         result = validator.validate(workflow)
@@ -406,10 +402,10 @@ class TestWorkflowRefiner:
                     "type": "agent",
                     "role": "executor",
                     "goal": "Task",
-                    "tools": ["unknown_tool"]
+                    "tools": ["unknown_tool"],
                 }
             ],
-            "entry_point": "agent1"
+            "entry_point": "agent1",
         }
 
         result = validator.validate(workflow)
@@ -430,10 +426,10 @@ class TestWorkflowRefiner:
                     "type": "agent",
                     "role": "executor",
                     "goal": "Task",
-                    "tool_budget": 15
+                    "tool_budget": 15,
                 }
             ],
-            "entry_point": "agent1"
+            "entry_point": "agent1",
         }
 
         error = WorkflowValidationError(
@@ -441,7 +437,7 @@ class TestWorkflowRefiner:
             severity=ErrorSeverity.ERROR,
             message="Missing field",
             location="nodes[agent1].role",
-            suggestion="Add role field"
+            suggestion="Add role field",
         )
 
         fix = refiner.refine_single_error(workflow, error)
@@ -461,10 +457,10 @@ class TestWorkflowRefiner:
                     "type": "agent",
                     "role": "executor",
                     "goal": "Task",
-                    "tool_budget": "15"  # Wrong type
+                    "tool_budget": "15",  # Wrong type
                 }
             ],
-            "entry_point": "agent1"
+            "entry_point": "agent1",
         }
 
         result = validator.validate(workflow)
@@ -486,15 +482,8 @@ class TestWorkflowRefiner:
         refiner_aggressive = WorkflowRefiner(conservative=False)
 
         workflow = {
-            "nodes": [
-                {
-                    "id": "agent1",
-                    "type": "agent",
-                    "role": "executor",
-                    "goal": "Task"
-                }
-            ],
-            "entry_point": "agent1"
+            "nodes": [{"id": "agent1", "type": "agent", "role": "executor", "goal": "Task"}],
+            "entry_point": "agent1",
         }
 
         validator = WorkflowValidator()
@@ -521,19 +510,12 @@ class TestRefinementIntegration:
                     "id": "agent1",
                     "type": "agent",
                     "role": "developer",  # Invalid
-                    "tool_budget": 1000  # Out of range
+                    "tool_budget": 1000,  # Out of range
                 },
-                {
-                    "id": "orphan",
-                    "type": "agent",
-                    "role": "executor",
-                    "goal": "Orphan task"
-                }
+                {"id": "orphan", "type": "agent", "role": "executor", "goal": "Orphan task"},
             ],
-            "edges": [
-                {"source": "agent1", "target": "__end__"}
-            ],
-            "entry_point": "agent1"
+            "edges": [{"source": "agent1", "target": "__end__"}],
+            "entry_point": "agent1",
         }
 
         result = validator.validate(workflow)
@@ -562,10 +544,10 @@ class TestRefinementIntegration:
                     "type": "agent",
                     "role": "executor",
                     "goal": "Task",
-                    "tool_budget": 15
+                    "tool_budget": 15,
                 }
             ],
-            "entry_point": "agent1"
+            "entry_point": "agent1",
         }
 
         result = validator.validate(workflow)
@@ -589,10 +571,10 @@ class TestRefinementIntegration:
                     "type": "agent",
                     "role": "executor",
                     "goal": "Task",
-                    "tool_budget": "15"
+                    "tool_budget": "15",
                 }
             ],
-            "entry_point": "agent1"
+            "entry_point": "agent1",
         }
 
         result = validator.validate(workflow)
@@ -607,15 +589,8 @@ class TestRefinementIntegration:
         refiner = WorkflowRefiner()
 
         workflow = {
-            "nodes": [
-                {
-                    "id": "agent1",
-                    "type": "agent",
-                    "role": "executor",
-                    "goal": "Task"
-                }
-            ],
-            "entry_point": "agent1"
+            "nodes": [{"id": "agent1", "type": "agent", "role": "executor", "goal": "Task"}],
+            "entry_point": "agent1",
         }
 
         # Create validation result with unfixable error
@@ -627,9 +602,9 @@ class TestRefinementIntegration:
                     severity=ErrorSeverity.CRITICAL,
                     message="Some unfixable error",
                     location="nodes[agent1]",
-                    suggestion="Manual fix required"
+                    suggestion="Manual fix required",
                 )
-            ]
+            ],
         )
 
         refinement = refiner.refine(workflow, result)
@@ -651,9 +626,9 @@ class TestRefinementIntegration:
                     severity=ErrorSeverity.CRITICAL,
                     message="Missing required field: 'nodes'",
                     location="workflow.nodes",
-                    suggestion="Add nodes"
+                    suggestion="Add nodes",
                 )
-            ]
+            ],
         )
 
         refinement = refiner.refine(workflow, result)

@@ -933,8 +933,7 @@ class NodeExecutorFactory:
                 members = []
                 for member_dict in node.members:
                     role = role_map.get(
-                        member_dict.get("role", "executor").lower(),
-                        SubAgentRole.EXECUTOR
+                        member_dict.get("role", "executor").lower(), SubAgentRole.EXECUTOR
                     )
                     member = TeamMember(
                         id=member_dict.get("id", f"{role.value}_{len(members)}"),
@@ -960,10 +959,7 @@ class NodeExecutorFactory:
                     "pipeline": TeamFormation.PIPELINE,
                     "consensus": TeamFormation.CONSENSUS,
                 }
-                formation = formation_map.get(
-                    node.team_formation.lower(),
-                    TeamFormation.SEQUENTIAL
-                )
+                formation = formation_map.get(node.team_formation.lower(), TeamFormation.SEQUENTIAL)
 
                 # Map merge mode string to enum
                 merge_mode_map = {
@@ -972,10 +968,7 @@ class NodeExecutorFactory:
                     "merge": MergeMode.MERGE,
                     "error": MergeMode.ERROR,
                 }
-                merge_mode = merge_mode_map.get(
-                    node.merge_mode.lower(),
-                    MergeMode.TEAM_WINS
-                )
+                merge_mode = merge_mode_map.get(node.merge_mode.lower(), MergeMode.TEAM_WINS)
 
                 # Create TeamNode config
                 from victor.framework.workflows.nodes import TeamNodeConfig

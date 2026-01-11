@@ -324,7 +324,9 @@ class IaCScannerTool(BaseTool):
                     lines.append(f"  - [{f.rule_id}] {f.message}")
 
         if result.low_count > 0:
-            lines.append(f"\n{_get_icon('info')} **Low ({result.low_count}):** (use summary for details)")
+            lines.append(
+                f"\n{_get_icon('info')} **Low ({result.low_count}):** (use summary for details)"
+            )
 
         return "\n".join(lines)
 

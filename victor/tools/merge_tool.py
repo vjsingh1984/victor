@@ -48,6 +48,7 @@ def _get_icon(name: str) -> str:
     global _presentation
     if _presentation is None:
         from victor.agent.presentation import create_presentation_adapter
+
         _presentation = create_presentation_adapter()
     return _presentation.icon(name, with_color=False)
 

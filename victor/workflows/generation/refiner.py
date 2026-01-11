@@ -99,14 +99,16 @@ class SchemaRefiner:
 
     # Valid values for enum-like fields
     VALID_AGENT_ROLES = {
-        "researcher", "planner", "executor", "reviewer",
-        "writer", "analyst", "coordinator"
+        "researcher",
+        "planner",
+        "executor",
+        "reviewer",
+        "writer",
+        "analyst",
+        "coordinator",
     }
 
-    VALID_NODE_TYPES = {
-        "agent", "compute", "condition", "parallel",
-        "transform", "team", "hitl"
-    }
+    VALID_NODE_TYPES = {"agent", "compute", "condition", "parallel", "transform", "team", "hitl"}
 
     def __init__(self, conservative: bool = True):
         """Initialize schema refiner.
@@ -117,9 +119,7 @@ class SchemaRefiner:
         self.conservative = conservative
 
     def refine(
-        self,
-        schema: Dict[str, Any],
-        errors: List[WorkflowValidationError]
+        self, schema: Dict[str, Any], errors: List[WorkflowValidationError]
     ) -> Tuple[Dict[str, Any], List[WorkflowFix]]:
         """Apply schema-level fixes.
 
@@ -144,9 +144,7 @@ class SchemaRefiner:
         return refined, fixes
 
     def _fix_error(
-        self,
-        schema: Dict[str, Any],
-        error: WorkflowValidationError
+        self, schema: Dict[str, Any], error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix a single schema error.
 
@@ -157,8 +155,6 @@ class SchemaRefiner:
         Returns:
             WorkflowFix if fix was applied, None if not fixable
         """
-        error_type = error.error_code or error.message.split(":")[0] if ":" in error.message else ""
-
         # Missing required field
         if "missing required field" in error.message.lower():
             return self._fix_missing_field(schema, error)
@@ -178,15 +174,13 @@ class SchemaRefiner:
         return None
 
     def _fix_missing_field(
-        self,
-        schema: Dict[str, Any],
-        error: WorkflowValidationError
+        self, schema: Dict[str, Any], error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix missing required field."""
         location = error.location
 
         # Extract node info from location
-        node_match = re.search(r'nodes\[([^\]]+)\]', location)
+        node_match = re.search(r"nodes\[([^\]]+)\]", location)
         if not node_match:
             return None
 
@@ -231,15 +225,13 @@ class SchemaRefiner:
                 description=f"Added missing '{missing_field}' field with default value",
                 location=location,
                 after_value=default_value,
-                auto_applied=True
+                auto_applied=True,
             )
 
         return None
 
     def _fix_type_conversion(
-        self,
-        schema: Dict[str, Any],
-        error: WorkflowValidationError
+        self, schema: Dict[str, Any], error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix type conversion errors."""
         location = error.location
@@ -256,7 +248,7 @@ class SchemaRefiner:
         field_name = parts[-1]
 
         # Try to find the value
-        node_match = re.search(r'nodes\[(\d+)\]', location)
+        node_match = re.search(r"nodes\[(\d+)\]", location)
         if not node_match:
             return None
 
@@ -284,7 +276,7 @@ class SchemaRefiner:
                         location=location,
                         before_value=current_value,
                         after_value=new_value,
-                        auto_applied=True
+                        auto_applied=True,
                     )
             except (ValueError, TypeError):
                 # Use default if conversion fails
@@ -302,21 +294,19 @@ class SchemaRefiner:
                         location=location,
                         before_value=current_value,
                         after_value=defaults[field_name],
-                        auto_applied=True
+                        auto_applied=True,
                     )
 
         return None
 
     def _fix_range_clamp(
-        self,
-        schema: Dict[str, Any],
-        error: WorkflowValidationError
+        self, schema: Dict[str, Any], error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix out-of-range values by clamping."""
         location = error.location
 
         # Navigate to the field
-        node_match = re.search(r'nodes\[(\d+)\]', location)
+        node_match = re.search(r"nodes\[(\d+)\]", location)
         if not node_match:
             return None
 
@@ -326,7 +316,7 @@ class SchemaRefiner:
             return None
 
         node = nodes[node_index]
-        field_match = re.search(r'(\w+) should be between', error.message)
+        field_match = re.search(r"(\w+) should be between", error.message)
         if not field_match:
             return None
 
@@ -347,7 +337,7 @@ class SchemaRefiner:
                 location=location,
                 before_value=current_value,
                 after_value=clamped_value,
-                auto_applied=True
+                auto_applied=True,
             )
 
         elif field_name == "timeout":
@@ -360,20 +350,18 @@ class SchemaRefiner:
                 location=location,
                 before_value=current_value,
                 after_value=clamped_value,
-                auto_applied=True
+                auto_applied=True,
             )
 
         return None
 
     def _fix_invalid_enum(
-        self,
-        schema: Dict[str, Any],
-        error: WorkflowValidationError
+        self, schema: Dict[str, Any], error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix invalid enum values."""
         location = error.location
 
-        node_match = re.search(r'nodes\[(\d+)\]', location)
+        node_match = re.search(r"nodes\[(\d+)\]", location)
         if not node_match:
             return None
 
@@ -405,10 +393,7 @@ class SchemaRefiner:
                 "analyst": "analyst",
             }
 
-            new_value = role_mapping.get(
-                invalid_value.lower(),
-                "executor"  # Default fallback
-            )
+            new_value = role_mapping.get(invalid_value.lower(), "executor")  # Default fallback
 
             node[field_name] = new_value
 
@@ -418,16 +403,12 @@ class SchemaRefiner:
                 location=location,
                 before_value=invalid_value,
                 after_value=new_value,
-                auto_applied=True
+                auto_applied=True,
             )
 
         return None
 
-    def _navigate_to_location(
-        self,
-        schema: Dict[str, Any],
-        location: str
-    ) -> bool:
+    def _navigate_to_location(self, schema: Dict[str, Any], location: str) -> bool:
         """Navigate to a location in the schema (placeholder for navigation logic)."""
         # This is a placeholder - actual navigation depends on schema structure
         return True
@@ -452,9 +433,7 @@ class StructureRefiner:
         self.conservative = conservative
 
     def refine(
-        self,
-        schema: Dict[str, Any],
-        errors: List[WorkflowValidationError]
+        self, schema: Dict[str, Any], errors: List[WorkflowValidationError]
     ) -> Tuple[Dict[str, Any], List[WorkflowFix]]:
         """Apply structure-level fixes.
 
@@ -486,10 +465,7 @@ class StructureRefiner:
         return refined, fixes
 
     def _fix_error(
-        self,
-        schema: Dict[str, Any],
-        nodes_map: Dict[str, Any],
-        error: WorkflowValidationError
+        self, schema: Dict[str, Any], nodes_map: Dict[str, Any], error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix a single structure error."""
         # Orphan node
@@ -508,10 +484,7 @@ class StructureRefiner:
         return None
 
     def _fix_orphan_node(
-        self,
-        schema: Dict[str, Any],
-        nodes_map: Dict[str, Any],
-        error: WorkflowValidationError
+        self, schema: Dict[str, Any], nodes_map: Dict[str, Any], error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix orphan node by removing it."""
         # Extract node ID
@@ -534,16 +507,13 @@ class StructureRefiner:
                 description=f"Removed unreachable node '{node_id}'",
                 location=f"nodes[{node_id}]",
                 before_value=f"Node with {len(nodes_map.get(node_id, {}))} fields",
-                auto_applied=True
+                auto_applied=True,
             )
 
         return None
 
     def _fix_entry_point(
-        self,
-        schema: Dict[str, Any],
-        nodes_map: Dict[str, Any],
-        error: WorkflowValidationError
+        self, schema: Dict[str, Any], nodes_map: Dict[str, Any], error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix missing entry point by setting first node."""
         nodes = schema.get("nodes", [])
@@ -564,7 +534,7 @@ class StructureRefiner:
             location="workflow.entry_point",
             before_value=old_entry or "(missing)",
             after_value=first_node_id,
-            auto_applied=True
+            auto_applied=True,
         )
 
 
@@ -578,11 +548,7 @@ class SemanticRefiner:
     - Add missing optional fields
     """
 
-    def __init__(
-        self,
-        conservative: bool = True,
-        strict_mode: bool = True
-    ):
+    def __init__(self, conservative: bool = True, strict_mode: bool = True):
         """Initialize semantic refiner.
 
         Args:
@@ -594,19 +560,25 @@ class SemanticRefiner:
 
         # Valid values for enum-like fields
         self.valid_agent_roles = {
-            "researcher", "planner", "executor", "reviewer",
-            "writer", "analyst", "coordinator"
+            "researcher",
+            "planner",
+            "executor",
+            "reviewer",
+            "writer",
+            "analyst",
+            "coordinator",
         }
 
         self.valid_team_formations = {
-            "sequential", "parallel", "hierarchical",
-            "pipeline", "consensus"
+            "sequential",
+            "parallel",
+            "hierarchical",
+            "pipeline",
+            "consensus",
         }
 
     def refine(
-        self,
-        schema: Dict[str, Any],
-        errors: List[WorkflowValidationError]
+        self, schema: Dict[str, Any], errors: List[WorkflowValidationError]
     ) -> Tuple[Dict[str, Any], List[WorkflowFix]]:
         """Apply semantic-level fixes.
 
@@ -635,9 +607,7 @@ class SemanticRefiner:
         return refined, fixes
 
     def _fix_error(
-        self,
-        schema: Dict[str, Any],
-        error: WorkflowValidationError
+        self, schema: Dict[str, Any], error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix a single semantic error."""
         # Unknown tool
@@ -651,14 +621,12 @@ class SemanticRefiner:
         return None
 
     def _fix_unknown_tool(
-        self,
-        schema: Dict[str, Any],
-        error: WorkflowValidationError
+        self, schema: Dict[str, Any], error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix unknown tool by removing it."""
         location = error.location
 
-        node_match = re.search(r'nodes\[([^\]]+)\]', location)
+        node_match = re.search(r"nodes\[([^\]]+)\]", location)
         if not node_match:
             return None
 
@@ -695,18 +663,16 @@ class SemanticRefiner:
             location=location,
             before_value=tool_name,
             after_value="(removed)",
-            auto_applied=True
+            auto_applied=True,
         )
 
     def _fix_invalid_role(
-        self,
-        schema: Dict[str, Any],
-        error: WorkflowValidationError
+        self, schema: Dict[str, Any], error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix invalid role by mapping to valid one."""
         location = error.location
 
-        node_match = re.search(r'nodes\[([^\]]+)\]', location)
+        node_match = re.search(r"nodes\[([^\]]+)\]", location)
         if not node_match:
             return None
 
@@ -746,7 +712,7 @@ class SemanticRefiner:
             location=location,
             before_value=current_role,
             after_value=new_role,
-            auto_applied=True
+            auto_applied=True,
         )
 
 
@@ -768,9 +734,7 @@ class SecurityRefiner:
         self.conservative = conservative
 
     def refine(
-        self,
-        schema: Dict[str, Any],
-        errors: List[WorkflowValidationError]
+        self, schema: Dict[str, Any], errors: List[WorkflowValidationError]
     ) -> Tuple[Dict[str, Any], List[WorkflowFix]]:
         """Apply security-level fixes.
 
@@ -799,9 +763,7 @@ class SecurityRefiner:
         return refined, fixes
 
     def _fix_error(
-        self,
-        schema: Dict[str, Any],
-        error: WorkflowValidationError
+        self, schema: Dict[str, Any], error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix a single security error."""
         # Resource limit exceeded
@@ -811,9 +773,7 @@ class SecurityRefiner:
         return None
 
     def _fix_resource_limit(
-        self,
-        schema: Dict[str, Any],
-        error: WorkflowValidationError
+        self, schema: Dict[str, Any], error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix resource limit by clamping."""
         # Extract field and limit
@@ -821,7 +781,7 @@ class SecurityRefiner:
         if not field_match:
             return None
 
-        resource_type = field_match.group(1)
+        _resource_type = field_match.group(1)  # noqa: F841
         current_value = int(field_match.group(2))
         max_value = int(field_match.group(3))
 
@@ -844,7 +804,7 @@ class SecurityRefiner:
                     location="workflow",
                     before_value=f"Total: {current_value}",
                     after_value=f"Total: {max_value}",
-                    auto_applied=True
+                    auto_applied=True,
                 )
 
         return None
@@ -866,11 +826,7 @@ class WorkflowRefiner:
         print(f"Applied {len(fixes)} automated fixes")
     """
 
-    def __init__(
-        self,
-        conservative: bool = True,
-        strict_mode: bool = True
-    ):
+    def __init__(self, conservative: bool = True, strict_mode: bool = True):
         """Initialize workflow refiner.
 
         Args:
@@ -882,16 +838,11 @@ class WorkflowRefiner:
 
         self.schema_refiner = SchemaRefiner(conservative=conservative)
         self.structure_refiner = StructureRefiner(conservative=conservative)
-        self.semantic_refiner = SemanticRefiner(
-            conservative=conservative,
-            strict_mode=strict_mode
-        )
+        self.semantic_refiner = SemanticRefiner(conservative=conservative, strict_mode=strict_mode)
         self.security_refiner = SecurityRefiner(conservative=conservative)
 
     def refine(
-        self,
-        schema: Dict[str, Any],
-        validation_result: WorkflowGenerationValidationResult
+        self, schema: Dict[str, Any], validation_result: WorkflowGenerationValidationResult
     ) -> RefinementResult:
         """Apply automated refinements to workflow.
 
@@ -910,32 +861,28 @@ class WorkflowRefiner:
         # 1. Schema first (foundational)
         if validation_result.schema_errors:
             refined_schema, schema_fixes = self.schema_refiner.refine(
-                refined_schema,
-                validation_result.schema_errors
+                refined_schema, validation_result.schema_errors
             )
             all_fixes.extend(schema_fixes)
 
         # 2. Structure second (affects execution)
         if validation_result.structure_errors:
             refined_schema, structure_fixes = self.structure_refiner.refine(
-                refined_schema,
-                validation_result.structure_errors
+                refined_schema, validation_result.structure_errors
             )
             all_fixes.extend(structure_fixes)
 
         # 3. Semantic third (node-specific)
         if validation_result.semantic_errors:
             refined_schema, semantic_fixes = self.semantic_refiner.refine(
-                refined_schema,
-                validation_result.semantic_errors
+                refined_schema, validation_result.semantic_errors
             )
             all_fixes.extend(semantic_fixes)
 
         # 4. Security last (safety)
         if validation_result.security_errors:
             refined_schema, security_fixes = self.security_refiner.refine(
-                refined_schema,
-                validation_result.security_errors
+                refined_schema, validation_result.security_errors
             )
             all_fixes.extend(security_fixes)
 
@@ -950,13 +897,11 @@ class WorkflowRefiner:
             fixes_applied=fix_descriptions,
             original_errors=original_errors,
             remaining_errors=[],  # Would need revalidation to populate
-            convergence_achieved=len(all_fixes) > 0
+            convergence_achieved=len(all_fixes) > 0,
         )
 
     def refine_single_error(
-        self,
-        schema: Dict[str, Any],
-        error: WorkflowValidationError
+        self, schema: Dict[str, Any], error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Apply refinement for a single error.
 

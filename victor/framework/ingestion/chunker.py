@@ -251,9 +251,7 @@ class BaseChunker:
 
             # Try to find a sentence boundary
             if self._config.respect_sentence_boundaries and chunk_end < len(content):
-                search_start = max(
-                    current_pos + self._config.min_chunk_size, chunk_end - 100
-                )
+                search_start = max(current_pos + self._config.min_chunk_size, chunk_end - 100)
                 search_text = content[search_start : chunk_end + 50]
 
                 match = None
@@ -466,9 +464,7 @@ class BaseChunker:
                     sub_chunks = self._chunk_text(json.dumps(value, indent=2))
                     for sub_text, _, _ in sub_chunks:
                         header = f"Key: {key}\n"
-                        chunks.append(
-                            (header + sub_text, pos, pos + len(header + sub_text))
-                        )
+                        chunks.append((header + sub_text, pos, pos + len(header + sub_text)))
                         pos += len(header + sub_text)
                 elif len(chunk_text) >= self._config.min_chunk_size:
                     chunks.append((chunk_text, pos, pos + len(chunk_text)))

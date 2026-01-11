@@ -48,6 +48,7 @@ def _get_icon(name: str) -> str:
     global _presentation
     if _presentation is None:
         from victor.agent.presentation import create_presentation_adapter
+
         _presentation = create_presentation_adapter()
     return _presentation.icon(name, with_color=False)
 
@@ -282,7 +283,11 @@ Actions:
         lines.append("")
 
         # Compliance status
-        status_icon = _get_icon("success") if summary["compliance_status"] == "compliant" else _get_icon("warning")
+        status_icon = (
+            _get_icon("success")
+            if summary["compliance_status"] == "compliant"
+            else _get_icon("warning")
+        )
         lines.append(f"**Compliance Status:** {status_icon} {summary['compliance_status']}")
         if summary["violations"] > 0:
             lines.append(f"**Violations:** {summary['violations']}")

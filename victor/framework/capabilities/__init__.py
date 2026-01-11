@@ -37,10 +37,10 @@ from .privacy import PrivacyCapabilityProvider
 
 __all__ = [
     # Base classes
-    'BaseCapabilityProvider',
-    'CapabilityMetadata',
+    "BaseCapabilityProvider",
+    "CapabilityMetadata",
     # Concrete implementations
-    'FileOperationsCapability',
-    'PromptContributionCapability',
-    'PrivacyCapabilityProvider',
+    "FileOperationsCapability",
+    "PromptContributionCapability",
+    "PrivacyCapabilityProvider",
 ]

@@ -309,11 +309,11 @@ class WorkflowGenerationPipeline:
                 if progress_callback:
                     await progress_callback("Refining schema...")
 
-                logger.info(f"Validation failed, attempting refinement ({len(validation.all_errors)} errors)")
-
-                refined_schema, refinement_result = await self._refine_schema(
-                    schema, validation
+                logger.info(
+                    f"Validation failed, attempting refinement ({len(validation.all_errors)} errors)"
                 )
+
+                refined_schema, refinement_result = await self._refine_schema(schema, validation)
 
                 if refinement_result.success:
                     schema = refined_schema
@@ -485,9 +485,7 @@ class WorkflowGenerationPipeline:
             logger.error(f"Failed to compile schema to StateGraph: {e}")
             raise ValueError(f"Schema compilation failed: {e}") from e
 
-    async def _interactive_approval(
-        self, stage: str, data: Dict[str, Any]
-    ) -> bool:
+    async def _interactive_approval(self, stage: str, data: Dict[str, Any]) -> bool:
         """Request user approval in interactive mode.
 
         Args:

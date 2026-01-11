@@ -141,31 +141,17 @@ class TestListMergeStrategy:
         team_state = {"items": [3, 4, 5]}
 
         strategy = ListMergeStrategy(mode=MergeMode.TEAM_WINS)
-        merged = strategy.merge(
-            graph_state,
-            team_state,
-            deduplicate=True
-        )
+        merged = strategy.merge(graph_state, team_state, deduplicate=True)
 
         assert merged["items"] == [1, 2, 3, 4, 5]
 
     def test_merge_lists_with_list_keys(self):
         """Test merging with explicit list keys."""
-        graph_state = {
-            "items": [1, 2],
-            "other": "value"
-        }
-        team_state = {
-            "items": [3, 4],
-            "other": "new_value"
-        }
+        graph_state = {"items": [1, 2], "other": "value"}
+        team_state = {"items": [3, 4], "other": "new_value"}
 
         strategy = ListMergeStrategy(mode=MergeMode.TEAM_WINS)
-        merged = strategy.merge(
-            graph_state,
-            team_state,
-            list_keys=["items"]
-        )
+        merged = strategy.merge(graph_state, team_state, list_keys=["items"])
 
         assert merged["items"] == [1, 2, 3, 4]
         assert merged["other"] == "new_value"  # Non-list uses default merge
@@ -194,10 +180,7 @@ class TestCustomMergeStrategy:
                 return f"{graph_val}+{team_val}"
             return team_val
 
-        strategy = CustomMergeStrategy(
-            conflict_resolver=resolve_conflict,
-            mode=MergeMode.TEAM_WINS
-        )
+        strategy = CustomMergeStrategy(conflict_resolver=resolve_conflict, mode=MergeMode.TEAM_WINS)
         merged = strategy.merge(graph_state, team_state)
 
         assert merged["key"] == "graph+team"
@@ -211,8 +194,7 @@ class TestCustomMergeStrategy:
             return None  # Fall back to default
 
         strategy = CustomMergeStrategy(
-            conflict_resolver=resolve_conflict,
-            mode=MergeMode.GRAPH_WINS
+            conflict_resolver=resolve_conflict, mode=MergeMode.GRAPH_WINS
         )
         merged = strategy.merge(graph_state, team_state)
 
@@ -220,18 +202,8 @@ class TestCustomMergeStrategy:
 
     def test_custom_resolver_with_nested_dicts(self):
         """Test custom resolver doesn't prevent recursive dict merging."""
-        graph_state = {
-            "level1": {
-                "key1": "value1",
-                "shared": "graph"
-            }
-        }
-        team_state = {
-            "level1": {
-                "key2": "value2",
-                "shared": "team"
-            }
-        }
+        graph_state = {"level1": {"key1": "value1", "shared": "graph"}}
+        team_state = {"level1": {"key2": "value2", "shared": "team"}}
 
         # Custom resolver only applies to top-level conflicts
         def resolve_conflict(key, graph_val, team_val):
@@ -239,10 +211,7 @@ class TestCustomMergeStrategy:
                 return "custom"
             return None
 
-        strategy = CustomMergeStrategy(
-            conflict_resolver=resolve_conflict,
-            mode=MergeMode.TEAM_WINS
-        )
+        strategy = CustomMergeStrategy(conflict_resolver=resolve_conflict, mode=MergeMode.TEAM_WINS)
         merged = strategy.merge(graph_state, team_state)
 
         # Nested dict should still be merged recursively
@@ -256,21 +225,10 @@ class TestSelectiveMergeStrategy:
 
     def test_merge_only_selected_keys(self):
         """Test merging only specified keys."""
-        graph_state = {
-            "key1": "value1",
-            "key2": "value2",
-            "key3": "value3"
-        }
-        team_state = {
-            "key1": "new1",
-            "key2": "new2",
-            "key3": "new3"
-        }
+        graph_state = {"key1": "value1", "key2": "value2", "key3": "value3"}
+        team_state = {"key1": "new1", "key2": "new2", "key3": "new3"}
 
-        strategy = SelectiveMergeStrategy(
-            keys_to_merge=["key1", "key2"],
-            mode=MergeMode.TEAM_WINS
-        )
+        strategy = SelectiveMergeStrategy(keys_to_merge=["key1", "key2"], mode=MergeMode.TEAM_WINS)
         merged = strategy.merge(graph_state, team_state)
 
         assert merged["key1"] == "new1"
@@ -282,10 +240,7 @@ class TestSelectiveMergeStrategy:
         graph_state = {"key1": "value1", "key2": "value2"}
         team_state = {"key2": "new2"}  # key1 missing
 
-        strategy = SelectiveMergeStrategy(
-            keys_to_merge=["key1", "key2"],
-            mode=MergeMode.TEAM_WINS
-        )
+        strategy = SelectiveMergeStrategy(keys_to_merge=["key1", "key2"], mode=MergeMode.TEAM_WINS)
         merged = strategy.merge(graph_state, team_state)
 
         assert merged["key1"] == "value1"  # Unchanged
@@ -293,17 +248,11 @@ class TestSelectiveMergeStrategy:
 
     def test_recursive_false(self):
         """Test selective merge without recursion."""
-        graph_state = {
-            "nested": {"key": "value"}
-        }
-        team_state = {
-            "nested": {"new_key": "new_value"}
-        }
+        graph_state = {"nested": {"key": "value"}}
+        team_state = {"nested": {"new_key": "new_value"}}
 
         strategy = SelectiveMergeStrategy(
-            keys_to_merge=["nested"],
-            mode=MergeMode.TEAM_WINS,
-            recursive=False
+            keys_to_merge=["nested"], mode=MergeMode.TEAM_WINS, recursive=False
         )
         merged = strategy.merge(graph_state, team_state)
 
@@ -319,20 +268,14 @@ class TestValidateMergedState:
         merged_state = {"key1": "value1", "key2": "value2"}
 
         # Should pass
-        assert validate_merged_state(
-            merged_state,
-            required_keys=["key1", "key2"]
-        )
+        assert validate_merged_state(merged_state, required_keys=["key1", "key2"])
 
     def test_validate_missing_required_key(self):
         """Test validation fails with missing required key."""
         merged_state = {"key1": "value1"}
 
         with pytest.raises(StateMergeError) as exc_info:
-            validate_merged_state(
-                merged_state,
-                required_keys=["key1", "key2"]
-            )
+            validate_merged_state(merged_state, required_keys=["key1", "key2"])
 
         assert "Missing required keys" in str(exc_info.value)
 
@@ -341,20 +284,14 @@ class TestValidateMergedState:
         merged_state = {"key1": "value1"}
 
         # Should pass
-        assert validate_merged_state(
-            merged_state,
-            forbidden_keys=["key2"]
-        )
+        assert validate_merged_state(merged_state, forbidden_keys=["key2"])
 
     def test_validate_forbidden_key_present(self):
         """Test validation fails with forbidden key present."""
         merged_state = {"key1": "value1", "_internal": "secret"}
 
         with pytest.raises(StateMergeError) as exc_info:
-            validate_merged_state(
-                merged_state,
-                forbidden_keys=["_internal"]
-            )
+            validate_merged_state(merged_state, forbidden_keys=["_internal"])
 
         assert "Forbidden keys present" in str(exc_info.value)
 
@@ -363,20 +300,14 @@ class TestValidateMergedState:
         merged_state = {"count": 5}
 
         # Should pass
-        assert validate_merged_state(
-            merged_state,
-            validators={"count": lambda x: x > 0}
-        )
+        assert validate_merged_state(merged_state, validators={"count": lambda x: x > 0})
 
     def test_validate_custom_validator_fails(self):
         """Test validation fails with custom validator."""
         merged_state = {"count": -1}
 
         with pytest.raises(StateMergeError) as exc_info:
-            validate_merged_state(
-                merged_state,
-                validators={"count": lambda x: x > 0}
-            )
+            validate_merged_state(merged_state, validators={"count": lambda x: x > 0})
 
         assert "Validation failed for key 'count'" in str(exc_info.value)
 
@@ -402,9 +333,7 @@ class TestCreateMergeStrategy:
     def test_create_selective_strategy(self):
         """Test creating selective merge strategy."""
         strategy = create_merge_strategy(
-            "selective",
-            mode=MergeMode.TEAM_WINS,
-            keys_to_merge=["key1"]
+            "selective", mode=MergeMode.TEAM_WINS, keys_to_merge=["key1"]
         )
         assert isinstance(strategy, SelectiveMergeStrategy)
 

@@ -338,8 +338,10 @@ class ListMergeStrategy(BaseMergeStrategy):
 
                 # Check if this should be treated as a list merge
                 is_list_merge = (
-                    list_keys and key in list_keys
-                ) or isinstance(graph_value, list) and isinstance(team_value, list)
+                    (list_keys and key in list_keys)
+                    or isinstance(graph_value, list)
+                    and isinstance(team_value, list)
+                )
 
                 if is_list_merge:
                     # Merge lists
@@ -370,9 +372,7 @@ class CustomMergeStrategy(BaseMergeStrategy):
 
     def __init__(
         self,
-        conflict_resolver: Optional[
-            Callable[[str, Any, Any], Any]
-        ] = None,
+        conflict_resolver: Optional[Callable[[str, Any, Any], Any]] = None,
         mode: MergeMode = MergeMode.TEAM_WINS,
     ):
         """Initialize custom merge strategy.
@@ -562,9 +562,7 @@ def validate_merged_state(
                     errors.append(f"Validator error for key '{key}': {e}")
 
     if errors:
-        raise StateMergeError(
-            message=f"State validation failed: {'; '.join(errors)}"
-        )
+        raise StateMergeError(message=f"State validation failed: {'; '.join(errors)}")
 
     return True
 

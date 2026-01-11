@@ -252,9 +252,7 @@ def list_verticals(
     if tags:
         tag_list = [t.strip().lower() for t in tags.split(",")]
         verticals = [
-            v
-            for v in verticals
-            if v.metadata and any(tag in v.metadata.tags for tag in tag_list)
+            v for v in verticals if v.metadata and any(tag in v.metadata.tags for tag in tag_list)
         ]
         if verticals:
             console.print(f"[dim]Filtering by tags: {tags}[/]")
@@ -299,10 +297,7 @@ def list_verticals(
                 if vertical.metadata and vertical.metadata.class_spec.provides_tools
                 else "-"
             )
-            if (
-                vertical.metadata
-                and len(vertical.metadata.class_spec.provides_tools) > 3
-            ):
+            if vertical.metadata and len(vertical.metadata.class_spec.provides_tools) > 3:
                 tools += "..."
 
             workflows = (
@@ -310,10 +305,7 @@ def list_verticals(
                 if vertical.metadata and vertical.metadata.class_spec.provides_workflows
                 else "-"
             )
-            if (
-                vertical.metadata
-                and len(vertical.metadata.class_spec.provides_workflows) > 3
-            ):
+            if vertical.metadata and len(vertical.metadata.class_spec.provides_workflows) > 3:
                 workflows += "..."
 
             table.add_row(

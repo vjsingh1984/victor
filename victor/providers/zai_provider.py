@@ -130,8 +130,11 @@ class ZAIProvider(BaseProvider):
         if not resolved_key:
             try:
                 from victor.config.api_keys import get_api_key
+
                 # Try multiple aliases: zai, zhipuai, zhipu
-                resolved_key = get_api_key("zai") or get_api_key("zhipuai") or get_api_key("zhipu") or ""
+                resolved_key = (
+                    get_api_key("zai") or get_api_key("zhipuai") or get_api_key("zhipu") or ""
+                )
             except ImportError:
                 pass
 
@@ -142,7 +145,11 @@ class ZAIProvider(BaseProvider):
             )
 
         super().__init__(
-            api_key=resolved_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs
+            api_key=resolved_key,
+            base_url=base_url,
+            timeout=timeout,
+            max_retries=max_retries,
+            **kwargs,
         )
         self.client = httpx.AsyncClient(
             base_url=base_url,

@@ -15,18 +15,16 @@ from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Vertical
-from textual.widgets import Footer
+from textual.screen import ModalScreen
+from textual.widgets import Button, DataTable, Footer, Input, Label
+from victor.ui.tui.session import Message
 from victor.ui.tui.theme import THEME_CSS
 from victor.ui.tui.widgets import (
-    ConversationLog,
     EnhancedConversationLog,
     InputWidget,
     StatusBar,
     ThinkingWidget,
     ToolCallWidget,
-    CodeBlock,
-    StreamingMessageBlock,
-    ToolProgressPanel,
 )
 
 if TYPE_CHECKING:
@@ -42,10 +40,15 @@ class TUIConsoleAdapter:
     conversation log as system messages.
     """
 
-    def __init__(self, conversation_log: ConversationLog):
+    def __init__(
+        self,
+        conversation_log: EnhancedConversationLog,
+        on_line: Optional[Callable[[str], None]] = None,
+    ):
         self._log = conversation_log
         self._buffer = io.StringIO()
         self._console = Console(file=self._buffer, force_terminal=False, width=120)
+        self._on_line = on_line
 
     def print(self, *args, **kwargs) -> None:
         """Capture print output and display in TUI."""
@@ -63,11 +66,144 @@ class TUIConsoleAdapter:
             for line in output.split("\n"):
                 line = line.strip()
                 if line:
+                    if self._on_line:
+                        self._on_line(line)
                     self._log.add_system_message(line)
 
     def __getattr__(self, name):
         """Delegate other console methods to the internal console."""
         return getattr(self._console, name)
+
+
+class SessionPicker(ModalScreen[Optional[str]]):
+    """Modal screen to select a saved TUI session."""
+
+    BINDINGS = [
+        Binding("escape", "cancel", "Cancel", show=False),
+        Binding("enter", "select", "Select", show=False),
+        Binding("ctrl+f", "focus_filter", "Filter", show=False),
+        Binding("ctrl+l", "clear_filter", "Clear Filter", show=False),
+        Binding("ctrl+u", "sort_recent", "Sort Recent", show=False),
+        Binding("ctrl+m", "sort_messages", "Sort Messages", show=False),
+        Binding("ctrl+n", "sort_name", "Sort Name", show=False),
+    ]
+
+    def __init__(
+        self,
+        sessions: list[dict[str, Any]],
+        title: str = "Resume Session",
+        help_text: str = (
+            "Enter: resume  Esc: cancel  Ctrl+F: filter  Ctrl+L: clear  "
+            "Ctrl+U: recent  Ctrl+M: messages  Ctrl+N: name"
+        ),
+    ) -> None:
+        super().__init__()
+        self._sessions = sessions
+        self._session_ids: list[str] = []
+        self._title = title
+        self._help_text = help_text
+
+    def compose(self) -> ComposeResult:
+        with Container(id="session-picker"):
+            yield Label(self._title, id="session-title")
+            yield Input(placeholder="Filter sessions...", id="session-filter")
+            yield DataTable(id="session-table", zebra_stripes=True)
+            yield Label(self._help_text, id="session-help")
+
+    def on_mount(self) -> None:
+        table = self.query_one("#session-table", DataTable)
+        table.cursor_type = "row"
+        table.add_columns("Source", "ID", "Name", "Provider", "Model", "Updated", "Messages")
+        self._populate_table(self._sessions)
+        if self._session_ids:
+            table.focus()
+            table.move_cursor(row=0, column=0)
+
+    def action_focus_filter(self) -> None:
+        self.query_one("#session-filter", Input).focus()
+
+    def action_clear_filter(self) -> None:
+        filter_input = self.query_one("#session-filter", Input)
+        filter_input.value = ""
+        self._apply_filter("")
+
+    def action_sort_recent(self) -> None:
+        self._sort_sessions(lambda item: item.get("updated_at", ""), reverse=True)
+
+    def action_sort_messages(self) -> None:
+        self._sort_sessions(lambda item: item.get("message_count", 0), reverse=True)
+
+    def action_sort_name(self) -> None:
+        self._sort_sessions(lambda item: (item.get("name") or "").lower(), reverse=False)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    def action_select(self) -> None:
+        if not self._session_ids:
+            self.dismiss(None)
+            return
+        table = self.query_one("#session-table", DataTable)
+        row = table.cursor_row or 0
+        if row < 0 or row >= len(self._session_ids):
+            self.dismiss(None)
+            return
+        self.dismiss(self._session_ids[row])
+
+    def on_data_table_row_selected(self, _event) -> None:
+        self.action_select()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id != "session-filter":
+            return
+        self._apply_filter(event.value)
+
+    def _format_time(self, value: str) -> str:
+        try:
+            from datetime import datetime
+
+            return datetime.fromisoformat(value).strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            return value[:16] if value else ""
+
+    def _populate_table(self, sessions: list[dict[str, Any]]) -> None:
+        table = self.query_one("#session-table", DataTable)
+        table.clear()
+        self._session_ids.clear()
+        for session in sessions:
+            session_key = session.get("key", session["id"])
+            self._session_ids.append(session_key)
+            table.add_row(
+                session.get("source", ""),
+                session["id"][:8],
+                session["name"],
+                session.get("provider", ""),
+                session["model"],
+                self._format_time(session.get("updated_at", "")),
+                str(session.get("message_count", 0)),
+            )
+        if self._session_ids:
+            table.move_cursor(row=0, column=0)
+
+    def _apply_filter(self, value: str) -> None:
+        query = value.strip().lower()
+        if not query:
+            self._populate_table(self._sessions)
+            return
+        filtered = []
+        for session in self._sessions:
+            haystack = " ".join(
+                str(session.get(key, ""))
+                for key in ("id", "name", "provider", "model", "source")
+            ).lower()
+            if query in haystack:
+                filtered.append(session)
+        self._populate_table(filtered)
+
+    def _sort_sessions(self, key, reverse: bool) -> None:
+        self._sessions.sort(key=key, reverse=reverse)
+        filter_value = self.query_one("#session-filter", Input).value
+        self._apply_filter(filter_value)
 
 
 class VictorTUI(App):
@@ -120,7 +256,7 @@ class VictorTUI(App):
         layout: vertical;
     }
 
-    ConversationLog {
+    EnhancedConversationLog {
         height: 1fr;
         min-height: 0;
         background: $panel;
@@ -128,6 +264,22 @@ class VictorTUI(App):
         padding: 1 2;
         margin: 0 0 1 0;
         scrollbar-gutter: stable;
+    }
+
+    #jump-to-bottom {
+        dock: bottom;
+        display: none;
+        height: 1;
+        width: auto;
+        padding: 0 1;
+        margin: 0 0 1 0;
+        background: $panel;
+        border: round $border-muted;
+        color: $text-muted;
+    }
+
+    #jump-to-bottom.visible {
+        display: block;
     }
 
     /* Status bar */
@@ -150,6 +302,26 @@ class VictorTUI(App):
     StatusBar .provider-info {
         color: $text-muted;
         text-style: bold;
+        width: 1fr;
+    }
+
+    StatusBar .status-indicator {
+        color: $text-muted;
+        text-style: bold;
+        text-align: center;
+        width: auto;
+    }
+
+    StatusBar .status-indicator.idle {
+        color: $text-muted;
+    }
+
+    StatusBar .status-indicator.busy {
+        color: $primary;
+    }
+
+    StatusBar .status-indicator.streaming {
+        color: $warning;
     }
 
     StatusBar .provider-info .victor-name {
@@ -159,6 +331,7 @@ class VictorTUI(App):
     StatusBar .shortcuts {
         color: $text-muted;
         text-align: right;
+        width: 1fr;
     }
 
     /* Messages */
@@ -311,6 +484,30 @@ class VictorTUI(App):
         display: block;
     }
 
+    #session-picker {
+        width: 80%;
+        max-width: 100;
+        height: 70%;
+        padding: 1 2;
+        background: $panel;
+        border: round $border-strong;
+    }
+
+    #session-title {
+        text-style: bold;
+        margin-bottom: 1;
+    }
+
+    #session-filter {
+        width: 100%;
+        margin-bottom: 1;
+    }
+
+    #session-help {
+        color: $text-muted;
+        margin-top: 1;
+    }
+
     Footer {
         background: $panel;
         color: $text-muted;
@@ -325,6 +522,11 @@ class VictorTUI(App):
         Binding("escape", "focus_input", "Focus Input", show=False),
         # Phase 1.6 Enhanced keyboard shortcuts
         Binding("ctrl+t", "toggle_thinking", "Toggle Thinking", show=True),
+        Binding("ctrl+y", "toggle_tools", "Toggle Tools", show=True),
+        Binding("ctrl+x", "cancel_stream", "Cancel", show=True),
+        Binding("ctrl+g", "resume_any_session", "Resume Any Session", show=True),
+        Binding("ctrl+p", "resume_project_session", "Resume Project Session", show=True),
+        Binding("ctrl+r", "resume_session", "Resume Session", show=True),
         Binding("ctrl+s", "save_session", "Save Session", show=True),
         Binding("ctrl+slash", "show_help", "Help", show=True),
         Binding("ctrl+up", "scroll_up", "Scroll Up", show=False),
@@ -360,20 +562,26 @@ class VictorTUI(App):
         self.stream = stream
         self.on_message = on_message
         self.settings = settings
-        self._conversation_log: ConversationLog | None = None
+        self._conversation_log: EnhancedConversationLog | None = None
         self._input_widget: InputWidget | None = None
+        self._status_bar: StatusBar | None = None
+        self._jump_button: Button | None = None
         self._is_processing = False
         self._current_tool_widget: ToolCallWidget | None = None
+        self._tool_widgets: list[ToolCallWidget] = []
+        self._tool_widget_limit = 5
         self._thinking_widget: ThinkingWidget | None = None
         self._slash_handler = None  # Initialized in on_mount when conversation_log is ready
         self._console_adapter = None
+        self._session_messages: list[Message] = []
 
     def compose(self) -> ComposeResult:
         """Compose the TUI layout."""
         yield StatusBar(provider=self.provider, model=self.model)
         with Container(id="main-container"):
             with Vertical(id="conversation-area"):
-                yield ConversationLog(id="conversation-log")
+                yield EnhancedConversationLog(id="conversation-log")
+                yield Button("Jump to bottom", id="jump-to-bottom", variant="default")
             with Container(id="thinking-container"):
                 yield ThinkingWidget(id="thinking-widget")
             with Container(id="tool-calls-container"):
@@ -383,15 +591,20 @@ class VictorTUI(App):
 
     def on_mount(self) -> None:
         """Handle mount event."""
-        self._conversation_log = self.query_one("#conversation-log", ConversationLog)
+        self._conversation_log = self.query_one("#conversation-log", EnhancedConversationLog)
         self._input_widget = self.query_one("#input-widget", InputWidget)
         self._thinking_widget = self.query_one("#thinking-widget", ThinkingWidget)
+        self._status_bar = self.query_one(StatusBar)
+        self._jump_button = self.query_one("#jump-to-bottom", Button)
 
         # Initialize slash command handler with TUI console adapter
         if self.settings:
             from victor.ui.slash_commands import SlashCommandHandler
 
-            self._console_adapter = TUIConsoleAdapter(self._conversation_log)
+            self._console_adapter = TUIConsoleAdapter(
+                self._conversation_log,
+                on_line=lambda line: self._record_message("system", line),
+            )
             self._slash_handler = SlashCommandHandler(
                 console=self._console_adapter,
                 settings=self.settings,
@@ -401,8 +614,10 @@ class VictorTUI(App):
             self._slash_handler.set_exit_callback(self.exit)
 
         # Show welcome message
-        self._conversation_log.add_system_message(f"Connected to {self.provider}/{self.model}")
-        self._conversation_log.add_system_message("Type /help for commands, Ctrl+C to exit")
+        self._add_system_message(f"Connected to {self.provider}/{self.model}")
+        self._add_system_message("Type /help for commands, Ctrl+C to exit")
+        self._set_status("Idle", "idle")
+        self._update_jump_to_bottom()
 
         # Focus input
         self._input_widget.focus_input()
@@ -425,7 +640,7 @@ class VictorTUI(App):
             return
 
         # Add user message to log
-        self._conversation_log.add_user_message(message)
+        self._add_user_message(message)
 
         # Process message (note: @work decorator makes this return a Worker, not a coroutine)
         self._process_message(message)
@@ -457,16 +672,16 @@ class VictorTUI(App):
             try:
                 await self._slash_handler.execute(command)
             except Exception as e:
-                self._conversation_log.add_error_message(f"Command error: {e}")
+                self._add_error_message(f"Command error: {e}")
         else:
             # Fallback for when settings not provided
             if cmd == "/help":
-                self._conversation_log.add_system_message("Available commands:")
-                self._conversation_log.add_system_message("  /clear - Clear conversation")
-                self._conversation_log.add_system_message("  /exit  - Exit application")
-                self._conversation_log.add_system_message("  /help  - Show this help")
+                self._add_system_message("Available commands:")
+                self._add_system_message("  /clear - Clear conversation")
+                self._add_system_message("  /exit  - Exit application")
+                self._add_system_message("  /help  - Show this help")
             else:
-                self._conversation_log.add_system_message(f"Unknown command: {command}")
+                self._add_system_message(f"Unknown command: {command}")
 
         self._input_widget.focus_input()
 
@@ -477,6 +692,7 @@ class VictorTUI(App):
             return
 
         self._is_processing = True
+        self._set_status("Working", "busy")
 
         try:
             if self.agent:
@@ -487,17 +703,20 @@ class VictorTUI(App):
                 if asyncio.iscoroutine(result):
                     result = await result
                 if result:
-                    self._conversation_log.add_assistant_message(str(result))
+                    self._call_ui(self._add_assistant_message, str(result))
             else:
                 # Demo mode
-                self._conversation_log.add_assistant_message(
-                    f"You said: *{message}*\n\n" "(No agent configured - running in demo mode)"
+                self._call_ui(
+                    self._add_assistant_message,
+                    f"You said: *{message}*\n\n" "(No agent configured - running in demo mode)",
                 )
         except Exception as e:
-            self._conversation_log.add_error_message(str(e))
+            self._call_ui(self._add_error_message, str(e))
         finally:
             self._is_processing = False
-            self._input_widget.focus_input()
+            self._set_status("Idle", "idle")
+            if self._input_widget:
+                self._call_ui(self._input_widget.focus_input)
 
     async def _process_with_agent(self, message: str) -> None:
         """Process message with the agent."""
@@ -508,14 +727,15 @@ class VictorTUI(App):
             await self._stream_response(message)
         else:
             response = await self.agent.chat(message)
-            self._conversation_log.add_assistant_message(response.content)
+            self._call_ui(self._add_assistant_message, response.content)
 
     async def _stream_response(self, message: str) -> None:
         """Stream response from agent."""
         content_buffer = ""
 
         # Start streaming display
-        self._conversation_log.start_streaming()
+        await self._start_streaming_ui()
+        self._set_status("Streaming", "streaming")
 
         try:
             async for chunk in self.agent.stream_chat(message):
@@ -525,25 +745,28 @@ class VictorTUI(App):
 
                     if chunk_type == "content":
                         content_buffer += chunk.content or ""
-                        self._conversation_log.update_streaming(content_buffer)
+                        if self._conversation_log:
+                            self._call_ui(self._conversation_log.update_streaming, content_buffer)
 
                     elif chunk_type == "thinking_start":
-                        self._show_thinking()
+                        self._call_ui(self._show_thinking)
 
                     elif chunk_type == "thinking":
-                        self._update_thinking(chunk.content or "")
+                        self._call_ui(self._update_thinking, chunk.content or "")
 
                     elif chunk_type == "thinking_end":
-                        self._hide_thinking()
+                        self._call_ui(self._hide_thinking)
 
                     elif chunk_type == "tool_start":
-                        self._show_tool_call(
+                        self._call_ui(
+                            self._show_tool_call,
                             chunk.tool_name or "unknown",
                             chunk.arguments or {},
                         )
 
                     elif chunk_type == "tool_end":
-                        self._finish_tool_call(
+                        self._call_ui(
+                            self._finish_tool_call,
                             success=chunk.success if hasattr(chunk, "success") else True,
                             elapsed=chunk.elapsed if hasattr(chunk, "elapsed") else None,
                         )
@@ -551,12 +774,17 @@ class VictorTUI(App):
                 elif hasattr(chunk, "content") and chunk.content:
                     # Simple content chunk
                     content_buffer += chunk.content
-                    self._conversation_log.update_streaming(content_buffer)
+                    if self._conversation_log:
+                        self._call_ui(self._conversation_log.update_streaming, content_buffer)
 
         finally:
             # Finish streaming
-            self._conversation_log.finish_streaming()
-            self._hide_thinking()
+            if self._conversation_log:
+                self._call_ui(self._conversation_log.finish_streaming)
+            self._call_ui(self._hide_thinking)
+            self._set_status("Idle", "idle")
+            if content_buffer.strip():
+                self._record_message("assistant", content_buffer)
 
     def _show_thinking(self) -> None:
         """Show thinking panel."""
@@ -585,6 +813,8 @@ class VictorTUI(App):
             status="pending",
         )
         container.mount(self._current_tool_widget)
+        self._tool_widgets.append(self._current_tool_widget)
+        self._prune_tool_widgets()
 
     def _finish_tool_call(
         self,
@@ -594,8 +824,39 @@ class VictorTUI(App):
         """Finish current tool call."""
         if self._current_tool_widget:
             status = "success" if success else "error"
-            self._current_tool_widget.update_status(status, elapsed)
+            finished_widget = self._current_tool_widget
+            finished_widget.update_status(status, elapsed)
             self._current_tool_widget = None
+            self._schedule_tool_widget_cleanup(finished_widget)
+            self._prune_tool_widgets()
+
+    def _schedule_tool_widget_cleanup(self, widget: ToolCallWidget) -> None:
+        def _remove() -> None:
+            self._remove_tool_widget(widget)
+
+        self.set_timer(6.0, _remove)
+
+    def _remove_tool_widget(self, widget: ToolCallWidget) -> None:
+        if widget in self._tool_widgets:
+            self._tool_widgets.remove(widget)
+        try:
+            widget.remove()
+        except Exception:
+            pass
+        if not self._tool_widgets:
+            container = self.query_one("#tool-calls-container")
+            container.remove_class("visible")
+
+    def _prune_tool_widgets(self) -> None:
+        while len(self._tool_widgets) > self._tool_widget_limit:
+            widget = self._tool_widgets.pop(0)
+            try:
+                widget.remove()
+            except Exception:
+                pass
+        if not self._tool_widgets:
+            container = self.query_one("#tool-calls-container")
+            container.remove_class("visible")
 
     def action_quit(self) -> None:
         """Quit the application."""
@@ -604,9 +865,10 @@ class VictorTUI(App):
     def action_clear(self) -> None:
         """Clear conversation."""
         self._conversation_log.clear()
+        self._session_messages.clear()
         if self.agent:
             self.agent.reset_conversation()
-        self._conversation_log.add_system_message("Conversation cleared")
+        self._add_system_message("Conversation cleared")
 
     def action_focus_input(self) -> None:
         """Focus the input widget."""
@@ -617,10 +879,257 @@ class VictorTUI(App):
         container = self.query_one("#thinking-container")
         if "visible" in container.classes:
             container.remove_class("visible")
-            self._conversation_log.add_system_message("Thinking panel hidden")
+            self._add_system_message("Thinking panel hidden")
         else:
             container.add_class("visible")
-            self._conversation_log.add_system_message("Thinking panel shown")
+            self._add_system_message("Thinking panel shown")
+
+    def action_toggle_tools(self) -> None:
+        """Toggle the tool calls panel visibility."""
+        container = self.query_one("#tool-calls-container")
+        if "visible" in container.classes:
+            container.remove_class("visible")
+            self._add_system_message("Tools panel hidden")
+        else:
+            container.add_class("visible")
+            self._add_system_message("Tools panel shown")
+
+    def action_cancel_stream(self) -> None:
+        """Request cancellation of the current stream if active."""
+        if not self.agent:
+            self._add_system_message("No active agent to cancel")
+            return
+        if not hasattr(self.agent, "is_streaming") or not self.agent.is_streaming():
+            self._add_system_message("No active stream to cancel")
+            return
+        if hasattr(self.agent, "request_cancellation"):
+            self.agent.request_cancellation()
+            self._add_system_message("Cancellation requested")
+            self._set_status("Canceling", "busy")
+        else:
+            self._add_system_message("Streaming cancellation not supported")
+
+    def action_resume_session(self) -> None:
+        """Show session picker and load a saved session."""
+        from victor.ui.tui.session import SessionManager
+
+        manager = SessionManager()
+        sessions = manager.list_sessions(limit=20)
+        if not sessions:
+            self._add_system_message("No saved sessions found")
+            return
+        self.push_screen(SessionPicker(sessions), self._handle_session_choice)
+
+    def action_resume_project_session(self) -> None:
+        """Resume a project session from the project SQLite database."""
+        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+
+        persistence = get_sqlite_session_persistence()
+        sessions = persistence.list_sessions(limit=20)
+        if not sessions:
+            self._add_system_message("No project sessions found")
+            return
+        mapped = [
+            {
+                "id": session["session_id"],
+                "name": session.get("title") or session["session_id"][:8],
+                "source": "Project",
+                "key": f"project:{session['session_id']}",
+                "provider": session.get("provider", ""),
+                "model": session.get("model", ""),
+                "updated_at": session.get("updated_at", ""),
+                "message_count": session.get("message_count", 0),
+            }
+            for session in sessions
+        ]
+        self.push_screen(
+            SessionPicker(mapped, title="Resume Project Session"),
+            self._handle_project_session_choice,
+        )
+
+    def action_resume_any_session(self) -> None:
+        """Resume a session from either TUI or project history."""
+        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+        from victor.ui.tui.session import SessionManager
+
+        manager = SessionManager()
+        tui_sessions = manager.list_sessions(limit=20)
+
+        persistence = get_sqlite_session_persistence()
+        project_sessions = persistence.list_sessions(limit=20)
+
+        combined = []
+        for session in tui_sessions:
+            combined.append(
+                {
+                    "id": session["id"],
+                    "name": session["name"],
+                    "source": "TUI",
+                    "key": f"tui:{session['id']}",
+                    "provider": session.get("provider", ""),
+                    "model": session.get("model", ""),
+                    "updated_at": session.get("updated_at", ""),
+                    "message_count": session.get("message_count", 0),
+                }
+            )
+        for session in project_sessions:
+            combined.append(
+                {
+                    "id": session["session_id"],
+                    "name": session.get("title") or session["session_id"][:8],
+                    "source": "Project",
+                    "key": f"project:{session['session_id']}",
+                    "provider": session.get("provider", ""),
+                    "model": session.get("model", ""),
+                    "updated_at": session.get("updated_at", ""),
+                    "message_count": session.get("message_count", 0),
+                }
+            )
+
+        if not combined:
+            self._add_system_message("No sessions found")
+            return
+
+        combined.sort(key=lambda item: item.get("updated_at", ""), reverse=True)
+        self.push_screen(
+            SessionPicker(combined, title="Resume Session (All Sources)"),
+            self._handle_any_session_choice,
+        )
+
+    def _handle_session_choice(self, session_id: Optional[str]) -> None:
+        if not session_id:
+            self._add_system_message("Session restore cancelled")
+            return
+        if session_id.startswith("tui:"):
+            self._load_session(session_id.split(":", 1)[1])
+        else:
+            self._load_session(session_id)
+
+    def _handle_project_session_choice(self, session_id: Optional[str]) -> None:
+        if not session_id:
+            self._add_system_message("Project session restore cancelled")
+            return
+        if session_id.startswith("project:"):
+            self._load_project_session(session_id.split(":", 1)[1])
+        else:
+            self._load_project_session(session_id)
+
+    def _handle_any_session_choice(self, session_key: Optional[str]) -> None:
+        if not session_key:
+            self._add_system_message("Session restore cancelled")
+            return
+        if session_key.startswith("tui:"):
+            self._load_session(session_key.split(":", 1)[1])
+        elif session_key.startswith("project:"):
+            self._load_project_session(session_key.split(":", 1)[1])
+        else:
+            self._load_session(session_key)
+
+    def _load_session(self, session_id: str) -> None:
+        from victor.ui.tui.session import SessionManager
+
+        manager = SessionManager()
+        session = manager.load(session_id)
+        if not session:
+            self._add_error_message(f"Session not found: {session_id}")
+            return
+
+        if self._conversation_log:
+            self._conversation_log.clear()
+
+        self._session_messages = list(session.messages)
+        for msg in session.messages:
+            self._render_message(msg.role, msg.content)
+
+        self._restore_agent_conversation(session.messages)
+        self._add_system_message(f"Session loaded: {session.name or session.id[:8]}")
+
+    def _load_project_session(self, session_id: str) -> None:
+        from victor.agent.conversation_state import ConversationStateMachine
+        from victor.agent.message_history import MessageHistory
+        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+
+        persistence = get_sqlite_session_persistence()
+        session = persistence.load_session(session_id)
+        if not session:
+            self._add_error_message(f"Project session not found: {session_id}")
+            return
+
+        conversation = session.get("conversation", {})
+        history = MessageHistory.from_dict(conversation) if conversation else MessageHistory()
+        messages = history.messages
+
+        if self._conversation_log:
+            self._conversation_log.clear()
+
+        self._session_messages = []
+        for msg in messages:
+            role = msg.role
+            content = msg.content
+            if role == "tool":
+                role = "system"
+                if msg.name:
+                    content = f"Tool result ({msg.name}): {content}"
+                else:
+                    content = f"Tool result: {content}"
+            if not content and getattr(msg, "tool_calls", None):
+                content = "Tool calls requested."
+            if not content:
+                continue
+            self._render_message(role, content)
+            self._session_messages.append(Message(role=role, content=content, metadata={}))
+
+        if self.agent:
+            self.agent.conversation = history
+            self.agent.active_session_id = session_id
+            conversation_state = session.get("conversation_state")
+            if conversation_state:
+                try:
+                    self.agent.conversation_state = ConversationStateMachine.from_dict(
+                        conversation_state
+                    )
+                except Exception as exc:
+                    self._add_error_message(f"Failed to restore conversation state: {exc}")
+
+        metadata = session.get("metadata", {})
+        title = metadata.get("title") or session_id[:8]
+        self._add_system_message(f"Project session loaded: {title}")
+
+    def _render_message(self, role: str, content: str) -> None:
+        if not self._conversation_log:
+            return
+        if role == "user":
+            self._conversation_log.add_user_message(content)
+        elif role == "assistant":
+            self._conversation_log.add_assistant_message(content)
+        elif role == "system":
+            self._conversation_log.add_system_message(content)
+        elif role == "error":
+            self._conversation_log.add_error_message(content)
+
+    def _restore_agent_conversation(self, messages: list[Message]) -> None:
+        if not self.agent or not hasattr(self.agent, "conversation"):
+            return
+        try:
+            from victor.agent.message_history import MessageHistory
+
+            system_prompt = ""
+            try:
+                system_prompt = self.agent.conversation.system_prompt
+            except Exception:
+                system_prompt = ""
+
+            history = MessageHistory(system_prompt=system_prompt)
+            for msg in messages:
+                role = msg.role
+                if role == "error":
+                    role = "system"
+                if role not in ("system", "user", "assistant", "tool"):
+                    continue
+                history.add_message(role, msg.content)
+            self.agent.conversation = history
+        except Exception as exc:
+            self._add_error_message(f"Failed to restore agent context: {exc}")
 
     def action_save_session(self) -> None:
         """Save the current session."""
@@ -634,12 +1143,11 @@ class VictorTUI(App):
                 provider=self.provider,
                 model=self.model,
             )
-            # Note: In a full implementation, we'd iterate through conversation_log
-            # For now, just save an empty session as a placeholder
-            manager.save_session(session)
-            self._conversation_log.add_system_message(f"Session saved: {session.id[:8]}")
+            session.messages = list(self._session_messages)
+            manager.save(session)
+            self._add_system_message(f"Session saved: {session.id[:8]}")
         except Exception as e:
-            self._conversation_log.add_error_message(f"Failed to save session: {e}")
+            self._add_error_message(f"Failed to save session: {e}")
 
     def action_show_help(self) -> None:
         """Show help overlay with keyboard shortcuts."""
@@ -650,6 +1158,11 @@ Keyboard Shortcuts:
   Ctrl+C       Exit
   Ctrl+L       Clear conversation
   Ctrl+T       Toggle thinking panel
+  Ctrl+Y       Toggle tools panel
+  Ctrl+X       Cancel streaming
+  Ctrl+G       Resume any session
+  Ctrl+P       Resume project session
+  Ctrl+R       Resume session
   Ctrl+S       Save session
   Ctrl+/       Show this help
   Ctrl+↑/↓     Scroll conversation
@@ -663,23 +1176,51 @@ Slash Commands:
   /provider    Switch provider
   /exit        Exit TUI
 """
-        self._conversation_log.add_system_message(help_text.strip())
+        self._add_system_message(help_text.strip())
 
     def action_scroll_up(self) -> None:
         """Scroll conversation up."""
+        if not self._conversation_log:
+            return
+        self._conversation_log.disable_auto_scroll()
         self._conversation_log.scroll_up(animate=False)
+        self._conversation_log.update_auto_scroll_state()
+        self._update_jump_to_bottom()
 
     def action_scroll_down(self) -> None:
         """Scroll conversation down."""
+        if not self._conversation_log:
+            return
         self._conversation_log.scroll_down(animate=False)
+        self._conversation_log.update_auto_scroll_state()
+        self._update_jump_to_bottom()
 
     def action_scroll_top(self) -> None:
         """Scroll to top of conversation."""
+        if not self._conversation_log:
+            return
+        self._conversation_log.disable_auto_scroll()
         self._conversation_log.scroll_home(animate=False)
+        self._conversation_log.update_auto_scroll_state()
+        self._update_jump_to_bottom()
 
     def action_scroll_bottom(self) -> None:
         """Scroll to bottom of conversation."""
-        self._conversation_log.scroll_end(animate=False)
+        if not self._conversation_log:
+            return
+        self._conversation_log.scroll_to_bottom(animate=False)
+        self._update_jump_to_bottom()
+
+    def on_scroll(self, event) -> None:
+        if event.sender is self._conversation_log:
+            self._update_jump_to_bottom()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id != "jump-to-bottom":
+            return
+        if self._conversation_log:
+            self._conversation_log.scroll_to_bottom(animate=False)
+        self._update_jump_to_bottom()
 
     def add_message(self, content: str, role: str = "assistant") -> None:
         """Add a message to the conversation log.
@@ -691,13 +1232,69 @@ Slash Commands:
             role: Message role (user, assistant, system, error)
         """
         if role == "user":
-            self._conversation_log.add_user_message(content)
+            self._add_user_message(content)
         elif role == "assistant":
-            self._conversation_log.add_assistant_message(content)
+            self._add_assistant_message(content)
         elif role == "system":
-            self._conversation_log.add_system_message(content)
+            self._add_system_message(content)
         elif role == "error":
+            self._add_error_message(content)
+
+    def _call_ui(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
+        try:
+            self.call_from_thread(func, *args, **kwargs)
+        except RuntimeError:
+            func(*args, **kwargs)
+
+    def _set_status(self, status: str, state: str = "idle") -> None:
+        if not self._status_bar:
+            return
+        self._call_ui(self._status_bar.update_status, status, state)
+
+    def _update_jump_to_bottom(self) -> None:
+        if not self._jump_button or not self._conversation_log:
+            return
+        if self._conversation_log.auto_scroll_enabled:
+            self._jump_button.remove_class("visible")
+        else:
+            self._jump_button.add_class("visible")
+
+    async def _start_streaming_ui(self) -> None:
+        if not self._conversation_log:
+            return
+        started = asyncio.Event()
+
+        def _start() -> None:
+            self._conversation_log.start_streaming()
+            started.set()
+
+        self._call_ui(_start)
+        await started.wait()
+
+    def _record_message(self, role: str, content: str, **metadata: Any) -> None:
+        if not content:
+            return
+        self._session_messages.append(Message(role=role, content=content, metadata=metadata))
+
+    def _add_user_message(self, content: str) -> None:
+        if self._conversation_log:
+            self._conversation_log.add_user_message(content)
+        self._record_message("user", content)
+
+    def _add_assistant_message(self, content: str) -> None:
+        if self._conversation_log:
+            self._conversation_log.add_assistant_message(content)
+        self._record_message("assistant", content)
+
+    def _add_system_message(self, content: str) -> None:
+        if self._conversation_log:
+            self._conversation_log.add_system_message(content)
+        self._record_message("system", content)
+
+    def _add_error_message(self, content: str) -> None:
+        if self._conversation_log:
             self._conversation_log.add_error_message(content)
+        self._record_message("error", content)
 
 
 async def run_tui(

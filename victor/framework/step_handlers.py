@@ -890,9 +890,7 @@ class CapabilityConfigStepHandler(BaseStepHandler):
         result.add_info(f"Applied {len(configs)} capability configs")
         logger.debug(f"Applied capability configs: {list(configs.keys())}")
 
-    def _get_capability_configs(
-        self, vertical: Type["VerticalBase"]
-    ) -> Dict[str, Any]:
+    def _get_capability_configs(self, vertical: Type["VerticalBase"]) -> Dict[str, Any]:
         """Get capability configs from vertical.
 
         Args:

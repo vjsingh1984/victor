@@ -131,7 +131,11 @@ class XAIProvider(BaseProvider):
             )
 
         super().__init__(
-            api_key=self._api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs
+            api_key=self._api_key,
+            base_url=base_url,
+            timeout=timeout,
+            max_retries=max_retries,
+            **kwargs,
         )
         self.client = httpx.AsyncClient(
             base_url=base_url,

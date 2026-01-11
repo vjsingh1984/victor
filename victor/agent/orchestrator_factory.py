@@ -2189,7 +2189,10 @@ class OrchestratorFactory(ModeAwareMixin):
             return None
 
         try:
-            from victor.storage.checkpoints import ConversationCheckpointManager, SQLiteCheckpointBackend
+            from victor.storage.checkpoints import (
+                ConversationCheckpointManager,
+                SQLiteCheckpointBackend,
+            )
             from victor.config.settings import get_project_paths
 
             # Get project paths for checkpoint storage

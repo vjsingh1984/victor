@@ -12,6 +12,7 @@ Enhanced widgets include:
 
 from __future__ import annotations
 
+import asyncio
 import re
 import sqlite3
 import time
@@ -87,6 +88,7 @@ class StatusBar(Static):
         super().__init__(**kwargs)
         self.provider = provider
         self.model = model
+        self.status = "Idle"
 
     def compose(self) -> ComposeResult:
         with Horizontal(classes="status-content"):
@@ -100,6 +102,9 @@ class StatusBar(Static):
                 ),
                 classes="provider-info",
             )
+            status_label = Label(self.status, classes="status-indicator")
+            status_label.add_class("idle")
+            yield status_label
             yield Label(
                 Text.assemble(
                     ("Ctrl+C", "bold"),
@@ -125,6 +130,14 @@ class StatusBar(Static):
             )
         )
         self.refresh()
+
+    def update_status(self, status: str, state: str = "idle") -> None:
+        """Update status text and styling."""
+        self.status = status
+        label = self.query_one(".status-indicator", Label)
+        label.update(self.status)
+        label.remove_class("idle", "busy", "streaming")
+        label.add_class(state)
 
 
 class MessageWidget(Static):
@@ -294,6 +307,7 @@ class InputWidget(Static):
         self._input: SubmitTextArea | None = None
         self._history_index: int = -1  # -1 means not browsing history
         self._draft: str = ""  # Save current draft when browsing history
+        self._history_task: asyncio.Task | None = None
 
     def compose(self) -> ComposeResult:
         with Vertical():
@@ -321,18 +335,31 @@ class InputWidget(Static):
         # Load persistent history from conversation database (once per session)
         if not InputWidget._history_loaded:
             InputWidget._history_loaded = True
-            db_history = _get_input_history_from_db(limit=InputWidget._max_history)
-            if db_history:
-                # Merge DB history with any in-session history
-                # DB history goes first (older), session history last (newer)
-                seen = set(InputWidget._history)
-                for msg in db_history:
-                    if msg not in seen:
-                        InputWidget._history.insert(0, msg)
-                        seen.add(msg)
-                # Trim to max size
-                if len(InputWidget._history) > InputWidget._max_history:
-                    InputWidget._history = InputWidget._history[-InputWidget._max_history :]
+            self._history_task = asyncio.create_task(self._load_history_async())
+
+    async def _load_history_async(self) -> None:
+        """Load input history without blocking the UI."""
+        try:
+            db_history = await asyncio.to_thread(
+                _get_input_history_from_db,
+                limit=InputWidget._max_history,
+            )
+        except Exception:
+            return
+
+        if not db_history:
+            return
+
+        # Merge DB history with any in-session history
+        # DB history goes first (older), session history last (newer)
+        seen = set(InputWidget._history)
+        for msg in db_history:
+            if msg not in seen:
+                InputWidget._history.insert(0, msg)
+                seen.add(msg)
+        # Trim to max size
+        if len(InputWidget._history) > InputWidget._max_history:
+            InputWidget._history = InputWidget._history[-InputWidget._max_history :]
 
     def on_key(self, event) -> None:
         """Handle key events for history navigation.
@@ -914,6 +941,11 @@ class EnhancedConversationLog(VerticalScroll):
         super().__init__(**kwargs)
         self._streaming_message: Optional[StreamingMessageBlock] = None
         self._message_count = 0
+        self._auto_scroll = True
+
+    @property
+    def auto_scroll_enabled(self) -> bool:
+        return self._auto_scroll
 
     def add_user_message(self, content: str) -> None:
         """Add a user message to the log."""
@@ -924,7 +956,7 @@ class EnhancedConversationLog(VerticalScroll):
         )
         self._message_count += 1
         self.mount(msg)
-        self.scroll_end(animate=False)
+        self._maybe_scroll_end()
 
     def add_assistant_message(self, content: str) -> None:
         """Add a complete assistant message to the log."""
@@ -935,7 +967,7 @@ class EnhancedConversationLog(VerticalScroll):
         )
         self._message_count += 1
         self.mount(msg)
-        self.scroll_end(animate=False)
+        self._maybe_scroll_end()
 
     def add_system_message(self, content: str) -> None:
         """Add a system/status message to the log."""
@@ -945,7 +977,7 @@ class EnhancedConversationLog(VerticalScroll):
         )
         self._message_count += 1
         self.mount(msg)
-        self.scroll_end(animate=False)
+        self._maybe_scroll_end()
 
     def add_error_message(self, content: str) -> None:
         """Add an error message to the log."""
@@ -955,7 +987,7 @@ class EnhancedConversationLog(VerticalScroll):
         )
         self._message_count += 1
         self.mount(msg)
-        self.scroll_end(animate=False)
+        self._maybe_scroll_end()
 
     def start_streaming(self) -> StreamingMessageBlock:
         """Start a streaming response and return the message block."""
@@ -967,20 +999,20 @@ class EnhancedConversationLog(VerticalScroll):
         self._streaming_message.is_streaming = True
         self._message_count += 1
         self.mount(self._streaming_message)
-        self.scroll_end(animate=False)
+        self._maybe_scroll_end()
         return self._streaming_message
 
     def update_streaming(self, content: str) -> None:
         """Update the current streaming message."""
         if self._streaming_message:
             self._streaming_message.content = content
-            self.scroll_end(animate=False)
+            self._maybe_scroll_end()
 
     def append_streaming_chunk(self, chunk: str) -> None:
         """Append a chunk to the current streaming message."""
         if self._streaming_message:
             self._streaming_message.append_chunk(chunk)
-            self.scroll_end(animate=False)
+            self._maybe_scroll_end()
 
     def finish_streaming(self) -> None:
         """Finish the current streaming response."""
@@ -1003,7 +1035,7 @@ class EnhancedConversationLog(VerticalScroll):
         )
         self._message_count += 1
         self.mount(panel)
-        self.scroll_end(animate=False)
+        self._maybe_scroll_end()
         return panel
 
     def add_code_block(
@@ -1019,7 +1051,7 @@ class EnhancedConversationLog(VerticalScroll):
         )
         self._message_count += 1
         self.mount(block)
-        self.scroll_end(animate=False)
+        self._maybe_scroll_end()
 
     def clear(self) -> None:
         """Clear all messages from the log."""
@@ -1027,3 +1059,31 @@ class EnhancedConversationLog(VerticalScroll):
             child.remove()
         self._message_count = 0
         self._streaming_message = None
+        self._auto_scroll = True
+
+    def on_scroll(self, _event) -> None:
+        """Update auto-scroll when the user scrolls."""
+        self.update_auto_scroll_state()
+
+    def scroll_to_bottom(self, animate: bool = False) -> None:
+        """Scroll to bottom and re-enable auto-scroll."""
+        self._auto_scroll = True
+        self.scroll_end(animate=animate)
+
+    def disable_auto_scroll(self) -> None:
+        """Disable auto-scroll until user returns to bottom."""
+        self._auto_scroll = False
+
+    def update_auto_scroll_state(self) -> None:
+        """Update auto-scroll based on scroll position."""
+        self._auto_scroll = self._is_at_bottom()
+
+    def _maybe_scroll_end(self) -> None:
+        if self._auto_scroll:
+            self.scroll_end(animate=False)
+
+    def _is_at_bottom(self) -> bool:
+        try:
+            return self.scroll_y >= self.max_scroll_y - 1
+        except Exception:
+            return True

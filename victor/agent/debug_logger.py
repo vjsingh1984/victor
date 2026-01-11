@@ -303,7 +303,9 @@ class DebugLogger:
             )
         elif char_count > 50000:
             chart_icon = self._presentation.icon("chart", with_color=False)
-            self.logger.info(f"   {chart_icon} Context: {char_count:,} chars (~{estimated_tokens:,} tokens)")
+            self.logger.info(
+                f"   {chart_icon} Context: {char_count:,} chars (~{estimated_tokens:,} tokens)"
+            )
 
     def log_conversation_summary(self, messages: List[Message]) -> None:
         """Log final conversation summary."""

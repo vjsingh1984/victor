@@ -21,6 +21,7 @@ from enum import Enum
 
 class FileOperationType(Enum):
     """Types of file operations."""
+
     READ = "read"
     WRITE = "write"
     EDIT = "edit"
@@ -30,6 +31,7 @@ class FileOperationType(Enum):
 @dataclass
 class FileOperation:
     """A file operation configuration."""
+
     operation: FileOperationType
     tool_name: str
     required: bool = True

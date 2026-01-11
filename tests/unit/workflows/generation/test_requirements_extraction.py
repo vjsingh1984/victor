@@ -94,11 +94,11 @@ class TestRuleBasedExtractor:
         """Test extracting a simple sequential workflow."""
         extractor = RuleBasedExtractor()
 
-        requirements = extractor.extract(
-            "Analyze code then find bugs then fix them then run tests"
-        )
+        requirements = extractor.extract("Analyze code then find bugs then fix them then run tests")
 
-        assert requirements.description == "Analyze code then find bugs then fix them then run tests"
+        assert (
+            requirements.description == "Analyze code then find bugs then fix them then run tests"
+        )
         assert len(requirements.functional.tasks) >= 1
         assert requirements.structural.execution_order == "sequential"
 
@@ -106,9 +106,7 @@ class TestRuleBasedExtractor:
         """Test extracting a conditional workflow."""
         extractor = RuleBasedExtractor()
 
-        requirements = extractor.extract(
-            "Run tests and if they pass, deploy to production"
-        )
+        requirements = extractor.extract("Run tests and if they pass, deploy to production")
 
         assert requirements.structural.execution_order == "conditional"
         # Should detect at least one branch
@@ -402,9 +400,7 @@ class TestWorkflowRequirements:
         requirements = WorkflowRequirements(
             description="Test workflow",
             functional=FunctionalRequirements(
-                tasks=[
-                    TaskRequirement(id="task_1", description="Analyze", task_type="agent")
-                ],
+                tasks=[TaskRequirement(id="task_1", description="Analyze", task_type="agent")],
                 success_criteria=["Done"],
             ),
             structural=StructuralRequirements(execution_order="sequential"),
@@ -422,9 +418,7 @@ class TestWorkflowRequirements:
         requirements = WorkflowRequirements(
             description="Test workflow",
             functional=FunctionalRequirements(
-                tasks=[
-                    TaskRequirement(id="task_1", description="Analyze", task_type="agent")
-                ],
+                tasks=[TaskRequirement(id="task_1", description="Analyze", task_type="agent")],
                 success_criteria=["Done"],
             ),
             structural=StructuralRequirements(execution_order="sequential"),
@@ -445,9 +439,7 @@ class TestWorkflowRequirements:
         requirements = WorkflowRequirements(
             description="Test workflow",
             functional=FunctionalRequirements(
-                tasks=[
-                    TaskRequirement(id="task_1", description="Analyze", task_type="agent")
-                ],
+                tasks=[TaskRequirement(id="task_1", description="Analyze", task_type="agent")],
                 success_criteria=["Done"],
             ),
             structural=StructuralRequirements(execution_order="sequential"),

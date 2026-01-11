@@ -183,8 +183,7 @@ class TeamNode:
 
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     future = executor.submit(
-                        asyncio.run,
-                        self.execute_async(orchestrator, graph_state)
+                        asyncio.run, self.execute_async(orchestrator, graph_state)
                     )
                     return future.result()
             else:
@@ -354,9 +353,7 @@ class TeamNode:
         """
         # Exclude internal keys
         return {
-            k: v
-            for k, v in graph_state.items()
-            if not k.startswith("_") or k in ["_task", "_goal"]
+            k: v for k, v in graph_state.items() if not k.startswith("_") or k in ["_task", "_goal"]
         }
 
     async def _execute_team(
@@ -520,10 +517,7 @@ class TeamNode:
                 "reviewer": SubAgentRole.REVIEWER,
                 "tester": SubAgentRole.TESTER,
             }
-            role = role_map.get(
-                member_data["role"].lower(),
-                SubAgentRole.EXECUTOR
-            )
+            role = role_map.get(member_data["role"].lower(), SubAgentRole.EXECUTOR)
 
             member = TeamMember(
                 id=member_data["id"],
@@ -561,10 +555,7 @@ class TeamNode:
             "pipeline": TeamFormation.PIPELINE,
             "consensus": TeamFormation.CONSENSUS,
         }
-        formation = formation_map.get(
-            data["team_formation"].lower(),
-            TeamFormation.SEQUENTIAL
-        )
+        formation = formation_map.get(data["team_formation"].lower(), TeamFormation.SEQUENTIAL)
 
         return cls(
             id=data["id"],

@@ -83,7 +83,7 @@ class ConditionNodeExecutor:
             result={"passthrough": True, "condition": True},
             metadata={
                 "branches": list(node.branches.keys()) if hasattr(node, "branches") else [],
-            }
+            },
         )
 
         return state

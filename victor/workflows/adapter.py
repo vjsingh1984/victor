@@ -46,7 +46,11 @@ import warnings
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
 if TYPE_CHECKING:
-    from victor.workflows.compiler_protocols import CompiledGraphProtocol, WorkflowCompilerProtocol
+    from victor.workflows.compiler_protocols import (
+        CompiledGraphProtocol,
+        ExecutionResultProtocol,
+        WorkflowCompilerProtocol,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +113,9 @@ class UnifiedWorkflowCompilerAdapter(DeprecationAdapter):
         # Create DI container if settings provided
         if settings:
             from victor.core.container import ServiceContainer
-            from victor.workflows.services.workflow_service_provider import configure_workflow_services
+            from victor.workflows.services.workflow_service_provider import (
+                configure_workflow_services,
+            )
 
             self._container = ServiceContainer()
             configure_workflow_services(self._container, settings)

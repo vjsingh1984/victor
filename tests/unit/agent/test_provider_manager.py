@@ -330,11 +330,13 @@ class TestProviderSwitching:
         mock_adapter.get_capabilities.return_value = mock_caps
         mock_adapter_registry.get_adapter.return_value = mock_adapter
 
-        result = await manager.switch_provider("openai", "gpt-4-turbo")
+        # Mock health check to pass
+        with patch.object(manager._provider_switcher._health_monitor, "check_health", return_value=True):
+            result = await manager.switch_provider("openai", "gpt-4-turbo")
 
-        assert result is True
-        assert manager.provider_name == "openai"
-        assert manager.model == "gpt-4-turbo"
+            assert result is True
+            assert manager.provider_name == "openai"
+            assert manager.model == "gpt-4-turbo"
 
     @pytest.mark.asyncio
     @patch("victor.agent.provider.switcher.ProviderRegistry")
@@ -390,9 +392,13 @@ class TestProviderSwitching:
         mock_adapter.get_capabilities.return_value = mock_caps
         mock_adapter_registry.get_adapter.return_value = mock_adapter
 
-        # Mock health check to fail then succeed
+        # Mock health check to fail then succeed (for fallback)
+        health_check_results = [False, True]  # First fails, second succeeds
+        async def mock_check_health(provider):
+            return health_check_results.pop(0)
+
         with patch.object(
-            manager, "_check_provider_health", new=AsyncMock(side_effect=[False, True])
+            manager._provider_switcher._health_monitor, "check_health", side_effect=mock_check_health
         ):
             result = await manager.switch_provider("google")
 
@@ -529,7 +535,9 @@ class TestSwitchHistory:
         mock_adapter.get_capabilities.return_value = mock_caps
         mock_adapter_registry.get_adapter.return_value = mock_adapter
 
-        await manager.switch_provider("openai", "gpt-4")
+        # Mock health check to pass
+        with patch.object(manager._provider_switcher._health_monitor, "check_health", return_value=True):
+            await manager.switch_provider("openai", "gpt-4")
 
         history = manager.get_switch_history()
         assert len(history) >= 1
@@ -583,7 +591,10 @@ class TestSwitchCallbacks:
             callback_calls.append(state)
 
         manager.add_switch_callback(callback)
-        await manager.switch_provider("openai", "gpt-4")
+
+        # Mock health check to pass
+        with patch.object(manager._provider_switcher._health_monitor, "check_health", return_value=True):
+            await manager.switch_provider("openai", "gpt-4")
 
         assert len(callback_calls) == 1
         assert callback_calls[0].provider_name == "openai"

@@ -72,109 +72,64 @@ class WorkflowNodeSchema(BaseModel):
         ...,
         min_length=1,
         max_length=100,
-        description="Unique node identifier (alphanumeric with underscores/hyphens)"
+        description="Unique node identifier (alphanumeric with underscores/hyphens)",
     )
-    name: str = Field(
-        ...,
-        min_length=1,
-        max_length=200,
-        description="Human-readable node name"
-    )
-    type: NodeKind = Field(
-        ...,
-        description="Node type determining execution behavior"
-    )
+    name: str = Field(..., min_length=1, max_length=200, description="Human-readable node name")
+    type: NodeKind = Field(..., description="Node type determining execution behavior")
     description: Optional[str] = Field(
-        None,
-        max_length=500,
-        description="Optional node description"
+        None, max_length=500, description="Optional node description"
     )
 
     # Common fields
-    next_nodes: List[str] = Field(
-        default_factory=list,
-        description="Successor node IDs"
-    )
+    next_nodes: List[str] = Field(default_factory=list, description="Successor node IDs")
     timeout: Optional[int] = Field(
-        None,
-        ge=0,
-        le=3600,
-        description="Node timeout in seconds (max 1 hour)"
+        None, ge=0, le=3600, description="Node timeout in seconds (max 1 hour)"
     )
     max_retries: Optional[int] = Field(
-        None,
-        ge=0,
-        le=10,
-        description="Maximum retry attempts on failure"
+        None, ge=0, le=10, description="Maximum retry attempts on failure"
     )
 
     # Agent node fields
     role: Optional[str] = Field(
         None,
-        description="Agent role (researcher, planner, executor, reviewer, writer, analyst, coder)"
+        description="Agent role (researcher, planner, executor, reviewer, writer, analyst, coder)",
     )
-    goal: Optional[str] = Field(
-        None,
-        description="Agent's task goal or objective"
-    )
+    goal: Optional[str] = Field(None, description="Agent's task goal or objective")
     tool_budget: Optional[int] = Field(
-        None,
-        ge=0,
-        le=500,
-        description="Tool call budget for this node"
+        None, ge=0, le=500, description="Tool call budget for this node"
     )
     tools: Optional[List[str]] = Field(
-        None,
-        description="Specific tools to use (overrides default tool selection)"
+        None, description="Specific tools to use (overrides default tool selection)"
     )
 
     # Compute node fields
-    handler: Optional[str] = Field(
-        None,
-        description="Registered compute handler name"
-    )
+    handler: Optional[str] = Field(None, description="Registered compute handler name")
 
     # Condition node fields
-    condition: Optional[str] = Field(
-        None,
-        description="Condition function name for branching"
-    )
+    condition: Optional[str] = Field(None, description="Condition function name for branching")
     branches: Optional[Dict[str, str]] = Field(
-        None,
-        description="Branch mappings (condition_value -> node_id)"
+        None, description="Branch mappings (condition_value -> node_id)"
     )
 
     # Parallel node fields
     parallel_nodes: Optional[List[str]] = Field(
-        None,
-        description="List of parallel node IDs to execute"
+        None, description="List of parallel node IDs to execute"
     )
     join_strategy: Optional[Literal["all", "any", "merge"]] = Field(
-        None,
-        description="How to join parallel branch results"
+        None, description="How to join parallel branch results"
     )
 
     # Transform node fields
-    transform: Optional[str] = Field(
-        None,
-        description="Transform function name"
-    )
+    transform: Optional[str] = Field(None, description="Transform function name")
 
     # Team node fields
-    members: Optional[List[str]] = Field(
-        None,
-        description="Team member roles"
-    )
-    team_formation: Optional[Literal["sequential", "parallel", "hierarchical", "pipeline", "consensus"]] = Field(
-        None,
-        description="Team coordination pattern"
-    )
+    members: Optional[List[str]] = Field(None, description="Team member roles")
+    team_formation: Optional[
+        Literal["sequential", "parallel", "hierarchical", "pipeline", "consensus"]
+    ] = Field(None, description="Team coordination pattern")
 
     # Metadata
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict,
-        description="Additional node metadata"
-    )
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional node metadata")
 
     @field_validator("id")
     @classmethod
@@ -198,8 +153,7 @@ class WorkflowNodeSchema(BaseModel):
 
         if not re.match(r"^[a-zA-Z0-9_\-]+$", v):
             raise ValueError(
-                "Node ID must be alphanumeric (underscores and hyphens allowed). "
-                f"Got: '{v}'"
+                "Node ID must be alphanumeric (underscores and hyphens allowed). " f"Got: '{v}'"
             )
         return v
 
@@ -249,26 +203,12 @@ class WorkflowEdgeSchema(BaseModel):
         condition: Condition expression (if conditional)
     """
 
-    source: str = Field(
-        ...,
-        min_length=1,
-        description="Source node ID"
-    )
-    target: str = Field(
-        ...,
-        description="Target node ID (or __end__ for terminal)"
-    )
-    label: Optional[str] = Field(
-        None,
-        description="Optional edge label for visualization"
-    )
-    conditional: bool = Field(
-        default=False,
-        description="Whether this edge is conditional"
-    )
+    source: str = Field(..., min_length=1, description="Source node ID")
+    target: str = Field(..., description="Target node ID (or __end__ for terminal)")
+    label: Optional[str] = Field(None, description="Optional edge label for visualization")
+    conditional: bool = Field(default=False, description="Whether this edge is conditional")
     condition: Optional[str] = Field(
-        None,
-        description="Condition expression (if edge is conditional)"
+        None, description="Condition expression (if edge is conditional)"
     )
 
 
@@ -306,46 +246,28 @@ class WorkflowDefinitionSchema(BaseModel):
     """
 
     name: str = Field(
-        ...,
-        min_length=1,
-        max_length=100,
-        description="Workflow name (unique identifier)"
+        ..., min_length=1, max_length=100, description="Workflow name (unique identifier)"
     )
-    description: Optional[str] = Field(
-        None,
-        max_length=500,
-        description="Workflow description"
-    )
+    description: Optional[str] = Field(None, max_length=500, description="Workflow description")
     entry_point: str = Field(
-        ...,
-        min_length=1,
-        description="Entry point node ID (must exist in nodes)"
+        ..., min_length=1, description="Entry point node ID (must exist in nodes)"
     )
     nodes: List[WorkflowNodeSchema] = Field(
-        ...,
-        min_length=1,
-        description="Workflow nodes (must have at least one)"
+        ..., min_length=1, description="Workflow nodes (must have at least one)"
     )
     edges: List[WorkflowEdgeSchema] = Field(
-        default_factory=list,
-        description="Workflow edges defining execution flow"
+        default_factory=list, description="Workflow edges defining execution flow"
     )
 
     # Workflow-level configuration
     max_iterations: Optional[int] = Field(
-        None,
-        ge=1,
-        le=500,
-        description="Maximum iterations for loop detection"
+        None, ge=1, le=500, description="Maximum iterations for loop detection"
     )
     max_timeout_seconds: Optional[float] = Field(
-        None,
-        ge=0,
-        description="Total workflow timeout in seconds"
+        None, ge=0, description="Total workflow timeout in seconds"
     )
     metadata: Dict[str, Any] = Field(
-        default_factory=dict,
-        description="Additional workflow metadata"
+        default_factory=dict, description="Additional workflow metadata"
     )
 
     @field_validator("nodes")
@@ -369,8 +291,7 @@ class WorkflowDefinitionSchema(BaseModel):
         if len(ids) != len(set(ids)):
             duplicates = [node_id for node_id in ids if ids.count(node_id) > 1]
             raise ValueError(
-                f"Duplicate node IDs found: {set(duplicates)}. "
-                "Each node must have a unique ID."
+                f"Duplicate node IDs found: {set(duplicates)}. " "Each node must have a unique ID."
             )
         return v
 
@@ -440,21 +361,18 @@ class WorkflowDefinitionSchema(BaseModel):
         """
         import yaml
 
-        return yaml.dump(
-            self.to_dict(),
-            default_flow_style=False,
-            sort_keys=False
-        )
+        return yaml.dump(self.to_dict(), default_flow_style=False, sort_keys=False)
 
 
 # Convenience functions for common workflows
+
 
 def create_simple_agent_workflow(
     name: str,
     goal: str,
     role: str = "executor",
     tool_budget: int = 15,
-    description: Optional[str] = None
+    description: Optional[str] = None,
 ) -> WorkflowDefinitionSchema:
     """Create a simple single-agent workflow.
 
@@ -479,9 +397,9 @@ def create_simple_agent_workflow(
                 type="agent",
                 role=role,
                 goal=goal,
-                tool_budget=tool_budget
+                tool_budget=tool_budget,
             )
-        ]
+        ],
     )
 
 

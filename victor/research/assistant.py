@@ -46,16 +46,18 @@ class ResearchAssistant(VerticalBase):
         tools = cls._file_ops.get_tool_list()
 
         # Add research-specific tools
-        tools.extend([
-            # Core research tools
-            ToolNames.WEB_SEARCH,  # Web search (internet search)
-            ToolNames.WEB_FETCH,  # Fetch URL content
-            # Directory listing for file exploration
-            ToolNames.LS,  # list_directory → ls
-            # Code search for technical research
-            ToolNames.CODE_SEARCH,  # Semantic code search
-            ToolNames.OVERVIEW,  # codebase_overview → overview
-        ])
+        tools.extend(
+            [
+                # Core research tools
+                ToolNames.WEB_SEARCH,  # Web search (internet search)
+                ToolNames.WEB_FETCH,  # Fetch URL content
+                # Directory listing for file exploration
+                ToolNames.LS,  # list_directory → ls
+                # Code search for technical research
+                ToolNames.CODE_SEARCH,  # Semantic code search
+                ToolNames.OVERVIEW,  # codebase_overview → overview
+            ]
+        )
 
         return tools
 

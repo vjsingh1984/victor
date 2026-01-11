@@ -215,9 +215,7 @@ class DebugCommand(BaseSlashCommand):
                 node_id=node_id,
                 position=bp_position,
                 condition=condition_fn,
-                bp_type=(
-                    BreakpointType.CONDITIONAL if condition_fn else BreakpointType.NODE
-                ),
+                bp_type=(BreakpointType.CONDITIONAL if condition_fn else BreakpointType.NODE),
                 ignore_count=ignore_count,
             )
 

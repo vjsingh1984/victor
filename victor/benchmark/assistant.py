@@ -25,6 +25,7 @@ from victor.tools.tool_names import ToolNames
 
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import ModeConfigProviderProtocol
+    from victor.core.vertical_types import TieredToolConfig
 
 
 class BenchmarkVertical(VerticalBase):

@@ -182,7 +182,9 @@ def cqrs_event_to_framework(cqrs_event: "CQRSEvent") -> AgentExecutionEvent:
     return convert_from_cqrs(data, event_type, metadata)
 
 
-def observability_event_to_framework(topic: str, data: Dict[str, Any], **metadata) -> AgentExecutionEvent:
+def observability_event_to_framework(
+    topic: str, data: Dict[str, Any], **metadata
+) -> AgentExecutionEvent:
     """Convert an observability event (topic-based) to a framework AgentExecutionEvent.
 
     Uses topic-based mapping since observability events now use topics

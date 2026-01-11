@@ -134,9 +134,7 @@ class TestChainRegistrySingleton:
             with lock:
                 instances.append(instance)
 
-        threads = [
-            threading.Thread(target=create_instance) for _ in range(10)
-        ]
+        threads = [threading.Thread(target=create_instance) for _ in range(10)]
 
         for t in threads:
             t.start()

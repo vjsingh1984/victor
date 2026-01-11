@@ -53,7 +53,6 @@ Example:
 from __future__ import annotations
 
 import logging
-from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
@@ -532,12 +531,17 @@ class YAMLToolDependencyProvider(BaseToolDependencyProvider):
         return self._vertical
 
 
-@lru_cache(maxsize=16)
-def get_cached_provider(yaml_path: str) -> BaseToolDependencyProvider:
-    """Get a cached tool dependency provider for a YAML file.
+# Mtime-aware provider cache for automatic cache invalidation
+# Format: {path_str: (mtime_ns, provider_instance)}
+_provider_cache: Dict[str, Tuple[int, BaseToolDependencyProvider]] = {}
 
-    This function caches provider instances for efficiency when the same
-    YAML file is loaded multiple times.
+
+def get_cached_provider(yaml_path: str) -> BaseToolDependencyProvider:
+    """Get a cached tool dependency provider for a YAML file with mtime validation.
+
+    This function caches provider instances with file modification time (mtime)
+    validation. If the YAML file is modified, the cache is automatically invalidated
+    and a fresh provider is created.
 
     Args:
         yaml_path: Path to the YAML configuration file (as string for caching).
@@ -549,11 +553,78 @@ def get_cached_provider(yaml_path: str) -> BaseToolDependencyProvider:
         # First call loads from disk
         provider1 = get_cached_provider("victor/coding/tool_dependencies.yaml")
 
-        # Second call returns cached instance
+        # Second call returns cached instance (if file unchanged)
         provider2 = get_cached_provider("victor/coding/tool_dependencies.yaml")
         assert provider1 is provider2
+
+        # If file is modified, cache is invalidated and fresh instance returned
     """
-    return create_tool_dependency_provider(yaml_path)
+    path = Path(yaml_path).resolve()
+    path_str = str(path)
+
+    # Check cache with mtime validation
+    if path_str in _provider_cache:
+        cached_mtime, provider = _provider_cache[path_str]
+        try:
+            current_mtime = path.stat().st_mtime_ns
+            if current_mtime == cached_mtime:
+                logger.debug(f"Cache HIT for {yaml_path} (mtime: {current_mtime})")
+                return provider
+            else:
+                logger.debug(
+                    f"Cache INVALIDATED for {yaml_path} "
+                    f"(mtime changed: {cached_mtime} -> {current_mtime})"
+                )
+        except FileNotFoundError:
+            logger.debug(f"Cache MISS (file not found): {yaml_path}")
+            # File was deleted, invalidate cache entry
+            del _provider_cache[path_str]
+
+    # Create new provider (cache miss or invalidated)
+    logger.debug(f"Cache MISS for {yaml_path}, creating new provider")
+    provider = create_tool_dependency_provider(yaml_path)
+
+    # Cache with current mtime
+    try:
+        mtime = path.stat().st_mtime_ns
+        _provider_cache[path_str] = (mtime, provider)
+    except FileNotFoundError:
+        # File was deleted during load, don't cache
+        pass
+
+    return provider
+
+
+def invalidate_provider_cache(yaml_path: Optional[str] = None) -> int:
+    """Invalidate cached provider instances.
+
+    Useful for testing or forcing a reload of YAML files.
+
+    Args:
+        yaml_path: Optional specific path to invalidate. If None, clears all.
+
+    Returns:
+        Number of cache entries invalidated.
+
+    Example:
+        # Invalidate all caches
+        count = invalidate_provider_cache()
+
+        # Invalidate specific file
+        count = invalidate_provider_cache("victor/coding/tool_dependencies.yaml")
+    """
+    if yaml_path:
+        path_str = str(Path(yaml_path).resolve())
+        if path_str in _provider_cache:
+            del _provider_cache[path_str]
+            logger.debug(f"Invalidated cache for {yaml_path}")
+            return 1
+        return 0
+    else:
+        count = len(_provider_cache)
+        _provider_cache.clear()
+        logger.debug(f"Invalidated all {count} cached providers")
+        return count
 
 
 # Mapping of vertical names to their canonicalization settings
@@ -644,5 +715,6 @@ __all__ = [
     "load_tool_dependency_yaml",
     "create_tool_dependency_provider",
     "get_cached_provider",
+    "invalidate_provider_cache",
     "create_vertical_tool_dependency_provider",
 ]

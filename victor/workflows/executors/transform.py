@@ -91,7 +91,7 @@ class TransformNodeExecutor:
                 result={"transformed_keys": list(transformed.keys())},
                 metadata={
                     "duration_seconds": time.time() - start_time,
-                }
+                },
             )
 
             logger.info(f"Transform node {node.id} completed successfully")
@@ -110,7 +110,7 @@ class TransformNodeExecutor:
                 error=str(e),
                 metadata={
                     "duration_seconds": time.time() - start_time,
-                }
+                },
             )
 
             raise

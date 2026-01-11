@@ -121,14 +121,16 @@ class FEPValidationResult:
         ]
 
         if self.metadata:
-            lines.extend([
-                "",
-                "Metadata:",
-                f"  FEP: {self.metadata.fep:04d}",
-                f"  Title: {self.metadata.title}",
-                f"  Type: {self.metadata.type.value}",
-                f"  Status: {self.metadata.status.value}",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "Metadata:",
+                    f"  FEP: {self.metadata.fep:04d}",
+                    f"  Title: {self.metadata.title}",
+                    f"  Type: {self.metadata.type.value}",
+                    f"  Status: {self.metadata.status.value}",
+                ]
+            )
 
         if self.errors:
             lines.extend(["", "Errors:"])
@@ -243,11 +245,7 @@ class FEPValidator:
         try:
             metadata = parse_fep_metadata(content)
         except ValueError as e:
-            errors.append(
-                FEPValidationError(
-                    severity="error", section="metadata", message=str(e)
-                )
-            )
+            errors.append(FEPValidationError(severity="error", section="metadata", message=str(e)))
             return FEPValidationResult(
                 is_valid=False,
                 metadata=None,

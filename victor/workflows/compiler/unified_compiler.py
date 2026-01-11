@@ -26,7 +26,10 @@ from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from victor.workflows.definition import WorkflowDefinition
-    from victor.workflows.compiler_protocols import CompiledGraphProtocol, NodeExecutorFactoryProtocol
+    from victor.workflows.compiler_protocols import (
+        CompiledGraphProtocol,
+        NodeExecutorFactoryProtocol,
+    )
 
 logger = logging.getLogger(__name__)
 

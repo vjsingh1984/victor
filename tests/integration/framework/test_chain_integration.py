@@ -60,6 +60,7 @@ class TestCodingChainRegistry:
             # If chains module doesn't exist, that's okay
             # Just verify the infrastructure is in place
             from victor.framework.chain_registry import get_chain_registry
+
             registry = get_chain_registry()
             # Registry should exist even if empty
             assert registry is not None
@@ -154,7 +155,9 @@ class TestCodingChainRegistry:
         semver_pattern = r"^\d+\.\d+\.\d+$"
 
         for meta in metadata_list:
-            assert re.match(semver_pattern, meta.version), f"{meta.name} has invalid version: {meta.version}"
+            assert re.match(
+                semver_pattern, meta.version
+            ), f"{meta.name} has invalid version: {meta.version}"
 
     def test_coding_chain_categories(self):
         """Coding chains are properly categorized (if registered)."""

@@ -79,7 +79,7 @@ class ErrorReport:
         result: WorkflowGenerationValidationResult,
         errors_by_category: Dict[str, List[WorkflowValidationError]],
         errors_by_severity: Dict[str, List[WorkflowValidationError]],
-        errors_by_node: Dict[str, List[WorkflowValidationError]]
+        errors_by_node: Dict[str, List[WorkflowValidationError]],
     ):
         self.result = result
         self.errors_by_category = errors_by_category
@@ -151,14 +151,14 @@ class ErrorReporter:
             result=result,
             errors_by_category=errors_by_category,
             errors_by_severity=errors_by_severity,
-            errors_by_node=errors_by_node
+            errors_by_node=errors_by_node,
         )
 
     def human_report(
         self,
         result: WorkflowGenerationValidationResult,
         show_suggestions: bool = True,
-        show_context: bool = False
+        show_context: bool = False,
     ) -> str:
         """Generate human-readable error report.
 
@@ -259,7 +259,7 @@ class ErrorReporter:
         result: WorkflowGenerationValidationResult,
         include_fixes: bool = True,
         include_context: bool = False,
-        max_errors_per_category: int = 20
+        max_errors_per_category: int = 20,
     ) -> str:
         """Generate LLM-friendly error report for refinement.
 
@@ -303,7 +303,9 @@ class ErrorReporter:
                 if include_context and error.context:
                     lines.append(f"    Context: {json.dumps(error.context)}")
             if len(report.errors_by_category["schema"]) > max_errors_per_category:
-                lines.append(f"  ... and {len(report.errors_by_category['schema']) - max_errors_per_category} more schema errors")
+                lines.append(
+                    f"  ... and {len(report.errors_by_category['schema']) - max_errors_per_category} more schema errors"
+                )
             lines.append("")
 
         # Structure errors
@@ -317,7 +319,9 @@ class ErrorReporter:
                 if include_context and error.context:
                     lines.append(f"    Context: {json.dumps(error.context)}")
             if len(report.errors_by_category["structure"]) > max_errors_per_category:
-                lines.append(f"  ... and {len(report.errors_by_category['structure']) - max_errors_per_category} more structure errors")
+                lines.append(
+                    f"  ... and {len(report.errors_by_category['structure']) - max_errors_per_category} more structure errors"
+                )
             lines.append("")
 
         # Semantic errors
@@ -331,7 +335,9 @@ class ErrorReporter:
                 if include_context and error.context:
                     lines.append(f"    Context: {json.dumps(error.context)}")
             if len(report.errors_by_category["semantic"]) > max_errors_per_category:
-                lines.append(f"  ... and {len(report.errors_by_category['semantic']) - max_errors_per_category} more semantic errors")
+                lines.append(
+                    f"  ... and {len(report.errors_by_category['semantic']) - max_errors_per_category} more semantic errors"
+                )
             lines.append("")
 
         # Security errors
@@ -345,7 +351,9 @@ class ErrorReporter:
                 if include_context and error.context:
                     lines.append(f"    Context: {json.dumps(error.context)}")
             if len(report.errors_by_category["security"]) > max_errors_per_category:
-                lines.append(f"  ... and {len(report.errors_by_category['security']) - max_errors_per_category} more security errors")
+                lines.append(
+                    f"  ... and {len(report.errors_by_category['security']) - max_errors_per_category} more security errors"
+                )
             lines.append("")
 
         # Summary
@@ -359,11 +367,7 @@ class ErrorReporter:
 
         return "\n".join(lines)
 
-    def json_report(
-        self,
-        result: WorkflowGenerationValidationResult,
-        indent: int = 2
-    ) -> str:
+    def json_report(self, result: WorkflowGenerationValidationResult, indent: int = 2) -> str:
         """Generate JSON report for programmatic consumption.
 
         Args:
@@ -376,9 +380,7 @@ class ErrorReporter:
         return json.dumps(result.to_dict(), indent=indent)
 
     def markdown_report(
-        self,
-        result: WorkflowGenerationValidationResult,
-        include_suggestions: bool = True
+        self, result: WorkflowGenerationValidationResult, include_suggestions: bool = True
     ) -> str:
         """Generate Markdown report for documentation.
 
@@ -477,11 +479,7 @@ class ErrorReporter:
             f"{report.warning_count} warnings"
         )
 
-    def node_report(
-        self,
-        result: WorkflowGenerationValidationResult,
-        node_id: str
-    ) -> str:
+    def node_report(self, result: WorkflowGenerationValidationResult, node_id: str) -> str:
         """Generate report for a specific node.
 
         Useful for focused debugging of problematic nodes.
@@ -504,12 +502,9 @@ class ErrorReporter:
         lines.append("-" * 40)
 
         for error in node_errors:
-            severity_emoji = {
-                "critical": "🚨",
-                "error": "❌",
-                "warning": "⚠️",
-                "info": "ℹ️"
-            }.get(error.severity.value, "")
+            severity_emoji = {"critical": "🚨", "error": "❌", "warning": "⚠️", "info": "ℹ️"}.get(
+                error.severity.value, ""
+            )
 
             lines.append(f"{severity_emoji} [{error.severity.value.upper()}] {error.message}")
             if error.suggestion:
@@ -518,9 +513,7 @@ class ErrorReporter:
         return "\n".join(lines)
 
     def category_report(
-        self,
-        result: WorkflowGenerationValidationResult,
-        category: ErrorCategory
+        self, result: WorkflowGenerationValidationResult, category: ErrorCategory
     ) -> str:
         """Generate report for a specific error category.
 
@@ -557,8 +550,7 @@ class ErrorReporter:
         return "\n".join(lines)
 
     def prioritize_errors(
-        self,
-        errors: List[WorkflowValidationError]
+        self, errors: List[WorkflowValidationError]
     ) -> List[WorkflowValidationError]:
         """Sort errors by severity and importance.
 
@@ -599,7 +591,7 @@ class ErrorReporter:
                 category_priority.get(e.category, 5),
                 # Tertiary sort: location (alphabetical)
                 e.location,
-            )
+            ),
         )
 
 

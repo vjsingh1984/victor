@@ -24,6 +24,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from victor.agent.subagents.base import SubAgentRole
     from victor.workflows.definition import AgentNode, WorkflowState
     from victor.workflows.compiler_protocols import NodeExecutorProtocol
 
@@ -109,7 +110,7 @@ class AgentNodeExecutor:
                 tool_budget=node.tool_budget,
                 allowed_tools=node.allowed_tools,
                 timeout_seconds=int(node.timeout_seconds) if node.timeout_seconds else 300,
-                disable_embeddings=getattr(node, 'disable_embeddings', False),
+                disable_embeddings=getattr(node, "disable_embeddings", False),
             )
         except Exception as e:
             logger.error(f"Agent node {node.id} execution failed: {e}")
@@ -135,7 +136,7 @@ class AgentNodeExecutor:
                 "role": node.role,
                 "tool_budget": node.tool_budget,
                 "profile": node.profile,
-            }
+            },
         )
 
         logger.info(f"Agent node {node.id} completed successfully")
@@ -217,6 +218,7 @@ class AgentNodeExecutor:
                 # Handle dict values by converting to JSON
                 if isinstance(value, dict):
                     import json
+
                     return json.dumps(value)
                 # Handle primitive values
                 return str(value)

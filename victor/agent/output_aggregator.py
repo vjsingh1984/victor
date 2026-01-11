@@ -363,9 +363,7 @@ class OutputAggregator:
 
         result_summaries = []
         for i, r in enumerate(self._results, 1):
-            status = self._presentation.icon(
-                "success" if r.success else "error", with_color=False
-            )
+            status = self._presentation.icon("success" if r.success else "error", with_color=False)
             result_str = str(r.result)
             if len(result_str) > 200:
                 result_str = result_str[:200] + "..."

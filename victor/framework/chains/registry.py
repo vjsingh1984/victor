@@ -167,7 +167,9 @@ class ChainRegistry:
 
         # Validate category
         if category not in self._categories:
-            raise ValueError(f"Invalid category: {category}. Must be one of: {list(self._categories.keys())}")
+            raise ValueError(
+                f"Invalid category: {category}. Must be one of: {list(self._categories.keys())}"
+            )
 
         with self._lock:
             # Initialize version dict if needed

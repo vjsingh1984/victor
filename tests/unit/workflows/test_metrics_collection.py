@@ -705,9 +705,7 @@ class TestSQLitePersistence:
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
 
-            cursor.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"
-            )
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;")
             tables = [row[0] for row in cursor.fetchall()]
 
             assert "workflow_metrics" in tables

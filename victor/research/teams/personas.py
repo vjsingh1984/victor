@@ -792,6 +792,7 @@ __all__ = [
 # Persona Registration with FrameworkPersonaProvider
 # =============================================================================
 
+
 def _register_research_personas() -> None:
     """Register all research personas with FrameworkPersonaProvider.
 
@@ -842,6 +843,7 @@ def _register_research_personas() -> None:
     except Exception as e:
         # Log but don't fail module import
         import logging
+
         logger = logging.getLogger(__name__)
         logger.warning(f"Failed to register research personas with framework: {e}")
 

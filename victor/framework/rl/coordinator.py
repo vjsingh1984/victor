@@ -616,7 +616,9 @@ class RLCoordinator:
 
                 return CacheEvictionLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "grounding_threshold":
-                from victor.framework.rl.learners.grounding_threshold import GroundingThresholdLearner
+                from victor.framework.rl.learners.grounding_threshold import (
+                    GroundingThresholdLearner,
+                )
 
                 return GroundingThresholdLearner(
                     name=name, db_connection=self.db, learning_rate=0.1

@@ -102,9 +102,7 @@ class IStorageBackend(Protocol):
         """
         ...
 
-    def list_experiments(
-        self, query: Optional[ExperimentQuery] = None
-    ) -> List[Experiment]:
+    def list_experiments(self, query: Optional[ExperimentQuery] = None) -> List[Experiment]:
         """List experiments with optional filtering.
 
         Args:
@@ -192,9 +190,7 @@ class IStorageBackend(Protocol):
         """
         ...
 
-    def get_metric_history(
-        self, run_id: str, metric_key: str
-    ) -> List[Metric]:
+    def get_metric_history(self, run_id: str, metric_key: str) -> List[Metric]:
         """Get history of a specific metric.
 
         Args:

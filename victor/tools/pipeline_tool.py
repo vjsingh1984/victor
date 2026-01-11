@@ -367,7 +367,11 @@ class PipelineAnalyzerTool(BaseTool):
         line_delta = comparison["line_coverage_delta"]
         branch_delta = comparison["branch_coverage_delta"]
 
-        status = f"{_get_icon('trend_up')} Improved" if comparison["improved"] else f"{_get_icon('trend_down')} Regressed"
+        status = (
+            f"{_get_icon('trend_up')} Improved"
+            if comparison["improved"]
+            else f"{_get_icon('trend_down')} Regressed"
+        )
         lines.append(f"**Status:** {status}")
         lines.append("")
 

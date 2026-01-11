@@ -184,21 +184,25 @@ class PatternRecommender:
         for benefit in recommendation.expected_benefits:
             lines.append(f"- {benefit}")
 
-        lines.extend([
-            "",
-            "### Potential Risks",
-        ])
+        lines.extend(
+            [
+                "",
+                "### Potential Risks",
+            ]
+        )
 
         for risk in recommendation.potential_risks:
             lines.append(f"- {risk}")
 
-        lines.extend([
-            "",
-            "### Pattern Statistics",
-            f"- Success Rate: {pattern.success_rate:.1%}",
-            f"- Usage Count: {pattern.metrics.usage_count}",
-            f"- Avg Duration: {pattern.metrics.avg_duration_ms:.0f}ms",
-        ])
+        lines.extend(
+            [
+                "",
+                "### Pattern Statistics",
+                f"- Success Rate: {pattern.success_rate:.1%}",
+                f"- Usage Count: {pattern.metrics.usage_count}",
+                f"- Avg Duration: {pattern.metrics.avg_duration_ms:.0f}ms",
+            ]
+        )
 
         return "\n".join(lines)
 

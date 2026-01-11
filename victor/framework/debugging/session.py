@@ -153,6 +153,7 @@ class DebugSession:
         self._event_bus = event_bus
         # Use time.time() instead of event loop time to avoid "no event loop" errors
         import time
+
         self.created_at = time.time()
 
         # Create components

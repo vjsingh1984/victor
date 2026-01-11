@@ -42,6 +42,7 @@ def _get_icon(name: str) -> str:
     global _presentation
     if _presentation is None:
         from victor.agent.presentation import create_presentation_adapter
+
         _presentation = create_presentation_adapter()
     return _presentation.icon(name, with_color=False)
 
@@ -468,7 +469,9 @@ async def rename(
         if applied_count == len(all_file_changes):
             report.append(f"{_get_icon('success')} All {applied_count} files updated successfully")
         else:
-            report.append(f"{_get_icon('warning')}  {applied_count}/{len(all_file_changes)} files updated (some failed)")
+            report.append(
+                f"{_get_icon('warning')}  {applied_count}/{len(all_file_changes)} files updated (some failed)"
+            )
     else:
         report.append("")
         report.append(f"{_get_icon('warning')}  PREVIEW MODE - no changes were made")

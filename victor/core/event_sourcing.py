@@ -1080,5 +1080,3 @@ class StateChangedEvent(DomainEvent):
     from_state: str = ""
     to_state: str = ""
     reason: str = ""
-
-

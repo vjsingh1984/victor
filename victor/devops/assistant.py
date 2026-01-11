@@ -322,4 +322,3 @@ When creating configurations:
         from victor.devops.handlers import HANDLERS
 
         return HANDLERS
-

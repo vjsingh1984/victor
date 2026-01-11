@@ -151,9 +151,7 @@ class VariantEvaluator:
         Returns:
             EvaluationResult with scores and recommendation
         """
-        logger.info(
-            f"Evaluating variant {variant.variant_id} using {mode.value} mode"
-        )
+        logger.info(f"Evaluating variant {variant.variant_id} using {mode.value} mode")
 
         if mode == EvaluationMode.DRY_RUN:
             result = await self._evaluate_dry_run(
@@ -367,9 +365,9 @@ class VariantEvaluator:
             Overall weighted score
         """
         return (
-            self.objective_weights["duration"] * duration_score +
-            self.objective_weights["cost"] * cost_score +
-            self.objective_weights["quality"] * quality_score
+            self.objective_weights["duration"] * duration_score
+            + self.objective_weights["cost"] * cost_score
+            + self.objective_weights["quality"] * quality_score
         )
 
     async def compare_variants(

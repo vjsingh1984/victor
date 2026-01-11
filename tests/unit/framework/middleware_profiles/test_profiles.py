@@ -156,9 +156,7 @@ class TestSafetyFirstProfile:
     def test_safety_first_git_config(self):
         """safety_first_profile() should configure GitSafetyMiddleware."""
         profile = MiddlewareProfiles.safety_first_profile()
-        git_middleware = next(
-            m for m in profile.middlewares if isinstance(m, GitSafetyMiddleware)
-        )
+        git_middleware = next(m for m in profile.middlewares if isinstance(m, GitSafetyMiddleware))
 
         assert git_middleware._block_dangerous is True
         assert git_middleware._warn_on_risky is True
@@ -216,9 +214,7 @@ class TestDevelopmentProfile:
     def test_development_git_config(self):
         """development_profile() should have permissive GitSafetyMiddleware."""
         profile = MiddlewareProfiles.development_profile()
-        git_middleware = next(
-            m for m in profile.middlewares if isinstance(m, GitSafetyMiddleware)
-        )
+        git_middleware = next(m for m in profile.middlewares if isinstance(m, GitSafetyMiddleware))
 
         assert git_middleware._block_dangerous is False
         assert git_middleware._warn_on_risky is True
@@ -277,9 +273,7 @@ class TestProductionProfile:
     def test_production_git_config(self):
         """production_profile() should have strict GitSafetyMiddleware."""
         profile = MiddlewareProfiles.production_profile()
-        git_middleware = next(
-            m for m in profile.middlewares if isinstance(m, GitSafetyMiddleware)
-        )
+        git_middleware = next(m for m in profile.middlewares if isinstance(m, GitSafetyMiddleware))
 
         assert git_middleware._block_dangerous is True
         assert git_middleware._warn_on_risky is True
@@ -382,9 +376,7 @@ class TestCICDProfile:
     def test_ci_cd_git_config(self):
         """ci_cd_profile() should not warn in CI/CD."""
         profile = MiddlewareProfiles.ci_cd_profile()
-        git_middleware = next(
-            m for m in profile.middlewares if isinstance(m, GitSafetyMiddleware)
-        )
+        git_middleware = next(m for m in profile.middlewares if isinstance(m, GitSafetyMiddleware))
 
         assert git_middleware._block_dangerous is True
         assert git_middleware._warn_on_risky is False  # No warnings in CI/CD

@@ -324,6 +324,7 @@ class TestChainRegistryPerformance:
 
         def get_singleton():
             from victor.framework.chain_registry import get_chain_registry
+
             return get_chain_registry()
 
         result = benchmark(get_singleton)
@@ -531,6 +532,7 @@ class TestPersonaRegistryPerformance:
 
         def get_singleton():
             from victor.framework.persona_registry import get_persona_registry
+
             return get_persona_registry()
 
         result = benchmark(get_singleton)
@@ -598,6 +600,7 @@ class TestCapabilityProviderPerformance:
 
         Expected: < 1ms
         """
+
         def create_provider():
             return TestCapabilityProvider(num_capabilities=100)
 
@@ -710,9 +713,7 @@ class TestMiddlewarePerformance:
         middleware = GitSafetyMiddleware(block_dangerous=True)
 
         async def run_middleware():
-            return await middleware.before_tool_call(
-                "git", {"command": "git status"}
-            )
+            return await middleware.before_tool_call("git", {"command": "git status"})
 
         def run_sync():
             return asyncio.run(run_middleware())
@@ -959,9 +960,7 @@ class TestPerformanceAssertions:
         elapsed = time.perf_counter() - start
 
         avg_time_ms = (elapsed / 1000) * 1000
-        assert (
-            avg_time_ms < 0.1
-        ), f"Chain lookup too slow: {avg_time_ms:.3f}ms (target: < 0.1ms)"
+        assert avg_time_ms < 0.1, f"Chain lookup too slow: {avg_time_ms:.3f}ms (target: < 0.1ms)"
 
     def test_persona_registration_meets_target(self):
         """Assert persona registration is < 1ms per item."""

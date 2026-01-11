@@ -211,11 +211,7 @@ class TestNodeExecutorFactory:
 
         # Test creating agent executor
         agent_node = AgentNode(
-            id="test",
-            name="Test Agent",
-            role="researcher",
-            goal="Test",
-            output_key="result"
+            id="test", name="Test Agent", role="researcher", goal="Test", output_key="result"
         )
         agent_executor = factory.create_executor(agent_node)
         assert agent_executor is not None
@@ -223,10 +219,7 @@ class TestNodeExecutorFactory:
 
         # Test creating compute executor
         compute_node = ComputeNode(
-            id="test",
-            name="Test Compute",
-            handler="test_handler",
-            output_key="result"
+            id="test", name="Test Compute", handler="test_handler", output_key="result"
         )
         compute_executor = factory.create_executor(compute_node)
         assert compute_executor is not None
@@ -281,10 +274,7 @@ class TestExecutionResult:
         """Test that execution result has required properties."""
         from victor.workflows.compiled_executor import ExecutionResult
 
-        result = ExecutionResult(
-            final_state={"key": "value"},
-            metrics={"duration": 1.0}
-        )
+        result = ExecutionResult(final_state={"key": "value"}, metrics={"duration": 1.0})
 
         assert result.final_state == {"key": "value"}
         assert result.metrics == {"duration": 1.0}

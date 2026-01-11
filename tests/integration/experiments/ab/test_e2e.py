@@ -140,9 +140,7 @@ class TestABTestManager:
 
     async def test_sticky_allocation_consistency(self, temp_db, sample_experiment_config):
         """Test that sticky allocation is consistent."""
-        manager = ABTestManager(
-            storage_path=temp_db, allocation_strategy=AllocationStrategy.STICKY
-        )
+        manager = ABTestManager(storage_path=temp_db, allocation_strategy=AllocationStrategy.STICKY)
 
         # Create and start experiment
         experiment_id = await manager.create_experiment(sample_experiment_config)

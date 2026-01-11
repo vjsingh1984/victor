@@ -143,9 +143,7 @@ class TestE2EGenerationAutoMode:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
-    async def test_generate_simple_bug_fix_workflow(
-        self, mock_orchestrator, sample_llm_responses
-    ):
+    async def test_generate_simple_bug_fix_workflow(self, mock_orchestrator, sample_llm_responses):
         """Test generating a simple bug fix workflow."""
         pipeline = WorkflowGenerationPipeline(
             mock_orchestrator,
@@ -184,9 +182,7 @@ class TestE2EGenerationAutoMode:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
-    async def test_generate_with_validation_callback(
-        self, mock_orchestrator, sample_llm_responses
-    ):
+    async def test_generate_with_validation_callback(self, mock_orchestrator, sample_llm_responses):
         """Test generation with custom validation callback."""
         pipeline = WorkflowGenerationPipeline(
             mock_orchestrator,
@@ -220,9 +216,7 @@ class TestE2EGenerationAutoMode:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
-    async def test_generate_with_progress_callback(
-        self, mock_orchestrator, sample_llm_responses
-    ):
+    async def test_generate_with_progress_callback(self, mock_orchestrator, sample_llm_responses):
         """Test generation with progress callback."""
         pipeline = WorkflowGenerationPipeline(
             mock_orchestrator,
@@ -267,9 +261,7 @@ class TestE2EGenerationInteractiveMode:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
-    async def test_generate_with_user_approval(
-        self, mock_orchestrator, sample_llm_responses
-    ):
+    async def test_generate_with_user_approval(self, mock_orchestrator, sample_llm_responses):
         """Test generation with user approval at each stage."""
         pipeline = WorkflowGenerationPipeline(
             mock_orchestrator,
@@ -283,12 +275,15 @@ class TestE2EGenerationInteractiveMode:
         ]
 
         # Mock user approval (auto-approve in non-TTY)
-        with patch(
-            "victor.workflows.generation.workflow_pipeline.WorkflowGenerationPipeline._interactive_approval",
-            return_value=True,
-        ), patch(
-            "victor.workflows.generation.workflow_pipeline.WorkflowGenerationPipeline._validate_schema",
-            return_value=MagicMock(is_valid=True),
+        with (
+            patch(
+                "victor.workflows.generation.workflow_pipeline.WorkflowGenerationPipeline._interactive_approval",
+                return_value=True,
+            ),
+            patch(
+                "victor.workflows.generation.workflow_pipeline.WorkflowGenerationPipeline._validate_schema",
+                return_value=MagicMock(is_valid=True),
+            ),
         ):
             result = await pipeline.generate_workflow(
                 "Fix bugs in the code",
@@ -299,9 +294,7 @@ class TestE2EGenerationInteractiveMode:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
-    async def test_generate_with_user_rejection(
-        self, mock_orchestrator, sample_llm_responses
-    ):
+    async def test_generate_with_user_rejection(self, mock_orchestrator, sample_llm_responses):
         """Test generation when user rejects at requirements stage."""
         pipeline = WorkflowGenerationPipeline(
             mock_orchestrator,
@@ -381,9 +374,7 @@ class TestE2EWorkflowRefinement:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
-    async def test_refine_existing_workflow(
-        self, mock_orchestrator, sample_llm_responses
-    ):
+    async def test_refine_existing_workflow(self, mock_orchestrator, sample_llm_responses):
         """Test refining an existing workflow."""
         pipeline = WorkflowGenerationPipeline(
             mock_orchestrator,
@@ -393,9 +384,7 @@ class TestE2EWorkflowRefinement:
         # Create a simple workflow graph
         original_schema = {
             "workflow_name": "simple_workflow",
-            "nodes": [
-                {"id": "node1", "type": "agent", "role": "executor", "goal": "Task 1"}
-            ],
+            "nodes": [{"id": "node1", "type": "agent", "role": "executor", "goal": "Task 1"}],
             "edges": [{"source": "node1", "target": "__end__", "type": "normal"}],
             "entry_point": "node1",
         }
@@ -511,9 +500,7 @@ class TestE2EGenerationMultipleVerticals:
             ("dataanalysis", "Analyze dataset and create visualizations"),
         ],
     )
-    async def test_generate_workflow_for_vertical(
-        self, mock_orchestrator, vertical, description
-    ):
+    async def test_generate_workflow_for_vertical(self, mock_orchestrator, vertical, description):
         """Test generation for different verticals."""
         pipeline = WorkflowGenerationPipeline(
             mock_orchestrator,
@@ -523,7 +510,9 @@ class TestE2EGenerationMultipleVerticals:
         # Mock LLM responses (include required description field and at least one task)
         mock_orchestrator.chat.side_effect = [
             f'{{"description": "{description}", "functional": {{"tasks": [{{"id": "task1", "description": "Main task", "task_type": "agent", "role": "executor", "goal": "{description}"}}]}}, "structural": {{"execution_order": "sequential"}}, "quality": {{}}, "context": {{"vertical": "{vertical}"}}}}',
-            '{{"workflow_name": "test", "nodes": [{{"id": "task1", "type": "agent", "role": "executor", "goal": "{description}"}}], "edges": [{{"source": "task1", "target": "__end__", "type": "normal"}}], "entry_point": "task1"}}'.replace('{description}', description),
+            '{{"workflow_name": "test", "nodes": [{{"id": "task1", "type": "agent", "role": "executor", "goal": "{description}"}}], "edges": [{{"source": "task1", "target": "__end__", "type": "normal"}}], "entry_point": "task1"}}'.replace(
+                "{description}", description
+            ),
         ]
 
         with patch(

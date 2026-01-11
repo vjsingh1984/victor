@@ -182,9 +182,7 @@ class WorkflowBreakpoint:
                 try:
                     matches = self.condition(state)
                 except Exception as e:
-                    logger.warning(
-                        f"Breakpoint {self.id} condition evaluation failed: {e}"
-                    )
+                    logger.warning(f"Breakpoint {self.id} condition evaluation failed: {e}")
                     matches = False
             else:
                 matches = True
@@ -316,11 +314,7 @@ class BreakpointStorage:
             List of breakpoints for the node
         """
         bp_ids = self._node_index.get(node_id, [])
-        return [
-            self._breakpoints[bp_id]
-            for bp_id in bp_ids
-            if bp_id in self._breakpoints
-        ]
+        return [self._breakpoints[bp_id] for bp_id in bp_ids if bp_id in self._breakpoints]
 
     def clear(self) -> None:
         """Clear all breakpoints."""

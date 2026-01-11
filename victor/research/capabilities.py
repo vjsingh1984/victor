@@ -807,4 +807,3 @@ def get_capability_configs() -> Dict[str, Any]:
             "enable_contradiction_detection": True,
         },
     }
-

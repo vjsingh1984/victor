@@ -141,9 +141,7 @@ class FEPManager:
 
         # Extract sections
         sections: Dict[str, FEPSection] = {}
-        self.validator._extract_and_validate_sections(
-            content_without_frontmatter, sections
-        )
+        self.validator._extract_and_validate_sections(content_without_frontmatter, sections)
 
         return sections
 
@@ -166,9 +164,7 @@ class FEPManager:
 
         return self.validator.validate_file(matches[0])
 
-    def update_fep_status(
-        self, fep_number: int, new_status: FEPStatus
-    ) -> Tuple[bool, str]:
+    def update_fep_status(self, fep_number: int, new_status: FEPStatus) -> Tuple[bool, str]:
         """Update FEP status.
 
         Args:
@@ -192,21 +188,22 @@ class FEPManager:
             # Read content
             content = fep_file.read_text(encoding="utf-8")
 
-            # Parse metadata
-            metadata = parse_fep_metadata(content)
-
             # Update status in frontmatter
             # Pattern: status: CurrentStatus
             status_pattern = r"^status:\s*\S+"
             new_status_line = f"status: {new_status.value}"
 
-            new_content = re.sub(status_pattern, new_status_line, content, count=1, flags=re.MULTILINE)
+            new_content = re.sub(
+                status_pattern, new_status_line, content, count=1, flags=re.MULTILINE
+            )
 
             # Update modified date
             today = datetime.now().strftime("%Y-%m-%d")
             modified_pattern = r"^modified:\s*\d{4}-\d{2}-\d{2}"
             new_modified_line = f"modified: {today}"
-            new_content = re.sub(modified_pattern, new_modified_line, new_content, count=1, flags=re.MULTILINE)
+            new_content = re.sub(
+                modified_pattern, new_modified_line, new_content, count=1, flags=re.MULTILINE
+            )
 
             # Write back
             fep_file.write_text(new_content, encoding="utf-8")

@@ -405,7 +405,9 @@ class TestGetToolStatusMessage:
     def test_execute_bash_with_long_command_truncates(self):
         """Test that long commands are truncated at 80 chars."""
         long_command = "a" * 100  # 100 characters
-        result = get_tool_status_message("execute_bash", {"command": long_command}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "execute_bash", {"command": long_command}, presentation=self.presentation
+        )
 
         # Should truncate to 80 chars + "..."
         expected = f"{self.ICON_PREFIX} Running execute_bash: `{'a' * 80}...`"
@@ -415,14 +417,18 @@ class TestGetToolStatusMessage:
     def test_execute_bash_exactly_80_chars(self):
         """Test command exactly at 80 chars boundary."""
         command = "x" * 80
-        result = get_tool_status_message("execute_bash", {"command": command}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "execute_bash", {"command": command}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Running execute_bash: `{command}`"
         assert "..." not in result
 
     def test_execute_bash_81_chars_truncates(self):
         """Test command at 81 chars gets truncated."""
         command = "y" * 81
-        result = get_tool_status_message("execute_bash", {"command": command}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "execute_bash", {"command": command}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Running execute_bash: `{'y' * 80}...`"
 
     def test_execute_bash_no_command(self):
@@ -432,7 +438,9 @@ class TestGetToolStatusMessage:
 
     def test_list_directory_with_path(self):
         """Test status message for list_directory with path."""
-        result = get_tool_status_message("list_directory", {"path": "/home/user"}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "list_directory", {"path": "/home/user"}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Listing directory: /home/user"
 
     def test_list_directory_without_path(self):
@@ -442,7 +450,9 @@ class TestGetToolStatusMessage:
 
     def test_read_with_path(self):
         """Test status message for read tool with path."""
-        result = get_tool_status_message("read", {"path": "/etc/config.yaml"}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "read", {"path": "/etc/config.yaml"}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Reading file: /etc/config.yaml"
 
     def test_read_without_path(self):
@@ -452,13 +462,17 @@ class TestGetToolStatusMessage:
 
     def test_edit_files_single_file(self):
         """Test status message for edit_files with single file."""
-        result = get_tool_status_message("edit_files", {"files": [{"path": "main.py"}]}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "edit_files", {"files": [{"path": "main.py"}]}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Editing: main.py"
 
     def test_edit_files_multiple_files(self):
         """Test status message for edit_files with multiple files."""
         files = [{"path": "a.py"}, {"path": "b.py"}, {"path": "c.py"}]
-        result = get_tool_status_message("edit_files", {"files": files}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "edit_files", {"files": files}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Editing: a.py, b.py, c.py"
 
     def test_edit_files_more_than_three(self):
@@ -470,12 +484,16 @@ class TestGetToolStatusMessage:
             {"path": "d.py"},
             {"path": "e.py"},
         ]
-        result = get_tool_status_message("edit_files", {"files": files}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "edit_files", {"files": files}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Editing: a.py, b.py, c.py (+2 more)"
 
     def test_edit_files_empty_list(self):
         """Test edit_files with empty files list."""
-        result = get_tool_status_message("edit_files", {"files": []}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "edit_files", {"files": []}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Running edit_files..."
 
     def test_edit_files_no_files_key(self):
@@ -485,18 +503,24 @@ class TestGetToolStatusMessage:
 
     def test_edit_files_non_list_files(self):
         """Test edit_files with non-list files value."""
-        result = get_tool_status_message("edit_files", {"files": "not a list"}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "edit_files", {"files": "not a list"}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Running edit_files..."
 
     def test_edit_files_missing_path_in_file(self):
         """Test edit_files when file entry is missing path."""
         files = [{"content": "data"}, {"path": "b.py"}, {}]
-        result = get_tool_status_message("edit_files", {"files": files}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "edit_files", {"files": files}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Editing: ?, b.py, ?"
 
     def test_write_with_path(self):
         """Test status message for write tool with path."""
-        result = get_tool_status_message("write", {"path": "/tmp/output.txt"}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "write", {"path": "/tmp/output.txt"}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Writing file: /tmp/output.txt"
 
     def test_write_without_path(self):
@@ -506,26 +530,34 @@ class TestGetToolStatusMessage:
 
     def test_code_search_with_short_query(self):
         """Test status message for code_search with short query."""
-        result = get_tool_status_message("code_search", {"query": "def main"}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "code_search", {"query": "def main"}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Searching: def main"
 
     def test_code_search_with_long_query_truncates(self):
         """Test that long queries are truncated at 50 chars."""
         long_query = "q" * 60
-        result = get_tool_status_message("code_search", {"query": long_query}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "code_search", {"query": long_query}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Searching: {'q' * 50}..."
 
     def test_code_search_exactly_50_chars(self):
         """Test query exactly at 50 chars boundary."""
         query = "z" * 50
-        result = get_tool_status_message("code_search", {"query": query}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "code_search", {"query": query}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Searching: {query}"
         assert "..." not in result
 
     def test_code_search_51_chars_truncates(self):
         """Test query at 51 chars gets truncated."""
         query = "w" * 51
-        result = get_tool_status_message("code_search", {"query": query}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "code_search", {"query": query}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Searching: {'w' * 50}..."
 
     def test_code_search_no_query(self):
@@ -535,7 +567,9 @@ class TestGetToolStatusMessage:
 
     def test_unknown_tool_default_message(self):
         """Test default message for unknown tools."""
-        result = get_tool_status_message("unknown_tool", {"any": "args"}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "unknown_tool", {"any": "args"}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Running unknown_tool..."
 
     def test_default_message_for_various_tools(self):
@@ -553,13 +587,17 @@ class TestGetToolStatusMessage:
     def test_special_characters_in_command(self):
         """Test handling special characters in bash command."""
         command = 'echo "hello world" | grep -E "pattern"'
-        result = get_tool_status_message("execute_bash", {"command": command}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "execute_bash", {"command": command}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Running execute_bash: `{command}`"
 
     def test_newlines_in_command(self):
         """Test handling newlines in bash command."""
         command = "echo 'line1\nline2'"
-        result = get_tool_status_message("execute_bash", {"command": command}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "execute_bash", {"command": command}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Running execute_bash: `{command}`"
 
     def test_message_starts_with_emoji(self):
@@ -615,7 +653,9 @@ class TestBackwardCompatibilityAliases:
     def test_get_tool_status_message_alias(self):
         """Test _get_tool_status_message alias."""
         result1 = get_tool_status_message("read", {"path": "/test"}, presentation=self.presentation)
-        result2 = _get_tool_status_message("read", {"path": "/test"}, presentation=self.presentation)
+        result2 = _get_tool_status_message(
+            "read", {"path": "/test"}, presentation=self.presentation
+        )
 
         assert result1 == result2
 

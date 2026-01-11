@@ -954,7 +954,9 @@ class EventRegistry:
 
         return None
 
-    def _fallback_to_external(self, event: AgentExecutionEvent, target: EventTarget) -> Dict[str, Any]:
+    def _fallback_to_external(
+        self, event: AgentExecutionEvent, target: EventTarget
+    ) -> Dict[str, Any]:
         """Fallback conversion for unknown event types."""
         base = {
             "timestamp": event.timestamp,

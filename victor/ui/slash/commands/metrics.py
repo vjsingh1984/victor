@@ -472,7 +472,9 @@ class LearningCommand(BaseSlashCommand):
                         mode_controller = integration.mode_controller
                     elif hasattr(integration, "_pipeline"):
                         pipeline = getattr(integration, "_pipeline", None)
-                        mode_controller = getattr(pipeline, "_mode_controller", None) if pipeline else None
+                        mode_controller = (
+                            getattr(pipeline, "_mode_controller", None) if pipeline else None
+                        )
                     else:
                         mode_controller = None
 
@@ -514,8 +516,16 @@ class LearningCommand(BaseSlashCommand):
                         )
                         content += f"  {rank['provider']}: Q={rank['q_value']:.2f} (n={rank['sample_count']}){current}\n"
 
-                    exploration = learner.get_exploration_rate() if hasattr(learner, "get_exploration_rate") else getattr(learner, "_exploration_rate", 0.1)
-                    strategy = learner.get_strategy() if hasattr(learner, "get_strategy") else getattr(learner, "_strategy", None)
+                    exploration = (
+                        learner.get_exploration_rate()
+                        if hasattr(learner, "get_exploration_rate")
+                        else getattr(learner, "_exploration_rate", 0.1)
+                    )
+                    strategy = (
+                        learner.get_strategy()
+                        if hasattr(learner, "get_strategy")
+                        else getattr(learner, "_strategy", None)
+                    )
                     content += f"\n  Strategy: {strategy.value if strategy else 'epsilon_greedy'}\n"
                     content += f"  Exploration Rate: {exploration:.2f}\n"
         except Exception as e:

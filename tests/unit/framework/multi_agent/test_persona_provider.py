@@ -864,9 +864,7 @@ class TestThreadSafety:
             except Exception as e:
                 errors.append(e)
 
-        threads = [
-            threading.Thread(target=register_persona, args=(i,)) for i in range(num_threads)
-        ]
+        threads = [threading.Thread(target=register_persona, args=(i,)) for i in range(num_threads)]
 
         for thread in threads:
             thread.start()
@@ -908,9 +906,7 @@ class TestThreadSafety:
             except Exception as e:
                 errors.append(e)
 
-        threads = [
-            threading.Thread(target=get_persona, args=(i,)) for i in range(20)
-        ]
+        threads = [threading.Thread(target=get_persona, args=(i,)) for i in range(20)]
 
         for thread in threads:
             thread.start()

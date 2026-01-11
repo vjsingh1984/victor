@@ -472,9 +472,7 @@ class ProviderSwitchCoordinator:
             True if hook was found and removed
         """
         original_len = len(self._registered_hooks)
-        self._registered_hooks = [
-            h for h in self._registered_hooks if h.hook.name != name
-        ]
+        self._registered_hooks = [h for h in self._registered_hooks if h.hook.name != name]
         removed = len(self._registered_hooks) < original_len
         if removed:
             logger.debug(f"Unregistered hook '{name}'")

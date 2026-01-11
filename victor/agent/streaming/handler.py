@@ -101,6 +101,7 @@ class StreamingChatHandler:
         # Presentation adapter for icon rendering (decouples from UI)
         if presentation is None:
             from victor.agent.presentation import create_presentation_adapter
+
             self._presentation = create_presentation_adapter()
         else:
             self._presentation = presentation
@@ -182,7 +183,9 @@ class StreamingChatHandler:
             )
             result = IterationResult(action=IterationAction.YIELD_AND_CONTINUE)
             result.add_chunk(
-                StreamChunk(content=f"\n[loop] {self._presentation.icon('warning', with_color=False)} Multiple blocked attempts - forcing completion\n")
+                StreamChunk(
+                    content=f"\n[loop] {self._presentation.icon('warning', with_color=False)} Multiple blocked attempts - forcing completion\n"
+                )
             )
             # Add strong instruction to stop tool use
             self.message_adder.add_message(
@@ -546,7 +549,9 @@ class StreamingChatHandler:
         """
         result = IterationResult(action=IterationAction.YIELD_AND_CONTINUE)
         result.add_chunk(
-            StreamChunk(content=f"\n[loop] {self._presentation.icon('warning', with_color=False)} Multiple blocked attempts - forcing completion\n")
+            StreamChunk(
+                content=f"\n[loop] {self._presentation.icon('warning', with_color=False)} Multiple blocked attempts - forcing completion\n"
+            )
         )
         self.message_adder.add_message(
             "user",

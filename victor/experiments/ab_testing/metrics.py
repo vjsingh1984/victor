@@ -238,9 +238,7 @@ class MetricsCollector:
         # Check cache first
         key = f"{experiment_id}:{variant_id}"
         if key in self._aggregation_cache:
-            return self._compute_aggregated_metrics(
-                self._aggregation_cache[key], variant_id
-            )
+            return self._compute_aggregated_metrics(self._aggregation_cache[key], variant_id)
 
         # Load from database
         conn = sqlite3.connect(str(self.storage_path))

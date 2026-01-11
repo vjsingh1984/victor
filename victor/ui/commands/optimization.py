@@ -67,6 +67,7 @@ def profile(
     Example:
         victor opt profile my_workflow --min-executions 5
     """
+
     async def run_profile():
         tracker = ExperimentTracker()
         optimizer = WorkflowOptimizer(experiment_tracker=tracker)
@@ -168,6 +169,7 @@ def suggest(
     Example:
         victor opt suggest my_workflow --max-suggestions 5
     """
+
     async def run_suggest():
         tracker = ExperimentTracker()
         optimizer = WorkflowOptimizer(
@@ -200,10 +202,14 @@ def suggest(
             click.echo(f"   Confidence: {suggestion.confidence:.1%}")
 
             if suggestion.estimated_cost_reduction > 0:
-                click.echo(f"   Estimated cost reduction: ${suggestion.estimated_cost_reduction:.4f}")
+                click.echo(
+                    f"   Estimated cost reduction: ${suggestion.estimated_cost_reduction:.4f}"
+                )
 
             if suggestion.estimated_duration_reduction > 0:
-                click.echo(f"   Estimated time saved: {suggestion.estimated_duration_reduction:.2f}s")
+                click.echo(
+                    f"   Estimated time saved: {suggestion.estimated_duration_reduction:.2f}s"
+                )
 
             click.echo()
 
@@ -257,6 +263,7 @@ def optimize(
     Example:
         victor opt optimize my_workflow config.json --algorithm hill_climbing
     """
+
     async def run_optimize():
         # Load workflow config
         with open(config_file, "r") as f:
@@ -338,6 +345,7 @@ def validate(
     Example:
         victor opt validate variant.json my_workflow --test-inputs tests.json
     """
+
     async def run_validate():
         # Load variant
         with open(variant_file, "r") as f:

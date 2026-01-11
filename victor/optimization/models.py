@@ -312,18 +312,14 @@ class WorkflowProfile:
         return [
             opp
             for opp in self.opportunities
-            if opp.confidence >= min_confidence
-            and opp.expected_improvement >= min_improvement
+            if opp.confidence >= min_confidence and opp.expected_improvement >= min_improvement
         ]
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "workflow_id": self.workflow_id,
-            "node_stats": {
-                node_id: stats.to_dict()
-                for node_id, stats in self.node_stats.items()
-            },
+            "node_stats": {node_id: stats.to_dict() for node_id, stats in self.node_stats.items()},
             "bottlenecks": [b.to_dict() for b in self.bottlenecks],
             "opportunities": [o.to_dict() for o in self.opportunities],
             "total_duration": self.total_duration,

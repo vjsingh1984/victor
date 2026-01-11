@@ -490,5 +490,3 @@ class EventSubscriptionError(Exception):
 
 # Type for backend factory functions
 BackendFactory = Callable[[BackendConfig], IEventBackend]
-
-

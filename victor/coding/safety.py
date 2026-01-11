@@ -219,7 +219,8 @@ def create_git_safety_rules(
             SafetyRule(
                 name="git_block_force_push",
                 description="Block force push to protected branches",
-                check_fn=lambda op: "git push" in op and "--force" in op
+                check_fn=lambda op: "git push" in op
+                and "--force" in op
                 and any(branch in op for branch in protected),
                 level=SafetyLevel.HIGH,
                 allow_override=False,
@@ -335,7 +336,8 @@ def create_test_safety_rules(
             SafetyRule(
                 name="test_block_destructive",
                 description="Block tests that modify production data or databases",
-                check_fn=lambda op: "pytest" in op or "test" in op
+                check_fn=lambda op: "pytest" in op
+                or "test" in op
                 and any(db in op for db in ["prod", "production", "--database"]),
                 level=SafetyLevel.HIGH,
                 allow_override=True,

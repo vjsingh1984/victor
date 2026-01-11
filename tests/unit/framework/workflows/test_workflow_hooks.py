@@ -343,6 +343,7 @@ class TestErrorHandling:
 
     def test_handles_attribute_error_gracefully(self):
         """Should handle AttributeError gracefully and return None."""
+
         # Create a provider that returns a module without expected attributes
         class BrokenProvider(BaseYAMLWorkflowProvider):
             def _get_escape_hatches_module(self) -> str:

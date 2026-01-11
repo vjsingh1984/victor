@@ -201,9 +201,7 @@ class RequirementPipeline:
                     validation_result = validator.validate(requirements)
                     if not validation_result.is_valid:
                         logger.error("Re-validation failed after ambiguity resolution")
-                        raise ValueError(
-                            f"Requirements still invalid: {validation_result.errors}"
-                        )
+                        raise ValueError(f"Requirements still invalid: {validation_result.errors}")
 
             # Update metadata
             extraction_time = time.time() - start_time

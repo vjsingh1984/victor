@@ -217,7 +217,9 @@ class TestAgentRun:
 
         async def mock_stream(*args, **kwargs):
             yield AgentExecutionEvent(type=EventType.ERROR, error="Something went wrong")
-            yield AgentExecutionEvent(type=EventType.STREAM_END, success=False, error="Something went wrong")
+            yield AgentExecutionEvent(
+                type=EventType.STREAM_END, success=False, error="Something went wrong"
+            )
 
         agent = Agent(mock_orchestrator)
 

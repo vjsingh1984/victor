@@ -263,7 +263,9 @@ class TestCrossVerticalConsistency:
 
         for provider in providers:
             assert hasattr(provider, "compile_workflow"), f"{provider} missing compile_workflow"
-            assert hasattr(provider, "stream_compiled_workflow"), f"{provider} missing stream_compiled_workflow"
+            assert hasattr(
+                provider, "stream_compiled_workflow"
+            ), f"{provider} missing stream_compiled_workflow"
 
     def test_workflow_yaml_files_exist(self):
         """Test YAML workflow files exist for each vertical."""

@@ -99,8 +99,7 @@ class NodeExecutorFactory:
         """
         if node_type in self._executor_types and not replace:
             raise ValueError(
-                f"Node type '{node_type}' already registered. "
-                f"Use replace=True to override."
+                f"Node type '{node_type}' already registered. " f"Use replace=True to override."
             )
 
         self._executor_types[node_type] = executor_class
@@ -127,14 +126,13 @@ class NodeExecutorFactory:
             executor_fn = factory.create_executor(agent_node)
             result_state = await executor_fn(initial_state)
         """
-        # Determine node type
-        node_type = node.__class__.__name__.replace("Node", "").lower()
-
         # TODO: Phase 2 - Use new executor implementations
         # For now, delegate to legacy implementation
         return self._create_legacy_executor(node)
 
-    def _create_legacy_executor(self, node: "WorkflowNode") -> Callable[["WorkflowState"], "WorkflowState"]:
+    def _create_legacy_executor(
+        self, node: "WorkflowNode"
+    ) -> Callable[["WorkflowState"], "WorkflowState"]:
         """Create executor using legacy implementation (temporary stub).
 
         This delegates to the existing NodeExecutorFactory in

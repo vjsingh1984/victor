@@ -1302,9 +1302,7 @@ class SemanticToolSelector:
         # First, add all mandatory tools
         for tool in mandatory_tools:
             if tool.name not in selected_names:
-                selected_tools.append(
-                    (tool, SemanticSelectorDefaults.MANDATORY_TOOL_SCORE)
-                )
+                selected_tools.append((tool, SemanticSelectorDefaults.MANDATORY_TOOL_SCORE))
                 selected_names.add(tool.name)
 
         # Then add top semantic matches
@@ -1448,9 +1446,7 @@ class SemanticToolSelector:
         # First, add all mandatory tools
         for tool in mandatory_tools:
             if tool.name not in selected_names:
-                selected_tools.append(
-                    (tool, SemanticSelectorDefaults.MANDATORY_TOOL_SCORE)
-                )
+                selected_tools.append((tool, SemanticSelectorDefaults.MANDATORY_TOOL_SCORE))
                 selected_names.add(tool.name)
 
         # Then add top semantic matches
@@ -1861,9 +1857,7 @@ class SemanticToolSelector:
         mandatory_tools = [tool for tool in tools.list_tools() if tool.name in mandatory_tool_names]
         for tool in mandatory_tools:
             if tool.name not in selected_names:
-                selected_tools.append(
-                    (tool, SemanticSelectorDefaults.MANDATORY_TOOL_SCORE)
-                )
+                selected_tools.append((tool, SemanticSelectorDefaults.MANDATORY_TOOL_SCORE))
                 selected_names.add(tool.name)
 
         # Add top semantic matches

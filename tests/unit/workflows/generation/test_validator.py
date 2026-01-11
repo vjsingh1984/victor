@@ -49,13 +49,11 @@ class TestSchemaValidator:
                     "type": "agent",
                     "role": "executor",
                     "goal": "Start task",
-                    "tool_budget": 15
+                    "tool_budget": 15,
                 }
             ],
-            "edges": [
-                {"source": "start", "target": "__end__"}
-            ],
-            "entry_point": "start"
+            "edges": [{"source": "start", "target": "__end__"}],
+            "entry_point": "start",
         }
 
         errors = validator.validate(workflow)
@@ -65,9 +63,7 @@ class TestSchemaValidator:
         """Test detection of missing required fields."""
         validator = SchemaValidator()
 
-        workflow = {
-            "name": "incomplete"
-        }
+        workflow = {"name": "incomplete"}
 
         errors = validator.validate(workflow)
         assert len(errors) > 0
@@ -82,13 +78,8 @@ class TestSchemaValidator:
         validator = SchemaValidator()
 
         workflow = {
-            "nodes": [
-                {
-                    "id": "bad_node",
-                    "type": "invalid_type"
-                }
-            ],
-            "entry_point": "bad_node"
+            "nodes": [{"id": "bad_node", "type": "invalid_type"}],
+            "entry_point": "bad_node",
         }
 
         errors = validator.validate(workflow)
@@ -103,14 +94,8 @@ class TestSchemaValidator:
 
         # Agent node without role
         workflow = {
-            "nodes": [
-                {
-                    "id": "agent1",
-                    "type": "agent",
-                    "goal": "Do something"
-                }
-            ],
-            "entry_point": "agent1"
+            "nodes": [{"id": "agent1", "type": "agent", "goal": "Do something"}],
+            "entry_point": "agent1",
         }
 
         errors = validator.validate(workflow)
@@ -128,10 +113,10 @@ class TestSchemaValidator:
                     "type": "agent",
                     "role": "executor",
                     "goal": "Task",
-                    "tool_budget": 1000  # Out of range
+                    "tool_budget": 1000,  # Out of range
                 }
             ],
-            "entry_point": "agent1"
+            "entry_point": "agent1",
         }
 
         errors = validator.validate(workflow)
@@ -145,9 +130,9 @@ class TestSchemaValidator:
         workflow = {
             "nodes": [
                 {"id": "dup", "type": "agent", "role": "executor", "goal": "Task 1"},
-                {"id": "dup", "type": "agent", "role": "executor", "goal": "Task 2"}
+                {"id": "dup", "type": "agent", "role": "executor", "goal": "Task 2"},
             ],
-            "entry_point": "dup"
+            "entry_point": "dup",
         }
 
         errors = validator.validate(workflow)
@@ -165,13 +150,10 @@ class TestGraphStructureValidator:
         workflow = {
             "nodes": [
                 {"id": "start", "type": "agent", "role": "executor", "goal": "Start"},
-                {"id": "end", "type": "agent", "role": "executor", "goal": "End"}
+                {"id": "end", "type": "agent", "role": "executor", "goal": "End"},
             ],
-            "edges": [
-                {"source": "start", "target": "end"},
-                {"source": "end", "target": "__end__"}
-            ],
-            "entry_point": "start"
+            "edges": [{"source": "start", "target": "end"}, {"source": "end", "target": "__end__"}],
+            "entry_point": "start",
         }
 
         errors = validator.validate(workflow)
@@ -184,12 +166,10 @@ class TestGraphStructureValidator:
         workflow = {
             "nodes": [
                 {"id": "start", "type": "agent", "role": "executor", "goal": "Start"},
-                {"id": "orphan", "type": "agent", "role": "executor", "goal": "Orphan"}
+                {"id": "orphan", "type": "agent", "role": "executor", "goal": "Orphan"},
             ],
-            "edges": [
-                {"source": "start", "target": "__end__"}
-            ],
-            "entry_point": "start"
+            "edges": [{"source": "start", "target": "__end__"}],
+            "entry_point": "start",
         }
 
         errors = validator.validate(workflow)
@@ -201,13 +181,9 @@ class TestGraphStructureValidator:
         validator = GraphStructureValidator()
 
         workflow = {
-            "nodes": [
-                {"id": "start", "type": "agent", "role": "executor", "goal": "Start"}
-            ],
-            "edges": [
-                {"source": "start", "target": "nonexistent"}
-            ],
-            "entry_point": "start"
+            "nodes": [{"id": "start", "type": "agent", "role": "executor", "goal": "Start"}],
+            "edges": [{"source": "start", "target": "nonexistent"}],
+            "entry_point": "start",
         }
 
         errors = validator.validate(workflow)
@@ -221,13 +197,13 @@ class TestGraphStructureValidator:
         workflow = {
             "nodes": [
                 {"id": "a", "type": "compute", "tools": []},
-                {"id": "b", "type": "compute", "tools": []}
+                {"id": "b", "type": "compute", "tools": []},
             ],
             "edges": [
                 {"source": "a", "target": "b"},
-                {"source": "b", "target": "a"}  # Cycle without condition
+                {"source": "b", "target": "a"},  # Cycle without condition
             ],
-            "entry_point": "a"
+            "entry_point": "a",
         }
 
         errors = validator.validate(workflow)
@@ -242,14 +218,18 @@ class TestGraphStructureValidator:
             "nodes": [
                 {"id": "a", "type": "compute", "tools": []},
                 {"id": "b", "type": "compute", "tools": []},
-                {"id": "check", "type": "condition", "branches": {"continue": "a", "done": "__end__"}}
+                {
+                    "id": "check",
+                    "type": "condition",
+                    "branches": {"continue": "a", "done": "__end__"},
+                },
             ],
             "edges": [
                 {"source": "a", "target": "b"},
                 {"source": "b", "target": "check"},
-                {"source": "check", "target": {"continue": "a", "done": "__end__"}}
+                {"source": "check", "target": {"continue": "a", "done": "__end__"}},
             ],
-            "entry_point": "a"
+            "entry_point": "a",
         }
 
         errors = validator.validate(workflow)
@@ -272,7 +252,7 @@ class TestSemanticValidator:
                     "type": "agent",
                     "role": "executor",
                     "goal": "Execute task",
-                    "tool_budget": 15
+                    "tool_budget": 15,
                 }
             ]
         }
@@ -282,6 +262,7 @@ class TestSemanticValidator:
 
     def test_agent_tools_validation(self):
         """Test agent tools validation."""
+
         # Mock tool registry
         class MockToolRegistry:
             def get_tool(self, name):
@@ -290,10 +271,7 @@ class TestSemanticValidator:
                     return {"name": "valid_tool"}
                 return None
 
-        validator = SemanticValidator(
-            tool_registry=MockToolRegistry(),
-            strict_mode=True
-        )
+        validator = SemanticValidator(tool_registry=MockToolRegistry(), strict_mode=True)
 
         workflow = {
             "nodes": [
@@ -302,7 +280,7 @@ class TestSemanticValidator:
                     "type": "agent",
                     "role": "executor",
                     "goal": "Task",
-                    "tools": ["valid_tool", "invalid_tool"]
+                    "tools": ["valid_tool", "invalid_tool"],
                 }
             ]
         }
@@ -317,11 +295,7 @@ class TestSemanticValidator:
 
         workflow = {
             "nodes": [
-                {
-                    "id": "cond1",
-                    "type": "condition",
-                    "branches": "not_a_dict"  # Invalid type
-                }
+                {"id": "cond1", "type": "condition", "branches": "not_a_dict"}  # Invalid type
             ]
         }
 
@@ -344,7 +318,7 @@ class TestSecurityValidator:
                     "type": "agent",
                     "role": "executor",
                     "goal": "Task",
-                    "tool_budget": 15
+                    "tool_budget": 15,
                 }
             ]
         }
@@ -363,15 +337,15 @@ class TestSecurityValidator:
                     "type": "agent",
                     "role": "executor",
                     "goal": "Task",
-                    "tool_budget": 60
+                    "tool_budget": 60,
                 },
                 {
                     "id": "agent2",
                     "type": "agent",
                     "role": "executor",
                     "goal": "Task",
-                    "tool_budget": 60
-                }
+                    "tool_budget": 60,
+                },
             ]
         }
 
@@ -388,7 +362,7 @@ class TestSecurityValidator:
                 {
                     "id": "parallel1",
                     "type": "parallel",
-                    "parallel_nodes": ["a", "b", "c", "d", "e", "f"]  # 6 branches
+                    "parallel_nodes": ["a", "b", "c", "d", "e", "f"],  # 6 branches
                 }
             ]
         }
@@ -408,14 +382,16 @@ class TestSecurityValidator:
                     "type": "agent",
                     "role": "executor",
                     "goal": "Task",
-                    "tools": ["web_search", "http_request"]
+                    "tools": ["web_search", "http_request"],
                 }
             ]
         }
 
         errors = validator.validate(workflow)
         assert len(errors) > 0
-        assert any("airgapped" in e.message.lower() or "network" in e.message.lower() for e in errors)
+        assert any(
+            "airgapped" in e.message.lower() or "network" in e.message.lower() for e in errors
+        )
 
 
 class TestWorkflowValidator:
@@ -433,23 +409,20 @@ class TestWorkflowValidator:
                     "type": "agent",
                     "role": "executor",
                     "goal": "Start the workflow",
-                    "tool_budget": 15
+                    "tool_budget": 15,
                 },
                 {
                     "id": "check",
                     "type": "condition",
-                    "branches": {
-                        "continue": "start",
-                        "done": "__end__"
-                    }
-                }
+                    "branches": {"continue": "start", "done": "__end__"},
+                },
             ],
             "edges": [
                 {"source": "start", "target": "check"},
-                {"source": "check", "target": {"continue": "start", "done": "__end__"}}
+                {"source": "check", "target": {"continue": "start", "done": "__end__"}},
             ],
             "entry_point": "start",
-            "max_iterations": 10
+            "max_iterations": 10,
         }
 
         result = validator.validate(workflow)
@@ -463,13 +436,8 @@ class TestWorkflowValidator:
 
         workflow = {
             "name": "broken",
-            "nodes": [
-                {
-                    "id": "bad",
-                    "type": "invalid_type"
-                }
-            ],
-            "entry_point": "bad"
+            "nodes": [{"id": "bad", "type": "invalid_type"}],
+            "entry_point": "bad",
         }
 
         result = validator.validate(workflow)
@@ -488,11 +456,11 @@ class TestWorkflowValidator:
             "nodes": [
                 {
                     "id": "start",
-                    "type": "agent"
+                    "type": "agent",
                     # Missing role and goal - schema error
                 }
             ],
-            "entry_point": "start"
+            "entry_point": "start",
         }
 
         result = validator.validate(workflow)
@@ -515,10 +483,7 @@ class TestWorkflowValidator:
         """Test validation of single layer."""
         validator = WorkflowValidator()
 
-        workflow = {
-            "nodes": [{"id": "n1", "type": "agent"}],
-            "entry_point": "n1"
-        }
+        workflow = {"nodes": [{"id": "n1", "type": "agent"}], "entry_point": "n1"}
 
         # Validate only schema layer
         errors = validator.validate_layer(workflow, "schema")
@@ -549,11 +514,11 @@ class TestWorkflowValidator:
                             "type": "agent",
                             "role": "executor",
                             "goal": "Task",
-                            "tool_budget": 15
+                            "tool_budget": 15,
                         }
                     ],
                     "edges": [{"source": "start", "target": "__end__"}],
-                    "entry_point": "start"
+                    "entry_point": "start",
                 }
 
         workflow = MockWorkflow()
@@ -566,15 +531,8 @@ class TestWorkflowValidator:
         validator = WorkflowValidator()
 
         workflow = {
-            "nodes": [
-                {
-                    "id": "a",
-                    "type": "agent",
-                    "role": "executor",
-                    "goal": "Task"
-                }
-            ],
-            "entry_point": "a"
+            "nodes": [{"id": "a", "type": "agent", "role": "executor", "goal": "Task"}],
+            "entry_point": "a",
         }
 
         result = validator.validate(workflow, workflow_name="test_workflow")
@@ -613,40 +571,40 @@ class TestValidationIntegration:
                     "type": "agent",
                     "role": "researcher",
                     "goal": "Fetch customer data from database",
-                    "tool_budget": 20
+                    "tool_budget": 20,
                 },
                 {
                     "id": "analyze",
                     "type": "agent",
                     "role": "analyst",
                     "goal": "Analyze data for patterns",
-                    "tool_budget": 30
+                    "tool_budget": 30,
                 },
                 {
                     "id": "check_quality",
                     "type": "condition",
-                    "branches": {
-                        "good_quality": "generate_report",
-                        "needs_work": "fetch_data"
-                    }
+                    "branches": {"good_quality": "generate_report", "needs_work": "fetch_data"},
                 },
                 {
                     "id": "generate_report",
                     "type": "agent",
                     "role": "writer",
                     "goal": "Generate analysis report",
-                    "tool_budget": 25
-                }
+                    "tool_budget": 25,
+                },
             ],
             "edges": [
                 {"source": "fetch_data", "target": "analyze"},
                 {"source": "analyze", "target": "check_quality"},
-                {"source": "check_quality", "target": {"good_quality": "generate_report", "needs_work": "fetch_data"}},
-                {"source": "generate_report", "target": "__end__"}
+                {
+                    "source": "check_quality",
+                    "target": {"good_quality": "generate_report", "needs_work": "fetch_data"},
+                },
+                {"source": "generate_report", "target": "__end__"},
             ],
             "entry_point": "fetch_data",
             "max_iterations": 10,
-            "max_timeout_seconds": 600
+            "max_timeout_seconds": 600,
         }
 
         result = validator.validate(workflow, workflow_name="data_analysis_pipeline")
@@ -663,25 +621,20 @@ class TestValidationIntegration:
             "nodes": [
                 {
                     "id": "a",
-                    "type": "agent"
+                    "type": "agent",
                     # Missing role and goal
                 },
-                {
-                    "id": "b",
-                    "type": "invalid_type"
-                },
+                {"id": "b", "type": "invalid_type"},
                 {
                     "id": "c",
                     "type": "agent",
                     "role": "executor",
                     "goal": "Task",
-                    "tool_budget": 1000  # Out of range
-                }
+                    "tool_budget": 1000,  # Out of range
+                },
             ],
-            "edges": [
-                {"source": "a", "target": "nonexistent"}  # Invalid target
-            ],
-            "entry_point": "missing"  # Invalid entry point
+            "edges": [{"source": "a", "target": "nonexistent"}],  # Invalid target
+            "entry_point": "missing",  # Invalid entry point
         }
 
         result = validator.validate(workflow)

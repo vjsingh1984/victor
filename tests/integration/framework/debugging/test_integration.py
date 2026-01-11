@@ -70,9 +70,7 @@ class TestWorkflowDebugging:
     async def test_step_through_workflow(self, sample_workflow, debug_session):
         """Test stepping through workflow execution."""
         # Set breakpoint
-        debug_session.set_breakpoint(
-            node_id="analyze", position=BreakpointPosition.AFTER
-        )
+        debug_session.set_breakpoint(node_id="analyze", position=BreakpointPosition.AFTER)
 
         hook = debug_session.create_hook()
 

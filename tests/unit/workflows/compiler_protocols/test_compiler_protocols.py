@@ -44,7 +44,8 @@ class TestWorkflowCompilerProtocol:
         """Verify protocol has only necessary methods (ISP compliance)."""
         # Count protocol methods
         protocol_methods = [
-            name for name in dir(WorkflowCompilerProtocol)
+            name
+            for name in dir(WorkflowCompilerProtocol)
             if not name.startswith("_") and callable(getattr(WorkflowCompilerProtocol, name))
         ]
         # Should only have 1 method: compile
@@ -71,7 +72,8 @@ class TestCompiledGraphProtocol:
     def test_protocol_is_minimal(self):
         """Verify protocol has only necessary methods (ISP compliance)."""
         protocol_methods = [
-            name for name in dir(CompiledGraphProtocol)
+            name
+            for name in dir(CompiledGraphProtocol)
             if not name.startswith("_") and callable(getattr(CompiledGraphProtocol, name))
         ]
         # Should have 2 methods: invoke, stream
@@ -92,10 +94,7 @@ class TestExecutionResultProtocol:
     def test_protocol_is_minimal(self):
         """Verify protocol has only necessary properties (ISP compliance)."""
         # Should only have 2 properties
-        protocol_attrs = [
-            name for name in dir(ExecutionResultProtocol)
-            if not name.startswith("_")
-        ]
+        protocol_attrs = [name for name in dir(ExecutionResultProtocol) if not name.startswith("_")]
         # Should be minimal (properties + __protocol_attrs__ etc)
         assert len(protocol_attrs) <= 5, f"Too many attributes: {protocol_attrs}"
 
@@ -290,12 +289,16 @@ class TestProtocolTypeHints:
     def test_workflow_compiler_has_type_hints(self):
         """Verify WorkflowCompilerProtocol has type hints."""
         # Protocol should have __annotations__ or be a Protocol
-        assert hasattr(WorkflowCompilerProtocol, "__annotations__") or hasattr(WorkflowCompilerProtocol, "__protocol_attrs__")
+        assert hasattr(WorkflowCompilerProtocol, "__annotations__") or hasattr(
+            WorkflowCompilerProtocol, "__protocol_attrs__"
+        )
 
     def test_compiled_graph_has_type_hints(self):
         """Verify CompiledGraphProtocol has type hints."""
         # Protocol should have __annotations__ or be a Protocol
-        assert hasattr(CompiledGraphProtocol, "__annotations__") or hasattr(CompiledGraphProtocol, "__protocol_attrs__")
+        assert hasattr(CompiledGraphProtocol, "__annotations__") or hasattr(
+            CompiledGraphProtocol, "__protocol_attrs__"
+        )
 
 
 @pytest.mark.unit

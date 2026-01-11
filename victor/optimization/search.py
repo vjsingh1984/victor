@@ -161,7 +161,9 @@ class HillClimbingOptimizer:
         applied_opportunities: List[int] = []
 
         for iteration in range(max_iterations):
-            logger.info(f"Iteration {iteration + 1}/{max_iterations}, current score: {current_score:.3f}")
+            logger.info(
+                f"Iteration {iteration + 1}/{max_iterations}, current score: {current_score:.3f}"
+            )
 
             # Generate neighbors by applying opportunities
             neighbors = await self._generate_neighbors(
@@ -336,9 +338,9 @@ class HillClimbingOptimizer:
 
         # Weighted combination
         score = (
-            self.objective_weights["duration"] * duration_score +
-            self.objective_weights["cost"] * cost_score +
-            self.objective_weights["quality"] * quality_score
+            self.objective_weights["duration"] * duration_score
+            + self.objective_weights["cost"] * cost_score
+            + self.objective_weights["quality"] * quality_score
         )
 
         return score

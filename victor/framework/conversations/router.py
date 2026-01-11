@@ -90,9 +90,7 @@ class MessageRouter:
             return message.recipients
 
         # Use routing strategy
-        return await self.get_recipients(
-            message.sender, participants, context
-        )
+        return await self.get_recipients(message.sender, participants, context)
 
     async def get_recipients(
         self,
@@ -121,9 +119,7 @@ class MessageRouter:
             return self._role_based_route(speaker, participants, target_role)
 
         elif self.strategy == RoutingStrategy.CAPABILITY_BASED:
-            return self._capability_based_route(
-                speaker, participants, target_capability
-            )
+            return self._capability_based_route(speaker, participants, target_capability)
 
         elif self.strategy == RoutingStrategy.ROUND_ROBIN:
             return self._round_robin_route(speaker, participants)
@@ -175,9 +171,7 @@ class MessageRouter:
             Participant IDs matching target role
         """
         # Get speaker's role
-        speaker_participant = next(
-            (p for p in participants if p.id == speaker), None
-        )
+        speaker_participant = next((p for p in participants if p.id == speaker), None)
         if not speaker_participant:
             return self._broadcast_route(speaker, participants)
 
@@ -198,9 +192,7 @@ class MessageRouter:
             target_roles = role_pairs.get(speaker_participant.role, [])
             if not target_roles:
                 return self._broadcast_route(speaker, participants)
-            recipients = [
-                p.id for p in participants if p.role in target_roles
-            ]
+            recipients = [p.id for p in participants if p.role in target_roles]
 
         # Exclude sender
         if self.exclude_sender and speaker in recipients:
@@ -227,9 +219,7 @@ class MessageRouter:
         if not target_capability:
             return self._broadcast_route(speaker, participants)
 
-        recipients = [
-            p.id for p in participants if target_capability in p.capabilities
-        ]
+        recipients = [p.id for p in participants if target_capability in p.capabilities]
 
         if self.exclude_sender and speaker in recipients:
             recipients.remove(speaker)

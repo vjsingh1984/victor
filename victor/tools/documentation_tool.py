@@ -788,7 +788,11 @@ async def docs_coverage(
     report.append("")
     report.append("Recommendations:")
     for rec in recommendations:
-        level_icon = _get_icon("level_critical") if coverage < 50 else (_get_icon("level_medium") if coverage < 80 else _get_icon("level_low"))
+        level_icon = (
+            _get_icon("level_critical")
+            if coverage < 50
+            else (_get_icon("level_medium") if coverage < 80 else _get_icon("level_low"))
+        )
         report.append(f"  {level_icon} {rec}")
 
     # Truncate lists to prevent context overflow

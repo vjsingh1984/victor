@@ -223,7 +223,9 @@ def create_research_source_safety_rules(
                 name="research_require_source_verification",
                 description="Require verification for non-.edu/.gov sources",
                 check_fn=lambda op: ("cite" in op.lower() or "source" in op.lower())
-                and not any(domain in op.lower() for domain in [".edu", ".gov", "arxiv.org", "doi.org"]),
+                and not any(
+                    domain in op.lower() for domain in [".edu", ".gov", "arxiv.org", "doi.org"]
+                ),
                 level=SafetyLevel.LOW,  # Warn only
                 allow_override=True,
             )

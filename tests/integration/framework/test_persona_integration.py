@@ -534,7 +534,11 @@ class TestPersonaUtilityFunctions:
 
     def test_register_persona_spec_utility(self):
         """register_persona_spec() utility function works."""
-        from victor.framework.persona_registry import register_persona_spec, PersonaSpec, get_persona_registry
+        from victor.framework.persona_registry import (
+            register_persona_spec,
+            PersonaSpec,
+            get_persona_registry,
+        )
 
         spec = PersonaSpec(
             name="util_persona",
@@ -549,7 +553,11 @@ class TestPersonaUtilityFunctions:
 
     def test_get_persona_spec_utility(self):
         """get_persona_spec() utility function retrieves personas."""
-        from victor.framework.persona_registry import register_persona_spec, get_persona_spec, PersonaSpec
+        from victor.framework.persona_registry import (
+            register_persona_spec,
+            get_persona_spec,
+            PersonaSpec,
+        )
 
         spec = PersonaSpec(
             name="get_test",
@@ -674,9 +682,15 @@ class TestPersonaIntegrationScenarios:
         registry = get_persona_registry()
 
         # Register across verticals
-        registry.register("c1", PersonaSpec(name="c1", role="C1", expertise=["c"]), vertical="coding")
-        registry.register("c2", PersonaSpec(name="c2", role="C2", expertise=["c"]), vertical="coding")
-        registry.register("r1", PersonaSpec(name="r1", role="R1", expertise=["r"]), vertical="research")
+        registry.register(
+            "c1", PersonaSpec(name="c1", role="C1", expertise=["c"]), vertical="coding"
+        )
+        registry.register(
+            "c2", PersonaSpec(name="c2", role="C2", expertise=["c"]), vertical="coding"
+        )
+        registry.register(
+            "r1", PersonaSpec(name="r1", role="R1", expertise=["r"]), vertical="research"
+        )
 
         # List by vertical
         coding_personas = registry.list_personas(vertical="coding")
@@ -693,8 +707,12 @@ class TestPersonaIntegrationScenarios:
         registry = get_persona_registry()
 
         # Register
-        registry.register("s1", PersonaSpec(name="s1", role="S1", expertise=["e1"]), vertical="test")
-        registry.register("s2", PersonaSpec(name="s2", role="S2", expertise=["e2"]), vertical="test")
+        registry.register(
+            "s1", PersonaSpec(name="s1", role="S1", expertise=["e1"]), vertical="test"
+        )
+        registry.register(
+            "s2", PersonaSpec(name="s2", role="S2", expertise=["e2"]), vertical="test"
+        )
 
         # Get specs
         specs = registry.list_specs(vertical="test")

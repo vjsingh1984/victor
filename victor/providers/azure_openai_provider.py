@@ -171,6 +171,7 @@ class AzureOpenAIProvider(BaseProvider):
         if not resolved_key:
             try:
                 from victor.config.api_keys import get_api_key
+
                 resolved_key = get_api_key("azure_openai") or get_api_key("azure") or ""
             except ImportError:
                 pass

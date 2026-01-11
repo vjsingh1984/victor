@@ -34,13 +34,36 @@ logger = logging.getLogger(__name__)
 
 # Binary file extensions to skip
 BINARY_EXTENSIONS: Set[str] = {
-    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".webp",
-    ".mp3", ".mp4", ".wav", ".avi", ".mov", ".mkv",
-    ".zip", ".tar", ".gz", ".rar", ".7z",
-    ".exe", ".dll", ".so", ".dylib",
-    ".pyc", ".pyo", ".class",
-    ".db", ".sqlite", ".sqlite3",
-    ".bin", ".dat",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".bmp",
+    ".ico",
+    ".webp",
+    ".mp3",
+    ".mp4",
+    ".wav",
+    ".avi",
+    ".mov",
+    ".mkv",
+    ".zip",
+    ".tar",
+    ".gz",
+    ".rar",
+    ".7z",
+    ".exe",
+    ".dll",
+    ".so",
+    ".dylib",
+    ".pyc",
+    ".pyo",
+    ".class",
+    ".db",
+    ".sqlite",
+    ".sqlite3",
+    ".bin",
+    ".dat",
 }
 
 
@@ -77,7 +100,9 @@ def extract_text_from_html(html_content: str) -> str:
         # Fallback: basic regex-based extraction
         logger.warning("BeautifulSoup not available, using basic HTML extraction")
         # Remove script and style tags
-        text = re.sub(r"<script[^>]*>.*?</script>", "", html_content, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(
+            r"<script[^>]*>.*?</script>", "", html_content, flags=re.DOTALL | re.IGNORECASE
+        )
         text = re.sub(r"<style[^>]*>.*?</style>", "", text, flags=re.DOTALL | re.IGNORECASE)
         # Remove all tags
         text = re.sub(r"<[^>]+>", " ", text)
@@ -162,7 +187,11 @@ class FileHandler:
 
         # Detect document type
         doc_type_str = detect_document_type(source, content)
-        doc_type = DocumentType(doc_type_str) if doc_type_str in [e.value for e in DocumentType] else DocumentType.TEXT
+        doc_type = (
+            DocumentType(doc_type_str)
+            if doc_type_str in [e.value for e in DocumentType]
+            else DocumentType.TEXT
+        )
 
         return SourceContent(
             content=content,
@@ -312,7 +341,11 @@ class URLHandler:
         else:
             # Try to detect from content
             doc_type_str = detect_document_type(source, content)
-            doc_type = DocumentType(doc_type_str) if doc_type_str in [e.value for e in DocumentType] else DocumentType.TEXT
+            doc_type = (
+                DocumentType(doc_type_str)
+                if doc_type_str in [e.value for e in DocumentType]
+                else DocumentType.TEXT
+            )
 
         # Parse URL for metadata
         parsed = urlparse(source)
@@ -354,7 +387,12 @@ class DirectoryHandler:
         """
         self._patterns = patterns or ["*"]
         self._exclude_patterns = exclude_patterns or [
-            ".*", "__pycache__", "node_modules", ".git", ".venv", "venv"
+            ".*",
+            "__pycache__",
+            "node_modules",
+            ".git",
+            ".venv",
+            "venv",
         ]
         self._recursive = recursive
         self._file_handler = FileHandler()

@@ -395,13 +395,22 @@ class TestSafetyEnforcer:
         """get_rules_by_level should filter rules by level."""
         enforcer = SafetyEnforcer(config=SafetyConfig())
         enforcer.add_rule(
-            SafetyRule(name="high", description="High", check_fn=lambda op: True, level=SafetyLevel.HIGH)
+            SafetyRule(
+                name="high", description="High", check_fn=lambda op: True, level=SafetyLevel.HIGH
+            )
         )
         enforcer.add_rule(
-            SafetyRule(name="medium", description="Medium", check_fn=lambda op: True, level=SafetyLevel.MEDIUM)
+            SafetyRule(
+                name="medium",
+                description="Medium",
+                check_fn=lambda op: True,
+                level=SafetyLevel.MEDIUM,
+            )
         )
         enforcer.add_rule(
-            SafetyRule(name="low", description="Low", check_fn=lambda op: True, level=SafetyLevel.LOW)
+            SafetyRule(
+                name="low", description="Low", check_fn=lambda op: True, level=SafetyLevel.LOW
+            )
         )
 
         high_rules = enforcer.get_rules_by_level(SafetyLevel.HIGH)
@@ -607,15 +616,21 @@ class TestVerticalSafetyIntegration:
         # Test low-credibility source blocking
         allowed, reason = enforcer.check_operation("cite article from fake-blog.blogspot.com")
         assert allowed is False
-        assert ("credibility" in reason.lower() or "blogspot" in reason.lower()
-                or "blocked" in reason.lower())
+        assert (
+            "credibility" in reason.lower()
+            or "blogspot" in reason.lower()
+            or "blocked" in reason.lower()
+        )
 
         # Test blocked domain - note: low-credibility rule may trigger first
         allowed, reason = enforcer.check_operation("cite source from fake-news-site.com")
         assert allowed is False
         # Either the domain-specific rule or the general low-credibility rule can block
-        assert ("fake" in reason.lower() or "credibility" in reason.lower()
-                or "blocked" in reason.lower())
+        assert (
+            "fake" in reason.lower()
+            or "credibility" in reason.lower()
+            or "blocked" in reason.lower()
+        )
 
     def test_research_safety_content_rules(self):
         """Research content safety rules should block fabricated content."""
@@ -676,8 +691,7 @@ class TestVerticalSafetyIntegration:
         # Test credit card export blocking (use space, not underscore)
         allowed, reason = enforcer.check_operation("to_csv credit card data")
         assert allowed is False
-        assert ("credit" in reason.lower() or "pii" in reason.lower()
-                or "blocked" in reason.lower())
+        assert "credit" in reason.lower() or "pii" in reason.lower() or "blocked" in reason.lower()
 
     def test_dataanalysis_safety_export_rules(self):
         """DataAnalysis export safety rules should block external uploads."""
@@ -733,8 +747,11 @@ class TestVerticalSafetyIntegration:
         # Test blocking operations on protected repositories
         allowed, reason = enforcer.check_operation("write file to /production directory")
         assert allowed is False
-        assert ("workspace" in reason.lower() or "protected" in reason.lower()
-                or "blocked" in reason.lower())
+        assert (
+            "workspace" in reason.lower()
+            or "protected" in reason.lower()
+            or "blocked" in reason.lower()
+        )
 
         # Test blocking git operations on protected repositories
         allowed, reason = enforcer.check_operation("git push to release branch")
@@ -773,7 +790,11 @@ class TestVerticalSafetyIntegration:
         # Test blocking tests on production environments
         allowed, reason = enforcer.check_operation("run tests on production environment")
         assert allowed is False
-        assert "production" in reason.lower() or "test" in reason.lower() or "blocked" in reason.lower()
+        assert (
+            "production" in reason.lower()
+            or "test" in reason.lower()
+            or "blocked" in reason.lower()
+        )
 
         # Test blocking destructive tests
         allowed, reason = enforcer.check_operation("drop table test")
@@ -795,7 +816,11 @@ class TestVerticalSafetyIntegration:
         # Test blocking external uploads
         allowed, reason = enforcer.check_operation("upload benchmark data to s3")
         assert allowed is False
-        assert "external" in reason.lower() or "upload" in reason.lower() or "blocked" in reason.lower()
+        assert (
+            "external" in reason.lower()
+            or "upload" in reason.lower()
+            or "blocked" in reason.lower()
+        )
 
         # Test blocking task data leaks
         allowed, reason = enforcer.check_operation("export benchmark task description")
@@ -805,7 +830,11 @@ class TestVerticalSafetyIntegration:
         # Test blocking solution sharing
         allowed, reason = enforcer.check_operation("share humaneval solution on api")
         assert allowed is False
-        assert "solution" in reason.lower() or "benchmark" in reason.lower() or "blocked" in reason.lower()
+        assert (
+            "solution" in reason.lower()
+            or "benchmark" in reason.lower()
+            or "blocked" in reason.lower()
+        )
 
     def test_create_all_benchmark_safety_rules(self):
         """create_all_benchmark_safety_rules should register all benchmark rules."""

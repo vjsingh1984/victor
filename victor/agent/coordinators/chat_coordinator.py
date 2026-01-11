@@ -663,7 +663,10 @@ class ChatCoordinator:
                     # === INTENT CLASSIFICATION (P0 SRP refactor) ===
                     if not self._intent_classification_handler:
                         from victor.agent.streaming import create_intent_classification_handler
-                        self._intent_classification_handler = create_intent_classification_handler(orch)
+
+                        self._intent_classification_handler = create_intent_classification_handler(
+                            orch
+                        )
 
                     # Ensure tracking variables are initialized
                     if not hasattr(orch, "_continuation_prompts"):
@@ -710,6 +713,7 @@ class ChatCoordinator:
                     # === CONTINUATION ACTION HANDLING (P0 SRP refactor) ===
                     if not self._continuation_handler:
                         from victor.agent.streaming import create_continuation_handler
+
                         self._continuation_handler = create_continuation_handler(orch)
 
                     action_result["action"] = action
@@ -734,6 +738,7 @@ class ChatCoordinator:
                 # === TOOL EXECUTION PHASE (P0 SRP refactor) ===
                 if not self._tool_execution_handler:
                     from victor.agent.streaming import create_tool_execution_handler
+
                     self._tool_execution_handler = create_tool_execution_handler(orch)
 
                 self._tool_execution_handler.update_observed_files(
@@ -1012,33 +1017,51 @@ class ChatCoordinator:
             Dictionary with classification results including is_analysis_task,
             is_action_task, needs_execution, and coarse_task_type
         """
-        orch = self._orchestrator
-
         # Check for analysis keywords
         analysis_keywords = [
-            "analyze", "analysis", "investigate", "explore", "examine",
-            "review", "audit", "inspect", "study", "understand", "explain",
-            "find", "search", "look for", "identify", "locate", "trace",
-            "debug", "troubleshoot", "diagnose"
+            "analyze",
+            "analysis",
+            "investigate",
+            "explore",
+            "examine",
+            "review",
+            "audit",
+            "inspect",
+            "study",
+            "understand",
+            "explain",
+            "find",
+            "search",
+            "look for",
+            "identify",
+            "locate",
+            "trace",
+            "debug",
+            "troubleshoot",
+            "diagnose",
         ]
-        is_analysis_task = any(
-            keyword in user_message.lower() for keyword in analysis_keywords
-        )
+        is_analysis_task = any(keyword in user_message.lower() for keyword in analysis_keywords)
 
         # Check for action keywords
         action_keywords = [
-            "create", "write", "build", "implement", "add", "generate",
-            "make", "construct", "develop", "produce", "form", "compose"
+            "create",
+            "write",
+            "build",
+            "implement",
+            "add",
+            "generate",
+            "make",
+            "construct",
+            "develop",
+            "produce",
+            "form",
+            "compose",
         ]
-        is_action_task = any(
-            keyword in user_message.lower() for keyword in action_keywords
-        )
+        is_action_task = any(keyword in user_message.lower() for keyword in action_keywords)
 
         # Check for execution keywords
         execution_keywords = ["run", "execute", "test", "deploy", "launch"]
-        needs_execution = any(
-            keyword in user_message.lower() for keyword in execution_keywords
-        )
+        needs_execution = any(keyword in user_message.lower() for keyword in execution_keywords)
 
         # Determine coarse task type
         if is_analysis_task:
@@ -1549,9 +1572,7 @@ class ChatCoordinator:
     # Tool Call Processing
     # =====================================================================
 
-    def _parse_and_validate_tool_calls(
-        self, tool_calls: Any, full_content: str
-    ) -> tuple[Any, str]:
+    def _parse_and_validate_tool_calls(self, tool_calls: Any, full_content: str) -> tuple[Any, str]:
         """Parse, validate, and normalize tool calls.
 
         Args:
@@ -1561,8 +1582,6 @@ class ChatCoordinator:
         Returns:
             Tuple of (validated_tool_calls, full_content)
         """
-        orch = self._orchestrator
-
         if tool_calls:
             for tc in tool_calls:
                 if tc.get("name"):

@@ -66,6 +66,7 @@ def create_experiment(
     Example:
         victor ab create experiment_config.yaml
     """
+
     async def _create():
         from victor.experiments.ab_testing import (
             ABTestManager,
@@ -175,6 +176,7 @@ def start_experiment(
     Example:
         victor ab start exp_123
     """
+
     async def _start():
         from victor.experiments.ab_testing import ABTestManager
 
@@ -215,6 +217,7 @@ def stop_experiment(
     Example:
         victor ab stop exp_123
     """
+
     async def _stop():
         from victor.experiments.ab_testing import ABTestManager
 
@@ -247,6 +250,7 @@ def show_status(
     Example:
         victor ab status exp_123
     """
+
     async def _status():
         from victor.experiments.ab_testing import ABTestManager
 
@@ -311,6 +315,7 @@ def show_results(
         victor ab results exp_123
         victor ab results exp_123 --detailed
     """
+
     async def _results():
         from victor.experiments.ab_testing import ABTestManager, MetricsCollector
 
@@ -359,7 +364,9 @@ def show_results(
                 console.print(f"    Mean:   {metrics.execution_time_mean:.2f}s")
                 console.print(f"    Median: {metrics.execution_time_median:.2f}s")
                 console.print(f"    P95:    {metrics.execution_time_p95:.2f}s")
-                console.print(f"    95% CI: ({metrics.execution_time_ci[0]:.2f}s, {metrics.execution_time_ci[1]:.2f}s)")
+                console.print(
+                    f"    95% CI: ({metrics.execution_time_ci[0]:.2f}s, {metrics.execution_time_ci[1]:.2f}s)"
+                )
 
                 console.print(f"  Token Usage:")
                 console.print(f"    Mean:   {metrics.total_tokens_mean:.0f}")
@@ -371,7 +378,9 @@ def show_results(
 
                 console.print(f"  Success Rate:")
                 console.print(f"    Rate:   {metrics.success_rate:.1%}")
-                console.print(f"    95% CI: ({metrics.success_rate_ci[0]:.1%}, {metrics.success_rate_ci[1]:.1%})")
+                console.print(
+                    f"    95% CI: ({metrics.success_rate_ci[0]:.1%}, {metrics.success_rate_ci[1]:.1%})"
+                )
 
                 console.print(f"  Cost:")
                 console.print(f"    Total:     ${metrics.total_cost:.4f}")
@@ -398,6 +407,7 @@ def list_experiments(
         victor ab list
         victor ab list --status running
     """
+
     async def _list():
         import sqlite3
         from pathlib import Path

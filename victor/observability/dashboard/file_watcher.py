@@ -300,15 +300,15 @@ class EventFileWatcher(Static):
                 topic = f"{category_str.lower()}.{name.lower()}"
             logger.debug(f"[EventFileWatcher._parse_jsonl_line] Topic: '{topic}'")
 
-            # Create Event from dict
-            event = Event(
+            # Create MessagingEvent from dict
+            event = MessagingEvent(
                 id=data.get("id"),
                 timestamp=timestamp,
                 topic=topic,
                 data=data.get("data", {}),
                 source=data.get("source"),
                 correlation_id=data.get("trace_id"),
-                session_id=data.get("session_id"),
+                headers={"session_id": data.get("session_id")} if data.get("session_id") else None,
             )
 
             logger.debug(

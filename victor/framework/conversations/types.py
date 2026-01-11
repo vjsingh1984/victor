@@ -157,7 +157,11 @@ class ConversationalMessage:
             conversation_id=data.get("conversation_id", conversation_id),
             turn_number=data.get("turn_number", 0),
             reply_to=data.get("reply_to"),
-            metadata={k: v for k, v in data.items() if k not in ["conversation_id", "turn_number", "reply_to"]},
+            metadata={
+                k: v
+                for k, v in data.items()
+                if k not in ["conversation_id", "turn_number", "reply_to"]
+            },
         )
 
 

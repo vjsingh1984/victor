@@ -409,7 +409,10 @@ class State:
         # Return unsubscribe function
         def unsubscribe() -> None:
             """Remove the state change callback."""
-            if hasattr(observability, "_state_callbacks") and callback in observability._state_callbacks:
+            if (
+                hasattr(observability, "_state_callbacks")
+                and callback in observability._state_callbacks
+            ):
                 observability._state_callbacks.remove(callback)
 
         return unsubscribe

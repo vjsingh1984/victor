@@ -679,8 +679,7 @@ class TestRoundTripSerialization:
         # Create schema format for from_schema
         deserialization_schema = {
             "nodes": [
-                {"id": node_id, "type": "function", "func": node_id}
-                for node_id in schema["nodes"]
+                {"id": node_id, "type": "function", "func": node_id} for node_id in schema["nodes"]
             ],
             "edges": [],
             "entry_point": schema["entry_point"],
@@ -703,9 +702,7 @@ class TestRoundTripSerialization:
             "double": double_node,
         }
 
-        restored_graph = StateGraph.from_schema(
-            deserialization_schema, node_registry=node_registry
-        )
+        restored_graph = StateGraph.from_schema(deserialization_schema, node_registry=node_registry)
 
         # Verify structure matches
         assert restored_graph._entry_point == original_graph._entry_point

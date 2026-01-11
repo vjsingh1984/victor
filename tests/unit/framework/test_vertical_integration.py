@@ -1123,121 +1123,121 @@ class TestVerticalIntegrationCaching:
     def test_cache_key_generation(self):
         """Test that cache keys are generated correctly."""
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
-        
+
         # Generate cache key for MockVertical
         cache_key = pipeline._generate_cache_key(MockVertical)
-        
+
         assert cache_key is not None
         assert isinstance(cache_key, str)
         assert cache_key.startswith("v1_")
         assert "mock_vertical" in cache_key
-        
+
     def test_cache_key_includes_vertical_name(self):
         """Test that cache key includes vertical name."""
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
-        
+
         key1 = pipeline._generate_cache_key(MockVertical)
-        
+
         # Create a different vertical
         class DifferentVertical:
             name = "different_vertical"
-            
+
             @classmethod
             def get_config(cls):
                 return MockVerticalConfig(cls.name)
-                
+
             @classmethod
             def get_tools(cls):
                 return []
-                
+
             @classmethod
             def get_system_prompt(cls):
                 return ""
-                
+
             @classmethod
             def get_stages(cls):
                 return {}
-                
+
             @classmethod
             def get_extensions(cls):
                 return None
-        
+
         key2 = pipeline._generate_cache_key(DifferentVertical)
-        
+
         # Keys should be different
         assert key1 != key2
-        
+
     def test_cache_disabled_by_default(self):
         """Test that caching is enabled by default but can be disabled."""
         pipeline_with_cache = VerticalIntegrationPipeline()
         assert pipeline_with_cache._enable_cache is True
-        
+
         pipeline_no_cache = VerticalIntegrationPipeline(enable_cache=False)
         assert pipeline_no_cache._enable_cache is False
-        
+
     def test_cache_hit_on_second_apply(self):
         """Test that second apply returns cached result."""
         orchestrator = MockOrchestrator()
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
-        
+
         # First application - should execute integration
         result1 = pipeline.apply(orchestrator, MockVertical)
-        
+
         # Reset orchestrator state
         orchestrator._enabled_tools = set()
-        
+
         # Second application - should use cache
         result2 = pipeline.apply(orchestrator, MockVertical)
-        
+
         # Both should succeed
         assert result1.success is True
         assert result2.success is True
-        
+
         # Results should have the same vertical name
         assert result1.vertical_name == result2.vertical_name
-        
+
     def test_cache_miss_after_disabling(self):
         """Test that cache is not used when disabled."""
         orchestrator = MockOrchestrator()
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
-        
+
         # First application with cache enabled
         result1 = pipeline.apply(orchestrator, MockVertical)
-        
+
         # Disable cache
         pipeline._enable_cache = False
-        
+
         # Second application - should not use cache
         result2 = pipeline.apply(orchestrator, MockVertical)
-        
+
         # Both should succeed
         assert result1.success is True
         assert result2.success is True
-        
+
     def test_cache_ttl_configuration(self):
         """Test that cache TTL can be configured."""
         pipeline = VerticalIntegrationPipeline(enable_cache=True, cache_ttl=1800)
         assert pipeline._cache_ttl == 1800
-        
+
     def test_cache_stores_integration_result(self):
         """Test that cache stores IntegrationResult objects."""
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
         orchestrator = MockOrchestrator()
-        
+
         # Apply vertical
         result = pipeline.apply(orchestrator, MockVertical)
-        
+
         # Check that cache has the entry
         cache_key = pipeline._generate_cache_key(MockVertical)
         assert cache_key in pipeline._cache
-        
+
         # Load from cache
         cached_result = pipeline._load_from_cache(cache_key)
-        
+
         assert cached_result is not None
         assert isinstance(cached_result, type(result))
         assert cached_result.vertical_name == result.vertical_name
-        
+
     def test_cache_invalidates_on_source_change(self):
         """Test that cache invalidates when source file changes."""
         import tempfile
@@ -1246,8 +1246,9 @@ class TestVerticalIntegrationCaching:
         from pathlib import Path
 
         # Create a mock vertical with a temporary source file
-        temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False)
-        temp_file.write("""
+        temp_file = tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False)
+        temp_file.write(
+            """
 class TempVertical:
     name = "temp_vertical"
 
@@ -1270,12 +1271,14 @@ class TempVertical:
     @classmethod
     def get_extensions(cls):
         return None
-""")
+"""
+        )
         temp_file.close()
 
         try:
             # Import the temporary vertical
             import importlib.util
+
             spec = importlib.util.spec_from_file_location("temp_vertical", temp_file.name)
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
@@ -1292,8 +1295,9 @@ class TempVertical:
 
             # Modify the file
             import time
+
             time.sleep(0.1)  # Ensure different mtime
-            with open(temp_file.name, 'a') as f:
+            with open(temp_file.name, "a") as f:
                 f.write("\n# Modified\n")
 
             # Second cache key should be different
@@ -1304,38 +1308,39 @@ class TempVertical:
         finally:
             # Cleanup
             import os
+
             if "temp_vertical" in sys.modules:
                 del sys.modules["temp_vertical"]
             os.unlink(temp_file.name)
-            
+
     def test_cache_handles_missing_file(self):
         """Test that cache handles missing source files gracefully."""
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
-        
+
         # Create a mock vertical that can't be inspected
         class BadVertical:
             name = "bad_vertical"
-        
+
         # Should return None or raise a handled error
         cache_key = pipeline._generate_cache_key(BadVertical)
-        
+
         # Either returns None or a valid key (but shouldn't crash)
         assert cache_key is None or isinstance(cache_key, str)
-        
+
     def test_cache_clear_method(self):
         """Test that cache can be cleared."""
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
         orchestrator = MockOrchestrator()
-        
+
         # Populate cache
         pipeline.apply(orchestrator, MockVertical)
         cache_key = pipeline._generate_cache_key(MockVertical)
-        
+
         assert cache_key in pipeline._cache
-        
+
         # Clear cache
         pipeline._cache.clear()
-        
+
         # Should be empty now
         assert cache_key not in pipeline._cache or len(pipeline._cache) == 0
 
@@ -1346,74 +1351,76 @@ class TestCachingPerformance:
     def test_cached_apply_faster_than_uncached(self, benchmark=False):
         """Test that cached application is faster than uncached."""
         import time
-        
+
         orchestrator = MockOrchestrator()
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
-        
+
         # Clear cache first
         pipeline._cache = {}
-        
+
         # Time first application (cold start)
         start = time.perf_counter()
         result1 = pipeline.apply(orchestrator, MockVertical)
         cold_time = time.perf_counter() - start
-        
+
         # Time second application (warm cache)
         start = time.perf_counter()
         result2 = pipeline.apply(orchestrator, MockVertical)
         warm_time = time.perf_counter() - start
-        
+
         # Both should succeed
         assert result1.success is True
         assert result2.success is True
-        
+
         # Warm start should be faster or at least not significantly slower
         # (allowing for some variance in timing)
         if not benchmark:  # Only assert in normal tests
-            assert warm_time <= cold_time * 1.5, \
-                f"Warm start ({warm_time:.4f}s) should be faster than cold start ({cold_time:.4f}s)"
-        
+            assert (
+                warm_time <= cold_time * 1.5
+            ), f"Warm start ({warm_time:.4f}s) should be faster than cold start ({cold_time:.4f}s)"
+
     def test_cache_memory_overhead(self):
         """Test that cache memory overhead is reasonable."""
         import sys
-        
+
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
         orchestrator = MockOrchestrator()
-        
+
         # Get baseline memory
         baseline_size = sys.getsizeof(pipeline._cache)
-        
+
         # Apply vertical (populates cache)
         pipeline.apply(orchestrator, MockVertical)
-        
+
         # Check cache size after
         cache_size = sys.getsizeof(pipeline._cache)
-        
+
         # Cache overhead should be reasonable (< 10MB for a single entry)
         # Note: This is a rough check, actual memory usage depends on the IntegrationResult
-        assert cache_size < 10 * 1024 * 1024, \
-            f"Cache memory overhead ({cache_size} bytes) should be < 10MB"
-        
+        assert (
+            cache_size < 10 * 1024 * 1024
+        ), f"Cache memory overhead ({cache_size} bytes) should be < 10MB"
+
     def test_cache_hit_rate_high(self):
         """Test that cache hit rate is high for repeated applies."""
         orchestrator = MockOrchestrator()
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
-        
+
         # Apply same vertical multiple times
         iterations = 10
         successes = 0
-        
+
         for _ in range(iterations):
             result = pipeline.apply(orchestrator, MockVertical)
             if result.success:
                 successes += 1
-        
+
         # All should succeed
         assert successes == iterations
-        
+
         # Cache should have been used after first iteration
         # (we can't directly measure hit rate, but we can infer from speed)
-        
+
         # Expected behavior: Only first call does full integration
         # Subsequent calls use cache (faster)
         # This is implicitly tested by the speed improvement test above
@@ -1425,90 +1432,100 @@ class TestCachingEdgeCases:
     def test_cache_with_none_result(self):
         """Test cache behavior when integration returns None."""
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
-        
+
         # Try to load from empty cache
         result = pipeline._load_from_cache("nonexistent_key")
         assert result is None
-        
+
     def test_cache_corruption_handling(self):
         """Test that cache handles corrupted data gracefully."""
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
-        
+
         # Corrupt the cache with invalid data
         pipeline._cache["corrupted_key"] = b"invalid_pickle_data"
-        
+
         # Should handle corruption gracefully
         result = pipeline._load_from_cache("corrupted_key")
         assert result is None
-        
+
         # Corrupted entry should be removed
         assert "corrupted_key" not in pipeline._cache
-        
+
     def test_cache_with_multiple_verticals(self):
         """Test cache with multiple different verticals."""
         orchestrator = MockOrchestrator()
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
-        
+
         # Create different verticals
         class Vertical1:
             name = "vertical1"
+
             @classmethod
             def get_config(cls):
                 return MockVerticalConfig(cls.name)
+
             @classmethod
             def get_tools(cls):
                 return ["tool1"]
+
             @classmethod
             def get_system_prompt(cls):
                 return "Prompt 1"
+
             @classmethod
             def get_stages(cls):
                 return {}
+
             @classmethod
             def get_extensions(cls):
                 return None
-                
+
         class Vertical2:
             name = "vertical2"
+
             @classmethod
             def get_config(cls):
                 return MockVerticalConfig(cls.name)
+
             @classmethod
             def get_tools(cls):
                 return ["tool2"]
+
             @classmethod
             def get_system_prompt(cls):
                 return "Prompt 2"
+
             @classmethod
             def get_stages(cls):
                 return {}
+
             @classmethod
             def get_extensions(cls):
                 return None
-        
+
         # Apply both verticals
         result1 = pipeline.apply(orchestrator, Vertical1)
         result2 = pipeline.apply(orchestrator, Vertical2)
-        
+
         # Both should succeed
         assert result1.success is True
         assert result2.success is True
-        
+
         # Cache should have entries for both
         assert len(pipeline._cache) >= 2
-        
+
         # Verify cache keys are different
         key1 = pipeline._generate_cache_key(Vertical1)
         key2 = pipeline._generate_cache_key(Vertical2)
         assert key1 != key2
-        
+
     def test_cache_key_stability(self):
         """Test that cache keys are stable across multiple generations."""
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
-        
+
         # Generate key multiple times
         keys = [pipeline._generate_cache_key(MockVertical) for _ in range(10)]
-        
+
         # All keys should be identical
         assert len(set(keys)) == 1, "Cache keys should be stable"
 
@@ -1519,37 +1536,38 @@ class TestCachingIntegration:
     def test_caching_with_real_coding_vertical(self):
         """Test caching with real CodingAssistant vertical."""
         from victor.coding import CodingAssistant
-        
+
         orchestrator = MockOrchestrator()
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
-        
+
         # First application
         result1 = pipeline.apply(orchestrator, CodingAssistant)
-        
+
         # Reset orchestrator
         orchestrator._enabled_tools = set()
-        
+
         # Second application (should use cache)
         result2 = pipeline.apply(orchestrator, CodingAssistant)
-        
+
         # Both should succeed
         assert result1.success is True
         assert result2.success is True
         assert result1.vertical_name == result2.vertical_name
-        
+
     def test_cache_invalidation_after_vertical_update(self):
         """Test that cache invalidates when vertical is updated."""
         # This test verifies the concept but doesn't actually modify source files
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
-        
+
         # Get initial cache key
         from victor.coding import CodingAssistant
+
         key1 = pipeline._generate_cache_key(CodingAssistant)
-        
+
         # The key should be stable
         key2 = pipeline._generate_cache_key(CodingAssistant)
         assert key1 == key2
-        
+
         # In production, if the CodingAssistant source file changed,
         # the key would be different due to file hash change
         # (This is conceptual - we don't actually modify files in tests)
@@ -1570,10 +1588,10 @@ class TestParallelExecution:
 
         # Mock handlers
         independent_handler = MagicMock()
-        independent_handler.__class__.__name__ = 'ToolStepHandler'
+        independent_handler.__class__.__name__ = "ToolStepHandler"
 
         dependent_handler = MagicMock()
-        dependent_handler.__class__.__name__ = 'ConfigStepHandler'
+        dependent_handler.__class__.__name__ = "ConfigStepHandler"
 
         handlers = [independent_handler, dependent_handler]
         independent, dependent = pipeline._classify_handlers(handlers)
@@ -1645,10 +1663,7 @@ class TestFeatureFlags:
 
     def test_cache_flag_can_be_combined_with_parallel(self):
         """Test that cache and parallel flags can be combined."""
-        pipeline = create_integration_pipeline(
-            enable_cache=True,
-            enable_parallel=True
-        )
+        pipeline = create_integration_pipeline(enable_cache=True, enable_parallel=True)
         assert pipeline._enable_cache is True
         assert pipeline._parallel_enabled is True
 

@@ -750,6 +750,7 @@ class GraphExecutionResult(Generic[StateType]):
 # Graph Execution Helpers (SRP Compliance)
 # =============================================================================
 
+
 class IterationController:
     """Controls graph iteration logic (SRP: Single Responsibility).
 
@@ -946,9 +947,7 @@ class NodeExecutor:
             else:
                 # Traditional deep copy approach
                 if remaining is not None:
-                    state = await asyncio.wait_for(
-                        node.execute(state), timeout=remaining
-                    )
+                    state = await asyncio.wait_for(node.execute(state), timeout=remaining)
                 else:
                     state = await node.execute(state)
 
@@ -1107,7 +1106,9 @@ class GraphEventEmitter:
         except Exception as e:
             logger.debug(f"Failed to emit node_end event: {e}")
 
-    def emit_graph_completed(self, success: bool, iterations: int, duration: float, node_count: int):
+    def emit_graph_completed(
+        self, success: bool, iterations: int, duration: float, node_count: int
+    ):
         """Emit graph completed event."""
         if not self.emit_events:
             return
@@ -1308,7 +1309,9 @@ class CompiledGraph(Generic[StateType]):
             interrupt_after=exec_config.interrupt.interrupt_after,
         )
         node_executor = NodeExecutor(nodes=self._nodes, use_copy_on_write=use_cow)
-        checkpoint_manager = GraphCheckpointManager(checkpointer=exec_config.checkpoint.checkpointer)
+        checkpoint_manager = GraphCheckpointManager(
+            checkpointer=exec_config.checkpoint.checkpointer
+        )
         event_emitter = GraphEventEmitter(
             graph_id=graph_id,
             emit_events=exec_config.observability.emit_events,
@@ -1378,9 +1381,7 @@ class CompiledGraph(Generic[StateType]):
 
                 # Debug hook - after node
                 if hook:
-                    await hook.after_node(
-                        current_node, state, error if not success else None
-                    )
+                    await hook.after_node(current_node, state, error if not success else None)
 
                 if not success:
                     return GraphExecutionResult(
@@ -2036,6 +2037,7 @@ class StateGraph(Generic[StateType]):
                             **state,
                             "_pending_agent": node_config,
                         }
+
                     return agent_placeholder
 
                 metadata = {k: v for k, v in node_def.items() if k not in ["id", "type"]}
@@ -2051,6 +2053,7 @@ class StateGraph(Generic[StateType]):
                             **state,
                             "_pending_compute": node_config,
                         }
+
                     return compute_placeholder
 
                 metadata = {k: v for k, v in node_def.items() if k not in ["id", "type"]}
@@ -2080,9 +2083,7 @@ class StateGraph(Generic[StateType]):
             elif edge_type == "conditional":
                 condition_name = edge_def.get("condition")
                 if not condition_name:
-                    raise ValueError(
-                        f"Conditional edge from '{source}' must specify 'condition'"
-                    )
+                    raise ValueError(f"Conditional edge from '{source}' must specify 'condition'")
 
                 if condition_name not in condition_registry:
                     raise ValueError(

@@ -128,7 +128,7 @@ class ParallelNodeExecutor:
                 metadata={
                     "duration_seconds": time.time() - start_time,
                     "join_strategy": join_strategy,
-                }
+                },
             )
 
             logger.info(f"Parallel node {node.id} completed with strategy: {join_strategy}")
@@ -147,7 +147,7 @@ class ParallelNodeExecutor:
                 error=str(e),
                 metadata={
                     "duration_seconds": time.time() - start_time,
-                }
+                },
             )
 
             raise

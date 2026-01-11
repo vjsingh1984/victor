@@ -98,18 +98,14 @@ def configure_data_privacy(
         }
     else:
         # Fallback: set attribute if config dict doesn't exist
-        setattr(
-            orchestrator,
-            "privacy_config",
-            {
-                "anonymize_pii": anonymize_pii,
-                "pii_columns": pii_columns or [],
-                "hash_identifiers": hash_identifiers,
-                "log_access": log_access,
-                "detect_secrets": detect_secrets,
-                "secret_patterns": secret_patterns or _get_default_secret_patterns(),
-            },
-        )
+        orchestrator.privacy_config = {
+            "anonymize_pii": anonymize_pii,
+            "pii_columns": pii_columns or [],
+            "hash_identifiers": hash_identifiers,
+            "log_access": log_access,
+            "detect_secrets": detect_secrets,
+            "secret_patterns": secret_patterns or _get_default_secret_patterns(),
+        }
 
     logger.info(
         f"Configured data privacy: anonymize={anonymize_pii}, "
@@ -184,17 +180,13 @@ def configure_secrets_masking(
             "custom_patterns": custom_patterns or [],
         }
     else:
-        setattr(
-            orchestrator,
-            "secrets_masking_config",
-            {
-                "enabled": enabled,
-                "replacement": replacement,
-                "mask_in_arguments": mask_in_arguments,
-                "mask_in_output": mask_in_output,
-                "custom_patterns": custom_patterns or [],
-            },
-        )
+        orchestrator.secrets_masking_config = {
+            "enabled": enabled,
+            "replacement": replacement,
+            "mask_in_arguments": mask_in_arguments,
+            "mask_in_output": mask_in_output,
+            "custom_patterns": custom_patterns or [],
+        }
 
     logger.info(f"Configured secrets masking: enabled={enabled}, replacement={replacement}")
 
@@ -249,17 +241,13 @@ def configure_audit_logging(
             "log_file_path": log_file_path,
         }
     else:
-        setattr(
-            orchestrator,
-            "audit_logging_config",
-            {
-                "enabled": enabled,
-                "log_data_access": log_data_access,
-                "log_pii_access": log_pii_access,
-                "log_secrets_access": log_secrets_access,
-                "log_file_path": log_file_path,
-            },
-        )
+        orchestrator.audit_logging_config = {
+            "enabled": enabled,
+            "log_data_access": log_data_access,
+            "log_pii_access": log_pii_access,
+            "log_secrets_access": log_secrets_access,
+            "log_file_path": log_file_path,
+        }
 
     logger.info(f"Configured audit logging: enabled={enabled}, data_access={log_data_access}")
 

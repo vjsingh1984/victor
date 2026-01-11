@@ -239,10 +239,11 @@ class NodeExecutorFactory:
         Spawns a sub-agent with the specified role and goal to process
         the task using LLM inference and tool execution.
         """
+
         # Select orchestrator based on node profile
         def get_orchestrator_for_node(node: AgentNode):
             """Get the appropriate orchestrator for a node based on its profile."""
-            if hasattr(node, 'profile') and node.profile and node.profile in self.orchestrators:
+            if hasattr(node, "profile") and node.profile and node.profile in self.orchestrators:
                 return self.orchestrators[node.profile]
             return self.orchestrator
 
@@ -310,7 +311,7 @@ class NodeExecutorFactory:
 
                 # Get orchestrator for this node based on profile
                 node_orchestrator = get_orchestrator_for_node(node)
-                profile_used = getattr(node, 'profile', 'default')
+                profile_used = getattr(node, "profile", "default")
                 logger.debug(f"   Using orchestrator: {profile_used}")
 
                 if node_orchestrator is None:
@@ -347,7 +348,9 @@ class NodeExecutorFactory:
 
                     # Create and execute sub-agent
                     sub_orchestrator = SubAgentOrchestrator(node_orchestrator)
-                    logger.debug(f"   {_get_icon('gear')}  Spawning sub-agent with role: {role.value}")
+                    logger.debug(
+                        f"   {_get_icon('gear')}  Spawning sub-agent with role: {role.value}"
+                    )
 
                     result = await sub_orchestrator.spawn(
                         role=role,
@@ -355,7 +358,7 @@ class NodeExecutorFactory:
                         tool_budget=node.tool_budget,
                         allowed_tools=node.allowed_tools,
                         timeout_seconds=int(node.timeout_seconds) if node.timeout_seconds else 300,
-                        disable_embeddings=getattr(node, 'disable_embeddings', False),
+                        disable_embeddings=getattr(node, "disable_embeddings", False),
                     )
 
                     output = {
@@ -372,9 +375,11 @@ class NodeExecutorFactory:
                     logger.debug(f"   Success: {output['success']}")
                     logger.debug(f"   Tool Calls Used: {output['tool_calls']}/{node.tool_budget}")
                     logger.debug(f"   Duration: {duration:.2f}s")
-                    if output['error']:
+                    if output["error"]:
                         logger.debug(f"   Error: {output['error']}")
-                    logger.debug(f"   Response Preview (first 200 chars): {str(output['response'])[:200]}...")
+                    logger.debug(
+                        f"   Response Preview (first 200 chars): {str(output['response'])[:200]}..."
+                    )
                     logger.debug(f"{'='*80}\n")
 
                 # Store output in state
@@ -799,7 +804,9 @@ class YAMLToStateGraphCompiler:
         self.orchestrators = orchestrators or {}
         self.tool_registry = tool_registry or self._get_default_tool_registry()
         self.config = config or CompilerConfig()
-        self._executor_factory = NodeExecutorFactory(orchestrator, orchestrators, self.tool_registry)
+        self._executor_factory = NodeExecutorFactory(
+            orchestrator, orchestrators, self.tool_registry
+        )
 
     def _get_default_tool_registry(self) -> Optional["ToolRegistry"]:
         """Get the default tool registry if available."""

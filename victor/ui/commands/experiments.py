@@ -182,10 +182,12 @@ def show_experiment(
     info_table.add_row("Tags", ", ".join(experiment.tags) or "-")
     info_table.add_row("Created", _format_timestamp(experiment.created_at.isoformat()))
     info_table.add_row(
-        "Started", _format_timestamp(experiment.started_at.isoformat()) if experiment.started_at else "-"
+        "Started",
+        _format_timestamp(experiment.started_at.isoformat()) if experiment.started_at else "-",
     )
     info_table.add_row(
-        "Completed", _format_timestamp(experiment.completed_at.isoformat()) if experiment.completed_at else "-"
+        "Completed",
+        _format_timestamp(experiment.completed_at.isoformat()) if experiment.completed_at else "-",
     )
     info_table.add_row("Git Commit", experiment.git_commit_sha or "-")
     info_table.add_row("Git Branch", experiment.git_branch or "-")
@@ -211,7 +213,9 @@ def show_experiment(
 
         for run in runs[:10]:  # Show first 10 runs
             # Format metrics summary
-            metrics_str = ", ".join(f"{k}={v:.3f}" for k, v in list(run.metrics_summary.items())[:3])
+            metrics_str = ", ".join(
+                f"{k}={v:.3f}" for k, v in list(run.metrics_summary.items())[:3]
+            )
             if len(run.metrics_summary) > 3:
                 metrics_str += f" +{len(run.metrics_summary) - 3}"
 
@@ -289,7 +293,9 @@ def delete_experiment(
 
     # Confirm deletion
     if not force:
-        console.print(f"[bold yellow]Warning:[/] This will delete experiment '{experiment.name}' and all its runs.")
+        console.print(
+            f"[bold yellow]Warning:[/] This will delete experiment '{experiment.name}' and all its runs."
+        )
         confirm = typer.confirm("Continue?")
         if not confirm:
             console.print("Aborted.")
@@ -438,6 +444,7 @@ def show_run(
     if metrics:
         # Group by metric name
         from collections import defaultdict
+
         metrics_by_key = defaultdict(list)
         for m in metrics:
             metrics_by_key[m.key].append(m)
@@ -445,7 +452,9 @@ def show_run(
         console.print("\n[bold]Metric History:[/]")
         for key, history in sorted(metrics_by_key.items()):
             values = [m.value for m in history]
-            console.print(f"  {key}: {len(values)} points, range=[{min(values):.4f}, {max(values):.4f}]")
+            console.print(
+                f"  {key}: {len(values)} points, range=[{min(values):.4f}, {max(values):.4f}]"
+            )
 
     # Display artifacts
     artifacts = storage.get_artifacts(run_id)

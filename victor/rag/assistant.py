@@ -322,4 +322,3 @@ You: [Use rag_query tool with query="authentication"]
         from victor.rag.capabilities import get_capability_configs
 
         return get_capability_configs()
-

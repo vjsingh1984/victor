@@ -246,7 +246,9 @@ class TestCapabilityProviderCrossVerticalReuse:
         import sys
 
         # Save coding modules before removing them
-        coding_modules = {m: sys.modules[m] for m in list(sys.modules.keys()) if "victor.coding" in m}
+        coding_modules = {
+            m: sys.modules[m] for m in list(sys.modules.keys()) if "victor.coding" in m
+        }
 
         # Remove coding modules temporarily
         for mod in coding_modules:
@@ -322,7 +324,9 @@ class TestCapabilityProviderCrossVerticalReuse:
 
         for cap_name, meta in metadata.items():
             # Version should match SemVer (strict or loose)
-            assert re.match(semver_pattern_strict, meta.version) or re.match(semver_pattern_loose, meta.version), f"{cap_name} has invalid version: {meta.version}"
+            assert re.match(semver_pattern_strict, meta.version) or re.match(
+                semver_pattern_loose, meta.version
+            ), f"{cap_name} has invalid version: {meta.version}"
 
     def test_capability_dependencies_tracking(self):
         """Capabilities properly declare dependencies."""

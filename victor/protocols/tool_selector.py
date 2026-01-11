@@ -96,7 +96,9 @@ class ToolSelectionResult:
         filtered_names = [
             name for name in self.tool_names if self.scores.get(name, 0.0) >= min_score
         ]
-        filtered_scores = {name: self.scores[name] for name in filtered_names if name in self.scores}
+        filtered_scores = {
+            name: self.scores[name] for name in filtered_names if name in self.scores
+        }
         return ToolSelectionResult(
             tool_names=filtered_names,
             scores=filtered_scores,

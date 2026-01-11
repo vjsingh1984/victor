@@ -293,9 +293,7 @@ class PatternMiner:
         # Default to sequential
         return PatternCategory.SEQUENTIAL
 
-    def _detect_parallel_groups(
-        self, trace: WorkflowExecutionTrace
-    ) -> List[List[str]]:
+    def _detect_parallel_groups(self, trace: WorkflowExecutionTrace) -> List[List[str]]:
         """Detect groups of parallel nodes.
 
         Args:
@@ -338,19 +336,15 @@ class PatternMiner:
         """
         # Check for manager/worker naming
         has_manager = any(
-            "manager" in n.lower() or "coordinator" in n.lower()
-            for n in trace.nodes_executed
+            "manager" in n.lower() or "coordinator" in n.lower() for n in trace.nodes_executed
         )
         has_worker = any(
-            "worker" in n.lower() or "agent" in n.lower()
-            for n in trace.nodes_executed
+            "worker" in n.lower() or "agent" in n.lower() for n in trace.nodes_executed
         )
 
         return has_manager and has_worker
 
-    def _extract_participants(
-        self, traces: List[WorkflowExecutionTrace]
-    ) -> List[Dict[str, Any]]:
+    def _extract_participants(self, traces: List[WorkflowExecutionTrace]) -> List[Dict[str, Any]]:
         """Extract participant specs from traces.
 
         Args:
@@ -376,11 +370,13 @@ class PatternMiner:
             elif "planner" in node.lower():
                 role = "planner"
 
-            participants.append({
-                "id": node,
-                "role": role,
-                "occurrence_rate": count / len(traces),
-            })
+            participants.append(
+                {
+                    "id": node,
+                    "role": role,
+                    "occurrence_rate": count / len(traces),
+                }
+            )
 
         return participants
 

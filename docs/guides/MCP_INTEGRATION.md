@@ -128,7 +128,7 @@ print(result.content)
 # With timeout
 result = await client.call_tool(
     "search",
-    {"query": "TODO"},
+    {"query": "pattern matching"},
     timeout=10.0
 )
 

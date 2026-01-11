@@ -100,7 +100,7 @@ class TestCodingRLConfig:
 
         assert config.get_patience("anthropic") == 3
         assert config.get_patience("ollama") == 7
-        assert config.get_patience("unknown") == 3  # default
+        assert config.get_patience("unknown") == 4  # default from BaseRLConfig
 
     def test_is_learner_active(self):
         """Test checking if learner is active."""

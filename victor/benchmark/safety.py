@@ -76,13 +76,9 @@ def create_benchmark_repository_safety_rules(
                 name="benchmark_block_outside_workspace",
                 description="Block benchmark operations outside designated workspace",
                 check_fn=lambda op: (
-                    any(
-                        protected in op.lower()
-                        for protected in protected_repositories
-                    )
+                    any(protected in op.lower() for protected in protected_repositories)
                     and any(
-                        tool in op.lower()
-                        for tool in ["write", "edit", "delete", "modify", "git"]
+                        tool in op.lower() for tool in ["write", "edit", "delete", "modify", "git"]
                     )
                 ),
                 level=SafetyLevel.HIGH,
@@ -105,10 +101,7 @@ def create_benchmark_repository_safety_rules(
                         "git apply",
                     ]
                 )
-                and any(
-                    protected in op.lower()
-                    for protected in protected_repositories
-                ),
+                and any(protected in op.lower() for protected in protected_repositories),
                 level=SafetyLevel.HIGH,
                 allow_override=False,  # Never allow git ops on protected repos
             )
@@ -150,12 +143,15 @@ def create_benchmark_resource_safety_rules(
         def check_excessive_timeout(op: str, max_seconds=max_timeout_seconds) -> bool:
             """Check if operation has timeout exceeding max_seconds."""
             # Check for timeout keywords
-            if not any(phrase in op.lower() for phrase in ["timeout", "time_limit", "max_time", "duration"]):
+            if not any(
+                phrase in op.lower() for phrase in ["timeout", "time_limit", "max_time", "duration"]
+            ):
                 return False
 
             # Extract all numbers from the operation
             import re
-            numbers = re.findall(r'\d+', op)
+
+            numbers = re.findall(r"\d+", op)
             for num_str in numbers:
                 try:
                     num = int(num_str)
@@ -258,10 +254,7 @@ def create_benchmark_test_safety_rules(
                 name="benchmark_block_production_test_runs",
                 description="Block running benchmark tests on production environments",
                 check_fn=lambda op: (
-                    any(
-                        env in op.lower()
-                        for env in protected_environments
-                    )
+                    any(env in op.lower() for env in protected_environments)
                     and any(
                         test_op in op.lower()
                         for test_op in [
@@ -474,8 +467,10 @@ def create_all_benchmark_safety_rules(
     """
     # Extract kwargs for each rule function
     repository_kwargs = {
-        k: v for k, v in kwargs.items()
-        if k in {
+        k: v
+        for k, v in kwargs.items()
+        if k
+        in {
             "block_outside_workspace",
             "protected_repositories",
             "block_git_operations_outside_workspace",
@@ -483,8 +478,10 @@ def create_all_benchmark_safety_rules(
     }
 
     resource_kwargs = {
-        k: v for k, v in kwargs.items()
-        if k in {
+        k: v
+        for k, v in kwargs.items()
+        if k
+        in {
             "block_excessive_timeouts",
             "max_timeout_seconds",
             "block_unlimited_budgets",
@@ -493,8 +490,10 @@ def create_all_benchmark_safety_rules(
     }
 
     test_kwargs = {
-        k: v for k, v in kwargs.items()
-        if k in {
+        k: v
+        for k, v in kwargs.items()
+        if k
+        in {
             "block_production_test_runs",
             "block_destructive_tests",
             "protected_environments",
@@ -502,8 +501,10 @@ def create_all_benchmark_safety_rules(
     }
 
     data_kwargs = {
-        k: v for k, v in kwargs.items()
-        if k in {
+        k: v
+        for k, v in kwargs.items()
+        if k
+        in {
             "block_external_uploads",
             "block_task_data_leaks",
             "block_solution_sharing",

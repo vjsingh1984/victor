@@ -801,7 +801,10 @@ class SafetyEnforcer:
                     elif rule.level == SafetyLevel.LOW:
                         # LOW level - warn but don't block (unless config is HIGH)
                         if self.config.level == SafetyLevel.HIGH:
-                            return False, f"Blocked by safety rule: {rule.name} - {rule.description}"
+                            return (
+                                False,
+                                f"Blocked by safety rule: {rule.name} - {rule.description}",
+                            )
                         # Warn but allow
                         if self.config.audit_log:
                             # Log warning (would integrate with logging system)
@@ -811,7 +814,7 @@ class SafetyEnforcer:
                         # Rule disabled
                         pass
 
-            except Exception as e:
+            except Exception:
                 # Rule check failed - log and continue
                 if self.config.audit_log:
                     # Log error (would integrate with logging system)
@@ -839,8 +842,6 @@ class SafetyEnforcer:
 __all__ = [
     # Agent configuration
     "AgentConfig",
-    "create_default_agent_config",
-    "AgentMode",
     # Graph configuration
     "ExecutionConfig",
     "CheckpointConfig",
@@ -857,4 +858,3 @@ __all__ = [
     "SafetyRule",
     "SafetyEnforcer",
 ]
-

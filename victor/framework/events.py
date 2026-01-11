@@ -355,7 +355,9 @@ def stream_start_event(**kwargs: Any) -> AgentExecutionEvent:
     return AgentExecutionEvent(type=EventType.STREAM_START, **kwargs)
 
 
-def stream_end_event(success: bool = True, error: Optional[str] = None, **kwargs: Any) -> AgentExecutionEvent:
+def stream_end_event(
+    success: bool = True, error: Optional[str] = None, **kwargs: Any
+) -> AgentExecutionEvent:
     """Create a stream end event.
 
     Args:
@@ -392,5 +394,3 @@ def milestone_event(milestone: str, **kwargs: Any) -> AgentExecutionEvent:
         AgentExecutionEvent with type=MILESTONE
     """
     return AgentExecutionEvent(type=EventType.MILESTONE, milestone=milestone, **kwargs)
-
-

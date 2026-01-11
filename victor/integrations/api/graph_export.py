@@ -251,9 +251,7 @@ def export_graph_schema(
     # Detect graph type
     if hasattr(graph, "get_graph_schema"):
         # StateGraph.CompiledGraph
-        return _export_from_compiled_graph(
-            graph, workflow_id, name, description  # type: ignore
-        )
+        return _export_from_compiled_graph(graph, workflow_id, name, description)  # type: ignore
     elif hasattr(graph, "nodes"):
         # WorkflowDefinition
         return _export_from_workflow_definition(
@@ -261,9 +259,7 @@ def export_graph_schema(
         )
     elif hasattr(graph, "_nodes") and hasattr(graph, "_edges"):
         # WorkflowVisualizer
-        return _export_from_visualizer(
-            graph, workflow_id, name, description  # type: ignore
-        )
+        return _export_from_visualizer(graph, workflow_id, name, description)  # type: ignore
     else:
         raise TypeError(
             f"Unsupported graph type: {type(graph)}. "

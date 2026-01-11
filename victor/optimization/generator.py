@@ -150,9 +150,6 @@ class WorkflowVariantGenerator:
             f"on {opportunity.target}"
         )
 
-        # Create strategy instance
-        strategy = create_strategy(opportunity.strategy_type)
-
         # Deep copy config to avoid modifying original
         variant_config = deepcopy(workflow_config)
 
@@ -249,20 +246,22 @@ class WorkflowVariantGenerator:
                 if "edges" in config:
                     # Remove edges involving this node
                     config["edges"] = [
-                        edge for edge in config["edges"]
-                        if edge.get("source") != node_id
-                        and edge.get("target") != node_id
+                        edge
+                        for edge in config["edges"]
+                        if edge.get("source") != node_id and edge.get("target") != node_id
                     ]
 
-                changes.append(WorkflowChange(
-                    change_type="remove_node",
-                    target=node_id,
-                    description=f"Removed node '{node_id}' (success rate: {profile.node_stats[node_id].success_rate:.1%})",
-                    metadata={
-                        "removed_node": removed_node,
-                        "reason": "pruning",
-                    },
-                ))
+                changes.append(
+                    WorkflowChange(
+                        change_type="remove_node",
+                        target=node_id,
+                        description=f"Removed node '{node_id}' (success rate: {profile.node_stats[node_id].success_rate:.1%})",
+                        metadata={
+                            "removed_node": removed_node,
+                            "reason": "pruning",
+                        },
+                    )
+                )
 
                 logger.info(f"Pruned node: {node_id}")
 
@@ -313,43 +312,48 @@ class WorkflowVariantGenerator:
         if "edges" in config:
             # Find edges to/from target nodes
             incoming_edges = [
-                edge for edge in config["edges"]
-                if edge.get("target") in target_nodes
+                edge for edge in config["edges"] if edge.get("target") in target_nodes
             ]
             outgoing_edges = [
-                edge for edge in config["edges"]
-                if edge.get("source") in target_nodes
+                edge for edge in config["edges"] if edge.get("source") in target_nodes
             ]
 
             # Remove old edges
             config["edges"] = [
-                edge for edge in config["edges"]
+                edge
+                for edge in config["edges"]
                 if edge not in incoming_edges and edge not in outgoing_edges
             ]
 
             # Add new edges through parallel node
             for edge in incoming_edges:
-                config["edges"].append({
-                    "source": edge["source"],
-                    "target": parallel_node_id,
-                })
+                config["edges"].append(
+                    {
+                        "source": edge["source"],
+                        "target": parallel_node_id,
+                    }
+                )
 
             for edge in outgoing_edges:
-                config["edges"].append({
-                    "source": parallel_node_id,
-                    "target": edge["target"],
-                })
+                config["edges"].append(
+                    {
+                        "source": parallel_node_id,
+                        "target": edge["target"],
+                    }
+                )
 
-        changes.append(WorkflowChange(
-            change_type="create_parallel_node",
-            target=",".join(target_nodes),
-            description=f"Created parallel node '{parallel_node_id}' with {len(target_nodes)} nodes",
-            metadata={
-                "parallel_node_id": parallel_node_id,
-                "node_ids": target_nodes,
-                "estimated_speedup": opportunity.metadata.get("estimated_speedup", 2.0),
-            },
-        ))
+        changes.append(
+            WorkflowChange(
+                change_type="create_parallel_node",
+                target=",".join(target_nodes),
+                description=f"Created parallel node '{parallel_node_id}' with {len(target_nodes)} nodes",
+                metadata={
+                    "parallel_node_id": parallel_node_id,
+                    "node_ids": target_nodes,
+                    "estimated_speedup": opportunity.metadata.get("estimated_speedup", 2.0),
+                },
+            )
+        )
 
         logger.info(f"Created parallel node: {parallel_node_id}")
 
@@ -392,16 +396,18 @@ class WorkflowVariantGenerator:
                         old_tool = node_config.get("tool")
                         node_config["tool"] = new_tool
 
-                        changes.append(WorkflowChange(
-                            change_type="substitute_tool",
-                            target=node_id,
-                            description=f"Substituted tool '{old_tool}' with '{new_tool}' in node '{node_id}'",
-                            metadata={
-                                "old_tool": old_tool,
-                                "new_tool": new_tool,
-                                "node_id": node_id,
-                            },
-                        ))
+                        changes.append(
+                            WorkflowChange(
+                                change_type="substitute_tool",
+                                target=node_id,
+                                description=f"Substituted tool '{old_tool}' with '{new_tool}' in node '{node_id}'",
+                                metadata={
+                                    "old_tool": old_tool,
+                                    "new_tool": new_tool,
+                                    "node_id": node_id,
+                                },
+                            )
+                        )
 
                         logger.info(f"Substituted tool in node {node_id}: {old_tool} -> {new_tool}")
 
@@ -455,12 +461,11 @@ class WorkflowVariantGenerator:
         if has_cycle:
             # Check if max_iterations is set to handle cycles
             has_max_iter = any(
-                node.get("max_iterations", 0) > 0
-                for node in config.get("nodes", {}).values()
+                node.get("max_iterations", 0) > 0 for node in config.get("nodes", {}).values()
             )
 
             if not has_max_iter:
-                logger.warning(f"Detected cycle without max_iterations")
+                logger.warning("Detected cycle without max_iterations")
                 return False
 
         # Check 4: At least one node exists

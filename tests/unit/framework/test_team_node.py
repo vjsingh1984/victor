@@ -253,6 +253,7 @@ class TestTeamNode:
     @pytest.mark.asyncio
     async def test_execute_async_timeout(self, sample_team_node):
         """Test team execution with timeout."""
+
         # Mock that times out
         async def timeout_execute(*args, **kwargs):
             await asyncio.sleep(2)  # Longer than timeout

@@ -227,9 +227,7 @@ class ArtifactManager:
 
         return storage.get_artifacts(run_id)
 
-    def delete_artifact(
-        self, artifact_id: str, storage: Optional[IStorageBackend] = None
-    ) -> bool:
+    def delete_artifact(self, artifact_id: str, storage: Optional[IStorageBackend] = None) -> bool:
         """Delete an artifact.
 
         Removes both the database record and the file from disk.
@@ -284,9 +282,7 @@ class ArtifactManager:
 
         return f"file://{path.absolute()}"
 
-    def cleanup_run_artifacts(
-        self, run_id: str, storage: Optional[IStorageBackend] = None
-    ) -> int:
+    def cleanup_run_artifacts(self, run_id: str, storage: Optional[IStorageBackend] = None) -> int:
         """Delete all artifacts for a run.
 
         Args:
@@ -341,9 +337,7 @@ class ArtifactManager:
 
         # Get total usage across all runs
         file_count = sum(1 for _ in self.artifact_root.rglob("*") if _.is_file())
-        total_bytes = sum(
-            f.stat().st_size for f in self.artifact_root.rglob("*") if f.is_file()
-        )
+        total_bytes = sum(f.stat().st_size for f in self.artifact_root.rglob("*") if f.is_file())
 
         return {"bytes": total_bytes, "file_count": file_count}
 

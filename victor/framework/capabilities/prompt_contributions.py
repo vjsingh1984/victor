@@ -21,6 +21,7 @@ from dataclasses import dataclass
 @dataclass
 class PromptContribution:
     """A prompt contribution configuration."""
+
     name: str
     task_type: str
     hint: str

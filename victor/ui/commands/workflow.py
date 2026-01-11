@@ -802,18 +802,19 @@ def run_workflow(
     # Set log level if specified
     if log_level:
         import logging
+
         level = getattr(logging, log_level.upper(), None)
         if not isinstance(level, int):
             console.print(f"[bold red]Error:[/] Invalid log level: {log_level}")
             raise typer.Exit(1)
 
         # Configure logging
-        logging.basicConfig(level=level, format='%(levelname)s: %(message)s')
+        logging.basicConfig(level=level, format="%(levelname)s: %(message)s")
 
         # Filter out noisy HTTP third-party logs at DEBUG level
         # Only show WARNING and above for HTTP libraries
         if level <= logging.DEBUG:
-            for http_logger in ['httpcore', 'httpx', 'urllib3']:
+            for http_logger in ["httpcore", "httpx", "urllib3"]:
                 logging.getLogger(http_logger).setLevel(logging.WARNING)
 
         console.print(f"[dim]Log level set to: {log_level}[/]")
@@ -891,7 +892,7 @@ def run_workflow(
             profile_to_nodes = {}  # Map profile to list of nodes using it
 
             for node in workflow.nodes.values():
-                if isinstance(node, AgentNode) and hasattr(node, 'profile') and node.profile:
+                if isinstance(node, AgentNode) and hasattr(node, "profile") and node.profile:
                     node_profiles.add(node.profile)
                     if node.profile not in profile_to_nodes:
                         profile_to_nodes[node.profile] = []
@@ -905,7 +906,9 @@ def run_workflow(
             # Always include the default profile
             all_profiles = node_profiles | {profile}
 
-            console.print(f"[dim]Creating orchestrators for profiles: {', '.join(sorted(all_profiles))}[/]")
+            console.print(
+                f"[dim]Creating orchestrators for profiles: {', '.join(sorted(all_profiles))}[/]"
+            )
 
             # Debug: Show profile to node mapping
             for prof, nodes in sorted(profile_to_nodes.items()):
@@ -925,7 +928,10 @@ def run_workflow(
                     logger.debug(f"Successfully created orchestrator for profile: {profile_name}")
                     console.print(f"  [dim]✓ Profile '{profile_name}' initialized[/]")
                 except Exception as e:
-                    logger.error(f"Failed to create orchestrator for profile '{profile_name}': {e}", exc_info=True)
+                    logger.error(
+                        f"Failed to create orchestrator for profile '{profile_name}': {e}",
+                        exc_info=True,
+                    )
                     console.print(f"  [red]✗ Profile '{profile_name}' failed: {e}[/]")
                     if profile_name == profile:
                         # If default profile fails, we can't continue
@@ -1151,7 +1157,9 @@ def generate_workflow(
 
     console.print("\n[bold blue]Generating workflow from description...[/]")
     console.print("[dim]" + "─" * 50 + "[/]")
-    console.print(f"[dim]Description:[/] {description[:100]}{'...' if len(description) > 100 else ''}")
+    console.print(
+        f"[dim]Description:[/] {description[:100]}{'...' if len(description) > 100 else ''}"
+    )
     console.print(f"[dim]Vertical:[/] {vertical}")
     console.print(f"[dim]Strategy:[/] {strategy}")
 
@@ -1179,15 +1187,9 @@ def generate_workflow(
             req_pipeline = RequirementPipeline(orchestrator, vertical=vertical)
             requirements = await req_pipeline.extract_and_validate(description)
 
-            console.print(
-                f"  [green]✓[/] Extracted {len(requirements.functional.tasks)} tasks"
-            )
-            console.print(
-                f"  [dim]Tools: {list(requirements.functional.tools.keys())}[/]"
-            )
-            console.print(
-                f"  [dim]Execution order: {requirements.structural.execution_order}[/]"
-            )
+            console.print(f"  [green]✓[/] Extracted {len(requirements.functional.tasks)} tasks")
+            console.print(f"  [dim]Tools: {list(requirements.functional.tools.keys())}[/]")
+            console.print(f"  [dim]Execution order: {requirements.structural.execution_order}[/]")
 
             # Check for ambiguities
             if requirements.metadata.ambiguities:
@@ -1205,11 +1207,13 @@ def generate_workflow(
 
             if dry_run:
                 console.print("\n[bold yellow]Dry run mode[/] - requirements extracted:")
-                console.print(Panel(
-                    json.dumps(requirements.to_dict(), indent=2, default=str)[:2000],
-                    title="Requirements",
-                    border_style="blue",
-                ))
+                console.print(
+                    Panel(
+                        json.dumps(requirements.to_dict(), indent=2, default=str)[:2000],
+                        title="Requirements",
+                        border_style="blue",
+                    )
+                )
                 return
 
             # Step 2: Generate workflow
@@ -1235,9 +1239,7 @@ def generate_workflow(
                 raise typer.Exit(1)
 
             console.print("  [green]✓[/] Generated workflow schema")
-            console.print(
-                f"  [dim]Duration: {result.metadata.duration_seconds:.2f}s[/]"
-            )
+            console.print(f"  [dim]Duration: {result.metadata.duration_seconds:.2f}s[/]")
 
             # Step 3: Convert to YAML
             console.print("\n[bold]Step 3:[/] Converting to YAML...")
@@ -1253,17 +1255,13 @@ def generate_workflow(
             yaml_data = {
                 "workflows": {
                     workflow_schema.get("workflow_name", "generated_workflow"): {
-                        "description": workflow_schema.get(
-                            "description", description[:100]
-                        ),
+                        "description": workflow_schema.get("description", description[:100]),
                         "metadata": {
                             "vertical": vertical,
                             "generated_by": "victor workflow generate",
                             "generation_strategy": strategy,
                         },
-                        "nodes": _convert_nodes_to_yaml(
-                            workflow_schema.get("nodes", [])
-                        ),
+                        "nodes": _convert_nodes_to_yaml(workflow_schema.get("nodes", [])),
                     }
                 }
             }
@@ -1306,6 +1304,7 @@ def generate_workflow(
         finally:
             # Cleanup
             from victor.ui.commands.utils import graceful_shutdown
+
             try:
                 await graceful_shutdown(orchestrator)
             except Exception:

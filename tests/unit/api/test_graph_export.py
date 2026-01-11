@@ -412,6 +412,7 @@ class TestExportGraphSchema:
 
     def test_export_with_custom_metadata(self):
         """Test exporting with custom workflow metadata."""
+
         # Create a mock workflow definition
         class MockWorkflow:
             def __init__(self):

@@ -181,15 +181,15 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
                         # Try to instantiate - this will fail for abstract classes
                         instance = attr()
                         # Verify it has the required methods
-                        if hasattr(instance, "get_capabilities") and hasattr(instance, "get_capability_metadata"):
+                        if hasattr(instance, "get_capabilities") and hasattr(
+                            instance, "get_capability_metadata"
+                        ):
                             return instance
                     except TypeError:
                         # Abstract class or can't be instantiated, skip
                         continue
 
-            logger.warning(
-                f"No concrete capability provider class found in {module_path}"
-            )
+            logger.warning(f"No concrete capability provider class found in {module_path}")
             return None
         except ImportError as e:
             logger.warning(f"Failed to import capability provider from {module_path}: {e}")

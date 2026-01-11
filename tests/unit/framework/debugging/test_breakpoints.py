@@ -47,7 +47,9 @@ class TestWorkflowBreakpoint:
 
     def test_conditional_breakpoint_creation(self):
         """Test creating a conditional breakpoint."""
-        condition = lambda state: state.get("errors", 0) > 5
+
+        def condition(state):
+            return state.get("errors", 0) > 5
 
         bp = WorkflowBreakpoint(
             id="bp-2",
@@ -265,7 +267,9 @@ class TestBreakpointManager:
 
     async def test_set_conditional_breakpoint(self, breakpoint_manager):
         """Test setting a conditional breakpoint."""
-        condition = lambda state: state.get("errors", 0) > 5
+
+        def condition(state):
+            return state.get("errors", 0) > 5
 
         bp = breakpoint_manager.set_breakpoint(
             node_id="process",

@@ -151,9 +151,7 @@ class WorkflowOptimizer:
                 variant_generator=self.variant_generator,
             )
         else:
-            raise ValueError(
-                f"Unsupported search algorithm: {self.config.search_algorithm}"
-            )
+            raise ValueError(f"Unsupported search algorithm: {self.config.search_algorithm}")
 
     async def analyze_workflow(
         self,
@@ -361,10 +359,7 @@ class WorkflowOptimizer:
         Returns:
             WorkflowVariant if successful, None otherwise
         """
-        logger.info(
-            f"Applying optimization {opportunity.strategy_type.value} "
-            f"to {workflow_id}"
-        )
+        logger.info(f"Applying optimization {opportunity.strategy_type.value} " f"to {workflow_id}")
 
         # Get profile for validation
         profile = await self.analyze_workflow(

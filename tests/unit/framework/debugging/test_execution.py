@@ -69,6 +69,7 @@ class TestExecutionController:
 
     async def test_step_over(self, execution_controller, sample_state):
         """Test step over command."""
+
         # Pause first
         async def pause_task():
             await execution_controller.pause(
@@ -92,6 +93,7 @@ class TestExecutionController:
 
     async def test_step_into(self, execution_controller, sample_state):
         """Test step into command."""
+
         # Pause first
         async def pause_task():
             await execution_controller.pause(
@@ -115,6 +117,7 @@ class TestExecutionController:
 
     async def test_step_out(self, execution_controller, sample_state):
         """Test step out command."""
+
         # Pause first
         async def pause_task():
             await execution_controller.pause(
@@ -136,9 +139,7 @@ class TestExecutionController:
         # Let pause complete
         await pause_task
 
-    async def test_should_pause_with_breakpoints(
-        self, execution_controller, sample_state
-    ):
+    async def test_should_pause_with_breakpoints(self, execution_controller, sample_state):
         """Test should_pause with breakpoints."""
         bp = WorkflowBreakpoint(
             id="bp-1",
@@ -155,9 +156,7 @@ class TestExecutionController:
 
         assert should is True
 
-    async def test_should_pause_without_breakpoints(
-        self, execution_controller, sample_state
-    ):
+    async def test_should_pause_without_breakpoints(self, execution_controller, sample_state):
         """Test should_pause without breakpoints."""
         should = execution_controller.should_pause(
             node_id="analyze",

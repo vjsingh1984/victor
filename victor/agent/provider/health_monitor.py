@@ -79,6 +79,10 @@ class ProviderHealthMonitor(IProviderHealthMonitor):
         Returns:
             True if provider is healthy, False otherwise
         """
+        # Skip health check if disabled
+        if not self._enable_health_checks:
+            return True
+
         try:
             # Lazy initialize health checker
             if not self._health_checker:

@@ -140,7 +140,11 @@ class ComputeNodeExecutor:
                                 tool_name,
                                 _exec_ctx={
                                     "workflow_context": state,
-                                    "constraints": node.constraints.to_dict() if hasattr(node, "constraints") and node.constraints else {},
+                                    "constraints": (
+                                        node.constraints.to_dict()
+                                        if hasattr(node, "constraints") and node.constraints
+                                        else {}
+                                    ),
                                 },
                                 **params,
                             ),
@@ -186,7 +190,7 @@ class ComputeNodeExecutor:
                 "handler": node.handler,
                 "tools": node.tools if hasattr(node, "tools") else [],
                 "tool_calls_used": tool_calls_used,
-            }
+            },
         )
 
         logger.info(f"Compute node {node.id} completed successfully")

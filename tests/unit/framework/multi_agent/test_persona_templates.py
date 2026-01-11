@@ -70,7 +70,10 @@ class TestResearcherTemplate:
         assert len(template.description) > 0
         # Description should mention information gathering or analysis
         desc_lower = template.description.lower()
-        assert any(term in desc_lower for term in ["information", "gathering", "synthesis", "analysis", "sources"])
+        assert any(
+            term in desc_lower
+            for term in ["information", "gathering", "synthesis", "analysis", "sources"]
+        )
 
     def test_has_research_strengths(self):
         """Should have research-related strengths."""
@@ -809,11 +812,15 @@ class TestTemplateConsistency:
         }
 
         for name, template in templates.items():
-            assert "prompt_extensions" in template.custom_traits, f"{name} missing prompt_extensions"
+            assert (
+                "prompt_extensions" in template.custom_traits
+            ), f"{name} missing prompt_extensions"
             assert isinstance(
                 template.custom_traits["prompt_extensions"], dict
             ), f"{name} prompt_extensions not a dict"
-            assert len(template.custom_traits["prompt_extensions"]) > 0, f"{name} has empty prompt_extensions"
+            assert (
+                len(template.custom_traits["prompt_extensions"]) > 0
+            ), f"{name} has empty prompt_extensions"
 
     def test_all_prompt_extensions_have_consistent_keys(self):
         """All prompt_extensions should have consistent structure."""
@@ -828,9 +835,7 @@ class TestTemplateConsistency:
 
         for name, template in templates.items():
             actual_keys = set(template.custom_traits["prompt_extensions"].keys())
-            assert (
-                actual_keys == expected_keys
-            ), f"{name} has unexpected keys: {actual_keys}"
+            assert actual_keys == expected_keys, f"{name} has unexpected keys: {actual_keys}"
 
     def test_template_descriptions_are_meaningful(self):
         """All template descriptions should be meaningful."""
@@ -857,9 +862,9 @@ class TestTemplateConsistency:
         }
 
         for name, template in templates.items():
-            assert isinstance(template.communication_style, CommunicationStyle), (
-                f"{name} has invalid communication_style type"
-            )
+            assert isinstance(
+                template.communication_style, CommunicationStyle
+            ), f"{name} has invalid communication_style type"
 
     def test_all_templates_have_valid_expertise_levels(self):
         """All templates should have valid ExpertiseLevel enum values."""
@@ -871,9 +876,9 @@ class TestTemplateConsistency:
         }
 
         for name, template in templates.items():
-            assert isinstance(template.expertise_level, ExpertiseLevel), (
-                f"{name} has invalid expertise_level type"
-            )
+            assert isinstance(
+                template.expertise_level, ExpertiseLevel
+            ), f"{name} has invalid expertise_level type"
 
 
 # =============================================================================

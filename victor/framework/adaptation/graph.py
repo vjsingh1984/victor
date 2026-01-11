@@ -201,9 +201,7 @@ class AdaptableGraph:
             # Step 3: Create checkpoint
             checkpoint_id = None
             if self._config.enable_auto_checkpoint:
-                checkpoint_id = await self.create_checkpoint(
-                    f"Before: {modification.description}"
-                )
+                checkpoint_id = await self.create_checkpoint(f"Before: {modification.description}")
 
             # Step 4: Apply modification
             try:
@@ -475,14 +473,16 @@ class AdaptableGraph:
         if "modifications" not in self._metadata:
             self._metadata["modifications"] = []
 
-        self._metadata["modifications"].append({
-            "id": modification.id,
-            "type": modification.modification_type.value,
-            "description": modification.description,
-            "target_node": modification.target_node,
-            "target_edge": modification.target_edge,
-            "applied_at": datetime.now().isoformat(),
-        })
+        self._metadata["modifications"].append(
+            {
+                "id": modification.id,
+                "type": modification.modification_type.value,
+                "description": modification.description,
+                "target_node": modification.target_node,
+                "target_edge": modification.target_edge,
+                "applied_at": datetime.now().isoformat(),
+            }
+        )
 
         # Actual graph modification would happen here
         # This depends on the StateGraph/CompiledGraph implementation
@@ -509,6 +509,7 @@ class AdaptableGraph:
             self._circuit_open = True
             # Open for 60 seconds
             from datetime import timedelta
+
             self._circuit_open_until = datetime.now() + timedelta(seconds=60)
             logger.warning("Circuit breaker opened due to consecutive failures")
 

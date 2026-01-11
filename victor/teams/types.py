@@ -173,9 +173,7 @@ class AgentMessage:
         """Check if this is a reply to another message."""
         return self.reply_to is not None
 
-    def to_context_string(
-        self, presentation: Optional["PresentationProtocol"] = None
-    ) -> str:
+    def to_context_string(self, presentation: Optional["PresentationProtocol"] = None) -> str:
         """Format message for inclusion in agent context.
 
         Args:

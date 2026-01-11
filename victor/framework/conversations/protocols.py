@@ -752,16 +752,14 @@ class ConsensusProtocol(BaseConversationProtocol):
     ) -> Optional[str]:
         """Get next speaker, entering voting phase periodically."""
         # Check if we should enter voting phase
-        if (context.turn_count > 0 and
-            context.turn_count % (len(self._participants) * 2) == 0):
+        if context.turn_count > 0 and context.turn_count % (len(self._participants) * 2) == 0:
             self._in_voting_phase = True
             self._votes.clear()
 
         if self._in_voting_phase:
             # Get next voter
             voters_needed = [
-                p.agent_id for p in self._participants
-                if p.agent_id not in self._votes
+                p.agent_id for p in self._participants if p.agent_id not in self._votes
             ]
             if voters_needed:
                 return voters_needed[0]

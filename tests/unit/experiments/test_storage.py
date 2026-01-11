@@ -76,8 +76,7 @@ def test_update_experiment(temp_db: SQLiteStorage):
 
     # Update status
     result = temp_db.update_experiment(
-        experiment.experiment_id,
-        {"status": ExperimentStatus.RUNNING}
+        experiment.experiment_id, {"status": ExperimentStatus.RUNNING}
     )
 
     assert result is True
@@ -154,10 +153,7 @@ def test_update_run(temp_db: SQLiteStorage):
     temp_db.create_run(run)
 
     # Update status
-    result = temp_db.update_run(
-        run.run_id,
-        {"status": RunStatus.COMPLETED}
-    )
+    result = temp_db.update_run(run.run_id, {"status": RunStatus.COMPLETED})
 
     assert result is True
 

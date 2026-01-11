@@ -1750,13 +1750,17 @@ class YAMLWorkflowLoader:
             FileNotFoundError: If file path doesn't exist
         """
         # Check if source is a file path
-        source_path = Path(source) if not source.strip().startswith(("workflows:", "-", "{")) else None
+        source_path = (
+            Path(source) if not source.strip().startswith(("workflows:", "-", "{")) else None
+        )
 
         if source_path:
             if not source_path.exists():
                 raise FileNotFoundError(f"Workflow file not found: {source}")
             # Load from file
-            return load_workflow_from_file(source_path, workflow_name=workflow_name, config=self._config)
+            return load_workflow_from_file(
+                source_path, workflow_name=workflow_name, config=self._config
+            )
         else:
             # Parse as YAML string
             return load_workflow_from_yaml(source, workflow_name=workflow_name, config=self._config)

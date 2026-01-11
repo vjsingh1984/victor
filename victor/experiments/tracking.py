@@ -29,7 +29,10 @@ import sys
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+
+if TYPE_CHECKING:
+    from victor.experiments.artifacts import ArtifactManager
 
 import importlib.metadata
 
@@ -112,9 +115,7 @@ class ActiveRun:
 
         # Update metrics summary with latest value
         self._run.metrics_summary[key] = value
-        self._storage.update_run(
-            self._run.run_id, {"metrics_summary": self._run.metrics_summary}
-        )
+        self._storage.update_run(self._run.run_id, {"metrics_summary": self._run.metrics_summary})
 
         logger.debug(f"Logged metric {key}={value} for run {self._run.run_id}")
 
@@ -129,9 +130,7 @@ class ActiveRun:
             raise RuntimeError("Cannot log param: run has ended")
 
         self._run.parameters[key] = str(value)
-        self._storage.update_run(
-            self._run.run_id, {"parameters": self._run.parameters}
-        )
+        self._storage.update_run(self._run.run_id, {"parameters": self._run.parameters})
 
         logger.debug(f"Logged param {key}={value} for run {self._run.run_id}")
 
@@ -345,9 +344,7 @@ class ExperimentTracker:
         """
         return self._storage.get_experiment(experiment_id)
 
-    def list_experiments(
-        self, query: Optional[ExperimentQuery] = None
-    ) -> List[Experiment]:
+    def list_experiments(self, query: Optional[ExperimentQuery] = None) -> List[Experiment]:
         """List experiments with optional filtering.
 
         Args:

@@ -173,9 +173,7 @@ class DebugHook:
             return
 
         # Determine position
-        position = (
-            BreakpointPosition.ON_ERROR if error else BreakpointPosition.AFTER
-        )
+        position = BreakpointPosition.ON_ERROR if error else BreakpointPosition.AFTER
 
         # Evaluate breakpoints
         breakpoints = self._breakpoint_mgr.evaluate_breakpoints(

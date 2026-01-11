@@ -200,8 +200,12 @@ class Experiment:
             group_id=data.get("group_id"),
             workflow_name=data.get("workflow_name"),
             vertical=data.get("vertical", "coding"),
-            started_at=datetime.fromisoformat(data["started_at"]) if data.get("started_at") else None,
-            completed_at=datetime.fromisoformat(data["completed_at"]) if data.get("completed_at") else None,
+            started_at=(
+                datetime.fromisoformat(data["started_at"]) if data.get("started_at") else None
+            ),
+            completed_at=(
+                datetime.fromisoformat(data["completed_at"]) if data.get("completed_at") else None
+            ),
         )
 
 
@@ -288,7 +292,9 @@ class Run:
             name=data["name"],
             status=RunStatus(data["status"]),
             started_at=datetime.fromisoformat(data["started_at"]),
-            completed_at=datetime.fromisoformat(data["completed_at"]) if data.get("completed_at") else None,
+            completed_at=(
+                datetime.fromisoformat(data["completed_at"]) if data.get("completed_at") else None
+            ),
             metrics_summary=data.get("metrics_summary", {}),
             parameters=data.get("parameters", {}),
             error_message=data.get("error_message"),

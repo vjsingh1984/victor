@@ -512,7 +512,9 @@ def create_rag_ingestion_safety_rules(
                 name="rag_block_executable_ingestion",
                 description="Block ingestion of executable files",
                 check_fn=lambda op: "rag_ingest" in op
-                and any(ext in op.lower() for ext in [".exe", ".dll", ".bat", ".cmd", ".sh", ".ps1"]),
+                and any(
+                    ext in op.lower() for ext in [".exe", ".dll", ".bat", ".cmd", ".sh", ".ps1"]
+                ),
                 level=SafetyLevel.HIGH,
                 allow_override=False,
             )

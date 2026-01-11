@@ -211,9 +211,7 @@ class TestFEPValidator:
         """Test validating a valid FEP."""
         from victor.feps import FEPValidator
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".md", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
             f.write(sample_fep_content)
             f.flush()
             fep_path = Path(f.name)
@@ -234,9 +232,7 @@ class TestFEPValidator:
         """Test validating an invalid FEP."""
         from victor.feps import FEPValidator
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".md", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
             f.write(invalid_fep_content)
             f.flush()
             fep_path = Path(f.name)
@@ -270,9 +266,7 @@ authors:
 A summary that is long enough to meet the minimum word count requirements for validation. This ensures the section passes the quality checks.
 """
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".md", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
             f.write(content)
             f.flush()
             fep_path = Path(f.name)
@@ -338,9 +332,7 @@ Compatible.
 No references.
 """
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".md", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
             f.write(content)
             f.flush()
             fep_path = Path(f.name)
@@ -367,9 +359,7 @@ class TestFEPListCommand:
             # Create sample FEP files
             (feps_dir / "fep-0001-test.md").write_text(sample_fep_content)
             (feps_dir / "fep-0002-another.md").write_text(
-                sample_fep_content.replace("fep: 1", "fep: 2").replace(
-                    "Test FEP", "Another FEP"
-                )
+                sample_fep_content.replace("fep: 1", "fep: 2").replace("Test FEP", "Another FEP")
             )
 
             with patch("victor.ui.commands.fep._get_feps_dir", return_value=feps_dir):
@@ -527,12 +517,18 @@ Template summary.
                         fep_app,
                         [
                             "create",
-                            "--title", "Test Feature",
-                            "--type", "standards",
-                            "--author", "Test Author",
-                            "--email", "test@example.com",
-                            "--github", "testauthor",
-                            "--output", str(output_path),
+                            "--title",
+                            "Test Feature",
+                            "--type",
+                            "standards",
+                            "--author",
+                            "Test Author",
+                            "--email",
+                            "test@example.com",
+                            "--github",
+                            "testauthor",
+                            "--output",
+                            str(output_path),
                         ],
                     )
 
@@ -561,9 +557,12 @@ Template summary.
                             fep_app,
                             [
                                 "create",
-                                "--title", "Test",
-                                "--type", "standards",
-                                "--author", "Test Author",
+                                "--title",
+                                "Test",
+                                "--type",
+                                "standards",
+                                "--author",
+                                "Test Author",
                             ],
                         )
 

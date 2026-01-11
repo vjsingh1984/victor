@@ -424,9 +424,7 @@ class WorkflowMetricsCollector:
             success = error is None
             metrics.tool_metrics[tool_name].update(duration=duration, success=success)
 
-    def _on_workflow_complete(
-        self, chunk: WorkflowStreamChunk, success: bool
-    ) -> None:
+    def _on_workflow_complete(self, chunk: WorkflowStreamChunk, success: bool) -> None:
         """Track workflow completion."""
         workflow_id = chunk.workflow_id
 
@@ -482,9 +480,7 @@ class WorkflowMetricsCollector:
             return None
         return workflow.node_metrics.get(node_id)
 
-    def get_tool_metrics(
-        self, workflow_id: str, tool_name: str
-    ) -> Optional[ToolUsageMetrics]:
+    def get_tool_metrics(self, workflow_id: str, tool_name: str) -> Optional[ToolUsageMetrics]:
         """Get metrics for a specific tool.
 
         Args:
@@ -542,8 +538,7 @@ class WorkflowMetricsCollector:
 
             data = {
                 "workflows": {
-                    wf_id: metrics.to_dict()
-                    for wf_id, metrics in self._workflows.items()
+                    wf_id: metrics.to_dict() for wf_id, metrics in self._workflows.items()
                 },
                 "saved_at": datetime.now().isoformat(),
             }
@@ -625,7 +620,8 @@ class WorkflowMetricsCollector:
             cursor = conn.cursor()
 
             # Create tables
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS workflow_metrics (
                     workflow_id TEXT PRIMARY KEY,
                     workflow_name TEXT,
@@ -638,9 +634,11 @@ class WorkflowMetricsCollector:
                     first_execution REAL,
                     last_execution REAL
                 )
-            """)
+            """
+            )
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS node_metrics (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     workflow_id TEXT,
@@ -655,9 +653,11 @@ class WorkflowMetricsCollector:
                     last_execution REAL,
                     FOREIGN KEY (workflow_id) REFERENCES workflow_metrics (workflow_id)
                 )
-            """)
+            """
+            )
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS tool_metrics (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     workflow_id TEXT,
@@ -668,7 +668,8 @@ class WorkflowMetricsCollector:
                     last_used REAL,
                     FOREIGN KEY (workflow_id) REFERENCES workflow_metrics (workflow_id)
                 )
-            """)
+            """
+            )
 
             conn.commit()
             conn.close()
@@ -688,24 +689,27 @@ class WorkflowMetricsCollector:
 
             for workflow_id, metrics in self._workflows.items():
                 # Upsert workflow metrics
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT OR REPLACE INTO workflow_metrics
                     (workflow_id, workflow_name, total_executions, successful_executions,
                      failed_executions, total_duration, avg_duration, cost_tracking,
                      first_execution, last_execution)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    workflow_id,
-                    metrics.workflow_name,
-                    metrics.total_executions,
-                    metrics.successful_executions,
-                    metrics.failed_executions,
-                    metrics.total_duration,
-                    metrics.avg_duration,
-                    metrics.cost_tracking,
-                    metrics.first_execution,
-                    metrics.last_execution,
-                ))
+                """,
+                    (
+                        workflow_id,
+                        metrics.workflow_name,
+                        metrics.total_executions,
+                        metrics.successful_executions,
+                        metrics.failed_executions,
+                        metrics.total_duration,
+                        metrics.avg_duration,
+                        metrics.cost_tracking,
+                        metrics.first_execution,
+                        metrics.last_execution,
+                    ),
+                )
 
                 # Delete existing node/tool metrics for this workflow
                 cursor.execute("DELETE FROM node_metrics WHERE workflow_id = ?", (workflow_id,))
@@ -713,38 +717,44 @@ class WorkflowMetricsCollector:
 
                 # Insert node metrics
                 for node_id, node_metrics in metrics.node_metrics.items():
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT INTO node_metrics
                         (workflow_id, node_id, execution_count, total_duration, avg_duration,
                          min_duration, max_duration, success_count, failure_count, last_execution)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        workflow_id,
-                        node_id,
-                        node_metrics.execution_count,
-                        node_metrics.total_duration,
-                        node_metrics.avg_duration,
-                        node_metrics.min_duration,
-                        node_metrics.max_duration,
-                        node_metrics.success_count,
-                        node_metrics.failure_count,
-                        node_metrics.last_execution,
-                    ))
+                    """,
+                        (
+                            workflow_id,
+                            node_id,
+                            node_metrics.execution_count,
+                            node_metrics.total_duration,
+                            node_metrics.avg_duration,
+                            node_metrics.min_duration,
+                            node_metrics.max_duration,
+                            node_metrics.success_count,
+                            node_metrics.failure_count,
+                            node_metrics.last_execution,
+                        ),
+                    )
 
                 # Insert tool metrics
                 for tool_name, tool_metrics in metrics.tool_metrics.items():
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT INTO tool_metrics
                         (workflow_id, tool_name, call_count, total_duration, error_count, last_used)
                         VALUES (?, ?, ?, ?, ?, ?)
-                    """, (
-                        workflow_id,
-                        tool_name,
-                        tool_metrics.call_count,
-                        tool_metrics.total_duration,
-                        tool_metrics.error_count,
-                        tool_metrics.last_used,
-                    ))
+                    """,
+                        (
+                            workflow_id,
+                            tool_name,
+                            tool_metrics.call_count,
+                            tool_metrics.total_duration,
+                            tool_metrics.error_count,
+                            tool_metrics.last_used,
+                        ),
+                    )
 
             conn.commit()
             conn.close()
@@ -830,7 +840,9 @@ class WorkflowMetricsCollector:
 
             # Load tool metrics
             for row in cursor.execute("SELECT * FROM tool_metrics"):
-                (_, workflow_id, tool_name, call_count, total_duration, error_count, last_used) = row
+                (_, workflow_id, tool_name, call_count, total_duration, error_count, last_used) = (
+                    row
+                )
 
                 if workflow_id in self._workflows:
                     tool_metrics = ToolUsageMetrics(tool_name=tool_name)

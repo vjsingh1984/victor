@@ -90,21 +90,29 @@ class StatisticalAnalyzer:
 
         # Calculate effect size (Cohen's d)
         pooled_std = np.sqrt(
-            ((len(control_arr) - 1) * np.var(control_arr, ddof=1) +
-             (len(treatment_arr) - 1) * np.var(treatment_arr, ddof=1)) /
-            (len(control_arr) + len(treatment_arr) - 2)
+            (
+                (len(control_arr) - 1) * np.var(control_arr, ddof=1)
+                + (len(treatment_arr) - 1) * np.var(treatment_arr, ddof=1)
+            )
+            / (len(control_arr) + len(treatment_arr) - 2)
         )
         cohens_d = (np.mean(treatment_arr) - np.mean(control_arr)) / pooled_std
 
         # Confidence interval for difference
         diff = np.mean(treatment_arr) - np.mean(control_arr)
         se_diff = np.sqrt(
-            np.var(control_arr, ddof=1) / len(control_arr) +
-            np.var(treatment_arr, ddof=1) / len(treatment_arr)
+            np.var(control_arr, ddof=1) / len(control_arr)
+            + np.var(treatment_arr, ddof=1) / len(treatment_arr)
         )
         ci = (
-            float(diff - stats.t.ppf(1 - alpha / 2, len(control_arr) + len(treatment_arr) - 2) * se_diff),
-            float(diff + stats.t.ppf(1 - alpha / 2, len(control_arr) + len(treatment_arr) - 2) * se_diff),
+            float(
+                diff
+                - stats.t.ppf(1 - alpha / 2, len(control_arr) + len(treatment_arr) - 2) * se_diff
+            ),
+            float(
+                diff
+                + stats.t.ppf(1 - alpha / 2, len(control_arr) + len(treatment_arr) - 2) * se_diff
+            ),
         )
 
         # Determine significance
@@ -177,8 +185,8 @@ class StatisticalAnalyzer:
 
         # Confidence interval for rate difference
         se_rate = np.sqrt(
-            (control_rate * (1 - control_rate) / control_total) +
-            (treatment_rate * (1 - treatment_rate) / treatment_total)
+            (control_rate * (1 - control_rate) / control_total)
+            + (treatment_rate * (1 - treatment_rate) / treatment_total)
         )
         z = stats.norm.ppf(1 - alpha / 2)
         ci = (float(rate_diff - z * se_rate), float(rate_diff + z * se_rate))
@@ -475,9 +483,7 @@ class StatisticalAnalyzer:
         # Check if best is significantly better than control
         if best_id == control_id:
             # Control is best - check if significantly better than all treatments
-            all_not_significant = all(
-                not self.is_significant(p, alpha) for p in p_values.values()
-            )
+            all_not_significant = all(not self.is_significant(p, alpha) for p in p_values.values())
             significant = all_not_significant
         else:
             # Treatment is best - check if significantly better than control

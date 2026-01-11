@@ -248,9 +248,7 @@ class ConversationalNode:
             self._context.current_speaker = speaker
             self._context.current_turn += 1
 
-            logger.debug(
-                f"Turn {self._context.current_turn}: speaker={speaker}"
-            )
+            logger.debug(f"Turn {self._context.current_turn}: speaker={speaker}")
 
             # Execute turn
             turn = await self._execute_turn(speaker, orchestrator)
@@ -344,22 +342,16 @@ class ConversationalNode:
         # Route message and get responses
         responses = []
         if self._router:
-            recipients = await self._router.route_message(
-                message, self.participants, self._context
-            )
+            recipients = await self._router.route_message(message, self.participants, self._context)
 
             # Collect responses (optional, depending on protocol)
             for recipient_id in recipients:
-                should_reply = await self._router.should_reply(
-                    recipient_id, message, self._context
-                )
+                should_reply = await self._router.should_reply(recipient_id, message, self._context)
                 if should_reply and orchestrator:
                     # Get response from recipient
                     recipient = self._context.participants.get(recipient_id)
                     if recipient:
-                        reply_prompt = self._build_reply_prompt(
-                            recipient, message
-                        )
+                        reply_prompt = self._build_reply_prompt(recipient, message)
                         if hasattr(orchestrator, "chat"):
                             reply_text = await orchestrator.chat(reply_prompt)
                         else:
@@ -405,9 +397,7 @@ class ConversationalNode:
 
         return True, None
 
-    def _build_speaker_prompt(
-        self, participant: ConversationParticipant
-    ) -> str:
+    def _build_speaker_prompt(self, participant: ConversationParticipant) -> str:
         """Build prompt for speaker's turn.
 
         Args:
@@ -422,13 +412,9 @@ class ConversationalNode:
             recent = self._history.turns[-3:]  # Last 3 turns
             history_parts = []
             for turn in recent:
-                history_parts.append(
-                    f"[{turn.speaker}]: {turn.message.content[:200]}..."
-                )
+                history_parts.append(f"[{turn.speaker}]: {turn.message.content[:200]}...")
                 for resp in turn.responses[:2]:
-                    history_parts.append(
-                        f"  -> [{resp.sender}]: {resp.content[:100]}..."
-                    )
+                    history_parts.append(f"  -> [{resp.sender}]: {resp.content[:100]}...")
             history_context = "\n".join(history_parts)
 
         prompt = f"""You are participating in a multi-agent conversation.

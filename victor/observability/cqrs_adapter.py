@@ -554,10 +554,10 @@ class CQRSEventAdapter:
             event_data["_source"] = "cqrs"
             event_data["_event_type"] = event_type
 
-        return Event(
+        return MessagingEvent(
             topic=topic,
             data=event_data,
-            timestamp=getattr(event, "timestamp", datetime.now(timezone.utc)),
+            timestamp=getattr(event, "timestamp", datetime.now(timezone.utc)).timestamp(),
         )
 
     def _infer_topic_prefix(self, event_type: str) -> str:

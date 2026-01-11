@@ -593,7 +593,9 @@ class ABTestManager:
         if metrics.experiment_id in self._experiment_status:
             status = self._experiment_status[metrics.experiment_id]
             status.total_samples += 1
-            status.variant_samples[metrics.variant_id] = status.variant_samples.get(metrics.variant_id, 0) + 1
+            status.variant_samples[metrics.variant_id] = (
+                status.variant_samples.get(metrics.variant_id, 0) + 1
+            )
 
     async def get_status(self, experiment_id: str) -> Optional[ExperimentStatus]:
         """Get experiment status.
@@ -696,9 +698,7 @@ class ABTestManager:
             statistical_significance=bool(row[2]),
             p_value=row[3],
             confidence_interval=json.loads(row[4]) if row[4] else None,
-            variant_results={
-                k: VariantResult(**v) for k, v in json.loads(row[5]).items()
-            },
+            variant_results={k: VariantResult(**v) for k, v in json.loads(row[5]).items()},
             recommendation=row[6],
             reasoning=row[7],
             analyzed_at=row[8],

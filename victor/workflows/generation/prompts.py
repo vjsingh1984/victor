@@ -79,7 +79,7 @@ class RefinementPromptBuilder:
         workflow_dict: Dict[str, Any],
         validation_result: WorkflowGenerationValidationResult,
         examples: Optional[List[Dict[str, Any]]] = None,
-        iteration: int = 0
+        iteration: int = 0,
     ) -> str:
         """Build refinement prompt for LLM.
 
@@ -129,9 +129,7 @@ This is refinement iteration #{iteration + 1}. Previous attempts to fix this wor
     def _validation_errors(self, result: WorkflowGenerationValidationResult) -> str:
         """Format validation errors for LLM."""
         llm_report = self.error_reporter.llm_report(
-            result,
-            include_fixes=True,
-            include_context=False
+            result, include_fixes=True, include_context=False
         )
 
         return f"""# Validation Errors
@@ -156,7 +154,8 @@ This is refinement iteration #{iteration + 1}. Previous attempts to fix this wor
         """Few-shot examples section."""
         sections = []
         for i, example in enumerate(examples, 1):
-            sections.append(f"""## Example {i}
+            sections.append(
+                f"""## Example {i}
 
 **Error:** {example['error']}
 
@@ -171,7 +170,8 @@ This is refinement iteration #{iteration + 1}. Previous attempts to fix this wor
 ```
 
 **Explanation:** {example.get('explanation', '(not provided)')}
-""")
+"""
+            )
 
         return "\n".join(sections)
 
@@ -276,9 +276,8 @@ edges:
     target: __end__
 entry_point: fetch  # FIXED: Use existing node as entry point
 """,
-            "explanation": "The entry_point must reference an existing node ID. Changed 'start' to 'fetch'."
+            "explanation": "The entry_point must reference an existing node ID. Changed 'start' to 'fetch'.",
         },
-
         "unconditional_cycle": {
             "error": "GraphValidationError: Unconditional cycle detected: step1 -> step2 -> step1",
             "original": """name: iterative_process
@@ -316,9 +315,8 @@ edges:
     target: should_continue
 entry_point: step1
 """,
-            "explanation": "Added a condition node to break the cycle. The condition checks if processing should continue or finish."
+            "explanation": "Added a condition node to break the cycle. The condition checks if processing should continue or finish.",
         },
-
         "missing_agent_fields": {
             "error": "SemanticValidationError: Agent node 'worker' must specify 'role' and 'goal'",
             "original": """name: task_runner
@@ -344,9 +342,8 @@ edges:
     target: __end__
 entry_point: worker
 """,
-            "explanation": "Agent nodes require 'role' (what type of agent) and 'goal' (what task to perform)."
+            "explanation": "Agent nodes require 'role' (what type of agent) and 'goal' (what task to perform).",
         },
-
         "invalid_tool_reference": {
             "error": "SemanticValidationError: Tool 'magic_wand' not found in registry",
             "original": """name: automation
@@ -369,9 +366,8 @@ edges:
     target: __end__
 entry_point: do_magic
 """,
-            "explanation": "Replaced non-existent tool 'magic_wand' with 'bash_execute' which exists in the tool registry."
+            "explanation": "Replaced non-existent tool 'magic_wand' with 'bash_execute' which exists in the tool registry.",
         },
-
         "orphan_node": {
             "error": "GraphValidationError: Node 'cleanup' is not reachable from entry point 'start'",
             "original": """name: data_flow
@@ -405,9 +401,8 @@ edges:
     target: __end__
 entry_point: start
 """,
-            "explanation": "Connected orphan node 'cleanup' to the workflow by adding edge from 'start' to 'cleanup'."
+            "explanation": "Connected orphan node 'cleanup' to the workflow by adding edge from 'start' to 'cleanup'.",
         },
-
         "missing_condition_branches": {
             "error": "SchemaValidationError: Condition node missing 'branches' field",
             "original": """name: decision_flow
@@ -432,9 +427,8 @@ edges:
     target: __end__
 entry_point: check_quality
 """,
-            "explanation": "Added 'branches' mapping to condition node, specifying which nodes to route to based on condition result."
+            "explanation": "Added 'branches' mapping to condition node, specifying which nodes to route to based on condition result.",
         },
-
         "invalid_node_type": {
             "error": "SchemaValidationError: Invalid node type: 'worker'",
             "original": """name: simple_task
@@ -459,14 +453,13 @@ edges:
     target: __end__
 entry_point: task1
 """,
-            "explanation": "Changed node type from 'worker' (invalid) to 'agent' (valid). Node types must be one of: agent, compute, condition, parallel, transform, team, hitl."
+            "explanation": "Changed node type from 'worker' (invalid) to 'agent' (valid). Node types must be one of: agent, compute, condition, parallel, transform, team, hitl.",
         },
     }
 
     @classmethod
     def get_examples_for_errors(
-        cls,
-        validation_result: WorkflowGenerationValidationResult
+        cls, validation_result: WorkflowGenerationValidationResult
     ) -> List[Dict[str, Any]]:
         """Get relevant examples based on validation errors.
 
@@ -517,12 +510,7 @@ entry_point: task1
 
     @classmethod
     def add_example(
-        cls,
-        error_type: str,
-        error: str,
-        original: str,
-        fixed: str,
-        explanation: str
+        cls, error_type: str, error: str, original: str, fixed: str, explanation: str
     ) -> None:
         """Add a new example to the library.
 
@@ -537,7 +525,7 @@ entry_point: task1
             "error": error,
             "original": original,
             "fixed": fixed,
-            "explanation": explanation
+            "explanation": explanation,
         }
 
 
@@ -546,7 +534,7 @@ def build_refinement_prompt(
     workflow_dict: Dict[str, Any],
     validation_result: WorkflowGenerationValidationResult,
     include_examples: bool = True,
-    iteration: int = 0
+    iteration: int = 0,
 ) -> str:
     """Convenience function to build refinement prompt.
 
@@ -578,7 +566,7 @@ def build_refinement_prompt(
         workflow_dict=workflow_dict,
         validation_result=validation_result,
         examples=examples,
-        iteration=iteration
+        iteration=iteration,
     )
 
 

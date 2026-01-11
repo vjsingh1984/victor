@@ -239,7 +239,14 @@ class VerticalPackageMetadata(BaseModel):
             lines.append("]")
 
         # Optional fields
-        for field in ["python_package", "homepage", "repository", "documentation", "issues", "category"]:
+        for field in [
+            "python_package",
+            "homepage",
+            "repository",
+            "documentation",
+            "issues",
+            "category",
+        ]:
             value = getattr(self, field, None)
             if value:
                 lines.append(f'{field} = "{value}"')

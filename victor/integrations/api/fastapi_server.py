@@ -2956,17 +2956,14 @@ Respond with just the command to run."""
                 # In production, you might load from workflow registry
                 raise HTTPException(
                     status_code=404,
-                    detail=f"Workflow {workflow_id} not found. Execute the workflow first."
+                    detail=f"Workflow {workflow_id} not found. Execute the workflow first.",
                 )
 
             except HTTPException:
                 raise
             except Exception as e:
                 logger.error(f"Failed to get graph for workflow {workflow_id}: {e}")
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to export graph: {str(e)}"
-                )
+                raise HTTPException(status_code=500, detail=f"Failed to export graph: {str(e)}")
 
         @app.get("/workflows/{workflow_id}/execution", tags=["Workflows"])
         async def get_workflow_execution_status(workflow_id: str) -> JSONResponse:
@@ -2987,15 +2984,11 @@ Respond with just the command to run."""
             try:
                 if workflow_id not in self._workflow_executions:
                     raise HTTPException(
-                        status_code=404,
-                        detail=f"Workflow execution {workflow_id} not found"
+                        status_code=404, detail=f"Workflow execution {workflow_id} not found"
                     )
 
                 # Get execution state
-                exec_state = get_execution_state(
-                    workflow_id,
-                    self._workflow_executions
-                )
+                exec_state = get_execution_state(workflow_id, self._workflow_executions)
 
                 return JSONResponse(exec_state.to_dict())
 
@@ -3004,15 +2997,11 @@ Respond with just the command to run."""
             except Exception as e:
                 logger.error(f"Failed to get execution state for {workflow_id}: {e}")
                 raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to get execution state: {str(e)}"
+                    status_code=500, detail=f"Failed to get execution state: {str(e)}"
                 )
 
         @app.websocket("/workflows/{workflow_id}/stream")
-        async def workflow_websocket_stream(
-            websocket: WebSocket,
-            workflow_id: str
-        ) -> None:
+        async def workflow_websocket_stream(websocket: WebSocket, workflow_id: str) -> None:
             """Real-time workflow execution event stream via WebSocket.
 
             Provides live updates for workflow execution including:
@@ -3040,9 +3029,7 @@ Respond with just the command to run."""
             try:
                 # Handle connection through event bridge
                 await self._workflow_event_bridge.handle_websocket_connection(
-                    websocket,
-                    workflow_id,
-                    client_id=uuid.uuid4().hex[:12]
+                    websocket, workflow_id, client_id=uuid.uuid4().hex[:12]
                 )
             except WebSocketDisconnect:
                 logger.info(f"WebSocket disconnected for workflow {workflow_id}")
@@ -3053,7 +3040,9 @@ Respond with just the command to run."""
                 except Exception:
                     pass
 
-        @app.get("/workflows/visualize/{workflow_id}", response_class=HTMLResponse, tags=["Workflows"])
+        @app.get(
+            "/workflows/visualize/{workflow_id}", response_class=HTMLResponse, tags=["Workflows"]
+        )
         async def visualize_workflow(workflow_id: str) -> HTMLResponse:
             """Serve HTML page with interactive workflow visualization.
 
@@ -3105,7 +3094,7 @@ Respond with just the command to run."""
                 logger.error(f"Failed to serve visualization for {workflow_id}: {e}")
                 return HTMLResponse(
                     content=f"<html><body><h1>Error</h1><p>{str(e)}</p></body></html>",
-                    status_code=500
+                    status_code=500,
                 )
 
         # WebSocket endpoint

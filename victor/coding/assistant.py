@@ -125,32 +125,34 @@ class CodingAssistant(VerticalBase):
         tools = cls._file_ops.get_tool_list()
 
         # Add coding-specific tools
-        tools.extend([
-            # Core filesystem (beyond framework basics)
-            ToolNames.LS,  # list_directory -> ls
-            ToolNames.OVERVIEW,  # get_project_overview -> overview
-            # Search
-            ToolNames.CODE_SEARCH,  # semantic_code_search -> code_search
-            ToolNames.PLAN,  # plan_files -> plan
-            # Git (unified git tool handles all operations)
-            ToolNames.GIT,  # Git operations
-            # Shell
-            ToolNames.SHELL,  # execute_bash -> shell
-            # Code intelligence
-            ToolNames.LSP,  # lsp operations
-            ToolNames.SYMBOL,  # find_symbol -> symbol
-            ToolNames.REFS,  # find_references -> refs
-            # Refactoring
-            ToolNames.RENAME,  # refactor_rename_symbol -> rename
-            ToolNames.EXTRACT,  # refactor_extract_function -> extract
-            # Testing
-            ToolNames.TEST,  # run_tests -> test
-            # Docker
-            ToolNames.DOCKER,  # docker operations
-            # Web (for documentation)
-            ToolNames.WEB_SEARCH,  # web_search
-            ToolNames.WEB_FETCH,  # web_fetch
-        ])
+        tools.extend(
+            [
+                # Core filesystem (beyond framework basics)
+                ToolNames.LS,  # list_directory -> ls
+                ToolNames.OVERVIEW,  # get_project_overview -> overview
+                # Search
+                ToolNames.CODE_SEARCH,  # semantic_code_search -> code_search
+                ToolNames.PLAN,  # plan_files -> plan
+                # Git (unified git tool handles all operations)
+                ToolNames.GIT,  # Git operations
+                # Shell
+                ToolNames.SHELL,  # execute_bash -> shell
+                # Code intelligence
+                ToolNames.LSP,  # lsp operations
+                ToolNames.SYMBOL,  # find_symbol -> symbol
+                ToolNames.REFS,  # find_references -> refs
+                # Refactoring
+                ToolNames.RENAME,  # refactor_rename_symbol -> rename
+                ToolNames.EXTRACT,  # refactor_extract_function -> extract
+                # Testing
+                ToolNames.TEST,  # run_tests -> test
+                # Docker
+                ToolNames.DOCKER,  # docker operations
+                # Web (for documentation)
+                ToolNames.WEB_SEARCH,  # web_search
+                ToolNames.WEB_FETCH,  # web_fetch
+            ]
+        )
 
         return tools
 

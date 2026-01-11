@@ -46,7 +46,10 @@ import copy
 import logging
 import re
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
+
+if TYPE_CHECKING:
+    from victor.workflows.generation.requirements import RequirementValidationResult
 
 from victor.workflows.generation.types import (
     ErrorCategory,
@@ -70,22 +73,21 @@ class SchemaValidator:
     """
 
     # Valid node types
-    VALID_NODE_TYPES = {
-        "agent", "compute", "condition", "parallel",
-        "transform", "team", "hitl"
-    }
+    VALID_NODE_TYPES = {"agent", "compute", "condition", "parallel", "transform", "team", "hitl"}
 
     # Valid agent roles
     VALID_AGENT_ROLES = {
-        "researcher", "planner", "executor", "reviewer",
-        "writer", "analyst", "coordinator"
+        "researcher",
+        "planner",
+        "executor",
+        "reviewer",
+        "writer",
+        "analyst",
+        "coordinator",
     }
 
     # Valid team formations
-    VALID_TEAM_FORMATIONS = {
-        "sequential", "parallel", "hierarchical",
-        "pipeline", "consensus"
-    }
+    VALID_TEAM_FORMATIONS = {"sequential", "parallel", "hierarchical", "pipeline", "consensus"}
 
     # Valid join strategies
     VALID_JOIN_STRATEGIES = {"all", "any", "merge"}
@@ -118,7 +120,9 @@ class SchemaValidator:
 
         # Check edges if present
         if "edges" in workflow:
-            errors.extend(self._validate_edges(workflow.get("edges", []), workflow.get("nodes", [])))
+            errors.extend(
+                self._validate_edges(workflow.get("edges", []), workflow.get("nodes", []))
+            )
 
         # Check entry point if present
         if "entry_point" in workflow:
@@ -136,13 +140,15 @@ class SchemaValidator:
 
         for field in required_fields:
             if field not in workflow:
-                errors.append(WorkflowValidationError(
-                    category=ErrorCategory.SCHEMA,
-                    severity=ErrorSeverity.CRITICAL,
-                    message=f"Missing required field: '{field}'",
-                    location=f"workflow.{field}",
-                    suggestion=f"Add '{field}' field to workflow definition"
-                ))
+                errors.append(
+                    WorkflowValidationError(
+                        category=ErrorCategory.SCHEMA,
+                        severity=ErrorSeverity.CRITICAL,
+                        message=f"Missing required field: '{field}'",
+                        location=f"workflow.{field}",
+                        suggestion=f"Add '{field}' field to workflow definition",
+                    )
+                )
 
         return errors
 
@@ -152,13 +158,15 @@ class SchemaValidator:
 
         # Check if nodes list is non-empty
         if not nodes:
-            errors.append(WorkflowValidationError(
-                category=ErrorCategory.SCHEMA,
-                severity=ErrorSeverity.CRITICAL,
-                message="Nodes list is empty",
-                location="workflow.nodes",
-                suggestion="Add at least one node to the workflow"
-            ))
+            errors.append(
+                WorkflowValidationError(
+                    category=ErrorCategory.SCHEMA,
+                    severity=ErrorSeverity.CRITICAL,
+                    message="Nodes list is empty",
+                    location="workflow.nodes",
+                    suggestion="Add at least one node to the workflow",
+                )
+            )
             return errors
 
         # Check for unique node IDs
@@ -166,13 +174,15 @@ class SchemaValidator:
         duplicates = [nid for nid in node_ids if node_ids.count(nid) > 1]
 
         if duplicates:
-            errors.append(WorkflowValidationError(
-                category=ErrorCategory.SCHEMA,
-                severity=ErrorSeverity.ERROR,
-                message=f"Duplicate node IDs found: {set(duplicates)}",
-                location="workflow.nodes",
-                suggestion="Ensure all node IDs are unique"
-            ))
+            errors.append(
+                WorkflowValidationError(
+                    category=ErrorCategory.SCHEMA,
+                    severity=ErrorSeverity.ERROR,
+                    message=f"Duplicate node IDs found: {set(duplicates)}",
+                    location="workflow.nodes",
+                    suggestion="Ensure all node IDs are unique",
+                )
+            )
 
         # Validate each node
         for i, node in enumerate(nodes):
@@ -188,34 +198,40 @@ class SchemaValidator:
 
         # Check required fields
         if "id" not in node:
-            errors.append(WorkflowValidationError(
-                category=ErrorCategory.SCHEMA,
-                severity=ErrorSeverity.ERROR,
-                message="Node missing 'id' field",
-                location=f"nodes[{index}]",
-                suggestion="Add unique 'id' field to node"
-            ))
+            errors.append(
+                WorkflowValidationError(
+                    category=ErrorCategory.SCHEMA,
+                    severity=ErrorSeverity.ERROR,
+                    message="Node missing 'id' field",
+                    location=f"nodes[{index}]",
+                    suggestion="Add unique 'id' field to node",
+                )
+            )
 
         if "type" not in node:
-            errors.append(WorkflowValidationError(
-                category=ErrorCategory.SCHEMA,
-                severity=ErrorSeverity.CRITICAL,
-                message=f"Node missing 'type' field",
-                location=location,
-                suggestion=f"Add 'type' field (valid: {self.VALID_NODE_TYPES})"
-            ))
+            errors.append(
+                WorkflowValidationError(
+                    category=ErrorCategory.SCHEMA,
+                    severity=ErrorSeverity.CRITICAL,
+                    message="Node missing 'type' field",
+                    location=location,
+                    suggestion=f"Add 'type' field (valid: {self.VALID_NODE_TYPES})",
+                )
+            )
             return errors  # Can't validate further without type
 
         # Validate node type
         node_type = node.get("type")
         if node_type not in self.VALID_NODE_TYPES:
-            errors.append(WorkflowValidationError(
-                category=ErrorCategory.SCHEMA,
-                severity=ErrorSeverity.ERROR,
-                message=f"Invalid node type: '{node_type}'",
-                location=location,
-                suggestion=f"Use one of: {self.VALID_NODE_TYPES}"
-            ))
+            errors.append(
+                WorkflowValidationError(
+                    category=ErrorCategory.SCHEMA,
+                    severity=ErrorSeverity.ERROR,
+                    message=f"Invalid node type: '{node_type}'",
+                    location=location,
+                    suggestion=f"Use one of: {self.VALID_NODE_TYPES}",
+                )
+            )
 
         # Type-specific validation
         if node_type == "agent":
@@ -233,60 +249,74 @@ class SchemaValidator:
 
         return errors
 
-    def _validate_agent_node(self, node: Dict[str, Any], location: str) -> List[WorkflowValidationError]:
+    def _validate_agent_node(
+        self, node: Dict[str, Any], location: str
+    ) -> List[WorkflowValidationError]:
         """Validate agent node fields."""
         errors = []
 
         # Check required fields
         if "role" not in node:
-            errors.append(WorkflowValidationError(
-                category=ErrorCategory.SCHEMA,
-                severity=ErrorSeverity.ERROR,
-                message="Agent node missing 'role' field",
-                location=location,
-                suggestion=f"Add 'role' field (valid: {self.VALID_AGENT_ROLES})"
-            ))
+            errors.append(
+                WorkflowValidationError(
+                    category=ErrorCategory.SCHEMA,
+                    severity=ErrorSeverity.ERROR,
+                    message="Agent node missing 'role' field",
+                    location=location,
+                    suggestion=f"Add 'role' field (valid: {self.VALID_AGENT_ROLES})",
+                )
+            )
         elif node.get("role") not in self.VALID_AGENT_ROLES:
-            errors.append(WorkflowValidationError(
-                category=ErrorCategory.SCHEMA,
-                severity=ErrorSeverity.ERROR,
-                message=f"Invalid agent role: '{node.get('role')}'",
-                location=f"{location}.role",
-                suggestion=f"Use one of: {self.VALID_AGENT_ROLES}"
-            ))
+            errors.append(
+                WorkflowValidationError(
+                    category=ErrorCategory.SCHEMA,
+                    severity=ErrorSeverity.ERROR,
+                    message=f"Invalid agent role: '{node.get('role')}'",
+                    location=f"{location}.role",
+                    suggestion=f"Use one of: {self.VALID_AGENT_ROLES}",
+                )
+            )
 
         if "goal" not in node:
-            errors.append(WorkflowValidationError(
-                category=ErrorCategory.SCHEMA,
-                severity=ErrorSeverity.ERROR,
-                message="Agent node missing 'goal' field",
-                location=location,
-                suggestion="Add 'goal' field with task description"
-            ))
+            errors.append(
+                WorkflowValidationError(
+                    category=ErrorCategory.SCHEMA,
+                    severity=ErrorSeverity.ERROR,
+                    message="Agent node missing 'goal' field",
+                    location=location,
+                    suggestion="Add 'goal' field with task description",
+                )
+            )
 
         # Validate tool_budget if present
         if "tool_budget" in node:
             tool_budget = node.get("tool_budget")
             if not isinstance(tool_budget, int):
-                errors.append(WorkflowValidationError(
-                    category=ErrorCategory.SCHEMA,
-                    severity=ErrorSeverity.ERROR,
-                    message=f"tool_budget must be integer, got {type(tool_budget).__name__}",
-                    location=f"{location}.tool_budget",
-                    suggestion="Convert tool_budget to integer"
-                ))
+                errors.append(
+                    WorkflowValidationError(
+                        category=ErrorCategory.SCHEMA,
+                        severity=ErrorSeverity.ERROR,
+                        message=f"tool_budget must be integer, got {type(tool_budget).__name__}",
+                        location=f"{location}.tool_budget",
+                        suggestion="Convert tool_budget to integer",
+                    )
+                )
             elif not (1 <= tool_budget <= 500):
-                errors.append(WorkflowValidationError(
-                    category=ErrorCategory.SCHEMA,
-                    severity=ErrorSeverity.ERROR,
-                    message=f"tool_budget {tool_budget} out of range [1, 500]",
-                    location=f"{location}.tool_budget",
-                    suggestion="Set tool_budget between 1 and 500"
-                ))
+                errors.append(
+                    WorkflowValidationError(
+                        category=ErrorCategory.SCHEMA,
+                        severity=ErrorSeverity.ERROR,
+                        message=f"tool_budget {tool_budget} out of range [1, 500]",
+                        location=f"{location}.tool_budget",
+                        suggestion="Set tool_budget between 1 and 500",
+                    )
+                )
 
         return errors
 
-    def _validate_compute_node(self, node: Dict[str, Any], location: str) -> List[WorkflowValidationError]:
+    def _validate_compute_node(
+        self, node: Dict[str, Any], location: str
+    ) -> List[WorkflowValidationError]:
         """Validate compute node fields."""
         errors = []
 
@@ -295,102 +325,122 @@ class SchemaValidator:
         has_handler = "handler" in node and node["handler"]
 
         if not has_tools and not has_handler:
-            errors.append(WorkflowValidationError(
-                category=ErrorCategory.SCHEMA,
-                severity=ErrorSeverity.ERROR,
-                message="Compute node must specify 'tools' or 'handler'",
-                location=location,
-                suggestion="Add 'tools' list or 'handler' function name"
-            ))
+            errors.append(
+                WorkflowValidationError(
+                    category=ErrorCategory.SCHEMA,
+                    severity=ErrorSeverity.ERROR,
+                    message="Compute node must specify 'tools' or 'handler'",
+                    location=location,
+                    suggestion="Add 'tools' list or 'handler' function name",
+                )
+            )
 
         return errors
 
-    def _validate_condition_node(self, node: Dict[str, Any], location: str) -> List[WorkflowValidationError]:
+    def _validate_condition_node(
+        self, node: Dict[str, Any], location: str
+    ) -> List[WorkflowValidationError]:
         """Validate condition node fields."""
         errors = []
 
         if "branches" not in node:
-            errors.append(WorkflowValidationError(
-                category=ErrorCategory.SCHEMA,
-                severity=ErrorSeverity.ERROR,
-                message="Condition node missing 'branches' field",
-                location=location,
-                suggestion="Add 'branches' mapping (e.g., {'continue': 'node1', 'done': '__end__'})"
-            ))
+            errors.append(
+                WorkflowValidationError(
+                    category=ErrorCategory.SCHEMA,
+                    severity=ErrorSeverity.ERROR,
+                    message="Condition node missing 'branches' field",
+                    location=location,
+                    suggestion="Add 'branches' mapping (e.g., {'continue': 'node1', 'done': '__end__'})",
+                )
+            )
 
         return errors
 
-    def _validate_parallel_node(self, node: Dict[str, Any], location: str) -> List[WorkflowValidationError]:
+    def _validate_parallel_node(
+        self, node: Dict[str, Any], location: str
+    ) -> List[WorkflowValidationError]:
         """Validate parallel node fields."""
         errors = []
 
         if "parallel_nodes" not in node:
-            errors.append(WorkflowValidationError(
-                category=ErrorCategory.SCHEMA,
-                severity=ErrorSeverity.ERROR,
-                message="Parallel node missing 'parallel_nodes' field",
-                location=location,
-                suggestion="Add 'parallel_nodes' list with node IDs to execute in parallel"
-            ))
+            errors.append(
+                WorkflowValidationError(
+                    category=ErrorCategory.SCHEMA,
+                    severity=ErrorSeverity.ERROR,
+                    message="Parallel node missing 'parallel_nodes' field",
+                    location=location,
+                    suggestion="Add 'parallel_nodes' list with node IDs to execute in parallel",
+                )
+            )
 
         if "join_strategy" in node:
             join_strategy = node.get("join_strategy")
             if join_strategy not in self.VALID_JOIN_STRATEGIES:
-                errors.append(WorkflowValidationError(
-                    category=ErrorCategory.SCHEMA,
-                    severity=ErrorSeverity.ERROR,
-                    message=f"Invalid join_strategy: '{join_strategy}'",
-                    location=f"{location}.join_strategy",
-                    suggestion=f"Use one of: {self.VALID_JOIN_STRATEGIES}"
-                ))
+                errors.append(
+                    WorkflowValidationError(
+                        category=ErrorCategory.SCHEMA,
+                        severity=ErrorSeverity.ERROR,
+                        message=f"Invalid join_strategy: '{join_strategy}'",
+                        location=f"{location}.join_strategy",
+                        suggestion=f"Use one of: {self.VALID_JOIN_STRATEGIES}",
+                    )
+                )
 
         return errors
 
-    def _validate_transform_node(self, node: Dict[str, Any], location: str) -> List[WorkflowValidationError]:
+    def _validate_transform_node(
+        self, node: Dict[str, Any], location: str
+    ) -> List[WorkflowValidationError]:
         """Validate transform node fields."""
         errors = []
 
         if "transform" not in node:
-            errors.append(WorkflowValidationError(
-                category=ErrorCategory.SCHEMA,
-                severity=ErrorSeverity.ERROR,
-                message="Transform node missing 'transform' field",
-                location=location,
-                suggestion="Add 'transform' field with transformation function name"
-            ))
+            errors.append(
+                WorkflowValidationError(
+                    category=ErrorCategory.SCHEMA,
+                    severity=ErrorSeverity.ERROR,
+                    message="Transform node missing 'transform' field",
+                    location=location,
+                    suggestion="Add 'transform' field with transformation function name",
+                )
+            )
 
         return errors
 
-    def _validate_team_node(self, node: Dict[str, Any], location: str) -> List[WorkflowValidationError]:
+    def _validate_team_node(
+        self, node: Dict[str, Any], location: str
+    ) -> List[WorkflowValidationError]:
         """Validate team node fields."""
         errors = []
 
         if "team_formation" in node:
             formation = node.get("team_formation")
             if formation not in self.VALID_TEAM_FORMATIONS:
-                errors.append(WorkflowValidationError(
-                    category=ErrorCategory.SCHEMA,
-                    severity=ErrorSeverity.ERROR,
-                    message=f"Invalid team_formation: '{formation}'",
-                    location=f"{location}.team_formation",
-                    suggestion=f"Use one of: {self.VALID_TEAM_FORMATIONS}"
-                ))
+                errors.append(
+                    WorkflowValidationError(
+                        category=ErrorCategory.SCHEMA,
+                        severity=ErrorSeverity.ERROR,
+                        message=f"Invalid team_formation: '{formation}'",
+                        location=f"{location}.team_formation",
+                        suggestion=f"Use one of: {self.VALID_TEAM_FORMATIONS}",
+                    )
+                )
 
         if "members" not in node:
-            errors.append(WorkflowValidationError(
-                category=ErrorCategory.SCHEMA,
-                severity=ErrorSeverity.ERROR,
-                message="Team node missing 'members' field",
-                location=location,
-                suggestion="Add 'members' list with team member definitions"
-            ))
+            errors.append(
+                WorkflowValidationError(
+                    category=ErrorCategory.SCHEMA,
+                    severity=ErrorSeverity.ERROR,
+                    message="Team node missing 'members' field",
+                    location=location,
+                    suggestion="Add 'members' list with team member definitions",
+                )
+            )
 
         return errors
 
     def _validate_edges(
-        self,
-        edges: List[Dict[str, Any]],
-        nodes: List[Dict[str, Any]]
+        self, edges: List[Dict[str, Any]], nodes: List[Dict[str, Any]]
     ) -> List[WorkflowValidationError]:
         """Validate edges list."""
         errors = []
@@ -405,24 +455,28 @@ class SchemaValidator:
 
             # Check required fields
             if "source" not in edge:
-                errors.append(WorkflowValidationError(
-                    category=ErrorCategory.SCHEMA,
-                    severity=ErrorSeverity.ERROR,
-                    message="Edge missing 'source' field",
-                    location=location,
-                    suggestion="Add 'source' field with source node ID"
-                ))
+                errors.append(
+                    WorkflowValidationError(
+                        category=ErrorCategory.SCHEMA,
+                        severity=ErrorSeverity.ERROR,
+                        message="Edge missing 'source' field",
+                        location=location,
+                        suggestion="Add 'source' field with source node ID",
+                    )
+                )
                 continue  # Can't validate further without source
 
             # Check target
             if "target" not in edge:
-                errors.append(WorkflowValidationError(
-                    category=ErrorCategory.SCHEMA,
-                    severity=ErrorSeverity.ERROR,
-                    message="Edge missing 'target' field",
-                    location=location,
-                    suggestion="Add 'target' field with target node ID or '__end__'"
-                ))
+                errors.append(
+                    WorkflowValidationError(
+                        category=ErrorCategory.SCHEMA,
+                        severity=ErrorSeverity.ERROR,
+                        message="Edge missing 'target' field",
+                        location=location,
+                        suggestion="Add 'target' field with target node ID or '__end__'",
+                    )
+                )
 
         return errors
 
@@ -434,13 +488,15 @@ class SchemaValidator:
         node_ids = {node.get("id") for node in nodes if "id" in node}
 
         if entry_point not in node_ids:
-            errors.append(WorkflowValidationError(
-                category=ErrorCategory.SCHEMA,
-                severity=ErrorSeverity.CRITICAL,
-                message=f"Entry point '{entry_point}' not found in nodes",
-                location="workflow.entry_point",
-                suggestion=f"Set entry_point to one of: {list(node_ids)}"
-            ))
+            errors.append(
+                WorkflowValidationError(
+                    category=ErrorCategory.SCHEMA,
+                    severity=ErrorSeverity.CRITICAL,
+                    message=f"Entry point '{entry_point}' not found in nodes",
+                    location="workflow.entry_point",
+                    suggestion=f"Set entry_point to one of: {list(node_ids)}",
+                )
+            )
 
         return errors
 
@@ -452,41 +508,49 @@ class SchemaValidator:
         if "max_iterations" in workflow:
             max_iter = workflow.get("max_iterations")
             if not isinstance(max_iter, int):
-                errors.append(WorkflowValidationError(
-                    category=ErrorCategory.SCHEMA,
-                    severity=ErrorSeverity.WARNING,
-                    message=f"max_iterations must be integer, got {type(max_iter).__name__}",
-                    location="workflow.max_iterations",
-                    suggestion="Convert max_iterations to integer"
-                ))
+                errors.append(
+                    WorkflowValidationError(
+                        category=ErrorCategory.SCHEMA,
+                        severity=ErrorSeverity.WARNING,
+                        message=f"max_iterations must be integer, got {type(max_iter).__name__}",
+                        location="workflow.max_iterations",
+                        suggestion="Convert max_iterations to integer",
+                    )
+                )
             elif not (1 <= max_iter <= 500):
-                errors.append(WorkflowValidationError(
-                    category=ErrorCategory.SCHEMA,
-                    severity=ErrorSeverity.WARNING,
-                    message=f"max_iterations {max_iter} out of range [1, 500]",
-                    location="workflow.max_iterations",
-                    suggestion="Set max_iterations between 1 and 500"
-                ))
+                errors.append(
+                    WorkflowValidationError(
+                        category=ErrorCategory.SCHEMA,
+                        severity=ErrorSeverity.WARNING,
+                        message=f"max_iterations {max_iter} out of range [1, 500]",
+                        location="workflow.max_iterations",
+                        suggestion="Set max_iterations between 1 and 500",
+                    )
+                )
 
         # Validate max_timeout_seconds
         if "max_timeout_seconds" in workflow:
             timeout = workflow.get("max_timeout_seconds")
             if not isinstance(timeout, (int, float)):
-                errors.append(WorkflowValidationError(
-                    category=ErrorCategory.SCHEMA,
-                    severity=ErrorSeverity.WARNING,
-                    message=f"max_timeout_seconds must be numeric, got {type(timeout).__name__}",
-                    location="workflow.max_timeout_seconds",
-                    suggestion="Convert max_timeout_seconds to float"
-                ))
+                errors.append(
+                    WorkflowValidationError(
+                        category=ErrorCategory.SCHEMA,
+                        severity=ErrorSeverity.WARNING,
+                        message=f"max_timeout_seconds must be numeric, got {type(timeout).__name__}",
+                        location="workflow.max_timeout_seconds",
+                        suggestion="Convert max_timeout_seconds to float",
+                    )
+                )
             elif timeout < 0:
-                errors.append(WorkflowValidationError(
-                    category=ErrorCategory.SCHEMA,
-                    severity=ErrorSeverity.WARNING,
-                    message=f"max_timeout_seconds must be non-negative, got {timeout}",
-                    location="workflow.max_timeout_seconds",
-                    suggestion="Set max_timeout_seconds to >= 0"
-                ))
+                errors.append(
+                    WorkflowValidationError(
+                        category=ErrorCategory.SCHEMA,
+                        severity=ErrorSeverity.WARNING,
+                        message=f"max_timeout_seconds must be non-negative, got {timeout}",
+                        location="workflow.max_timeout_seconds",
+                        suggestion="Set max_timeout_seconds to >= 0",
+                    )
+                )
 
         return errors
 
@@ -510,10 +574,7 @@ class GraphStructureValidator:
         """
         self.max_cycle_depth = max_cycle_depth
 
-    def validate(
-        self,
-        workflow: Dict[str, Any]
-    ) -> List[WorkflowValidationError]:
+    def validate(self, workflow: Dict[str, Any]) -> List[WorkflowValidationError]:
         """Validate graph structure.
 
         Args:
@@ -549,9 +610,7 @@ class GraphStructureValidator:
         return errors
 
     def _build_graph(
-        self,
-        nodes: List[Dict[str, Any]],
-        edges: List[Dict[str, Any]]
+        self, nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]
     ) -> Dict[str, List[str]]:
         """Build adjacency list representation."""
         graph = {node.get("id"): [] for node in nodes if "id" in node}
@@ -570,10 +629,7 @@ class GraphStructureValidator:
         return graph
 
     def _check_reachability(
-        self,
-        graph: Dict[str, List[str]],
-        entry_point: str,
-        nodes: List[Dict[str, Any]]
+        self, graph: Dict[str, List[str]], entry_point: str, nodes: List[Dict[str, Any]]
     ) -> List[WorkflowValidationError]:
         """Check all nodes are reachable from entry point."""
         errors = []
@@ -598,21 +654,20 @@ class GraphStructureValidator:
         unreachable = node_ids - visited - {"__end__"}
 
         for node_id in unreachable:
-            errors.append(WorkflowValidationError(
-                category=ErrorCategory.STRUCTURE,
-                severity=ErrorSeverity.ERROR,
-                message=f"Node '{node_id}' is not reachable from entry point '{entry_point}'",
-                location=f"nodes[{node_id}]",
-                suggestion=f"Add edge from existing node to '{node_id}' or set as entry_point"
-            ))
+            errors.append(
+                WorkflowValidationError(
+                    category=ErrorCategory.STRUCTURE,
+                    severity=ErrorSeverity.ERROR,
+                    message=f"Node '{node_id}' is not reachable from entry point '{entry_point}'",
+                    location=f"nodes[{node_id}]",
+                    suggestion=f"Add edge from existing node to '{node_id}' or set as entry_point",
+                )
+            )
 
         return errors
 
     def _check_edge_references(
-        self,
-        graph: Dict[str, List[str]],
-        nodes: List[Dict[str, Any]],
-        edges: List[Dict[str, Any]]
+        self, graph: Dict[str, List[str]], nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]
     ) -> List[WorkflowValidationError]:
         """Check edge references exist."""
         errors = []
@@ -626,42 +681,46 @@ class GraphStructureValidator:
 
             # Check source exists
             if source and source not in node_ids:
-                errors.append(WorkflowValidationError(
-                    category=ErrorCategory.STRUCTURE,
-                    severity=ErrorSeverity.ERROR,
-                    message=f"Edge source '{source}' not found in nodes",
-                    location=f"edges[{i}].source",
-                    suggestion=f"Fix source to reference existing node: {list(node_ids)}"
-                ))
+                errors.append(
+                    WorkflowValidationError(
+                        category=ErrorCategory.STRUCTURE,
+                        severity=ErrorSeverity.ERROR,
+                        message=f"Edge source '{source}' not found in nodes",
+                        location=f"edges[{i}].source",
+                        suggestion=f"Fix source to reference existing node: {list(node_ids)}",
+                    )
+                )
 
             # Check target exists
             if target:
                 if isinstance(target, str) and target not in node_ids:
-                    errors.append(WorkflowValidationError(
-                        category=ErrorCategory.STRUCTURE,
-                        severity=ErrorSeverity.ERROR,
-                        message=f"Edge target '{target}' not found in nodes",
-                        location=f"edges[{i}].target",
-                        suggestion=f"Fix target to reference existing node: {list(node_ids)}"
-                    ))
+                    errors.append(
+                        WorkflowValidationError(
+                            category=ErrorCategory.STRUCTURE,
+                            severity=ErrorSeverity.ERROR,
+                            message=f"Edge target '{target}' not found in nodes",
+                            location=f"edges[{i}].target",
+                            suggestion=f"Fix target to reference existing node: {list(node_ids)}",
+                        )
+                    )
                 elif isinstance(target, dict):
                     # Check all branch targets
                     for branch_name, branch_target in target.items():
                         if branch_target not in node_ids:
-                            errors.append(WorkflowValidationError(
-                                category=ErrorCategory.STRUCTURE,
-                                severity=ErrorSeverity.ERROR,
-                                message=f"Conditional branch '{branch_name}' target '{branch_target}' not found",
-                                location=f"edges[{i}].target.{branch_name}",
-                                suggestion=f"Fix branch target to: {list(node_ids)}"
-                            ))
+                            errors.append(
+                                WorkflowValidationError(
+                                    category=ErrorCategory.STRUCTURE,
+                                    severity=ErrorSeverity.ERROR,
+                                    message=f"Conditional branch '{branch_name}' target '{branch_target}' not found",
+                                    location=f"edges[{i}].target.{branch_name}",
+                                    suggestion=f"Fix branch target to: {list(node_ids)}",
+                                )
+                            )
 
         return errors
 
     def _check_cycles(
-        self,
-        graph: Dict[str, List[str]],
-        nodes: List[Dict[str, Any]]
+        self, graph: Dict[str, List[str]], nodes: List[Dict[str, Any]]
     ) -> List[WorkflowValidationError]:
         """Detect invalid cycles (cycles without condition nodes)."""
         errors = []
@@ -704,20 +763,20 @@ class GraphStructureValidator:
                     has_condition = any(n in condition_nodes for n in cycle_path)
 
                     if not has_condition:
-                        errors.append(WorkflowValidationError(
-                            category=ErrorCategory.STRUCTURE,
-                            severity=ErrorSeverity.CRITICAL,
-                            message=f"Unconditional cycle detected: {' -> '.join(cycle_path)}",
-                            location="edges",
-                            suggestion="Add a condition node in the cycle or restructure to avoid cycle"
-                        ))
+                        errors.append(
+                            WorkflowValidationError(
+                                category=ErrorCategory.STRUCTURE,
+                                severity=ErrorSeverity.CRITICAL,
+                                message=f"Unconditional cycle detected: {' -> '.join(cycle_path)}",
+                                location="edges",
+                                suggestion="Add a condition node in the cycle or restructure to avoid cycle",
+                            )
+                        )
 
         return errors
 
     def _check_dead_ends(
-        self,
-        graph: Dict[str, List[str]],
-        nodes: List[Dict[str, Any]]
+        self, graph: Dict[str, List[str]], nodes: List[Dict[str, Any]]
     ) -> List[WorkflowValidationError]:
         """Check for dead-end nodes."""
         errors = []
@@ -736,13 +795,15 @@ class GraphStructureValidator:
             if node_type in ["hitl"]:
                 continue
 
-            errors.append(WorkflowValidationError(
-                category=ErrorCategory.STRUCTURE,
-                severity=ErrorSeverity.WARNING,
-                message=f"Node '{node_id}' has no outgoing edges (dead end)",
-                location=f"nodes[{node_id}]",
-                suggestion="Add edge to another node or to '__end__'"
-            ))
+            errors.append(
+                WorkflowValidationError(
+                    category=ErrorCategory.STRUCTURE,
+                    severity=ErrorSeverity.WARNING,
+                    message=f"Node '{node_id}' has no outgoing edges (dead end)",
+                    location=f"nodes[{node_id}]",
+                    suggestion="Add edge to another node or to '__end__'",
+                )
+            )
 
         return errors
 
@@ -761,7 +822,7 @@ class SemanticValidator:
         self,
         tool_registry: Optional[Any] = None,
         handler_registry: Optional[Dict[str, Any]] = None,
-        strict_mode: bool = True
+        strict_mode: bool = True,
     ):
         """Initialize semantic validator.
 
@@ -814,9 +875,7 @@ class SemanticValidator:
         return errors
 
     def _validate_agent_semantics(
-        self,
-        node: Dict[str, Any],
-        location: str
+        self, node: Dict[str, Any], location: str
     ) -> List[WorkflowValidationError]:
         """Validate agent node semantics."""
         errors = []
@@ -825,33 +884,37 @@ class SemanticValidator:
         if "tools" in node and node["tools"]:
             tools = node["tools"]
             if not isinstance(tools, list):
-                errors.append(WorkflowValidationError(
-                    category=ErrorCategory.SEMANTIC,
-                    severity=ErrorSeverity.ERROR,
-                    message=f"Agent 'tools' must be a list, got {type(tools).__name__}",
-                    location=f"{location}.tools",
-                    suggestion="Convert tools to a list"
-                ))
+                errors.append(
+                    WorkflowValidationError(
+                        category=ErrorCategory.SEMANTIC,
+                        severity=ErrorSeverity.ERROR,
+                        message=f"Agent 'tools' must be a list, got {type(tools).__name__}",
+                        location=f"{location}.tools",
+                        suggestion="Convert tools to a list",
+                    )
+                )
             else:
                 # Check tool availability (if registry available)
                 if self.tool_registry:
                     for tool_name in tools:
                         if not self._tool_exists(tool_name):
-                            severity = ErrorSeverity.ERROR if self.strict_mode else ErrorSeverity.WARNING
-                            errors.append(WorkflowValidationError(
-                                category=ErrorCategory.SEMANTIC,
-                                severity=severity,
-                                message=f"Tool '{tool_name}' not found in registry",
-                                location=f"{location}.tools",
-                                suggestion="Verify tool is registered or remove from tools list"
-                            ))
+                            severity = (
+                                ErrorSeverity.ERROR if self.strict_mode else ErrorSeverity.WARNING
+                            )
+                            errors.append(
+                                WorkflowValidationError(
+                                    category=ErrorCategory.SEMANTIC,
+                                    severity=severity,
+                                    message=f"Tool '{tool_name}' not found in registry",
+                                    location=f"{location}.tools",
+                                    suggestion="Verify tool is registered or remove from tools list",
+                                )
+                            )
 
         return errors
 
     def _validate_compute_semantics(
-        self,
-        node: Dict[str, Any],
-        location: str
+        self, node: Dict[str, Any], location: str
     ) -> List[WorkflowValidationError]:
         """Validate compute node semantics."""
         errors = []
@@ -861,13 +924,15 @@ class SemanticValidator:
             handler_name = node["handler"]
             if handler_name not in self.handler_registry:
                 severity = ErrorSeverity.ERROR if self.strict_mode else ErrorSeverity.WARNING
-                errors.append(WorkflowValidationError(
-                    category=ErrorCategory.SEMANTIC,
-                    severity=severity,
-                    message=f"Handler '{handler_name}' not registered",
-                    location=f"{location}.handler",
-                    suggestion=f"Register handler or use one of: {list(self.handler_registry.keys())}"
-                ))
+                errors.append(
+                    WorkflowValidationError(
+                        category=ErrorCategory.SEMANTIC,
+                        severity=severity,
+                        message=f"Handler '{handler_name}' not registered",
+                        location=f"{location}.handler",
+                        suggestion=f"Register handler or use one of: {list(self.handler_registry.keys())}",
+                    )
+                )
 
         # Validate tools if specified
         if "tools" in node and node["tools"]:
@@ -875,21 +940,23 @@ class SemanticValidator:
             if self.tool_registry:
                 for tool_name in tools:
                     if not self._tool_exists(tool_name):
-                        severity = ErrorSeverity.ERROR if self.strict_mode else ErrorSeverity.WARNING
-                        errors.append(WorkflowValidationError(
-                            category=ErrorCategory.SEMANTIC,
-                            severity=severity,
-                            message=f"Tool '{tool_name}' not found in registry",
-                            location=f"{location}.tools",
-                            suggestion="Verify tool is registered or remove from tools list"
-                        ))
+                        severity = (
+                            ErrorSeverity.ERROR if self.strict_mode else ErrorSeverity.WARNING
+                        )
+                        errors.append(
+                            WorkflowValidationError(
+                                category=ErrorCategory.SEMANTIC,
+                                severity=severity,
+                                message=f"Tool '{tool_name}' not found in registry",
+                                location=f"{location}.tools",
+                                suggestion="Verify tool is registered or remove from tools list",
+                            )
+                        )
 
         return errors
 
     def _validate_condition_semantics(
-        self,
-        node: Dict[str, Any],
-        location: str
+        self, node: Dict[str, Any], location: str
     ) -> List[WorkflowValidationError]:
         """Validate condition node semantics."""
         errors = []
@@ -898,13 +965,15 @@ class SemanticValidator:
         if "branches" in node and node["branches"]:
             branches = node["branches"]
             if not isinstance(branches, dict):
-                errors.append(WorkflowValidationError(
-                    category=ErrorCategory.SEMANTIC,
-                    severity=ErrorSeverity.ERROR,
-                    message=f"Condition 'branches' must be a dict, got {type(branches).__name__}",
-                    location=f"{location}.branches",
-                    suggestion="Convert branches to a dict mapping branch names to node IDs"
-                ))
+                errors.append(
+                    WorkflowValidationError(
+                        category=ErrorCategory.SEMANTIC,
+                        severity=ErrorSeverity.ERROR,
+                        message=f"Condition 'branches' must be a dict, got {type(branches).__name__}",
+                        location=f"{location}.branches",
+                        suggestion="Convert branches to a dict mapping branch names to node IDs",
+                    )
+                )
 
         return errors
 
@@ -936,7 +1005,7 @@ class SecurityValidator:
         max_timeout_seconds: float = 3600.0,
         max_iterations: int = 50,
         max_parallel_branches: int = 10,
-        airgapped_mode: bool = False
+        airgapped_mode: bool = False,
     ):
         """Initialize security validator.
 
@@ -959,9 +1028,7 @@ class SecurityValidator:
         ]
 
         # Network tools (blocked in airgapped mode)
-        self.network_tools = {
-            "web_search", "http_request", "api_call", "fetch_url"
-        }
+        self.network_tools = {"web_search", "http_request", "api_call", "fetch_url"}
 
     def validate(self, workflow: Dict[str, Any]) -> List[WorkflowValidationError]:
         """Validate security and safety constraints.
@@ -989,10 +1056,7 @@ class SecurityValidator:
 
         return errors
 
-    def _check_resource_limits(
-        self,
-        workflow: Dict[str, Any]
-    ) -> List[WorkflowValidationError]:
+    def _check_resource_limits(self, workflow: Dict[str, Any]) -> List[WorkflowValidationError]:
         """Check workflow doesn't exceed resource limits."""
         errors = []
 
@@ -1012,33 +1076,34 @@ class SecurityValidator:
                 total_tool_budget += budget
 
         if total_tool_budget > self.max_tool_budget:
-            errors.append(WorkflowValidationError(
-                category=ErrorCategory.SECURITY,
-                severity=ErrorSeverity.ERROR,
-                message=f"Total tool budget {total_tool_budget} exceeds limit {self.max_tool_budget}",
-                location="workflow",
-                suggestion=f"Reduce tool budgets or increase max_tool_budget"
-            ))
+            errors.append(
+                WorkflowValidationError(
+                    category=ErrorCategory.SECURITY,
+                    severity=ErrorSeverity.ERROR,
+                    message=f"Total tool budget {total_tool_budget} exceeds limit {self.max_tool_budget}",
+                    location="workflow",
+                    suggestion="Reduce tool budgets or increase max_tool_budget",
+                )
+            )
 
         # Check parallel branches
         for node in nodes:
             if node.get("type") == "parallel" and "parallel_nodes" in node:
                 parallel_count = len(node.get("parallel_nodes", []))
                 if parallel_count > self.max_parallel_branches:
-                    errors.append(WorkflowValidationError(
-                        category=ErrorCategory.SECURITY,
-                        severity=ErrorSeverity.ERROR,
-                        message=f"Parallel node '{node.get('id')}' has {parallel_count} branches, exceeds limit {self.max_parallel_branches}",
-                        location=f"nodes[{node.get('id')}]",
-                        suggestion=f"Reduce parallel branches or increase max_parallel_branches"
-                    ))
+                    errors.append(
+                        WorkflowValidationError(
+                            category=ErrorCategory.SECURITY,
+                            severity=ErrorSeverity.ERROR,
+                            message=f"Parallel node '{node.get('id')}' has {parallel_count} branches, exceeds limit {self.max_parallel_branches}",
+                            location=f"nodes[{node.get('id')}]",
+                            suggestion="Reduce parallel branches or increase max_parallel_branches",
+                        )
+                    )
 
         return errors
 
-    def _check_tool_combinations(
-        self,
-        workflow: Dict[str, Any]
-    ) -> List[WorkflowValidationError]:
+    def _check_tool_combinations(self, workflow: Dict[str, Any]) -> List[WorkflowValidationError]:
         """Check for dangerous tool combinations."""
         errors = []
 
@@ -1053,19 +1118,20 @@ class SecurityValidator:
         # Check dangerous combinations
         for tool_set, dangerous_tool in self.dangerous_combinations:
             if tool_set.issubset(all_tools) and dangerous_tool in all_tools:
-                errors.append(WorkflowValidationError(
-                    category=ErrorCategory.SECURITY,
-                    severity=ErrorSeverity.CRITICAL,
-                    message=f"Dangerous tool combination: {tool_set} + {dangerous_tool}",
-                    location="workflow",
-                    suggestion=f"Remove {dangerous_tool} or restructure workflow to avoid combination"
-                ))
+                errors.append(
+                    WorkflowValidationError(
+                        category=ErrorCategory.SECURITY,
+                        severity=ErrorSeverity.CRITICAL,
+                        message=f"Dangerous tool combination: {tool_set} + {dangerous_tool}",
+                        location="workflow",
+                        suggestion=f"Remove {dangerous_tool} or restructure workflow to avoid combination",
+                    )
+                )
 
         return errors
 
     def _check_airgapped_constraints(
-        self,
-        workflow: Dict[str, Any]
+        self, workflow: Dict[str, Any]
     ) -> List[WorkflowValidationError]:
         """Check airgapped mode constraints."""
         errors = []
@@ -1081,33 +1147,34 @@ class SecurityValidator:
         # Check for network tools
         network_tools_found = all_tools & self.network_tools
         if network_tools_found:
-            errors.append(WorkflowValidationError(
-                category=ErrorCategory.SECURITY,
-                severity=ErrorSeverity.ERROR,
-                message=f"Network tools not allowed in airgapped mode: {network_tools_found}",
-                location="workflow",
-                suggestion="Remove network tools or disable airgapped mode"
-            ))
+            errors.append(
+                WorkflowValidationError(
+                    category=ErrorCategory.SECURITY,
+                    severity=ErrorSeverity.ERROR,
+                    message=f"Network tools not allowed in airgapped mode: {network_tools_found}",
+                    location="workflow",
+                    suggestion="Remove network tools or disable airgapped mode",
+                )
+            )
 
         return errors
 
-    def _check_infinite_loops(
-        self,
-        workflow: Dict[str, Any]
-    ) -> List[WorkflowValidationError]:
+    def _check_infinite_loops(self, workflow: Dict[str, Any]) -> List[WorkflowValidationError]:
         """Check for potential infinite loops."""
         errors = []
 
         # Check if workflow has max_iterations set
         max_iterations = workflow.get("max_iterations")
         if max_iterations and max_iterations > self.max_iterations:
-            errors.append(WorkflowValidationError(
-                category=ErrorCategory.SECURITY,
-                severity=ErrorSeverity.WARNING,
-                message=f"max_iterations {max_iterations} exceeds recommended limit {self.max_iterations}",
-                location="workflow.max_iterations",
-                suggestion=f"Consider reducing max_iterations to {self.max_iterations} or less"
-            ))
+            errors.append(
+                WorkflowValidationError(
+                    category=ErrorCategory.SECURITY,
+                    severity=ErrorSeverity.WARNING,
+                    message=f"max_iterations {max_iterations} exceeds recommended limit {self.max_iterations}",
+                    location="workflow.max_iterations",
+                    suggestion=f"Consider reducing max_iterations to {self.max_iterations} or less",
+                )
+            )
 
         return errors
 
@@ -1133,7 +1200,7 @@ class WorkflowValidator:
         strict_mode: bool = True,
         tool_registry: Optional[Any] = None,
         handler_registry: Optional[Dict[str, Any]] = None,
-        airgapped_mode: bool = False
+        airgapped_mode: bool = False,
     ):
         """Initialize workflow validator.
 
@@ -1150,16 +1217,12 @@ class WorkflowValidator:
         self.schema_validator = SchemaValidator(strict_mode=strict_mode)
         self.structure_validator = GraphStructureValidator()
         self.semantic_validator = SemanticValidator(
-            tool_registry=tool_registry,
-            handler_registry=handler_registry,
-            strict_mode=strict_mode
+            tool_registry=tool_registry, handler_registry=handler_registry, strict_mode=strict_mode
         )
         self.security_validator = SecurityValidator(airgapped_mode=airgapped_mode)
 
     def validate(
-        self,
-        workflow: Dict[str, Any],
-        workflow_name: Optional[str] = None
+        self, workflow: Dict[str, Any], workflow_name: Optional[str] = None
     ) -> WorkflowGenerationValidationResult:
         """Validate workflow across all 4 layers.
 
@@ -1178,14 +1241,16 @@ class WorkflowValidator:
         else:
             return WorkflowGenerationValidationResult(
                 is_valid=False,
-                schema_errors=[WorkflowValidationError(
-                    category=ErrorCategory.SCHEMA,
-                    severity=ErrorSeverity.CRITICAL,
-                    message="Workflow must be a dict or have to_dict() method",
-                    location="workflow",
-                    suggestion="Provide workflow as dictionary"
-                )],
-                workflow_name=workflow_name
+                schema_errors=[
+                    WorkflowValidationError(
+                        category=ErrorCategory.SCHEMA,
+                        severity=ErrorSeverity.CRITICAL,
+                        message="Workflow must be a dict or have to_dict() method",
+                        location="workflow",
+                        suggestion="Provide workflow as dictionary",
+                    )
+                ],
+                workflow_name=workflow_name,
             )
 
         # Run all 4 validation layers
@@ -1197,8 +1262,7 @@ class WorkflowValidator:
         # Determine if valid (no critical or error-level issues)
         all_errors = schema_errors + structure_errors + semantic_errors + security_errors
         has_blocking_errors = any(
-            e.severity in [ErrorSeverity.CRITICAL, ErrorSeverity.ERROR]
-            for e in all_errors
+            e.severity in [ErrorSeverity.CRITICAL, ErrorSeverity.ERROR] for e in all_errors
         )
 
         return WorkflowGenerationValidationResult(
@@ -1207,14 +1271,10 @@ class WorkflowValidator:
             structure_errors=structure_errors,
             semantic_errors=semantic_errors,
             security_errors=security_errors,
-            workflow_name=workflow_name
+            workflow_name=workflow_name,
         )
 
-    def validate_layer(
-        self,
-        workflow: Dict[str, Any],
-        layer: str
-    ) -> List[WorkflowValidationError]:
+    def validate_layer(self, workflow: Dict[str, Any], layer: str) -> List[WorkflowValidationError]:
         """Validate a single layer.
 
         Useful for targeted validation.
@@ -1245,8 +1305,7 @@ class WorkflowValidator:
             return self.security_validator.validate(workflow_dict)
         else:
             raise ValueError(
-                f"Invalid layer: {layer}. "
-                f"Valid layers: schema, structure, semantic, security"
+                f"Invalid layer: {layer}. " f"Valid layers: schema, structure, semantic, security"
             )
 
 
@@ -1360,7 +1419,10 @@ class RequirementValidator:
             RequirementWorkflowGenerationValidationResult with errors, warnings, and recommendations
         """
         # Import here to avoid circular dependency
-        from victor.workflows.generation.requirements import RequirementValidationResult, RequirementValidationError
+        from victor.workflows.generation.requirements import (
+            RequirementValidationResult,
+            RequirementValidationError,
+        )
 
         errors = []
         warnings = []
@@ -1531,10 +1593,7 @@ class RequirementValidator:
                 )
 
         # Check: Parallel execution with dependencies
-        if (
-            requirements.structural.execution_order == "parallel"
-            and dependencies
-        ):
+        if requirements.structural.execution_order == "parallel" and dependencies:
             warnings.append(
                 RequirementValidationError(
                     field="structural.execution_order",
@@ -1545,10 +1604,7 @@ class RequirementValidator:
             )
 
         # Check: Conflicting quality constraints
-        if (
-            requirements.quality.max_duration_seconds
-            and len(requirements.functional.tasks) > 0
-        ):
+        if requirements.quality.max_duration_seconds and len(requirements.functional.tasks) > 0:
             min_time = len(requirements.functional.tasks) * 30  # 30s per task min
             if requirements.quality.max_duration_seconds < min_time:
                 errors.append(

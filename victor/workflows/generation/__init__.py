@@ -162,7 +162,6 @@ __all__ = [
     "Ambiguity",
     "RequirementValidationResult",
     "RequirementValidationError",
-
     # Requirements extraction
     "RequirementExtractor",
     "RuleBasedExtractor",
@@ -173,7 +172,6 @@ __all__ = [
     "InteractiveClarifier",
     "Question",
     "QuestionGenerator",
-
     # Workflow validation types
     "ErrorSeverity",
     "ErrorCategory",
@@ -183,30 +181,25 @@ __all__ = [
     "RefinementIteration",
     "RefinementHistory",
     "WorkflowFix",
-
     # Workflow validators
     "WorkflowValidator",
     "SchemaValidator",
     "GraphStructureValidator",
     "SemanticValidator",
     "SecurityValidator",
-
     # Workflow refiner
     "WorkflowRefiner",
     "SchemaRefiner",
     "StructureRefiner",
     "SemanticRefiner",
     "SecurityRefiner",
-
     # Error reporting
     "ErrorReporter",
     "ErrorReport",
-
     # Prompts
     "RefinementPromptBuilder",
     "ExampleLibrary",
     "build_refinement_prompt",
-
     # Workflow generation
     "WorkflowGenerator",
     "GenerationStrategy",

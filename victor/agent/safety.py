@@ -162,9 +162,7 @@ class ConfirmationRequest:
     details: List[str]
     arguments: Dict[str, Any]
 
-    def format_message(
-        self, presentation: Optional["PresentationProtocol"] = None
-    ) -> str:
+    def format_message(self, presentation: Optional["PresentationProtocol"] = None) -> str:
         """Format confirmation request as a user-friendly message.
 
         Args:

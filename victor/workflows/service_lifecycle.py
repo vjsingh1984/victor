@@ -444,7 +444,9 @@ class LanceDBService(ServiceLifecycle):
 
         persist_dir = config.config.get("persist_directory")
         if not persist_dir:
-            raise ValueError(f"LanceDB service '{config.name}' missing 'persist_directory' in config")
+            raise ValueError(
+                f"LanceDB service '{config.name}' missing 'persist_directory' in config"
+            )
 
         logger.info(f"Initializing LanceDB service: {config.name} at {persist_dir}")
 

@@ -322,9 +322,7 @@ class TestVerticalRegistryManager:
         manager = VerticalRegistryManager(dry_run=False)
         spec = PackageSpec(name="victor-security")
 
-        mock_run.side_effect = subprocess.CalledProcessError(
-            1, "pip", stderr="Installation failed"
-        )
+        mock_run.side_effect = subprocess.CalledProcessError(1, "pip", stderr="Installation failed")
 
         success, message = manager.install(spec)
 
@@ -760,9 +758,7 @@ class TestVerticalInstallation:
     def test_install_pip_failure(self, mock_validate, mock_run):
         """Test installation when pip install fails."""
         mock_validate.return_value = []
-        mock_run.side_effect = subprocess.CalledProcessError(
-            1, "pip", stderr="Package not found"
-        )
+        mock_run.side_effect = subprocess.CalledProcessError(1, "pip", stderr="Package not found")
 
         result = runner.invoke(vertical_app, ["install", "nonexistent-package"])
 

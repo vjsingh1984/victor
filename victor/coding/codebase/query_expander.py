@@ -295,9 +295,7 @@ class QueryExpander:
             expansions: Custom expansion dictionary. If None, uses SEMANTIC_QUERY_EXPANSIONS.
         """
         self.expansions = expansions or SEMANTIC_QUERY_EXPANSIONS
-        self._base = FrameworkQueryExpander(
-            QueryExpansionConfig(expansions=self.expansions)
-        )
+        self._base = FrameworkQueryExpander(QueryExpansionConfig(expansions=self.expansions))
 
     def expand_query(self, query: str, max_expansions: int = 5) -> List[str]:
         """Expand query with synonyms and related terms.

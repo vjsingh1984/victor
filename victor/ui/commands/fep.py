@@ -149,9 +149,7 @@ def create_fep(
             if result.returncode == 0:
                 github_username = result.stdout.strip()
     except FileNotFoundError:
-        console.print(
-            "[yellow]Warning:[/] Git not found. Specify author info manually.\n"
-        )
+        console.print("[yellow]Warning:[/] Git not found. Specify author info manually.\n")
 
     if not author_name:
         console.print("[bold red]Error:[/] Author name required (use --author)")
@@ -234,9 +232,7 @@ implementation: null
 @fep_app.command("validate")
 def validate_fep_command(
     fep_path: Path = typer.Argument(..., help="Path to FEP markdown file"),
-    verbose: bool = typer.Option(
-        False, "--verbose", "-v", help="Show detailed validation output"
-    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed validation output"),
 ) -> None:
     """Validate FEP structure and content.
 
@@ -406,11 +402,17 @@ This PR proposes {metadata.title.lower()}.
 """
 
         gh_cmd = [
-            "gh", "pr", "create",
-            "--title", pr_title,
-            "--body", pr_body,
-            "--label", "fep",
-            "--label", f"status:{metadata.status.value.lower()}",
+            "gh",
+            "pr",
+            "create",
+            "--title",
+            pr_title,
+            "--body",
+            pr_body,
+            "--label",
+            "fep",
+            "--label",
+            f"status:{metadata.status.value.lower()}",
         ]
 
         if draft:
@@ -440,18 +442,12 @@ This PR proposes {metadata.title.lower()}.
 
 @fep_app.command("list")
 def list_feps(
-    status: Optional[str] = typer.Option(
-        None, "--status", "-s", help="Filter by status"
-    ),
-    fep_type: Optional[str] = typer.Option(
-        None, "--type", "-t", help="Filter by type"
-    ),
+    status: Optional[str] = typer.Option(None, "--status", "-s", help="Filter by status"),
+    fep_type: Optional[str] = typer.Option(None, "--type", "-t", help="Filter by type"),
     sort_by: str = typer.Option(
         "number", "--sort", help="Sort by field (number, created, modified, title)"
     ),
-    verbose: bool = typer.Option(
-        False, "--verbose", "-v", help="Show more details"
-    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show more details"),
 ) -> None:
     """List all FEPs with optional filtering and sorting.
 
@@ -478,7 +474,9 @@ def list_feps(
     type_filter = None
     if fep_type:
         try:
-            type_filter = FEPType(fep_type.title() + " Track" if fep_type != "process" else "Process")
+            type_filter = FEPType(
+                fep_type.title() + " Track" if fep_type != "process" else "Process"
+            )
         except ValueError:
             console.print(f"[bold red]Error:[/] Invalid type: {fep_type}")
             console.print(f"Valid types: {[t.value for t in FEPType]}")
@@ -541,9 +539,7 @@ def list_feps(
 @fep_app.command("view")
 def view_fep(
     fep_number: int = typer.Argument(..., help="FEP number"),
-    markdown: bool = typer.Option(
-        False, "--markdown", "-m", help="Render as markdown"
-    ),
+    markdown: bool = typer.Option(False, "--markdown", "-m", help="Render as markdown"),
 ) -> None:
     """Display specific FEP details.
 
@@ -632,7 +628,12 @@ def view_fep(
 @fep_app.command("status")
 def update_fep_status(
     fep_number: int = typer.Argument(..., help="FEP number"),
-    status: str = typer.Option(..., "--status", "-s", help="New status (draft, review, accepted, rejected, deferred, withdrawn, implemented)"),
+    status: str = typer.Option(
+        ...,
+        "--status",
+        "-s",
+        help="New status (draft, review, accepted, rejected, deferred, withdrawn, implemented)",
+    ),
 ) -> None:
     """Update FEP status.
 
@@ -683,7 +684,9 @@ def show_fep_stats() -> None:
     stats = manager.get_statistics()
 
     console.print()
-    console.print(Panel(f"[bold]Total FEPs:[/] {stats['total']}", title="FEP Statistics", border_style="cyan"))
+    console.print(
+        Panel(f"[bold]Total FEPs:[/] {stats['total']}", title="FEP Statistics", border_style="cyan")
+    )
     console.print()
 
     # Status breakdown
@@ -712,10 +715,7 @@ def show_fep_stats() -> None:
 def search_feps(
     query: str = typer.Argument(..., help="Search query"),
     search_in: Optional[str] = typer.Option(
-        None,
-        "--in",
-        "-i",
-        help="Fields to search in (comma-separated: title,authors)"
+        None, "--in", "-i", help="Fields to search in (comma-separated: title,authors)"
     ),
 ) -> None:
     """Search FEPs by query string.

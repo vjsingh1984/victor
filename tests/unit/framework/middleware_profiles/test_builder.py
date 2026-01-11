@@ -190,11 +190,7 @@ class TestBuilderFluentInterface:
             GitSafetyMiddleware(block_dangerous=False),
         ]
 
-        profile = (
-            MiddlewareProfileBuilder()
-            .add_middlewares(middlewares)
-            .build()
-        )
+        profile = MiddlewareProfileBuilder().add_middlewares(middlewares).build()
 
         assert len(profile.middlewares) == 3
 
@@ -203,10 +199,12 @@ class TestBuilderFluentInterface:
         profile = (
             MiddlewareProfileBuilder()
             .add_middleware(LoggingMiddleware())
-            .add_middlewares([
-                SecretMaskingMiddleware(),
-                GitSafetyMiddleware(),
-            ])
+            .add_middlewares(
+                [
+                    SecretMaskingMiddleware(),
+                    GitSafetyMiddleware(),
+                ]
+            )
             .add_middleware(LoggingMiddleware(log_level=logging.INFO))
             .build()
         )
@@ -224,62 +222,37 @@ class TestBuilderConfiguration:
 
     def test_set_name_updates_name(self):
         """set_name() should update profile name."""
-        profile = (
-            MiddlewareProfileBuilder()
-            .set_name("test_name")
-            .build()
-        )
+        profile = MiddlewareProfileBuilder().set_name("test_name").build()
 
         assert profile.name == "test_name"
 
     def test_set_name_multiple_calls(self):
         """Multiple set_name() calls should use last value."""
-        profile = (
-            MiddlewareProfileBuilder()
-            .set_name("first")
-            .set_name("second")
-            .build()
-        )
+        profile = MiddlewareProfileBuilder().set_name("first").set_name("second").build()
 
         assert profile.name == "second"
 
     def test_set_description_updates_description(self):
         """set_description() should update profile description."""
-        profile = (
-            MiddlewareProfileBuilder()
-            .set_description("Test description")
-            .build()
-        )
+        profile = MiddlewareProfileBuilder().set_description("Test description").build()
 
         assert profile.description == "Test description"
 
     def test_set_priority_updates_priority(self):
         """set_priority() should update profile priority."""
-        profile = (
-            MiddlewareProfileBuilder()
-            .set_priority(100)
-            .build()
-        )
+        profile = MiddlewareProfileBuilder().set_priority(100).build()
 
         assert profile.priority == 100
 
     def test_set_priority_zero(self):
         """set_priority() should accept 0 (highest priority)."""
-        profile = (
-            MiddlewareProfileBuilder()
-            .set_priority(0)
-            .build()
-        )
+        profile = MiddlewareProfileBuilder().set_priority(0).build()
 
         assert profile.priority == 0
 
     def test_set_priority_negative(self):
         """set_priority() should accept negative values."""
-        profile = (
-            MiddlewareProfileBuilder()
-            .set_priority(-10)
-            .build()
-        )
+        profile = MiddlewareProfileBuilder().set_priority(-10).build()
 
         assert profile.priority == -10
 
@@ -310,10 +283,12 @@ class TestBuilderMiddlewareManagement:
         profile = (
             MiddlewareProfileBuilder()
             .add_middleware(LoggingMiddleware())
-            .add_middlewares([
-                SecretMaskingMiddleware(),
-                GitSafetyMiddleware(),
-            ])
+            .add_middlewares(
+                [
+                    SecretMaskingMiddleware(),
+                    GitSafetyMiddleware(),
+                ]
+            )
             .build()
         )
 
@@ -373,11 +348,7 @@ class TestBuilderMiddlewareManagement:
 
     def test_clear_middlewares_empty_list(self):
         """clear_middlewares() should handle empty list."""
-        profile = (
-            MiddlewareProfileBuilder()
-            .clear_middlewares()
-            .build()
-        )
+        profile = MiddlewareProfileBuilder().clear_middlewares().build()
 
         assert len(profile.middlewares) == 0
 
@@ -438,32 +409,20 @@ class TestBuilderEdgeCases:
 
     def test_build_with_no_middlewares(self):
         """Builder should build profile with no middlewares."""
-        profile = (
-            MiddlewareProfileBuilder()
-            .set_name("empty_profile")
-            .build()
-        )
+        profile = MiddlewareProfileBuilder().set_name("empty_profile").build()
 
         assert len(profile.middlewares) == 0
         assert profile.name == "empty_profile"
 
     def test_build_with_empty_string_name(self):
         """Builder should accept empty string name."""
-        profile = (
-            MiddlewareProfileBuilder()
-            .set_name("")
-            .build()
-        )
+        profile = MiddlewareProfileBuilder().set_name("").build()
 
         assert profile.name == ""
 
     def test_build_with_empty_string_description(self):
         """Builder should accept empty string description."""
-        profile = (
-            MiddlewareProfileBuilder()
-            .set_description("")
-            .build()
-        )
+        profile = MiddlewareProfileBuilder().set_description("").build()
 
         assert profile.description == ""
 
@@ -586,20 +545,26 @@ class TestBuilderIntegration:
             MiddlewareProfileBuilder()
             .set_name("custom_safety")
             .set_description("Custom safety profile")
-            .add_middleware(GitSafetyMiddleware(
-                block_dangerous=True,
-                warn_on_risky=True,
-                protected_branches={"production", "staging", "main"},
-            ))
-            .add_middleware(SecretMaskingMiddleware(
-                replacement="[REDACTED]",
-                mask_in_arguments=True,
-            ))
-            .add_middleware(LoggingMiddleware(
-                log_level=logging.DEBUG,
-                include_arguments=True,
-                sanitize_arguments=True,
-            ))
+            .add_middleware(
+                GitSafetyMiddleware(
+                    block_dangerous=True,
+                    warn_on_risky=True,
+                    protected_branches={"production", "staging", "main"},
+                )
+            )
+            .add_middleware(
+                SecretMaskingMiddleware(
+                    replacement="[REDACTED]",
+                    mask_in_arguments=True,
+                )
+            )
+            .add_middleware(
+                LoggingMiddleware(
+                    log_level=logging.DEBUG,
+                    include_arguments=True,
+                    sanitize_arguments=True,
+                )
+            )
             .set_priority(25)
             .build()
         )
@@ -618,15 +583,19 @@ class TestBuilderIntegration:
         profile = (
             MiddlewareProfileBuilder()
             .set_name("mixed")
-            .add_middleware(LoggingMiddleware(
-                log_level=logging.INFO,
-                include_arguments=True,
-                sanitize_arguments=False,
-            ))
-            .add_middleware(SecretMaskingMiddleware(
-                replacement="[XXX]",
-                mask_in_arguments=False,
-            ))
+            .add_middleware(
+                LoggingMiddleware(
+                    log_level=logging.INFO,
+                    include_arguments=True,
+                    sanitize_arguments=False,
+                )
+            )
+            .add_middleware(
+                SecretMaskingMiddleware(
+                    replacement="[XXX]",
+                    mask_in_arguments=False,
+                )
+            )
             .set_priority(40)
             .build()
         )

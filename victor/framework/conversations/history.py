@@ -76,8 +76,7 @@ class ConversationHistory:
             self.messages_by_sender[response.sender].append(response)
 
         logger.debug(
-            f"Added turn {turn.turn_number} to history "
-            f"(total turns: {len(self.turns)})"
+            f"Added turn {turn.turn_number} to history " f"(total turns: {len(self.turns)})"
         )
 
     async def get_history(
@@ -182,9 +181,9 @@ class ConversationExporter:
                         "sender": turn.message.sender,
                         "content": turn.message.content,
                         "type": turn.message.message_type.value,
-                        "timestamp": turn.message.timestamp.isoformat()
-                        if turn.message.timestamp
-                        else None,
+                        "timestamp": (
+                            turn.message.timestamp.isoformat() if turn.message.timestamp else None
+                        ),
                     },
                     "responses": [
                         {
@@ -285,15 +284,11 @@ class ConversationExporter:
             for resp in turn.responses:
                 arrow = "->>" if turn.message.requires_response else "->"
                 content = turn.message.content[:30].replace('"', "'")
-                lines.append(
-                    f"    {turn.speaker}{arrow}{resp.sender}: {content}..."
-                )
+                lines.append(f"    {turn.speaker}{arrow}{resp.sender}: {content}...")
 
                 # Response
                 resp_content = resp.content[:30].replace('"', "'")
-                lines.append(
-                    f"    {resp.sender}-->{turn.speaker}: {resp_content}..."
-                )
+                lines.append(f"    {resp.sender}-->{turn.speaker}: {resp_content}...")
 
         return "\n".join(lines)
 

@@ -144,9 +144,7 @@ class PruningStrategy(BaseOptimizationStrategy):
             return OptimizationOpportunity(
                 strategy_type=OptimizationStrategyType.PRUNING,
                 target=bottleneck.node_id,
-                description=(
-                    f"Remove node '{bottleneck.node_id}' with unused outputs"
-                ),
+                description=(f"Remove node '{bottleneck.node_id}' with unused outputs"),
                 expected_improvement=0.1,  # Small improvement
                 risk_level=BottleneckSeverity.MEDIUM,
                 confidence=0.8,
@@ -225,9 +223,7 @@ class ParallelizationStrategy(BaseOptimizationStrategy):
                         f"Execute {len(group.node_ids)} nodes in parallel "
                         f"(potential speedup: {group.estimated_speedup:.2f}x)"
                     ),
-                    expected_improvement=(
-                        group.estimated_speedup - 1
-                    ) / group.estimated_speedup,
+                    expected_improvement=(group.estimated_speedup - 1) / group.estimated_speedup,
                     risk_level=BottleneckSeverity.MEDIUM,
                     estimated_duration_reduction=(
                         group.sequential_duration - group.parallel_duration
@@ -276,20 +272,19 @@ class ParallelizationStrategy(BaseOptimizationStrategy):
 
             if len(independent_nodes) > 1:
                 # Calculate estimated speedup
-                durations = [
-                    profile.node_stats[n].p95_duration
-                    for n in independent_nodes
-                ]
+                durations = [profile.node_stats[n].p95_duration for n in independent_nodes]
                 sequential_time = sum(durations)
                 parallel_time = max(durations)
                 speedup = sequential_time / parallel_time if parallel_time > 0 else 1.0
 
-                parallel_groups.append(ParallelGroup(
-                    node_ids=list(independent_nodes),
-                    estimated_speedup=speedup,
-                    sequential_duration=sequential_time,
-                    parallel_duration=parallel_time,
-                ))
+                parallel_groups.append(
+                    ParallelGroup(
+                        node_ids=list(independent_nodes),
+                        estimated_speedup=speedup,
+                        sequential_duration=sequential_time,
+                        parallel_duration=parallel_time,
+                    )
+                )
 
         return parallel_groups
 
@@ -312,10 +307,7 @@ class ParallelizationStrategy(BaseOptimizationStrategy):
         """
         # Simplified: assume no dependencies for MVP
         # In production, this would analyze the actual workflow structure
-        return {
-            node_id: set()
-            for node_id in profile.node_stats.keys()
-        }
+        return {node_id: set() for node_id in profile.node_stats.keys()}
 
     def _find_independent_nodes(
         self,
@@ -347,10 +339,7 @@ class ParallelizationStrategy(BaseOptimizationStrategy):
             other_deps = deps.get(other_node, set())
 
             # Check if nodes are independent (no dependencies in either direction)
-            if (
-                other_node not in node_deps
-                and node_id not in other_deps
-            ):
+            if other_node not in node_deps and node_id not in other_deps:
                 independent.add(other_node)
                 visited.add(other_node)
 

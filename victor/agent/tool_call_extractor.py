@@ -424,13 +424,21 @@ class ToolCallExtractor:
             query = text[start:end].strip()
 
             # Clean up common phrases
-            query = re.sub(r'^(?:let me|I will|I\'ll|I\'d|can|could|please|can you|could you)\s+(?:check|see|query|search|look at|examine|explore|find|show)\s+(the\s+)?graph\s+(for|about)?\s*', '', query, flags=re.IGNORECASE)
+            query = re.sub(
+                r"^(?:let me|I will|I\'ll|I\'d|can|could|please|can you|could you)\s+(?:check|see|query|search|look at|examine|explore|find|show)\s+(the\s+)?graph\s+(for|about)?\s*",
+                "",
+                query,
+                flags=re.IGNORECASE,
+            )
             query = query.strip()
 
         if query:
             # Determine graph mode based on keywords
             mode = "find"  # default
-            if any(word in query.lower() for word in ["neighbor", "connected", "related", "calls", "callee", "caller"]):
+            if any(
+                word in query.lower()
+                for word in ["neighbor", "connected", "related", "calls", "callee", "caller"]
+            ):
                 mode = "neighbors"
             elif any(word in query.lower() for word in ["path", "between", "connection"]):
                 mode = "path"

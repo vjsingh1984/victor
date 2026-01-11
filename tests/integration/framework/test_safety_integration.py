@@ -28,7 +28,6 @@ class TestSafetyIntegration:
             ("rag_ingest document.pdf", True),
             ("rag_search query text", True),
             ("rag_add_document doc1", True),
-            
             # Dangerous operations - should be blocked
             ("rag_delete --all", False),
             ("rag_delete *", False),
@@ -39,9 +38,11 @@ class TestSafetyIntegration:
 
         for operation, should_be_allowed in operations:
             allowed, reason = enforcer.check_operation(operation)
-            
+
             if should_be_allowed:
-                assert allowed is True, f"Safe operation should be allowed: {operation}. Reason: {reason}"
+                assert (
+                    allowed is True
+                ), f"Safe operation should be allowed: {operation}. Reason: {reason}"
             else:
                 assert allowed is False, f"Dangerous operation should be blocked: {operation}"
 
@@ -56,7 +57,6 @@ class TestSafetyIntegration:
             ("cite arxiv.org paper", True),
             ("search .gov sources", True),
             ("analyze research findings", True),
-            
             # Dangerous operations - should be blocked
             ("cite fake-blog.blogspot.com", False),
             ("invent citation for claim", False),
@@ -66,9 +66,11 @@ class TestSafetyIntegration:
 
         for operation, should_be_allowed in operations:
             allowed, reason = enforcer.check_operation(operation)
-            
+
             if should_be_allowed:
-                assert allowed is True, f"Safe operation should be allowed: {operation}. Reason: {reason}"
+                assert (
+                    allowed is True
+                ), f"Safe operation should be allowed: {operation}. Reason: {reason}"
             else:
                 assert allowed is False, f"Dangerous operation should be blocked: {operation}"
 
@@ -83,7 +85,6 @@ class TestSafetyIntegration:
             ("analyze dataset.csv", True),
             ("create visualization", True),
             ("export anonymized data", True),
-            
             # Dangerous operations - should be blocked
             ("export data with SSN to CSV", False),
             ("to_csv credit card data", False),
@@ -94,15 +95,19 @@ class TestSafetyIntegration:
 
         for operation, should_be_allowed in operations:
             allowed, reason = enforcer.check_operation(operation)
-            
+
             # Note: "upload to s3 bucket" should actually be blocked
             if operation == "upload to s3 bucket":
                 should_be_allowed = False
-            
+
             if should_be_allowed:
-                assert allowed is True, f"Safe operation should be allowed: {operation}. Reason: {reason}"
+                assert (
+                    allowed is True
+                ), f"Safe operation should be allowed: {operation}. Reason: {reason}"
             else:
-                assert allowed is False, f"Dangerous operation should be blocked: {operation}. Reason: {reason}"
+                assert (
+                    allowed is False
+                ), f"Dangerous operation should be blocked: {operation}. Reason: {reason}"
 
     def test_all_verticals_safety_integration(self):
         """All vertical safety rules should work together without conflicts."""
@@ -131,23 +136,27 @@ class TestSafetyIntegration:
         for operation, should_be_allowed in test_cases:
             allowed, reason = enforcer.check_operation(operation)
             if should_be_allowed:
-                assert allowed is True, f"Operation should be allowed: {operation}. Reason: {reason}"
+                assert (
+                    allowed is True
+                ), f"Operation should be allowed: {operation}. Reason: {reason}"
             else:
-                assert allowed is False, f"Operation should be blocked: {operation}. Reason: {reason}"
+                assert (
+                    allowed is False
+                ), f"Operation should be blocked: {operation}. Reason: {reason}"
 
     def test_safety_levels_enforcement(self):
         """Safety levels should be enforced correctly across all verticals."""
         # HIGH level - block all dangerous operations
         enforcer_high = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
         create_all_rag_safety_rules(enforcer_high)
-        
+
         allowed, _ = enforcer_high.check_operation("rag_delete --all")
         assert allowed is False, "HIGH level should block dangerous operations"
 
         # LOW level - warn but allow most operations
         enforcer_low = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.LOW))
         create_all_rag_safety_rules(enforcer_low)
-        
+
         # At LOW level, LOW priority rules should only warn (not block)
         # But HIGH priority rules should still block
         allowed, _ = enforcer_low.check_operation("rag_delete --all")
@@ -156,12 +165,13 @@ class TestSafetyIntegration:
     def test_custom_safety_rules_with_verticals(self):
         """Custom safety rules should work alongside vertical rules."""
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        
+
         # Register vertical rules
         create_all_coding_safety_rules(enforcer)
-        
+
         # Add custom rule
         from victor.framework.config import SafetyRule
+
         enforcer.add_rule(
             SafetyRule(
                 name="custom_block_specific_file",
@@ -183,7 +193,9 @@ class TestSafetyIntegration:
         allowed, _ = enforcer.check_operation("edit other_file.py")
         assert allowed is True
 
-    @pytest.mark.parametrize("safety_level", [SafetyLevel.LOW, SafetyLevel.MEDIUM, SafetyLevel.HIGH])
+    @pytest.mark.parametrize(
+        "safety_level", [SafetyLevel.LOW, SafetyLevel.MEDIUM, SafetyLevel.HIGH]
+    )
     def test_safety_level_consistency_across_verticals(self, safety_level):
         """Safety levels should work consistently for all verticals."""
         enforcer = SafetyEnforcer(config=SafetyConfig(level=safety_level))
@@ -222,7 +234,6 @@ class TestSafetyIntegration:
             ("execute swe-bench task", True),
             ("test solution locally", True),
             ("timeout=240 seconds", True),
-
             # Dangerous operations - should be blocked
             ("modify code in /production directory", False),
             ("git push to release branch", False),
@@ -239,9 +250,13 @@ class TestSafetyIntegration:
             allowed, reason = enforcer.check_operation(operation)
 
             if should_be_allowed:
-                assert allowed is True, f"Safe operation should be allowed: {operation}. Reason: {reason}"
+                assert (
+                    allowed is True
+                ), f"Safe operation should be allowed: {operation}. Reason: {reason}"
             else:
-                assert allowed is False, f"Dangerous operation should be blocked: {operation}. Reason: {reason}"
+                assert (
+                    allowed is False
+                ), f"Dangerous operation should be blocked: {operation}. Reason: {reason}"
 
     def test_all_six_verticals_safety_integration(self):
         """All 6 vertical safety rules should work together without conflicts."""
@@ -264,23 +279,18 @@ class TestSafetyIntegration:
             # Coding vertical
             ("git push --force origin main", False),
             ("rm -rf /important/data", False),
-
             # DevOps vertical
             ("kubectl delete deployment -n production app", False),
             ("docker run --privileged container", False),
-
             # RAG vertical
             ("rag_delete --all", False),
             ("rag_ingest malware.exe", False),
-
             # Research vertical
             ("cite fake-blog.blogspot.com", False),
             ("fabricate source data", False),
-
             # DataAnalysis vertical
             ("export data with SSN", False),
             ("upload to s3 bucket", False),
-
             # Benchmark vertical
             ("modify /production directory", False),
             ("tool_budget=-1", False),
@@ -291,9 +301,13 @@ class TestSafetyIntegration:
         for operation, should_be_allowed in test_cases:
             allowed, reason = enforcer.check_operation(operation)
             if should_be_allowed:
-                assert allowed is True, f"Operation should be allowed: {operation}. Reason: {reason}"
+                assert (
+                    allowed is True
+                ), f"Operation should be allowed: {operation}. Reason: {reason}"
             else:
-                assert allowed is False, f"Operation should be blocked: {operation}. Reason: {reason}"
+                assert (
+                    allowed is False
+                ), f"Operation should be blocked: {operation}. Reason: {reason}"
 
     def test_benchmark_data_privacy_enforcement(self):
         """Benchmark data privacy rules should be enforced at all safety levels."""
@@ -311,7 +325,9 @@ class TestSafetyIntegration:
 
             for operation in dangerous_ops:
                 allowed, reason = enforcer.check_operation(operation)
-                assert allowed is False, f"Data privacy rule should block at {safety_level} level: {operation}. Reason: {reason}"
+                assert (
+                    allowed is False
+                ), f"Data privacy rule should block at {safety_level} level: {operation}. Reason: {reason}"
 
     def test_benchmark_repository_isolation(self):
         """Benchmark repository isolation should prevent production access."""
@@ -332,7 +348,9 @@ class TestSafetyIntegration:
 
         for operation in protected_operations:
             allowed, reason = enforcer.check_operation(operation)
-            assert allowed is False, f"Should block operation on protected repo: {operation}. Reason: {reason}"
+            assert (
+                allowed is False
+            ), f"Should block operation on protected repo: {operation}. Reason: {reason}"
 
         # Test that safe operations are allowed
         safe_operations = [

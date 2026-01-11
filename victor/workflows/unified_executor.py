@@ -184,7 +184,11 @@ class StateGraphExecutor:
 
         if orchestrators:
             self.orchestrators = orchestrators
-            self.orchestrator = orchestrators.get(config.default_profile if config and config.default_profile else next(iter(orchestrators)))
+            self.orchestrator = orchestrators.get(
+                config.default_profile
+                if config and config.default_profile
+                else next(iter(orchestrators))
+            )
         elif orchestrator:
             self.orchestrators = {"default": orchestrator}
             self.orchestrator = orchestrator

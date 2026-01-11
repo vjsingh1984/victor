@@ -98,14 +98,10 @@ class WorkflowInterceptor:
             return await workflow_func(*args, **kwargs)
 
         # Allocate variant
-        variant_id = await self.experiment_manager.allocate_variant(
-            experiment_id, user_id, context
-        )
+        variant_id = await self.experiment_manager.allocate_variant(experiment_id, user_id, context)
 
         # Apply variant configuration
-        modified_kwargs = self._apply_variant_config(
-            experiment, variant_id, kwargs
-        )
+        modified_kwargs = self._apply_variant_config(experiment, variant_id, kwargs)
 
         # Add experiment context
         execution_id = uuid.uuid4().hex

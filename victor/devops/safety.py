@@ -266,9 +266,7 @@ def create_deployment_safety_rules(
             SafetyRule(
                 name="deployment_require_approval",
                 description="Require approval for production deployments",
-                check_fn=lambda op: any(
-                    env in op.lower() for env in protected
-                )
+                check_fn=lambda op: any(env in op.lower() for env in protected)
                 and any(cmd in op for cmd in ["deploy", "kubectl apply", "terraform apply"]),
                 level=SafetyLevel.HIGH,
                 allow_override=True,
@@ -330,7 +328,8 @@ def create_container_safety_rules(
             SafetyRule(
                 name="container_block_privileged",
                 description="Block privileged container creation",
-                check_fn=lambda op: "docker" in op.lower() or "kubectl" in op.lower()
+                check_fn=lambda op: "docker" in op.lower()
+                or "kubectl" in op.lower()
                 and "--privileged" in op
                 or "privileged: true" in op.lower(),
                 level=SafetyLevel.HIGH,
@@ -460,6 +459,10 @@ def create_all_devops_safety_rules(
         # Now all operations are checked
         allowed, reason = enforcer.check_operation("kubectl delete deployment -n production app")
     """
-    create_deployment_safety_rules(enforcer, protected_environments=deployment_protected_environments)
+    create_deployment_safety_rules(
+        enforcer, protected_environments=deployment_protected_environments
+    )
     create_container_safety_rules(enforcer)
-    create_infrastructure_safety_rules(enforcer, protected_resources=infrastructure_protected_resources)
+    create_infrastructure_safety_rules(
+        enforcer, protected_resources=infrastructure_protected_resources
+    )
