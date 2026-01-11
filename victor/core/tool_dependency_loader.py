@@ -624,16 +624,11 @@ def create_vertical_tool_dependency_provider(
     # Check if YAML exists, fall back to empty provider if not
     if not yaml_path.exists():
         logger.warning(f"Tool dependencies YAML not found for vertical '{vertical}': {yaml_path}")
-        # Return provider with minimal config - just vertical name and empty default sequence
+        # Return an LSP-compliant empty provider (Null Object pattern)
         # This allows the system to function even without YAML files
-        minimal_yaml = f"""
-vertical: {vertical}
-default_sequence:
-  - read
-"""
-        loader = ToolDependencyLoader(canonicalize=canonicalize or True)
-        loader.load_from_string(minimal_yaml)  # Validate the YAML
-        return YAMLToolDependencyProvider.__new__(YAMLToolDependencyProvider)
+        from victor.core.tool_types import EmptyToolDependencyProvider
+
+        return EmptyToolDependencyProvider(vertical)
 
     # Determine canonicalization setting
     if canonicalize is None:
