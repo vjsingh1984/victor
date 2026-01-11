@@ -75,6 +75,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
+    continue-on-error: true  # Don't fail release if GitHub Pages is not enabled
 
     steps:
       - name: Deploy to GitHub Pages
