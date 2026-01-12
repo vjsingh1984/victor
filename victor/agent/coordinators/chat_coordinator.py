@@ -606,6 +606,9 @@ class ChatCoordinator:
             # Record iteration in unified tracker
             orch.unified_tracker.record_iteration(content_length)
 
+            # Increment iteration counter AFTER completing iteration work
+            stream_ctx.increment_iteration()
+
             # Intelligent pipeline post-iteration hook: validate response quality
             if full_content and len(full_content.strip()) > 50:
                 quality_result = await self._validate_intelligent_response(
@@ -614,14 +617,14 @@ class ChatCoordinator:
                     tool_calls=orch.tool_calls_used,
                     task_type=stream_ctx.unified_task_type.value,
                 )
-                if quality_result and not quality_result.get("is_grounded", True):
-                    issues = quality_result.get("grounding_issues", [])
+                if quality_result and not quality_result.is_grounded:
+                    issues = quality_result.grounding_issues
                     if issues:
                         logger.warning(
                             f"IntelligentPipeline detected grounding issues: {issues[:3]}"
                         )
-                    if quality_result.get("should_retry"):
-                        grounding_feedback = quality_result.get("grounding_feedback", "")
+                    if quality_result.should_retry:
+                        grounding_feedback = quality_result.grounding_feedback
                         if grounding_feedback:
                             logger.info(
                                 f"Injecting grounding feedback for retry: {len(grounding_feedback)} chars"
@@ -629,13 +632,11 @@ class ChatCoordinator:
                             stream_ctx.pending_grounding_feedback = grounding_feedback
 
                 if quality_result:
-                    new_score = quality_result.get("quality_score", stream_ctx.last_quality_score)
+                    new_score = quality_result.quality_score
                     stream_ctx.update_quality_score(new_score)
 
-                if quality_result and quality_result.get("should_finalize"):
-                    finalize_reason = quality_result.get(
-                        "finalize_reason", "grounding limit exceeded"
-                    )
+                if quality_result and quality_result.should_finalize:
+                    finalize_reason = quality_result.finalize_reason or "grounding limit exceeded"
                     logger.warning(
                         f"Force finalize triggered: {finalize_reason}. "
                         "Stopping continuation to prevent infinite loop."
@@ -1299,10 +1300,7 @@ class ChatCoordinator:
             )
             stream_ctx.force_completion = True
 
-        # 4. Increment iteration
-        stream_ctx.increment_iteration()
-
-        # 5. Inject grounding feedback if pending
+        # 4. Inject grounding feedback if pending
         if stream_ctx.pending_grounding_feedback:
             logger.info("Injecting pending grounding feedback as system message")
             orch.add_message("system", stream_ctx.pending_grounding_feedback)
@@ -1714,15 +1712,16 @@ class ChatCoordinator:
 
         if recovery_action.action == "force_summary":
             stream_ctx.force_completion = True
-            return orch._chunk_generator.generate_summary_chunk(
-                "Providing summary based on information gathered so far."
+            return orch._chunk_generator.generate_content_chunk(
+                "Providing summary based on information gathered so far.",
+                is_final=True
             )
         elif recovery_action.action == "retry":
-            orch.add_message("system", recovery_action.get("message", "Please try again."))
+            orch.add_message("system", recovery_action.message or "Please try again.")
             return None
         elif recovery_action.action == "finalize":
             return orch._chunk_generator.generate_content_chunk(
-                recovery_action.get("message", ""), is_final=True
+                recovery_action.message or "", is_final=True
             )
         return None
 
@@ -1783,11 +1782,11 @@ class ChatCoordinator:
         """
         orch = self._orchestrator
 
-        if not orch._intelligent_pipeline:
+        if not orch._intelligent_integration:
             return None
 
         try:
-            return await orch._intelligent_pipeline.validate_response(
+            return await orch._intelligent_integration.validate_response(
                 response=response,
                 query=query,
                 tool_calls=tool_calls,
