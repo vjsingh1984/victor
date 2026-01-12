@@ -17,16 +17,21 @@
 Provides specialized executor classes for each workflow node type.
 Each executor handles ONE node type (SRP compliance).
 
-Executors:
+Node Executors:
 - AgentNodeExecutor: Handles agent nodes (LLM + tools)
 - ComputeNodeExecutor: Handles compute nodes (direct function calls)
 - TransformNodeExecutor: Handles transform nodes (state transformations)
 - ParallelNodeExecutor: Handles parallel nodes (concurrent execution)
 - ConditionNodeExecutor: Handles condition nodes (branching logic)
+
+Graph Executor:
+- StateGraphExecutor: Executes compiled StateGraph instances
 """
 
 from victor.workflows.executors.factory import NodeExecutorFactory
+from victor.workflows.executors.state_graph_executor import StateGraphExecutor
 
 __all__ = [
     "NodeExecutorFactory",
+    "StateGraphExecutor",
 ]
