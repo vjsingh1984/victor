@@ -178,7 +178,9 @@ class ConversationEmbeddingStore:
             # Fallback for older LanceDB versions
             existing_tables = []
             try:
-                existing_tables = self._db.list_tables().tables if hasattr(self._db, 'list_tables') else []
+                existing_tables = (
+                    self._db.list_tables().tables if hasattr(self._db, "list_tables") else []
+                )
             except Exception:
                 # If list_tables also fails, try to open table directly and catch exception
                 existing_tables = []

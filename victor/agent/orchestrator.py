@@ -2509,10 +2509,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         DRY violations and consistency issues.
         """
         # Check if tool_selector needs initialization (has initialize_tool_embeddings method)
-        if not hasattr(self.tool_selector, 'initialize_tool_embeddings'):
+        if not hasattr(self.tool_selector, "initialize_tool_embeddings"):
             return
         # ToolSelector owns the initialization state
-        if hasattr(self.tool_selector, '_embeddings_initialized') and self.tool_selector._embeddings_initialized:
+        if (
+            hasattr(self.tool_selector, "_embeddings_initialized")
+            and self.tool_selector._embeddings_initialized
+        ):
             return
 
         try:
@@ -2563,7 +2566,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         the main thread. Safe to call multiple times (no-op if already started).
         """
         # Check if tool_selector needs embedding initialization
-        if not hasattr(self.tool_selector, 'initialize_tool_embeddings') or self._embedding_preload_task:
+        if (
+            not hasattr(self.tool_selector, "initialize_tool_embeddings")
+            or self._embedding_preload_task
+        ):
             return
 
         task = self._create_background_task(self._preload_embeddings(), name="embedding_preload")
