@@ -37,6 +37,8 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 if TYPE_CHECKING:
     from victor.agent.conversation_state_machine import ConversationStage
 
+from victor.tools.tool_names import get_canonical_name
+
 logger = logging.getLogger(__name__)
 
 
@@ -163,8 +165,11 @@ class LoopSignature:
         Returns:
             Filtered arguments dict
         """
+        # Normalize tool name to canonical form for lookup
+        canonical_name = get_canonical_name(tool_name)
+
         # Get volatile fields for this tool
-        volatile = LoopSignature.VOLATILE_BY_TOOL.get(tool_name, set())
+        volatile = LoopSignature.VOLATILE_BY_TOOL.get(canonical_name, set())
 
         # Also exclude universal volatile fields
         universal_volatile = {"timeout", "retry", "verbose"}
