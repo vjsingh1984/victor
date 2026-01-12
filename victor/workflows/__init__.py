@@ -339,12 +339,6 @@ from victor.workflows.unified_compiler import (
     UnifiedWorkflowCompiler,
     create_unified_compiler,
 )
-# Adapter layer for backward compatibility (Phase 4)
-from victor.workflows.adapter import (
-    UnifiedWorkflowCompilerAdapter,
-    CompiledGraphAdapter,
-    ExecutorResultAdapter,
-)
 
 # Register framework handlers on module load
 # Domain-specific handlers are registered by each vertical when loaded
@@ -453,7 +447,6 @@ __all__ = [
     # WorkflowGraph DSL (compiles to WorkflowDefinition)
     "State",
     "WorkflowGraph",  # Typed workflow graph DSL
-    "StateGraph",  # Deprecated alias for WorkflowGraph
     "GraphNode",
     "GraphNodeType",
     "NodeFunc",
@@ -601,8 +594,4 @@ __all__ = [
     # Unified Compiler (Consistent Compilation and Caching)
     "UnifiedWorkflowCompiler",
     "create_unified_compiler",
-    # Adapter layer for backward compatibility (Phase 4)
-    "UnifiedWorkflowCompilerAdapter",
-    "CompiledGraphAdapter",
-    "ExecutorResultAdapter",
 ]

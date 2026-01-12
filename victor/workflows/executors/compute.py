@@ -15,7 +15,6 @@
 """Compute node executor.
 
 Executes compute nodes by calling registered handler functions.
-This is a stub that delegates to legacy implementation during migration.
 """
 
 from __future__ import annotations

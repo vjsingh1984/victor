@@ -177,35 +177,39 @@ class TestModeAwareLoopDetection:
     """Tests for mode-aware loop detection (Issue #1)."""
 
     def test_loop_threshold_default(self):
-        """Test default loop threshold without mode multiplier."""
+        """Test default loop threshold with BUILD mode multiplier (5.0)."""
         from victor.agent.unified_task_tracker import UnifiedTaskTracker
 
         tracker = UnifiedTaskTracker()
-        # Default threshold is 4, multiplier is 1.0
+        # BUILD mode has 5.0 multiplier by default, so 4 * 5.0 = 20
         threshold = tracker._get_loop_threshold()
-        assert threshold >= 4
+        assert threshold == 20  # 4 * 5.0
 
-    def test_loop_threshold_with_mode_multiplier(self):
-        """Test loop threshold with PLAN mode multiplier (2.5x)."""
+    def test_loop_threshold_with_plan_mode(self):
+        """Test loop threshold with PLAN mode (10x multiplier)."""
         from victor.agent.unified_task_tracker import UnifiedTaskTracker
+        from victor.agent.mode_controller import AgentMode
 
         tracker = UnifiedTaskTracker()
-        tracker.set_mode_exploration_multiplier(2.5)  # PLAN mode
+        # Change to PLAN mode which has 10.0 multiplier
+        tracker.mode_controller.switch_mode(AgentMode.PLAN)
 
         threshold = tracker._get_loop_threshold()
-        # Base 4 * 2.5 = 10
-        assert threshold == 10
+        # Base 4 * 10.0 = 40
+        assert threshold == 40
 
-    def test_loop_threshold_with_explore_multiplier(self):
-        """Test loop threshold with EXPLORE mode multiplier (3.0x)."""
+    def test_loop_threshold_with_explore_mode(self):
+        """Test loop threshold with EXPLORE mode (20x multiplier)."""
         from victor.agent.unified_task_tracker import UnifiedTaskTracker
+        from victor.agent.mode_controller import AgentMode
 
         tracker = UnifiedTaskTracker()
-        tracker.set_mode_exploration_multiplier(3.0)  # EXPLORE mode
+        # Change to EXPLORE mode which has 20.0 multiplier
+        tracker.mode_controller.switch_mode(AgentMode.EXPLORE)
 
         threshold = tracker._get_loop_threshold()
-        # Base 4 * 3.0 = 12
-        assert threshold == 12
+        # Base 4 * 20.0 = 80
+        assert threshold == 80
 
     def test_max_overlapping_reads_mode_aware(self):
         """Test max overlapping reads increases with mode multiplier."""

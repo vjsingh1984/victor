@@ -15,7 +15,6 @@
 """Condition node executor.
 
 Executes condition nodes by evaluating branching logic.
-This is a stub that delegates to legacy implementation during migration.
 """
 
 from __future__ import annotations

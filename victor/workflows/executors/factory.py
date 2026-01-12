@@ -180,63 +180,12 @@ class NodeExecutorFactory:
         if node_type in executor_map:
             return executor_map[node_type]
 
-        # Fallback to legacy for unknown types during migration
-        logger.warning(f"Unknown node type '{node_type.value}', using legacy implementation")
-        return self._get_legacy_executor_class(node_type)
-
-    def _get_legacy_executor_class(self, node_type: "WorkflowNodeType") -> Any:
-        """Get legacy executor class for backward compatibility.
-
-        During migration, falls back to legacy NodeExecutorFactory
-        for unknown node types.
-
-        Args:
-            node_type: Node type enum
-
-        Returns:
-            Legacy executor class
-
-        Deprecated:
-            This method is temporary and will be removed once all node types
-            have dedicated executor implementations.
-        """
-        # Import legacy factory
-        from victor.workflows.yaml_to_graph_compiler import NodeExecutorFactory as LegacyFactory
-
-        # For now, return the legacy factory itself
-        # The legacy factory's create_executor method will be used
-        return LegacyFactory
-
-    def _create_legacy_executor(
-        self, node: "WorkflowNode"
-    ) -> Callable[["WorkflowState"], "WorkflowState"]:
-        """Create executor using legacy implementation (temporary compatibility).
-
-        This delegates to the existing NodeExecutorFactory in
-        yaml_to_graph_compiler.py during the migration phase.
-
-        Args:
-            node: Workflow node definition
-
-        Returns:
-            Legacy executor function
-
-        Deprecated:
-            This method is temporary and will be removed once migration is complete.
-        """
-        # Import legacy factory
-        from victor.workflows.yaml_to_graph_compiler import NodeExecutorFactory as LegacyFactory
-
-        # Create legacy factory instance
-        # Note: This will need orchestrator and tool_registry from container
-        legacy_factory = LegacyFactory(
-            orchestrator=None,  # Will be set by execution context
-            orchestrators=None,  # Will be set by execution context
-            tool_registry=None,  # Will be set by execution context
+        # Unknown node type - raise clear error
+        raise ValueError(
+            f"Unsupported node type '{node_type.value}'. "
+            f"Supported types: {list(executor_map.keys()) + list(self._executor_types.keys())}. "
+            f"Use factory.register_executor_type() to register custom node types."
         )
-
-        # Delegate to legacy implementation
-        return legacy_factory.create_executor(node)
 
     def supports_node_type(self, node_type: str) -> bool:
         """Check if a node type is supported.
@@ -270,9 +219,9 @@ class NodeExecutorFactory:
         if node_type in self._executor_types:
             return True
 
-        # During migration, legacy types are also supported
-        legacy_types = {"hitl"}  # Human-in-the-loop, etc.
-        return node_type in legacy_types
+        # HITL nodes have their own executor
+        hitl_types = {"hitl"}
+        return node_type in hitl_types
 
 
 __all__ = [

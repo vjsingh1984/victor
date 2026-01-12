@@ -15,7 +15,6 @@
 """Transform node executor.
 
 Executes transform nodes by applying state transformations.
-This is a stub that delegates to legacy implementation during migration.
 """
 
 from __future__ import annotations

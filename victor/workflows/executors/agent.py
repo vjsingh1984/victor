@@ -15,7 +15,6 @@
 """Agent node executor.
 
 Executes agent nodes by spawning sub-agents with role-specific configurations.
-This is a stub that delegates to legacy implementation during migration.
 """
 
 from __future__ import annotations

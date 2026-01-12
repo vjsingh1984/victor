@@ -410,52 +410,70 @@ class ContinuationStrategy:
                     "updates": updates,
                 }
 
-            # CUMULATIVE INTERVENTION CHECK: If we've had too many prompt interventions
-            # across the session, nudge or force synthesis (prevents sessions that never finish)
+            # PROGRESS-AWARE CUMULATIVE INTERVENTION CHECK
+            # If we've had too many prompt interventions with LOW PROGRESS, nudge synthesis
+            # This allows active exploration (new file discovery) while preventing stuck loops
             cumulative_interventions = task_completion_signals.get(
                 "cumulative_prompt_interventions", 0
             )
             if cumulative_interventions >= 5 and is_analysis_task:
+                # Calculate progress ratio (unique files per intervention)
+                file_count = len(read_files)
+                unique_files = len(set(read_files))  # Dedupe in case of re-reads
+                progress_ratio = unique_files / max(cumulative_interventions, 1)
+
                 # Log for observability
                 logger.info(
-                    f"Cumulative prompt interventions ({cumulative_interventions}) reached threshold - "
-                    "nudging synthesis"
+                    f"Intervention check: count={cumulative_interventions}, "
+                    f"unique_files={unique_files}, total_reads={file_count}, "
+                    f"progress_ratio={progress_ratio:.2f}"
                 )
-                self._emit_event(
-                    topic="state.continuation.cumulative_intervention_nudge",
-                    data={
-                        "cumulative_interventions": cumulative_interventions,
-                        "required_outputs": required_outputs,
-                        "read_files_count": len(read_files),
-                    },
+
+                # Only intervene if:
+                # 1. High interventions (>8) regardless of progress, OR
+                # 2. Low progress (<0.5 new files per intervention) AND >5 interventions
+                should_nudge = cumulative_interventions >= 8 or (
+                    progress_ratio < 0.5 and cumulative_interventions >= 5
                 )
-                output_hints = (
-                    ", ".join(required_outputs[:3]) if required_outputs else "your findings"
-                )
-                # After 8+ interventions, force synthesis; before that, just nudge
-                if cumulative_interventions >= 8:
-                    return {
-                        "action": "request_summary",
-                        "message": (
-                            f"You've explored extensively with {len(read_files)} files read and "
-                            f"multiple continuation prompts. Please synthesize your analysis now "
-                            f"into {output_hints}. Provide your findings based on what you've already read."
-                        ),
-                        "reason": f"Excessive prompt interventions ({cumulative_interventions}) - forcing synthesis",
-                        "updates": updates,
-                    }
-                elif synthesis_nudge_count < 3:
-                    updates["synthesis_nudge_count"] = synthesis_nudge_count + 1
-                    return {
-                        "action": "continue_with_synthesis_hint",
-                        "message": (
-                            f"You've read {len(read_files)} files so far. When ready, please synthesize "
-                            f"your analysis into {output_hints}. You may continue exploring briefly, "
-                            f"but please produce the final output soon."
-                        ),
-                        "reason": f"Cumulative interventions ({cumulative_interventions}) nudge",
-                        "updates": updates,
-                    }
+
+                if should_nudge:
+                    self._emit_event(
+                        topic="state.continuation.cumulative_intervention_nudge",
+                        data={
+                            "cumulative_interventions": cumulative_interventions,
+                            "unique_files": unique_files,
+                            "total_reads": file_count,
+                            "progress_ratio": progress_ratio,
+                            "required_outputs": required_outputs,
+                        },
+                    )
+                    output_hints = (
+                        ", ".join(required_outputs[:3]) if required_outputs else "your findings"
+                    )
+                    # After 10+ interventions, force synthesis; before that, just nudge
+                    if cumulative_interventions >= 10:
+                        return {
+                            "action": "request_summary",
+                            "message": (
+                                f"You've explored extensively with {unique_files} unique files read and "
+                                f"{cumulative_interventions} intervention cycles. Please synthesize your analysis now "
+                                f"into {output_hints}. Provide your findings based on what you've already read."
+                            ),
+                            "reason": f"Excessive prompt interventions ({cumulative_interventions}) - forcing synthesis",
+                            "updates": updates,
+                        }
+                    elif synthesis_nudge_count < 3:
+                        updates["synthesis_nudge_count"] = synthesis_nudge_count + 1
+                        return {
+                            "action": "continue_with_synthesis_hint",
+                            "message": (
+                                f"You've read {unique_files} unique files so far. When ready, please synthesize "
+                                f"your analysis into {output_hints}. You may continue exploring briefly, "
+                                f"but please produce the final output soon."
+                            ),
+                            "reason": f"Interventions ({cumulative_interventions}) with low progress ({progress_ratio:.2f}) nudge",
+                            "updates": updates,
+                        }
 
         # CRITICAL FIX: If summary was already requested in a previous iteration,
         # we should finish now - don't ask for another summary or loop again.
