@@ -1488,25 +1488,7 @@ async def read(
             provider = getattr(settings, "provider", "").lower()
             local_providers = {"ollama", "lmstudio", "vllm", "llamacpp", "local"}
             if any(p in provider for p in local_providers):
-                # Try to get model context size from capabilities
-                try:
-                    from victor.providers.model_capabilities import get_model_capabilities
-
-                    model = getattr(settings, "model", "")
-                    caps = get_model_capabilities(model)
-                    context_window = caps.get("context_window", 0)
-                    if context_window > 0:
-                        # For local models with 64K+ context, use ~25% for reads (~16K tokens)
-                        # This gives good file reading while leaving room for the rest of the conversation
-                        max_tokens = context_window // 4  # Use 25% of context for file reads
-                        # Estimate ~3 bytes per token (average), ~40 chars per line
-                        max_lines = min(
-                            1500, max(100, max_tokens // 3)
-                        )  # Ensure at least 100 lines
-                        max_bytes = min(65536, max_tokens * 3)  # ~3 bytes per token average
-                        return max_lines, max_bytes
-                except Exception:
-                    pass
+                # For local models, use standard limits (model-specific context detection not available)
                 return 1500, 65536  # Fallback for local models: 1500, 64KB
 
             # Cloud models get higher limits (large context windows)
