@@ -483,7 +483,7 @@ class TestLogContextSize:
 
     @pytest.fixture
     def debug_logger(self):
-        return DebugLogger(name="test.context")
+        return DebugLogger(name="test.context", context_window=40000)
 
     def test_warns_very_large_context(self, debug_logger):
         """Test warning for very large context."""
@@ -495,7 +495,7 @@ class TestLogContextSize:
     def test_info_medium_context(self, debug_logger):
         """Test info for medium context."""
         with patch.object(debug_logger.logger, "info") as mock_info:
-            debug_logger.log_context_size(75000, 20000)
+            debug_logger.log_context_size(85000, 21000)
             mock_info.assert_called_once()
             assert "Context" in mock_info.call_args[0][0]
 
