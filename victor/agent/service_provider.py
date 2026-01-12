@@ -1076,8 +1076,10 @@ class OrchestratorServiceProvider:
         """Create SemanticToolSelector instance."""
         from victor.tools.semantic_selector import SemanticToolSelector
 
-        # Get embedding model from settings
-        embedding_model = getattr(self._settings, "embedding_model", "all-MiniLM-L12-v2")
+        # Get unified embedding model from settings for consistency
+        # Use unified_embedding_model (default: BAAI/bge-small-en-v1.5)
+        # This ensures parity across all LLM providers for semantic search
+        embedding_model = getattr(self._settings, "unified_embedding_model", "BAAI/bge-small-en-v1.5")
         use_semantic_selection = getattr(self._settings, "use_semantic_tool_selection", True)
 
         if not use_semantic_selection:
@@ -1097,7 +1099,13 @@ class OrchestratorServiceProvider:
 
             return NoOpSelector()
 
-        return SemanticToolSelector(embedding_model=embedding_model)
+        # IMPORTANT: Always use sentence-transformers for semantic search regardless of LLM provider
+        # This ensures consistency in context retrieval quality across all providers (ollama, openai, etc.)
+        # Using different embedding models per provider would break parity and cause inconsistent behavior
+        return SemanticToolSelector(
+            embedding_model=embedding_model,
+            embedding_provider='sentence-transformers',
+        )
 
     def _create_provider_registry(self) -> Any:
         """Create ProviderRegistry wrapper.

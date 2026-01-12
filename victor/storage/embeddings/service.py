@@ -543,3 +543,28 @@ class EmbeddingService:
         # Dot product
         similarities = np.dot(corpus_norms, query_norm)
         return np.asarray(similarities)
+
+
+def get_embedding_service(
+    model_name: str = DEFAULT_EMBEDDING_MODEL,
+    device: Optional[str] = None,
+) -> EmbeddingService:
+    """Convenience function to get the singleton embedding service instance.
+
+    This is a convenience wrapper around EmbeddingService.get_instance()
+    for easier importing and usage.
+
+    Args:
+        model_name: Model name (only used on first call)
+        device: Device (only used on first call)
+
+    Returns:
+        The singleton EmbeddingService instance
+
+    Example:
+        from victor.storage.embeddings.service import get_embedding_service
+
+        service = get_embedding_service()
+        embedding = await service.embed_text("Hello world")
+    """
+    return EmbeddingService.get_instance(model_name=model_name, device=device)

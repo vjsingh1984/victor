@@ -80,6 +80,35 @@ class KeywordToolSelector:
         self._core_tools_cache: Optional[Set[str]] = None
         self._core_readonly_cache: Optional[Set[str]] = None
 
+    def set_enabled_tools(self, tools: Set[str]) -> None:
+        """Set the enabled tools filter for this selector.
+
+        This allows the orchestrator to update the enabled tools filter
+        after initialization (e.g., when vertical context changes).
+
+        Args:
+            tools: Set of tool names to enable
+        """
+        self._enabled_tools = tools
+        logger.info(f"Updated enabled tools filter: {sorted(tools)}")
+
+    def set_tiered_config(self, tiered_config: Any) -> None:
+        """Set the tiered configuration for stage-aware filtering.
+
+        This allows the orchestrator to propagate tiered tool configuration
+        for vertical-specific stage filtering (e.g., analysis vs. execution).
+
+        Args:
+            tiered_config: TieredToolConfig with mandatory, vertical_core, etc.
+        """
+        # KeywordToolSelector doesn't use tiered config for filtering
+        # (it uses _enabled_tools instead), but we accept it for API compatibility
+        logger.debug(
+            f"Tiered config set on KeywordToolSelector (not used): "
+            f"mandatory={len(tiered_config.mandatory) if tiered_config else 0}, "
+            f"vertical_core={len(tiered_config.vertical_core) if tiered_config else 0}"
+        )
+
     async def select_tools(
         self,
         prompt: str,

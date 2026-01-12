@@ -529,7 +529,87 @@ class Settings(BaseSettings):
     unified_embedding_model: str = "BAAI/bge-small-en-v1.5"
 
     # Tool Selection Strategy
+    # NEW: Unified strategy selection (auto | keyword | semantic | hybrid)
+    # - auto: Automatically choose based on model size (semantic for large models, keyword for small)
+    # - keyword: Fast metadata-based selection (<1ms, no embeddings)
+    # - semantic: ML-based similarity search (~50ms, high quality)
+    # - hybrid: Blends semantic + keyword for best results (~30ms)
+    tool_selection_strategy: str = "auto"
+
+    # DEPRECATED: Use tool_selection_strategy instead
+    # Kept for backward compatibility - will be removed in v2.0
+    # Legacy setting: True=semantic, False=keyword
     use_semantic_tool_selection: bool = True  # Use embeddings instead of keywords (DEFAULT)
+
+    @field_validator("tool_selection_strategy")
+    @classmethod
+    def validate_tool_selection_strategy(cls, v: str) -> str:
+        """Validate tool_selection_strategy is a valid option.
+
+        Args:
+            v: Strategy name to validate
+
+        Returns:
+            Validated strategy name
+
+        Raises:
+            ValueError: If strategy is not one of the allowed values
+        """
+        allowed = {"auto", "keyword", "semantic", "hybrid"}
+        if v not in allowed:
+            raise ValueError(
+                f"tool_selection_strategy must be one of {allowed}, got '{v}'"
+            )
+        return v
+
+    def model_post_init(self, __context: Any) -> None:
+        """Handle auto-migration from deprecated use_semantic_tool_selection setting.
+
+        This method is called after model initialization to handle backward compatibility.
+        If the old use_semantic_tool_selection setting is explicitly set (not default),
+        it will migrate to the new tool_selection_strategy setting with a deprecation warning.
+
+        Args:
+            __context: Pydantic validation context
+        """
+        # Check if use_semantic_tool_selection was explicitly set
+        # We detect this by checking if it's in the __pydantic_private__ fields
+        # or if it was passed during initialization
+        if hasattr(self, "__pydantic_private__"):
+            private_fields = getattr(self, "__pydantic_private__", {})
+            # Check if use_semantic_tool_selection was explicitly set (not using default)
+            # by looking at __pydantic_fields_set__
+            field_set = getattr(self, "__pydantic_fields_set__", set())
+            if "use_semantic_tool_selection" in field_set:
+                import warnings
+
+                # Old setting was explicitly provided - migrate and warn
+                old_value = self.use_semantic_tool_selection
+                mapped_strategy = "semantic" if old_value else "keyword"
+
+                # Only show warning if user is still using the old setting
+                # and tool_selection_strategy is still at default "auto"
+                if self.tool_selection_strategy == "auto":
+                    warnings.warn(
+                        "use_semantic_tool_selection is deprecated and will be removed in v2.0. "
+                        f"Use tool_selection_strategy='{mapped_strategy}' instead. "
+                        f"Auto-migrating: use_semantic_tool_selection={old_value} -> "
+                        f"tool_selection_strategy='{mapped_strategy}'",
+                        DeprecationWarning,
+                        stacklevel=2,
+                    )
+                    # Migrate to the equivalent new setting
+                    self.tool_selection_strategy = mapped_strategy
+                elif self.tool_selection_strategy != mapped_strategy:
+                    # Both settings were provided - warn that old setting is ignored
+                    warnings.warn(
+                        f"use_semantic_tool_selection is deprecated and ignored because "
+                        f"tool_selection_strategy='{self.tool_selection_strategy}' was explicitly set. "
+                        f"Remove use_semantic_tool_selection from your configuration.",
+                        DeprecationWarning,
+                        stacklevel=2,
+                    )
+
     embedding_provider: str = (
         "sentence-transformers"  # sentence-transformers (local), ollama, vllm, lmstudio
     )
