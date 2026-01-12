@@ -110,27 +110,24 @@ class TestEmbeddingPreload:
     @pytest.mark.asyncio
     async def test_preload_embeddings_success(self, orchestrator):
         """Test _preload_embeddings initializes embeddings (covers lines 342-347)."""
-        mock_selector = MagicMock()
-        mock_selector.initialize_tool_embeddings = AsyncMock()
-        orchestrator.semantic_selector = mock_selector
-        orchestrator.tool_selector = MagicMock()
-        orchestrator.tool_selector._embeddings_initialized = False
+        mock_tool_selector = MagicMock()
+        mock_tool_selector.initialize_tool_embeddings = AsyncMock()
+        # Explicitly set _embeddings_initialized to False (MagicMock returns True by default)
+        mock_tool_selector._embeddings_initialized = False
+        orchestrator.tool_selector = mock_tool_selector
 
         await orchestrator._preload_embeddings()
 
-        mock_selector.initialize_tool_embeddings.assert_called_once()
-        assert orchestrator.tool_selector._embeddings_initialized is True
+        mock_tool_selector.initialize_tool_embeddings.assert_called_once_with(orchestrator.tools)
 
     @pytest.mark.asyncio
     async def test_preload_embeddings_failure(self, orchestrator):
         """Test _preload_embeddings handles exception (covers lines 348-352)."""
-        mock_selector = MagicMock()
-        mock_selector.initialize_tool_embeddings = AsyncMock(
+        mock_tool_selector = MagicMock()
+        mock_tool_selector.initialize_tool_embeddings = AsyncMock(
             side_effect=Exception("Embedding error")
         )
-        orchestrator.semantic_selector = mock_selector
-        orchestrator.tool_selector = MagicMock()
-        orchestrator.tool_selector._embeddings_initialized = False
+        orchestrator.tool_selector = mock_tool_selector
 
         # Should not raise
         await orchestrator._preload_embeddings()
