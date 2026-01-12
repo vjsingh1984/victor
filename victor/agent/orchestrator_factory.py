@@ -723,10 +723,33 @@ class OrchestratorFactory(ModeAwareMixin):
     def create_semantic_selector(self) -> Optional[Any]:
         """Create semantic tool selector if enabled.
 
+        DEPRECATED: This method is deprecated. Tool selection now uses the unified
+        strategy factory (create_tool_selector_strategy) which supports multiple
+        strategies (auto, keyword, semantic, hybrid). Configure via the
+        tool_selection_strategy setting instead of use_semantic_tool_selection.
+
         Returns:
             SemanticToolSelector instance or None
         """
-        use_semantic_selection = getattr(self.settings, "use_semantic_tool_selection", False)
+        import warnings
+
+        # Check if deprecated setting is being used
+        if hasattr(self.settings, "use_semantic_tool_selection"):
+            use_semantic_selection = self.settings.use_semantic_tool_selection
+
+            # Only warn if explicitly set (not default)
+            field_set = getattr(self.settings, "__pydantic_fields_set__", set())
+            if "use_semantic_tool_selection" in field_set:
+                warnings.warn(
+                    "create_semantic_selector() is deprecated. "
+                    "Tool selection now uses the unified strategy factory. "
+                    "Configure via tool_selection_strategy setting instead. "
+                    "This method will be removed in v2.0.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+        else:
+            use_semantic_selection = False
 
         if not use_semantic_selection:
             return None
@@ -745,7 +768,7 @@ class OrchestratorFactory(ModeAwareMixin):
             ollama_base_url=self.settings.ollama_base_url,
             cache_embeddings=True,
         )
-        logger.debug("SemanticToolSelector created")
+        logger.debug("SemanticToolSelector created (deprecated, use strategy factory)")
         return semantic_selector
 
     def create_parallel_executor(self, tool_executor: Any) -> Any:
@@ -1680,11 +1703,18 @@ class OrchestratorFactory(ModeAwareMixin):
         tool_selection: Any,
         on_selection_recorded: Any,
     ) -> Any:
-        """Create unified tool selector for semantic and keyword-based selection.
+        """Create unified tool selector using the new strategy factory.
+
+        This method now uses the unified tool selection strategy factory from
+        victor.agent.tool_selector_factory, which supports:
+        - auto: Automatic selection based on environment (default)
+        - keyword: Fast metadata-based selection (<1ms)
+        - semantic: ML-based embedding similarity (~50ms)
+        - hybrid: Blends semantic + keyword for best results (~30ms)
 
         Args:
             tools: ToolRegistry instance
-            semantic_selector: SemanticToolSelector instance
+            semantic_selector: SemanticToolSelector instance (deprecated, unused)
             conversation_state: ConversationStateMachine instance
             unified_tracker: UnifiedTaskTracker instance
             model: Model identifier
@@ -1693,25 +1723,43 @@ class OrchestratorFactory(ModeAwareMixin):
             on_selection_recorded: Callback for recording tool selections
 
         Returns:
-            ToolSelector instance configured with all dependencies
+            IToolSelector implementation from the new strategy factory
         """
-        from victor.agent.tool_selection import ToolSelector
+        from victor.agent.tool_selector_factory import create_tool_selector_strategy
+        from victor.storage.embeddings.service import get_embedding_service
 
-        fallback_max_tools = getattr(self.settings, "fallback_max_tools", 8)
+        # Get strategy from settings (migrated from use_semantic_tool_selection)
+        strategy = getattr(self.settings, "tool_selection_strategy", "auto")
 
-        selector = ToolSelector(
+        # Get embedding service for semantic/hybrid strategies
+        embedding_service = None
+        if strategy in ("semantic", "hybrid", "auto"):
+            try:
+                embedding_service = get_embedding_service()
+            except Exception as e:
+                logger.debug(f"Could not get embedding service: {e}")
+
+        # Get enabled tools from tool selection config
+        enabled_tools = None
+        if tool_selection and isinstance(tool_selection, dict):
+            enabled_tools = tool_selection.get("enabled_tools")
+
+        # Create selector using the new factory
+        selector = create_tool_selector_strategy(
+            strategy=strategy,
             tools=tools,
-            semantic_selector=semantic_selector,
             conversation_state=conversation_state,
-            task_tracker=unified_tracker,
             model=model,
             provider_name=provider_name,
-            tool_selection_config=tool_selection,
-            fallback_max_tools=fallback_max_tools,
-            on_selection_recorded=on_selection_recorded,
+            enabled_tools=enabled_tools,
+            embedding_service=embedding_service,
+            settings=self.settings,
         )
 
-        logger.debug(f"ToolSelector created with fallback_max_tools={fallback_max_tools}")
+        logger.debug(
+            f"ToolSelector created using strategy='{strategy}' "
+            f"(migrated from use_semantic_tool_selection setting)"
+        )
         return selector
 
     def create_intent_classifier(self) -> Any:

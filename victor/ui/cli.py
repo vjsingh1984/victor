@@ -22,6 +22,7 @@ from victor import __version__
 from victor.ui.commands.benchmark import benchmark_app
 from victor.ui.commands.capabilities import capabilities_app
 from victor.ui.commands.chat import chat_app, _run_default_interactive
+from victor.ui.commands.checkpoint import checkpoint_app
 from victor.ui.commands.config import config_app
 from victor.ui.commands.dashboard import dashboard_app
 from victor.ui.commands.docs import docs_app
@@ -33,6 +34,7 @@ from victor.ui.commands.index import index_app
 from victor.ui.commands.init import init_app
 from victor.ui.commands.keys import keys_app
 from victor.ui.commands.mcp import mcp_app
+from victor.ui.commands.memory import memory_app
 from victor.ui.commands.models import models_app
 from victor.ui.commands.profiles import profiles_app
 from victor.ui.commands.providers import providers_app
@@ -57,6 +59,7 @@ app = typer.Typer(
 app.add_typer(benchmark_app)
 app.add_typer(capabilities_app)
 app.add_typer(chat_app)
+app.add_typer(checkpoint_app)
 app.add_typer(config_app)
 app.add_typer(dashboard_app)
 app.add_typer(docs_app)
@@ -68,6 +71,7 @@ app.add_typer(index_app)
 app.add_typer(init_app)
 app.add_typer(keys_app)
 app.add_typer(mcp_app)
+app.add_typer(memory_app)
 app.add_typer(models_app)
 app.add_typer(profiles_app)
 app.add_typer(providers_app)

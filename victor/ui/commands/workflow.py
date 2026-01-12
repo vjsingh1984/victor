@@ -1050,6 +1050,220 @@ def list_backends() -> None:
     console.print("\n[dim]For SVG/PNG rendering, at least one backend is required.[/]")
 
 
+@workflow_app.command("presets")
+def list_presets(
+    preset_type: str = typer.Option(
+        "all",
+        "--type",
+        "-t",
+        help="Preset type to list: all, agents, workflows",
+    ),
+    category: Optional[str] = typer.Option(
+        None,
+        "--category",
+        "-c",
+        help="Filter by category (for workflows: code_review, research, etc.)",
+    ),
+) -> None:
+    """List available preset agents and workflows.
+
+    Shows predefined agent configurations and workflow templates that can be
+    used as starting points for custom workflows.
+
+    Example:
+        victor workflow presets
+        victor workflow presets --type agents
+        victor workflow presets --type workflows --category code_review
+    """
+    from victor.workflows.presets import (
+        list_agent_presets,
+        list_workflow_presets,
+        list_agent_presets_by_role,
+        list_workflow_presets_by_category,
+        get_agent_preset,
+        get_workflow_preset,
+    )
+
+    preset_type = preset_type.lower()
+
+    if preset_type in ("all", "agents"):
+        # List agent presets
+        console.print("\n[bold cyan]Agent Presets:[/]\n")
+
+        by_role = list_agent_presets_by_role()
+        for role, preset_names in sorted(by_role.items()):
+            console.print(f"  [bold]{role.title()}[/]")
+            for name in sorted(preset_names):
+                preset = get_agent_preset(name)
+                if preset:
+                    console.print(f"    • [cyan]{name}[/]: {preset.description}")
+
+            console.print()
+
+    if preset_type in ("all", "workflows"):
+        # List workflow presets
+        console.print("[bold cyan]Workflow Presets:[/]\n")
+
+        if category:
+            # Filter by category
+            by_category = list_workflow_presets_by_category()
+            if category not in by_category:
+                console.print(f"[bold red]Error:[/] Unknown category: {category}")
+                console.print(
+                    f"Available: {', '.join(sorted(by_category.keys()))}"
+                )
+                raise typer.Exit(1)
+
+            workflow_names = by_category[category]
+            for name in sorted(workflow_names):
+                preset = get_workflow_preset(name)
+                if preset:
+                    console.print(f"  • [cyan]{name}[/]: {preset.description}")
+                    console.print(
+                        f"    [dim]Complexity: {preset.complexity}, "
+                        f"~{preset.estimated_duration_minutes}min[/]"
+                    )
+        else:
+            # Show all by category
+            by_category = list_workflow_presets_by_category()
+            for cat, workflow_names in sorted(by_category.items()):
+                console.print(f"  [bold]{cat.title()}[/]")
+                for name in sorted(workflow_names):
+                    preset = get_workflow_preset(name)
+                    if preset:
+                        console.print(f"    • [cyan]{name}[/]: {preset.description}")
+
+                console.print()
+
+    console.print(
+        "\n[dim]Usage: Use preset names in workflow YAML files or WorkflowBuilder API[/]"
+    )
+
+
+@workflow_app.command("preset-info")
+def show_preset_info(
+    preset_name: str = typer.Argument(
+        ...,
+        help="Name of the preset to show details for",
+    ),
+    preset_type: str = typer.Option(
+        "workflow",
+        "--type",
+        "-t",
+        help="Preset type: agent or workflow",
+    ),
+) -> None:
+    """Show detailed information about a preset.
+
+    Displays full details including configuration, example usage, and parameters.
+
+    Example:
+        victor workflow preset-info code_reviewer --type agent
+        victor workflow preset-info code_review --type workflow
+    """
+    from victor.workflows.presets import get_agent_preset, get_workflow_preset
+
+    preset_type = preset_type.lower()
+
+    console.print(f"\n[bold cyan]Preset:[/] {preset_name}\n")
+    console.print("[dim]" + "─" * 50 + "[/]\n")
+
+    if preset_type == "agent":
+        preset = get_agent_preset(preset_name)
+        if not preset:
+            console.print(f"[bold red]Error:[/] Agent preset '{preset_name}' not found")
+            console.print(
+                f"[dim]Use 'victor workflow presets --type agents' to list available presets[/]"
+            )
+            raise typer.Exit(1)
+
+        # Display agent preset details
+        table = Table(show_header=False, box=None)
+        table.add_column("Property", style="cyan")
+        table.add_column("Value")
+
+        table.add_row("Name", preset.name)
+        table.add_row("Role", preset.role)
+        table.add_row("Description", preset.description)
+        table.add_row("Tool Budget", str(preset.default_tool_budget))
+        table.add_row("Goal Template", preset.goal_template)
+
+        if preset.allowed_tools:
+            table.add_row(
+                "Allowed Tools", ", ".join(preset.allowed_tools[:10]) + "..."
+                if len(preset.allowed_tools) > 10
+                else ", ".join(preset.allowed_tools)
+            )
+
+        if preset.llm_config:
+            table.add_row(
+                "LLM Config", ", ".join(f"{k}={v}" for k, v in preset.llm_config.items())
+            )
+
+        console.print(table)
+
+        if preset.example_goals:
+            console.print("\n[bold]Example Goals:[/]")
+            for goal in preset.example_goals:
+                console.print(f"  • {goal}")
+
+        console.print("\n[bold]Usage Example:[/]")
+        console.print(
+            f"  [dim]# In WorkflowBuilder:[/]\n"
+            f"  from victor.workflows.presets import get_agent_preset\n\n"
+            f"  preset = get_agent_preset('{preset_name}')\n"
+            f"  params = preset.to_workflow_builder_params('Custom goal')\n"
+            f"  workflow = WorkflowBuilder('my_workflow')\n"
+            f"              .add_agent('agent1', **params)\n"
+            f"              .build()"
+        )
+
+    elif preset_type == "workflow":
+        preset = get_workflow_preset(preset_name)
+        if not preset:
+            console.print(f"[bold red]Error:[/] Workflow preset '{preset_name}' not found")
+            console.print(
+                f"[dim]Use 'victor workflow presets --type workflows' to list available presets[/]"
+            )
+            raise typer.Exit(1)
+
+        # Display workflow preset details
+        table = Table(show_header=False, box=None)
+        table.add_column("Property", style="cyan")
+        table.add_column("Value")
+
+        table.add_row("Name", preset.name)
+        table.add_row("Category", preset.category)
+        table.add_row("Description", preset.description)
+        table.add_row("Complexity", preset.complexity)
+        table.add_row("Estimated Duration", f"{preset.estimated_duration_minutes} minutes")
+
+        console.print(table)
+
+        if preset.example_context:
+            console.print("\n[bold]Example Context:[/]")
+            import json
+
+            console.print(
+                json.dumps(preset.example_context, indent=2, default=str)[:500]
+            )
+
+        console.print("\n[bold]Usage Example:[/]")
+        console.print(
+            f"  [dim]# Create from preset:[/]\n"
+            f"  from victor.workflows.presets import create_workflow_from_preset\n\n"
+            f"  workflow = create_workflow_from_preset('{preset_name}')\n"
+            f"  result = await executor.execute(workflow, context)"
+        )
+
+    else:
+        console.print(f"[bold red]Error:[/] Invalid preset type: {preset_type}")
+        console.print("Valid types: agent, workflow")
+        raise typer.Exit(1)
+
+    console.print()
+
+
 @workflow_app.command("generate")
 def generate_workflow(
     description: str = typer.Argument(

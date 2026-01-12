@@ -2508,17 +2508,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Note: The ToolSelector owns the _embeddings_initialized state to avoid
         DRY violations and consistency issues.
         """
-        if not self.semantic_selector:
+        # Check if tool_selector needs initialization (has initialize_tool_embeddings method)
+        if not hasattr(self.tool_selector, 'initialize_tool_embeddings'):
             return
         # ToolSelector owns the initialization state
-        if self.tool_selector._embeddings_initialized:
+        if hasattr(self.tool_selector, '_embeddings_initialized') and self.tool_selector._embeddings_initialized:
             return
 
         try:
             logger.info("Starting background embedding preload...")
-            await self.semantic_selector.initialize_tool_embeddings(self.tools)
-            # Mark initialization complete in ToolSelector (single source of truth)
-            self.tool_selector._embeddings_initialized = True
+            # Initialize the actual tool_selector (not the deprecated semantic_selector)
+            await self.tool_selector.initialize_tool_embeddings(self.tools)
             logger.info(
                 f"{self._presentation.icon('success')} Tool embeddings preloaded successfully in background"
             )
@@ -2562,7 +2562,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Should be called after orchestrator initialization to avoid blocking
         the main thread. Safe to call multiple times (no-op if already started).
         """
-        if not self.use_semantic_selection or self._embedding_preload_task:
+        # Check if tool_selector needs embedding initialization
+        if not hasattr(self.tool_selector, 'initialize_tool_embeddings') or self._embedding_preload_task:
             return
 
         task = self._create_background_task(self._preload_embeddings(), name="embedding_preload")

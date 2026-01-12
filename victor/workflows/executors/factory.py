@@ -19,14 +19,15 @@ from:
 - victor/workflows/unified_compiler.py (lines 171-600)
 - victor/workflows/yaml_to_graph_compiler.py (lines 168-600)
 
-This is a temporary stub that delegates to the legacy implementation
-during the migration phase. The full implementation will be created in
-Phase 2 of the SOLID refactoring.
-
 Design Pattern: Factory
 - Maps node types to executor functions
 - Supports registration of custom node types (OCP compliance)
 - Protocol-based dependency injection (DIP compliance)
+
+SOLID Compliance:
+- SRP: ONLY creates executor functions (doesn't execute them)
+- OCP: Open for extension via register_executor_type()
+- DIP: Depends on ExecutionContextProtocol, not concrete classes
 """
 
 from __future__ import annotations
@@ -126,14 +127,90 @@ class NodeExecutorFactory:
             executor_fn = factory.create_executor(agent_node)
             result_state = await executor_fn(initial_state)
         """
-        # TODO: Phase 2 - Use new executor implementations
-        # For now, delegate to legacy implementation
-        return self._create_legacy_executor(node)
+        from victor.workflows.definition import WorkflowNodeType
+
+        # Get executor class for this node type
+        executor_class = self._get_executor_class(node.node_type)
+
+        # Create executor instance with execution context
+        # Note: Executors will resolve dependencies from container as needed
+        executor = executor_class(context=self._container)
+
+        # Return wrapper function that matches StateGraph signature
+        async def executor_wrapper(state: "WorkflowState") -> "WorkflowState":
+            return await executor.execute(node, state)
+
+        return executor_wrapper
+
+    def _get_executor_class(self, node_type: "WorkflowNodeType") -> Any:
+        """Get the executor class for a given node type.
+
+        Args:
+            node_type: Node type enum
+
+        Returns:
+            Executor class
+
+        Raises:
+            ValueError: If node type is not supported
+        """
+        from victor.workflows.definition import WorkflowNodeType
+
+        # Import executor classes
+        from victor.workflows.executors.agent import AgentNodeExecutor
+        from victor.workflows.executors.compute import ComputeNodeExecutor
+        from victor.workflows.executors.condition import ConditionNodeExecutor
+        from victor.workflows.executors.parallel import ParallelNodeExecutor
+        from victor.workflows.executors.transform import TransformNodeExecutor
+
+        # Map node types to executor classes
+        executor_map = {
+            WorkflowNodeType.AGENT: AgentNodeExecutor,
+            WorkflowNodeType.COMPUTE: ComputeNodeExecutor,
+            WorkflowNodeType.TRANSFORM: TransformNodeExecutor,
+            WorkflowNodeType.PARALLEL: ParallelNodeExecutor,
+            WorkflowNodeType.CONDITION: ConditionNodeExecutor,
+        }
+
+        # Check custom registered types first
+        if node_type.value in self._executor_types:
+            return self._executor_types[node_type.value]
+
+        # Use standard mapping
+        if node_type in executor_map:
+            return executor_map[node_type]
+
+        # Fallback to legacy for unknown types during migration
+        logger.warning(f"Unknown node type '{node_type.value}', using legacy implementation")
+        return self._get_legacy_executor_class(node_type)
+
+    def _get_legacy_executor_class(self, node_type: "WorkflowNodeType") -> Any:
+        """Get legacy executor class for backward compatibility.
+
+        During migration, falls back to legacy NodeExecutorFactory
+        for unknown node types.
+
+        Args:
+            node_type: Node type enum
+
+        Returns:
+            Legacy executor class
+
+        Deprecated:
+            This method is temporary and will be removed once all node types
+            have dedicated executor implementations.
+        """
+        # Import legacy factory
+        from victor.workflows.yaml_to_graph_compiler import NodeExecutorFactory as LegacyFactory
+
+        # For now, return the legacy factory itself
+        # The legacy factory's create_executor method will be used
+        return LegacyFactory
 
     def _create_legacy_executor(
         self, node: "WorkflowNode"
     ) -> Callable[["WorkflowState"], "WorkflowState"]:
-        """Create executor using legacy implementation (temporary stub).
+        """Create executor using legacy implementation (temporary compatibility).
 
         This delegates to the existing NodeExecutorFactory in
         yaml_to_graph_compiler.py during the migration phase.
@@ -143,6 +220,9 @@ class NodeExecutorFactory:
 
         Returns:
             Legacy executor function
+
+        Deprecated:
+            This method is temporary and will be removed once migration is complete.
         """
         # Import legacy factory
         from victor.workflows.yaml_to_graph_compiler import NodeExecutorFactory as LegacyFactory
@@ -171,9 +251,28 @@ class NodeExecutorFactory:
             if factory.supports_node_type("agent"):
                 executor = factory.create_executor(agent_node)
         """
-        # During migration, all legacy node types are supported
-        legacy_types = {"agent", "compute", "transform", "parallel", "condition"}
-        return node_type in legacy_types or node_type in self._executor_types
+        from victor.workflows.definition import WorkflowNodeType
+
+        # Standard node types that are supported
+        standard_types = {
+            WorkflowNodeType.AGENT.value,
+            WorkflowNodeType.COMPUTE.value,
+            WorkflowNodeType.TRANSFORM.value,
+            WorkflowNodeType.PARALLEL.value,
+            WorkflowNodeType.CONDITION.value,
+        }
+
+        # Check standard types
+        if node_type in standard_types:
+            return True
+
+        # Check custom registered types
+        if node_type in self._executor_types:
+            return True
+
+        # During migration, legacy types are also supported
+        legacy_types = {"hitl"}  # Human-in-the-loop, etc.
+        return node_type in legacy_types
 
 
 __all__ = [

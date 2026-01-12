@@ -14,8 +14,13 @@
 
 """Pure workflow compiler - NO execution logic.
 
-Compiles YAML workflows into executable StateGraph instances.
-This is a stub that delegates to legacy implementation during migration.
+Compiles YAML workflows into executable CompiledGraph instances.
+This is a pure compiler following SRP - ONLY compiles, NEVER executes.
+
+Architecture:
+    YAML File → YAMLWorkflowLoader → WorkflowDefinition → WorkflowDefinitionCompiler → CompiledGraph
+
+The CompiledGraph can then be executed by StateGraphExecutor.
 """
 
 from __future__ import annotations
@@ -40,11 +45,11 @@ class WorkflowCompiler:
     Responsibility (SRP):
     - Load YAML from file/string
     - Validate workflow definition
-    - Build StateGraph from definition
+    - Build CompiledGraph from definition
     - Return CompiledGraphProtocol
 
     Non-responsibility:
-    - Execution (handled by WorkflowExecutor)
+    - Execution (handled by StateGraphExecutor)
     - Caching (handled by decorator/wrapper)
     - Observability (handled by decorator/wrapper)
     - Node execution logic (handled by node executors)
@@ -56,36 +61,41 @@ class WorkflowCompiler:
 
     Attributes:
         _yaml_loader: Loads and parses YAML
-        _validator: Validates workflow structure
-        _node_executor_factory: Creates executor functions
+        _node_executor_factory: Creates executor functions for nodes
 
     Example:
+        from victor.workflows.yaml_loader import YAMLWorkflowLoader
+        from victor.workflows.compiler import WorkflowCompiler
+
+        loader = YAMLWorkflowLoader()
+        factory = NodeExecutorFactory(container=container)
         compiler = WorkflowCompiler(
-            yaml_loader=yaml_loader,
-            validator=validator,
+            yaml_loader=loader,
             node_executor_factory=factory,
         )
 
         compiled = compiler.compile("workflow.yaml")
-        result = await compiled.invoke({"input": "data"})
+        # Use executor to run:
+        # executor = StateGraphExecutor(compiled)
+        # result = await executor.invoke({"input": "data"})
     """
 
     def __init__(
         self,
         yaml_loader: Any,
-        validator: Any,
         node_executor_factory: "NodeExecutorFactoryProtocol",
+        yaml_config: Optional[Any] = None,
     ):
         """Initialize the compiler.
 
         Args:
-            yaml_loader: YAMLWorkflowLoader instance
-            validator: WorkflowValidator instance
-            node_executor_factory: NodeExecutorFactoryProtocol instance
+            yaml_loader: YAMLWorkflowLoader instance for loading YAML
+            node_executor_factory: NodeExecutorFactoryProtocol for creating node executors
+            yaml_config: Optional YAMLWorkflowConfig for loading configuration
         """
         self._yaml_loader = yaml_loader
-        self._validator = validator
         self._node_executor_factory = node_executor_factory
+        self._yaml_config = yaml_config
 
     def compile(
         self,
@@ -109,40 +119,119 @@ class WorkflowCompiler:
             FileNotFoundError: If YAML file doesn't exist
 
         Example:
-            compiler = WorkflowCompiler(...)
+            compiler = WorkflowCompiler(loader, factory)
             compiled = compiler.compile("workflow.yaml")
-            result = await compiled.invoke({"input": "data"})
+            # Execute with:
+            # executor = StateGraphExecutor(compiled)
+            # result = await executor.invoke({"input": "data"})
         """
         logger.info(f"Compiling workflow: {source[:100]}...")
 
-        # TODO: Implement proper compilation
-        # For now, delegate to legacy implementation
-        return self._compile_legacy(source, workflow_name=workflow_name, validate=validate)
+        # Load YAML to WorkflowDefinition
+        workflow_def = self._load_workflow(source, workflow_name)
 
-    def _compile_legacy(
+        # Validate if requested
+        if validate:
+            errors = workflow_def.validate()
+            if errors:
+                raise ValueError(f"Workflow validation failed: {'; '.join(errors)}")
+
+        # Compile to CompiledGraph using WorkflowDefinitionCompiler
+        return self._compile_to_graph(workflow_def)
+
+    def _load_workflow(
         self,
         source: str,
-        *,
         workflow_name: Optional[str] = None,
-        validate: bool = True,
+    ) -> "WorkflowDefinition":
+        """Load YAML source into WorkflowDefinition.
+
+        Args:
+            source: YAML file path or YAML string content
+            workflow_name: Name of workflow to load
+
+        Returns:
+            WorkflowDefinition object
+
+        Raises:
+            FileNotFoundError: If file path doesn't exist
+        """
+        # Check if source is a file path
+        if isinstance(source, str) and len(source) < 500 and not source.startswith((" ", "\t", "\n", "{", "[")):
+            path = Path(source)
+            if path.exists():
+                # Load from file
+                logger.debug(f"Loading workflow from file: {source}")
+                from victor.workflows.yaml_loader import load_workflow_from_file
+
+                result = load_workflow_from_file(
+                    str(source),
+                    workflow_name,
+                    config=self._yaml_config,
+                )
+            else:
+                # Treat as YAML content string
+                logger.debug(f"Loading workflow from YAML string (path doesn't exist): {source[:50]}...")
+                from victor.workflows.yaml_loader import load_workflow_from_yaml
+
+                result = load_workflow_from_yaml(
+                    source,
+                    workflow_name,
+                    config=self._yaml_config,
+                )
+        else:
+            # Treat as YAML content string
+            logger.debug(f"Loading workflow from YAML string: {source[:50]}...")
+            from victor.workflows.yaml_loader import load_workflow_from_yaml
+
+            result = load_workflow_from_yaml(
+                source,
+                workflow_name,
+                config=self._yaml_config,
+            )
+
+        # Handle dict or single workflow result
+        if isinstance(result, dict):
+            if not result:
+                raise ValueError(f"No workflows found in source")
+            # Return the requested workflow or first one
+            if workflow_name and workflow_name in result:
+                return result[workflow_name]
+            return next(iter(result.values()))
+        else:
+            return result
+
+    def _compile_to_graph(
+        self,
+        workflow_def: "WorkflowDefinition",
     ) -> "CompiledGraphProtocol":
-        """Delegate to legacy implementation (temporary stub)."""
-        from victor.workflows.yaml_to_graph_compiler import YAMLToStateGraphCompiler
+        """Compile WorkflowDefinition to CompiledGraph.
 
-        # Create legacy compiler
-        legacy_compiler = YAMLToStateGraphCompiler(
-            orchestrator=None,  # Will be set by execution context
-            orchestrators=None,  # Will be set by execution context
+        Uses WorkflowDefinitionCompiler to convert the workflow definition
+        into an executable CompiledGraph.
+
+        Args:
+            workflow_def: The workflow definition to compile
+
+        Returns:
+            CompiledGraph ready for execution
+        """
+        from victor.workflows.graph_compiler import WorkflowDefinitionCompiler
+
+        # Create compiler
+        compiler = WorkflowDefinitionCompiler(
+            runner_registry=getattr(self._node_executor_factory, "_runner_registry", None),
         )
 
-        # Load YAML
-        yaml_def = self._yaml_loader.load(source)
+        # Compile to CompiledGraph
+        compiled = compiler.compile(workflow_def)
 
-        # Compile using legacy implementation
-        return legacy_compiler.compile(
-            yaml_def,
-            workflow_name=workflow_name,
+        logger.info(
+            f"Compiled workflow '{workflow_def.name}' with "
+            f"{len(workflow_def.nodes)} nodes"
         )
+
+        return compiled
 
 
 __all__ = [

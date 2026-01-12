@@ -628,6 +628,23 @@ def select_tools_by_keywords(
 class ToolSelector(ModeAwareMixin):
     """Unified tool selection with semantic and keyword-based approaches.
 
+    DEPRECATED: This class is deprecated. Use the new unified tool selection
+    strategy factory instead:
+
+        from victor.agent.tool_selector_factory import create_tool_selector_strategy
+
+        selector = create_tool_selector_strategy(
+            strategy="auto",  # or "keyword", "semantic", "hybrid"
+            tools=tool_registry,
+            settings=settings,
+            embedding_service=embedding_service,
+        )
+
+    This class is kept for backward compatibility and will be removed in v2.0.
+
+    ---
+    Legacy documentation below:
+
     This class encapsulates tool selection logic extracted from AgentOrchestrator,
     providing a cleaner separation of concerns and easier testing.
 
@@ -665,6 +682,8 @@ class ToolSelector(ModeAwareMixin):
     ):
         """Initialize the tool selector.
 
+        DEPRECATED: Use create_tool_selector_strategy() instead.
+
         Args:
             tools: Tool registry containing available tools
             semantic_selector: Optional semantic selector for embedding-based selection
@@ -677,6 +696,16 @@ class ToolSelector(ModeAwareMixin):
             on_selection_recorded: Optional callback for recording selection stats
             vertical_context: Optional vertical context for vertical-specific tool selection
         """
+        import warnings
+
+        warnings.warn(
+            "ToolSelector is deprecated. Use create_tool_selector_strategy() from "
+            "victor.agent.tool_selector_factory instead. "
+            "Configure via tool_selection_strategy setting instead of use_semantic_tool_selection. "
+            "This class will be removed in v2.0.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.tools = tools
         self.semantic_selector = semantic_selector
         self.conversation_state = conversation_state

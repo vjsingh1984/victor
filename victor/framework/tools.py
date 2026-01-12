@@ -178,6 +178,7 @@ class ToolCategoryRegistry:
     """
 
     _instance: Optional["ToolCategoryRegistry"] = None
+    _instance_lock = threading.Lock()
 
     def __init__(self) -> None:
         """Initialize the registry with built-in defaults."""
@@ -193,9 +194,12 @@ class ToolCategoryRegistry:
 
     @classmethod
     def get_instance(cls) -> "ToolCategoryRegistry":
-        """Get singleton instance of the registry."""
+        """Get singleton instance of the registry (thread-safe)."""
         if cls._instance is None:
-            cls._instance = cls()
+            with cls._instance_lock:
+                # Double-checked locking pattern
+                if cls._instance is None:
+                    cls._instance = cls()
         return cls._instance
 
     @classmethod

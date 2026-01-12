@@ -8,9 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Unified Tool Selection Architecture (Release 2 Complete)** - New strategy pattern for tool selection with 4 strategies:
+  - **`tool_selection_strategy` Setting** - New unified setting: `auto` | `keyword` | `semantic` | `hybrid`
+  - **Keyword Selector** - Fast metadata-based selection (<1ms, no embeddings) in `victor/tools/keyword_tool_selector.py`
+  - **Hybrid Selector** - Blends semantic + keyword (~30ms, RRF blending) in `victor/tools/hybrid_tool_selector.py`
+  - **Strategy Factory** - `create_tool_selector_strategy()` in `victor/agent/tool_selector_factory.py`
+  - **Auto-Selection** - Automatically picks optimal strategy based on environment (airgapped, embeddings available)
+  - **Shared Utilities** - Extracted to `victor/tools/selection_common.py` and `victor/tools/selection_filters.py`
+  - **IToolSelector Protocol** - Unified protocol in `victor/protocols/tool_selector.py`
+  - **Settings Migration** - Auto-migrates from deprecated `use_semantic_tool_selection` with deprecation warnings
+- **Tool Selection Documentation** - Comprehensive guide at `docs/development/TOOL_SELECTION.md`
 - **Presentation Abstraction Layer** - Decouples UI concerns from core logic with `PresentationAdapter` protocol
 - **Registry Base Classes** - Centralized registry infrastructure in `victor/core/registry_base.py`
-- **Tool Selector Protocol** - Unified `IToolSelector` protocol for tool selection strategies
 - **SOLID Consolidation (Complete)** - 8-phase architectural refactoring for vertical configuration:
   - **Universal Registry System** - Type-safe generic registry with cache strategies (TTL, LRU, Manual, None)
   - **Data-Driven Mode Configuration** - YAML-based mode configs in `victor/config/modes/` for all verticals
@@ -69,14 +78,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.0] - 2025-12-31
 
-### BREAKING CHANGES
-- **Tool Selection API** - `use_semantic_tool_selection` setting replaced by `tool_selection_strategy`
-- **ToolSelector.select_tools()** - `use_semantic` parameter removed; strategy configured globally
-- **Protocols Renamed** - `ToolSelectorProtocol` and `SemanticToolSelectorProtocol` replaced by `IToolSelector`
+### Added
+- Database migration system with version-based schema evolution
+- Provider health monitoring and automatic fallback
+- Improved error handling and recovery mechanisms
+
+### Changed
+- Architecture improvements for cleaner module boundaries
+- Enhanced configuration system with YAML support
+
+### Fixed
+- Various bug fixes and stability improvements
+
+### Deprecated
+- `use_semantic_tool_selection` setting - Use `tool_selection_strategy` instead (will be removed in v2.0)
+- `ToolSelectorProtocol` and `SemanticToolSelectorProtocol` - Use `IToolSelector` from `victor.protocols.tool_selector` instead (will be removed in v2.0)
 
 **Migration Guide**:
 ```python
-# Old (deprecated)
+# Old (deprecated, shows warning)
 settings = Settings(use_semantic_tool_selection=True)
 tools = await selector.select_tools(message, use_semantic=True)
 

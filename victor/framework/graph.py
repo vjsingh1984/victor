@@ -72,6 +72,7 @@ import copy
 import hashlib
 import json
 import logging
+import threading
 import time
 import uuid
 from abc import ABC, abstractmethod
@@ -198,7 +199,7 @@ class CopyOnWriteState(Generic[StateType]):
         - Subsequent writes: O(1), no additional copy
     """
 
-    __slots__ = ("_source", "_copy", "_modified")
+    __slots__ = ("_source", "_copy", "_modified", "_lock")
 
     def __init__(self, source: StateType):
         """Initialize with source state.
@@ -209,17 +210,27 @@ class CopyOnWriteState(Generic[StateType]):
         self._source: StateType = source
         self._copy: Optional[StateType] = None
         self._modified: bool = False
+        self._lock = threading.Lock()
 
     def _ensure_copy(self) -> StateType:
-        """Ensure we have a mutable copy of the state.
+        """Ensure we have a mutable copy of the state (thread-safe).
+
+        Uses double-checked locking for thread-safety while maintaining
+        performance for read-heavy workloads.
 
         Returns:
             The mutable copy of the state
         """
-        if not self._modified:
-            self._copy = copy.deepcopy(self._source)
-            self._modified = True
-        return self._copy  # type: ignore
+        # Fast path: no lock if already modified
+        if self._modified:
+            return self._copy  # type: ignore
+
+        # Slow path: lock and recheck
+        with self._lock:
+            if not self._modified:
+                self._copy = copy.deepcopy(self._source)
+                self._modified = True
+            return self._copy  # type: ignore
 
     def __getitem__(self, key: str) -> Any:
         """Get item without copying.

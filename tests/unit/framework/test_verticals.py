@@ -526,16 +526,18 @@ class TestVerticalProtocolMethods:
 
     def test_get_mode_config_default(self):
         """All verticals should have default get_mode_config()."""
-        mode_config = CodingAssistant.get_mode_config()
-        assert isinstance(mode_config, dict)
-        assert "fast" in mode_config
-        assert "thorough" in mode_config
-        assert "explore" in mode_config
+        # List available modes
+        modes = CodingAssistant.list_modes()
+        assert isinstance(modes, list)
+        assert len(modes) > 0
 
-        # Each mode should have expected fields
-        fast = mode_config["fast"]
-        assert "tool_budget" in fast
-        assert "max_iterations" in fast
+        # Test that each mode can be retrieved
+        for mode_name in modes:
+            mode_config = CodingAssistant.get_mode_config(mode_name)
+            # Mode config is now an AgentMode instance
+            assert mode_config is not None
+            assert hasattr(mode_config, "name")
+            assert mode_config.name == mode_name
 
     def test_get_task_type_hints_default(self):
         """All verticals should have default get_task_type_hints()."""
@@ -563,9 +565,16 @@ class TestVerticalProtocolMethods:
             DevOpsAssistant,
             DataAnalysisAssistant,
         ]:
-            mode_config = vertical.get_mode_config()
-            assert isinstance(mode_config, dict), f"{vertical.name} get_mode_config failed"
-            assert len(mode_config) >= 3, f"{vertical.name} missing modes"
+            # Test that each vertical has modes available
+            modes = vertical.list_modes()
+            assert isinstance(modes, list), f"{vertical.name} list_modes failed"
+            assert len(modes) >= 3, f"{vertical.name} missing modes (expected at least 3)"
+
+            # Test that each mode can be retrieved
+            for mode_name in modes:
+                mode_config = vertical.get_mode_config(mode_name)
+                assert mode_config is not None, f"{vertical.name} get_mode_config('{mode_name}') failed"
+                assert hasattr(mode_config, "name")
 
     def test_all_verticals_have_task_type_hints(self):
         """All built-in verticals should have get_task_type_hints()."""
