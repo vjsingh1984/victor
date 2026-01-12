@@ -369,7 +369,8 @@ models:
     # Provider-specific support
     providers:
       ollama:
-        native_tool_calls: false  # NO {{ if .Tools }} in Ollama template
+        native_tool_calls: true   # Qwen3 coder supports tool calling
+        parallel_tool_calls: true
         requires_strict_prompting: true
       lmstudio:
         native_tool_calls: true   # llama.cpp enables it
@@ -380,6 +381,9 @@ models:
     settings:
       recommended_tool_budget: 10
       argument_format: xml
+      # Qwen3 models have good tool calling reliability
+      tool_reliability: high
+      continuation_patience: 6
 
   "qwen3-coder-tools*":
     # Custom -tools variant with Modelfile tool template

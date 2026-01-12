@@ -251,7 +251,25 @@ class ProfileLearningStore:
         if self._initialized:
             return
 
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        # Try to create the directory, fall back to global directory if project dir is read-only
+        try:
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            # If project directory is read-only, fall back to global victor directory
+            import os
+            from pathlib import Path
+
+            global_dir = Path.home() / ".victor"
+            self.db_path = global_dir / "profile_learning.db"
+
+            try:
+                self.db_path.parent.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                # Last resort: use temp directory
+                import tempfile
+                global_dir = Path(tempfile.gettempdir()) / "victor"
+                self.db_path = global_dir / "profile_learning.db"
+                self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(

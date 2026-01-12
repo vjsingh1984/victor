@@ -669,6 +669,37 @@ class ObservabilityBus:
             )
         )
 
+    def emit_metric(
+        self,
+        metric: str,
+        value: float,
+        **labels: Any,
+    ) -> None:
+        """Emit a metric event (fire-and-forget).
+
+        This is a convenience method for emitting metric events.
+        Events are emitted asynchronously without waiting for completion.
+
+        Args:
+            metric: Metric name (e.g., "latency", "request_count")
+            value: Metric value
+            **labels: Additional metric labels/dimensions
+        """
+        # Schedule emit as fire-and-forget task
+        import asyncio
+
+        asyncio.create_task(
+            self.emit(
+                topic="metric",
+                data={
+                    "name": metric,
+                    "value": value,
+                    **labels,
+                },
+                source="observability",
+            )
+        )
+
 
 class AgentMessageBus:
     """Specialized event bus for cross-agent communication.
