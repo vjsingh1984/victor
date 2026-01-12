@@ -373,67 +373,16 @@ jobs:
   # ==========================================================================
   # NOTE: All publishing jobs run AFTER all builds and release creation
   # This ensures we don't publish to PyPI/Docker Hub if any build fails
+  #
+  # Publishing order:
+  #   1. Docker (runs first as gate - after security scan)
+  #   2. TestPyPI (pre-releases only, after Docker)
+  #   3. PyPI (stable releases only, runs LAST after Docker)
   # ==========================================================================
 
-  # ==========================================================================
-  # Publish to TestPyPI (for pre-releases or manual testing) - runs first
-  # ==========================================================================
-  publish-testpypi:
-    name: Publish to TestPyPI
-    needs: [build-python, build-native, build-binary, build-docker, generate-checksums, create-release]
-    if: github.event.inputs.publish_testpypi == 'true' || contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc')
-    runs-on: ubuntu-latest
-    environment:
-      name: testpypi
-      url: https://test.pypi.org/project/victor/
-    permissions:
-      id-token: write
-
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: python-package
-          path: dist/
-
-      - name: Publish to TestPyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
-
-  # ==========================================================================
-  # Publish to PyPI (Trusted Publishing - no API token needed)
-  # IMPORTANT: This runs LAST after all builds pass and release is created
-  # ==========================================================================
-  publish-pypi:
-    name: Publish to PyPI
-    needs: [build-python, build-native, build-binary, build-docker, generate-checksums, create-release]
-    # Skip PyPI for pre-releases (they go to TestPyPI only)
-    if: "!contains(github.ref, 'alpha') && !contains(github.ref, 'beta') && !contains(github.ref, 'rc')"
-    runs-on: ubuntu-latest
-    # No environment required - trusted publisher configured without environment
-    permissions:
-      id-token: write  # Required for OIDC trusted publishing
-
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: python-package
-          path: dist/
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          verbose: true
-
-  # ==========================================================================
-  # Publish Docker image to Docker Hub
-  # IMPORTANT: This runs LAST after all builds pass and release is created
-  # ==========================================================================
   publish-docker:
     name: Publish Docker Image
-    needs: [build-python, build-native, build-binary, build-docker, generate-checksums, create-release]
+    needs: [security-scan, generate-checksums, create-release]
     runs-on: ubuntu-latest
 
     steps:
@@ -460,6 +409,56 @@ jobs:
         run: |
           docker push vjsingh1984/victor-ai:${{ steps.version.outputs.VERSION }}
           docker push vjsingh1984/victor-ai:latest
+
+  # ==========================================================================
+  publish-testpypi:
+    name: Publish to TestPyPI
+    needs: [publish-docker, build-python, build-native, build-binary, generate-checksums, create-release]
+    if: github.event.inputs.publish_testpypi == 'true' || contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc')
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/victor/
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package
+          path: dist/
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  # ==========================================================================
+  # Publish to PyPI (Trusted Publishing - no API token needed)
+  # IMPORTANT: This runs LAST after Docker publish succeeds
+  # ==========================================================================
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [publish-docker, build-python, build-native, build-binary, generate-checksums, create-release]
+    # Skip PyPI for pre-releases (they go to TestPyPI only)
+    if: "!contains(github.ref, 'alpha') && !contains(github.ref, 'beta') && !contains(github.ref, 'rc')"
+    runs-on: ubuntu-latest
+    # No environment required - trusted publisher configured without environment
+    permissions:
+      id-token: write  # Required for OIDC trusted publishing
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          verbose: true
 
   # ==========================================================================
   # Generate checksums for all artifacts
