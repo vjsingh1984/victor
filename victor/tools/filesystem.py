@@ -1474,29 +1474,37 @@ async def read(
     # Cloud models (Anthropic, OpenAI, etc.): ~2500 lines / 100KB (~25K tokens)
     # Local models (Ollama, LMStudio, vLLM): ~2000 lines / 32KB (~8K tokens)
     def _get_truncation_limits() -> tuple:
-        """Get appropriate truncation limits based on current provider."""
+        """Get appropriate truncation limits based on current provider/model."""
         try:
             from victor.config.settings import get_settings
+            from victor.config.config_loaders import get_provider_limits
 
             settings = get_settings()
+            provider = getattr(settings, "provider", "")
+            model = getattr(settings, "model", "")
 
-            # Check for airgapped mode or local providers
+            # Check for airgapped mode
             if settings.airgapped_mode:
-                return 1500, 65536  # ~2000 lines, 32KB for local models (airgapped)
+                return 1500, 65536  # ~2000 lines, 64KB for airgapped mode
 
-            # Check provider name for local indicators
-            provider = getattr(settings, "provider", "").lower()
-            local_providers = {"ollama", "lmstudio", "vllm", "llamacpp", "local"}
-            if any(p in provider for p in local_providers):
-                # For local models, use standard limits (model-specific context detection not available)
-                return 1500, 65536  # Fallback for local models: 1500, 64KB
+            # Get context window from provider_context_limits.yaml
+            # This supports provider defaults + model-specific overrides
+            limits = get_provider_limits(provider, model)
+            context_window = limits.context_window
 
-            # Cloud models get higher limits (large context windows)
-            # Anthropic: 200K tokens, GPT-4: 128K tokens
-            # 100KB ≈ 25K tokens at 4 bytes/token, reasonable for large context
-            return 1500, 65536  # ~2500 lines, 100KB for cloud models
+            if context_window > 0:
+                # Use ~25% of context window for file reads
+                # This leaves room for the rest of the conversation
+                max_tokens = context_window // 4
+                # Estimate ~3 bytes per token (average), ~40 chars per line
+                max_lines = min(1500, max(100, max_tokens // 3))  # Ensure at least 100 lines
+                max_bytes = min(65536, max_tokens * 3)  # ~3 bytes per token average
+                return max_lines, max_bytes
+
+            # Fallback to standard limits
+            return 1500, 65536
         except Exception:
-            # Default to cloud limits if settings unavailable
+            # Default limits if config loading fails
             return 1500, 65536  # ~1500 lines, 64KB
 
     MAX_LINES, MAX_BYTES = _get_truncation_limits()
