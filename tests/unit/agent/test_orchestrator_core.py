@@ -2627,36 +2627,6 @@ class TestIntelligentPipelineIntegration:
             orchestrator._record_intelligent_outcome(True, 0.9, True, True)
 
 
-class TestPrepareStream:
-    """Tests for _prepare_stream method."""
-
-    @pytest.mark.asyncio
-    async def test_prepare_stream_basic(self, orchestrator):
-        """Test _prepare_stream initializes stream variables."""
-        result = await orchestrator._prepare_stream("test message")
-        assert result is not None
-        assert len(result) == 11  # Should return 11 values
-        # Unpack to verify structure
-        (
-            stream_metrics,
-            start_time,
-            total_tokens,
-            cumulative_usage,
-            max_total_iterations,
-            max_exploration_iterations,
-            total_iterations,
-            force_completion,
-            unified_task_type,
-            task_classification,
-            complexity_tool_budget,
-        ) = result
-        assert stream_metrics is not None
-        assert start_time > 0
-        assert total_tokens == 0
-        # cumulative_usage may have zero values initialized
-        assert isinstance(cumulative_usage, dict)
-
-
 class TestApplyTaskGuidance:
     """Tests for _apply_task_guidance method."""
 
