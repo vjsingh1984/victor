@@ -2152,6 +2152,30 @@ class SemanticToolSelector:
         # Calculate cosine similarity
         return self._cosine_similarity(query_embedding, tool_embedding)
 
+    def prioritize_by_stage(
+        self,
+        user_message: str,
+        tools: Optional[List["ToolDefinition"]],
+    ) -> Optional[List["ToolDefinition"]]:
+        """Stage-aware pruning of tool list to keep it focused per step.
+
+        Note: SemanticToolSelector returns tools as-is since stage-based
+        prioritization should be handled by the wrapper selector or caller.
+        The semantic selection process already prioritizes based on semantic
+        relevance to the user's message.
+
+        Args:
+            user_message: The user's message (unused, for compatibility)
+            tools: List of tool definitions to filter
+
+        Returns:
+            The same list of tools (no-op for semantic selector)
+        """
+        # SemanticToolSelector returns tools as-is since it already prioritizes
+        # based on semantic similarity during the select_tools() call.
+        # Stage-based prioritization should happen before/after semantic selection.
+        return tools
+
     def _emit_semantic_match_event(
         self,
         selected_tools: List[Tuple[Any, float]],
