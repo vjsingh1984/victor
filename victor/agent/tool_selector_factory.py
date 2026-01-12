@@ -29,7 +29,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Optional, Set
 
-from victor.agent.protocols import IToolSelector
+from victor.protocols.tool_selector import IToolSelector
 from victor.tools.base import ToolRegistry
 
 if TYPE_CHECKING:
@@ -190,7 +190,7 @@ def _create_semantic_selector(
         model: Model name
         provider_name: Provider name
         enabled_tools: Optional vertical filter
-        embedding_service: Embedding service (required)
+        embedding_service: Embedding service (required for provider info)
 
     Returns:
         SemanticToolSelector instance
@@ -209,8 +209,26 @@ def _create_semantic_selector(
     # Note: SemanticToolSelector doesn't fully implement IToolSelector's signature yet
     # It uses its own select_relevant_tools_with_context() method
     # This will be addressed in Release 2 Phase 5
+
+    # Extract embedding model and provider from the embedding service
+    # The embedding_service has model_name attribute that we can use
+    embedding_model = getattr(embedding_service, 'model_name', 'all-MiniLM-L6-v2')
+
+    # Determine provider based on provider_name
+    # Map provider names to embedding providers
+    provider_map = {
+        'ollama': 'ollama',
+        'lmstudio': 'lmstudio',
+        'vllm': 'vllm',
+        'sentence-transformers': 'sentence-transformers',
+        'openai': 'sentence-transformers',  # Fallback to local
+        'anthropic': 'sentence-transformers',  # Fallback to local
+    }
+    embedding_provider = provider_map.get(provider_name, 'sentence-transformers')
+
     return SemanticToolSelector(
-        embedding_service=embedding_service,
+        embedding_model=embedding_model,
+        embedding_provider=embedding_provider,
         cache_embeddings=True,  # Enable caching for performance
     )
 
