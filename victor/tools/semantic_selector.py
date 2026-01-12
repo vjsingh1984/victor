@@ -20,7 +20,7 @@ import os
 import pickle
 import re
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple
+from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple, Union
 
 # Disable tokenizers parallelism BEFORE importing sentence_transformers
 # This prevents "bad value(s) in fds_to_keep" errors in async contexts
@@ -33,6 +33,11 @@ from victor.providers.base import ToolDefinition
 from victor.tools.base import CostTier, ToolMetadataRegistry, ToolRegistry
 from victor.storage.embeddings.service import EmbeddingService
 from victor.agent.tool_sequence_tracker import ToolSequenceTracker, create_sequence_tracker
+from victor.protocols.tool_selector import (
+    ToolSelectionResult,
+    ToolSelectionContext,
+    ToolSelectionStrategy,
+)
 from victor.agent.debug_logger import TRACE  # Import TRACE level
 from victor.tools.metadata_registry import (
     get_core_readonly_tools,
@@ -193,6 +198,14 @@ class SemanticToolSelector:
         if sequence_tracking:
             self._sequence_tracker = create_sequence_tracker()
 
+        # IToolSelector protocol: Track whether embeddings have been initialized
+        # This is checked by AgentOrchestrator._preload_embeddings()
+        self._embeddings_initialized: bool = False
+
+        # Store tools registry for legacy select_tools() calls
+        # The orchestrator doesn't pass tools registry in legacy calls, so we need it stored
+        self._tools_registry: Optional[ToolRegistry] = None
+
     async def initialize_tool_embeddings(self, tools: ToolRegistry) -> None:
         """Pre-compute embeddings for all tools (called once at startup).
 
@@ -204,6 +217,9 @@ class SemanticToolSelector:
         Args:
             tools: Tool registry with all available tools
         """
+        # Store tools registry for legacy select_tools() calls
+        self._tools_registry = tools
+
         # Refresh the centralized ToolMetadataRegistry (smart reindexing)
         # This collects metadata from all tools (explicit or auto-generated)
         # Uses hash-based change detection to skip reindexing if tools haven't changed
@@ -255,6 +271,9 @@ class SemanticToolSelector:
 
         # Save to disk
         self._save_to_cache(tools_hash)
+
+        # Mark initialization complete (IToolSelector protocol)
+        self._embeddings_initialized = True
 
         logger.info(
             f"Tool embeddings computed and cached for {len(self._tool_embedding_cache)} tools"
@@ -429,6 +448,9 @@ class SemanticToolSelector:
             # All checks passed - load embeddings
             self._tool_embedding_cache = embeddings
             self._tools_hash = tools_hash
+
+            # Mark initialization complete (IToolSelector protocol)
+            self._embeddings_initialized = True
 
             return True
 
@@ -1986,6 +2008,149 @@ class SemanticToolSelector:
 
         if self._client:
             await self._client.aclose()
+
+    # ========================================================================
+    # IToolSelector Protocol Implementation
+    # ========================================================================
+
+    @property
+    def strategy(self) -> ToolSelectionStrategy:
+        """Get the selection strategy used by this selector (IToolSelector protocol)."""
+        return ToolSelectionStrategy.SEMANTIC
+
+    async def select_tools(
+        self,
+        task: str,
+        *,
+        limit: int = 10,
+        min_score: float = 0.0,
+        context: Optional[ToolSelectionContext] = None,
+        # Legacy ToolSelector parameters (for backward compatibility with orchestrator)
+        use_semantic: bool = True,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+        conversation_depth: int = 0,
+        planned_tools: Optional[Any] = None,
+    ) -> Union[ToolSelectionResult, List[ToolDefinition]]:
+        """Select relevant tools for a task (IToolSelector protocol + legacy support).
+
+        This method handles TWO calling conventions:
+        1. IToolSelector protocol (new): select_tools(task, limit, min_score, context) -> ToolSelectionResult
+        2. Legacy ToolSelector (old): select_tools(prompt, use_semantic, conversation_history, ...) -> List[ToolDefinition]
+
+        Args:
+            task: Task description or query to match tools against
+            limit: Maximum number of tools to return
+            min_score: Minimum relevance score threshold (0.0-1.0)
+            context: Optional additional context for selection (new protocol)
+            use_semantic: Whether to use semantic selection (legacy, ignored - always semantic)
+            conversation_history: Conversation history (legacy)
+            conversation_depth: Conversation depth (legacy, unused)
+            planned_tools: Planned tools (legacy, unused)
+
+        Returns:
+            ToolSelectionResult (new protocol) or List[ToolDefinition] (legacy)
+        """
+        # Detect legacy call from AgentOrchestrator
+        # Legacy call has: use_semantic, conversation_history as kwargs, context=None
+        # New protocol has: limit, min_score, context with context.metadata['tools']
+        is_legacy_call = context is None
+
+        # Legacy calling convention from AgentOrchestrator
+        # Expected: select_tools(user_message, use_semantic=..., conversation_history=..., conversation_depth=...)
+        if is_legacy_call:
+            # Use stored tools registry from initialize_tool_embeddings()
+            tools_registry = self._tools_registry
+            if not tools_registry:
+                raise RuntimeError(
+                    "SemanticToolSelector not initialized. Call initialize_tool_embeddings(tools) first."
+                )
+
+            # task is actually user_message in legacy call
+            user_message = task
+            # use_semantic is ignored - we always use semantic selection in SemanticToolSelector
+            # conversation_history should be a list of dicts
+            conv_history = conversation_history if isinstance(conversation_history, list) else None
+
+            # Use existing semantic selection method
+            tools = await self.select_relevant_tools_with_context(
+                user_message=user_message,
+                tools=tools_registry,
+                conversation_history=conv_history,
+                max_tools=10,  # Default max tools for legacy call
+            )
+
+            # Legacy: Return List[ToolDefinition] directly
+            return tools
+
+        # New IToolSelector protocol calling convention
+        # Map IToolSelector protocol to existing method
+        tools_registry = context.metadata.get("tools") if context and context.metadata else None
+
+        if not tools_registry:
+            # If no tools registry in context, we need one - raise error
+            raise ValueError(
+                "ToolSelectionContext must include 'tools' in metadata. "
+                "Pass tools via: context=ToolSelectionContext(..., metadata={'tools': tool_registry})"
+            )
+
+        conv_history = context.conversation_history if context else None
+
+        # Use existing semantic selection method
+        tools = await self.select_relevant_tools_with_context(
+            user_message=task,
+            tools=tools_registry,
+            conversation_history=conv_history,
+            max_tools=limit,
+            similarity_threshold=min_score,
+        )
+
+        # Extract scores from the selection
+        tool_names = [t.name for t in tools]
+        scores: Dict[str, float] = {}
+
+        # Optionally compute scores for returned tools
+        query_embedding = await self._get_embedding(task)
+        for tool_name in tool_names:
+            if tool_name in self._tool_embedding_cache:
+                tool_embedding = self._tool_embedding_cache[tool_name]
+                scores[tool_name] = self._cosine_similarity(query_embedding, tool_embedding)
+
+        return ToolSelectionResult(
+            tool_names=tool_names,
+            scores=scores,
+            strategy_used=ToolSelectionStrategy.SEMANTIC,
+            metadata={"method": "semantic_similarity"},
+        )
+
+    async def get_tool_score(
+        self,
+        tool_name: str,
+        task: str,
+        *,
+        context: Optional[ToolSelectionContext] = None,
+    ) -> float:
+        """Get relevance score for a specific tool (IToolSelector protocol).
+
+        Args:
+            tool_name: Name of the tool to score
+            task: Task description to score against
+            context: Optional additional context
+
+        Returns:
+            Relevance score from 0.0 (not relevant) to 1.0 (highly relevant)
+        """
+        # Check if tool has cached embedding
+        if tool_name not in self._tool_embedding_cache:
+            return 0.0
+
+        # Get query embedding
+        query_embedding = await self._get_embedding(task)
+
+        # Get tool embedding
+        tool_embedding = self._tool_embedding_cache[tool_name]
+
+        # Calculate cosine similarity
+        return self._cosine_similarity(query_embedding, tool_embedding)
 
     def _emit_semantic_match_event(
         self,

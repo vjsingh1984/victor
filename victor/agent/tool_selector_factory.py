@@ -210,21 +210,14 @@ def _create_semantic_selector(
     # It uses its own select_relevant_tools_with_context() method
     # This will be addressed in Release 2 Phase 5
 
-    # Extract embedding model and provider from the embedding service
+    # Extract embedding model from the embedding service
     # The embedding_service has model_name attribute that we can use
     embedding_model = getattr(embedding_service, 'model_name', 'all-MiniLM-L6-v2')
 
-    # Determine provider based on provider_name
-    # Map provider names to embedding providers
-    provider_map = {
-        'ollama': 'ollama',
-        'lmstudio': 'lmstudio',
-        'vllm': 'vllm',
-        'sentence-transformers': 'sentence-transformers',
-        'openai': 'sentence-transformers',  # Fallback to local
-        'anthropic': 'sentence-transformers',  # Fallback to local
-    }
-    embedding_provider = provider_map.get(provider_name, 'sentence-transformers')
+    # IMPORTANT: Always use sentence-transformers for semantic search regardless of LLM provider
+    # This ensures consistency in context retrieval quality across all providers (ollama, openai, etc.)
+    # Using different embedding models per provider would break parity and cause inconsistent behavior
+    embedding_provider = 'sentence-transformers'
 
     return SemanticToolSelector(
         embedding_model=embedding_model,
