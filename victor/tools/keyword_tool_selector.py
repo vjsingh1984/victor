@@ -80,6 +80,9 @@ class KeywordToolSelector:
         self._core_tools_cache: Optional[Set[str]] = None
         self._core_readonly_cache: Optional[Set[str]] = None
 
+        # Maximum tools to return as fallback when stage pruning removes everything
+        self.fallback_max_tools = 10
+
     def set_enabled_tools(self, tools: Set[str]) -> None:
         """Set the enabled tools filter for this selector.
 
@@ -251,6 +254,30 @@ class KeywordToolSelector:
             context: Optional execution context
         """
         pass  # No learning in keyword selector
+
+    def prioritize_by_stage(
+        self,
+        user_message: str,
+        tools: Optional[List["ToolDefinition"]],
+    ) -> Optional[List["ToolDefinition"]]:
+        """Stage-aware pruning of tool list to keep it focused per step.
+
+        Note: KeywordToolSelector returns tools as-is since stage-based
+        filtering is already applied during select_tools() via _filter_tools_for_stage().
+        However, if there are more tools than fallback_max_tools, we limit the list.
+
+        Args:
+            user_message: The user's message (unused, for compatibility)
+            tools: List of tool definitions to filter
+
+        Returns:
+            The list of tools, limited to fallback_max_tools if necessary
+        """
+        # KeywordToolSelector already applies stage filtering during select_tools()
+        # via _filter_tools_for_stage(), but we enforce fallback_max_tools here.
+        if tools and len(tools) > self.fallback_max_tools:
+            return tools[: self.fallback_max_tools]
+        return tools
 
     async def close(self) -> None:
         """Cleanup resources (no-op for keyword selector).
