@@ -116,6 +116,7 @@ class ToolSelectionContext:
     Attributes:
         task_description: The task or query to select tools for
         conversation_stage: Current stage of the conversation (e.g., "planning", "executing")
+        planned_tools: Tools that should be prepended to selection (from workflows/previous steps)
         previous_tools: Tools that have already been used in this session
         failed_tools: Tools that failed in previous attempts
         model_name: Current LLM model being used
@@ -127,6 +128,7 @@ class ToolSelectionContext:
 
     task_description: str
     conversation_stage: Optional[str] = None
+    planned_tools: List[str] = field(default_factory=list)
     previous_tools: List[str] = field(default_factory=list)
     failed_tools: Set[str] = field(default_factory=set)
     model_name: str = ""
