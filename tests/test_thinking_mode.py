@@ -23,6 +23,8 @@ def create_mock_settings():
     mock_settings.analytics_enabled = False
     mock_settings.show_cost_metrics = False
     mock_settings.load_tool_config.return_value = {}
+    # Use keyword selection to avoid SemanticToolSelector initialization requirement
+    mock_settings.tool_selection_strategy = "keyword"
     return mock_settings
 
 

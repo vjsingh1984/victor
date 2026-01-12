@@ -136,14 +136,17 @@ class ChatCoordinator:
             tools = None
             if orch.provider.supports_tools() and orch.tool_calls_used < orch.tool_budget:
                 conversation_depth = orch.conversation.message_count()
-                conversation_history = (
-                    [msg.model_dump() for msg in orch.messages] if orch.messages else None
+                # Use new IToolSelector API with ToolSelectionContext
+                from victor.protocols import ToolSelectionContext
+
+                context = ToolSelectionContext(
+                    task_description=user_message,
+                    conversation_stage=orch.conversation_state.state.stage.value if orch.conversation_state.state.stage else None,
+                    previous_tools=[],
                 )
                 tools = await orch.tool_selector.select_tools(
                     user_message,
-                    use_semantic=orch.use_semantic_selection,
-                    conversation_history=conversation_history,
-                    conversation_depth=conversation_depth,
+                    context,
                 )
                 tools = orch.tool_selector.prioritize_by_stage(user_message, tools)
 
@@ -499,12 +502,12 @@ class ChatCoordinator:
             mentioned_tools_detected: List[str] = []
 
             # Check for mentioned tools early for recovery integration
-            from victor.agent.streaming.continuation import ContinuationStrategy
-            from victor.tools.tool_names import _ALL_TOOL_NAMES, TOOL_ALIASES
+            from victor.agent.continuation_strategy import ContinuationStrategy
+            from victor.tools.tool_names import get_all_canonical_names, TOOL_ALIASES
 
             if full_content and not tool_calls:
                 mentioned_tools_detected = ContinuationStrategy.detect_mentioned_tools(
-                    full_content, list(_ALL_TOOL_NAMES), TOOL_ALIASES
+                    full_content, list(get_all_canonical_names()), TOOL_ALIASES
                 )
 
             # Use recovery integration to detect and handle failures
@@ -667,6 +670,9 @@ class ChatCoordinator:
                         self._intent_classification_handler = create_intent_classification_handler(
                             orch
                         )
+
+                    # Import create_tracking_state for intent classification
+                    from victor.agent.streaming.intent_classification import create_tracking_state, apply_tracking_state_updates
 
                     # Ensure tracking variables are initialized
                     if not hasattr(orch, "_continuation_prompts"):
@@ -1161,18 +1167,21 @@ class ChatCoordinator:
             logger.info(f"available_inputs={available_inputs}")
 
         conversation_depth = orch.conversation.message_count()
-        conversation_history = (
-            [msg.model_dump() for msg in orch.messages] if orch.messages else None
+        # Use new IToolSelector API with ToolSelectionContext
+        from victor.protocols import ToolSelectionContext
+
+        context = ToolSelectionContext(
+            task_description=context_msg,
+            conversation_stage=orch.conversation_state.state.stage.value if orch.conversation_state.state.stage else None,
+            previous_tools=[],
+            planned_tools=planned_tools if planned_tools else [],
         )
         tools = await orch.tool_selector.select_tools(
             context_msg,
-            use_semantic=orch.use_semantic_selection,
-            conversation_history=conversation_history,
-            conversation_depth=conversation_depth,
-            planned_tools=planned_tools,
+            context,
         )
         logger.info(
-            f"context_msg={context_msg}\nuse_semantic={orch.use_semantic_selection}\nconversation_depth={conversation_depth}"
+            f"context_msg={context_msg}\nconversation_stage={orch.conversation_state.state.stage.value if orch.conversation_state.state.stage else None}"
         )
         tools = orch.tool_selector.prioritize_by_stage(context_msg, tools)
         current_intent = getattr(orch, "_current_intent", None)
@@ -1187,11 +1196,18 @@ class ChatCoordinator:
 
         Returns:
             List of required file paths mentioned in the message
+
+        Note:
+            PromptRequirements extracts counts, not actual file paths.
+            This method returns empty list since file path extraction
+            is not implemented. Use requirements.file_count for budgeting.
         """
         from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
 
         requirements = extract_prompt_requirements(user_message)
-        return requirements.required_files if requirements else []
+        # PromptRequirements only has counts, not file paths
+        # Return empty list - file paths extracted elsewhere via patterns
+        return []
 
     def _extract_required_outputs_from_prompt(self, user_message: str) -> List[str]:
         """Extract required outputs from the user message.
@@ -1201,11 +1217,17 @@ class ChatCoordinator:
 
         Returns:
             List of required outputs mentioned in the message
+
+        Note:
+            PromptRequirements extracts counts, not actual output paths.
+            This method returns empty list since output path extraction
+            is not implemented. Use requirements for budgeting only.
         """
         from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
 
         requirements = extract_prompt_requirements(user_message)
-        return requirements.required_outputs if requirements else []
+        # PromptRequirements only has counts, not output paths
+        return []
 
     def _get_max_context_chars(self) -> int:
         """Get the maximum context length in characters.
@@ -1214,8 +1236,8 @@ class ChatCoordinator:
             Maximum context length for the current provider/model
         """
         orch = self._orchestrator
-        limits = orch._provider_coordinator.get_provider_limits()
-        return limits.get("max_context_chars", 128000)
+        # Use context_manager which has provider-aware context limits
+        return orch._context_manager.get_max_context_chars()
 
     # =====================================================================
     # Iteration Pre-Checks
@@ -1631,6 +1653,11 @@ class ChatCoordinator:
             last_quality_score=stream_ctx.last_quality_score,
             streaming_context=stream_ctx,
             provider_name=orch.provider_name,
+            model=orch.model,
+            temperature=getattr(orch, "temperature", 0.7),
+            unified_task_type=getattr(orch._task_tracker, "current_task_type", None) if hasattr(orch, "_task_tracker") else None,
+            is_analysis_task=getattr(orch._task_tracker, "is_analysis_task", False) if hasattr(orch, "_task_tracker") else False,
+            is_action_task=getattr(orch._task_tracker, "is_action_task", False) if hasattr(orch, "_task_tracker") else False,
         )
 
     async def _handle_recovery_with_integration(
@@ -1652,12 +1679,23 @@ class ChatCoordinator:
             RecoveryAction with the action to take
         """
         orch = self._orchestrator
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-        return await orch._recovery_integration.detect_and_handle(
-            recovery_ctx,
-            full_content=full_content,
+        # Call handle_response with individual parameters instead of detect_and_handle
+        return await orch._recovery_integration.handle_response(
+            content=full_content,
             tool_calls=tool_calls,
             mentioned_tools=mentioned_tools,
+            provider_name=orch.provider_name,
+            model_name=orch.model,
+            tool_calls_made=orch.tool_calls_used,
+            tool_budget=orch.tool_budget,
+            iteration_count=stream_ctx.total_iterations,
+            max_iterations=stream_ctx.max_total_iterations,
+            current_temperature=getattr(orch, "temperature", 0.7),
+            quality_score=stream_ctx.last_quality_score,
+            task_type=getattr(orch._task_tracker, "current_task_type", "general") if hasattr(orch, "_task_tracker") else "general",
+            is_analysis_task=getattr(orch._task_tracker, "is_analysis_task", False) if hasattr(orch, "_task_tracker") else False,
+            is_action_task=getattr(orch._task_tracker, "is_action_task", False) if hasattr(orch, "_task_tracker") else False,
+            context_utilization=None,
         )
 
     def _apply_recovery_action(
