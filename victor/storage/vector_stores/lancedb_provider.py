@@ -137,7 +137,17 @@ class LanceDBProvider(BaseEmbeddingProvider):
         print(f"📚 Table: {table_name}")
 
         # Check if table exists
-        existing_tables = self.db.list_tables().tables
+        try:
+            existing_tables = self.db.table_names()
+        except AttributeError:
+            # Fallback for older LanceDB versions
+            existing_tables = []
+            try:
+                existing_tables = self.db.list_tables().tables if hasattr(self.db, 'list_tables') else []
+            except Exception:
+                # If list_tables also fails, try to open table directly and catch exception
+                existing_tables = []
+
         if table_name not in existing_tables:
             # Create empty table with schema
             # We'll add data later when indexing
