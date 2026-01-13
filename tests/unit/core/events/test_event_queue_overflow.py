@@ -71,6 +71,12 @@ def small_queue_backend():
 
 
 @pytest.fixture
+def small_queue_backend_passive():
+    """Backend with dispatcher disabled for testing passive queue behavior."""
+    return InMemoryEventBackend(queue_maxsize=5, auto_start_dispatcher=False)
+
+
+@pytest.fixture
 async def connected_small_backend(small_queue_backend):
     """Connected small backend."""
     await small_queue_backend.connect()
@@ -79,9 +85,23 @@ async def connected_small_backend(small_queue_backend):
 
 
 @pytest.fixture
+async def connected_small_backend_passive(small_queue_backend_passive):
+    """Connected small backend with passive queue (no dispatcher)."""
+    await small_queue_backend_passive.connect()
+    yield small_queue_backend_passive
+    await small_queue_backend_passive.disconnect()
+
+
+@pytest.fixture
 def medium_queue_backend():
     """Backend with medium queue for testing."""
     return InMemoryEventBackend(queue_maxsize=50)
+
+
+@pytest.fixture
+def medium_queue_backend_passive():
+    """Backend with medium queue and passive dispatcher."""
+    return InMemoryEventBackend(queue_maxsize=50, auto_start_dispatcher=False)
 
 
 @pytest.fixture
@@ -93,9 +113,23 @@ async def connected_medium_backend(medium_queue_backend):
 
 
 @pytest.fixture
+async def connected_medium_backend_passive(medium_queue_backend_passive):
+    """Connected medium backend with passive queue (no dispatcher)."""
+    await medium_queue_backend_passive.connect()
+    yield medium_queue_backend_passive
+    await medium_queue_backend_passive.disconnect()
+
+
+@pytest.fixture
 def large_queue_backend():
     """Backend with large queue for stress testing."""
     return InMemoryEventBackend(queue_maxsize=1000)
+
+
+@pytest.fixture
+def large_queue_backend_passive():
+    """Backend with large queue and passive dispatcher."""
+    return InMemoryEventBackend(queue_maxsize=1000, auto_start_dispatcher=False)
 
 
 @pytest.fixture
@@ -104,6 +138,14 @@ async def connected_large_backend(large_queue_backend):
     await large_queue_backend.connect()
     yield large_queue_backend
     await large_queue_backend.disconnect()
+
+
+@pytest.fixture
+async def connected_large_backend_passive(large_queue_backend_passive):
+    """Connected large backend with passive queue (no dispatcher)."""
+    await large_queue_backend_passive.connect()
+    yield large_queue_backend_passive
+    await large_queue_backend_passive.disconnect()
 
 
 @pytest.fixture
@@ -163,57 +205,57 @@ class TestEventQueueOverflowDetection:
     """Tests for detecting when event queue is full."""
 
     @pytest.mark.asyncio
-    async def test_queue_overflow_when_full(self, connected_small_backend):
+    async def test_queue_overflow_when_full(self, connected_small_backend_passive):
         """Backend should detect queue overflow when full."""
         # Fill queue to capacity
         for i in range(5):
             event = MessagingEvent(topic="test.event", data={"index": i})
-            result = await connected_small_backend.publish(event)
+            result = await connected_small_backend_passive.publish(event)
             assert result is True, f"Event {i} should be published"
 
         # Next event should fail or be handled according to strategy
         overflow_event = MessagingEvent(topic="test.event", data={"index": 5})
-        result = await connected_small_backend.publish(overflow_event)
+        result = await connected_small_backend_passive.publish(overflow_event)
 
         # Current implementation returns False when queue is full
         assert result is False, "Overflow event should be rejected"
 
     @pytest.mark.asyncio
-    async def test_queue_depth_tracking(self, connected_small_backend):
+    async def test_queue_depth_tracking(self, connected_small_backend_passive):
         """Backend should accurately track queue depth."""
-        assert connected_small_backend.get_queue_depth() == 0
+        assert connected_small_backend_passive.get_queue_depth() == 0
 
         # Add events
         for i in range(3):
             event = MessagingEvent(topic="test.event", data={"index": i})
-            await connected_small_backend.publish(event)
+            await connected_small_backend_passive.publish(event)
 
-        depth = connected_small_backend.get_queue_depth()
+        depth = connected_small_backend_passive.get_queue_depth()
         assert depth == 3, f"Queue depth should be 3, got {depth}"
 
     @pytest.mark.asyncio
-    async def test_queue_full_condition(self, connected_small_backend):
+    async def test_queue_full_condition(self, connected_small_backend_passive):
         """Backend should provide way to check if queue is full."""
         # Initially not full
-        assert connected_small_backend.get_queue_depth() < 5
+        assert connected_small_backend_passive.get_queue_depth() < 5
 
         # Fill to capacity
         for i in range(5):
             event = MessagingEvent(topic="test.event", data={"index": i})
-            await connected_small_backend.publish(event)
+            await connected_small_backend_passive.publish(event)
 
         # Now full
-        assert connected_small_backend.get_queue_depth() == 5
+        assert connected_small_backend_passive.get_queue_depth() == 5
 
     @pytest.mark.asyncio
-    async def test_queue_overflow_threshold(self, connected_medium_backend):
+    async def test_queue_overflow_threshold(self, connected_medium_backend_passive):
         """Backend should support overflow threshold warnings."""
         # Add events up to 80% capacity
         for i in range(40):
             event = MessagingEvent(topic="test.event", data={"index": i})
-            await connected_medium_backend.publish(event)
+            await connected_medium_backend_passive.publish(event)
 
-        depth = connected_medium_backend.get_queue_depth()
+        depth = connected_medium_backend_passive.get_queue_depth()
         assert depth == 40
         # Could emit warning event when crossing threshold
 
@@ -280,32 +322,32 @@ class TestOverflowStrategies:
         await backend.disconnect()
 
     @pytest.mark.asyncio
-    async def test_reject_strategy_returns_false(self, connected_small_backend):
+    async def test_reject_strategy_returns_false(self, connected_small_backend_passive):
         """Backend should reject new events when queue full."""
         # Fill queue
         for i in range(5):
             event = MessagingEvent(topic="test.event", data={"index": i})
-            result = await connected_small_backend.publish(event)
+            result = await connected_small_backend_passive.publish(event)
             assert result is True
 
         # Reject overflow
         overflow_event = MessagingEvent(topic="test.event", data={"index": 5})
-        result = await connected_small_backend.publish(overflow_event)
+        result = await connected_small_backend_passive.publish(overflow_event)
 
         assert result is False, "Should reject event when queue full"
 
     @pytest.mark.asyncio
-    async def test_reject_strategy_does_not_block(self, connected_small_backend):
+    async def test_reject_strategy_does_not_block(self, connected_small_backend_passive):
         """Reject strategy should be non-blocking."""
         # Fill queue
         for i in range(5):
             event = MessagingEvent(topic="test.event", data={"index": i})
-            await connected_small_backend.publish(event)
+            await connected_small_backend_passive.publish(event)
 
         # Should return immediately, not block
         start = time.time()
         overflow_event = MessagingEvent(topic="test.event", data={"index": 5})
-        result = await connected_small_backend.publish(overflow_event)
+        result = await connected_small_backend_passive.publish(overflow_event)
         elapsed = time.time() - start
 
         assert result is False
@@ -362,20 +404,20 @@ class TestOverflowMonitoring:
         # assert "overflow_rate" in metrics
 
     @pytest.mark.asyncio
-    async def test_queue_utilization_metrics(self, connected_medium_backend):
+    async def test_queue_utilization_metrics(self, connected_medium_backend_passive):
         """Backend should report queue utilization percentage."""
         # Add some events
         for i in range(25):
             event = MessagingEvent(topic="test.event", data={"index": i})
-            await connected_medium_backend.publish(event)
+            await connected_medium_backend_passive.publish(event)
 
-        depth = connected_medium_backend.get_queue_depth()
+        depth = connected_medium_backend_passive.get_queue_depth()
         utilization = (depth / 50) * 100
 
         assert utilization == 50.0, f"Utilization should be 50%, got {utilization}%"
 
         # Future: metrics should include utilization
-        # metrics = connected_medium_backend.get_metrics()
+        # metrics = connected_medium_backend_passive.get_metrics()
         # assert metrics["queue_utilization"] == 50.0
 
 
@@ -570,24 +612,24 @@ class TestQueueSizeLimits:
         await backend.disconnect()
 
     @pytest.mark.asyncio
-    async def test_medium_queue_limit(self, connected_medium_backend):
+    async def test_medium_queue_limit(self, connected_medium_backend_passive):
         """Backend should respect medium queue size limit."""
         published = 0
         for i in range(100):
             event = MessagingEvent(topic="test.event", data={"index": i})
-            result = await connected_medium_backend.publish(event)
+            result = await connected_medium_backend_passive.publish(event)
             if result:
                 published += 1
 
         assert published <= 50, "Should not exceed queue size"
 
     @pytest.mark.asyncio
-    async def test_large_queue_limit(self, connected_large_backend):
+    async def test_large_queue_limit(self, connected_large_backend_passive):
         """Backend should respect large queue size limit."""
         published = 0
         for i in range(1500):
             event = MessagingEvent(topic="test.event", data={"index": i})
-            result = await connected_large_backend.publish(event)
+            result = await connected_large_backend_passive.publish(event)
             if result:
                 published += 1
 

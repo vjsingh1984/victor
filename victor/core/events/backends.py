@@ -120,6 +120,7 @@ class InMemoryEventBackend:
         *,
         queue_maxsize: int = 10000,
         critical_reserve: int = 0,
+        auto_start_dispatcher: bool = True,
     ) -> None:
         """Initialize the in-memory backend.
 
@@ -127,6 +128,7 @@ class InMemoryEventBackend:
             config: Optional backend configuration
             queue_maxsize: Maximum queue size (0 for unbounded)
             critical_reserve: Reserved slots for critical events (future feature)
+            auto_start_dispatcher: If False, don't start dispatcher on connect (for testing)
         """
         self._config = config or BackendConfig()
         self._queue_maxsize = queue_maxsize
@@ -136,10 +138,14 @@ class InMemoryEventBackend:
         self._event_queue: queue.Queue[MessagingEvent] = queue.Queue(maxsize=queue_maxsize)
         self._is_connected = False
         self._dispatcher_task: Optional[asyncio.Task] = None
+        self._auto_start_dispatcher = auto_start_dispatcher
         # Use threading.Lock for thread-safe subscription management
         self._lock: threading.Lock = threading.Lock()
         self._pending_tasks: Set[asyncio.Task] = set()
         self._dropped_event_count = 0
+        # AT_LEAST_ONCE delivery tracking
+        self._pending_events: Dict[str, MessagingEvent] = {}  # event_id -> event
+        self._delivery_guarantee = self._config.delivery_guarantee
 
     @property
     def backend_type(self) -> BackendType:
@@ -155,12 +161,14 @@ class InMemoryEventBackend:
         """Connect and start the event dispatcher.
 
         The dispatcher runs in the background, delivering events to handlers.
+        Can be disabled with auto_start_dispatcher=False for testing passive queue behavior.
         """
         if self._is_connected:
             return
 
         self._is_connected = True
-        self._dispatcher_task = asyncio.create_task(self._dispatch_loop())
+        if self._auto_start_dispatcher:
+            self._dispatcher_task = asyncio.create_task(self._dispatch_loop())
         logger.debug("InMemoryEventBackend connected")
 
     async def disconnect(self) -> None:
@@ -319,6 +327,11 @@ class InMemoryEventBackend:
 
         Thread-safe: Reads from thread-safe queue.Queue and dispatches
         to subscriptions in the event loop's context.
+
+        For AT_LEAST_ONCE delivery:
+        - Tracks pending events until ACK'd
+        - Re-queues events on NACK with requeue=True
+        - Removes events from pending after successful ACK
         """
         import concurrent.futures
 
@@ -338,6 +351,17 @@ class InMemoryEventBackend:
                 except queue.Empty:
                     continue
 
+                # Check if this event needs AT_LEAST_ONCE tracking
+                needs_ack = (
+                    event.delivery_guarantee == DeliveryGuarantee.AT_LEAST_ONCE
+                    and not event.is_acknowledged()
+                )
+
+                if needs_ack:
+                    # Add to pending events for tracking
+                    self._pending_events[event.id] = event
+                    event.increment_delivery_count()
+
                 # Get matching subscriptions (thread-safe snapshot)
                 with self._lock:
                     subscriptions = list(self._subscriptions.values())
@@ -347,17 +371,78 @@ class InMemoryEventBackend:
                         if s.is_active and event.matches_pattern(s.pattern)
                     ]
 
-                # Dispatch to handlers concurrently
+                # Dispatch to handlers and wait for completion
+                handler_tasks = []
                 for subscription in matching:
                     try:
                         task = asyncio.create_task(
                             self._safe_call_handler(subscription.handler, event)
                         )
                         self._pending_tasks.add(task)
+                        handler_tasks.append(task)
                         task.add_done_callback(self._pending_tasks.discard)
                     except Exception:
                         # Silently skip all errors - event loop issues, closed loops, etc.
                         pass
+
+                # Wait for all handlers to complete
+                if handler_tasks:
+                    results = await asyncio.gather(*handler_tasks, return_exceptions=True)
+
+                # Handle ACK/NACK for AT_LEAST_ONCE delivery
+                if needs_ack:
+                    if event.is_acknowledged():
+                        # Explicitly ACK'd or NACK'd without requeue
+                        # Successfully processed, remove from pending
+                        self._pending_events.pop(event.id, None)
+                    elif event._nack_requeue:
+                        # Explicit NACK with requeue=True - don't auto-ACK
+                        if event.should_retry():
+                            # Reset flag before re-queuing for next delivery
+                            event.reset_for_redelivery()
+                            if event.id in self._pending_events:
+                                del self._pending_events[event.id]
+                            try:
+                                self._event_queue.put_nowait(event)
+                            except queue.Full:
+                                # Queue full - drop and count as lost
+                                self._dropped_event_count += 1
+                                logger.warning(
+                                    f"AT_LEAST_ONCE event {event.id} dropped on retry - queue full"
+                                )
+                        else:
+                            # Max retries reached
+                            self._pending_events.pop(event.id, None)
+                            logger.error(
+                                f"AT_LEAST_ONCE event {event.id} failed after "
+                                f"{event._delivery_count} delivery attempts"
+                            )
+                    elif not any(isinstance(r, Exception) for r in results if r is not None):
+                        # No exceptions in handlers and not explicitly NACK'd
+                        # Treat successful completion as implicit ACK
+                        # This maintains backward compatibility with handlers that don't call ack()
+                        await event.ack()
+                        self._pending_events.pop(event.id, None)
+                    else:
+                        # Handler raised exception - treat as NACK with requeue
+                        if event.should_retry():
+                            event.increment_delivery_count()
+                            if event.id in self._pending_events:
+                                del self._pending_events[event.id]
+                            try:
+                                self._event_queue.put_nowait(event)
+                            except queue.Full:
+                                self._dropped_event_count += 1
+                                logger.warning(
+                                    f"AT_LEAST_ONCE event {event.id} dropped on retry - queue full"
+                                )
+                        else:
+                            # Max retries reached
+                            self._pending_events.pop(event.id, None)
+                            logger.error(
+                                f"AT_LEAST_ONCE event {event.id} failed after "
+                                f"{event._delivery_count} delivery attempts"
+                            )
 
             except asyncio.CancelledError:
                 break

@@ -2188,6 +2188,22 @@ class SemanticToolSelector:
             self._sequence_tracker.clear_history()
             logger.debug("Cleared sequence tracker session history")
 
+    def notify_tools_changed(self) -> None:
+        """Notify selector that tools registry has changed (cache invalidation).
+
+        Call this when:
+        - Tools are added/removed/modified
+        - Tool definitions are updated
+        - Tool metadata changes
+
+        This invalidates internal caches:
+        - Tools hash (for cache key generation)
+        - Category memberships cache
+        """
+        self._tools_hash = None
+        self._category_memberships_cache.clear()
+        logger.info("SemanticToolSelector: Notified of tools registry change, caches invalidated")
+
     async def close(self) -> None:
         """Close HTTP client and save usage cache (Phase 3)."""
         # Phase 3: Save usage statistics before shutdown (force save)

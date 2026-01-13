@@ -135,6 +135,24 @@ class MessagingEvent:
     headers: Dict[str, str] = field(default_factory=dict)
     delivery_guarantee: DeliveryGuarantee = DeliveryGuarantee.AT_MOST_ONCE
 
+    # Delivery tracking fields (not serialized)
+    _acknowledged: bool = field(default=False, compare=False, repr=False)
+    _delivery_count: int = field(default=0, compare=False, repr=False)
+    _max_delivery_count: int = field(default=3, compare=False, repr=False)
+    _nack_requeue: bool = field(default=False, compare=False, repr=False)  # Track explicit NACK with requeue
+
+    def is_acknowledged(self) -> bool:
+        """Check if event has been acknowledged."""
+        return self._acknowledged
+
+    def should_retry(self) -> bool:
+        """Check if event should be retried."""
+        return self._delivery_count < self._max_delivery_count
+
+    def increment_delivery_count(self) -> None:
+        """Increment delivery count (for tracking retry attempts)."""
+        self._delivery_count += 1
+
     @property
     def category(self) -> str:
         """Extract category from topic (first part before the dot).
@@ -218,6 +236,35 @@ class MessagingEvent:
             return False
 
         return all(p == "*" or p == t for p, t in zip(pattern_parts, topic_parts))
+
+    async def ack(self) -> None:
+        """Acknowledge successful processing of this event.
+
+        For AT_LEAST_ONCE delivery, this tells the backend the event
+        was processed successfully and can be removed from pending state.
+        """
+        self._acknowledged = True
+
+    async def nack(self, requeue: bool = False) -> None:
+        """Negative acknowledgement - failed to process this event.
+
+        Args:
+            requeue: If True, event will be redelivered. If False, it's dropped.
+
+        For AT_LEAST_ONCE delivery, this tells the backend the event
+        failed to process and should be retried (if requeue=True).
+        """
+        if requeue:
+            self.increment_delivery_count()
+            self._nack_requeue = True  # Mark that explicit NACK with requeue was called
+        else:
+            # If not requeuing, mark as acknowledged to drop it
+            self._acknowledged = True
+            self._nack_requeue = False
+
+    def reset_for_redelivery(self) -> None:
+        """Reset the _nack_requeue flag before redelivery."""
+        self._nack_requeue = False
 
 
 @dataclass

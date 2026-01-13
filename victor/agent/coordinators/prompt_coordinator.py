@@ -22,6 +22,7 @@ Design Patterns:
     - Builder Pattern: Build complex prompts from multiple parts
     - Chain of Responsibility: Try contributors in priority order
     - SRP: Focused only on prompt building coordination
+    - Protocol Pattern: IPromptBuilderCoordinator for dependency inversion
 
 Usage:
     from victor.agent.coordinators.prompt_coordinator import PromptCoordinator
@@ -38,9 +39,54 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+import logging
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 from victor.protocols import IPromptContributor, PromptContext
+
+if TYPE_CHECKING:
+    from victor.framework.prompt import PromptBuilder
+
+logger = logging.getLogger(__name__)
+
+
+class IPromptBuilderCoordinator:
+    """Protocol for prompt building coordination.
+
+    Defines the interface for building system prompts with dynamic
+    adaptations based on model capabilities and context.
+    """
+
+    def build_system_prompt_with_adapter(
+        self,
+        prompt_builder: "PromptBuilder",
+        get_model_context_window: Callable[[], int],
+        model: str,
+        session_id: str,
+    ) -> str:
+        """Build system prompt with tool calling adapter.
+
+        Args:
+            prompt_builder: The prompt builder instance
+            get_model_context_window: Function to get model context window
+            model: Model name
+            session_id: Session identifier
+
+        Returns:
+            Built system prompt string
+        """
+        ...
+
+    def get_thinking_disabled_prompt(self, base_prompt: str) -> str:
+        """Get prompt with thinking mode disabled prefix.
+
+        Args:
+            base_prompt: The base prompt text
+
+        Returns:
+            Prompt with thinking disable prefix if available
+        """
+        ...
 
 
 class PromptCoordinator:
@@ -380,7 +426,204 @@ class TaskHintContributor(BasePromptContributor):
         return self._hints.copy()
 
 
+class PromptBuilderCoordinator(IPromptBuilderCoordinator):
+    """Coordinator for building system prompts with dynamic adaptations.
+
+    This coordinator extracts prompt building logic from the orchestrator,
+    providing a focused module for:
+    - Building system prompts with tool calling adapter
+    - Injecting dynamic parallel read budget hints
+    - Emitting RL events for prompt learning
+    - Handling thinking mode disable prefix for recovery scenarios
+
+    Responsibilities:
+    - Build system prompts using prompt_builder
+    - Calculate and inject parallel read budget based on context window
+    - Emit PROMPT_USED events for RL learning
+    - Provide thinking-disabled prompts for recovery scenarios
+
+    Design Patterns:
+    - SRP: Single responsibility for prompt building
+    - DIP: Depends on IPromptBuilderCoordinator protocol
+    - Builder: Constructs complex prompts from multiple parts
+    """
+
+    def __init__(
+        self,
+        tool_calling_caps: Optional[Any] = None,
+        enable_rl_events: bool = True,
+    ) -> None:
+        """Initialize the prompt builder coordinator.
+
+        Args:
+            tool_calling_caps: Tool calling capabilities from model config
+            enable_rl_events: Whether to emit RL events
+        """
+        self._tool_calling_caps = tool_calling_caps
+        self._enable_rl_events = enable_rl_events
+
+    def build_system_prompt_with_adapter(
+        self,
+        prompt_builder: "PromptBuilder",
+        get_model_context_window: Callable[[], int],
+        model: str,
+        session_id: str,
+        provider_name: str = "unknown",
+    ) -> str:
+        """Build system prompt using the tool calling adapter.
+
+        Includes dynamic parallel read budget based on model's context window.
+
+        Args:
+            prompt_builder: The PromptBuilder instance
+            get_model_context_window: Function to get model context window size
+            model: Model name
+            session_id: Session identifier for RL tracking
+            provider_name: Provider name for RL tracking
+
+        Returns:
+            Built system prompt with dynamic budget hint if applicable
+
+        Example:
+            prompt = coordinator.build_system_prompt_with_adapter(
+                prompt_builder=self.prompt_builder,
+                get_model_context_window=lambda: 128000,
+                model="claude-sonnet-4-5",
+                session_id="session-123",
+                provider_name="anthropic"
+            )
+        """
+        from victor.agent.context_compactor import calculate_parallel_read_budget
+
+        base_prompt = prompt_builder.build()
+
+        # Calculate dynamic parallel read budget based on model context window
+        context_window = get_model_context_window()
+        budget = calculate_parallel_read_budget(context_window)
+
+        # Inject dynamic budget hint for models with reasonable context
+        # Only add for models with >= 32K context (smaller models benefit from sequential reads)
+        if context_window >= 32768:
+            budget_hint = budget.to_prompt_hint()
+            final_prompt = f"{base_prompt}\n\n{budget_hint}"
+        else:
+            final_prompt = base_prompt
+
+        # Emit prompt_used event for RL learning
+        self._emit_prompt_used_event(
+            final_prompt,
+            provider_name=provider_name,
+            model=model,
+            session_id=session_id,
+        )
+
+        return final_prompt
+
+    def _emit_prompt_used_event(
+        self,
+        prompt: str,
+        provider_name: str,
+        model: str,
+        session_id: str,
+    ) -> None:
+        """Emit PROMPT_USED event for RL prompt template learner.
+
+        Args:
+            prompt: The final system prompt that was built
+            provider_name: Name of the provider
+            model: Model name
+            session_id: Session identifier
+
+        Note:
+            RL hook failure should never block prompt building.
+        """
+        if not self._enable_rl_events:
+            return
+
+        try:
+            from victor.framework.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+
+            hooks = get_rl_hooks()
+            if hooks is None:
+                return
+
+            # Determine prompt style based on provider type
+            # Cloud providers use concise style, local uses detailed
+            is_local = provider_name.lower() in {"ollama", "lmstudio", "vllm"}
+            prompt_style = "detailed" if is_local else "structured"
+
+            # Calculate prompt characteristics
+            has_examples = "example" in prompt.lower() or "e.g." in prompt.lower()
+            has_thinking = "step by step" in prompt.lower() or "think" in prompt.lower()
+            has_constraints = "must" in prompt.lower() or "always" in prompt.lower()
+
+            event = RLEvent(
+                type=RLEventType.PROMPT_USED,
+                success=True,  # Prompt was successfully built
+                quality_score=0.5,  # Neutral until we get outcome feedback
+                provider=provider_name,
+                model=model,
+                task_type="general",  # Will be updated with actual task type
+                metadata={
+                    "prompt_style": prompt_style,
+                    "prompt_length": len(prompt),
+                    "has_examples": has_examples,
+                    "has_thinking_prompt": has_thinking,
+                    "has_constraints": has_constraints,
+                    "session_id": session_id,
+                },
+            )
+            hooks.emit(event)
+            logger.debug(f"Emitted prompt_used event: style={prompt_style}")
+
+        except Exception as e:
+            # RL hook failure should never block prompt building
+            logger.debug(f"Failed to emit prompt_used event: {e}")
+
+    def get_thinking_disabled_prompt(self, base_prompt: str) -> str:
+        """Prefix a prompt with the thinking disable prefix if supported.
+
+        IMPORTANT: This should ONLY be used in RECOVERY scenarios where:
+        - Model returned empty response (stuck in thinking)
+        - Context overflow forced completion
+        - Iteration limit forced completion
+
+        Normal model calls should NOT use this - thinking mode produces
+        better quality results. This is a last-resort recovery mechanism.
+
+        For models with thinking mode (e.g., Qwen3), prepends the configured
+        disable prefix (e.g., "/no_think") to get direct responses without
+        internal reasoning overhead.
+
+        Args:
+            base_prompt: The base prompt text
+
+        Returns:
+            Prompt with thinking disable prefix if available, otherwise base_prompt
+
+        Example:
+            # In recovery scenario where model is stuck in thinking mode
+            recovery_prompt = coordinator.get_thinking_disabled_prompt(
+                "Summarize what you've found."
+            )
+        """
+        prefix = getattr(self._tool_calling_caps, "thinking_disable_prefix", None)
+        if prefix:
+            return f"{prefix}\n{base_prompt}"
+        return base_prompt
+
+    def set_tool_calling_caps(self, caps: Any) -> None:
+        """Update tool calling capabilities.
+
+        Args:
+            caps: New tool calling capabilities
+        """
+        self._tool_calling_caps = caps
+
+
 __all__ = [
+    "IPromptBuilderCoordinator",
+    "PromptBuilderCoordinator",
     "PromptCoordinator",
     "PromptBuildError",
     "BasePromptContributor",

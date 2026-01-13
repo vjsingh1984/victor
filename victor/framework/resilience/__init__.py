@@ -12,39 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Framework-layer facade for resilience patterns.
+"""Framework resilience module with retry handlers and circuit breakers.
 
 This module provides a unified access point to resilience components from
 the framework layer. It re-exports existing implementations from core modules
-without duplicating code, following the Facade Pattern.
+and provides new workflow-specific retry handlers.
 
 Delegated modules:
 - victor.providers.circuit_breaker: Standalone circuit breaker with decorator support
 - victor.providers.resilience: ResilientProvider with circuit breaker + retry + fallback
 - victor.core.retry: Unified retry strategies (exponential, linear, fixed)
+- victor.framework.resilience.retry: New workflow retry handlers
 
-Design Pattern: Facade
-- Single import point for framework users
-- No code duplication - pure re-exports
-- Maintains backward compatibility with original modules
-- Enables discovery of resilience capabilities through framework namespace
-
-Example:
-    from victor.framework import (
+Quick Start:
+    from victor.framework.resilience import (
         # Circuit Breaker
         CircuitBreaker,
-        CircuitBreakerRegistry,
-        CircuitState,
-
-        # Resilient Provider (complete solution)
-        ResilientProvider,
-        CircuitBreakerConfig,
-        ProviderRetryConfig,
-
         # Retry Strategies
         ExponentialBackoffStrategy,
-        LinearBackoffStrategy,
         with_retry,
+        # Workflow Handlers
+        RetryHandler,
+        retry_with_backoff,
     )
 
     # Use standalone circuit breaker
@@ -57,16 +46,15 @@ Example:
     async def retriable_operation():
         ...
 
-    # Use resilient provider (combines everything)
-    provider = ResilientProvider(
-        primary_provider=anthropic_provider,
-        fallback_providers=[openai_provider],
-        circuit_config=CircuitBreakerConfig(failure_threshold=5),
-        retry_config=ProviderRetryConfig(max_retries=3),
-    )
-"""
+    # Use retry handler in code
+    result = await retry_with_backoff(api_call, max_retries=5)
 
-from __future__ import annotations
+    # In YAML workflows:
+    #   - id: fetch_with_retry
+    #     type: compute
+    #     handler: retry_with_backoff
+    #     tools: [http_get]
+"""
 
 # =============================================================================
 # Circuit Breaker (Standalone)
@@ -115,6 +103,25 @@ from victor.core.retry import (
     with_retry_sync,
 )
 
+# =============================================================================
+# Framework-Specific Retry Handlers
+# From: victor/framework/resilience/retry.py
+# =============================================================================
+from victor.framework.resilience.retry import (
+    DatabaseRetryHandler,
+    FRAMEWORK_RETRY_HANDLERS,
+    NetworkRetryHandler,
+    RateLimitRetryHandler,
+    register_framework_retry_handlers,
+    retry_with_backoff,
+    retry_with_backoff_sync,
+    RetryConfig,
+    RetryHandler,
+    RetryHandlerConfig,
+    with_exponential_backoff,
+    with_exponential_backoff_sync,
+)
+
 __all__ = [
     # Circuit Breaker (Standalone)
     "CircuitBreaker",
@@ -145,4 +152,18 @@ __all__ = [
     "tool_retry_strategy",
     "with_retry",
     "with_retry_sync",
+    # Framework-Specific Retry Handlers
+    "RetryConfig",
+    "RetryHandlerConfig",
+    "RetryHandler",
+    "retry_with_backoff",
+    "retry_with_backoff_sync",
+    "with_exponential_backoff",
+    "with_exponential_backoff_sync",
+    # Specialized handlers
+    "NetworkRetryHandler",
+    "RateLimitRetryHandler",
+    "DatabaseRetryHandler",
+    "FRAMEWORK_RETRY_HANDLERS",
+    "register_framework_retry_handlers",
 ]

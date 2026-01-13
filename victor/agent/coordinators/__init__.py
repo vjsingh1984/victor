@@ -39,6 +39,8 @@ from victor.agent.coordinators.prompt_coordinator import (
     BasePromptContributor,
     SystemPromptContributor,
     TaskHintContributor,
+    IPromptBuilderCoordinator,
+    PromptBuilderCoordinator,
 )
 
 from victor.agent.coordinators.context_coordinator import (
@@ -56,6 +58,18 @@ from victor.agent.coordinators.analytics_coordinator import (
 )
 
 from victor.agent.coordinators.chat_coordinator import ChatCoordinator
+from victor.agent.coordinators.tool_coordinator import (
+    ToolCoordinator,
+    ToolCoordinatorConfig,
+    IToolCoordinator,
+    TaskContext,
+    create_tool_coordinator,
+)
+
+from victor.agent.coordinators.tool_selection_coordinator import (
+    ToolSelectionCoordinator,
+    IToolSelectionCoordinator,
+)
 
 __all__ = [
     # ConfigCoordinator
@@ -70,6 +84,8 @@ __all__ = [
     "BasePromptContributor",
     "SystemPromptContributor",
     "TaskHintContributor",
+    "IPromptBuilderCoordinator",
+    "PromptBuilderCoordinator",
     # ContextCoordinator
     "ContextCoordinator",
     "ContextCompactionError",
@@ -82,4 +98,13 @@ __all__ = [
     "ConsoleAnalyticsExporter",
     # ChatCoordinator
     "ChatCoordinator",
+    # ToolCoordinator
+    "ToolCoordinator",
+    "ToolCoordinatorConfig",
+    "IToolCoordinator",
+    "TaskContext",
+    "create_tool_coordinator",
+    # ToolSelectionCoordinator
+    "ToolSelectionCoordinator",
+    "IToolSelectionCoordinator",
 ]

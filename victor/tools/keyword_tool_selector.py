@@ -286,6 +286,21 @@ class KeywordToolSelector:
         """
         pass  # No resources to clean up
 
+    def notify_tools_changed(self) -> None:
+        """Notify selector that tools registry has changed (cache invalidation).
+
+        Call this when:
+        - Tools are added/removed/modified
+        - Tool definitions are updated
+
+        This invalidates internal caches:
+        - Core tools cache
+        - Core readonly cache
+        """
+        self._core_tools_cache = None
+        self._core_readonly_cache = None
+        logger.info("KeywordToolSelector: Notified of tools registry change, caches invalidated")
+
     # =========================================================================
     # Helper Methods (extracted from ToolSelector)
     # =========================================================================

@@ -46,7 +46,7 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from victor.protocols import (
     IAnalyticsExporter,
@@ -55,6 +55,12 @@ from victor.protocols import (
     AnalyticsQuery,
     AnalyticsResult,
 )
+
+if TYPE_CHECKING:
+    from victor.agent.coordinators.evaluation_coordinator import EvaluationCoordinator
+    from victor.agent.coordinators.metrics_coordinator import MetricsCoordinator
+    from victor.agent.memory.memory_manager import MemoryManager
+    from victor.agent.stream_handler import StreamMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -98,15 +104,18 @@ class AnalyticsCoordinator:
         self,
         exporters: Optional[List[IAnalyticsExporter]] = None,
         enable_memory_storage: bool = True,
+        metrics_coordinator: Optional["MetricsCoordinator"] = None,
     ) -> None:
         """Initialize the analytics coordinator.
 
         Args:
             exporters: List of analytics exporters
             enable_memory_storage: Enable in-memory event storage
+            metrics_coordinator: Optional MetricsCoordinator for bridging
         """
         self._exporters = exporters or []
         self._enable_memory_storage = enable_memory_storage
+        self._metrics_coordinator = metrics_coordinator
         self._session_analytics: Dict[str, SessionAnalytics] = {}
 
     async def track_event(
@@ -140,8 +149,7 @@ class AnalyticsCoordinator:
         self._session_analytics[session_id].updated_at = datetime.utcnow().isoformat()
 
         logger.debug(
-            f"Tracked analytics event {event.get('type', 'unknown')} "
-            f"for session {session_id}"
+            f"Tracked analytics event {event.get('type', 'unknown')} " f"for session {session_id}"
         )
 
     async def export_analytics(
@@ -201,10 +209,7 @@ class AnalyticsCoordinator:
 
         # Export to all exporters in parallel
         results = await asyncio.gather(
-            *[
-                self._export_to_destination(exporter, export_data)
-                for exporter in target_exporters
-            ],
+            *[self._export_to_destination(exporter, export_data) for exporter in target_exporters],
             return_exceptions=True,
         )
 
@@ -214,9 +219,7 @@ class AnalyticsCoordinator:
             if isinstance(result, Exception):
                 errors.append(f"{target_exporters[i].exporter_type()}: {str(result)}")
             elif isinstance(result, ExportResult) and not result.success:
-                errors.append(
-                    f"{target_exporters[i].exporter_type()}: {result.error_message}"
-                )
+                errors.append(f"{target_exporters[i].exporter_type()}: {result.error_message}")
 
         return ExportResult(
             success=len(errors) == 0,
@@ -328,6 +331,369 @@ class AnalyticsCoordinator:
             "updated_at": session_analytics.updated_at,
         }
 
+    # === BRIDGE METHODS: Wrap MetricsCoordinator ===
+
+    def finalize_stream_metrics(
+        self, usage_data: Optional[Dict[str, int]] = None
+    ) -> Optional["StreamMetrics"]:
+        """Bridge to MetricsCoordinator.finalize_stream_metrics().
+
+        Delegates to MetricsCoordinator if available, otherwise returns None.
+
+        Args:
+            usage_data: Optional usage data for finalization
+
+        Returns:
+            StreamMetrics if coordinator available, None otherwise
+        """
+        if not self._metrics_coordinator:
+            return None
+        return self._metrics_coordinator.finalize_stream_metrics(usage_data)
+
+    def get_last_stream_metrics(self) -> Optional["StreamMetrics"]:
+        """Bridge to MetricsCoordinator.get_last_stream_metrics().
+
+        Returns:
+            Last StreamMetrics if coordinator available, None otherwise
+        """
+        if not self._metrics_coordinator:
+            return None
+        return self._metrics_coordinator.get_last_stream_metrics()
+
+    def get_streaming_metrics_summary(self) -> Optional[Dict[str, Any]]:
+        """Bridge to MetricsCoordinator.get_streaming_metrics_summary().
+
+        Returns:
+            Metrics summary dict if coordinator available, None otherwise
+        """
+        if not self._metrics_coordinator:
+            return None
+        return self._metrics_coordinator.get_streaming_metrics_summary()
+
+    def get_streaming_metrics_history(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Bridge to MetricsCoordinator.get_streaming_metrics_history().
+
+        Args:
+            limit: Maximum number of history entries to return
+
+        Returns:
+            List of metrics dicts if coordinator available, empty list otherwise
+        """
+        if not self._metrics_coordinator:
+            return []
+        return self._metrics_coordinator.get_streaming_metrics_history(limit)
+
+    def get_session_cost_summary(self) -> Dict[str, Any]:
+        """Bridge to MetricsCoordinator.get_session_cost_summary().
+
+        Returns:
+            Session cost summary if coordinator available, empty dict otherwise
+        """
+        if not self._metrics_coordinator:
+            return {}
+        return self._metrics_coordinator.get_session_cost_summary()
+
+    def get_session_cost(self) -> float:
+        """Bridge to MetricsCoordinator.get_session_cost().
+
+        Returns:
+            Total session cost if coordinator available, 0.0 otherwise
+        """
+        if not self._metrics_coordinator:
+            return 0.0
+        return self._metrics_coordinator.get_session_cost()
+
+    def get_token_usage(self) -> Dict[str, int]:
+        """Bridge to MetricsCoordinator.get_token_usage().
+
+        Returns:
+            Token usage dict if coordinator available, empty dict otherwise
+        """
+        if not self._metrics_coordinator:
+            return {}
+        return self._metrics_coordinator.get_token_usage()
+
+    def get_model_usage(self) -> Dict[str, int]:
+        """Bridge to MetricsCoordinator.get_model_usage().
+
+        Returns:
+            Model usage dict if coordinator available, empty dict otherwise
+        """
+        if not self._metrics_coordinator:
+            return {}
+        return self._metrics_coordinator.get_model_usage()
+
+    def get_provider_usage(self) -> Dict[str, int]:
+        """Bridge to MetricsCoordinator.get_provider_usage().
+
+        Returns:
+            Provider usage dict if coordinator available, empty dict otherwise
+        """
+        if not self._metrics_coordinator:
+            return {}
+        return self._metrics_coordinator.get_provider_usage()
+
+    def get_session_cost_formatted(self) -> str:
+        """Bridge to MetricsCoordinator.get_session_cost_formatted().
+
+        Returns:
+            Formatted cost string if coordinator available, 'cost n/a' otherwise
+        """
+        if not self._metrics_coordinator:
+            return "cost n/a"
+        return self._metrics_coordinator.get_session_cost_formatted()
+
+    def export_session_costs(
+        self,
+        path: str,
+        format: str = "json",
+    ) -> None:
+        """Bridge to MetricsCoordinator.export_session_costs().
+
+        Args:
+            path: File path to export costs to
+            format: Export format ('json' or 'csv')
+
+        Raises:
+            RuntimeError: If MetricsCoordinator not available
+        """
+        if not self._metrics_coordinator:
+            raise RuntimeError("MetricsCoordinator not available")
+        return self._metrics_coordinator.export_session_costs(path, format)
+
+    def get_optimization_status(
+        self,
+        context_compactor: Optional[Any] = None,
+        usage_analytics: Optional[Any] = None,
+        sequence_tracker: Optional[Any] = None,
+        code_correction_middleware: Optional[Any] = None,
+        safety_checker: Optional[Any] = None,
+        auto_committer: Optional[Any] = None,
+        search_router: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """Get comprehensive status of all integrated optimization components.
+
+        Provides visibility into the health and statistics of all optimization
+        components for debugging, monitoring, and observability.
+
+        Args:
+            context_compactor: Optional ContextCompactor instance
+            usage_analytics: Optional UsageAnalytics instance
+            sequence_tracker: Optional ToolSequenceTracker instance
+            code_correction_middleware: Optional code correction middleware
+            safety_checker: Optional SafetyChecker instance
+            auto_committer: Optional AutoCommitter instance
+            search_router: Optional SearchRouter instance
+
+        Returns:
+            Dictionary with component status and statistics:
+            - context_compactor: Compaction stats, utilization, threshold
+            - usage_analytics: Tool/provider metrics, session info
+            - sequence_tracker: Pattern learning stats, suggestions
+            - code_correction: Enabled status, correction stats
+            - safety_checker: Enabled status, pattern counts
+            - auto_committer: Enabled status, commit history
+            - search_router: Routing stats, pattern matches
+        """
+        import time
+
+        status: Dict[str, Any] = {
+            "timestamp": time.time(),
+            "components": {},
+        }
+
+        # Context Compactor
+        if context_compactor:
+            status["components"]["context_compactor"] = context_compactor.get_statistics()
+
+        # Usage Analytics
+        if usage_analytics:
+            try:
+                status["components"]["usage_analytics"] = {
+                    "session_active": usage_analytics._current_session is not None,
+                    "tool_records_count": len(usage_analytics._tool_records),
+                    "provider_records_count": len(usage_analytics._provider_records),
+                }
+            except Exception:
+                status["components"]["usage_analytics"] = {"status": "error"}
+
+        # Sequence Tracker
+        if sequence_tracker:
+            try:
+                status["components"]["sequence_tracker"] = sequence_tracker.get_statistics()
+            except Exception:
+                status["components"]["sequence_tracker"] = {"status": "error"}
+
+        # Code Correction Middleware
+        status["components"]["code_correction"] = {
+            "enabled": code_correction_middleware is not None,
+        }
+        if code_correction_middleware:
+            # Support both old-style (with config) and new vertical middleware (without config)
+            if hasattr(code_correction_middleware, "config"):
+                status["components"]["code_correction"]["config"] = {
+                    "auto_fix": code_correction_middleware.config.auto_fix,
+                    "max_iterations": code_correction_middleware.config.max_iterations,
+                }
+            else:
+                # New vertical middleware - use get_config() if available or default values
+                status["components"]["code_correction"]["config"] = {
+                    "auto_fix": getattr(code_correction_middleware, "auto_fix", True),
+                    "max_iterations": getattr(
+                        code_correction_middleware, "max_iterations", 1
+                    ),
+                }
+
+        # Safety Checker
+        status["components"]["safety_checker"] = {
+            "enabled": safety_checker is not None,
+            "has_confirmation_callback": (
+                safety_checker.confirmation_callback is not None
+                if safety_checker
+                else False
+            ),
+        }
+
+        # Auto Committer
+        status["components"]["auto_committer"] = {
+            "enabled": auto_committer is not None,
+        }
+        if auto_committer:
+            status["components"]["auto_committer"]["auto_commit"] = auto_committer.auto_commit
+
+        # Search Router
+        status["components"]["search_router"] = {
+            "enabled": search_router is not None,
+        }
+
+        # Overall health
+        enabled_count = sum(
+            1
+            for c in status["components"].values()
+            if c.get("enabled", True) and c.get("status") != "error"
+        )
+        status["health"] = {
+            "enabled_components": enabled_count,
+            "total_components": len(status["components"]),
+            "status": "healthy" if enabled_count >= 4 else "degraded",
+        }
+
+        return status
+
+    def get_tool_usage_stats(
+        self,
+        conversation_state_summary: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Bridge to MetricsCollector.get_tool_usage_stats().
+
+        Access MetricsCollector through MetricsCoordinator.
+
+        Args:
+            conversation_state_summary: Optional conversation state summary
+
+        Returns:
+            Tool usage stats if coordinator available, empty dict otherwise
+        """
+        if not self._metrics_coordinator:
+            return {}
+        # Access MetricsCollector through MetricsCoordinator
+        return self._metrics_coordinator.get_tool_usage_stats(
+            conversation_state_summary=conversation_state_summary
+        )
+
+    def get_session_stats_ext(
+        self,
+        memory_manager: Optional["MemoryManager"] = None,
+        session_id: Optional[str] = None,
+        fallback_message_count: int = 0,
+    ) -> Dict[str, Any]:
+        """Get session stats, bridging to MemoryManager.
+
+        This method provides a unified interface for session statistics,
+        bridging to MemoryManager when available, with fallback handling.
+
+        Args:
+            memory_manager: Optional MemoryManager instance
+            session_id: Optional session ID for MemoryManager lookup
+            fallback_message_count: Fallback message count if no MemoryManager
+
+        Returns:
+            Session stats dict with keys:
+            - enabled: bool (whether MemoryManager is active)
+            - message_count: int (from MemoryManager or fallback)
+            - session_id: str (if available)
+            Plus any additional stats from MemoryManager
+        """
+        if not memory_manager or not session_id:
+            return {
+                "enabled": False,
+                "message_count": fallback_message_count,
+            }
+
+        try:
+            stats = memory_manager.get_session_stats(session_id)
+            return stats
+        except Exception as e:
+            import logging
+
+            logger_ext = logging.getLogger(__name__)
+            logger_ext.warning(f"Failed to get session stats: {e}")
+            return {
+                "enabled": True,
+                "message_count": fallback_message_count,
+                "error": str(e),
+            }
+
+    def flush_analytics(
+        self,
+        evaluation_coordinator: Optional["EvaluationCoordinator"] = None,
+        tool_cache: Optional[Any] = None,
+    ) -> Dict[str, bool]:
+        """Flush all analytics data to persistent storage.
+
+        This method provides a unified flush interface that:
+        1. Flushes EvaluationCoordinator analytics (UsageAnalytics, ToolSequenceTracker)
+        2. Flushes tool_cache if available
+
+        Args:
+            evaluation_coordinator: Optional EvaluationCoordinator to flush
+            tool_cache: Optional tool cache to flush
+
+        Returns:
+            Dictionary with success status for each component:
+            - usage_analytics: bool (UsageAnalytics flushed successfully)
+            - sequence_tracker: bool (ToolSequenceTracker flushed successfully)
+            - tool_cache: bool (tool_cache flushed successfully, or True if no cache)
+        """
+        results = {
+            "usage_analytics": False,
+            "sequence_tracker": False,
+            "tool_cache": True,  # Default to True if no cache
+        }
+
+        if evaluation_coordinator:
+            try:
+                flush_results = evaluation_coordinator.flush_analytics()
+                results.update(flush_results)
+            except Exception as e:
+                import logging
+
+                logger_flush = logging.getLogger(__name__)
+                logger_flush.error(f"Failed to flush evaluation coordinator: {e}")
+
+        if tool_cache:
+            try:
+                tool_cache.flush()
+                results["tool_cache"] = True
+            except Exception as e:
+                import logging
+
+                logger_flush = logging.getLogger(__name__)
+                logger_flush.error(f"Failed to flush tool cache: {e}")
+                results["tool_cache"] = False
+
+        return results
+
     def add_exporter(
         self,
         exporter: IAnalyticsExporter,
@@ -398,6 +764,7 @@ class AnalyticsCoordinator:
 
 
 # Built-in exporters
+
 
 class BaseAnalyticsExporter(IAnalyticsExporter):
     """Base class for analytics exporters.
@@ -476,7 +843,7 @@ class ConsoleAnalyticsExporter(BaseAnalyticsExporter):
                 if event.get("data"):
                     print(f"    Data: {event['data']}")
 
-        print(f"=== End Export ===\n")
+        print("=== End Export ===\n")
 
         return ExportResult(
             success=True,

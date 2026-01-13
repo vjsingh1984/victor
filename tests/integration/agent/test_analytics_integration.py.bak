@@ -1,0 +1,750 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Integration tests for full analytics flow.
+
+This module tests the complete analytics workflow from tracking events
+to exporting analytics data across multiple exporters.
+
+Test Coverage:
+    - Event tracking and persistence
+    - Multi-exporter coordination
+    - Query and retrieval operations
+    - Session statistics aggregation
+    - Data clearing operations
+    - Error handling and recovery
+
+Integration Points:
+    - AnalyticsCoordinator
+    - ConsoleAnalyticsExporter
+    - MockAnalyticsExporter (for testing)
+    - AnalyticsEvent and AnalyticsQuery protocols
+"""
+
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from victor.agent.coordinators.analytics_coordinator import (
+    AnalyticsCoordinator,
+    ConsoleAnalyticsExporter,
+)
+from victor.agent.coordinators.evaluation_coordinator import EvaluationCoordinator
+from victor.protocols import (
+    ExportResult,
+)
+
+
+@pytest.mark.integration
+class TestFullAnalyticsFlow:
+    """Test full analytics flow from tracking to export.
+
+    These tests verify the complete analytics workflow including:
+    - Event tracking and storage
+    - Multi-exporter parallel execution
+    - Query and filtering operations
+    - Session statistics calculation
+    - Data clearing and cleanup
+    - Error handling across exporters
+    """
+
+    @pytest.fixture
+    def analytics_coordinator(self):
+        """Create AnalyticsCoordinator with mock exporters.
+
+        Returns a coordinator configured with:
+        - ConsoleAnalyticsExporter (verbose=False for clean test output)
+        - Mock exporter for verification
+
+        The mock exporter records export calls and simulates
+        successful exports with configurable behavior.
+        """
+        from victor.protocols import IAnalyticsExporter
+
+        # Create mock exporter
+        mock_exporter = MagicMock(spec=IAnalyticsExporter)
+        mock_exporter.exporter_type = MagicMock(return_value="mock")
+        mock_exporter.export = AsyncMock(
+            return_value=ExportResult(
+                success=True, exporter_type="mock", records_exported=2
+            )
+        )
+
+        return AnalyticsCoordinator(
+            exporters=[ConsoleAnalyticsExporter(verbose=False), mock_exporter],
+        )
+
+    @pytest.mark.asyncio
+    async def test_track_and_export_analytics_event(self, analytics_coordinator):
+        """Test tracking event and exporting analytics.
+
+        This test verifies the complete flow:
+        1. Track an analytics event
+        2. Export analytics to all configured exporters
+        3. Verify export was called on all exporters
+        4. Verify data integrity (event count, data preservation)
+
+        Expected Behavior:
+        - Event is stored in session analytics
+        - Export is called on all exporters
+        - Export result indicates success
+        - Event count matches tracked events
+        - Event data is preserved through export
+
+        TODO: Implement test
+        - Create AnalyticsEvent with tool_call type
+        - Track event using coordinator.track_event()
+        - Export analytics using coordinator.export_analytics()
+        - Assert export result success
+        - Assert mock exporter was called
+        - Assert event data integrity
+        """
+        # TODO: Implement full analytics tracking and export test
+        # This should fail until implementation is complete
+        assert False, "TODO: Implement test_track_and_export_analytics_event"
+
+    @pytest.mark.asyncio
+    async def test_query_analytics_after_tracking(self, analytics_coordinator):
+        """Test querying analytics after tracking events.
+
+        This test verifies query functionality:
+        1. Track multiple events of different types
+        2. Query analytics by session_id
+        3. Query analytics by event_type
+        4. Verify filtered results
+
+        Expected Behavior:
+        - Query returns matching events
+        - Session filter works correctly
+        - Event type filter works correctly
+        - Limit parameter is respected
+        - Results are in chronological order
+
+        TODO: Implement test
+        - Track multiple events (tool_call, llm_request, etc.)
+        - Query by session_id
+        - Query by event_type
+        - Assert result count matches expected
+        - Assert event types match filter
+        - Test limit parameter
+        """
+        # TODO: Implement analytics query test
+        # This should fail until implementation is complete
+        assert False, "TODO: Implement test_query_analytics_after_tracking"
+
+    @pytest.mark.asyncio
+    async def test_get_session_stats_from_coordinator(self, analytics_coordinator):
+        """Test getting session stats from coordinator.
+
+        This test verifies session statistics:
+        1. Track multiple events for a session
+        2. Get session statistics
+        3. Verify stats accuracy
+
+        Expected Behavior:
+        - Stats include total event count
+        - Stats include event type breakdown
+        - Stats include timestamps
+        - Stats include session_id
+        - Stats mark session as found
+
+        TODO: Implement test
+        - Track events of different types
+        - Call get_session_stats()
+        - Assert total_events count
+        - Assert event_counts dictionary
+        - Assert created_at and updated_at timestamps
+        - Assert found flag is True
+        """
+        # TODO: Implement session stats test
+        # This should fail until implementation is complete
+        assert False, "TODO: Implement test_get_session_stats_from_coordinator"
+
+    @pytest.mark.asyncio
+    async def test_clear_session_removes_data(self, analytics_coordinator):
+        """Test that clearing session removes analytics data.
+
+        This test verifies data cleanup:
+        1. Track events for a session
+        2. Clear the session
+        3. Query returns empty results
+        4. Session stats returns not found
+
+        Expected Behavior:
+        - clear_session() removes all data
+        - Query returns no events for cleared session
+        - Session stats indicates session not found
+        - Can track new events after clearing
+
+        TODO: Implement test
+        - Track multiple events
+        - Clear session using clear_session()
+        - Query analytics for cleared session
+        - Assert query returns empty results
+        - Assert session stats shows not found
+        - Verify can track new events after clear
+        """
+        # TODO: Implement session clear test
+        # This should fail until implementation is complete
+        assert False, "TODO: Implement test_clear_session_removes_data"
+
+    @pytest.mark.asyncio
+    async def test_export_to_multiple_exporters(self, analytics_coordinator):
+        """Test exporting to multiple exporters in parallel.
+
+        This test verifies parallel exporter execution:
+        1. Configure multiple exporters (3+)
+        2. Track analytics events
+        3. Export analytics
+        4. Verify all exporters called
+        5. Verify parallel execution (timing)
+
+        Expected Behavior:
+        - All exporters receive the same data
+        - Exporters are called in parallel (not sequential)
+        - Export result aggregates all exporter results
+        - Partial failures are handled correctly
+        - Export timing indicates parallel execution
+
+        TODO: Implement test
+        - Create 3 mock exporters with timing tracking
+        - Track analytics events
+        - Export analytics
+        - Assert all exporters called
+        - Assert exporters called in parallel (timing)
+        - Test partial failure scenario (one exporter fails)
+        - Assert error aggregation in result
+        """
+        # TODO: Implement multi-exporter parallel test
+        # This should fail until implementation is complete
+        assert False, "TODO: Implement test_export_to_multiple_exporters"
+
+    @pytest.mark.asyncio
+    async def test_export_failure_handling(self, analytics_coordinator):
+        """Test analytics export with failing exporters.
+
+        This test verifies error handling:
+        1. Configure exporters that fail
+        2. Track analytics events
+        3. Export analytics
+        4. Verify error handling
+
+        Expected Behavior:
+        - Failed exports don't crash coordinator
+        - Export result includes error details
+        - Successful exporters still complete
+        - Error messages are aggregated
+        - Result indicates partial success
+
+        TODO: Implement test
+        - Create failing exporter (raises exception)
+        - Create successful exporter
+        - Track events
+        - Export analytics
+        - Assert export result success=False
+        - Assert error_message contains failure details
+        - Assert successful exporter was still called
+        - Assert metadata includes failed_exporters count
+        """
+        # TODO: Implement export failure handling test
+        # This should fail until implementation is complete
+        assert False, "TODO: Implement test_export_failure_handling"
+
+    @pytest.mark.asyncio
+    async def test_query_with_time_range_filters(self, analytics_coordinator):
+        """Test querying analytics with time range filters.
+
+        This test verifies time-based filtering:
+        1. Track events with different timestamps
+        2. Query with start_time filter
+        3. Query with end_time filter
+        4. Query with both filters
+
+        Expected Behavior:
+        - start_time filter excludes earlier events
+        - end_time filter excludes later events
+        - Combined filter returns events in range
+        - Filters work correctly with edge cases
+        - Timestamps are compared correctly (ISO format)
+
+        TODO: Implement test
+        - Track events with specific timestamps
+        - Query with start_time only
+        - Query with end_time only
+        - Query with both start_time and end_time
+        - Assert filtered results match expected
+        - Test boundary conditions
+        """
+        # TODO: Implement time range filter test
+        # This should fail until implementation is complete
+        assert False, "TODO: Implement test_query_with_time_range_filters"
+
+    @pytest.mark.asyncio
+    async def test_multi_session_isolation(self, analytics_coordinator):
+        """Test that multiple sessions maintain data isolation.
+
+        This test verifies session isolation:
+        1. Track events for multiple sessions
+        2. Query specific session
+        3. Clear one session
+        4. Verify other sessions unaffected
+
+        Expected Behavior:
+        - Each session maintains separate event list
+        - Querying one session doesn't return others' data
+        - Clearing one session doesn't affect others
+        - Session stats are independent
+        - Export works per session
+
+        TODO: Implement test
+        - Track events for session_1
+        - Track events for session_2
+        - Query session_1 (verify no session_2 events)
+        - Clear session_1
+        - Assert session_2 data intact
+        - Export session_2 successfully
+        """
+        # TODO: Implement multi-session isolation test
+        # This should fail until implementation is complete
+        assert False, "TODO: Implement test_multi_session_isolation"
+
+    @pytest.mark.asyncio
+    async def test_export_empty_session(self, analytics_coordinator):
+        """Test exporting a session with no events.
+
+        This test verifies handling of empty sessions:
+        1. Create session (track event then clear it)
+        2. Attempt export
+        3. Verify graceful handling
+
+        Expected Behavior:
+        - Export returns success or graceful error
+        - Exporters receive empty event list
+        - No crashes or exceptions
+        - Clear error message if failed
+
+        TODO: Implement test
+        - Create session by tracking and clearing
+        - Attempt export of empty session
+        - Assert appropriate result (success or error)
+        - Verify no exceptions raised
+        - Check error message if failed
+        """
+        # TODO: Implement empty session export test
+        # This should fail until implementation is complete
+        assert False, "TODO: Implement test_export_empty_session"
+
+    @pytest.mark.asyncio
+    async def test_large_event_dataset_performance(self, analytics_coordinator):
+        """Test analytics performance with large event dataset.
+
+        This test verifies performance characteristics:
+        1. Track large number of events (100+)
+        2. Query with filters
+        3. Export analytics
+        4. Measure performance
+
+        Expected Behavior:
+        - Tracking scales linearly with event count
+        - Querying with filters is efficient
+        - Export handles large datasets
+        - No memory leaks or excessive memory usage
+        - Performance remains acceptable
+
+        TODO: Implement test
+        - Track 100+ events
+        - Query with various filters
+        - Export analytics
+        - Assert completion within reasonable time
+        - Verify memory usage is reasonable
+        - Check all events tracked correctly
+        """
+        # TODO: Implement large dataset performance test
+        # This should fail until implementation is complete
+        assert False, "TODO: Implement test_large_event_dataset_performance"
+
+
+@pytest.mark.integration
+class TestSessionStatsIntegration:
+    """Test session stats integration with MemoryManager (ConversationStore)."""
+
+    @pytest.fixture
+    def temp_db_path(self, tmp_path):
+        """Create a temporary database path for testing."""
+        return tmp_path / "test_session_stats.db"
+
+    @pytest.fixture
+    def memory_store(self, temp_db_path):
+        """Create a ConversationStore instance for testing."""
+        from victor.agent.conversation_memory import ConversationStore
+
+        store = ConversationStore(db_path=temp_db_path)
+        yield store
+        # Cleanup
+        if temp_db_path.exists():
+            temp_db_path.unlink()
+
+    @pytest.mark.asyncio
+    async def test_get_session_stats_with_memory_manager_enabled(self, memory_store):
+        """Test get_session_stats when MemoryManager is enabled.
+
+        Scenario:
+        1. Create orchestrator with memory_manager
+        2. Add messages to session
+        3. Get session stats
+        4. Verify accurate counts and metadata
+
+        Expected:
+        - Stats include message_count, total_tokens, available_tokens
+        - Stats include role_distribution
+        - Stats include tool_usage_count
+        - Stats include timestamps (created_at, last_activity, duration_seconds)
+
+        TODO: Implement this test after creating orchestrator fixture with MemoryManager enabled.
+        Expected assertions:
+        - assert stats["enabled"] is True
+        - assert stats["message_count"] == 5
+        - assert stats["total_tokens"] > 0
+        - assert stats["role_distribution"]["user"] == 3
+        - assert stats["role_distribution"]["assistant"] == 2
+        - assert "created_at" in stats
+        - assert "last_activity" in stats
+        - assert "duration_seconds" in stats
+        """
+        from victor.agent.conversation_memory import MessageRole
+
+        # Create a session
+        session = memory_store.create_session(project_path="/tmp/test_project")
+        session_id = session.session_id
+
+        # Add messages
+        memory_store.add_message(session_id, MessageRole.USER, "Hello")
+        memory_store.add_message(session_id, MessageRole.ASSISTANT, "Hi there!")
+        memory_store.add_message(session_id, MessageRole.USER, "How are you?")
+        memory_store.add_message(session_id, MessageRole.ASSISTANT, "I'm doing well!")
+        memory_store.add_message(session_id, MessageRole.USER, "Great!")
+
+        # Get session stats
+        stats = memory_store.get_session_stats(session_id)
+
+        # Verify stats (this is what the orchestrator should return)
+        assert stats is not None, "Session stats should not be None"
+        assert stats["session_id"] == session_id
+        assert stats["message_count"] == 5
+        assert stats["total_tokens"] >= 0
+        assert stats["available_tokens"] >= 0
+        assert stats["role_distribution"]["user"] == 3
+        assert stats["role_distribution"]["assistant"] == 2
+        assert "created_at" in stats
+        assert "last_activity" in stats
+        assert "duration_seconds" in stats
+
+        # TODO: Create orchestrator with memory_manager and verify orchestrator.get_session_stats()
+        # orchestrator = create_orchestrator_with_memory_manager(memory_store)
+        # orchestrator_stats = orchestrator.get_session_stats()
+        # assert orchestrator_stats["enabled"] is True
+        # assert orchestrator_stats["message_count"] == stats["message_count"]
+        assert False, "TODO: Implement orchestrator fixture and integration test"
+
+    @pytest.mark.asyncio
+    async def test_get_session_stats_without_memory_manager(self):
+        """Test get_session_stats when MemoryManager is disabled.
+
+        Scenario:
+        1. Create orchestrator without memory_manager
+        2. Get session stats
+        3. Verify fallback to message count
+
+        Expected:
+        - Stats show enabled: False
+        - Stats include session_id: None
+        - Stats include message_count from orchestrator.messages
+
+        TODO: Implement this test after creating orchestrator fixture without MemoryManager.
+        Expected assertions:
+        - assert stats["enabled"] is False
+        - assert stats["session_id"] is None
+        - assert stats["message_count"] == len(orchestrator.messages)
+        """
+        # TODO: Create orchestrator without memory_manager
+        # orchestrator = create_orchestrator_without_memory_manager()
+        # orchestrator.add_user_message("Test message")
+        # orchestrator.add_assistant_message("Test response")
+        # stats = orchestrator.get_session_stats()
+        # assert stats["enabled"] is False
+        # assert stats["session_id"] is None
+        # assert stats["message_count"] == 2
+        assert False, "TODO: Implement orchestrator fixture and integration test"
+
+    @pytest.mark.asyncio
+    async def test_get_session_stats_with_invalid_session_id(self, memory_store):
+        """Test get_session_stats with non-existent session.
+
+        Scenario:
+        1. Create orchestrator with memory_manager
+        2. Use invalid session_id
+        3. Verify graceful error handling
+
+        Expected:
+        - Returns empty dict from ConversationStore.get_session_stats()
+        - Orchestrator handles error gracefully
+        - No exceptions raised
+
+        TODO: Implement this test after creating orchestrator with MemoryManager.
+        Expected assertions:
+        - assert stats["enabled"] is True
+        - assert stats["error"] == "Session not found"
+        - assert "session_id" in stats
+        """
+        # Test that ConversationStore returns empty dict for invalid session
+        stats = memory_store.get_session_stats("invalid_session_id")
+        assert stats == {}, "Should return empty dict for non-existent session"
+
+        # TODO: Test orchestrator's error handling when memory_manager returns empty dict
+        # orchestrator = create_orchestrator_with_memory_manager(memory_store)
+        # orchestrator._memory_session_id = "invalid_session_id"
+        # stats = orchestrator.get_session_stats()
+        # assert stats["enabled"] is True
+        # assert stats["error"] == "Session not found"
+        assert False, "TODO: Implement orchestrator fixture and integration test"
+
+
+@pytest.mark.integration
+class TestFlushAnalyticsIntegration:
+    """Test flush_analytics integration."""
+
+    @pytest.fixture
+    def mock_usage_analytics(self):
+        """Create a mock UsageAnalytics instance."""
+        analytics = MagicMock()
+        analytics.flush = MagicMock()
+        return analytics
+
+    @pytest.fixture
+    def mock_sequence_tracker(self):
+        """Create a mock ToolSequenceTracker instance."""
+        tracker = MagicMock()
+        tracker.get_statistics = MagicMock(return_value={"unique_transitions": 42, "total_sequences": 10})
+        return tracker
+
+    @pytest.fixture
+    def evaluation_coordinator(self, mock_usage_analytics, mock_sequence_tracker):
+        """Create an EvaluationCoordinator instance with mocked dependencies."""
+        coordinator = EvaluationCoordinator(
+            usage_analytics=mock_usage_analytics,
+            sequence_tracker=mock_sequence_tracker,
+            get_rl_coordinator_fn=lambda: None,
+            get_vertical_context_fn=lambda: None,
+            get_stream_context_fn=lambda: None,
+            get_provider_fn=lambda: None,
+            get_model_fn=lambda: "claude-3-5-sonnet",
+            get_tool_calls_used_fn=lambda: 5,
+            get_intelligent_integration_fn=lambda: None,
+        )
+        return coordinator
+
+    @pytest.mark.asyncio
+    async def test_flush_analytics_calls_evaluation_coordinator(
+        self, evaluation_coordinator, mock_usage_analytics, mock_sequence_tracker
+    ):
+        """Test that flush_analytics calls EvaluationCoordinator.flush_analytics().
+
+        Scenario:
+        1. Create orchestrator with evaluation_coordinator
+        2. Flush analytics
+        3. Verify EvaluationCoordinator.flush_analytics() called
+        4. Verify tool_cache flushed if present
+
+        Expected:
+        - evaluation_coordinator.flush_analytics() called
+        - usage_analytics.flush() called
+        - sequence_tracker.get_statistics() called
+        - Returns dict with all components
+
+        TODO: Implement this test after creating orchestrator fixture.
+        Expected assertions:
+        - mock_usage_analytics.flush.assert_called_once()
+        - mock_sequence_tracker.get_statistics.assert_called_once()
+        - results["usage_analytics"] is True
+        - results["sequence_tracker"] is True
+        """
+        # Test coordinator-level flushing
+        results = evaluation_coordinator.flush_analytics()
+
+        # Verify coordinator called its components
+        mock_usage_analytics.flush.assert_called_once()
+        mock_sequence_tracker.get_statistics.assert_called_once()
+
+        # Verify results structure
+        assert isinstance(results, dict)
+        assert "usage_analytics" in results
+        assert "sequence_tracker" in results
+        assert "tool_cache" in results
+        assert results["usage_analytics"] is True
+        assert results["sequence_tracker"] is True
+
+        # TODO: Test orchestrator-level flushing
+        # orchestrator = create_orchestrator_with_coordinator(evaluation_coordinator)
+        # orchestrator.tool_cache = MagicMock()
+        # orchestrator.tool_cache.flush = MagicMock()
+        # results = orchestrator.flush_analytics()
+        # assert results["tool_cache"] is True
+        assert False, "TODO: Implement orchestrator fixture and integration test"
+
+    @pytest.mark.asyncio
+    async def test_flush_analytics_returns_success_dict(self, evaluation_coordinator):
+        """Test that flush_analytics returns proper success dictionary.
+
+        Scenario:
+        1. Flush analytics
+        2. Verify return type: Dict[str, bool]
+        3. Verify keys: usage_analytics, sequence_tracker, tool_cache
+
+        Expected:
+        - Returns dict with 3 keys
+        - All values are booleans
+        - usage_analytics: True if UsageAnalytics.flush() succeeds
+        - sequence_tracker: True if ToolSequenceTracker.get_statistics() succeeds
+        - tool_cache: False (not managed by coordinator)
+
+        TODO: Extend this test for orchestrator-level flushing.
+        Expected assertions:
+        - assert isinstance(results, dict)
+        - assert len(results) == 3
+        - assert all(isinstance(v, bool) for v in results.values())
+        """
+        results = evaluation_coordinator.flush_analytics()
+
+        # Verify return type
+        assert isinstance(results, dict), "Results should be a dictionary"
+        assert len(results) == 3, "Results should have 3 keys"
+
+        # Verify expected keys
+        expected_keys = {"usage_analytics", "sequence_tracker", "tool_cache"}
+        assert set(results.keys()) == expected_keys, f"Expected keys {expected_keys}"
+
+        # Verify all values are booleans
+        assert all(isinstance(v, bool) for v in results.values()), "All values should be boolean"
+
+        # TODO: Test orchestrator-level return value
+        # orchestrator = create_orchestrator_with_coordinator(evaluation_coordinator)
+        # results = orchestrator.flush_analytics()
+        # assert "tool_cache" in results
+        assert False, "TODO: Implement orchestrator fixture and integration test"
+
+    @pytest.mark.asyncio
+    async def test_flush_analytics_handles_exporter_errors(self):
+        """Test that flush_analytics handles exporter errors gracefully.
+
+        Scenario:
+        1. Create coordinator with failing exporter
+        2. Flush analytics
+        3. Verify errors aggregated, not raised
+
+        Expected:
+        - usage_analytics.flush() raises exception
+        - Error caught and logged
+        - results["usage_analytics"] is False
+        - Other components still flushed
+        - No exception propagated to caller
+
+        TODO: Implement this test after creating failing UsageAnalytics mock.
+        Expected assertions:
+        - results["usage_analytics"] is False
+        - results["sequence_tracker"] is True
+        - assert not raises Exception
+        """
+        # Create failing analytics
+        failing_analytics = MagicMock()
+        failing_analytics.flush = MagicMock(side_effect=Exception("Export failed"))
+
+        # Create working tracker
+        working_tracker = MagicMock()
+        working_tracker.get_statistics = MagicMock(return_value={"unique_transitions": 10})
+
+        # Create coordinator with failing exporter
+        coordinator = EvaluationCoordinator(
+            usage_analytics=failing_analytics,
+            sequence_tracker=working_tracker,
+            get_rl_coordinator_fn=lambda: None,
+            get_vertical_context_fn=lambda: None,
+            get_stream_context_fn=lambda: None,
+            get_provider_fn=lambda: None,
+            get_model_fn=lambda: "test-model",
+            get_tool_calls_used_fn=lambda: 0,
+            get_intelligent_integration_fn=lambda: None,
+        )
+
+        # Flush analytics - should not raise
+        results = coordinator.flush_analytics()
+
+        # Verify error handling
+        assert results["usage_analytics"] is False, "Failed analytics should return False"
+        assert results["sequence_tracker"] is True, "Working tracker should still succeed"
+
+        # TODO: Test orchestrator-level error handling
+        # orchestrator = create_orchestrator_with_coordinator(coordinator)
+        # results = orchestrator.flush_analytics()
+        # assert results["usage_analytics"] is False
+        assert False, "TODO: Implement orchestrator fixture and integration test"
+
+    @pytest.mark.asyncio
+    async def test_flush_analytics_with_no_exporters(self):
+        """Test flush_analytics when no exporters configured.
+
+        Scenario:
+        1. Create coordinator with no exporters
+        2. Flush analytics
+        3. Verify appropriate error/skip handling
+
+        Expected:
+        - usage_analytics is None
+        - sequence_tracker is None
+        - results["usage_analytics"] is False
+        - results["sequence_tracker"] is False
+        - results["tool_cache"] is False
+        - No exceptions raised
+
+        TODO: Implement this test and verify graceful handling.
+        Expected assertions:
+        - results["usage_analytics"] is False
+        - results["sequence_tracker"] is False
+        - results["tool_cache"] is False
+        """
+        # Create coordinator with no exporters
+        coordinator = EvaluationCoordinator(
+            usage_analytics=None,
+            sequence_tracker=None,
+            get_rl_coordinator_fn=lambda: None,
+            get_vertical_context_fn=lambda: None,
+            get_stream_context_fn=lambda: None,
+            get_provider_fn=lambda: None,
+            get_model_fn=lambda: "test-model",
+            get_tool_calls_used_fn=lambda: 0,
+            get_intelligent_integration_fn=lambda: None,
+        )
+
+        # Flush analytics
+        results = coordinator.flush_analytics()
+
+        # Verify all components return False
+        assert results["usage_analytics"] is False, "No analytics should return False"
+        assert results["sequence_tracker"] is False, "No tracker should return False"
+        assert results["tool_cache"] is False, "No tool cache should return False"
+
+        # TODO: Test orchestrator-level handling with no components
+        # orchestrator = create_orchestrator_with_no_analytics()
+        # results = orchestrator.flush_analytics()
+        # assert all(v is False for v in results.values())
+        assert False, "TODO: Implement orchestrator fixture and integration test"

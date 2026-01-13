@@ -40,7 +40,7 @@ from victor.core.verticals.base import VerticalBase, VerticalRegistry
 class MockVertical(VerticalBase):
     """Mock vertical for testing."""
 
-    name = "test_vertical"
+    name = "framework_shim_mock_vertical"
     description = "Test vertical for unit tests"
     version = "1.0.0"
 
@@ -50,7 +50,7 @@ class MockVertical(VerticalBase):
 
     @classmethod
     def get_system_prompt(cls):
-        return "You are a test assistant."
+        return "You are a framework shim test assistant."
 
     @classmethod
     def get_stages(cls):
@@ -287,7 +287,7 @@ class TestFrameworkShimVertical:
         """Register mock vertical for tests."""
         VerticalRegistry.register(MockVertical)
         yield
-        VerticalRegistry.unregister("test_vertical")
+        VerticalRegistry.unregister("framework_shim_mock_vertical")
 
     @pytest.mark.asyncio
     async def test_vertical_tools_applied(self, mock_settings, mock_orchestrator):
@@ -324,7 +324,7 @@ class TestFrameworkShimVertical:
             await shim.create_orchestrator()
 
             # New capability-based approach calls orchestrator.set_custom_prompt directly
-            mock_orchestrator.set_custom_prompt.assert_called_once_with("You are a test assistant.")
+            mock_orchestrator.set_custom_prompt.assert_called_once_with("You are a framework shim test assistant.")
 
     @pytest.mark.asyncio
     async def test_vertical_stages_applied(self, mock_settings, mock_orchestrator):
@@ -357,7 +357,7 @@ class TestFrameworkShimVertical:
         ) as mock_from_settings:
             mock_from_settings.return_value = mock_orchestrator
 
-            shim = FrameworkShim(mock_settings, vertical="test_vertical")
+            shim = FrameworkShim(mock_settings, vertical="framework_shim_mock_vertical")
             await shim.create_orchestrator()
 
             assert shim.vertical == MockVertical
@@ -397,7 +397,7 @@ class TestFrameworkShimVertical:
             config = shim.vertical_config
             assert config is not None
             # Check system_prompt contains expected text (may be prefixed by framework)
-            assert "test assistant" in config.system_prompt.lower()
+            assert "framework shim test assistant" in config.system_prompt.lower()
 
 
 class TestFrameworkShimLifecycle:
@@ -484,19 +484,19 @@ class TestGetVerticalFunction:
         """Register mock vertical for tests."""
         VerticalRegistry.register(MockVertical)
         yield
-        VerticalRegistry.unregister("test_vertical")
+        VerticalRegistry.unregister("framework_shim_mock_vertical")
 
     def test_get_vertical_by_exact_name(self):
         """Test getting vertical by exact name."""
-        vertical = get_vertical("test_vertical")
+        vertical = get_vertical("framework_shim_mock_vertical")
         assert vertical == MockVertical
 
     def test_get_vertical_case_insensitive(self):
         """Test case-insensitive vertical lookup."""
-        vertical = get_vertical("TEST_VERTICAL")
+        vertical = get_vertical("FRAMEWORK_SHIM_MOCK_VERTICAL")
         assert vertical == MockVertical
 
-        vertical = get_vertical("Test_Vertical")
+        vertical = get_vertical("Framework_Shim_Mock_Vertical")
         assert vertical == MockVertical
 
     def test_get_vertical_none(self):
@@ -532,12 +532,12 @@ class TestListVerticalsFunction:
         # Register mock vertical
         VerticalRegistry.register(MockVertical)
         yield
-        VerticalRegistry.unregister("test_vertical")
+        VerticalRegistry.unregister("framework_shim_mock_vertical")
 
     def test_list_verticals_includes_registered(self):
         """Test that list_verticals includes registered verticals."""
         names = list_verticals()
-        assert "test_vertical" in names
+        assert "framework_shim_mock_vertical" in names
 
     def test_list_verticals_includes_builtins(self):
         """Test that list_verticals includes built-in verticals."""

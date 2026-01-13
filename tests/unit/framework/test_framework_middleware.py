@@ -880,6 +880,279 @@ class TestMiddlewareIntegration:
         assert result.proceed is False
 
 
+# =============================================================================
+# CacheMiddleware Tests (Phase 2.3: Generic Middleware Library)
+# =============================================================================
+
+
+class TestCacheMiddleware:
+    """Tests for CacheMiddleware."""
+
+    @pytest.fixture
+    def middleware(self):
+        """Create a cache middleware instance."""
+        from victor.framework.middleware import CacheMiddleware
+
+        return CacheMiddleware(
+            ttl_seconds=300,  # 5 minutes
+            cacheable_tools={"read", "ls", "grep"},
+            key_components=["tool_name", "args"],  # What to include in cache key
+        )
+
+    @pytest.mark.asyncio
+    async def test_cacheable_tool_returns_cached_result(self, middleware):
+        """CacheMiddleware should return cached result on second call."""
+        args = {"path": "/tmp/test.txt"}
+
+        # First call - cache miss
+        result1 = await middleware.before_tool_call("read", args)
+        assert result1.cached_result is None
+        assert result1.proceed is True
+
+        # Simulate successful result
+        await middleware.after_tool_call(
+            "read", args, "file content", success=True
+        )
+
+        # Second call - cache hit
+        result2 = await middleware.before_tool_call("read", args)
+        assert result2.cached_result == "file content"
+        assert result2.proceed is False  # Don't proceed to actual tool call
+
+    @pytest.mark.asyncio
+    async def test_non_cacheable_tool_always_proceeds(self, middleware):
+        """Non-cacheable tools should always proceed to execution."""
+        args = {"command": "ls -la"}
+
+        result = await middleware.before_tool_call("bash", args)
+        assert result.cached_result is None
+        assert result.proceed is True
+
+    @pytest.mark.asyncio
+    async def test_failed_tool_calls_not_cached(self, middleware):
+        """Failed tool calls should not be cached."""
+        args = {"path": "/tmp/test.txt"}
+
+        await middleware.before_tool_call("read", args)
+        await middleware.after_tool_call(
+            "read", args, "error", success=False
+        )
+
+        # Should not cache failed calls
+        result2 = await middleware.before_tool_call("read", args)
+        assert result2.cached_result is None
+        assert result2.proceed is True
+
+    @pytest.mark.asyncio
+    async def test_cache_key_includes_tool_name(self, middleware):
+        """Cache key should differentiate between different tools."""
+        args1 = {"path": "/tmp/test.txt"}
+        args2 = {"path": "/tmp/test.txt"}
+
+        # Call different tools with same args
+        await middleware.before_tool_call("read", args1)
+        await middleware.after_tool_call("read", args1, "content", True)
+
+        result = await middleware.before_tool_call("ls", args2)
+        # Should not have cached result for different tool
+        assert result.cached_result is None
+        assert result.proceed is True
+
+    @pytest.mark.asyncio
+    async def test_cache_key_includes_arguments(self, middleware):
+        """Cache key should differentiate between different arguments."""
+        args1 = {"path": "/tmp/test1.txt"}
+        args2 = {"path": "/tmp/test2.txt"}
+
+        await middleware.before_tool_call("read", args1)
+        await middleware.after_tool_call("read", args1, "content1", True)
+
+        result = await middleware.before_tool_call("read", args2)
+        # Should not have cached result for different args
+        assert result.cached_result is None
+        assert result.proceed is True
+
+    @pytest.mark.asyncio
+    async def test_cache_invalidation(self, middleware):
+        """Cache should be invalidated when requested."""
+        args = {"path": "/tmp/test.txt"}
+
+        await middleware.before_tool_call("read", args)
+        await middleware.after_tool_call("read", args, "old content", True)
+
+        # Invalidate cache
+        middleware.invalidate("read", args)
+
+        # Should not have cached result after invalidation
+        result = await middleware.before_tool_call("read", args)
+        assert result.cached_result is None
+        assert result.proceed is True
+
+    @pytest.mark.asyncio
+    async def test_clear_all_cache(self, middleware):
+        """Clear all cached entries."""
+        args = {"path": "/tmp/test.txt"}
+
+        await middleware.before_tool_call("read", args)
+        await middleware.after_tool_call("read", args, "content", True)
+
+        # Clear all cache
+        middleware.clear()
+
+        result = await middleware.before_tool_call("read", args)
+        assert result.cached_result is None
+        assert result.proceed is True
+
+    @pytest.mark.asyncio
+    async def test_get_cache_stats(self, middleware):
+        """Get cache statistics."""
+        args = {"path": "/tmp/test.txt"}
+
+        # Initially empty
+        stats = middleware.get_stats()
+        assert stats["total_entries"] == 0
+        assert stats["hits"] == 0
+        assert stats["misses"] == 0
+
+        # Add entry
+        await middleware.before_tool_call("read", args)
+        await middleware.after_tool_call("read", args, "content", True)
+
+        # One miss
+        stats = middleware.get_stats()
+        assert stats["total_entries"] == 1
+        assert stats["misses"] == 1
+
+        # Cache hit
+        await middleware.before_tool_call("read", args)
+        stats = middleware.get_stats()
+        assert stats["hits"] == 1
+
+
+# =============================================================================
+# RateLimitMiddleware Tests (Phase 2.3: Generic Middleware Library)
+# =============================================================================
+
+
+class TestRateLimitMiddleware:
+    """Tests for RateLimitMiddleware."""
+
+    @pytest.fixture
+    def middleware(self):
+        """Create a rate limit middleware instance."""
+        from victor.framework.middleware import RateLimitMiddleware
+
+        return RateLimitMiddleware(
+            max_calls=5,
+            time_window_seconds=60,  # 5 calls per minute
+            blocked_tools={"write", "edit"},  # Only rate-limit these tools
+        )
+
+    @pytest.mark.asyncio
+    async def test_under_limit_allows_execution(self, middleware):
+        """RateLimitMiddleware should allow execution under limit."""
+        for i in range(5):
+            result = await middleware.before_tool_call("write", {"path": f"test{i}.txt"})
+            assert result.proceed is True
+            assert result.blocked is False
+            assert result.retry_after_seconds is None
+
+    @pytest.mark.asyncio
+    async def test_over_limit_blocks_execution(self, middleware):
+        """RateLimitMiddleware should block when over limit."""
+        # Make 5 calls (at limit)
+        for i in range(5):
+            await middleware.before_tool_call("write", {"path": f"test{i}.txt"})
+
+        # 6th call should be blocked
+        result = await middleware.before_tool_call("write", {"path": "test6.txt"})
+        assert result.proceed is False
+        assert result.blocked is True
+        assert result.retry_after_seconds is not None
+        assert 0 < result.retry_after_seconds <= 60
+
+    @pytest.mark.asyncio
+    async def test_non_limited_tool_not_blocked(self, middleware):
+        """Tools not in blocked_tools list should not be rate-limited."""
+        for i in range(10):  # More than the limit
+            result = await middleware.before_tool_call("read", {"path": f"test{i}.txt"})
+            assert result.proceed is True
+            assert result.blocked is False
+
+    @pytest.mark.asyncio
+    async def test_rate_limit_resets_after_time_window(self):
+        """Rate limit should reset after time window expires."""
+        from victor.framework.middleware import RateLimitMiddleware
+
+        # Use short time window for testing
+        middleware = RateLimitMiddleware(
+            max_calls=2,
+            time_window_seconds=1,  # 1 second window
+            blocked_tools={"write"},
+        )
+
+        # Make 2 calls (at limit)
+        await middleware.before_tool_call("write", {"path": "test1.txt"})
+        await middleware.before_tool_call("write", {"path": "test2.txt"})
+
+        # 3rd call should be blocked
+        result = await middleware.before_tool_call("write", {"path": "test3.txt"})
+        assert result.proceed is False
+
+        # Wait for window to expire
+        import asyncio
+        await asyncio.sleep(1.1)
+
+        # Should be allowed again
+        result = await middleware.before_tool_call("write", {"path": "test4.txt"})
+        assert result.proceed is True
+
+    @pytest.mark.asyncio
+    async def test_get_rate_limit_stats(self, middleware):
+        """Get rate limit statistics."""
+        # Make some calls
+        for i in range(3):
+            await middleware.before_tool_call("write", {"path": f"test{i}.txt"})
+
+        stats = middleware.get_stats()
+        assert stats["write"]["calls_made"] == 3
+        assert stats["write"]["limit"] == 5
+        assert stats["write"]["blocked"] is False
+
+    @pytest.mark.asyncio
+    async def test_reset_rate_limit(self, middleware):
+        """Reset rate limit for a tool."""
+        # Fill up the limit
+        for i in range(5):
+            await middleware.before_tool_call("write", {"path": f"test{i}.txt"})
+
+        # Should be blocked
+        result = await middleware.before_tool_call("write", {"path": "test6.txt"})
+        assert result.proceed is False
+
+        # Reset
+        middleware.reset("write")
+
+        # Should be allowed again
+        result = await middleware.before_tool_call("write", {"path": "test7.txt"})
+        assert result.proceed is True
+
+    @pytest.mark.asyncio
+    async def test_different_tools_have_separate_limits(self, middleware):
+        """Each tool should have its own rate limit counter."""
+        # Use write tool up to limit
+        for i in range(5):
+            await middleware.before_tool_call("write", {"path": f"test{i}.txt"})
+
+        # write should be blocked
+        write_result = await middleware.before_tool_call("write", {"path": "test.txt"})
+        assert write_result.proceed is False
+
+        # edit should still be allowed (different tool, same limit)
+        edit_result = await middleware.before_tool_call("edit", {"path": "test.txt"})
+        assert edit_result.proceed is True
+
+
 __all__ = [
     "TestLoggingMiddleware",
     "TestSecretMaskingMiddleware",
@@ -889,4 +1162,6 @@ __all__ = [
     "TestOutputValidationMiddleware",
     "TestValidationTypes",
     "TestMiddlewareIntegration",
+    "TestCacheMiddleware",
+    "TestRateLimitMiddleware",
 ]

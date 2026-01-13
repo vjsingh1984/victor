@@ -1,0 +1,723 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Tool selection cache for performance optimization.
+
+This module provides a high-performance caching layer for tool selection operations.
+It extends UniversalRegistry with TTL-based caching specifically optimized for
+tool selection use cases.
+
+Cache Types:
+    1. Query Selection Cache: Caches selections based on query + tools + config
+    2. Context-Aware Cache: Caches selections including conversation context
+    3. RL Ranking Cache: Caches RL-based tool rankings
+
+Expected Performance Improvement:
+    - 30-50% reduction in tool selection latency
+    - 40-50% hit rate for query cache
+    - 30-40% hit rate for context cache
+    - 60-70% hit rate for RL ranking cache
+
+Memory Usage:
+    - Approximately 100-200MB for 1000 cached selections
+    - Automatic LRU eviction when limit reached
+
+Example:
+    from victor.tools.caches import ToolSelectionCache
+
+    cache = ToolSelectionCache()
+
+    # Store selection result
+    cache.put_query(
+        cache_key="abc123...",
+        tools=["read", "write", "edit"],
+        ttl=3600  # 1 hour
+    )
+
+    # Retrieve selection result
+    result = cache.get_query("abc123...")
+    if result is not None:
+        # Cache hit - use cached tools
+        selected_tools = result.value
+"""
+
+from __future__ import annotations
+
+import logging
+import threading
+import time
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+from victor.core.registries import CacheStrategy, UniversalRegistry
+from victor.providers.base import ToolDefinition
+
+if TYPE_CHECKING:
+    from victor.tools.caches.cache_keys import CacheKeyGenerator
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class CachedSelection:
+    """A cached tool selection result.
+
+    Attributes:
+        value: List of selected tool names
+        tools: Full ToolDefinition objects (optional, for complete cache)
+        timestamp: When this selection was cached
+        hit_count: Number of times this cache entry was accessed
+        ttl: Time-to-live in seconds
+        metadata: Additional metadata (selection time, scores, etc.)
+    """
+
+    value: List[str]
+    tools: List[ToolDefinition] = field(default_factory=list)
+    timestamp: float = field(default_factory=time.time)
+    hit_count: int = 0
+    ttl: Optional[int] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def is_expired(self) -> bool:
+        """Check if this cached selection has expired.
+
+        Returns:
+            True if TTL has elapsed
+        """
+        if not self.ttl:
+            return False
+        return (time.time() - self.timestamp) > self.ttl
+
+    def record_hit(self) -> None:
+        """Record a cache hit for metrics."""
+        self.hit_count += 1
+
+    def get_age_seconds(self) -> float:
+        """Get age of this cache entry in seconds.
+
+        Returns:
+            Age in seconds since caching
+        """
+        return time.time() - self.timestamp
+
+
+@dataclass
+class CacheMetrics:
+    """Metrics for cache performance tracking.
+
+    Attributes:
+        hits: Number of cache hits
+        misses: Number of cache misses
+        evictions: Number of entries evicted
+        total_lookups: Total number of cache lookups
+        total_entries: Current number of cached entries
+        memory_usage_bytes: Estimated memory usage
+    """
+
+    hits: int = 0
+    misses: int = 0
+    evictions: int = 0
+    total_lookups: int = 0
+    total_entries: int = 0
+    memory_usage_bytes: int = 0
+
+    @property
+    def hit_rate(self) -> float:
+        """Calculate cache hit rate.
+
+        Returns:
+            Hit rate as a percentage (0.0 - 1.0)
+        """
+        if self.total_lookups == 0:
+            return 0.0
+        return self.hits / self.total_lookups
+
+    def record_hit(self) -> None:
+        """Record a cache hit."""
+        self.hits += 1
+        self.total_lookups += 1
+
+    def record_miss(self) -> None:
+        """Record a cache miss."""
+        self.misses += 1
+        self.total_lookups += 1
+
+    def record_eviction(self) -> None:
+        """Record a cache eviction."""
+        self.evictions += 1
+
+    def reset(self) -> None:
+        """Reset all metrics."""
+        self.hits = 0
+        self.misses = 0
+        self.evictions = 0
+        self.total_lookups = 0
+
+
+class ToolSelectionCache:
+    """High-performance cache for tool selection operations.
+
+    Provides three separate cache namespaces:
+        1. "query": Query-based selections (1 hour TTL)
+        2. "context": Context-aware selections (5 minutes TTL)
+        3. "rl": RL-based rankings (1 hour TTL)
+
+    Thread-safe with LRU eviction and comprehensive metrics.
+
+    Example:
+        cache = ToolSelectionCache(max_size=1000)
+
+        # Query cache
+        cache.put_query(key="abc123", tools=["read", "write"], ttl=3600)
+        result = cache.get("abc123", namespace="query")
+
+        # Context cache
+        cache.put_context(key="def456", tools=["read", "edit"], ttl=300)
+        result = cache.get("def456", namespace="context")
+
+        # Get metrics
+        metrics = cache.get_metrics()
+        print(f"Hit rate: {metrics.hit_rate:.1%}")
+    """
+
+    # Default TTL values (in seconds)
+    DEFAULT_QUERY_TTL: int = 3600  # 1 hour
+    DEFAULT_CONTEXT_TTL: int = 300  # 5 minutes
+    DEFAULT_RL_TTL: int = 3600  # 1 hour
+
+    # Namespace names
+    NAMESPACE_QUERY: str = "query"
+    NAMESPACE_CONTEXT: str = "context"
+    NAMESPACE_RL: str = "rl"
+
+    def __init__(
+        self,
+        max_size: int = 1000,
+        query_ttl: int = DEFAULT_QUERY_TTL,
+        context_ttl: int = DEFAULT_CONTEXT_TTL,
+        rl_ttl: int = DEFAULT_RL_TTL,
+        enabled: bool = True,
+    ):
+        """Initialize tool selection cache.
+
+        Args:
+            max_size: Maximum number of entries per namespace
+            query_ttl: Default TTL for query cache (seconds)
+            context_ttl: Default TTL for context cache (seconds)
+            rl_ttl: Default TTL for RL cache (seconds)
+            enabled: Whether caching is enabled
+        """
+        self._max_size = max_size
+        self._query_ttl = query_ttl
+        self._context_ttl = context_ttl
+        self._rl_ttl = rl_ttl
+        self._enabled = enabled
+
+        # Create registries for each namespace
+        self._query_registry = UniversalRegistry.get_registry(
+            "tool_selection_query",
+            cache_strategy=CacheStrategy.LRU,
+            max_size=max_size,
+        )
+        self._context_registry = UniversalRegistry.get_registry(
+            "tool_selection_context",
+            cache_strategy=CacheStrategy.LRU,
+            max_size=max_size,
+        )
+        self._rl_registry = UniversalRegistry.get_registry(
+            "tool_selection_rl",
+            cache_strategy=CacheStrategy.LRU,
+            max_size=max_size,
+        )
+
+        # Metrics per namespace
+        self._metrics: Dict[str, CacheMetrics] = {
+            self.NAMESPACE_QUERY: CacheMetrics(),
+            self.NAMESPACE_CONTEXT: CacheMetrics(),
+            self.NAMESPACE_RL: CacheMetrics(),
+        }
+
+        # Lock for metrics updates
+        self._metrics_lock = threading.RLock()
+
+        logger.info(
+            f"ToolSelectionCache initialized: enabled={enabled}, max_size={max_size}, "
+            f"TTL(query={query_ttl}s, context={context_ttl}s, rl={rl_ttl}s)"
+        )
+
+    # ========================================================================
+    # Cache Access Methods
+    # ========================================================================
+
+    def get(
+        self,
+        key: str,
+        namespace: str = NAMESPACE_QUERY,
+    ) -> Optional[CachedSelection]:
+        """Get cached selection by key.
+
+        Args:
+            key: Cache key
+            namespace: Cache namespace (query, context, rl)
+
+        Returns:
+            CachedSelection if found and not expired, None otherwise
+        """
+        if not self._enabled:
+            return None
+
+        registry = self._get_registry(namespace)
+        if not registry:
+            logger.warning(f"Unknown cache namespace: {namespace}")
+            return None
+
+        entry = registry.get(key, default=None)
+        if not entry:
+            self._record_miss(namespace)
+            return None
+
+        # Check if expired (double-check since registry handles TTL)
+        if entry.is_expired():
+            registry.invalidate(key=key)
+            self._record_miss(namespace)
+            return None
+
+        # Record hit
+        entry.record_hit()
+        self._record_hit(namespace)
+        self._update_entry_count(namespace)
+
+        logger.debug(f"Cache hit: namespace={namespace}, key={key[:8]}...")
+        return entry
+
+    def put(
+        self,
+        key: str,
+        value: List[str],
+        tools: Optional[List[ToolDefinition]] = None,
+        namespace: str = NAMESPACE_QUERY,
+        ttl: Optional[int] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Store selection in cache.
+
+        Args:
+            key: Cache key
+            value: List of tool names
+            tools: Optional full ToolDefinition objects
+            namespace: Cache namespace (query, context, rl)
+            ttl: Time-to-live in seconds (None for namespace default)
+            metadata: Optional metadata (scores, latency, etc.)
+        """
+        if not self._enabled:
+            return
+
+        registry = self._get_registry(namespace)
+        if not registry:
+            logger.warning(f"Unknown cache namespace: {namespace}")
+            return
+
+        # Use namespace default TTL if not specified
+        if ttl is None:
+            ttl = self._get_default_ttl(namespace)
+
+        # Create cached selection
+        cached = CachedSelection(
+            value=value,
+            tools=tools or [],
+            ttl=ttl,
+            metadata=metadata or {},
+        )
+
+        # Store in registry
+        registry.register(key, cached, ttl=ttl)
+
+        self._update_entry_count(namespace)
+        logger.debug(f"Cache put: namespace={namespace}, key={key[:8]}..., tools={len(value)}")
+
+    # ========================================================================
+    # Convenience Methods for Each Namespace
+    # ========================================================================
+
+    def get_query(self, key: str) -> Optional[CachedSelection]:
+        """Get cached query-based selection.
+
+        Args:
+            key: Cache key
+
+        Returns:
+            CachedSelection if found, None otherwise
+        """
+        return self.get(key, namespace=self.NAMESPACE_QUERY)
+
+    def put_query(
+        self,
+        key: str,
+        value: List[str],
+        tools: Optional[List[ToolDefinition]] = None,
+        ttl: Optional[int] = None,
+    ) -> None:
+        """Store query-based selection in cache.
+
+        Args:
+            key: Cache key
+            value: List of tool names
+            tools: Optional full ToolDefinition objects
+            ttl: Time-to-live (defaults to DEFAULT_QUERY_TTL)
+        """
+        self.put(key, value, tools, namespace=self.NAMESPACE_QUERY, ttl=ttl)
+
+    def get_context(self, key: str) -> Optional[CachedSelection]:
+        """Get cached context-aware selection.
+
+        Args:
+            key: Cache key
+
+        Returns:
+            CachedSelection if found, None otherwise
+        """
+        return self.get(key, namespace=self.NAMESPACE_CONTEXT)
+
+    def put_context(
+        self,
+        key: str,
+        value: List[str],
+        tools: Optional[List[ToolDefinition]] = None,
+        ttl: Optional[int] = None,
+    ) -> None:
+        """Store context-aware selection in cache.
+
+        Args:
+            key: Cache key
+            value: List of tool names
+            tools: Optional full ToolDefinition objects
+            ttl: Time-to-live (defaults to DEFAULT_CONTEXT_TTL)
+        """
+        self.put(key, value, tools, namespace=self.NAMESPACE_CONTEXT, ttl=ttl)
+
+    def get_rl(self, key: str) -> Optional[CachedSelection]:
+        """Get cached RL-based ranking.
+
+        Args:
+            key: Cache key
+
+        Returns:
+            CachedSelection if found, None otherwise
+        """
+        return self.get(key, namespace=self.NAMESPACE_RL)
+
+    def put_rl(
+        self,
+        key: str,
+        value: List[str],
+        tools: Optional[List[ToolDefinition]] = None,
+        ttl: Optional[int] = None,
+    ) -> None:
+        """Store RL-based ranking in cache.
+
+        Args:
+            key: Cache key
+            value: List of tool names (ranked)
+            tools: Optional full ToolDefinition objects
+            ttl: Time-to-live (defaults to DEFAULT_RL_TTL)
+        """
+        self.put(key, value, tools, namespace=self.NAMESPACE_RL, ttl=ttl)
+
+    # ========================================================================
+    # Cache Invalidation
+    # ========================================================================
+
+    def invalidate(
+        self,
+        key: Optional[str] = None,
+        namespace: Optional[str] = None,
+    ) -> int:
+        """Invalidate cache entries.
+
+        Args:
+            key: Specific key to invalidate (None = invalidate by namespace)
+            namespace: Namespace to invalidate (None = invalidate all)
+
+        Returns:
+            Number of entries invalidated
+
+        Example:
+            # Invalidate specific key
+            cache.invalidate(key="abc123", namespace="query")
+
+            # Invalidate entire namespace
+            cache.invalidate(namespace="query")
+
+            # Invalidate all caches
+            cache.invalidate()
+        """
+        if namespace:
+            registry = self._get_registry(namespace)
+            if registry:
+                count = registry.invalidate(key=key)
+                self._update_entry_count(namespace)
+                logger.info(f"Invalidated {count} entries in namespace '{namespace}'")
+                return count
+        else:
+            # Invalidate all namespaces
+            total = 0
+            for ns in [self.NAMESPACE_QUERY, self.NAMESPACE_CONTEXT, self.NAMESPACE_RL]:
+                registry = self._get_registry(ns)
+                if registry:
+                    total += registry.invalidate()
+            self._update_all_entry_counts()
+            logger.info(f"Invalidated all {total} cache entries")
+            return total
+
+        return 0
+
+    def invalidate_on_tools_change(self) -> None:
+        """Invalidate all caches when tools registry changes.
+
+        Call this when:
+        - Tools are added/removed
+        - Tool definitions are modified
+        - Tool metadata is updated
+        """
+        self.invalidate()
+        logger.info("All caches invalidated due to tools registry change")
+
+    # ========================================================================
+    # Metrics
+    # ========================================================================
+
+    def get_metrics(self, namespace: Optional[str] = None) -> CacheMetrics:
+        """Get cache metrics.
+
+        Args:
+            namespace: Optional namespace to get metrics for
+
+        Returns:
+            CacheMetrics for the namespace (or combined if None)
+        """
+        with self._metrics_lock:
+            if namespace:
+                return self._metrics.get(namespace, CacheMetrics())
+
+            # Combine metrics from all namespaces
+            combined = CacheMetrics()
+            for metrics in self._metrics.values():
+                combined.hits += metrics.hits
+                combined.misses += metrics.misses
+                combined.evictions += metrics.evictions
+                combined.total_lookups += metrics.total_lookups
+                combined.total_entries += metrics.total_entries
+            return combined
+
+    def reset_metrics(self, namespace: Optional[str] = None) -> None:
+        """Reset cache metrics.
+
+        Args:
+            namespace: Optional namespace to reset (all if None)
+        """
+        with self._metrics_lock:
+            if namespace:
+                if namespace in self._metrics:
+                    self._metrics[namespace].reset()
+            else:
+                for metrics in self._metrics.values():
+                    metrics.reset()
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get comprehensive cache statistics.
+
+        Returns:
+            Dictionary with cache stats
+        """
+        stats = {
+            "enabled": self._enabled,
+            "max_size": self._max_size,
+            "namespaces": {},
+        }
+
+        for ns in [self.NAMESPACE_QUERY, self.NAMESPACE_CONTEXT, self.NAMESPACE_RL]:
+            metrics = self.get_metrics(ns)
+            registry = self._get_registry(ns)
+            registry_stats = registry.get_stats() if registry else {}
+
+            stats["namespaces"][ns] = {
+                "ttl": self._get_default_ttl(ns),
+                "hits": metrics.hits,
+                "misses": metrics.misses,
+                "hit_rate": metrics.hit_rate,
+                "evictions": metrics.evictions,
+                "total_entries": metrics.total_entries,
+                "utilization": registry_stats.get("utilization", 0.0),
+            }
+
+        # Add combined stats
+        combined = self.get_metrics()
+        stats["combined"] = {
+            "hits": combined.hits,
+            "misses": combined.misses,
+            "hit_rate": combined.hit_rate,
+            "evictions": combined.evictions,
+            "total_entries": combined.total_entries,
+        }
+
+        return stats
+
+    # ========================================================================
+    # Configuration
+    # ========================================================================
+
+    @property
+    def enabled(self) -> bool:
+        """Check if caching is enabled."""
+        return self._enabled
+
+    def enable(self) -> None:
+        """Enable caching."""
+        self._enabled = True
+        logger.info("Tool selection caching enabled")
+
+    def disable(self) -> None:
+        """Disable caching."""
+        self._enabled = False
+        logger.info("Tool selection caching disabled")
+
+    # ========================================================================
+    # Internal Methods
+    # ========================================================================
+
+    def _get_registry(self, namespace: str) -> Optional[UniversalRegistry]:
+        """Get registry for namespace.
+
+        Args:
+            namespace: Cache namespace
+
+        Returns:
+            UniversalRegistry or None if unknown namespace
+        """
+        registries = {
+            self.NAMESPACE_QUERY: self._query_registry,
+            self.NAMESPACE_CONTEXT: self._context_registry,
+            self.NAMESPACE_RL: self._rl_registry,
+        }
+        return registries.get(namespace)
+
+    def _get_default_ttl(self, namespace: str) -> int:
+        """Get default TTL for namespace.
+
+        Args:
+            namespace: Cache namespace
+
+        Returns:
+            Default TTL in seconds
+        """
+        ttls = {
+            self.NAMESPACE_QUERY: self._query_ttl,
+            self.NAMESPACE_CONTEXT: self._context_ttl,
+            self.NAMESPACE_RL: self._rl_ttl,
+        }
+        return ttls.get(namespace, self._query_ttl)
+
+    def _record_hit(self, namespace: str) -> None:
+        """Record a cache hit.
+
+        Args:
+            namespace: Cache namespace
+        """
+        with self._metrics_lock:
+            if namespace in self._metrics:
+                self._metrics[namespace].record_hit()
+
+    def _record_miss(self, namespace: str) -> None:
+        """Record a cache miss.
+
+        Args:
+            namespace: Cache namespace
+        """
+        with self._metrics_lock:
+            if namespace in self._metrics:
+                self._metrics[namespace].record_miss()
+
+    def _update_entry_count(self, namespace: str) -> None:
+        """Update entry count for namespace.
+
+        Args:
+            namespace: Cache namespace
+        """
+        with self._metrics_lock:
+            registry = self._get_registry(namespace)
+            if registry and namespace in self._metrics:
+                stats = registry.get_stats()
+                self._metrics[namespace].total_entries = stats.get("total_entries", 0)
+
+    def _update_all_entry_counts(self) -> None:
+        """Update entry counts for all namespaces."""
+        for ns in [self.NAMESPACE_QUERY, self.NAMESPACE_CONTEXT, self.NAMESPACE_RL]:
+            self._update_entry_count(ns)
+
+
+# Global singleton instance
+_global_cache: Optional[ToolSelectionCache] = None
+_cache_lock = threading.Lock()
+
+
+def get_tool_selection_cache(
+    max_size: int = 1000,
+    query_ttl: int = ToolSelectionCache.DEFAULT_QUERY_TTL,
+    context_ttl: int = ToolSelectionCache.DEFAULT_CONTEXT_TTL,
+    rl_ttl: int = ToolSelectionCache.DEFAULT_RL_TTL,
+    enabled: bool = True,
+) -> ToolSelectionCache:
+    """Get global tool selection cache instance.
+
+    Creates cache on first call with specified configuration.
+
+    Args:
+        max_size: Maximum number of entries per namespace
+        query_ttl: Default TTL for query cache (seconds)
+        context_ttl: Default TTL for context cache (seconds)
+        rl_ttl: Default TTL for RL cache (seconds)
+        enabled: Whether caching is enabled
+
+    Returns:
+        Shared ToolSelectionCache instance
+    """
+    global _global_cache
+    with _cache_lock:
+        if _global_cache is None:
+            _global_cache = ToolSelectionCache(
+                max_size=max_size,
+                query_ttl=query_ttl,
+                context_ttl=context_ttl,
+                rl_ttl=rl_ttl,
+                enabled=enabled,
+            )
+        return _global_cache
+
+
+def invalidate_tool_selection_cache() -> None:
+    """Invalidate all tool selection caches.
+
+    Convenience function for global cache invalidation.
+    """
+    cache = get_tool_selection_cache()
+    cache.invalidate()
+
+
+__all__ = [
+    "CachedSelection",
+    "CacheMetrics",
+    "ToolSelectionCache",
+    "get_tool_selection_cache",
+    "invalidate_tool_selection_cache",
+]

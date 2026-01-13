@@ -52,6 +52,29 @@ from victor.agent.task_analyzer import (
     reset_task_analyzer,
 )
 
+# Phase 1 extraction components (Task 1)
+from victor.agent.configuration_manager import (
+    ConfigurationManager,
+    create_configuration_manager,
+    get_configuration_manager,
+    reset_configuration_manager,
+)
+from victor.agent.memory_manager import (
+    MemoryManager,
+    SessionRecoveryManager,
+    create_memory_manager,
+    create_session_recovery_manager,
+)
+from victor.agent.search_router import (
+    SearchRouter,
+    SearchRoute,
+    SearchType,
+    route_query,
+    suggest_search_tool,
+    is_keyword_query,
+    is_semantic_query,
+)
+
 # Intelligent agent components (RL-based learning, quality scoring, prompt optimization)
 from victor.agent.intelligent_pipeline import (
     IntelligentAgentPipeline,
@@ -109,6 +132,22 @@ __all__ = [
     "TaskAnalysis",
     "get_task_analyzer",
     "reset_task_analyzer",
+    # Phase 1 extraction components (Task 1)
+    "ConfigurationManager",
+    "create_configuration_manager",
+    "get_configuration_manager",
+    "reset_configuration_manager",
+    "MemoryManager",
+    "SessionRecoveryManager",
+    "create_memory_manager",
+    "create_session_recovery_manager",
+    "SearchRouter",
+    "SearchRoute",
+    "SearchType",
+    "route_query",
+    "suggest_search_tool",
+    "is_keyword_query",
+    "is_semantic_query",
     # Intelligent Pipeline
     "IntelligentAgentPipeline",
     "RequestContext",

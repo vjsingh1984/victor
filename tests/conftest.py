@@ -142,6 +142,23 @@ def reset_singletons():
         except ImportError:
             pass
 
+        # Reset VerticalRegistry (remove test verticals that may pollute other tests)
+        # We only remove test-specific verticals (like test_vertical, mock_vertical, etc.)
+        # and keep all production verticals intact
+        try:
+            from victor.core.verticals import VerticalRegistry
+
+            # Remove test verticals (heuristic: names containing "test", "mock", "temp")
+            test_vertical_names = [
+                name for name in VerticalRegistry._registry.keys()
+                if any(keyword in name.lower() for keyword in ["test", "mock", "temp", "dummy", "fake"])
+            ]
+
+            for name in test_vertical_names:
+                VerticalRegistry.unregister(name)
+        except ImportError:
+            pass
+
     # Reset before test
     _reset_all()
 

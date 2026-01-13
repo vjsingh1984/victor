@@ -21,6 +21,8 @@ This module provides common middleware that all verticals can use:
 3. MetricsMiddleware - Record tool execution metrics
 4. GitSafetyMiddleware - Block dangerous git operations
 5. OutputValidationMiddleware - Validate and optionally fix tool outputs
+6. CacheMiddleware - Cache tool execution results
+7. RateLimitMiddleware - Rate limit tool execution
 
 Example usage:
     from victor.framework.middleware import (
@@ -1247,6 +1249,521 @@ class OutputValidationMiddleware(MiddlewareProtocol):
         return self._applicable_tools
 
 
+# =============================================================================
+# Cache Middleware
+# =============================================================================
+
+
+class CacheResult:
+    """Cache middleware result that supports attribute access.
+
+    Provides both attribute access and dict-like interface for
+    backward compatibility with MiddlewareResult.
+    """
+
+    def __init__(
+        self,
+        proceed: bool = True,
+        cached_result: Optional[Any] = None,
+        modified_arguments: Optional[Dict[str, Any]] = None,
+        error_message: Optional[str] = None,
+        **metadata,
+    ):
+        self.proceed = proceed
+        self.cached_result = cached_result
+        self.modified_arguments = modified_arguments
+        self.error_message = error_message
+        self._metadata = metadata
+
+    def __getattr__(self, name):
+        # Provide access to metadata keys as attributes
+        if name in self._metadata:
+            return self._metadata[name]
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+
+
+class CacheMiddleware(MiddlewareProtocol):
+    """Cache tool execution results.
+
+    This middleware caches results from idempotent tools to avoid
+    redundant executions. Only successful results are cached.
+
+    Example:
+        middleware = CacheMiddleware(
+            ttl_seconds=300,  # 5 minutes
+            cacheable_tools={"read", "ls", "grep"},
+            key_components=["tool_name", "args"],
+        )
+
+        # First call - cache miss
+        result1 = await middleware.before_tool_call("read", {"path": "file.txt"})
+        assert result1.cached_result is None
+
+        # After successful execution
+        await middleware.after_tool_call("read", {"path": "file.txt"}, "content", True)
+
+        # Second call - cache hit
+        result2 = await middleware.before_tool_call("read", {"path": "file.txt"})
+        assert result2.cached_result == "content"
+        assert result2.proceed is False
+    """
+
+    def __init__(
+        self,
+        ttl_seconds: int = 300,
+        cacheable_tools: Optional[Set[str]] = None,
+        key_components: Optional[List[str]] = None,
+    ):
+        """Initialize the cache middleware.
+
+        Args:
+            ttl_seconds: Time-to-live for cache entries in seconds
+            cacheable_tools: Set of tool names that can be cached
+            key_components: Components to include in cache key
+                (["tool_name", "args"] includes both tool name and arguments)
+        """
+        import hashlib
+        import json
+
+        self._ttl_seconds = ttl_seconds
+        self._cacheable_tools = cacheable_tools or set()
+        self._key_components = key_components or ["tool_name", "args"]
+        self._hashlib = hashlib
+        self._json = json
+
+        # Cache storage: {cache_key: (result, expiry_time)}
+        self._cache: Dict[str, tuple[Any, float]] = {}
+
+        # Statistics
+        self._hits = 0
+        self._misses = 0
+
+    def _build_cache_key(self, tool_name: str, arguments: Dict[str, Any]) -> str:
+        """Build cache key from tool name and arguments.
+
+        Args:
+            tool_name: Name of the tool
+            arguments: Tool arguments
+
+        Returns:
+            Cache key as a hash string
+        """
+        key_parts = []
+
+        if "tool_name" in self._key_components:
+            key_parts.append(tool_name)
+
+        if "args" in self._key_components:
+            # Sort arguments for consistent hashing
+            sorted_args = self._json.dumps(arguments, sort_keys=True)
+            key_parts.append(sorted_args)
+
+        key_string = ":".join(key_parts)
+        return self._hashlib.sha256(key_string.encode()).hexdigest()
+
+    def _is_cacheable(self, tool_name: str) -> bool:
+        """Check if a tool is cacheable.
+
+        Args:
+            tool_name: Name of the tool
+
+        Returns:
+            True if tool should be cached
+        """
+        return tool_name in self._cacheable_tools
+
+    def _is_expired(self, cache_key: str) -> bool:
+        """Check if a cache entry has expired.
+
+        Args:
+            cache_key: Cache entry key
+
+        Returns:
+            True if entry has expired
+        """
+        if cache_key not in self._cache:
+            return True
+
+        _, expiry_time = self._cache[cache_key]
+        import time
+
+        return time.time() > expiry_time
+
+    async def before_tool_call(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> CacheResult:
+        """Check cache before tool execution.
+
+        Args:
+            tool_name: Name of the tool being called
+            arguments: Arguments passed to the tool
+
+        Returns:
+            CacheResult with cached result if available
+        """
+        if not self._is_cacheable(tool_name):
+            return CacheResult(proceed=True, cached_result=None)
+
+        cache_key = self._build_cache_key(tool_name, arguments)
+
+        # Check if entry exists and is not expired
+        if cache_key in self._cache and not self._is_expired(cache_key):
+            cached_result, _ = self._cache[cache_key]
+            self._hits += 1
+
+            # Return cached result
+            return CacheResult(proceed=False, cached_result=cached_result)
+
+        self._misses += 1
+        return CacheResult(proceed=True, cached_result=None)
+
+    async def after_tool_call(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        result: Any,
+        success: bool,
+    ) -> Optional[Any]:
+        """Cache successful tool results.
+
+        Args:
+            tool_name: Name of the tool that was called
+            arguments: Arguments that were passed
+            result: Result from the tool execution
+            success: Whether the tool execution succeeded
+
+        Returns:
+            None (no modification)
+        """
+        # Only cache successful results from cacheable tools
+        if not success or not self._is_cacheable(tool_name):
+            return None
+
+        cache_key = self._build_cache_key(tool_name, arguments)
+        import time
+
+        expiry_time = time.time() + self._ttl_seconds
+        self._cache[cache_key] = (result, expiry_time)
+
+        return None
+
+    def invalidate(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+        """Invalidate a specific cache entry.
+
+        Args:
+            tool_name: Name of the tool
+            arguments: Arguments that were used
+        """
+        cache_key = self._build_cache_key(tool_name, arguments)
+        self._cache.pop(cache_key, None)
+
+    def clear(self) -> None:
+        """Clear all cached entries."""
+        self._cache.clear()
+        self._hits = 0
+        self._misses = 0
+
+    def get_stats(self) -> Dict[str, int]:
+        """Get cache statistics.
+
+        Returns:
+            Dict with total_entries, hits, misses
+        """
+        # Clean up expired entries
+        import time
+
+        current_time = time.time()
+        self._cache = {
+            k: v for k, v in self._cache.items() if current_time < v[1]
+        }
+
+        total_entries = len(self._cache)
+        hit_rate = self._hits / (self._hits + self._misses) if (self._hits + self._misses) > 0 else 0.0
+
+        return {
+            "total_entries": total_entries,
+            "hits": self._hits,
+            "misses": self._misses,
+            "hit_rate": hit_rate,
+        }
+
+    def get_priority(self) -> MiddlewarePriority:
+        """Get the priority of this middleware.
+
+        Cache runs with HIGH priority to avoid unnecessary executions.
+
+        Returns:
+            HIGH priority
+        """
+        return MiddlewarePriority.HIGH
+
+    def get_applicable_tools(self) -> Optional[Set[str]]:
+        """Get tools this middleware applies to.
+
+        Returns:
+            Set of cacheable tools
+        """
+        return self._cacheable_tools
+
+
+# =============================================================================
+# Rate Limit Middleware
+# =============================================================================
+
+
+class RateLimitResult:
+    """Rate limit middleware result that supports attribute access.
+
+    Provides both attribute access and dict-like interface for
+    backward compatibility with MiddlewareResult.
+    """
+
+    def __init__(
+        self,
+        proceed: bool = True,
+        blocked: bool = False,
+        retry_after_seconds: Optional[float] = None,
+        modified_arguments: Optional[Dict[str, Any]] = None,
+        error_message: Optional[str] = None,
+        **metadata,
+    ):
+        self.proceed = proceed
+        self.blocked = blocked
+        self.retry_after_seconds = retry_after_seconds
+        self.modified_arguments = modified_arguments
+        self.error_message = error_message
+        self._metadata = metadata
+
+    def __getattr__(self, name):
+        # Provide access to metadata keys as attributes
+        if name in self._metadata:
+            return self._metadata[name]
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+
+
+class RateLimitMiddleware(MiddlewareProtocol):
+    """Rate limit tool execution.
+
+    This middleware limits the rate at which specific tools can be called.
+    Useful for preventing abuse of expensive or sensitive operations.
+
+    Example:
+        middleware = RateLimitMiddleware(
+            max_calls=5,
+            time_window_seconds=60,  # 5 calls per minute
+            blocked_tools={"write", "edit"},
+        )
+
+        # Make 5 calls (at limit)
+        for i in range(5):
+            result = await middleware.before_tool_call("write", {"path": f"test{i}.txt"})
+            assert result.proceed is True
+
+        # 6th call should be blocked
+        result = await middleware.before_tool_call("write", {"path": "test6.txt"})
+        assert result.proceed is False
+        assert result.blocked is True
+        assert result.retry_after_seconds is not None
+    """
+
+    def __init__(
+        self,
+        max_calls: int = 10,
+        time_window_seconds: int = 60,
+        blocked_tools: Optional[Set[str]] = None,
+    ):
+        """Initialize the rate limit middleware.
+
+        Args:
+            max_calls: Maximum number of allowed calls per time window
+            time_window_seconds: Time window in seconds
+            blocked_tools: Set of tool names to rate limit
+        """
+        self._max_calls = max_calls
+        self._time_window_seconds = time_window_seconds
+        self._blocked_tools = blocked_tools or set()
+
+        # Track calls per tool: {tool_name: [(timestamp, count), ...]}
+        self._call_history: Dict[str, List[float]] = {}
+
+    def _is_limited(self, tool_name: str) -> bool:
+        """Check if a tool is rate-limited.
+
+        Args:
+            tool_name: Name of the tool
+
+        Returns:
+            True if tool should be rate-limited
+        """
+        return tool_name in self._blocked_tools
+
+    def _clean_old_calls(self, tool_name: str) -> None:
+        """Remove calls outside the time window.
+
+        Args:
+            tool_name: Name of the tool
+        """
+        if tool_name not in self._call_history:
+            return
+
+        import time
+
+        current_time = time.time()
+        cutoff_time = current_time - self._time_window_seconds
+
+        # Keep only calls within the time window
+        self._call_history[tool_name] = [
+            ts for ts in self._call_history[tool_name] if ts > cutoff_time
+        ]
+
+    def _get_call_count(self, tool_name: str) -> int:
+        """Get the number of calls within the time window.
+
+        Args:
+            tool_name: Name of the tool
+
+        Returns:
+            Number of calls in the current time window
+        """
+        self._clean_old_calls(tool_name)
+        return len(self._call_history.get(tool_name, []))
+
+    def _get_retry_after(self, tool_name: str) -> float:
+        """Calculate seconds until next allowed call.
+
+        Args:
+            tool_name: Name of the tool
+
+        Returns:
+            Seconds to wait before retry
+        """
+        if tool_name not in self._call_history or not self._call_history[tool_name]:
+            return 0.0
+
+        # Get the oldest call in the window
+        oldest_call = min(self._call_history[tool_name])
+        import time
+
+        current_time = time.time()
+        # When the oldest call will exit the window
+        window_end = oldest_call + self._time_window_seconds
+
+        return max(0.0, window_end - current_time)
+
+    async def before_tool_call(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> RateLimitResult:
+        """Check rate limit before tool execution.
+
+        Args:
+            tool_name: Name of the tool being called
+            arguments: Arguments passed to the tool
+
+        Returns:
+            RateLimitResult with rate limit status
+        """
+        if not self._is_limited(tool_name):
+            return RateLimitResult(proceed=True, blocked=False, retry_after_seconds=None)
+
+        # Clean old calls
+        self._clean_old_calls(tool_name)
+
+        # Get current call count
+        call_count = self._get_call_count(tool_name)
+
+        if call_count >= self._max_calls:
+            # Rate limit exceeded
+            retry_after = self._get_retry_after(tool_name)
+
+            return RateLimitResult(
+                proceed=False,
+                blocked=True,
+                retry_after_seconds=retry_after,
+                error_message=f"Rate limit exceeded for {tool_name}. "
+                f"Maximum {self._max_calls} calls per {self._time_window_seconds} seconds. "
+                f"Retry after {retry_after:.1f} seconds.",
+                call_count=call_count,
+                limit=self._max_calls,
+            )
+
+        # Track this call
+        import time
+
+        current_time = time.time()
+        if tool_name not in self._call_history:
+            self._call_history[tool_name] = []
+        self._call_history[tool_name].append(current_time)
+
+        return RateLimitResult(
+            proceed=True, blocked=False, retry_after_seconds=None, call_count=call_count + 1, limit=self._max_calls
+        )
+
+    async def after_tool_call(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        result: Any,
+        success: bool,
+    ) -> Optional[Any]:
+        """No-op after tool call.
+
+        Returns:
+            None (no modification)
+        """
+        return None
+
+    def reset(self, tool_name: str) -> None:
+        """Reset rate limit for a specific tool.
+
+        Args:
+            tool_name: Name of the tool to reset
+        """
+        self._call_history.pop(tool_name, None)
+
+    def reset_all(self) -> None:
+        """Reset all rate limits."""
+        self._call_history.clear()
+
+    def get_stats(self) -> Dict[str, Dict[str, Any]]:
+        """Get rate limit statistics.
+
+        Returns:
+            Dict mapping tool names to their stats
+        """
+        stats = {}
+
+        for tool_name in self._blocked_tools:
+            call_count = self._get_call_count(tool_name)
+            is_blocked = call_count >= self._max_calls
+
+            stats[tool_name] = {
+                "calls_made": call_count,
+                "limit": self._max_calls,
+                "blocked": is_blocked,
+                "time_window_seconds": self._time_window_seconds,
+            }
+
+        return stats
+
+    def get_priority(self) -> MiddlewarePriority:
+        """Get the priority of this middleware.
+
+        Rate limit runs with CRITICAL priority to block calls early.
+
+        Returns:
+            CRITICAL priority
+        """
+        return MiddlewarePriority.CRITICAL
+
+    def get_applicable_tools(self) -> Optional[Set[str]]:
+        """Get tools this middleware applies to.
+
+        Returns:
+            Set of rate-limited tools
+        """
+        return self._blocked_tools
+
+
 __all__ = [
     # Middleware
     "LoggingMiddleware",
@@ -1254,6 +1771,8 @@ __all__ = [
     "MetricsMiddleware",
     "GitSafetyMiddleware",
     "OutputValidationMiddleware",
+    "CacheMiddleware",
+    "RateLimitMiddleware",
     # Validation Types
     "ValidationSeverity",
     "ValidationIssue",
@@ -1262,4 +1781,8 @@ __all__ = [
     "FixableValidatorProtocol",
     # Types
     "ToolMetrics",
+    # Cache Types
+    "CacheResult",
+    # Rate Limit Types
+    "RateLimitResult",
 ]

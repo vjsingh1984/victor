@@ -431,3 +431,205 @@ class TestAnalyticsCoordinator:
 
         assert len(result.events) == 1
         assert result.events[0]["timestamp"] == "2025-01-02T00:00:00"
+
+
+class TestAnalyticsCoordinatorBridgeMethods:
+    """Tests for AnalyticsCoordinator bridge methods to MetricsCoordinator."""
+
+    @pytest.fixture
+    def mock_metrics_coordinator(self):
+        """Create mock MetricsCoordinator."""
+        from unittest.mock import MagicMock
+        coordinator = MagicMock()
+        coordinator.finalize_stream_metrics = MagicMock(return_value={"test": "metrics"})
+        coordinator.get_last_stream_metrics = MagicMock(return_value={"last": "metrics"})
+        coordinator.get_streaming_metrics_summary = MagicMock(return_value={"summary": "data"})
+        coordinator.get_streaming_metrics_history = MagicMock(return_value=[{"h1": "data"}, {"h2": "data"}])
+        coordinator.get_session_cost_summary = MagicMock(return_value={"cost": 0.123})
+        coordinator.get_session_cost_formatted = MagicMock(return_value="$0.0123")
+        coordinator.export_session_costs = MagicMock()
+        coordinator.get_tool_usage_stats = MagicMock(return_value={"tools": {}})
+        return coordinator
+
+    @pytest.fixture
+    def coordinator_with_metrics(self, mock_metrics_coordinator):
+        """Create coordinator with MetricsCoordinator bridge."""
+        from victor.agent.coordinators import AnalyticsCoordinator
+        return AnalyticsCoordinator(
+            metrics_coordinator=mock_metrics_coordinator,
+        )
+
+    def test_finalize_stream_metrics_delegates(self, coordinator_with_metrics, mock_metrics_coordinator):
+        """Test finalize_stream_metrics delegates to MetricsCoordinator."""
+        usage_data = {"prompt_tokens": 100, "completion_tokens": 50}
+        result = coordinator_with_metrics.finalize_stream_metrics(usage_data)
+        mock_metrics_coordinator.finalize_stream_metrics.assert_called_once_with(usage_data)
+        assert result == {"test": "metrics"}
+
+    def test_finalize_stream_metrics_no_coordinator(self):
+        """Test finalize_stream_metrics returns None when no MetricsCoordinator."""
+        from victor.agent.coordinators import AnalyticsCoordinator
+        coordinator = AnalyticsCoordinator()
+        result = coordinator.finalize_stream_metrics()
+        assert result is None
+
+    def test_get_last_stream_metrics_delegates(self, coordinator_with_metrics, mock_metrics_coordinator):
+        """Test get_last_stream_metrics delegates to MetricsCoordinator."""
+        result = coordinator_with_metrics.get_last_stream_metrics()
+        mock_metrics_coordinator.get_last_stream_metrics.assert_called_once()
+        assert result == {"last": "metrics"}
+
+    def test_get_last_stream_metrics_no_coordinator(self):
+        """Test get_last_stream_metrics returns None when no MetricsCoordinator."""
+        from victor.agent.coordinators import AnalyticsCoordinator
+        coordinator = AnalyticsCoordinator()
+        result = coordinator.get_last_stream_metrics()
+        assert result is None
+
+    def test_get_streaming_metrics_summary_delegates(self, coordinator_with_metrics, mock_metrics_coordinator):
+        """Test get_streaming_metrics_summary delegates to MetricsCoordinator."""
+        result = coordinator_with_metrics.get_streaming_metrics_summary()
+        mock_metrics_coordinator.get_streaming_metrics_summary.assert_called_once()
+        assert result == {"summary": "data"}
+
+    def test_get_streaming_metrics_history_delegates(self, coordinator_with_metrics, mock_metrics_coordinator):
+        """Test get_streaming_metrics_history delegates to MetricsCoordinator."""
+        result = coordinator_with_metrics.get_streaming_metrics_history(limit=5)
+        mock_metrics_coordinator.get_streaming_metrics_history.assert_called_once_with(5)
+        assert result == [{"h1": "data"}, {"h2": "data"}]
+
+    def test_get_session_cost_summary_delegates(self, coordinator_with_metrics, mock_metrics_coordinator):
+        """Test get_session_cost_summary delegates to MetricsCoordinator."""
+        result = coordinator_with_metrics.get_session_cost_summary()
+        mock_metrics_coordinator.get_session_cost_summary.assert_called_once()
+        assert result == {"cost": 0.123}
+
+    def test_get_session_cost_summary_no_coordinator(self):
+        """Test get_session_cost_summary returns empty dict when no MetricsCoordinator."""
+        from victor.agent.coordinators import AnalyticsCoordinator
+        coordinator = AnalyticsCoordinator()
+        result = coordinator.get_session_cost_summary()
+        assert result == {}
+
+    def test_get_session_cost_formatted_delegates(self, coordinator_with_metrics, mock_metrics_coordinator):
+        """Test get_session_cost_formatted delegates to MetricsCoordinator."""
+        result = coordinator_with_metrics.get_session_cost_formatted()
+        mock_metrics_coordinator.get_session_cost_formatted.assert_called_once()
+        assert result == "$0.0123"
+
+    def test_get_session_cost_formatted_no_coordinator(self):
+        """Test get_session_cost_formatted returns fallback when no MetricsCoordinator."""
+        from victor.agent.coordinators import AnalyticsCoordinator
+        coordinator = AnalyticsCoordinator()
+        result = coordinator.get_session_cost_formatted()
+        assert result == "cost n/a"
+
+    def test_export_session_costs_delegates(self, coordinator_with_metrics, mock_metrics_coordinator):
+        """Test export_session_costs delegates to MetricsCoordinator."""
+        coordinator_with_metrics.export_session_costs("/tmp/costs.json", "json")
+        mock_metrics_coordinator.export_session_costs.assert_called_once_with("/tmp/costs.json", "json")
+
+    def test_export_session_costs_no_coordinator_raises(self):
+        """Test export_session_costs raises RuntimeError when no MetricsCoordinator."""
+        from victor.agent.coordinators import AnalyticsCoordinator
+        coordinator = AnalyticsCoordinator()
+        with pytest.raises(RuntimeError, match="MetricsCoordinator not available"):
+            coordinator.export_session_costs("/tmp/costs.json")
+
+    def test_get_tool_usage_stats_delegates(self, coordinator_with_metrics, mock_metrics_coordinator):
+        """Test get_tool_usage_stats delegates to MetricsCoordinator."""
+        result = coordinator_with_metrics.get_tool_usage_stats(conversation_state_summary={"test": "summary"})
+        mock_metrics_coordinator.get_tool_usage_stats.assert_called_once_with(conversation_state_summary={"test": "summary"})
+        assert result == {"tools": {}}
+
+    def test_get_tool_usage_stats_no_coordinator(self):
+        """Test get_tool_usage_stats returns empty dict when no MetricsCoordinator."""
+        from victor.agent.coordinators import AnalyticsCoordinator
+        coordinator = AnalyticsCoordinator()
+        result = coordinator.get_tool_usage_stats()
+        assert result == {}
+
+    def test_get_session_stats_with_memory_manager(self):
+        """Test get_session_stats_ext with MemoryManager."""
+        from unittest.mock import MagicMock
+        from victor.agent.coordinators import AnalyticsCoordinator
+        coordinator = AnalyticsCoordinator()
+        memory_manager = MagicMock()
+        memory_manager.get_session_stats = MagicMock(return_value={
+            "enabled": True,
+            "message_count": 10,
+        })
+        result = coordinator.get_session_stats_ext(
+            memory_manager=memory_manager,
+            session_id="test-session",
+            fallback_message_count=5,
+        )
+        memory_manager.get_session_stats.assert_called_once_with("test-session")
+        assert result["enabled"] is True
+        assert result["message_count"] == 10
+
+    def test_get_session_stats_without_memory_manager(self):
+        """Test get_session_stats_ext without MemoryManager returns fallback."""
+        from victor.agent.coordinators import AnalyticsCoordinator
+        coordinator = AnalyticsCoordinator()
+        result = coordinator.get_session_stats_ext(
+            memory_manager=None,
+            session_id=None,
+            fallback_message_count=5,
+        )
+        assert result["enabled"] is False
+        assert result["message_count"] == 5
+
+    def test_get_session_stats_with_exception(self):
+        """Test get_session_stats_ext handles MemoryManager exceptions gracefully."""
+        from unittest.mock import MagicMock
+        from victor.agent.coordinators import AnalyticsCoordinator
+        coordinator = AnalyticsCoordinator()
+        memory_manager = MagicMock()
+        memory_manager.get_session_stats = MagicMock(side_effect=Exception("Session not found"))
+        result = coordinator.get_session_stats_ext(
+            memory_manager=memory_manager,
+            session_id="invalid-session",
+            fallback_message_count=3,
+        )
+        assert result["enabled"] is True
+        assert result["message_count"] == 3
+        assert "error" in result
+
+    def test_flush_analytics_with_evaluation_coordinator(self):
+        """Test flush_analytics delegates to EvaluationCoordinator."""
+        from unittest.mock import MagicMock
+        from victor.agent.coordinators import AnalyticsCoordinator
+        coordinator = AnalyticsCoordinator()
+        eval_coordinator = MagicMock()
+        eval_coordinator.flush_analytics = MagicMock(return_value={
+            "usage_analytics": True,
+            "sequence_tracker": True,
+        })
+        result = coordinator.flush_analytics(evaluation_coordinator=eval_coordinator)
+        eval_coordinator.flush_analytics.assert_called_once()
+        assert result["usage_analytics"] is True
+        assert result["sequence_tracker"] is True
+        assert result["tool_cache"] is True  # No tool cache, defaults to True
+
+    def test_flush_analytics_with_tool_cache(self):
+        """Test flush_analytics flushes tool_cache."""
+        from unittest.mock import MagicMock
+        from victor.agent.coordinators import AnalyticsCoordinator
+        coordinator = AnalyticsCoordinator()
+        tool_cache = MagicMock()
+        tool_cache.flush = MagicMock()
+        result = coordinator.flush_analytics(tool_cache=tool_cache)
+        tool_cache.flush.assert_called_once()
+        assert result["tool_cache"] is True
+
+    def test_flush_analytics_handles_errors(self):
+        """Test flush_analytics handles exceptions gracefully."""
+        from unittest.mock import MagicMock
+        from victor.agent.coordinators import AnalyticsCoordinator
+        coordinator = AnalyticsCoordinator()
+        eval_coordinator = MagicMock()
+        eval_coordinator.flush_analytics = MagicMock(side_effect=Exception("Flush failed"))
+        result = coordinator.flush_analytics(evaluation_coordinator=eval_coordinator)
+        assert result["usage_analytics"] is False
+        assert result["sequence_tracker"] is False

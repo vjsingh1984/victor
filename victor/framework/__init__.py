@@ -248,6 +248,7 @@ except ImportError:
     _SERVICE_PROVIDER_EXPORTS = []
 
 # Resilience Facade (Phase 9.1 - Re-exports from providers/core modules)
+# Phase 10 - Added framework retry handlers for workflows
 try:
     from victor.framework.resilience import (
         # Circuit Breaker (Standalone)
@@ -279,6 +280,19 @@ try:
         tool_retry_strategy,
         with_retry,
         with_retry_sync,
+        # Framework-Specific Retry Handlers (Phase 10)
+        DatabaseRetryHandler,
+        FRAMEWORK_RETRY_HANDLERS,
+        NetworkRetryHandler,
+        RateLimitRetryHandler,
+        register_framework_retry_handlers,
+        retry_with_backoff,
+        retry_with_backoff_sync,
+        RetryConfig,
+        RetryHandler,
+        RetryHandlerConfig,
+        with_exponential_backoff,
+        with_exponential_backoff_sync,
     )
 
     _RESILIENCE_EXPORTS = [
@@ -311,6 +325,19 @@ try:
         "tool_retry_strategy",
         "with_retry",
         "with_retry_sync",
+        # Framework-Specific Retry Handlers (Phase 10)
+        "RetryConfig",
+        "RetryHandlerConfig",
+        "RetryHandler",
+        "retry_with_backoff",
+        "retry_with_backoff_sync",
+        "with_exponential_backoff",
+        "with_exponential_backoff_sync",
+        "NetworkRetryHandler",
+        "RateLimitRetryHandler",
+        "DatabaseRetryHandler",
+        "FRAMEWORK_RETRY_HANDLERS",
+        "register_framework_retry_handlers",
     ]
 except ImportError:
     _RESILIENCE_EXPORTS = []
@@ -404,6 +431,80 @@ try:
     ]
 except ImportError:
     _METRICS_EXPORTS = []
+
+# Service Lifecycle (Phase 10 - Framework service lifecycle management)
+try:
+    from victor.framework.services import (
+        # Protocols
+        ServiceLifecycleProtocol,
+        ServiceConfigurable,
+        ServiceTypeHandler,
+        # State enums
+        ServiceState,
+        HealthStatus,
+        # Data classes
+        ServiceMetadata,
+        HealthCheckResult,
+        BaseServiceConfig,
+        SQLiteServiceConfig,
+        DockerServiceConfig,
+        HTTPServiceConfig,
+        ExternalServiceConfig,
+        # Exceptions
+        ServiceStartError,
+        ServiceStopError,
+        # Base class
+        BaseService,
+        # Built-in services
+        SQLiteServiceHandler,
+        DockerServiceHandler,
+        HTTPServiceHandler,
+        ExternalServiceHandler,
+        # Registry
+        ServiceRegistry,
+        # Manager
+        ServiceManager,
+        # Convenience functions
+        create_sqlite_service,
+        create_http_service,
+    )
+
+    _SERVICES_EXPORTS = [
+        # Protocols
+        "ServiceLifecycleProtocol",
+        "ServiceConfigurable",
+        "ServiceTypeHandler",
+        # State enums
+        "ServiceState",
+        "HealthStatus",
+        # Data classes
+        "ServiceMetadata",
+        "HealthCheckResult",
+        "BaseServiceConfig",
+        "SQLiteServiceConfig",
+        "DockerServiceConfig",
+        "HTTPServiceConfig",
+        "ExternalServiceConfig",
+        # Exceptions
+        "ServiceStartError",
+        "ServiceStopError",
+        # Base class
+        "BaseService",
+        # Built-in services
+        "SQLiteServiceHandler",
+        "DockerServiceHandler",
+        "HTTPServiceHandler",
+        "ExternalServiceHandler",
+        # Registry
+        "ServiceRegistry",
+        # Manager
+        "ServiceManager",
+        # Convenience functions
+        "create_sqlite_service",
+        "create_http_service",
+    ]
+except ImportError:
+    _SERVICES_EXPORTS = []
 
 # Teams (Phase 4 - Multi-Agent Teams Exposure)
 # NOTE: Canonical team types (TeamFormation, MemberResult, TeamResult, etc.)
@@ -762,6 +863,7 @@ __all__ = (
     + _RESILIENCE_EXPORTS
     + _HEALTH_EXPORTS
     + _METRICS_EXPORTS
+    + _SERVICES_EXPORTS
     + _TEAMS_EXPORTS
     + _RL_EXPORTS
     + _TEAM_REGISTRY_EXPORTS
