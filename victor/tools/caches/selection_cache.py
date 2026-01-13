@@ -714,10 +714,45 @@ def invalidate_tool_selection_cache() -> None:
     cache.invalidate()
 
 
+def reset_tool_selection_cache() -> None:
+    """Reset the global tool selection cache singleton.
+
+    This is primarily used for testing to ensure isolation between tests.
+    After calling this, the next call to get_tool_selection_cache() will
+    create a new instance.
+
+    This also clears the underlying UniversalRegistries to ensure
+    complete isolation between tests.
+    """
+    global _global_cache
+    with _cache_lock:
+        # First invalidate all caches in the current instance if it exists
+        if _global_cache is not None:
+            _global_cache.invalidate()
+
+        # Reset the global cache instance
+        _global_cache = None
+
+        # Also clear the underlying UniversalRegistries
+        # These are singletons that persist across cache instances
+        for registry_name in [
+            "tool_selection_query",
+            "tool_selection_context",
+            "tool_selection_rl",
+        ]:
+            try:
+                registry = UniversalRegistry.get_registry(registry_name)
+                registry.invalidate()
+            except Exception:
+                # Ignore any errors during cleanup
+                pass
+
+
 __all__ = [
     "CachedSelection",
     "CacheMetrics",
     "ToolSelectionCache",
     "get_tool_selection_cache",
     "invalidate_tool_selection_cache",
+    "reset_tool_selection_cache",
 ]

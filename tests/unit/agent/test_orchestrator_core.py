@@ -2864,17 +2864,19 @@ class TestGetRecentSessions:
         """Test returns sessions from memory manager."""
         from datetime import datetime
 
-        mock_session = MagicMock()
-        mock_session.session_id = "session-1"
-        mock_session.created_at = datetime(2024, 1, 1, 12, 0, 0)
-        mock_session.last_activity = datetime(2024, 1, 1, 13, 0, 0)
-        mock_session.project_path = "/test/path"
-        mock_session.provider = "anthropic"
-        mock_session.model = "claude-3"
-        mock_session.messages = [MagicMock(), MagicMock()]
-
+        # Mock the MemoryManager's get_recent_sessions method to return session data
         mock_manager = MagicMock()
-        mock_manager.list_sessions.return_value = [mock_session]
+        mock_manager.get_recent_sessions.return_value = [
+            {
+                "session_id": "session-1",
+                "created_at": "2024-01-01T12:00:00",
+                "last_activity": "2024-01-01T13:00:00",
+                "project_path": "/test/path",
+                "provider": "anthropic",
+                "model": "claude-3",
+                "message_count": 2,
+            }
+        ]
         orchestrator.memory_manager = mock_manager
 
         result = orchestrator.get_recent_sessions(limit=5)
@@ -2882,12 +2884,12 @@ class TestGetRecentSessions:
         assert len(result) == 1
         assert result[0]["session_id"] == "session-1"
         assert result[0]["message_count"] == 2
-        mock_manager.list_sessions.assert_called_once_with(limit=5)
+        mock_manager.get_recent_sessions.assert_called_once_with(limit=5)
 
     def test_handles_exception_gracefully(self, orchestrator):
         """Test handles exception and returns empty list."""
         mock_manager = MagicMock()
-        mock_manager.list_sessions.side_effect = Exception("Database error")
+        mock_manager.get_recent_sessions.side_effect = Exception("Database error")
         orchestrator.memory_manager = mock_manager
 
         result = orchestrator.get_recent_sessions()
@@ -2905,39 +2907,53 @@ class TestRecoverSession:
 
     def test_returns_false_when_session_not_found(self, orchestrator):
         """Test returns False when session not found."""
+        # The SessionRecoveryManager calls get_session_stats on conversation_store
+        # We need to mock the conversation store through the memory manager wrapper
         mock_manager = MagicMock()
-        mock_manager.get_session.return_value = None
+        # Configure the _conversation_store to return None for get_session_stats
+        mock_conversation_store = MagicMock()
+        mock_conversation_store.get_session_stats.return_value = None
+        mock_manager._conversation_store = mock_conversation_store
         orchestrator.memory_manager = mock_manager
 
-        result = orchestrator.recover_session("nonexistent-session")
+        # Mock LifecycleManager.recover_session to return False (session not found)
+        with patch.object(orchestrator._session_recovery_manager._lifecycle_manager, "recover_session", return_value=False):
+            result = orchestrator.recover_session("nonexistent-session")
+
         assert result is False
 
     def test_recovers_session_successfully(self, orchestrator):
         """Test recovers session and restores messages."""
-        mock_msg = MagicMock()
-        mock_msg.role = "user"
-        mock_msg.content = "Hello"
-        mock_msg.to_provider_format.return_value = {"role": "user", "content": "Hello"}
-
-        mock_session = MagicMock()
-        mock_session.messages = [mock_msg]
-
+        # Mock the conversation store to return valid session stats
         mock_manager = MagicMock()
-        mock_manager.get_session.return_value = mock_session
+        mock_conversation_store = MagicMock()
+        mock_conversation_store.get_session_stats.return_value = {
+            "message_count": 1,
+            "total_tokens": 100,
+        }
+        mock_manager._conversation_store = mock_conversation_store
         orchestrator.memory_manager = mock_manager
 
-        result = orchestrator.recover_session("session-123")
+        # Mock LifecycleManager.recover_session to return False (so it falls back to direct recovery)
+        with patch.object(orchestrator._session_recovery_manager._lifecycle_manager, "recover_session", return_value=False):
+            result = orchestrator.recover_session("session-123")
 
         assert result is True
         assert orchestrator._memory_session_id == "session-123"
 
     def test_handles_exception_gracefully(self, orchestrator):
         """Test handles exception and returns False."""
+        # Mock the conversation store to raise an exception
         mock_manager = MagicMock()
-        mock_manager.get_session.side_effect = Exception("Database error")
+        mock_conversation_store = MagicMock()
+        mock_conversation_store.get_session_stats.side_effect = Exception("Database error")
+        mock_manager._conversation_store = mock_conversation_store
         orchestrator.memory_manager = mock_manager
 
-        result = orchestrator.recover_session("session-123")
+        # Mock LifecycleManager.recover_session to raise an exception
+        with patch.object(orchestrator._session_recovery_manager._lifecycle_manager, "recover_session", side_effect=Exception("LC error")):
+            result = orchestrator.recover_session("session-123")
+
         assert result is False
 
 
@@ -2949,10 +2965,11 @@ class TestGetMemoryContext:
         orchestrator.memory_manager = None
         orchestrator._memory_session_id = None
 
-        # Mock messages property
+        # Mock conversation.messages using PropertyMock
+        from unittest.mock import PropertyMock
         mock_msg = MagicMock()
         mock_msg.model_dump.return_value = {"role": "user", "content": "test"}
-        with patch.object(type(orchestrator), "messages", property(lambda self: [mock_msg])):
+        with patch.object(type(orchestrator.conversation), "messages", new_callable=PropertyMock, return_value=[mock_msg]):
             result = orchestrator.get_memory_context()
 
         assert len(result) == 1
@@ -2963,9 +2980,10 @@ class TestGetMemoryContext:
         orchestrator.memory_manager = MagicMock()
         orchestrator._memory_session_id = None
 
+        from unittest.mock import PropertyMock
         mock_msg = MagicMock()
         mock_msg.model_dump.return_value = {"role": "assistant", "content": "hello"}
-        with patch.object(type(orchestrator), "messages", property(lambda self: [mock_msg])):
+        with patch.object(type(orchestrator.conversation), "messages", new_callable=PropertyMock, return_value=[mock_msg]):
             result = orchestrator.get_memory_context()
 
         assert len(result) == 1
@@ -2973,7 +2991,7 @@ class TestGetMemoryContext:
     def test_gets_context_from_memory_manager(self, orchestrator):
         """Test gets context from memory manager."""
         mock_manager = MagicMock()
-        mock_manager.get_context_messages.return_value = [
+        mock_manager.get_context.return_value = [
             {"role": "user", "content": "test1"},
             {"role": "assistant", "content": "test2"},
         ]
@@ -2983,21 +3001,19 @@ class TestGetMemoryContext:
         result = orchestrator.get_memory_context(max_tokens=1000)
 
         assert len(result) == 2
-        mock_manager.get_context_messages.assert_called_once_with(
-            session_id="session-123",
-            max_tokens=1000,
-        )
+        mock_manager.get_context.assert_called_once_with(max_tokens=1000)
 
     def test_handles_exception_with_fallback(self, orchestrator):
         """Test handles exception and falls back to in-memory."""
         mock_manager = MagicMock()
-        mock_manager.get_context_messages.side_effect = Exception("Error")
+        mock_manager.get_context.side_effect = Exception("Error")
         orchestrator.memory_manager = mock_manager
         orchestrator._memory_session_id = "session-123"
 
+        from unittest.mock import PropertyMock
         mock_msg = MagicMock()
         mock_msg.model_dump.return_value = {"role": "user", "content": "fallback"}
-        with patch.object(type(orchestrator), "messages", property(lambda self: [mock_msg])):
+        with patch.object(type(orchestrator.conversation), "messages", new_callable=PropertyMock, return_value=[mock_msg]):
             result = orchestrator.get_memory_context()
 
         assert len(result) == 1
@@ -3868,15 +3884,6 @@ class TestGetStageRecommendedTools:
         """Test get_stage_recommended_tools returns a set."""
         tools = orchestrator.get_stage_recommended_tools()
         assert isinstance(tools, set)
-
-
-class TestGetOptimizationStatus:
-    """Tests for get_optimization_status method."""
-
-    def test_returns_dict(self, orchestrator):
-        """Test get_optimization_status returns a dict."""
-        status = orchestrator.get_optimization_status()
-        assert isinstance(status, dict)
 
 
 class TestGetLastStreamMetrics:

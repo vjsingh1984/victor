@@ -129,6 +129,11 @@ class KeywordToolSelector:
         Returns:
             List of relevant ToolDefinition objects
         """
+        # Check cache first (Phase 3 Task 2: Selection result caching)
+        cached_result = self._try_get_cached_selection(prompt, context)
+        if cached_result is not None:
+            return cached_result
+
         all_tools = list(self.tools.list_tools())
 
         # Start with planned tools if provided
@@ -176,6 +181,10 @@ class KeywordToolSelector:
                 f"Selected {len(selected_tools)} tools from vertical filter: "
                 f"{', '.join(tool_names)}"
             )
+
+            # Store in cache (Phase 3 Task 2: Selection result caching)
+            self._store_selection_in_cache(prompt, selected_tools, context)
+
             return selected_tools
 
         # Fallback: Build selected tool names using core tools + registry keyword matches
@@ -218,6 +227,9 @@ class KeywordToolSelector:
             f"Selected {len(selected_tools)} tools (small_model={small_model}): "
             f"{', '.join(tool_names)}"
         )
+
+        # Store in cache (Phase 3 Task 2: Selection result caching)
+        self._store_selection_in_cache(prompt, selected_tools, context)
 
         return selected_tools
 
@@ -286,6 +298,146 @@ class KeywordToolSelector:
         """
         pass  # No resources to clean up
 
+    # =========================================================================
+    # Selection Result Caching (Phase 3 Task 2)
+    # =========================================================================
+
+    def _try_get_cached_selection(
+        self,
+        prompt: str,
+        context: "ToolSelectionContext",
+    ) -> Optional[List[ToolDefinition]]:
+        """Try to get cached tool selection result.
+
+        Args:
+            prompt: User prompt
+            context: Tool selection context
+
+        Returns:
+            Cached list of ToolDefinition or None if not found
+        """
+        try:
+            from victor.tools.caches import get_cache_key_generator, get_tool_selection_cache
+        except ImportError:
+            return None
+
+        key_gen = get_cache_key_generator()
+        cache = get_tool_selection_cache()
+
+        # Calculate tools hash
+        tools_hash = key_gen.calculate_tools_hash(self.tools)
+
+        # Determine cache key type based on context
+        conversation_history = getattr(context, "conversation_history", None) if context else None
+        pending_actions = getattr(context, "pending_actions", None) if context else None
+
+        has_context = (conversation_history and len(conversation_history) > 0) or (
+            pending_actions and len(pending_actions) > 0
+        )
+
+        if has_context:
+            # Use context-aware cache
+            cache_key = key_gen.generate_context_key(
+                query=prompt,
+                tools_hash=tools_hash,
+                conversation_history=conversation_history,
+                pending_actions=pending_actions,
+            )
+            cached = cache.get_context(cache_key)
+        else:
+            # Use simple query cache
+            config_hash = self._get_config_hash()
+            cache_key = key_gen.generate_query_key(
+                query=prompt,
+                tools_hash=tools_hash,
+                config_hash=config_hash,
+            )
+            cached = cache.get_query(cache_key)
+
+        if cached and cached.tools:
+            logger.debug(f"KeywordToolSelector: Cache hit for prompt: {prompt[:50]}...")
+            return cached.tools
+
+        return None
+
+    def _store_selection_in_cache(
+        self,
+        prompt: str,
+        tools: List[ToolDefinition],
+        context: "ToolSelectionContext",
+    ) -> None:
+        """Store tool selection result in cache.
+
+        Args:
+            prompt: User prompt
+            tools: Selected tools to cache
+            context: Tool selection context
+        """
+        try:
+            from victor.tools.caches import get_cache_key_generator, get_tool_selection_cache
+        except ImportError:
+            return
+
+        key_gen = get_cache_key_generator()
+        cache = get_tool_selection_cache()
+
+        tool_names = [t.name for t in tools]
+
+        # Calculate tools hash
+        tools_hash = key_gen.calculate_tools_hash(self.tools)
+
+        # Determine cache key type based on context
+        conversation_history = getattr(context, "conversation_history", None) if context else None
+        pending_actions = getattr(context, "pending_actions", None) if context else None
+
+        has_context = (conversation_history and len(conversation_history) > 0) or (
+            pending_actions and len(pending_actions) > 0
+        )
+
+        if has_context:
+            # Use context-aware cache (shorter TTL)
+            cache_key = key_gen.generate_context_key(
+                query=prompt,
+                tools_hash=tools_hash,
+                conversation_history=conversation_history,
+                pending_actions=pending_actions,
+            )
+            cache.put_context(cache_key, tool_names, tools=tools)
+        else:
+            # Use simple query cache (longer TTL)
+            config_hash = self._get_config_hash()
+            cache_key = key_gen.generate_query_key(
+                query=prompt,
+                tools_hash=tools_hash,
+                config_hash=config_hash,
+            )
+            cache.put_query(cache_key, tool_names, tools=tools)
+
+    def _get_config_hash(self) -> str:
+        """Generate hash of selector configuration for cache invalidation.
+
+        Returns:
+            Hash string for configuration
+        """
+        import hashlib
+
+        enabled_hash = ",".join(sorted(self._enabled_tools)) if self._enabled_tools else "none"
+        config_str = f"enabled:{enabled_hash}:model:{self.model}"
+        return hashlib.sha256(config_str.encode()).hexdigest()[:16]
+
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Get cache performance statistics.
+
+        Returns:
+            Dictionary with cache metrics
+        """
+        try:
+            from victor.tools.caches import get_tool_selection_cache
+            cache = get_tool_selection_cache()
+            return cache.get_stats()
+        except ImportError:
+            return {"enabled": False}
+
     def notify_tools_changed(self) -> None:
         """Notify selector that tools registry has changed (cache invalidation).
 
@@ -296,9 +448,18 @@ class KeywordToolSelector:
         This invalidates internal caches:
         - Core tools cache
         - Core readonly cache
+        - Selection result cache
         """
         self._core_tools_cache = None
         self._core_readonly_cache = None
+
+        # Invalidate selection cache if available
+        try:
+            from victor.tools.caches import invalidate_tool_selection_cache
+            invalidate_tool_selection_cache()
+        except ImportError:
+            pass  # Cache module not available
+
         logger.info("KeywordToolSelector: Notified of tools registry change, caches invalidated")
 
     # =========================================================================

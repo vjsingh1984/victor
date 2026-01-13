@@ -159,6 +159,14 @@ def reset_singletons():
         except ImportError:
             pass
 
+        # Reset ToolSelectionCache singleton
+        try:
+            from victor.tools.caches.selection_cache import reset_tool_selection_cache
+
+            reset_tool_selection_cache()
+        except ImportError:
+            pass
+
     # Reset before test
     _reset_all()
 

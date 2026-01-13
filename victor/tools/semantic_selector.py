@@ -1250,6 +1250,142 @@ class SemanticToolSelector:
 
         return penalty
 
+    # ========================================================================
+    # Selection Result Caching (Phase 3 Task 2)
+    # ========================================================================
+
+    def _try_get_cached_selection(
+        self,
+        query: str,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+        similarity_threshold: float = SemanticSelectorDefaults.SIMILARITY_THRESHOLD,
+    ) -> Optional[List[ToolDefinition]]:
+        """Try to get cached tool selection result.
+
+        Args:
+            query: User query
+            conversation_history: Optional conversation history for context-aware caching
+            similarity_threshold: Minimum similarity threshold used for selection
+
+        Returns:
+            Cached list of ToolDefinition or None if not found
+        """
+        try:
+            from victor.tools.caches import get_cache_key_generator, get_tool_selection_cache
+        except ImportError:
+            return None
+
+        if not self._tools_registry:
+            return None
+
+        key_gen = get_cache_key_generator()
+        cache = get_tool_selection_cache()
+
+        # Calculate tools hash
+        tools_hash = key_gen.calculate_tools_hash(self._tools_registry)
+
+        # Determine cache key type based on context
+        if conversation_history and len(conversation_history) > 0:
+            # Use context-aware cache
+            cache_key = key_gen.generate_context_key(
+                query=query,
+                tools_hash=tools_hash,
+                conversation_history=conversation_history,
+            )
+            cached = cache.get_context(cache_key)
+        else:
+            # Use simple query cache (includes threshold for correctness)
+            config_hash = self._get_config_hash(similarity_threshold)
+            cache_key = key_gen.generate_query_key(
+                query=query,
+                tools_hash=tools_hash,
+                config_hash=config_hash,
+            )
+            cached = cache.get_query(cache_key)
+
+        if cached and cached.tools:
+            logger.debug(f"SemanticToolSelector: Cache hit for query: {query[:50]}...")
+            return cached.tools
+
+        return None
+
+    def _store_selection_in_cache(
+        self,
+        query: str,
+        tools: List[ToolDefinition],
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+        similarity_threshold: float = SemanticSelectorDefaults.SIMILARITY_THRESHOLD,
+    ) -> None:
+        """Store tool selection result in cache.
+
+        Args:
+            query: User query
+            tools: Selected tools to cache
+            conversation_history: Optional conversation history for context-aware caching
+            similarity_threshold: Minimum similarity threshold used for selection
+        """
+        try:
+            from victor.tools.caches import get_cache_key_generator, get_tool_selection_cache
+        except ImportError:
+            return
+
+        if not self._tools_registry:
+            return
+
+        key_gen = get_cache_key_generator()
+        cache = get_tool_selection_cache()
+
+        tool_names = [t.name for t in tools]
+
+        # Calculate tools hash
+        tools_hash = key_gen.calculate_tools_hash(self._tools_registry)
+
+        # Determine cache key type based on context
+        if conversation_history and len(conversation_history) > 0:
+            # Use context-aware cache (shorter TTL)
+            cache_key = key_gen.generate_context_key(
+                query=query,
+                tools_hash=tools_hash,
+                conversation_history=conversation_history,
+            )
+            cache.put_context(cache_key, tool_names, tools=tools)
+        else:
+            # Use simple query cache (longer TTL, includes threshold)
+            config_hash = self._get_config_hash(similarity_threshold)
+            cache_key = key_gen.generate_query_key(
+                query=query,
+                tools_hash=tools_hash,
+                config_hash=config_hash,
+            )
+            cache.put_query(cache_key, tool_names, tools=tools)
+
+    def _get_config_hash(self, similarity_threshold: float) -> str:
+        """Generate hash of selector configuration for cache invalidation.
+
+        Args:
+            similarity_threshold: Similarity threshold used for selection
+
+        Returns:
+            Hash string for configuration
+        """
+        import hashlib
+
+        config_str = f"threshold:{similarity_threshold}:model:{self.embedding_model}"
+        return hashlib.sha256(config_str.encode()).hexdigest()[:16]
+
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Get cache performance statistics.
+
+        Returns:
+            Dictionary with cache metrics
+        """
+        try:
+            from victor.tools.caches import get_tool_selection_cache
+            cache = get_tool_selection_cache()
+            return cache.get_stats()
+        except ImportError:
+            return {"enabled": False}
+
     def _generate_cost_warnings(
         self, selected_tools: List[Tuple[Any, float]], tools: ToolRegistry
     ) -> List[str]:
@@ -1308,6 +1444,7 @@ class SemanticToolSelector:
         - Tracking pending actions from the original request
         - Including conversation context in semantic search
         - Ensuring mandatory tools for pending actions
+        - Using selection result caching for performance
 
         Args:
             user_message: Current user message
@@ -1319,6 +1456,15 @@ class SemanticToolSelector:
         Returns:
             List of relevant tools with context-aware selection
         """
+        # Check cache first (Phase 3 Task 2: Selection result caching)
+        cached_result = self._try_get_cached_selection(
+            query=user_message,
+            conversation_history=conversation_history,
+            similarity_threshold=similarity_threshold,
+        )
+        if cached_result is not None:
+            return cached_result
+
         # Phase 2: Extract pending actions
         pending_actions = []
         if conversation_history:
@@ -1476,10 +1622,20 @@ class SemanticToolSelector:
         )
 
         # Convert to ToolDefinition
-        return [
+        result = [
             ToolDefinition(name=tool.name, description=tool.description, parameters=tool.parameters)
             for tool, _ in selected_tools
         ]
+
+        # Store in cache (Phase 3 Task 2: Selection result caching)
+        self._store_selection_in_cache(
+            query=user_message,
+            tools=result,
+            conversation_history=conversation_history,
+            similarity_threshold=similarity_threshold,
+        )
+
+        return result
 
     async def select_relevant_tools(
         self,
@@ -1493,6 +1649,7 @@ class SemanticToolSelector:
         Enhanced with Phase 1 features:
         - Mandatory tool selection for specific keywords
         - Category-based filtering for better relevance
+        - Selection result caching for performance (Phase 3 Task 2)
 
         Args:
             user_message: User's input message
@@ -1503,6 +1660,15 @@ class SemanticToolSelector:
         Returns:
             List of relevant ToolDefinition objects, sorted by relevance
         """
+        # Check cache first (Phase 3 Task 2: Selection result caching)
+        cached_result = self._try_get_cached_selection(
+            query=user_message,
+            conversation_history=None,  # No conversation history for this method
+            similarity_threshold=similarity_threshold,
+        )
+        if cached_result is not None:
+            return cached_result
+
         # Phase 1: Get mandatory tools (always included)
         mandatory_tool_names = self._get_mandatory_tools(user_message)
         if mandatory_tool_names:
@@ -1620,10 +1786,20 @@ class SemanticToolSelector:
         )
 
         # Convert to ToolDefinition
-        return [
+        result = [
             ToolDefinition(name=tool.name, description=tool.description, parameters=tool.parameters)
             for tool, _ in selected_tools
         ]
+
+        # Store in cache (Phase 3 Task 2: Selection result caching)
+        self._store_selection_in_cache(
+            query=user_message,
+            tools=result,
+            conversation_history=None,  # No conversation history for this method
+            similarity_threshold=similarity_threshold,
+        )
+
+        return result
 
     async def _get_embedding(self, text: str) -> np.ndarray:
         """Get embedding vector for text.
@@ -2199,9 +2375,18 @@ class SemanticToolSelector:
         This invalidates internal caches:
         - Tools hash (for cache key generation)
         - Category memberships cache
+        - Selection result cache
         """
         self._tools_hash = None
         self._category_memberships_cache.clear()
+
+        # Invalidate selection cache if available
+        try:
+            from victor.tools.caches import invalidate_tool_selection_cache
+            invalidate_tool_selection_cache()
+        except ImportError:
+            pass  # Cache module not available
+
         logger.info("SemanticToolSelector: Notified of tools registry change, caches invalidated")
 
     async def close(self) -> None:

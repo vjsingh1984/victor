@@ -78,10 +78,6 @@ from victor.agent.coordinators.metrics_coordinator import (
 from victor.agent.coordinators.workflow_coordinator import (
     WorkflowCoordinator,
 )  # noqa: F401  # imported for runtime use
-from victor.agent.coordinators.analytics_coordinator import (
-    AnalyticsCoordinator,
-    ConsoleAnalyticsExporter,
-)  # noqa: F401  # imported for runtime use
 
 if TYPE_CHECKING:
     # Type-only imports (created by factory, only used for type hints)
@@ -536,7 +532,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self.model,
             self.provider_name,
             self.tool_adapter,
-            self.tool_calling_caps,
+            self._tool_calling_caps_internal,
         ) = self._factory.create_provider_manager_with_adapter(provider, model, provider_name)
 
         # ProviderCoordinator: Wraps ProviderManager with rate limiting and health monitoring (TD-002)
@@ -568,7 +564,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             provider_name=self.provider_name,
             model=model,
             tool_adapter=self.tool_adapter,
-            tool_calling_caps=self.tool_calling_caps,
+            tool_calling_caps=self._tool_calling_caps_internal,
         )
 
         # Load project context from .victor/init.md (via factory - DI with fallback)
@@ -581,7 +577,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         from victor.agent.coordinators.prompt_coordinator import PromptBuilderCoordinator
 
         self._prompt_coordinator = PromptBuilderCoordinator(
-            tool_calling_caps=self.tool_calling_caps,
+            tool_calling_caps=self._tool_calling_caps_internal,
             enable_rl_events=True,
         )
 
@@ -600,7 +596,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._system_added = False
 
         # Initialize tool call budget (via factory) - uses adapter recommendations with settings override
-        self.tool_budget = self._factory.initialize_tool_budget(self.tool_calling_caps)
+        self.tool_budget = self._factory.initialize_tool_budget(self._tool_calling_caps_internal)
 
         # Initialize SessionStateManager for consolidated execution state tracking (TD-002)
         # Replaces scattered state variables: tool_calls_used, observed_files, executed_tools,
@@ -679,12 +675,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             cumulative_token_usage=self._cumulative_token_usage,
         )
 
-        # Analytics coordinator with MetricsCoordinator bridge for unified analytics
-        self._analytics_coordinator = AnalyticsCoordinator(
-            exporters=[ConsoleAnalyticsExporter(verbose=False)],
-            metrics_coordinator=self._metrics_coordinator,  # Bridge for unified analytics
-        )
-
         # Result cache for pure/idempotent tools (via factory)
         self.tool_cache = self._factory.create_tool_cache()
         # Minimal dependency graph (used for planning search→read→analyze) (via factory, DI)
@@ -711,7 +701,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Persistent conversation memory with SQLite backing (via factory)
         # Provides session recovery, token-aware pruning, and multi-turn context retention
         self.memory_manager, self._memory_session_id = self._factory.create_memory_components(
-            self.provider_name, self.tool_calling_caps.native_tool_calls
+            self.provider_name, self._tool_calling_caps_internal.native_tool_calls
         )
 
         # Initialize LanceDB embedding store for efficient semantic retrieval if memory enabled
@@ -808,7 +798,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Initialize UnifiedTaskTracker (via factory, DI with fallback)
         # This is the single source of truth for task progress, milestones, and loop detection
-        self.unified_tracker = self._factory.create_unified_tracker(self.tool_calling_caps)
+        self.unified_tracker = self._factory.create_unified_tracker(self._tool_calling_caps_internal)
 
         # Initialize unified ToolSelector (via factory) - semantic + keyword selection
         self.tool_selector = self._factory.create_tool_selector(
@@ -1389,6 +1379,62 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             value: ObservabilityIntegration instance or None to disable
         """
         self._observability = value
+
+    @property
+    def memory_manager(self) -> Optional["MemoryManager"]:
+        """Get the memory manager component.
+
+        This provides access to the MemoryManager wrapper for session
+        persistence and recovery operations. The MemoryManager wraps
+        the ConversationStore and provides a unified interface for
+        memory operations.
+
+        Returns:
+            MemoryManager instance, or None if not enabled
+        """
+        return self._memory_manager_wrapper
+
+    @memory_manager.setter
+    def memory_manager(self, value: Optional["MemoryManager"]) -> None:
+        """Set the memory manager component.
+
+        This allows tests to inject a mock MemoryManager for testing
+        memory-related operations without requiring a full ConversationStore.
+
+        Also updates the SessionRecoveryManager's reference to ensure
+        consistent behavior across the memory subsystem.
+
+        Args:
+            value: MemoryManager instance or None to disable
+        """
+        self._memory_manager_wrapper = value if value is not None else None
+        # Update SessionRecoveryManager's reference if it exists
+        if hasattr(self, "_session_recovery_manager") and self._session_recovery_manager is not None:
+            self._session_recovery_manager._memory_manager = value if value is not None else None
+
+    @property
+    def tool_calling_caps(self) -> Any:
+        """Get the tool calling capabilities.
+
+        Returns:
+            Tool calling capabilities object with adapter configuration
+        """
+        return self._tool_calling_caps_internal
+
+    @tool_calling_caps.setter
+    def tool_calling_caps(self, value: Any) -> None:
+        """Set the tool calling capabilities.
+
+        This allows tests to inject mock capabilities and also updates
+        the prompt_coordinator to ensure consistent behavior.
+
+        Args:
+            value: Tool calling capabilities object
+        """
+        self._tool_calling_caps_internal = value
+        # Update prompt_coordinator if it exists
+        if hasattr(self, "_prompt_coordinator") and self._prompt_coordinator is not None:
+            self._prompt_coordinator.set_tool_calling_caps(value)
 
     @property
     def provider_manager(self) -> "ProviderManager":
@@ -2463,38 +2509,38 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> Optional[StreamMetrics]:
         """Finalize stream metrics at end of streaming session.
 
-        Delegates to AnalyticsCoordinator (Phase 2 refactoring).
+        Delegates to MetricsCoordinator for metrics collection.
 
         Args:
             usage_data: Optional cumulative token usage from provider API.
                        When provided, enables accurate token counts.
         """
-        return self._analytics_coordinator.finalize_stream_metrics(usage_data)
+        return self._metrics_coordinator.finalize_stream_metrics(usage_data)
 
     def get_last_stream_metrics(self) -> Optional[StreamMetrics]:
         """Get metrics from the last streaming session.
 
-        Delegates to AnalyticsCoordinator (Phase 2 refactoring).
+        Delegates to MetricsCoordinator for metrics retrieval.
 
         Returns:
             StreamMetrics from the last session or None if no metrics available
         """
-        return self._analytics_coordinator.get_last_stream_metrics()
+        return self._metrics_coordinator.get_last_stream_metrics()
 
     def get_streaming_metrics_summary(self) -> Optional[Dict[str, Any]]:
         """Get comprehensive streaming metrics summary.
 
-        Delegates to AnalyticsCoordinator (Phase 2 refactoring).
+        Delegates to MetricsCoordinator for metrics aggregation.
 
         Returns:
             Dictionary with aggregated metrics or None if metrics disabled.
         """
-        return self._analytics_coordinator.get_streaming_metrics_summary()
+        return self._metrics_coordinator.get_streaming_metrics_summary()
 
     def get_streaming_metrics_history(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent streaming metrics history.
 
-        Delegates to AnalyticsCoordinator (Phase 2 refactoring).
+        Delegates to MetricsCoordinator for metrics history.
 
         Args:
             limit: Maximum number of recent metrics to return
@@ -2502,38 +2548,38 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             List of recent metrics dictionaries
         """
-        return self._analytics_coordinator.get_streaming_metrics_history(limit)
+        return self._metrics_coordinator.get_streaming_metrics_history(limit)
 
     def get_session_cost_summary(self) -> Dict[str, Any]:
         """Get session cost summary.
 
-        Delegates to AnalyticsCoordinator (Phase 2 refactoring).
+        Delegates to MetricsCoordinator for cost tracking.
 
         Returns:
             Dictionary with session cost statistics
         """
-        return self._analytics_coordinator.get_session_cost_summary()
+        return self._metrics_coordinator.get_session_cost_summary()
 
     def get_session_cost_formatted(self) -> str:
         """Get formatted session cost string.
 
-        Delegates to AnalyticsCoordinator (Phase 2 refactoring).
+        Delegates to MetricsCoordinator for cost formatting.
 
         Returns:
             Cost string like "$0.0123" or "cost n/a"
         """
-        return self._analytics_coordinator.get_session_cost_formatted()
+        return self._metrics_coordinator.get_session_cost_formatted()
 
     def export_session_costs(self, path: str, format: str = "json") -> None:
         """Export session costs to file.
 
-        Delegates to AnalyticsCoordinator (Phase 2 refactoring).
+        Delegates to MetricsCoordinator for cost export.
 
         Args:
             path: Output file path
             format: Export format ("json" or "csv")
         """
-        self._analytics_coordinator.export_session_costs(path, format)
+        self._metrics_coordinator.export_session_costs(path, format)
 
     async def _preload_embeddings(self) -> None:
         """Preload tool embeddings in background to avoid blocking first query.
@@ -2751,6 +2797,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def get_tool_usage_stats(self) -> Dict[str, Any]:
         """Get comprehensive tool usage statistics.
 
+        Delegates to MetricsCoordinator for tool usage analytics.
+
         Returns:
             Dictionary with usage analytics including:
             - Selection stats (semantic/keyword/fallback counts)
@@ -2758,7 +2806,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             - Cost tracking (by tier and total)
             - Overall metrics
         """
-        return self._analytics_coordinator.get_tool_usage_stats(
+        return self._metrics_coordinator.get_tool_usage_stats(
             conversation_state_summary=self.conversation_state.get_state_summary()
         )
 
@@ -2805,7 +2853,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def get_optimization_status(self) -> Dict[str, Any]:
         """Get comprehensive status of all integrated optimization components.
 
-        Delegates to AnalyticsCoordinator for unified status reporting.
+        Creates AnalyticsCoordinator inline for unified status reporting.
 
         Returns:
             Dictionary with component status and statistics:
@@ -2817,7 +2865,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             - auto_committer: Enabled status, commit history
             - search_router: Routing stats, pattern matches
         """
-        return self._analytics_coordinator.get_optimization_status(
+        from victor.agent.coordinators.analytics_coordinator import AnalyticsCoordinator
+
+        coordinator = AnalyticsCoordinator(
+            exporters=[],  # No exporters needed for status reporting
+        )
+        return coordinator.get_optimization_status(
             context_compactor=self._context_compactor,
             usage_analytics=self._usage_analytics,
             sequence_tracker=self._sequence_tracker,
@@ -2840,11 +2893,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             - sequence_tracker: Whether patterns were saved
             - tool_cache: Whether cache was flushed
         """
-        # Delegate to AnalyticsCoordinator for unified analytics flushing
-        results = self._analytics_coordinator.flush_analytics(
-            evaluation_coordinator=self._evaluation_coordinator,
-            tool_cache=getattr(self, "tool_cache", None),
-        )
+        # Flush evaluation coordinator analytics
+        results = self._evaluation_coordinator.flush_analytics()
+
+        # Flush tool cache if available
+        tool_cache = getattr(self, "tool_cache", None)
+        if tool_cache:
+            try:
+                tool_cache.flush()
+                results["tool_cache"] = True
+            except Exception as e:
+                logger.error(f"Failed to flush tool cache: {e}")
+                results["tool_cache"] = False
 
         logger.info(f"Analytics flush complete: {results}")
         return results
@@ -3030,12 +3090,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         Note:
             This method assumes self.model, self.provider_name, self.tool_adapter,
-            and self.tool_calling_caps are already updated before calling.
+            and self._tool_calling_caps_internal are already updated before calling.
         """
         # Apply model-specific exploration settings to unified tracker
         self.unified_tracker.set_model_exploration_settings(
-            exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
-            continuation_patience=self.tool_calling_caps.continuation_patience,
+            exploration_multiplier=self._tool_calling_caps_internal.exploration_multiplier,
+            continuation_patience=self._tool_calling_caps_internal.continuation_patience,
         )
 
         # Get prompt contributors from vertical extensions
@@ -3056,7 +3116,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             provider_name=self.provider_name,
             model=self.model,
             tool_adapter=self.tool_adapter,
-            capabilities=self.tool_calling_caps,
+            capabilities=self._tool_calling_caps_internal,
             prompt_contributors=prompt_contributors,
         )
 
@@ -3076,7 +3136,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 logger.debug("Skipping tool budget reset on provider switch (sticky user override)")
                 return
 
-        default_budget = max(self.tool_calling_caps.recommended_tool_budget, 50)
+        default_budget = max(self._tool_calling_caps_internal.recommended_tool_budget, 50)
         self.tool_budget = getattr(self.settings, "tool_call_budget", default_budget)
 
     def _parse_tool_calls_with_adapter(
@@ -4368,8 +4428,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             - final_chunk: Final chunk to yield if recovery produced text response
         """
         # Get recovery prompts via streaming handler
-        has_thinking_mode = getattr(self.tool_calling_caps, "thinking_mode", False)
-        thinking_prefix = getattr(self.tool_calling_caps, "thinking_disable_prefix", None)
+        has_thinking_mode = getattr(self._tool_calling_caps_internal, "thinking_mode", False)
+        thinking_prefix = getattr(self._tool_calling_caps_internal, "thinking_disable_prefix", None)
         recovery_prompts = self._streaming_handler.get_recovery_prompts(
             ctx=stream_ctx,
             base_temperature=self.temperature,
@@ -5351,9 +5411,19 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         Returns:
             List of session metadata dictionaries
+
+        Note:
+            If memory manager is not enabled or retrieval fails, returns empty list.
         """
-        # Delegate to MemoryManager wrapper
-        return self._memory_manager_wrapper.get_recent_sessions(limit=limit)
+        # Return empty list if memory manager is not enabled
+        if self._memory_manager_wrapper is None:
+            return []
+        # Delegate to MemoryManager wrapper with exception handling
+        try:
+            return self._memory_manager_wrapper.get_recent_sessions(limit=limit)
+        except Exception as e:
+            logger.warning(f"Failed to get recent sessions: {e}")
+            return []
 
     def recover_session(self, session_id: str) -> bool:
         """Recover a previous conversation session.
@@ -5366,6 +5436,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             True if session was recovered successfully
         """
+        # Return False if memory manager is not enabled
+        if self._memory_manager_wrapper is None:
+            logger.warning("Cannot recover session: memory manager not enabled")
+            return False
+
         # Update lifecycle manager reference if needed
         if self._session_recovery_manager._lifecycle_manager is None:
             self._session_recovery_manager._lifecycle_manager = self._lifecycle_manager
@@ -5376,7 +5451,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if success:
             # Update orchestrator-specific session tracking
             self._memory_session_id = session_id
-            self._memory_manager_wrapper.session_id = session_id
+            if self._memory_manager_wrapper is not None:
+                self._memory_manager_wrapper.session_id = session_id
             logger.info(f"Recovered session {session_id[:8]}... ")
         else:
             logger.warning(f"Failed to recover session {session_id}")
@@ -5403,13 +5479,20 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             If memory retrieval fails, logs a warning and uses in-memory
             messages as fallback.
         """
-        # Delegate to MemoryManager wrapper
-        return self._memory_manager_wrapper.get_context(max_tokens=max_tokens)
+        # Fall back to in-memory messages if memory manager is not enabled or no session
+        if self._memory_manager_wrapper is None or not self._memory_session_id:
+            return [msg.model_dump() for msg in self.conversation.messages]
+        # Delegate to MemoryManager wrapper with exception handling
+        try:
+            return self._memory_manager_wrapper.get_context(max_tokens=max_tokens)
+        except Exception as e:
+            logger.warning(f"Failed to get memory context, falling back to in-memory: {e}")
+            return [msg.model_dump() for msg in self.conversation.messages]
 
     def get_session_stats(self) -> Dict[str, Any]:
         """Get statistics for the current memory session.
 
-        Delegates to AnalyticsCoordinator.get_session_stats_ext().
+        Delegates to MemoryManager for session statistics.
 
         Returns:
             Dictionary with session statistics including:
@@ -5421,12 +5504,38 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             - available_tokens: Remaining token budget
             - Other session metadata
         """
-        # Delegate to AnalyticsCoordinator which bridges to MemoryManager
-        return self._analytics_coordinator.get_session_stats_ext(
-            memory_manager=self.memory_manager,
-            session_id=self._memory_session_id,
-            fallback_message_count=len(self.messages),
-        )
+        if not self.memory_manager or not self._memory_session_id:
+            return {
+                "enabled": False,
+                "session_id": self._memory_session_id,
+                "message_count": len(self.messages),
+            }
+
+        try:
+            stats = self.memory_manager.get_session_stats(self._memory_session_id)
+            # Handle empty stats (session not found)
+            if not stats or not any(k in stats for k in ("message_count", "total_tokens", "found")):
+                return {
+                    "enabled": True,
+                    "session_id": self._memory_session_id,
+                    "message_count": len(self.messages),
+                    "found": False,
+                    "error": "Session not found",
+                }
+            # Add enabled and session_id fields if not present (for backward compatibility)
+            if "enabled" not in stats:
+                stats["enabled"] = True
+            if "session_id" not in stats:
+                stats["session_id"] = self._memory_session_id
+            return stats
+        except Exception as e:
+            logger.warning(f"Failed to get session stats: {e}")
+            return {
+                "enabled": True,
+                "session_id": self._memory_session_id,
+                "message_count": len(self.messages),
+                "error": str(e),
+            }
 
     async def shutdown(self) -> None:
         """Clean up resources and shutdown gracefully.

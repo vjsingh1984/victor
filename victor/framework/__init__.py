@@ -1295,5 +1295,168 @@ try:
 except ImportError:
     _WORKFLOW_ENGINE_EXPORTS = []
 
+# Parallel Execution Framework (Phase 3 Task 3 - Generic parallel execution)
+try:
+    from victor.framework.parallel import (
+        # Main executor
+        ParallelExecutor,
+        ParallelExecutorHandler,
+        # Configuration
+        ParallelConfig,
+        ResourceLimit,
+        # Enums
+        JoinStrategy,
+        ErrorStrategy,
+        # Result classes
+        ParallelExecutionResult,
+        ProgressEvent,
+        # Progress callback
+        ProgressCallback,
+        # Strategy classes
+        AllJoinStrategy,
+        AnyJoinStrategy,
+        FirstJoinStrategy,
+        NOfMJoinStrategy,
+        MajorityJoinStrategy,
+        FailFastErrorStrategy,
+        ContinueAllErrorStrategy,
+        CollectErrorsErrorStrategy,
+        # Factory functions
+        create_parallel_executor,
+        create_join_strategy,
+        create_error_strategy,
+        execute_parallel,
+        execute_parallel_with_config,
+        register_parallel_handler,
+        # Validation
+        validate_join_strategy,
+        validate_error_strategy,
+        # Protocols
+        JoinStrategyProtocol,
+        ErrorStrategyProtocol,
+        ResultAggregatorProtocol,
+        ParallelExecutorProtocol,
+    )
+
+    _PARALLEL_EXPORTS = [
+        # Main executor
+        "ParallelExecutor",
+        "ParallelExecutorHandler",
+        # Configuration
+        "ParallelConfig",
+        "ResourceLimit",
+        # Enums
+        "JoinStrategy",
+        "ErrorStrategy",
+        # Result classes
+        "ParallelExecutionResult",
+        "ProgressEvent",
+        # Progress callback
+        "ProgressCallback",
+        # Strategy classes
+        "AllJoinStrategy",
+        "AnyJoinStrategy",
+        "FirstJoinStrategy",
+        "NOfMJoinStrategy",
+        "MajorityJoinStrategy",
+        "FailFastErrorStrategy",
+        "ContinueAllErrorStrategy",
+        "CollectErrorsErrorStrategy",
+        # Factory functions
+        "create_parallel_executor",
+        "create_join_strategy",
+        "create_error_strategy",
+        "execute_parallel",
+        "execute_parallel_with_config",
+        "register_parallel_handler",
+        # Validation
+        "validate_join_strategy",
+        "validate_error_strategy",
+        # Protocols
+        "JoinStrategyProtocol",
+        "ErrorStrategyProtocol",
+        "ResultAggregatorProtocol",
+        "ParallelExecutorProtocol",
+    ]
+
+    __all__ = list(__all__) + _PARALLEL_EXPORTS
+except ImportError:
+    _PARALLEL_EXPORTS = []
+
+# Validation Framework (Phase 3 Task 3 - Generic validation patterns)
+try:
+    from victor.framework.validation import (
+        # Pipeline
+        ValidationPipeline,
+        ValidationConfig,
+        ValidationContext,
+        ValidationResult,
+        ValidationStage,
+        ValidationAction,
+        ValidationHandler,
+        create_validation_pipeline,
+        # Validators
+        ValidatorProtocol,
+        ThresholdValidator,
+        RangeValidator,
+        PresenceValidator,
+        PatternValidator,
+        TypeValidator,
+        LengthValidator,
+        CompositeValidator,
+        CompositeLogic,
+        ConditionalValidator,
+        TransformingValidator,
+        # YAML integration
+        ValidatorConfig,
+        HandlerConfig,
+        ValidationNodeConfig,
+        ValidatorFactory,
+        HandlerFactory,
+        ValidationPipelineBuilder,
+        create_pipeline_from_yaml,
+        validate_from_yaml,
+        validate_pipeline_handler,
+    )
+
+    _VALIDATION_EXPORTS = [
+        # Pipeline
+        "ValidationPipeline",
+        "ValidationConfig",
+        "ValidationContext",
+        "ValidationResult",
+        "ValidationStage",
+        "ValidationAction",
+        "ValidationHandler",
+        "create_validation_pipeline",
+        # Validators
+        "ValidatorProtocol",
+        "ThresholdValidator",
+        "RangeValidator",
+        "PresenceValidator",
+        "PatternValidator",
+        "TypeValidator",
+        "LengthValidator",
+        "CompositeValidator",
+        "CompositeLogic",
+        "ConditionalValidator",
+        "TransformingValidator",
+        # YAML integration
+        "ValidatorConfig",
+        "HandlerConfig",
+        "ValidationNodeConfig",
+        "ValidatorFactory",
+        "HandlerFactory",
+        "ValidationPipelineBuilder",
+        "create_pipeline_from_yaml",
+        "validate_from_yaml",
+        "validate_pipeline_handler",
+    ]
+except ImportError:
+    _VALIDATION_EXPORTS = []
+
+if _VALIDATION_EXPORTS:
+    __all__ = list(__all__) + _VALIDATION_EXPORTS
+
 # Version of the framework API
 __version__ = "0.5.0"
