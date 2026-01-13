@@ -1,0 +1,955 @@
+# RAG Workflow Migration Examples
+# =================================
+# This file demonstrates how to migrate RAG workflows to use
+# the new framework capabilities.
+#
+# RAG-Specific Patterns:
+# 1. Vector search with retry (rate limits, connection issues)
+# 2. Result validation pipelines
+# 3. Parallel hybrid search (dense + sparse)
+# 4. HITL for insufficient context
+# 5. Citation generation with compute nodes
+
+workflows:
+  # ===========================================================================
+  # EXAMPLE 1: Vector Search with Retry Migration
+  # ===========================================================================
+  #
+  # BEFORE: Manual retry handling for vector searches
+  # AFTER: Use framework retry_with_backoff
+  #
+  vector_search_retry_before:
+    description: "OLD: Manual vector search retry"
+    nodes:
+      - id: vector_search
+        type: compute
+        name: "Vector Search (Old Way)"
+        tools: [shell]
+        inputs:
+          command: |
+            curl -s "$VECTOR_API/search" \
+              -H "Content-Type: application/json" \
+              -d '{"query": "'"$query"'", "top_k": 10}'
+        output: search_results
+        next: [check_rate_limit]
+
+      - id: check_rate_limit
+        type: condition
+        name: "Check for Rate Limit"
+        condition: "search_results.status == 429 and retry_count < 5"
+        branches:
+          "true": exponential_backoff
+          "false": process_results
+
+      - id: exponential_backoff
+        type: transform
+        name: "Exponential Backoff"
+        transform: |
+          retry_count = retry_count + 1
+          wait_time = min(2 ** retry_count, 60)  # Cap at 60s
+        next: [vector_search]
+
+  vector_search_retry_after:
+    description: "NEW: Using framework retry_with_backoff"
+    nodes:
+      - id: vector_search
+        type: compute
+        name: "Vector Search with Retry"
+        handler: retry_with_backoff
+        tools: []
+        inputs:
+          query: $ctx.user_query
+          index_name: $ctx.index_name
+          top_k: 10
+          similarity_threshold: 0.7
+        config:
+          max_retries: 5
+          base_delay: 2.0
+          max_delay: 60.0
+          exponential_base: 2.0
+          jitter: 0.2
+          retryable_patterns:
+            - "rate.?limit"
+            - "429"
+            - "overloaded"
+            - "connection"
+        output: search_results
+        constraints:
+          llm_allowed: false
+          network_allowed: true
+          timeout: 60
+        next: [process_results]
+
+  # ===========================================================================
+  # EXAMPLE 2: Search Result Validation Pipeline
+  # ===========================================================================
+  #
+  # BEFORE: Agent validates search results
+  # AFTER: Use framework validate_pipeline
+  #
+  result_validation_before:
+    description: "OLD: Agent validates search results"
+    nodes:
+      - id: validate_results
+        type: agent
+        name: "Validate Results (Old Way)"
+        role: validator
+        goal: |
+          Validate the search results:
+          1. Minimum of 3 results returned
+          2. All results have similarity > 0.7
+          3. All results have valid content
+          4. No duplicate results
+        tool_budget: 10
+        llm_config:
+          temperature: 0.1
+        input_mapping:
+          results: search_results
+        output: validation_result
+        next: [handle_validation]
+
+      - id: handle_validation
+        type: condition
+        name: "Handle Validation"
+        condition: "validation_result.valid"
+        branches:
+          "true": proceed
+          "false": fallback_search
+
+  result_validation_after:
+    description: "NEW: Using framework validate_pipeline"
+    nodes:
+      - id: validate_search_results
+        type: validate_pipeline
+        name: "Validate Search Results"
+        validators:
+          # Minimum result count
+          - type: threshold
+            field: result_count
+            min: 3
+            error_code: "INSUFFICIENT_RESULTS"
+
+          # Quality threshold for all results
+          - type: threshold
+            field: min_similarity
+            min: 0.7
+            error_code: "LOW_QUALITY_RESULTS"
+
+          # Content presence
+          - type: presence
+            field: content
+            required: true
+            error_code: "MISSING_CONTENT"
+
+          # No duplicates
+          - type: threshold
+            field: duplicate_count
+            max: 0
+            error_code: "DUPLICATE_RESULTS"
+
+          # Type validators
+          - type: type
+            field: chunk_id
+            expected_type: "string"
+            error_code: "INVALID_CHUNK_ID"
+
+          - type: type
+            field: similarity_score
+            expected_type: "float"
+            error_code: "INVALID_SIMILARITY"
+
+        handler:
+          type: conditional
+          config:
+            action: skip
+            min_severity: error
+            fallback:
+              type: halt
+
+        halt_on_error: false
+        collect_all_errors: true
+        input_mapping:
+          results: search_results
+        output: validation_result
+        next: [handle_validation]
+
+      - id: handle_validation
+        type: condition
+        name: "Handle Validation Result"
+        condition: "validation_result.is_valid"
+        branches:
+          "true": rerank
+          "false": fallback_search
+
+  # ===========================================================================
+  # EXAMPLE 3: Parallel Hybrid Search Migration
+  # ===========================================================================
+  #
+  # BEFORE: Manual parallel_nodes for dense + sparse search
+  # AFTER: Use framework parallel_execute
+  #
+  hybrid_search_before:
+    description: "OLD: Manual parallel_nodes for hybrid search"
+    nodes:
+      - id: parallel_search
+        type: parallel
+        name: "Hybrid Search (Old Way)"
+        parallel_nodes: [dense_search, sparse_search, entity_search]
+        join_strategy: all
+        next: [merge_results]
+
+      - id: dense_search
+        type: compute
+        name: "Dense Vector Search"
+        tools: [shell]
+        inputs:
+          index: $ctx.vector_index
+          query: $ctx.query_vector
+          top_k: 20
+        output: dense_results
+
+      - id: sparse_search
+        type: compute
+        name: "Sparse BM25 Search"
+        tools: [shell]
+        inputs:
+          index: $ctx.bm25_index
+          query: $ctx.user_query
+          top_k: 20
+        output: sparse_results
+
+      - id: entity_search
+        type: compute
+        name: "Entity Search"
+        tools: [shell]
+        inputs:
+          index: $ctx.entity_index
+          entities: $ctx.extracted_entities
+          top_k: 10
+        output: entity_results
+
+  hybrid_search_after:
+    description: "NEW: Using framework parallel_execute"
+    nodes:
+      - id: parallel_search
+        type: compute
+        name: "Hybrid Parallel Search"
+        handler: parallel_execute
+        tools: []
+        inputs:
+          tasks:
+            - name: dense_vector_search
+              handler: vector_search_handler
+              config:
+                index: $ctx.vector_index
+                query: $ctx.query_vector
+                top_k: 20
+                metric: cosine
+              timeout: 30
+              retry_config:
+                max_retries: 3
+                base_delay: 1.0
+
+            - name: sparse_bm25_search
+              handler: bm25_search_handler
+              config:
+                index: $ctx.bm25_index
+                query: $ctx.user_query
+                top_k: 20
+                k1: 1.2
+                b: 0.75
+              timeout: 15
+
+            - name: entity_search
+              handler: entity_search_handler
+              config:
+                index: $ctx.entity_index
+                entities: $ctx.extracted_entities
+                top_k: 10
+                match_type: fuzzy
+              timeout: 15
+
+        config:
+          join_strategy: all
+          error_strategy: collect_errors
+          max_concurrent: 3
+          timeout: 60
+
+        output: search_results
+        next: [merge_results]
+
+      - id: merge_results
+        type: compute
+        name: "Merge and Rerank"
+        handler: result_fusion
+        tools: []
+        inputs:
+          results: $ctx.search_results
+          fusion_method: reciprocal_rank
+          k: 60
+          top_k: 10
+        output: merged_results
+        next: [rerank]
+
+  # ===========================================================================
+  # EXAMPLE 4: HITL for Insufficient Context
+  # ===========================================================================
+  #
+  # BEFORE: Basic HITL input when context is insufficient
+  # AFTER: Rich HITL with multiple resolution options
+  #
+  insufficient_context_before:
+    description: "OLD: Basic HITL for insufficient context"
+    nodes:
+      - id: request_clarification
+        type: hitl
+        name: "Request Clarification"
+        hitl_type: input
+        prompt: |
+          The knowledge base doesn't have enough information to answer:
+          {user_query}
+
+          Please provide more details or rephrase.
+        context_keys:
+          - user_query
+        timeout: 300
+        fallback: continue
+        next: [handle_clarification]
+
+  insufficient_context_after:
+    description: "NEW: Rich HITL with context options"
+    nodes:
+      - id: assess_coverage
+        type: agent
+        name: "Assess Context Coverage"
+        role: analyst
+        goal: |
+          Assess if the retrieved context can answer the query:
+          1. Does context contain the answer? (yes/partial/no)
+          2. What information is missing?
+          3. Confidence level (high/medium/low)
+        tool_budget: 10
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          context: ranked_results
+          query: $ctx.user_query
+        output: coverage_assessment
+        next: [coverage_decision]
+
+      - id: coverage_decision
+        type: condition
+        name: "Coverage Decision"
+        condition: "coverage_assessment.has_answer"
+        branches:
+          "true": generate_answer
+          "false": request_clarification
+
+      - id: request_clarification
+        type: hitl
+        name: "Context Insufficient - Choose Action"
+        gate_type: choice_input
+        title: "Insufficient Information in Knowledge Base"
+        prompt: |
+          ## Query Analysis
+
+          **Your Question:**
+          {user_query}
+
+          **Coverage Assessment:** {coverage_level}
+          **Confidence:** {confidence_level}
+
+          ### Available Context
+          {available_context_summary}
+
+          ### What's Missing
+          {missing_information}
+
+          ---
+          How would you like to proceed?
+        context_keys:
+          - user_query
+          - coverage_level
+          - confidence_level
+          - available_context_summary
+          - missing_information
+        config:
+          timeout_seconds: 600
+          fallback_strategy: continue_with_default
+          default_value: "proceed_with_available"
+        choices:
+          - label: "Proceed with Available"
+            value: proceed_with_available
+            description: "Answer using available information"
+          - label: "Rephrase Question"
+            value: rephrase
+            description: "Rephrase your question for better results"
+          - label: "Narrow Focus"
+            value: narrow_focus
+            description: "Focus on a specific aspect"
+          - label: "Use Web Search"
+            value: web_search
+            description: "Search the web for additional information"
+        next: [handle_clarification]
+
+      - id: handle_clarification
+        type: condition
+        name: "Handle Clarification Decision"
+        condition: "clarification_result.choice"
+        branches:
+          "proceed_with_available": generate_answer
+          "rephrase": analyze_query
+          "narrow_focus": analyze_query
+          "web_search": web_search_supplement
+
+  # ===========================================================================
+  # EXAMPLE 5: Citation Generation with Compute
+  # ===========================================================================
+  #
+  # BEFORE: Agent generates citations (wasteful)
+  # AFTER: Compute node with template-based generation
+  #
+  citation_generation_before:
+    description: "OLD: Agent generates citations"
+    nodes:
+      - id: generate_citations
+        type: agent
+        name: "Generate Citations (Old Way)"
+        role: formatter
+        goal: |
+          Generate citations in {citation_format} style:
+          {sources}
+
+          Follow the citation style guide exactly.
+          Format inline citations as [1], [2], etc.
+        tool_budget: 10
+        llm_config:
+          temperature: 0.1
+        output: citations
+        next: [format_response]
+
+  citation_generation_after:
+    description: "NEW: Compute node for deterministic citation generation"
+    nodes:
+      - id: generate_citations
+        type: compute
+        name: "Generate Citations"
+        handler: citation_formatter
+        tools: []
+        inputs:
+          sources: $ctx.ranked_results
+          format: $ctx.citation_format  # APA, MLA, Chicago, IEEE
+          inline_style: true  # [1], [2] style
+        config:
+          include_urls: true
+          sort_by: relevance
+          max_sources: 10
+        output: citations
+        constraints:
+          llm_allowed: false
+          network_allowed: false
+          timeout: 30
+        next: [format_response]
+
+  # ===========================================================================
+  # COMPREHENSIVE EXAMPLE: Full RAG Query Workflow
+  # ===========================================================================
+  comprehensive_rag_query:
+    description: "Complete RAG query using all framework capabilities"
+
+    metadata:
+      version: "2.0"
+      author: "victor"
+      vertical: rag
+      framework_version: "0.5.0"
+
+    # Service definitions
+    services:
+      vector_store:
+        type: lancedb
+        config:
+          path: $ctx.project_dir/.victor/vectors
+          mode: readonly
+        lifecycle:
+          start: auto
+          cleanup: none
+
+      sparse_index:
+        type: tantivy
+        config:
+          path: $ctx.project_dir/.victor/bm25
+          mode: readonly
+        lifecycle:
+          start: on_demand
+          cleanup: none
+
+      query_cache:
+        type: memory
+        config:
+          max_size: 1000
+          ttl: 3600
+        lifecycle:
+          start: auto
+          cleanup: delete
+
+    nodes:
+      # Stage 1: Query Understanding (unchanged - requires LLM)
+      - id: analyze_query
+        type: agent
+        name: "Analyze Query"
+        role: analyst
+        goal: |
+          Analyze the user query:
+          1. Query type (factual, analytical, comparative, procedural)
+          2. Key concepts and entities
+          3. Required depth
+          4. Multi-hop reasoning needed
+        tool_budget: 10
+        llm_config:
+          temperature: 0.2
+        output: query_analysis
+        next: [expand_query]
+
+      # Stage 2: Query Expansion
+      - id: expand_query
+        type: agent
+        name: "Query Expansion"
+        role: executor
+        goal: |
+          Expand the query for better retrieval:
+          - Synonym expansion
+          - Concept decomposition
+          - Alternative phrasings
+        tool_budget: 10
+        llm_config:
+          temperature: 0.3
+        input_mapping:
+          analysis: query_analysis
+          original_query: $ctx.user_query
+        output: expanded_queries
+        next: [parallel_search]
+
+      # Stage 3: Parallel Hybrid Search (framework)
+      - id: parallel_search
+        type: compute
+        name: "Hybrid Parallel Search"
+        handler: parallel_execute
+        tools: []
+        inputs:
+          tasks:
+            - name: dense_vector_search
+              handler: vector_search_handler
+              config:
+                index: $ctx.vector_index
+                queries: $ctx.expanded_queries
+                top_k: 20
+                similarity_threshold: 0.7
+              timeout: 30
+              retry_config:
+                handler: network_retry
+                max_retries: 3
+                base_delay: 2.0
+
+            - name: sparse_bm25_search
+              handler: bm25_search_handler
+              config:
+                index: $ctx.bm25_index
+                queries: $ctx.expanded_queries
+                top_k: 20
+              timeout: 15
+
+            - name: entity_search
+              handler: entity_search_handler
+              config:
+                index: $ctx.entity_index
+                entities: $ctx.query_analysis.entities
+                top_k: 10
+              timeout: 15
+
+        config:
+          join_strategy: all
+          error_strategy: collect_errors
+          max_concurrent: 3
+          timeout: 60
+
+        output: search_results
+        next: [merge_results]
+
+      # Stage 4: Merge and Deduplicate (compute)
+      - id: merge_results
+        type: compute
+        name: "Merge and Deduplicate"
+        handler: result_fusion
+        tools: []
+        inputs:
+          results: $ctx.search_results
+          fusion_method: reciprocal_rank
+          k: 60
+          dedupe_by: chunk_id
+          top_k: 10
+        output: merged_results
+        constraints:
+          llm_allowed: false
+          timeout: 10
+        next: [validate_results]
+
+      # Stage 5: Validate Results (framework pipeline)
+      - id: validate_results
+        type: validate_pipeline
+        name: "Validate Search Results"
+        validators:
+          - type: threshold
+            field: result_count
+            min: 1
+            error_code: "NO_RESULTS"
+          - type: threshold
+            field: avg_similarity
+            min: 0.5
+            error_code: "LOW_QUALITY"
+          - type: presence
+            field: content
+            required: true
+        handler:
+          type: conditional
+          config:
+            action: skip
+            min_severity: error
+            fallback:
+              type: halt
+        halt_on_error: false
+        output: validation_result
+        next: [handle_validation]
+
+      - id: handle_validation
+        type: condition
+        name: "Handle Validation"
+        condition: "validation_result.is_valid"
+        branches:
+          "true": rerank
+          "false": fallback_search
+
+      # Stage 6: Fallback Search with Retry
+      - id: fallback_search
+        type: compute
+        name: "Fallback Broad Search"
+        handler: retry_with_backoff
+        tools: []
+        inputs:
+          query: $ctx.user_query
+          index_name: $ctx.index_name
+          top_k: 50
+          similarity_threshold: 0.3
+        config:
+          max_retries: 2
+          base_delay: 3.0
+        output: fallback_results
+        next: [check_fallback]
+
+      - id: check_fallback
+        type: condition
+        name: "Check Fallback Results"
+        condition: "fallback_result.count >= 1"
+        branches:
+          "true": rerank
+          "false": no_context_answer
+
+      # Stage 7: Rerank (agent)
+      - id: rerank
+        type: agent
+        name: "Rerank Results"
+        role: analyst
+        goal: |
+          Rerank retrieved chunks for relevance:
+          - Semantic similarity
+          - Factual completeness
+          - Source authority
+          - Context overlap
+        tool_budget: 15
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          results: merged_results
+          query: $ctx.user_query
+        output: ranked_results
+        next: [assess_coverage]
+
+      # Stage 8: Assess Coverage (agent)
+      - id: assess_coverage
+        type: agent
+        name: "Assess Context Coverage"
+        role: analyst
+        goal: |
+          Evaluate if context can answer the query:
+          1. Does context contain the answer?
+          2. Are there missing pieces?
+          3. Confidence level
+        tool_budget: 10
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          context: ranked_results
+          query: $ctx.user_query
+        output: coverage_assessment
+        next: [coverage_decision]
+
+      # Stage 9: Coverage Decision with HITL
+      - id: coverage_decision
+        type: hitl
+        name: "Coverage Decision"
+        gate_type: choice_input
+        title: "Information Assessment"
+        prompt: |
+          ## Query Coverage Assessment
+
+          **Coverage:** {coverage_level}
+          **Confidence:** {confidence_level}
+
+          ### Available Context Summary
+          {context_summary}
+
+          ### Potentially Missing
+          {missing_info}
+
+          ---
+          How should I proceed?
+        context_keys:
+          - coverage_level
+          - confidence_level
+          - context_summary
+          - missing_info
+        config:
+          timeout_seconds: 600
+          fallback_strategy: continue_with_default
+          default_value: "proceed"
+        choices:
+          - "Proceed with available context"
+          - "Search for more information"
+          - "Rephrase the question"
+        next: [handle_coverage_decision]
+
+      - id: handle_coverage_decision
+        type: condition
+        name: "Handle Coverage Decision"
+        condition: "coverage_decision.choice"
+        branches:
+          "Proceed with available context": generate_answer
+          "Search for more information": parallel_search
+          "Rephrase the question": analyze_query
+
+      # Stage 10: Generate Answer (agent)
+      - id: generate_answer
+        type: agent
+        name: "Generate Answer with Citations"
+        role: writer
+        goal: |
+          Generate a comprehensive answer:
+          1. Answer the specific question
+          2. Support claims with citations
+          3. Acknowledge uncertainty
+          4. Stay factual
+        tool_budget: 25
+        llm_config:
+          temperature: 0.3
+          max_tokens: 2000
+        input_mapping:
+          context: ranked_results
+          query: $ctx.user_query
+        output: draft_answer
+        next: [verify_answer]
+
+      # Stage 11: Verify Answer (agent)
+      - id: verify_answer
+        type: agent
+        name: "Verify Answer Accuracy"
+        role: reviewer
+        goal: |
+          Verify the generated answer:
+          1. All claims supported by context
+          2. No hallucinations
+          3. Citations accurate
+          4. Logical coherence
+        tool_budget: 15
+        llm_config:
+          temperature: 0.1
+        input_mapping:
+          answer: draft_answer
+          context: ranked_results
+          query: $ctx.user_query
+        output: verification
+        next: [check_verification]
+
+      - id: check_verification
+        type: condition
+        name: "Check Verification"
+        condition: "verification.passed"
+        branches:
+          "true": format_response
+          "false": revise_answer
+
+      - id: revise_answer
+        type: agent
+        name: "Revise Answer"
+        role: executor
+        goal: |
+          Revise based on verification:
+          {verification.issues}
+        tool_budget: 15
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          current_answer: draft_answer
+          issues: verification.issues
+          context: ranked_results
+        output: revised_answer
+        next: [format_response]
+
+      # Stage 12: Format Response with Citations (compute)
+      - id: format_response
+        type: compute
+        name: "Format Final Response"
+        handler: response_formatter
+        tools: []
+        inputs:
+          answer: $ctx.draft_answer  # or revised_answer
+          sources: $ctx.ranked_results
+          citation_format: inline
+          max_sources: 10
+        output: final_response
+        constraints:
+          llm_allowed: false
+          timeout: 10
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Query Complete"
+        transform: |
+          status = "completed"
+          query_time = elapsed_time()
+          source_count = len(ranked_results)
+          confidence = coverage_assessment.confidence
+
+  # ===========================================================================
+  # MAINTENANCE WORKFLOW: Index Maintenance Example
+  # ===========================================================================
+  index_maintenance:
+    description: "Index maintenance using framework capabilities"
+
+    metadata:
+      version: "2.0"
+      author: "victor"
+      vertical: rag
+
+    services:
+      vector_store:
+        type: lancedb
+        config:
+          path: $ctx.project_dir/.victor/vectors
+        lifecycle:
+          start: auto
+          cleanup: compact
+
+    nodes:
+      # Analyze index health (compute)
+      - id: analyze_index
+        type: compute
+        name: "Analyze Index Health"
+        handler: index_analyzer
+        tools: []
+        inputs:
+          index_name: $ctx.index_name
+          checks:
+            - vector_count
+            - index_size
+            - fragmentation_level
+            - orphaned_entries
+        output: index_health
+        constraints:
+          llm_allowed: false
+          timeout: 120
+        next: [validate_health]
+
+      # Validate health metrics (framework pipeline)
+      - id: validate_health
+        type: validate_pipeline
+        name: "Validate Index Health"
+        validators:
+          - type: threshold
+            field: fragmentation_level
+            max: 0.3
+            error_code: "HIGH_FRAGMENTATION"
+          - type: threshold
+            field: orphaned_percentage
+            max: 0.05
+            error_code: "MANY_ORPHANS"
+          - type: threshold
+            field: index_size_gb
+            max: 100
+            error_code: "INDEX_TOO_LARGE"
+        handler:
+          type: conditional
+          config:
+            action: skip
+            min_severity: warning
+        halt_on_error: false
+        output: validation_result
+        next: [maintenance_decision]
+
+      # Maintenance decision (HITL)
+      - id: maintenance_decision
+        type: hitl
+        name: "Maintenance Decision"
+        gate_type: approval
+        title: "Index Maintenance Required"
+        prompt: |
+          ## Index Analysis Complete
+
+          **Index:** {index_name}
+          **Size:** {index_size_gb} GB
+          **Fragmentation:** {fragmentation_level}%
+          **Orphaned Entries:** {orphaned_count}
+
+          ### Recommendations
+          {maintenance_recommendations}
+
+          ---
+          Approve maintenance operations?
+        context_keys:
+          - index_name
+          - index_size_gb
+          - fragmentation_level
+          - orphaned_count
+          - maintenance_recommendations
+        config:
+          timeout_seconds: 3600
+          fallback_strategy: continue
+        next: [execute_maintenance]
+
+      # Execute maintenance with retry (framework)
+      - id: execute_maintenance
+        type: compute
+        name: "Execute Maintenance Operations"
+        handler: retry_with_backoff
+        tools: []
+        inputs:
+          operations:
+            - compact_vectors
+            - rebuild_hnsw
+            - remove_orphans
+          config:
+            max_retries: 3
+            base_delay: 5.0
+        output: maintenance_result
+        constraints:
+          llm_allowed: false
+          write_allowed: true
+          timeout: 1800
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Maintenance Complete"
+        transform: |
+          status = "completed"
+          space_freed = maintenance_result.space_recovered
+          performance_improvement = maintenance_result.improvement_percent

@@ -10,12 +10,34 @@ This roadmap is directional and may change based on community feedback.
 | **3-6 months** | Workflow scale + Reliability | Better scheduling, richer observability, parallel execution, AT_LEAST_ONCE event delivery |
 | **6-12 months** | Platform maturity | Distributed execution, plugin marketplace, enterprise controls |
 
-## Recently delivered
+## Recently delivered (v0.5.x)
+
+### Framework Refactoring
+
+- **Workflow Coordinators**: Split monolithic WorkflowEngine into focused coordinators (YAML, Graph, HITL, Cache) following SRP
+- **Resilience Framework**: Unified retry strategies, circuit breakers, specialized handlers (NetworkRetryHandler, RateLimitRetryHandler, DatabaseRetryHandler)
+- **Service Lifecycle Management**: ServiceLifecycleProtocol, ServiceManager, ServiceRegistry for unified service management
+- **Validation Pipeline**: Generic ValidationPipeline with built-in validators (Threshold, Range, Pattern, Type, Length, Composite)
+- **Health Checking**: HealthChecker, ComponentHealth, ProviderHealthCheck for system monitoring
+- **Metrics Collection**: Counter, Gauge, Histogram, Timer, MetricsRegistry for observability
+- **Configuration Capability**: ConfigurationCapabilityProvider replacing vertical-specific @capability decorators
+- **Agent Components**: AgentBuilder, AgentSession, AgentBridge for flexible agent composition
+- **Tool Configuration**: ToolConfigurator with filters (AirgappedFilter, CostTierFilter, SecurityFilter)
+- **Tool Naming**: Canonical tool name enforcement to eliminate alias confusion
+
+### Documentation
+
+- **Migration Guide**: Comprehensive guide for migrating to new framework capabilities
+- **Framework README**: Detailed API documentation for all framework modules
+- **Updated CLAUDE.md**: Added new framework modules and canonical import locations
+
+### Earlier Releases
 
 - Provider switching with context independence
 - Workflow DSL with graph execution
 - Multi-agent team formations
 - Provider/tool/vertical registries and validation
+- Universal Registry System for cross-vertical entity management
 
 ## Upcoming Features
 

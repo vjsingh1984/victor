@@ -1,0 +1,568 @@
+# Coding Workflow Migration Examples
+# ====================================
+# This file demonstrates how to migrate coding workflows to use
+# the new framework capabilities, eliminating duplicated patterns.
+#
+# Framework Capabilities Covered:
+# 1. Retry Framework: retry_with_backoff handler
+# 2. Validation Framework: validate_pipeline node type
+# 3. Parallel Executor: parallel_execute handler
+# 4. HITL Framework: Framework HITL gates
+# 5. Service Lifecycle: Service definitions
+
+workflows:
+  # ===========================================================================
+  # EXAMPLE 1: Retry Pattern Migration
+  # ===========================================================================
+  #
+  # BEFORE: Custom retry logic in multiple places
+  # AFTER: Use framework retry_with_backoff handler
+  #
+  retry_migration_before:
+    description: "OLD: Custom retry with manual loop"
+    nodes:
+      - id: fetch_api
+        type: compute
+        name: "Fetch API (Old Way)"
+        tools: [shell]
+        inputs:
+          command: curl -s https://api.example.com/data
+        output: api_result
+        next: [check_result]
+
+      - id: check_result
+        type: condition
+        name: "Check Result"
+        condition: "api_result.status == 200 or retry_count >= 3"
+        branches:
+          "true": process_data
+          "false": increment_retry
+
+      - id: increment_retry
+        type: transform
+        name: "Increment Retry"
+        transform: |
+          retry_count = retry_count + 1
+          wait_seconds = 2 ** retry_count  # Manual exponential backoff
+        next: [fetch_api]
+
+  retry_migration_after:
+    description: "NEW: Using framework retry_with_backoff handler"
+    nodes:
+      - id: fetch_api
+        type: compute
+        name: "Fetch API with Retry"
+        handler: retry_with_backoff
+        tools: [shell]
+        inputs:
+          command: curl -s https://api.example.com/data
+        config:
+          max_retries: 3
+          base_delay: 2.0
+          exponential_base: 2.0
+          jitter: 0.1
+        output: api_result
+        next: [process_data]
+
+  # ===========================================================================
+  # EXAMPLE 2: Validation Pattern Migration
+  # ===========================================================================
+  #
+  # BEFORE: Agent-based validation with custom prompts
+  # AFTER: Use framework validate_pipeline node type
+  #
+  validation_migration_before:
+    description: "OLD: Agent-based quality check"
+    nodes:
+      - id: check_quality
+        type: agent
+        name: "Check Code Quality (Old Way)"
+        role: reviewer
+        goal: |
+          Validate that:
+          1. Code follows style guidelines
+          2. No syntax errors
+          3. Test coverage > 80%
+          4. Complexity score < 10
+        tool_budget: 15
+        llm_config:
+          temperature: 0.2
+        output: quality_check
+        next: [handle_quality]
+
+      - id: handle_quality
+        type: condition
+        name: "Handle Quality Check"
+        condition: "quality_check.passed"
+        branches:
+          "true": proceed
+          "false": fix_issues
+
+  validation_migration_after:
+    description: "NEW: Using framework validate_pipeline"
+    nodes:
+      - id: validate_code_quality
+        type: validate_pipeline
+        name: "Validate Code Quality"
+        validators:
+          - type: threshold
+            field: test_coverage
+            min: 80
+            max: 100
+            error_code: "LOW_COVERAGE"
+          - type: threshold
+            field: complexity_score
+            min: 0
+            max: 10
+            error_code: "HIGH_COMPLEXITY"
+          - type: pattern
+            field: code_style
+            pattern_type: python_pep8
+            error_code: "STYLE_VIOLATION"
+          - type: type
+            field: syntax_errors
+            expected_type: "null"
+            error_code: "SYNTAX_ERROR"
+        handler:
+          type: halt
+        halt_on_error: true
+        collect_all_errors: true
+        next: [handle_quality]
+
+      - id: handle_quality
+        type: condition
+        name: "Handle Validation Result"
+        condition: "_validation_result.is_valid"
+        branches:
+          "true": proceed
+          "false": fix_issues
+
+  # ===========================================================================
+  # EXAMPLE 3: Parallel Execution Migration
+  # ===========================================================================
+  #
+  # BEFORE: Manual parallel management with parallel_nodes
+  # AFTER: Use framework parallel_execute with strategies
+  #
+  parallel_migration_before:
+    description: "OLD: Using parallel_nodes directly"
+    nodes:
+      - id: parallel_checks
+        type: parallel
+        name: "Run Checks (Old Way)"
+        parallel_nodes: [lint_check, type_check, security_check]
+        join_strategy: all
+        next: [aggregate_results]
+
+      - id: lint_check
+        type: compute
+        name: "Lint"
+        tools: [shell]
+        inputs:
+          command: ruff check .
+        output: lint_results
+
+      - id: type_check
+        type: compute
+        name: "Type Check"
+        tools: [shell]
+        inputs:
+          command: mypy .
+        output: type_results
+
+      - id: security_check
+        type: compute
+        name: "Security Scan"
+        tools: [shell]
+        inputs:
+          command: bandit -r .
+        output: security_results
+
+  parallel_migration_after:
+    description: "NEW: Using framework parallel_execute"
+    nodes:
+      - id: parallel_checks
+        type: compute
+        name: "Run Parallel Checks"
+        handler: parallel_execute
+        tools: [shell]
+        inputs:
+          tasks:
+            - name: lint
+              command: ruff check .
+              timeout: 60
+            - name: type_check
+              command: mypy .
+              timeout: 120
+            - name: security
+              command: bandit -r .
+              timeout: 180
+        config:
+          join_strategy: all
+          error_strategy: collect_errors
+          max_concurrent: 3
+          timeout: 300
+        output: check_results
+        next: [aggregate_results]
+
+  # ===========================================================================
+  # EXAMPLE 4: HITL Pattern Migration
+  # ===========================================================================
+  #
+  # BEFORE: Basic HITL node with limited options
+  # AFTER: Use framework HITL gates with rich features
+  #
+  hitl_migration_before:
+    description: "OLD: Basic HITL approval"
+    nodes:
+      - id: request_approval
+        type: hitl
+        name: "Request Approval (Old Way)"
+        hitl_type: approval
+        prompt: |
+          Approve these changes?
+          {changes}
+        context_keys:
+          - changes
+        timeout: 300
+        fallback: continue
+        next: [handle_approval]
+
+      - id: handle_approval
+        type: condition
+        name: "Handle Approval"
+        condition: "approval_result"
+        branches:
+          "approved": proceed
+          "rejected": abort
+
+  hitl_migration_after:
+    description: "NEW: Using framework HITL gates"
+    nodes:
+      - id: request_approval
+        type: hitl
+        name: "Request Approval with Options"
+        gate_type: approval
+        title: "Code Review Approval"
+        prompt: |
+          ## Ready for Code Review
+
+          **Changes:**
+          {changes}
+
+          **Quality Metrics:**
+          - Test Coverage: {test_coverage}%
+          - Complexity: {complexity_score}
+          - Issues Found: {issue_count}
+        context_keys:
+          - changes
+          - test_coverage
+          - complexity_score
+          - issue_count
+        config:
+          timeout_seconds: 900
+          fallback_strategy: continue  # abort | continue | retry
+          show_details: true
+          require_reason_on_reject: true
+        choices:
+          - label: "Approve"
+            value: approved
+            description: "Approve and merge"
+          - label: "Request Changes"
+            value: changes_requested
+            description: "Request modifications"
+          - label: "Discuss"
+            value: discuss
+            description: "Schedule discussion"
+        next: [handle_approval]
+
+      - id: handle_approval
+        type: condition
+        name: "Handle Approval Decision"
+        condition: "approval_result.choice"
+        branches:
+          "approved": proceed
+          "changes_requested": fix_issues
+          "discuss": schedule_discussion
+
+  # ===========================================================================
+  # EXAMPLE 5: Service Lifecycle Migration
+  # ===========================================================================
+  #
+  # BEFORE: No service lifecycle management
+  # AFTER: Define services with lifecycle hooks
+  #
+  service_migration_before:
+    description: "OLD: No service definitions"
+    nodes:
+      - id: read_database
+        type: compute
+        name: "Read from Database"
+        tools: [shell]
+        inputs:
+          command: sqlite3 project.db "SELECT * FROM results"
+        output: db_results
+
+  service_migration_after:
+    description: "NEW: Using service lifecycle"
+    services:
+      project_db:
+        type: sqlite
+        config:
+          path: $ctx.project_dir/.victor/project.db
+          journal_mode: WAL
+          readonly: false
+        lifecycle:
+          start: auto        # auto | manual | on_demand
+          cleanup: preserve  # preserve | delete | vacuum
+          health_check: true
+          timeout: 30
+
+    nodes:
+      - id: read_database
+        type: compute
+        name: "Read from Managed Service"
+        handler: database_query
+        tools: []
+        inputs:
+          service: project_db
+          query: "SELECT * FROM results"
+        output: db_results
+        constraints:
+          llm_allowed: false
+          network_allowed: false
+          timeout: 30
+
+  # ===========================================================================
+  # COMPREHENSIVE EXAMPLE: Full Code Review Workflow
+  # ===========================================================================
+  #
+  # This shows a complete workflow using all framework capabilities
+  #
+  comprehensive_code_review:
+    description: "Complete code review using all framework capabilities"
+
+    metadata:
+      version: "2.0"
+      author: "victor"
+      vertical: coding
+      framework_version: "0.5.0"
+
+    # Service definitions with lifecycle
+    services:
+      project_db:
+        type: sqlite
+        config:
+          path: $ctx.project_dir/.victor/project.db
+          journal_mode: WAL
+        lifecycle:
+          start: auto
+          cleanup: preserve
+
+      cache_service:
+        type: memory
+        config:
+          max_size: 1000
+          ttl: 3600
+        lifecycle:
+          start: auto
+          cleanup: delete
+
+    nodes:
+      # Stage 1: Gather changes (with retry)
+      - id: gather_changes
+        type: compute
+        name: "Gather Code Changes"
+        handler: retry_with_backoff
+        tools: [shell]
+        inputs:
+          command: git diff HEAD~1
+        config:
+          max_retries: 3
+          base_delay: 1.0
+        output: changes
+        next: [validate_changes]
+
+      # Stage 2: Validate changes (framework validation)
+      - id: validate_changes
+        type: validate_pipeline
+        name: "Validate Change Set"
+        validators:
+          - type: presence
+            field: files_changed
+            required: true
+          - type: threshold
+            field: lines_changed
+            min: 1
+            max: 10000
+          - type: pattern
+            field: file_types
+            pattern_type: allowed_extensions
+            pattern: "\\.(py|js|ts|java|go)$"
+        handler:
+          type: halt
+        halt_on_error: true
+        next: [parallel_analysis]
+
+      # Stage 3: Parallel analysis (framework executor)
+      - id: parallel_analysis
+        type: compute
+        name: "Run Parallel Analysis"
+        handler: parallel_execute
+        tools: [shell]
+        inputs:
+          tasks:
+            - name: lint
+              command: ruff check --format json
+              timeout: 60
+            - name: type_check
+              command: mypy --no-error-summary
+              timeout: 120
+            - name: security
+              command: bandit -r -f json
+              timeout: 180
+            - name: complexity
+              command: radon cc . -a -s
+              timeout: 60
+        config:
+          join_strategy: all
+          error_strategy: collect_errors
+          max_concurrent: 4
+        output: analysis_results
+        next: [ai_review]
+
+      # Stage 4: AI review
+      - id: ai_review
+        type: agent
+        name: "AI Code Review"
+        role: reviewer
+        goal: |
+          Review the code based on analysis results:
+          {analysis_results}
+
+          Focus on:
+          1. Logic errors and bugs
+          2. Security vulnerabilities
+          3. Performance issues
+          4. Best practice violations
+        tool_budget: 30
+        tools: [read, grep, code_search]
+        llm_config:
+          temperature: 0.4
+        output: review_findings
+        next: [request_approval]
+
+      # Stage 5: HITL approval (framework gates)
+      - id: request_approval
+        type: hitl
+        name: "Review Approval"
+        gate_type: approval
+        title: "Code Review Decision"
+        prompt: |
+          ## Code Review Complete
+
+          **Files Changed:** {file_count}
+          **Lines Changed:** {lines_changed}
+
+          ### Issues Found
+          **Critical ({critical_count}):**
+          {critical_issues}
+
+          **Major ({major_count}):**
+          {major_issues}
+
+          **Minor ({minor_count}):**
+          {minor_issues}
+
+          ### AI Recommendation
+          {ai_recommendation}
+        context_keys:
+          - file_count
+          - lines_changed
+          - critical_count
+          - critical_issues
+          - major_count
+          - major_issues
+          - minor_count
+          - minor_issues
+          - ai_recommendation
+        config:
+          timeout_seconds: 900
+          fallback_strategy: continue
+          show_details: true
+          require_reason_on_reject: false
+        choices:
+          - label: "Approve"
+            value: approved
+          - label: "Request Changes"
+            value: changes_requested
+        next: [handle_approval]
+
+      - id: handle_approval
+        type: condition
+        name: "Handle Approval"
+        condition: "approval_result.choice"
+        branches:
+          "approved": complete
+          "changes_requested": request_fixes
+
+      - id: request_fixes
+        type: hitl
+        name: "Offer Auto-Fix"
+        gate_type: choice_input
+        title: "Auto-Fix Available"
+        prompt: |
+          Some issues can be fixed automatically:
+          {auto_fixable_issues}
+
+          Would you like me to apply these fixes?
+        context_keys:
+          - auto_fixable_issues
+        config:
+          timeout_seconds: 300
+          fallback_strategy: continue_with_default
+          default_value: "No"
+        choices:
+          - "Yes, fix automatically"
+          - "No, I'll fix manually"
+        next: [handle_fix_choice]
+
+      - id: handle_fix_choice
+        type: condition
+        name: "Handle Fix Choice"
+        condition: "fix_result.choice"
+        branches:
+          "Yes, fix automatically": apply_fixes
+          "No, I'll fix manually": complete
+
+      - id: apply_fixes
+        type: agent
+        name: "Apply Auto-Fixes"
+        role: executor
+        goal: "Apply the auto-fixable issues: {auto_fixable_issues}"
+        tool_budget: 20
+        tools: [edit, shell]
+        llm_config:
+          temperature: 0.1
+        output: fix_result
+        next: [verify_fixes]
+
+      - id: verify_fixes
+        type: compute
+        name: "Verify Fixes"
+        handler: retry_with_backoff
+        tools: [shell]
+        inputs:
+          command: pytest -xvs
+        config:
+          max_retries: 2
+          base_delay: 5.0
+        output: test_results
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Review Complete"
+        transform: |
+          status = "completed"
+          completion_time = current_timestamp()

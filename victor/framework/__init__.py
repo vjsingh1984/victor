@@ -985,6 +985,72 @@ try:
 except ImportError:
     pass
 
+# Enhanced HITL Framework (gates, templates, sessions)
+try:
+    from victor.framework.hitl import (
+        # Gates
+        ApprovalGate,
+        TextInput,
+        TextInputGate,
+        ChoiceInput,
+        ConfirmationDialog,
+        ReviewGate,
+        # Protocols
+        HITLGateProtocol,
+        HITLResponseProtocol,
+        InputValidationProtocol,
+        FallbackBehavior,
+        FallbackStrategy,
+        # Session
+        HITLSession,
+        HITLSessionConfig,
+        HITLSessionManager,
+        SessionState,
+        get_global_session_manager,
+        # Templates
+        PromptTemplate,
+        PromptTemplateRegistry,
+        TemplateContext,
+        get_prompt_template,
+        register_template,
+        render_template,
+        list_templates,
+    )
+
+    _HITL_FRAMEWORK_EXPORTS = [
+        # Gates
+        "ApprovalGate",
+        "TextInput",
+        "TextInputGate",
+        "ChoiceInput",
+        "ConfirmationDialog",
+        "ReviewGate",
+        # Protocols
+        "HITLGateProtocol",
+        "HITLResponseProtocol",
+        "InputValidationProtocol",
+        "FallbackBehavior",
+        "FallbackStrategy",
+        # Session
+        "HITLSession",
+        "HITLSessionConfig",
+        "HITLSessionManager",
+        "SessionState",
+        "get_global_session_manager",
+        # Templates
+        "PromptTemplate",
+        "PromptTemplateRegistry",
+        "TemplateContext",
+        "get_prompt_template",
+        "register_template",
+        "render_template",
+        "list_templates",
+    ]
+
+    __all__ = list(__all__) + _HITL_FRAMEWORK_EXPORTS
+except ImportError:
+    _HITL_FRAMEWORK_EXPORTS = []
+
 # Persona System
 try:
     from victor.framework.personas import (

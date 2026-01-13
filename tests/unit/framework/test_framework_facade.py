@@ -552,14 +552,18 @@ class TestFrameworkMainExports:
             _RESILIENCE_EXPORTS,
         )
 
+        # Phase 9 added resilience, health, and metrics facades
+        # Phase 10 added Framework-Specific Retry Handlers to resilience exports
         assert (
-            len(_RESILIENCE_EXPORTS) == 26
-        ), f"Expected 26 resilience exports, got {len(_RESILIENCE_EXPORTS)}"
-        assert len(_HEALTH_EXPORTS) == 18, f"Expected 18 health exports, got {len(_HEALTH_EXPORTS)}"
+            len(_RESILIENCE_EXPORTS) == 38
+        ), f"Expected 38 resilience exports, got {len(_RESILIENCE_EXPORTS)}"
+        assert (
+            len(_HEALTH_EXPORTS) == 18
+        ), f"Expected 18 health exports, got {len(_HEALTH_EXPORTS)}"
         assert (
             len(_METRICS_EXPORTS) == 13
         ), f"Expected 13 metrics exports, got {len(_METRICS_EXPORTS)}"
 
-        # Total new exports from Phase 9
+        # Total exports from Phase 9 (resilience, health, metrics) + Phase 10 (retry handlers)
         total = len(_RESILIENCE_EXPORTS) + len(_HEALTH_EXPORTS) + len(_METRICS_EXPORTS)
-        assert total == 57, f"Expected 57 total Phase 9 exports, got {total}"
+        assert total == 69, f"Expected 69 total Phase 9/10 exports, got {total}"

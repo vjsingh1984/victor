@@ -1,0 +1,725 @@
+# Research Workflow Migration Examples
+# ====================================
+# This file demonstrates how to migrate research workflows to use
+# the new framework capabilities.
+#
+# Research-Specific Patterns:
+# 1. Web search with retry (rate limits, network errors)
+# 2. Source validation pipelines
+# 3. Parallel source discovery
+# 4. HITL for gap analysis decisions
+# 5. Citation formatting (compute node)
+
+workflows:
+  # ===========================================================================
+  # EXAMPLE 1: Web Search with Retry Migration
+  # ===========================================================================
+  #
+  # BEFORE: Manual retry loops for web searches
+  # AFTER: Use framework retry_with_backoff with network_retry handler
+  #
+  web_search_retry_before:
+    description: "OLD: Manual retry for web searches"
+    nodes:
+      - id: web_search
+        type: agent
+        name: "Web Search (Old Way)"
+        role: researcher
+        goal: "Search for: {query}"
+        tool_budget: 20
+        tools: [web_search, web_fetch]
+        output: search_results
+        next: [check_results]
+
+      - id: check_results
+        type: condition
+        name: "Check if Rate Limited"
+        condition: "search_results.error == 'rate_limit' and retry_count < 5"
+        branches:
+          "true": wait_and_retry
+          "false": process_results
+
+      - id: wait_and_retry
+        type: transform
+        name: "Wait and Retry"
+        transform: |
+          retry_count = retry_count + 1
+          wait_seconds = 2 ** retry_count  # Exponential backoff
+        next: [web_search]
+
+  web_search_retry_after:
+    description: "NEW: Using framework network_retry handler"
+    nodes:
+      - id: web_search
+        type: compute
+        name: "Web Search with Retry"
+        handler: network_retry
+        tools: [web_search, web_fetch]
+        inputs:
+          query: $ctx.query
+          max_results: 20
+        config:
+          max_retries: 5
+          base_delay: 2.0
+          max_delay: 120.0
+          jitter: 0.25
+          retryable_patterns:
+            - "rate.?limit"
+            - "429"
+            - "overloaded"
+        output: search_results
+        next: [process_results]
+
+  # ===========================================================================
+  # EXAMPLE 2: Source Validation Pipeline Migration
+  # ===========================================================================
+  #
+  # BEFORE: Agent-based source validation
+  # AFTER: Use framework validate_pipeline for source quality checks
+  #
+  source_validation_before:
+    description: "OLD: Agent validates each source individually"
+    nodes:
+      - id: validate_sources
+        type: agent
+        name: "Validate Sources (Old Way)"
+        role: analyst
+        goal: |
+          For each source, check:
+          1. URL is accessible
+          2. Publication date is recent (within 5 years)
+          3. Author credibility
+          4. Source reputation
+          5. No obvious bias
+        tool_budget: 25
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          sources: gathered_sources
+        output: validated_sources
+        next: [filter_sources]
+
+      - id: filter_sources
+        type: transform
+        name: "Filter Valid Sources"
+        transform: |
+          valid_sources = [s for s in validated_sources if s.quality_score > 0.6]
+        next: [proceed]
+
+  source_validation_after:
+    description: "NEW: Using framework validate_pipeline"
+    nodes:
+      - id: validate_sources
+        type: validate_pipeline
+        name: "Validate Source Quality"
+        validators:
+          # Presence validators
+          - type: presence
+            field: url
+            required: true
+            error_code: "MISSING_URL"
+          - type: presence
+            field: title
+            required: true
+            error_code: "MISSING_TITLE"
+
+          # Pattern validators
+          - type: pattern
+            field: url
+            pattern_type: url
+            error_code: "INVALID_URL"
+
+          # Threshold validators
+          - type: threshold
+            field: credibility_score
+            min: 0.6
+            max: 1.0
+            error_code: "LOW_CREDIBILITY"
+          - type: threshold
+            field: recency_score
+            min: 0.0
+            max: 1.0
+            error_code: "OUTDATED_SOURCE"
+
+          # Type validators
+          - type: type
+            field: publication_date
+            expected_type: "date"
+            error_code: "INVALID_DATE"
+
+          # Composite validator for overall quality
+          - type: composite
+            field: overall_quality
+            logic: all
+            validators:
+              - type: threshold
+                field: credibility_score
+                min: 0.6
+              - type: threshold
+                field: recency_score
+                min: 0.3
+            error_code: "LOW_QUALITY"
+
+        handler:
+          type: conditional
+          config:
+            action: skip
+            min_severity: error
+            fallback:
+              type: halt
+        halt_on_error: false
+        collect_all_errors: true
+        input_mapping:
+          sources: gathered_sources
+        output: validation_result
+        next: [filter_sources]
+
+      - id: filter_sources
+        type: transform
+        name: "Extract Valid Sources"
+        transform: |
+          # validation_result.valid_items contains sources that passed
+          valid_sources = validation_result.valid_items
+          # validation_result.errors contains validation failures
+          invalid_count = len(validation_result.errors)
+        next: [proceed]
+
+  # ===========================================================================
+  # EXAMPLE 3: Parallel Source Discovery Migration
+  # ===========================================================================
+  #
+  # BEFORE: Manual parallel_nodes definition
+  # AFTER: Use framework parallel_execute with task definitions
+  #
+  parallel_discovery_before:
+    description: "OLD: Using parallel_nodes"
+    nodes:
+      - id: parallel_search
+        type: parallel
+        name: "Parallel Search (Old Way)"
+        parallel_nodes: [web_search, academic_search, code_search]
+        join_strategy: all
+        next: [aggregate_results]
+
+      - id: web_search
+        type: agent
+        name: "Web Search"
+        role: researcher
+        goal: "Search web for: {query}"
+        tool_budget: 20
+        tools: [web_search, web_fetch]
+        output: web_results
+
+      - id: academic_search
+        type: agent
+        name: "Academic Search"
+        role: researcher
+        goal: "Search academic sources for: {query}"
+        tool_budget: 25
+        tools: [web_search, web_fetch]
+        output: academic_results
+
+      - id: code_search
+        type: agent
+        name: "Code Search"
+        role: researcher
+        goal: "Search code for: {query}"
+        tool_budget: 15
+        tools: [code_search]
+        output: code_results
+
+  parallel_discovery_after:
+    description: "NEW: Using framework parallel_execute"
+    nodes:
+      - id: parallel_search
+        type: compute
+        name: "Parallel Source Discovery"
+        handler: parallel_execute
+        tools: []
+        inputs:
+          tasks:
+            - name: web_search
+              handler: research_search
+              config:
+                query: $ctx.query
+                sources: [web, news]
+                max_results: 20
+              timeout: 120
+
+            - name: academic_search
+              handler: research_search
+              config:
+                query: $ctx.query
+                sources: [scholar, arxiv]
+                max_results: 15
+              timeout: 180
+
+            - name: code_search
+              handler: research_search
+              config:
+                query: $ctx.query
+                sources: [github, stackoverflow]
+                max_results: 10
+              timeout: 90
+
+        config:
+          join_strategy: all
+          error_strategy: collect_errors
+          max_concurrent: 3
+          timeout: 300
+
+        output: search_results
+        next: [aggregate_results]
+
+  # ===========================================================================
+  # EXAMPLE 4: HITL Gap Analysis Migration
+  # ===========================================================================
+  #
+  # BEFORE: Basic HITL input node
+  # AFTER: Rich HITL choice gate with multiple options
+  #
+  gap_analysis_hitl_before:
+    description: "OLD: Basic HITL for gap decision"
+    nodes:
+      - id: request_more_research
+        type: hitl
+        name: "Request Additional Research"
+        hitl_type: input
+        prompt: |
+          Research coverage: {coverage_score}%
+
+          Should we continue or search more?
+        context_keys:
+          - coverage_score
+        timeout: 600
+        fallback: continue
+        next: [handle_decision]
+
+      - id: handle_decision
+        type: condition
+        name: "Handle Decision"
+        condition: "user_response"
+        branches:
+          "continue": synthesize
+          "search_more": parallel_search
+
+  gap_analysis_hitl_after:
+    description: "NEW: Rich HITL with structured choices"
+    nodes:
+      - id: request_more_research
+        type: hitl
+        name: "Gap Analysis Decision"
+        gate_type: choice_input
+        title: "Research Coverage Decision"
+        prompt: |
+          ## Research Coverage Analysis
+
+          **Current Coverage:** {coverage_score}%
+          **Target Coverage:** 70%
+
+          ### Identified Gaps
+          {gaps}
+
+          ### Sources Found
+          - Academic: {academic_count}
+          - Web: {web_count}
+          - Code: {code_count}
+
+          **Quality Score:** {quality_score}/1.0
+        context_keys:
+          - coverage_score
+          - gaps
+          - academic_count
+          - web_count
+          - code_count
+          - quality_score
+        config:
+          timeout_seconds: 600
+          fallback_strategy: continue_with_default
+          default_value: "proceed_with_available"
+          show_details: true
+        choices:
+          - label: "Proceed with Available"
+            value: proceed_with_available
+            description: "Continue synthesis with current sources"
+          - label: "Search Academic Sources"
+            value: search_academic
+            description: "Focus on academic papers and journals"
+          - label: "Search Web Sources"
+            value: search_web
+            description: "Find more web articles and documentation"
+          - label: "Adjust Scope"
+            value: adjust_scope
+            description: "Narrow or broaden research scope"
+        next: [handle_gap_decision]
+
+      - id: handle_gap_decision
+        type: condition
+        name: "Handle Gap Decision"
+        condition: "gap_decision.choice"
+        branches:
+          "proceed_with_available": synthesize
+          "search_academic": academic_search_only
+          "search_web": web_search_only
+          "adjust_scope": adjust_research_scope
+
+  # ===========================================================================
+  # EXAMPLE 5: Citation Formatting with Compute
+  # ===========================================================================
+  #
+  # BEFORE: Agent-based citation formatting (wasteful)
+  # AFTER: Compute node with template-based formatting
+  #
+  citation_formatting_before:
+    description: "OLD: Agent formats citations"
+    nodes:
+      - id: format_citations
+        type: agent
+        name: "Format Citations (Old Way)"
+        role: formatter
+        goal: |
+          Format sources as citations in {citation_format} style:
+          {sources}
+
+          Follow the citation style guide exactly.
+        tool_budget: 10
+        llm_config:
+          temperature: 0.1
+        output: formatted_citations
+        next: [generate_report]
+
+  citation_formatting_after:
+    description: "NEW: Compute node for deterministic formatting"
+    nodes:
+      - id: format_citations
+        type: compute
+        name: "Generate Citations"
+        handler: citation_formatter
+        tools: []
+        inputs:
+          sources: $ctx.validated_sources
+          format: $ctx.citation_format  # APA, MLA, Chicago, IEEE
+        config:
+          include_urls: true
+          sort_by: author  # author | date | title
+        output: citations
+        constraints:
+          llm_allowed: false
+          network_allowed: false
+          timeout: 30
+        next: [generate_report]
+
+  # ===========================================================================
+  # COMPREHENSIVE EXAMPLE: Full Deep Research Workflow
+  # ===========================================================================
+  comprehensive_deep_research:
+    description: "Complete deep research using all framework capabilities"
+
+    metadata:
+      version: "2.0"
+      author: "victor"
+      vertical: research
+      framework_version: "0.5.0"
+
+    # Service definitions
+    services:
+      citation_cache:
+        type: memory
+        config:
+          max_size: 500
+          ttl: 7200
+        lifecycle:
+          start: auto
+          cleanup: delete
+
+      search_history:
+        type: sqlite
+        config:
+          path: $ctx.project_dir/.victor/search_history.db
+          journal_mode: WAL
+        lifecycle:
+          start: auto
+          cleanup: preserve
+
+    nodes:
+      # Stage 1: Query Understanding (unchanged - requires LLM)
+      - id: understand_query
+        type: agent
+        name: "Understand Research Query"
+        role: researcher
+        goal: |
+          Analyze the research query to understand:
+          1. Core question and key concepts
+          2. Scope and depth required
+          3. Types of sources needed
+          4. Search strategy
+        tool_budget: 10
+        llm_config:
+          temperature: 0.3
+        output: query_analysis
+        next: [parallel_search]
+
+      # Stage 2: Parallel Source Discovery (framework)
+      - id: parallel_search
+        type: compute
+        name: "Parallel Source Discovery"
+        handler: parallel_execute
+        tools: []
+        inputs:
+          tasks:
+            - name: web_search
+              handler: web_search_handler
+              config:
+                query: $ctx.query
+                max_results: 20
+              retry_config:
+                max_retries: 3
+              timeout: 120
+
+            - name: academic_search
+              handler: academic_search_handler
+              config:
+                query: $ctx.query
+                databases: [scholar, arxiv, pubmed]
+                max_results: 15
+              timeout: 180
+
+            - name: code_search
+              handler: code_search_handler
+              config:
+                query: $ctx.query
+                repositories: [github, gitlab, stackoverflow]
+                max_results: 10
+              timeout: 90
+
+        config:
+          join_strategy: all
+          error_strategy: collect_errors
+          max_concurrent: 3
+          timeout: 300
+
+        output: search_results
+        next: [validate_sources]
+
+      # Stage 3: Source Validation (framework pipeline)
+      - id: validate_sources
+        type: validate_pipeline
+        name: "Validate Source Quality"
+        validators:
+          # Basic presence checks
+          - type: presence
+            field: url
+            required: true
+          - type: presence
+            field: title
+            required: true
+
+          # URL validation
+          - type: pattern
+            field: url
+            pattern_type: url
+            error_code: "INVALID_URL"
+
+          # Quality thresholds
+          - type: threshold
+            field: credibility_score
+            min: 0.6
+            error_code: "LOW_CREDIBILITY"
+
+          - type: threshold
+            field: relevance_score
+            min: 0.5
+            error_code: "LOW_RELEVANCE"
+
+          # Composite for overall quality
+          - type: composite
+            field: quality
+            logic: all
+            validators:
+              - type: threshold
+                field: credibility_score
+                min: 0.6
+              - type: threshold
+                field: relevance_score
+                min: 0.5
+
+        handler:
+          type: conditional
+          config:
+            action: skip
+            min_severity: error
+            fallback:
+              type: halt
+
+        halt_on_error: false
+        collect_all_errors: true
+
+        output: validation_result
+        next: [check_coverage]
+
+      # Stage 4: Coverage Check (condition node)
+      - id: check_coverage
+        type: condition
+        name: "Check Topic Coverage"
+        condition: "validation_result.valid_count >= 5"
+        branches:
+          "true": synthesize
+          "false": gap_analysis
+
+      # Stage 5: Gap Analysis with HITL
+      - id: gap_analysis
+        type: agent
+        name: "Identify Information Gaps"
+        role: analyst
+        goal: |
+          Identify gaps in the research:
+          - What aspects haven't been covered?
+          - What questions remain unanswered?
+          - What additional sources are needed?
+        tool_budget: 10
+        llm_config:
+          temperature: 0.3
+        output: gaps
+        next: [hitl_decision]
+
+      # Stage 6: HITL Decision Point
+      - id: hitl_decision
+        type: hitl
+        name: "Research Strategy Decision"
+        gate_type: choice_input
+        title: "Research Coverage Decision"
+        prompt: |
+          ## Research Coverage: {coverage_percentage}%
+
+          ### Sources Found
+          **Valid Sources:** {valid_source_count}
+          **Sources Discarded:** {invalid_source_count}
+
+          ### Identified Gaps
+          {gaps}
+
+          ### Recommendation
+          {recommendation}
+        context_keys:
+          - coverage_percentage
+          - valid_source_count
+          - invalid_source_count
+          - gaps
+          - recommendation
+        config:
+          timeout_seconds: 900
+          fallback_strategy: continue_with_default
+          default_value: "proceed"
+        choices:
+          - "Proceed with available sources"
+          - "Search for academic sources only"
+          - "Search for web sources only"
+          - "Adjust research scope"
+        next: [handle_decision]
+
+      # Stage 7: Handle Decision
+      - id: handle_decision
+        type: condition
+        name: "Handle Research Decision"
+        condition: "decision.choice"
+        branches:
+          "Proceed with available sources": synthesize
+          "Search for academic sources only": parallel_search
+          "Search for web sources only": parallel_search
+          "Adjust research scope": understand_query
+
+      # Stage 8: Synthesis
+      - id: synthesize
+        type: agent
+        name: "Synthesize Findings"
+        role: analyst
+        goal: |
+          Synthesize research findings:
+          1. Identify key themes and patterns
+          2. Reconcile conflicting information
+          3. Draw conclusions
+          4. Note limitations
+        tool_budget: 25
+        llm_config:
+          temperature: 0.4
+        input_mapping:
+          sources: validation_result.valid_items
+        output: synthesis
+        next: [format_citations]
+
+      # Stage 9: Citation Formatting (compute node)
+      - id: format_citations
+        type: compute
+        name: "Generate Citations"
+        handler: citation_formatter
+        tools: []
+        inputs:
+          sources: $ctx.validation_result.valid_items
+          format: $ctx.citation_format
+        config:
+          include_urls: true
+          sort_by: author
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        output: citations
+        next: [generate_report]
+
+      # Stage 10: HITL Review Before Report
+      - id: review_synthesis
+        type: hitl
+        name: "Review Synthesis"
+        gate_type: approval
+        title: "Research Synthesis Review"
+        prompt: |
+          ## Research Synthesis Ready
+
+          **Key Findings:**
+          {synthesis_summary}
+
+          **Sources:** {source_count}
+          **Citation Format:** {citation_format}
+
+          Approve for final report generation?
+        context_keys:
+          - synthesis_summary
+          - source_count
+          - citation_format
+        config:
+          timeout_seconds: 900
+          fallback_strategy: continue
+          show_details: true
+          require_reason_on_reject: false
+        next: [generate_report]
+
+      # Stage 11: Generate Report
+      - id: generate_report
+        type: agent
+        name: "Generate Research Report"
+        role: writer
+        goal: |
+          Generate a comprehensive research report:
+          1. Executive Summary
+          2. Introduction
+          3. Methodology
+          4. Findings
+          5. Conclusions
+          6. References
+        tool_budget: 30
+        tools: [write]
+        llm_config:
+          temperature: 0.5
+          max_tokens: 8000
+        input_mapping:
+          synthesis: synthesis
+          citations: citations
+        output: final_report
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Research Complete"
+        transform: |
+          status = "completed"
+          completion_time = current_timestamp()
+          report_path = write_file(final_report)

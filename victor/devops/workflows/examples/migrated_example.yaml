@@ -1,0 +1,882 @@
+# DevOps Workflow Migration Examples
+# ===================================
+# This file demonstrates how to migrate DevOps workflows to use
+# the new framework capabilities.
+#
+# DevOps-Specific Patterns:
+# 1. Health check with retry (service availability)
+# 2. Deployment validation pipelines
+# 3. Parallel infrastructure checks
+# 4. HITL for deployment approvals
+# 5. Rollback decision gates
+
+workflows:
+  # ===========================================================================
+  # EXAMPLE 1: Health Check with Retry Migration
+  # ===========================================================================
+  #
+  # BEFORE: Manual retry for health checks
+  # AFTER: Use framework retry_with_backoff
+  #
+  health_check_retry_before:
+    description: "OLD: Manual health check retry"
+    nodes:
+      - id: health_check
+        type: compute
+        name: "Health Check (Old Way)"
+        tools: [shell]
+        inputs:
+          command: curl -f http://localhost:8080/health || exit 1
+        output: health_status
+        next: [check_health]
+
+      - id: check_health
+        type: condition
+        name: "Check if Healthy"
+        condition: "health_status.healthy or retry_count >= 10"
+        branches:
+          "true": proceed
+          "false": wait_retry
+
+      - id: wait_retry
+        type: transform
+        name: "Wait and Retry"
+        transform: |
+          retry_count = (retry_count or 0) + 1
+          wait_seconds = 2 ** (retry_count // 3)  # Slower backoff
+        next: [health_check]
+
+  health_check_retry_after:
+    description: "NEW: Using framework retry_with_backoff"
+    nodes:
+      - id: health_check
+        type: compute
+        name: "Health Check with Retry"
+        handler: retry_with_backoff
+        tools: [shell]
+        inputs:
+          endpoints:
+            - http://localhost:8080/health
+            - http://localhost:8080/ready
+          expected_status: 200
+        config:
+          max_retries: 10
+          base_delay: 2.0
+          exponential_base: 1.5
+          max_delay: 30.0
+          jitter: 0.2
+        output: health_status
+        next: [check_healthy]
+
+      - id: check_healthy
+        type: condition
+        name: "Verify All Healthy"
+        condition: "health_status.all_healthy"
+        branches:
+          "true": proceed
+          "false": failed
+
+  # ===========================================================================
+  # EXAMPLE 2: Deployment Validation Pipeline
+  # ===========================================================================
+  #
+  # BEFORE: Agent validates configuration
+  # AFTER: Use framework validate_pipeline
+  #
+  deployment_validation_before:
+    description: "OLD: Agent validates deployment config"
+    nodes:
+      - id: validate_config
+        type: agent
+        name: "Validate Config (Old Way)"
+        role: validator
+        goal: |
+          Validate the deployment configuration:
+          1. All required fields present
+          2. Image tag format valid
+          3. Replica count in valid range
+          4. Resource limits reasonable
+          5. Environment variables set
+        tool_budget: 15
+        llm_config:
+          temperature: 0.1
+        input_mapping:
+          config: deployment_config
+        output: validation_result
+        next: [handle_validation]
+
+      - id: handle_validation
+        type: condition
+        name: "Handle Validation"
+        condition: "validation_result.valid"
+        branches:
+          "true": deploy
+          "false": fix_config
+
+  deployment_validation_after:
+    description: "NEW: Using framework validate_pipeline"
+    nodes:
+      - id: validate_deployment
+        type: validate_pipeline
+        name: "Validate Deployment Configuration"
+        validators:
+          # Presence validators
+          - type: presence
+            field: image_tag
+            required: true
+            error_code: "MISSING_IMAGE"
+
+          - type: presence
+            field: environment
+            required: true
+            error_code: "MISSING_ENVIRONMENT"
+
+          # Pattern validators
+          - type: pattern
+            field: image_tag
+            pattern_type: docker_tag
+            pattern: "^[a-z0-9]+([._-][a-z0-9]+)*(:[a-z0-9]+([._-][a-z0-9]+)*)?$"
+            error_code: "INVALID_IMAGE_TAG"
+
+          # Threshold validators
+          - type: threshold
+            field: replica_count
+            min: 1
+            max: 100
+            error_code: "INVALID_REPLICA_COUNT"
+
+          - type: threshold
+            field: cpu_limit
+            min: 0.1
+            max: 64
+            error_code: "INVALID_CPU_LIMIT"
+
+          - type: threshold
+            field: memory_limit
+            min: 128
+            max: 262144  # 256GB in MB
+            error_code: "INVALID_MEMORY_LIMIT"
+
+          # Type validators
+          - type: type
+            field: port
+            expected_type: "integer"
+            error_code: "INVALID_PORT_TYPE"
+
+        handler:
+          type: halt
+        halt_on_error: true
+        collect_all_errors: true
+        input_mapping:
+          config: deployment_config
+        output: validation_result
+        next: [deploy]
+
+  # ===========================================================================
+  # EXAMPLE 3: Parallel Infrastructure Checks
+  # ===========================================================================
+  #
+  # BEFORE: Manual parallel_nodes for dependency checks
+  # AFTER: Use framework parallel_execute
+  #
+  parallel_checks_before:
+    description: "OLD: Manual parallel infrastructure checks"
+    nodes:
+      - id: parallel_checks
+        type: parallel
+        name: "Infrastructure Checks (Old Way)"
+        parallel_nodes: [docker_check, k8s_check, network_check, secrets_check]
+        join_strategy: all
+        next: [aggregate_results]
+
+      - id: docker_check
+        type: compute
+        name: "Docker Available"
+        tools: [shell]
+        inputs:
+          command: docker --version
+        output: docker_status
+
+      - id: k8s_check
+        type: compute
+        name: "Kubernetes Configured"
+        tools: [shell]
+        inputs:
+          command: kubectl cluster-info
+        output: k8s_status
+
+      - id: network_check
+        type: compute
+        name: "Network Reachable"
+        tools: [shell]
+        inputs:
+          command: ping -c 1 registry.example.com
+        output: network_status
+
+      - id: secrets_check
+        type: compute
+        name: "Secrets Available"
+        tools: [shell]
+        inputs:
+          command: test -f ~/.docker/config.json
+        output: secrets_status
+
+  parallel_checks_after:
+    description: "NEW: Using framework parallel_execute"
+    nodes:
+      - id: parallel_checks
+        type: compute
+        name: "Infrastructure Dependency Checks"
+        handler: parallel_execute
+        tools: [shell]
+        inputs:
+          tasks:
+            - name: docker_available
+              command: docker --version
+              expected_output: "Docker version"
+              timeout: 10
+
+            - name: kubernetes_configured
+              command: kubectl cluster-info
+              expected_output: "is running"
+              timeout: 15
+
+            - name: registry_reachable
+              command: curl -sf https://registry.example.com/v2/
+              timeout: 10
+
+            - name: secrets_available
+              command: |
+                test -f "$DOCKER_CONFIG/config.json" && \
+                test -f "$KUBECONFIG"
+              timeout: 5
+
+            - name: disk_space_available
+              command: df -h / | tail -1 | awk '{print $5}' | sed 's/%//'
+              threshold: 90  # Warn if >90% used
+              timeout: 5
+
+        config:
+          join_strategy: all
+          error_strategy: collect_errors
+          max_concurrent: 5
+          timeout: 60
+
+        output: check_results
+        next: [verify_dependencies]
+
+      - id: verify_dependencies
+        type: condition
+        name: "Verify All Dependencies Met"
+        condition: "check_results.failed_count == 0"
+        branches:
+          "true": proceed
+          "false": report_failures
+
+  # ===========================================================================
+  # EXAMPLE 4: HITL Deployment Approval
+  # ===========================================================================
+  #
+  # BEFORE: Basic approval gate
+  # AFTER: Rich approval with details and choices
+  #
+  deployment_approval_before:
+    description: "OLD: Basic deployment approval"
+    nodes:
+      - id: approval_gate
+        type: hitl
+        name: "Deployment Approval"
+        hitl_type: approval
+        prompt: |
+          Deploy {version} to {environment}?
+        context_keys:
+          - version
+          - environment
+        timeout: 900
+        fallback: abort
+        next: [deploy]
+
+  deployment_approval_after:
+    description: "NEW: Rich approval with deployment details"
+    nodes:
+      - id: approval_gate
+        type: hitl
+        name: "Deployment Approval"
+        gate_type: approval
+        title: "Deployment Approval Required"
+        prompt: |
+          ## Deployment Summary
+
+          **Environment:** {environment}
+          **Version:** {version}
+          **Strategy:** {deploy_strategy}
+
+          ### Changes
+          **Files Modified:** {file_count}
+          **Lines Added:** {lines_added}
+          **Lines Removed:** {lines_removed}
+
+          ### Infrastructure
+          **Replicas:** {replica_count}
+          **CPU Limit:** {cpu_limit}
+          **Memory Limit:** {memory_limit}MB
+
+          ### Risk Assessment
+          **Risk Level:** {risk_level}
+          **Services Affected:** {affected_services}
+
+          ### Backup
+          **Backup Created:** {backup_available}
+          **Restore Time Estimate:** {restore_time} minutes
+
+          ---
+          **Do you approve this deployment?**
+        context_keys:
+          - environment
+          - version
+          - deploy_strategy
+          - file_count
+          - lines_added
+          - lines_removed
+          - replica_count
+          - cpu_limit
+          - memory_limit
+          - risk_level
+          - affected_services
+          - backup_available
+          - restore_time
+        config:
+          timeout_seconds: 1800  # 30 minutes for review
+          fallback_strategy: abort
+          show_details: true
+          require_reason_on_reject: true
+        choices:
+          - label: "Approve Deployment"
+            value: approved
+            description: "Deploy to {environment}"
+            style: primary
+          - label: "Request Changes"
+            value: changes_requested
+            description: "Modify deployment before proceeding"
+            style: warning
+          - label: "Postpone"
+            value: postponed
+            description: "Schedule for later"
+            style: secondary
+        next: [handle_approval]
+
+      - id: handle_approval
+        type: condition
+        name: "Handle Approval Decision"
+        condition: "approval_result.choice"
+        branches:
+          "approved": deploy
+          "changes_requested": request_modifications
+          "postponed": schedule_deployment
+
+  # ===========================================================================
+  # EXAMPLE 5: Rollback Decision Gate
+  # ===========================================================================
+  #
+  # BEFORE: Simple condition for rollback
+  # AFTER: HITL gate for informed rollback decision
+  #
+  rollback_decision_before:
+    description: "OLD: Simple health-based rollback"
+    nodes:
+      - id: check_health
+        type: condition
+        name: "Check Deployment Health"
+        condition: "health_status.healthy"
+        branches:
+          "true": complete
+          "false": rollback
+
+      - id: rollback
+        type: compute
+        name: "Execute Rollback"
+        tools: [shell]
+        inputs:
+          command: kubectl rollout undo deployment/app
+        next: [complete]
+
+  rollback_decision_after:
+    description: "NEW: Informed rollback decision with HITL"
+    nodes:
+      - id: analyze_health_failure
+        type: agent
+        name: "Analyze Health Failure"
+        role: analyst
+        goal: |
+          Analyze the health check failure:
+          1. What services are failing?
+          2. What errors are occurring?
+          3. Is this transient or permanent?
+          4. Can we fix without rollback?
+        tool_budget: 15
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          health_status: health_status
+          logs: deployment_logs
+        output: failure_analysis
+        next: [rollback_decision]
+
+      - id: rollback_decision
+        type: hitl
+        name: "Rollback Decision"
+        gate_type: choice_input
+        title: "Deployment Health Check Failed"
+        prompt: |
+          ## Health Check Analysis
+
+          **Status:** {health_status}
+          **Services Failing:** {failing_services}
+          **Error Rate:** {error_rate}%
+
+          ### Root Cause Analysis
+          {failure_analysis}
+
+          ### Options
+          1. **Rollback:** Revert to previous version ({previous_version})
+          2. **Retry Health Checks:** Wait and recheck
+          3. **Partial Rollback:** Rollback only failing services
+          4. **Continue:** Accept degraded state
+
+          ### Impact Assessment
+          **Users Affected:** {affected_users}
+          **Downtime so far:** {downtime_minutes} minutes
+        context_keys:
+          - health_status
+          - failing_services
+          - error_rate
+          - failure_analysis
+          - previous_version
+          - affected_users
+          - downtime_minutes
+        config:
+          timeout_seconds: 300  # 5 minutes to decide
+          fallback_strategy: continue_with_default
+          default_value: "rollback"
+        choices:
+          - label: "Rollback Now"
+            value: rollback
+            description: "Revert entire deployment"
+            style: danger
+          - label: "Retry Health Checks"
+            value: retry
+            description: "Wait and recheck health"
+            style: primary
+          - label: "Partial Rollback"
+            value: partial_rollback
+            description: "Rollback only failing services"
+            style: warning
+          - label: "Continue (Degraded)"
+            value: continue_degraded
+            description: "Accept current state"
+            style: secondary
+        next: [handle_rollback_decision]
+
+      - id: handle_rollback_decision
+        type: condition
+        name: "Handle Rollback Decision"
+        condition: "rollback_decision.choice"
+        branches:
+          "rollback": execute_full_rollback
+          "retry": health_check
+          "partial_rollback": execute_partial_rollback
+          "continue_degraded": log_incident
+
+  # ===========================================================================
+  # COMPREHENSIVE EXAMPLE: Full Deployment Workflow
+  # ===========================================================================
+  comprehensive_deployment:
+    description: "Complete deployment workflow using all framework capabilities"
+
+    metadata:
+      version: "2.0"
+      author: "victor"
+      vertical: devops
+      framework_version: "0.5.0"
+
+    # Service definitions
+    services:
+      deployment_db:
+        type: sqlite
+        config:
+          path: /var/lib/victor/deployments.db
+          journal_mode: WAL
+        lifecycle:
+          start: auto
+          cleanup: preserve
+
+      metrics_service:
+        type: prometheus
+        config:
+          endpoint: http://localhost:9090
+        lifecycle:
+          start: on_demand
+          cleanup: none
+
+    nodes:
+      # Stage 1: Validate Configuration
+      - id: validate_config
+        type: validate_pipeline
+        name: "Validate Deployment Configuration"
+        validators:
+          - type: presence
+            field: image_tag
+            required: true
+          - type: pattern
+            field: image_tag
+            pattern_type: docker_tag
+            pattern: "^[a-z0-9]+([._-][a-z0-9]+)*:[a-z0-9]+([._-][a-z0-9]+)*$"
+          - type: threshold
+            field: replica_count
+            min: 1
+            max: 100
+          - type: threshold
+            field: cpu_limit
+            min: 0.1
+            max: 64
+          - type: threshold
+            field: memory_limit
+            min: 128
+            max: 262144
+        handler:
+          type: halt
+        halt_on_error: true
+        next: [parallel_dependency_checks]
+
+      # Stage 2: Parallel Dependency Checks
+      - id: parallel_dependency_checks
+        type: compute
+        name: "Infrastructure Dependency Checks"
+        handler: parallel_execute
+        tools: [shell]
+        inputs:
+          tasks:
+            - name: docker_available
+              command: docker version
+              timeout: 10
+
+            - name: kubernetes_ready
+              command: kubectl cluster-info --request-timeout=10
+              timeout: 15
+
+            - name: registry_accessible
+              command: curl -sf https://{registry}/v2/
+              timeout: 10
+
+            - name: secrets_available
+              command: kubectl get secret deploy-secrets -n {namespace}
+              timeout: 10
+
+            - name: disk_space
+              command: df /var/lib/docker | tail -1 | awk '{print $5}' | sed 's/%//'
+              threshold: 90
+              timeout: 5
+
+        config:
+          join_strategy: all
+          error_strategy: collect_errors
+          max_concurrent: 5
+          timeout: 60
+
+        output: dependency_results
+        next: [handle_dependencies]
+
+      - id: handle_dependencies
+        type: condition
+        name: "Handle Dependency Results"
+        condition: "dependency_results.failed_count == 0"
+        branches:
+          "true": backup_current
+          "false": report_missing_dependencies
+
+      - id: report_missing_dependencies
+        type: transform
+        name: "Report Missing Dependencies"
+        transform: |
+          status = "failed"
+          missing = dependency_results.failed_tasks
+          error_message = "Missing dependencies: " + ", ".join(missing)
+
+      # Stage 3: Backup Current Deployment
+      - id: backup_current
+        type: compute
+        name: "Backup Current Deployment"
+        handler: retry_with_backoff
+        tools: [shell]
+        inputs:
+          commands:
+            - kubectl get deployment {app_name} -n {namespace} -o yaml > backup/deployment.yaml
+            - kubectl get configmap {app_name} -n {namespace} -o yaml > backup/configmap.yaml
+            - kubectl get secret {app_name}-secret -n {namespace} -o yaml > backup/secret.yaml
+        config:
+          max_retries: 3
+          base_delay: 2.0
+        output: backup_info
+        constraints:
+          write_allowed: true
+          timeout: 120
+        next: [deployment_approval]
+
+      # Stage 4: Deployment Approval
+      - id: deployment_approval
+        type: hitl
+        name: "Deployment Approval"
+        gate_type: approval
+        title: "Approve Deployment to {environment}"
+        prompt: |
+          ## Ready to Deploy
+
+          **Environment:** {environment}
+          **Version:** {image_tag}
+          **Strategy:** {deploy_strategy}
+
+          ### Changes
+          **Services:** {service_count}
+          **Replicas:** {replica_count}
+
+          ### Risk Assessment
+          **Risk Level:** {risk_level}
+          **Estimated Downtime:** {downtime_estimate} seconds
+
+          ### Rollback Information
+          **Backup:** {backup_info.available}
+          **Rollback Time:** {rollback_estimate} seconds
+
+          ---
+          Approve deployment?
+        context_keys:
+          - environment
+          - image_tag
+          - deploy_strategy
+          - service_count
+          - replica_count
+          - risk_level
+          - downtime_estimate
+          - backup_info
+          - rollback_estimate
+        config:
+          timeout_seconds: 1800
+          fallback_strategy: abort
+          show_details: true
+          require_reason_on_reject: true
+        next: [handle_approval]
+
+      - id: handle_approval
+        type: condition
+        name: "Handle Approval"
+        condition: "approval_result.approved"
+        branches:
+          "true": execute_deployment
+          "false": deployment_cancelled
+
+      # Stage 5: Execute Deployment
+      - id: execute_deployment
+        type: compute
+        name: "Execute Deployment"
+        handler: deployment_executor
+        tools: [shell]
+        inputs:
+          strategy: $ctx.deploy_strategy
+          image: $ctx.image_tag
+          replicas: $ctx.replica_count
+          namespace: $ctx.namespace
+        config:
+          timeout: 600
+          progress_tracking: true
+        output: deployment_result
+        constraints:
+          write_allowed: true
+          network_allowed: true
+        next: [health_check]
+
+      # Stage 6: Health Check with Retry
+      - id: health_check
+        type: compute
+        name: "Health Check"
+        handler: retry_with_backoff
+        tools: [shell]
+        inputs:
+          endpoints:
+            - http://{service_url}/health
+            - http://{service_url}/ready
+          expected_status: 200
+          health_check_command: kubectl get pods -n {namespace} -l app={app_name}
+        config:
+          max_retries: 20
+          base_delay: 5.0
+          max_delay: 60.0
+          exponential_base: 1.5
+        output: health_status
+        constraints:
+          network_allowed: true
+          timeout: 600
+        next: [analyze_health_result]
+
+      # Stage 7: Analyze Health Result
+      - id: analyze_health_result
+        type: condition
+        name: "Analyze Health Result"
+        condition: "health_status.all_healthy"
+        branches:
+          "true": smoke_tests
+          "false": analyze_failure
+
+      # Stage 8: Analyze Health Failure
+      - id: analyze_failure
+        type: agent
+        name: "Analyze Health Failure"
+        role: analyst
+        goal: |
+          Analyze why health checks failed:
+          1. Which services/components are failing?
+          2. What are the error patterns?
+          3. Is this transient or permanent?
+          4. What is the recommended action?
+        tool_budget: 15
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          health_status: health_status
+          logs: $ctx.deployment_logs
+        output: failure_analysis
+        next: [rollback_decision]
+
+      # Stage 9: Rollback Decision Gate
+      - id: rollback_decision
+        type: hitl
+        name: "Rollback Decision"
+        gate_type: choice_input
+        title: "Health Check Failed - Choose Action"
+        prompt: |
+          ## Deployment Health Check Failed
+
+          **Failing Services:** {failing_services}
+          **Error Rate:** {error_rate}%
+
+          ### Analysis
+          {failure_analysis}
+
+          ### Options
+          1. Rollback - Revert to previous version
+          2. Retry - Run health checks again
+          3. Continue - Accept degraded state
+          4. Investigate - Get more information
+        context_keys:
+          - failing_services
+          - error_rate
+          - failure_analysis
+        config:
+          timeout_seconds: 300
+          fallback_strategy: continue_with_default
+          default_value: "rollback"
+        choices:
+          - "Rollback"
+          - "Retry Health Checks"
+          - "Continue (Degraded)"
+          - "Investigate Further"
+        next: [handle_rollback_decision]
+
+      - id: handle_rollback_decision
+        type: condition
+        name: "Handle Rollback Decision"
+        condition: "rollback_decision.choice"
+        branches:
+          "Rollback": execute_rollback
+          "Retry Health Checks": health_check
+          "Continue (Degraded)": log_incident
+          "Investigate Further": get_diagnostics
+
+      # Stage 10: Smoke Tests
+      - id: smoke_tests
+        type: compute
+        name: "Run Smoke Tests"
+        handler: parallel_execute
+        tools: [shell]
+        inputs:
+          tasks:
+            - name: api smoke test
+              command: curl -f http://{service_url}/api/health || exit 1
+              timeout: 30
+
+            - name: ui smoke test
+              command: curl -f http://{service_url}/ || exit 1
+              timeout: 30
+
+            - name: database connectivity
+              command: kubectl exec -n {namespace} deployment/{app_name} -- pg_isready
+              timeout: 30
+
+        config:
+          join_strategy: all
+          error_strategy: fail_fast
+          max_concurrent: 3
+          timeout: 120
+
+        output: smoke_test_results
+        next: [finalize_deployment]
+
+      # Stage 11: Finalize
+      - id: finalize_deployment
+        type: transform
+        name: "Deployment Complete"
+        transform: |
+          status = "completed"
+          deployed_version = image_tag
+          deployment_time = current_timestamp()
+          health_status = "healthy"
+        next: [complete]
+
+      - id: execute_rollback
+        type: compute
+        name: "Execute Rollback"
+        handler: retry_with_backoff
+        tools: [shell]
+        inputs:
+          backup_path: backup_info.path
+          namespace: $ctx.namespace
+        config:
+          max_retries: 3
+        output: rollback_result
+        next: [log_rollback]
+
+      - id: log_rollback
+        type: transform
+        name: "Rollback Complete"
+        transform: |
+          status = "rolled_back"
+          reason = approval_result.reason or "Health check failed"
+          rollback_time = current_timestamp()
+
+      - id: log_incident
+        type: agent
+        name: "Log Incident"
+        role: writer
+        goal: |
+          Create an incident log for the deployment issue:
+          - What failed
+          - Impact assessment
+          - Actions taken
+        tool_budget: 10
+        tools: [write]
+        output: incident_log
+        next: [complete_degraded]
+
+      - id: complete_degraded
+        type: transform
+        name: "Complete (Degraded)"
+        transform: |
+          status = "degraded"
+          health_status = "partial"
+          incident_report = incident_log
+
+      - id: deployment_cancelled
+        type: transform
+        name: "Deployment Cancelled"
+        transform: |
+          status = "cancelled"
+          reason = approval_result.reason
