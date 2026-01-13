@@ -14,9 +14,12 @@
 
 """RAG-specific mode configurations using central registry.
 
-This module registers RAG-specific operational modes with the central
-ModeConfigRegistry and exports a registry-based provider for protocol
-compatibility.
+This module uses the consolidated framework defaults from
+VerticalModeDefaults for complexity-to-mode mapping. RAG vertical
+uses framework's ComplexityMapper for optimal mode selection.
+
+SOLID Design: Already using framework ComplexityMapper via
+RegistryBasedModeConfigProvider base class (no custom override needed).
 """
 
 from __future__ import annotations

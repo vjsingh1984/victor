@@ -745,6 +745,438 @@ def register_vertical_modes(
 
 
 # =============================================================================
+# Complexity Mapper (Vertical-Aware Mode Selection)
+# =============================================================================
+
+
+class ComplexityMapper:
+    """Maps complexity levels to mode names with vertical-specific overrides.
+
+    This utility consolidates the duplicate get_mode_for_complexity() logic
+    from all verticals into a single, configurable framework component.
+
+    Each vertical can register custom mappings for specific complexity levels,
+    with fallback to a standard base mapping.
+
+    Example:
+        mapper = ComplexityMapper("coding")
+        mapper.register_override("highly_complex", "architect")
+        mode = mapper.get_mode_for_complexity("highly_complex")  # Returns "architect"
+
+        # For research vertical
+        research_mapper = ComplexityMapper("research")
+        research_mapper.register_override("complex", "deep")
+        research_mapper.register_override("highly_complex", "academic")
+    """
+
+    # Standard complexity-to-mode mapping (used as fallback)
+    _BASE_MAPPING: Dict[str, str] = {
+        "trivial": "quick",
+        "simple": "quick",
+        "moderate": "standard",
+        "complex": "comprehensive",
+        "highly_complex": "extended",
+    }
+
+    def __init__(self, vertical: str) -> None:
+        """Initialize complexity mapper for a vertical.
+
+        Args:
+            vertical: Vertical name (e.g., "coding", "devops", "research")
+        """
+        self._vertical = vertical
+        self._overrides: Dict[str, str] = {}
+        self._load_default_overrides()
+
+    def _load_default_overrides(self) -> None:
+        """Load default vertical-specific overrides.
+
+        These are the common patterns observed across verticals.
+        """
+        # Coding vertical: fast for trivial/simple, thorough for complex, architect for highly complex
+        if self._vertical == "coding":
+            self._overrides = {
+                "trivial": "fast",
+                "simple": "fast",
+                "moderate": "default",
+                "complex": "thorough",
+                "highly_complex": "architect",
+            }
+
+        # Benchmark vertical: fast mode for trivial/simple, thorough for complex
+        elif self._vertical == "benchmark":
+            self._overrides = {
+                "trivial": "fast",
+                "simple": "fast",
+                "complex": "thorough",
+                "highly_complex": "thorough",
+            }
+
+        # Research vertical: deep and academic modes
+        elif self._vertical == "research":
+            self._overrides = {
+                "complex": "deep",
+                "highly_complex": "academic",
+            }
+
+        # DevOps vertical: migration mode for highly complex tasks
+        elif self._vertical == "devops":
+            self._overrides = {"highly_complex": "migration"}
+
+        # RAG vertical: index mode for highly complex tasks
+        elif self._vertical == "rag":
+            self._overrides = {"highly_complex": "index"}
+
+        # DataAnalysis vertical: insights mode for complex tasks
+        elif self._vertical == "dataanalysis":
+            self._overrides = {"complex": "insights", "highly_complex": "insights"}
+
+    def register_override(self, complexity: str, mode: str) -> None:
+        """Register a vertical-specific override for a complexity level.
+
+        Args:
+            complexity: Complexity level (trivial, simple, moderate, complex, highly_complex)
+            mode: Mode name to use for this complexity level
+        """
+        self._overrides[complexity] = mode
+
+    def get_mode_for_complexity(self, complexity: str) -> str:
+        """Get mode name for a complexity level.
+
+        Args:
+            complexity: Complexity level string
+
+        Returns:
+            Mode name (uses vertical-specific override if available,
+                     otherwise falls back to base mapping)
+        """
+        # Try vertical-specific override first
+        if complexity in self._overrides:
+            return self._overrides[complexity]
+
+        # Fall back to base mapping
+        return self._BASE_MAPPING.get(complexity, "standard")
+
+    @classmethod
+    def get_base_mapping(cls) -> Dict[str, str]:
+        """Get the standard base complexity-to-mode mapping.
+
+        Returns:
+            Dictionary mapping complexity levels to mode names
+        """
+        return cls._BASE_MAPPING.copy()
+
+
+# =============================================================================
+# Vertical Mode Registry (Pre-configured Defaults)
+# =============================================================================
+
+
+class VerticalModeDefaults:
+    """Pre-configured mode defaults for all verticals.
+
+    This class provides out-of-the-box configurations for all 6 verticals,
+    eliminating the need for each vertical to register its own modes.
+
+    Verticals can still override these defaults by calling register_vertical()
+    with their own configurations if needed.
+    """
+
+    @staticmethod
+    def get_coding_modes() -> Dict[str, ModeDefinition]:
+        """Get coding-specific mode definitions.
+
+        Returns:
+            Dict of mode name to ModeDefinition
+        """
+        return {
+            "architect": ModeDefinition(
+                name="architect",
+                tool_budget=40,
+                max_iterations=100,
+                temperature=0.8,
+                description="Architecture analysis and design tasks",
+                exploration_multiplier=2.5,
+            ),
+            "refactor": ModeDefinition(
+                name="refactor",
+                tool_budget=25,
+                max_iterations=60,
+                temperature=0.6,
+                description="Code refactoring with safety checks",
+                exploration_multiplier=1.5,
+            ),
+            "debug": ModeDefinition(
+                name="debug",
+                tool_budget=15,
+                max_iterations=40,
+                temperature=0.5,
+                description="Debugging and issue investigation",
+                exploration_multiplier=1.2,
+            ),
+            "test": ModeDefinition(
+                name="test",
+                tool_budget=15,
+                max_iterations=40,
+                temperature=0.5,
+                description="Test creation and execution",
+                exploration_multiplier=1.0,
+            ),
+        }
+
+    @staticmethod
+    def get_coding_task_budgets() -> Dict[str, int]:
+        """Get coding-specific task budgets.
+
+        Returns:
+            Dict of task type to tool budget
+        """
+        return {
+            "code_generation": 3,
+            "create_simple": 2,
+            "create": 5,
+            "edit": 5,
+            "search": 6,
+            "action": 15,
+            "analysis_deep": 25,
+            "analyze": 12,
+            "design": 25,
+            "refactor": 15,
+            "debug": 12,
+            "test": 10,
+            "general": 8,
+        }
+
+    @staticmethod
+    def get_devops_modes() -> Dict[str, ModeDefinition]:
+        """Get devops-specific mode definitions.
+
+        Returns:
+            Dict of mode name to ModeDefinition
+        """
+        return {
+            "migration": ModeDefinition(
+                name="migration",
+                tool_budget=35,
+                max_iterations=90,
+                temperature=0.7,
+                description="Complex infrastructure migrations",
+                exploration_multiplier=2.5,
+            ),
+        }
+
+    @staticmethod
+    def get_devops_task_budgets() -> Dict[str, int]:
+        """Get devops-specific task budgets.
+
+        Returns:
+            Dict of task type to tool budget
+        """
+        return {
+            "deploy": 8,
+            "infrastructure_create": 15,
+            "migration": 25,
+            "troubleshoot": 12,
+        }
+
+    @staticmethod
+    def get_rag_modes() -> Dict[str, ModeDefinition]:
+        """Get RAG-specific mode definitions.
+
+        Returns:
+            Dict of mode name to ModeDefinition
+        """
+        return {
+            "index": ModeDefinition(
+                name="index",
+                tool_budget=25,
+                max_iterations=70,
+                temperature=0.6,
+                description="Document ingestion and indexing",
+                exploration_multiplier=1.5,
+            ),
+        }
+
+    @staticmethod
+    def get_rag_task_budgets() -> Dict[str, int]:
+        """Get RAG-specific task budgets.
+
+        Returns:
+            Dict of task type to tool budget
+        """
+        return {
+            "ingest": 10,
+            "query": 5,
+            "index_update": 15,
+        }
+
+    @staticmethod
+    def get_dataanalysis_modes() -> Dict[str, ModeDefinition]:
+        """Get dataanalysis-specific mode definitions.
+
+        Returns:
+            Dict of mode name to ModeDefinition
+        """
+        return {
+            "insights": ModeDefinition(
+                name="insights",
+                tool_budget=30,
+                max_iterations=80,
+                temperature=0.7,
+                description="Deep data analysis and insight generation",
+                exploration_multiplier=2.0,
+            ),
+        }
+
+    @staticmethod
+    def get_dataanalysis_task_budgets() -> Dict[str, int]:
+        """Get dataanalysis-specific task budgets.
+
+        Returns:
+            Dict of task type to tool budget
+        """
+        return {
+            "analyze": 15,
+            "visualize": 10,
+            "transform": 12,
+        }
+
+    @staticmethod
+    def get_research_modes() -> Dict[str, ModeDefinition]:
+        """Get research-specific mode definitions.
+
+        Returns:
+            Dict of mode name to ModeDefinition
+        """
+        return {
+            "deep": ModeDefinition(
+                name="deep",
+                tool_budget=25,
+                max_iterations=70,
+                temperature=0.7,
+                description="Deep research with extensive analysis",
+                exploration_multiplier=2.0,
+            ),
+            "academic": ModeDefinition(
+                name="academic",
+                tool_budget=40,
+                max_iterations=100,
+                temperature=0.8,
+                description="Academic-level research with citation management",
+                exploration_multiplier=3.0,
+            ),
+        }
+
+    @staticmethod
+    def get_research_task_budgets() -> Dict[str, int]:
+        """Get research-specific task budgets.
+
+        Returns:
+            Dict of task type to tool budget
+        """
+        return {
+            "quick_search": 5,
+            "deep_research": 20,
+            "synthesis": 15,
+        }
+
+    @staticmethod
+    def get_benchmark_modes() -> Dict[str, ModeDefinition]:
+        """Get benchmark-specific mode definitions.
+
+        Returns:
+            Dict of mode name to ModeDefinition
+        """
+        return {}
+
+    @staticmethod
+    def get_benchmark_task_budgets() -> Dict[str, int]:
+        """Get benchmark-specific task budgets.
+
+        Returns:
+            Dict of task type to tool budget
+        """
+        return {
+            "test_patch": 5,
+            "verify_fix": 10,
+            "run_benchmark": 15,
+        }
+
+    @classmethod
+    def register_all_verticals(cls, registry: Optional[ModeConfigRegistry] = None) -> None:
+        """Register all verticals with their default configurations.
+
+        This is the main entry point for pre-configuring all verticals.
+        Call this during framework initialization to set up all verticals.
+
+        Args:
+            registry: Optional registry instance (uses singleton if not provided)
+
+        Example:
+            from victor.core.mode_config import VerticalModeDefaults
+
+            # Register all verticals with defaults
+            VerticalModeDefaults.register_all_verticals()
+        """
+        if registry is None:
+            registry = ModeConfigRegistry.get_instance()
+
+        # Coding vertical
+        registry.register_vertical(
+            name="coding",
+            modes=cls.get_coding_modes(),
+            task_budgets=cls.get_coding_task_budgets(),
+            default_mode="default",
+            default_budget=10,
+        )
+
+        # DevOps vertical
+        registry.register_vertical(
+            name="devops",
+            modes=cls.get_devops_modes(),
+            task_budgets=cls.get_devops_task_budgets(),
+            default_mode="standard",
+            default_budget=15,
+        )
+
+        # RAG vertical
+        registry.register_vertical(
+            name="rag",
+            modes=cls.get_rag_modes(),
+            task_budgets=cls.get_rag_task_budgets(),
+            default_mode="standard",
+            default_budget=12,
+        )
+
+        # DataAnalysis vertical
+        registry.register_vertical(
+            name="dataanalysis",
+            modes=cls.get_dataanalysis_modes(),
+            task_budgets=cls.get_dataanalysis_task_budgets(),
+            default_mode="standard",
+            default_budget=15,
+        )
+
+        # Research vertical
+        registry.register_vertical(
+            name="research",
+            modes=cls.get_research_modes(),
+            task_budgets=cls.get_research_task_budgets(),
+            default_mode="standard",
+            default_budget=12,
+        )
+
+        # Benchmark vertical
+        registry.register_vertical(
+            name="benchmark",
+            modes=cls.get_benchmark_modes(),
+            task_budgets=cls.get_benchmark_task_budgets(),
+            default_mode="fast",
+            default_budget=10,
+        )
+
+
+# =============================================================================
 # Registry-Based Provider (Protocol Adapter)
 # =============================================================================
 
@@ -754,6 +1186,8 @@ class RegistryBasedModeConfigProvider:
 
     This class implements the ModeConfigProviderProtocol pattern but uses
     the central ModeConfigRegistry, eliminating duplicate code in verticals.
+
+    Now enhanced with ComplexityMapper for vertical-aware complexity-to-mode mapping.
 
     Example:
         # In vertical __init__.py or mode_config.py
@@ -794,6 +1228,7 @@ class RegistryBasedModeConfigProvider:
         self._vertical = vertical
         self._default_mode = default_mode
         self._default_budget = default_budget
+        self._complexity_mapper = ComplexityMapper(vertical)
 
     def get_mode_configs(self) -> Dict[str, "ModeConfig"]:
         """Get mode configurations from the registry.
@@ -852,22 +1287,18 @@ class RegistryBasedModeConfigProvider:
         return self.get_default_tool_budget(task_type)
 
     def get_mode_for_complexity(self, complexity: str) -> str:
-        """Map complexity level to mode name.
+        """Map complexity level to mode name (vertical-aware).
+
+        This method now uses the ComplexityMapper which provides vertical-specific
+        overrides for complexity-to-mode mapping.
 
         Args:
             complexity: Complexity level (trivial, simple, moderate, complex, highly_complex)
 
         Returns:
-            Recommended mode name
+            Recommended mode name (with vertical-specific overrides applied)
         """
-        mapping = {
-            "trivial": "quick",
-            "simple": "quick",
-            "moderate": "standard",
-            "complex": "comprehensive",
-            "highly_complex": "extended",
-        }
-        return mapping.get(complexity, "standard")
+        return self._complexity_mapper.get_mode_for_complexity(complexity)
 
 
 __all__ = [
@@ -882,6 +1313,10 @@ __all__ = [
     "DEFAULT_TASK_BUDGETS",
     # Registry
     "ModeConfigRegistry",
+    # Complexity Mapper
+    "ComplexityMapper",
+    # Vertical Defaults
+    "VerticalModeDefaults",
     # Provider
     "RegistryBasedModeConfigProvider",
     # Functions

@@ -38,7 +38,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Protocol, Set, TYPE_CHECKING, runtime_checkable
 
 if TYPE_CHECKING:
     from victor.framework.tools import ToolSet
@@ -381,6 +381,74 @@ class MiddlewareResult:
 # =============================================================================
 
 
+@runtime_checkable
+class TieredToolConfigProtocol(Protocol):
+    """Protocol for tiered tool configuration.
+
+    Defines the interface that all tiered tool configurations must implement.
+    This enables isinstance() checks instead of hasattr() for ISP compliance.
+
+    The protocol captures the essential properties and methods of TieredToolConfig
+    that are used by the framework (tool access controller, vertical integration, etc.).
+
+    ISP Compliance:
+        - This protocol provides a minimal, focused interface
+        - Components depend on this protocol, not concrete implementations
+        - Enables duck typing with type safety via runtime_checkable
+
+    Example:
+        from victor.core.vertical_types import TieredToolConfigProtocol
+
+        # Type-safe check
+        if isinstance(config, TieredToolConfigProtocol):
+            tools = config.mandatory | config.vertical_core
+    """
+
+    @property
+    def mandatory(self) -> Set[str]:
+        """Tools always included regardless of task type."""
+        ...
+
+    @property
+    def vertical_core(self) -> Set[str]:
+        """Tools always included for this vertical."""
+        ...
+
+    @property
+    def semantic_pool(self) -> Set[str]:
+        """DEPRECATED - Tools selected via semantic matching."""
+        ...
+
+    @property
+    def stage_tools(self) -> Dict[str, Set[str]]:
+        """DEPRECATED - Tools available at specific stages."""
+        ...
+
+    def get_base_tools(self) -> Set[str]:
+        """Get tools always included (mandatory + vertical core)."""
+        ...
+
+    def get_all_tools(self) -> Set[str]:
+        """Get all tools in the configuration."""
+        ...
+
+    def get_tools_for_stage(self, stage: str) -> Set[str]:
+        """Get tools for a specific stage."""
+        ...
+
+    def get_semantic_pool_from_registry(self) -> Set[str]:
+        """Get semantic pool dynamically from ToolMetadataRegistry."""
+        ...
+
+    def get_effective_semantic_pool(self) -> Set[str]:
+        """Get effective semantic pool, preferring registry over static."""
+        ...
+
+    def get_tools_for_stage_from_registry(self, stage: str) -> Set[str]:
+        """Get tools for a stage using @tool decorator metadata."""
+        ...
+
+
 @dataclass
 class TieredToolConfig:
     """Tiered tool configuration for intelligent tool selection.
@@ -683,6 +751,7 @@ __all__ = [
     "MiddlewarePriority",
     "MiddlewareResult",
     # Tool Configuration
+    "TieredToolConfigProtocol",
     "TieredToolConfig",
     "TieredToolTemplate",
     # Config Base

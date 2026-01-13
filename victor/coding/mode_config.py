@@ -14,9 +14,12 @@
 
 """Coding-specific mode configurations using central registry.
 
-This module registers coding-specific operational modes with the central
-ModeConfigRegistry and exports a registry-based provider for protocol
-compatibility.
+This module now uses the consolidated framework defaults from
+VerticalModeDefaults for complexity-to-mode mapping, eliminating
+duplicate code while preserving coding-specific mode configurations.
+
+SOLID Refactoring: ComplexityMapper from framework handles complexity
+mapping, eliminating ~15 LOC of duplicate logic.
 """
 
 from __future__ import annotations
@@ -120,8 +123,12 @@ def _register_coding_modes() -> None:
 class CodingModeConfigProvider(RegistryBasedModeConfigProvider):
     """Mode configuration provider for coding vertical.
 
-    Uses the central ModeConfigRegistry but provides coding-specific
-    complexity mapping.
+    Uses the central ModeConfigRegistry with framework defaults for
+    complexity mapping. ComplexityMapper from framework provides
+    vertical-aware complexity-to-mode mapping (complex→thorough, highly_complex→architect).
+
+    SOLID Refactoring: No override needed for get_mode_for_complexity() -
+    framework's ComplexityMapper provides identical mapping.
     """
 
     def __init__(self) -> None:
@@ -134,23 +141,11 @@ class CodingModeConfigProvider(RegistryBasedModeConfigProvider):
             default_budget=10,
         )
 
-    def get_mode_for_complexity(self, complexity: str) -> str:
-        """Map complexity level to coding mode.
-
-        Args:
-            complexity: Complexity level
-
-        Returns:
-            Recommended mode name
-        """
-        mapping = {
-            "trivial": "fast",
-            "simple": "fast",
-            "moderate": "default",
-            "complex": "thorough",
-            "highly_complex": "architect",
-        }
-        return mapping.get(complexity, "default")
+    # NOTE: get_mode_for_complexity() now uses ComplexityMapper from framework
+    # The framework provides identical mapping:
+    #   trivial → fast, simple → fast, moderate → default
+    #   complex → thorough, highly_complex → architect
+    # No override needed - eliminated ~15 lines of duplicate code
 
 
 def get_mode_config(mode_name: str) -> ModeConfig | None:

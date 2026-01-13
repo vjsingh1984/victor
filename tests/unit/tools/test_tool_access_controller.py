@@ -897,3 +897,107 @@ class TestCreateToolAccessController:
         assert controller.get_layer("vertical") is not None
         assert controller.get_layer("stage") is not None
         assert controller.get_layer("intent") is not None
+
+
+# =============================================================================
+# TieredToolConfigProtocol Tests (ISP Compliance)
+# =============================================================================
+
+
+class TestTieredToolConfigProtocol:
+    """Tests for TieredToolConfigProtocol compliance (Phase 1: ISP Cleanup)."""
+
+    def test_tiered_tool_config_implements_protocol(self):
+        """Test that TieredToolConfig implements TieredToolConfigProtocol."""
+        from victor.core.vertical_types import (
+            TieredToolConfig,
+            TieredToolConfigProtocol,
+        )
+
+        config = TieredToolConfig(
+            mandatory={"read", "ls"},
+            vertical_core={"grep"},
+        )
+
+        assert isinstance(config, TieredToolConfigProtocol)
+
+    def test_vertical_layer_accepts_protocol_compliant_config(self, mock_registry):
+        """Test VerticalLayer accepts protocol-compliant config."""
+        from victor.core.vertical_types import (
+            TieredToolConfig,
+            TieredToolConfigProtocol,
+        )
+        from victor.agent.tool_access_controller import VerticalLayer
+
+        config = TieredToolConfig(
+            mandatory={"read", "ls"},
+            vertical_core={"grep"},
+        )
+
+        layer = VerticalLayer(tiered_config=config)
+        assert isinstance(layer._tiered_config, TieredToolConfigProtocol)
+
+    def test_vertical_layer_strict_mode_raises_for_non_protocol(self, mock_registry):
+        """Test VerticalLayer strict mode raises TypeError for non-protocol configs."""
+        from victor.agent.tool_access_controller import VerticalLayer
+
+        # Create a mock config that doesn't implement the protocol
+        class LegacyConfig:
+            def __init__(self):
+                self.mandatory = {"read"}
+                self.core_tools = ["ls"]
+
+        layer = VerticalLayer(tiered_config=LegacyConfig(), strict_mode=True)
+
+        with pytest.raises(TypeError, match="must implement TieredToolConfigProtocol"):
+            layer._get_allowed_from_config()
+
+    def test_vertical_layer_deprecation_warning_for_legacy_config(self, mock_registry):
+        """Test VerticalLayer shows deprecation warning for legacy configs."""
+        from victor.agent.tool_access_controller import VerticalLayer
+
+        # Create a mock config with partial interface (legacy)
+        class LegacyConfig:
+            def __init__(self):
+                self.mandatory = {"read"}
+                self.core_tools = ["ls"]
+
+        layer = VerticalLayer(tiered_config=LegacyConfig(), strict_mode=False)
+
+        with pytest.warns(DeprecationWarning, match="does not implement TieredToolConfigProtocol"):
+            layer._get_allowed_from_config()
+
+    def test_vertical_layer_works_with_protocol_compliant_config(self, mock_registry):
+        """Test VerticalLayer works correctly with protocol-compliant config."""
+        from victor.core.vertical_types import TieredToolConfig
+        from victor.agent.tool_access_controller import VerticalLayer
+
+        config = TieredToolConfig(
+            mandatory={"read", "ls"},
+            vertical_core={"grep", "search"},
+        )
+
+        layer = VerticalLayer(tiered_config=config)
+        allowed = layer._get_allowed_from_config()
+
+        assert "read" in allowed
+        assert "ls" in allowed
+        assert "grep" in allowed
+        assert "search" in allowed
+
+    def test_factory_supports_strict_mode(self, mock_registry):
+        """Test factory function supports strict_mode parameter."""
+        from victor.agent.tool_access_controller import create_tool_access_controller
+        from victor.core.vertical_types import TieredToolConfig
+
+        config = TieredToolConfig(mandatory={"read"})
+
+        controller = create_tool_access_controller(
+            registry=mock_registry,
+            tiered_config=config,
+            strict_mode=True,
+        )
+
+        vertical_layer = controller.get_layer("vertical")
+        assert isinstance(vertical_layer, VerticalLayer)
+        assert vertical_layer._strict_mode is True

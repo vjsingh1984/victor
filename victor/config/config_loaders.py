@@ -55,6 +55,7 @@ class ProviderLimits:
     supports_extended_context: bool = False
     rate_limit_rpm: int = 60
     rate_limit_tpm: int = 100000
+    session_idle_timeout: int = 180  # Default 3 minutes, can be overridden per provider
 
     @property
     def effective_context(self) -> int:
@@ -190,6 +191,7 @@ def get_provider_limits(provider: str, model: Optional[str] = None) -> ProviderL
         supports_extended_context=provider_data.get("supports_extended_context", False),
         rate_limit_rpm=provider_data.get("rate_limit_rpm", 60),
         rate_limit_tpm=provider_data.get("rate_limit_tpm", 100000),
+        session_idle_timeout=provider_data.get("session_idle_timeout", 180),
     )
 
     # Apply model-specific overrides
@@ -200,6 +202,8 @@ def get_provider_limits(provider: str, model: Optional[str] = None) -> ProviderL
                     limits.context_window = overrides["context_window"]
                 if "response_reserve" in overrides:
                     limits.response_reserve = overrides["response_reserve"]
+                if "session_idle_timeout" in overrides:
+                    limits.session_idle_timeout = overrides["session_idle_timeout"]
                 break
 
     return limits
@@ -226,6 +230,7 @@ def get_all_provider_limits() -> Dict[str, ProviderLimits]:
             supports_extended_context=config.get("supports_extended_context", False),
             rate_limit_rpm=config.get("rate_limit_rpm", 60),
             rate_limit_tpm=config.get("rate_limit_tpm", 100000),
+            session_idle_timeout=config.get("session_idle_timeout", 180),
         )
 
     return result

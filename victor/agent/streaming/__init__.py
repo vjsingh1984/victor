@@ -40,6 +40,9 @@ from victor.agent.streaming.streaming_coordinator import (
 from victor.agent.streaming.continuation import (
     ContinuationHandler,
     ContinuationResult,
+    ContinuationSignals,
+    ProgressMetrics,
+    TokenBudget,
     create_continuation_handler,
 )
 from victor.agent.streaming.tool_execution import (
@@ -66,6 +69,9 @@ __all__ = [
     "CoordinatorConfig",
     "ContinuationHandler",
     "ContinuationResult",
+    "ContinuationSignals",
+    "ProgressMetrics",
+    "TokenBudget",
     "ToolExecutionHandler",
     "ToolExecutionResult",
     "IntentClassificationHandler",

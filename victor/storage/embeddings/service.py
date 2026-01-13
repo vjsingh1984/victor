@@ -246,6 +246,8 @@ class EmbeddingService:
         Uses LRU eviction - removes entries from the front of OrderedDict
         until enough memory is freed.
 
+        NOTE: This method should only be called while holding _model_lock.
+
         Args:
             needed_bytes: Bytes needed for new entry
 
@@ -279,16 +281,17 @@ class EmbeddingService:
         Returns:
             Embedding vector as numpy array (float32)
         """
-        # Check cache first
+        # Check cache first (with lock for thread safety)
         if use_cache:
             cache_key = self._get_cache_key(text)
-            if cache_key in self._embedding_cache:
-                self._cache_hits += 1
-                # Move to end for LRU ordering (most recently used)
-                self._embedding_cache.move_to_end(cache_key)
-                logger.log(TRACE, f"[EmbeddingService] cache hit: chars={len(text)}")
-                return self._embedding_cache[cache_key]
-            self._cache_misses += 1
+            with self._model_lock:  # Reuse model_lock for cache protection
+                if cache_key in self._embedding_cache:
+                    self._cache_hits += 1
+                    # Move to end for LRU ordering (most recently used)
+                    self._embedding_cache.move_to_end(cache_key)
+                    logger.log(TRACE, f"[EmbeddingService] cache hit: chars={len(text)}")
+                    return self._embedding_cache[cache_key]
+                self._cache_misses += 1
 
         self._ensure_model_loaded()
 
@@ -313,17 +316,18 @@ class EmbeddingService:
 
             result = np.asarray(embedding, dtype=np.float32)
 
-            # Cache the result with memory-based eviction
+            # Cache the result with memory-based eviction (with lock)
             if use_cache:
                 entry_bytes = self._estimate_embedding_memory(result)
 
-                # Check if we need to evict entries to make room
-                if self._current_cache_memory_bytes + entry_bytes > self._max_cache_memory_bytes:
-                    self._evict_cache_for_memory(entry_bytes)
+                with self._model_lock:  # Protect cache operations
+                    # Check if we need to evict entries to make room
+                    if self._current_cache_memory_bytes + entry_bytes > self._max_cache_memory_bytes:
+                        self._evict_cache_for_memory(entry_bytes)
 
-                # Add to cache and update memory tracking
-                self._embedding_cache[cache_key] = result
-                self._current_cache_memory_bytes += entry_bytes
+                    # Add to cache and update memory tracking
+                    self._embedding_cache[cache_key] = result
+                    self._current_cache_memory_bytes += entry_bytes
 
             return result
         except Exception as e:
@@ -422,32 +426,34 @@ class EmbeddingService:
         Returns:
             Dictionary with cache stats including memory usage
         """
-        total = self._cache_hits + self._cache_misses
-        hit_rate = self._cache_hits / total if total > 0 else 0.0
-        memory_mb = self._current_cache_memory_bytes / (1024 * 1024)
-        max_memory_mb = self._max_cache_memory_bytes / (1024 * 1024)
-        memory_utilization = (
-            self._current_cache_memory_bytes / self._max_cache_memory_bytes
-            if self._max_cache_memory_bytes > 0
-            else 0.0
-        )
-        return {
-            "hits": self._cache_hits,
-            "misses": self._cache_misses,
-            "size": len(self._embedding_cache),
-            "hit_rate": f"{hit_rate:.1%}",
-            "memory_used_mb": f"{memory_mb:.2f}",
-            "max_memory_mb": f"{max_memory_mb:.2f}",
-            "memory_utilization": f"{memory_utilization:.1%}",
-        }
+        with self._model_lock:
+            total = self._cache_hits + self._cache_misses
+            hit_rate = self._cache_hits / total if total > 0 else 0.0
+            memory_mb = self._current_cache_memory_bytes / (1024 * 1024)
+            max_memory_mb = self._max_cache_memory_bytes / (1024 * 1024)
+            memory_utilization = (
+                self._current_cache_memory_bytes / self._max_cache_memory_bytes
+                if self._max_cache_memory_bytes > 0
+                else 0.0
+            )
+            return {
+                "hits": self._cache_hits,
+                "misses": self._cache_misses,
+                "size": len(self._embedding_cache),
+                "hit_rate": f"{hit_rate:.1%}",
+                "memory_used_mb": f"{memory_mb:.2f}",
+                "max_memory_mb": f"{max_memory_mb:.2f}",
+                "memory_utilization": f"{memory_utilization:.1%}",
+            }
 
     def clear_cache(self) -> None:
         """Clear the embedding cache."""
-        self._embedding_cache.clear()
-        self._current_cache_memory_bytes = 0
-        self._cache_hits = 0
-        self._cache_misses = 0
-        logger.debug("[EmbeddingService] Cache cleared")
+        with self._model_lock:
+            self._embedding_cache.clear()
+            self._current_cache_memory_bytes = 0
+            self._cache_hits = 0
+            self._cache_misses = 0
+            logger.debug("[EmbeddingService] Cache cleared")
 
     async def embed_text(self, text: str, use_cache: bool = True) -> np.ndarray:
         """Generate embedding for a single text (async version).

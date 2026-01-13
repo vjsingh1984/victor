@@ -196,16 +196,29 @@ class SqliteGraphStore(GraphStoreProtocol):
             conn.commit()
 
     async def upsert_edges(self, edges: Iterable[GraphEdge]) -> None:
-        rows = [
-            (
-                e.src,
-                e.dst,
-                e.type,
-                e.weight,
-                json.dumps(e.metadata),
+        # Prepare rows with type-safe weight conversion
+        rows = []
+        for e in edges:
+            # Ensure weight is None or float (SQLite may accept strings but we enforce type safety)
+            weight = e.weight
+            if weight is not None:
+                try:
+                    weight = float(weight)
+                except (ValueError, TypeError):
+                    # If weight cannot be converted to float, use None
+                    # This shouldn't happen with properly constructed GraphEdge objects
+                    weight = None
+
+            rows.append(
+                (
+                    e.src,
+                    e.dst,
+                    e.type,
+                    weight,
+                    json.dumps(e.metadata),
+                )
             )
-            for e in edges
-        ]
+
         if not rows:
             return
         async with self._lock:
@@ -237,16 +250,25 @@ class SqliteGraphStore(GraphStoreProtocol):
         async with self._lock:
             conn = self._connect()
             cur = conn.execute(query, params)
-            return [
-                GraphEdge(
-                    src=row[0],
-                    dst=row[1],
-                    type=row[2],
-                    weight=row[3],
-                    metadata=json.loads(row[4]) if row[4] else {},
+            edges = []
+            for row in cur.fetchall():
+                # Ensure weight is float or None (SQLite may return strings for REAL columns)
+                weight = row[3]
+                if weight is not None:
+                    try:
+                        weight = float(weight)
+                    except (ValueError, TypeError):
+                        weight = 1.0  # Default weight if conversion fails
+                edges.append(
+                    GraphEdge(
+                        src=row[0],
+                        dst=row[1],
+                        type=row[2],
+                        weight=weight,
+                        metadata=json.loads(row[4]) if row[4] else {},
+                    )
                 )
-                for row in cur.fetchall()
-            ]
+            return edges
 
     def _row_to_node(self, row: tuple) -> GraphNode:
         """Convert a database row to a GraphNode."""
@@ -438,13 +460,22 @@ class SqliteGraphStore(GraphStoreProtocol):
         async with self._lock:
             conn = self._connect()
             cur = conn.execute(f"SELECT src, dst, type, weight, metadata FROM {_EDGE_TABLE}")
-            return [
-                GraphEdge(
-                    src=row[0],
-                    dst=row[1],
-                    type=row[2],
-                    weight=row[3],
-                    metadata=json.loads(row[4]) if row[4] else {},
+            edges = []
+            for row in cur.fetchall():
+                # Ensure weight is float or None (SQLite may return strings for REAL columns)
+                weight = row[3]
+                if weight is not None:
+                    try:
+                        weight = float(weight)
+                    except (ValueError, TypeError):
+                        weight = 1.0  # Default weight if conversion fails
+                edges.append(
+                    GraphEdge(
+                        src=row[0],
+                        dst=row[1],
+                        type=row[2],
+                        weight=weight,
+                        metadata=json.loads(row[4]) if row[4] else {},
+                    )
                 )
-                for row in cur.fetchall()
-            ]
+            return edges

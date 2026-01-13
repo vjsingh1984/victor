@@ -100,7 +100,15 @@ class GraphAnalyzer:
         self.nodes[node.node_id] = node
 
     def add_edge(self, edge: GraphEdge) -> None:
-        weight = edge.weight or 1.0
+        # Ensure weight is always a float (defensive type checking)
+        weight = edge.weight
+        if weight is None:
+            weight = 1.0
+        else:
+            try:
+                weight = float(weight)
+            except (ValueError, TypeError):
+                weight = 1.0  # Default weight if conversion fails
         self.outgoing[edge.src].append((edge.dst, edge.type, weight))
         self.incoming[edge.dst].append((edge.src, edge.type, weight))
 

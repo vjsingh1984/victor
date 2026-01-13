@@ -124,6 +124,7 @@ class ToolSelectionContext:
         enabled_tools: Set of explicitly enabled tool names (None = all enabled)
         disabled_tools: Set of explicitly disabled tool names
         cost_budget: Optional cost budget constraint
+        metadata: Optional dictionary for additional context (e.g., tools registry)
     """
 
     task_description: str
@@ -136,6 +137,7 @@ class ToolSelectionContext:
     enabled_tools: Optional[Set[str]] = None
     disabled_tools: Set[str] = field(default_factory=set)
     cost_budget: Optional[float] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 
 @runtime_checkable

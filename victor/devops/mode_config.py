@@ -14,9 +14,12 @@
 
 """DevOps mode configurations using central registry.
 
-This module registers DevOps-specific operational modes with the central
-ModeConfigRegistry and exports a registry-based provider for protocol
-compatibility.
+This module now uses the consolidated framework defaults from
+VerticalModeDefaults for complexity-to-mode mapping, eliminating
+duplicate code while preserving DevOps-specific mode configurations.
+
+SOLID Refactoring: ComplexityMapper from framework handles complexity
+mapping, eliminating ~15 LOC of duplicate logic.
 """
 
 from __future__ import annotations
@@ -102,8 +105,12 @@ def _register_devops_modes() -> None:
 class DevOpsModeConfigProvider(RegistryBasedModeConfigProvider):
     """Mode configuration provider for DevOps vertical.
 
-    Uses the central ModeConfigRegistry but provides DevOps-specific
-    complexity mapping.
+    Uses the central ModeConfigRegistry with framework defaults for
+    complexity mapping. ComplexityMapper from framework provides
+    vertical-aware complexity-to-mode mapping (complex→comprehensive, highly_complex→migration).
+
+    SOLID Refactoring: No override needed for get_mode_for_complexity() -
+    framework's ComplexityMapper provides identical mapping.
     """
 
     def __init__(self) -> None:
@@ -116,23 +123,11 @@ class DevOpsModeConfigProvider(RegistryBasedModeConfigProvider):
             default_budget=20,
         )
 
-    def get_mode_for_complexity(self, complexity: str) -> str:
-        """Map complexity level to DevOps mode.
-
-        Args:
-            complexity: Complexity level
-
-        Returns:
-            Recommended mode name
-        """
-        mapping = {
-            "trivial": "quick",
-            "simple": "quick",
-            "moderate": "standard",
-            "complex": "comprehensive",
-            "highly_complex": "migration",
-        }
-        return mapping.get(complexity, "standard")
+    # NOTE: get_mode_for_complexity() now uses ComplexityMapper from framework
+    # The framework provides identical mapping:
+    #   trivial → quick, simple → quick, moderate → standard
+    #   complex → comprehensive, highly_complex → migration
+    # No override needed - eliminated ~15 lines of duplicate code
 
 
 __all__ = [

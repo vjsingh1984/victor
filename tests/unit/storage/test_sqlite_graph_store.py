@@ -49,3 +49,55 @@ async def test_sqlite_graph_store_upsert_and_query(tmp_path):
     neighbors = await store.get_neighbors("file:main.py")
     assert len(neighbors) == 1
     assert neighbors[0].dst == "symbol:main.py:foo"
+
+
+@pytest.mark.asyncio
+async def test_sqlite_graph_store_weight_type_conversion(tmp_path):
+    """Test that weights stored as strings are properly converted to floats.
+
+    This test defends against the type comparison error: "'<' not supported between
+    instances of 'int' and 'str'" that can occur when SQLite returns weights as
+    strings due to flexible typing.
+
+    See: https://github.com/anthropics/victor/issues/XXX
+    """
+    import sqlite3
+
+    db_path = tmp_path / "graph.db"
+    store = SqliteGraphStore(db_path)
+
+    # Add some nodes
+    nodes = [
+        GraphNode(node_id="node_a", type="function", name="a", file="a.py"),
+        GraphNode(node_id="node_b", type="function", name="b", file="b.py"),
+    ]
+    await store.upsert_nodes(nodes)
+
+    # Manually insert an edge with a string weight (simulating old/corrupted data)
+    # SQLite allows this due to flexible typing
+    async with store._lock:
+        conn = store._connect()
+        # Insert weight as a string to simulate data corruption or legacy data
+        conn.execute(
+            "INSERT INTO graph_edge (src, dst, type, weight, metadata) VALUES (?, ?, ?, ?, ?)",
+            ("node_a", "node_b", "CALLS", "2.5", "{}"),  # Weight as string
+        )
+        conn.commit()
+
+    # Verify that get_all_edges properly converts weight to float
+    edges = await store.get_all_edges()
+    assert len(edges) == 1
+    assert edges[0].weight == 2.5
+    assert isinstance(edges[0].weight, float)
+    assert not isinstance(edges[0].weight, str)
+
+    # Verify that get_neighbors also converts weight properly
+    neighbors = await store.get_neighbors("node_a")
+    assert len(neighbors) == 1
+    assert neighbors[0].weight == 2.5
+    assert isinstance(neighbors[0].weight, float)
+
+    # Verify that the weight can be used in numeric operations without error
+    # This would fail with the original bug if weight was a string
+    result = neighbors[0].weight * 2
+    assert result == 5.0

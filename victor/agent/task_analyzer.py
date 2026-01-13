@@ -124,6 +124,7 @@ class TaskAnalyzer:
         self._task_classifier = None
         self._intent_classifier = None
         self._coordinator = coordinator
+        self._last_complexity = None  # Track last analyzed complexity for continuation strategy
 
     def set_coordinator(self, coordinator: "ModeWorkflowTeamCoordinator") -> None:
         """Set the coordinator for team/workflow suggestions.
@@ -192,6 +193,10 @@ class TaskAnalyzer:
         history = context.get("history", [])
 
         complexity_result = self.complexity_classifier.classify(message)
+
+        # Store last complexity for continuation strategy
+        self._last_complexity = complexity_result.complexity
+
         action_result = self.action_authorizer.detect(message)
         unified_result = (
             self.unified_classifier.classify_with_context(message, history)

@@ -116,6 +116,14 @@ from victor.core.verticals.protocols.capability_provider import (
     VerticalPersonaProviderProtocol,
 )
 
+# Dynamic Extensions (OCP-Compliant)
+from victor.core.verticals.protocols.extension import (
+    StandardExtensionTypes,
+    IExtension,
+    IExtensionRegistry,
+    ExtensionMetadata,
+)
+
 # ISP-Compliant Vertical Providers
 from victor.core.verticals.protocols.providers import (
     MiddlewareProvider,
@@ -164,6 +172,7 @@ class VerticalExtensions:
         enrichment_strategy: Prompt enrichment strategy for DSPy-like optimization
         tool_selection_strategy: Strategy for vertical-specific tool selection
         tiered_tool_config: Tiered tool configuration for context-efficient selection
+        _dynamic_extensions: Dynamic extensions from registry (OCP-compliant)
     """
 
     middleware: List[MiddlewareProtocol] = field(default_factory=list)
@@ -178,6 +187,9 @@ class VerticalExtensions:
     enrichment_strategy: Optional[EnrichmentStrategyProtocol] = None
     tool_selection_strategy: Optional[ToolSelectionStrategyProtocol] = None
     tiered_tool_config: Optional[Any] = None  # TieredToolConfig
+    _dynamic_extensions: Dict[str, List["IExtension"]] = field(
+        default_factory=dict, repr=False, compare=False
+    )
 
     def get_all_task_hints(self) -> Dict[str, TaskTypeHint]:
         """Merge task hints from all contributors.
@@ -213,6 +225,21 @@ class VerticalExtensions:
         if self.mode_config_provider:
             return self.mode_config_provider.get_mode_configs()
         return {}
+
+    def get_extension(self, extension_type: str) -> List["IExtension"]:
+        """Get dynamic extensions by type.
+
+        Retrieves extensions from the dynamic extension registry,
+        enabling OCP compliance by supporting unlimited extension types.
+
+        Args:
+            extension_type: Type of extension to retrieve (e.g., "analytics",
+                          "tools", "middleware")
+
+        Returns:
+            List of extensions of the specified type (empty list if none)
+        """
+        return self._dynamic_extensions.get(extension_type, [])
 
 
 __all__ = [
@@ -255,6 +282,11 @@ __all__ = [
     "ChainProviderProtocol",
     "PersonaProviderProtocol",
     "VerticalPersonaProviderProtocol",
+    # Dynamic Extensions (OCP-Compliant)
+    "StandardExtensionTypes",
+    "IExtension",
+    "IExtensionRegistry",
+    "ExtensionMetadata",
     # Re-exports from core
     "ToolDependency",
     "ToolDependencyProviderProtocol",

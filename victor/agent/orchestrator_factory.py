@@ -348,6 +348,82 @@ class OrchestratorFactory(ModeAwareMixin):
 
         return self.container.get(PresentationProtocol)
 
+    # ==========================================================================
+    # Coordinator Creation Methods (Phase 1.4)
+    # ==========================================================================
+
+    def create_config_coordinator(
+        self, config_providers: Optional[List[Any]] = None
+    ) -> Any:
+        """Create configuration coordinator.
+
+        Args:
+            config_providers: Optional list of config providers (IConfigProvider)
+
+        Returns:
+            ConfigCoordinator instance
+        """
+        from victor.agent.coordinators.config_coordinator import ConfigCoordinator
+
+        return ConfigCoordinator(providers=config_providers or [])
+
+    def create_prompt_coordinator(
+        self, prompt_contributors: Optional[List[Any]] = None
+    ) -> Any:
+        """Create prompt coordinator.
+
+        Args:
+            prompt_contributors: Optional list of prompt contributors (IPromptContributor)
+
+        Returns:
+            PromptCoordinator instance
+        """
+        from victor.agent.coordinators.prompt_coordinator import PromptCoordinator
+
+        return PromptCoordinator(contributors=prompt_contributors or [])
+
+    def create_context_coordinator(
+        self, compaction_strategies: Optional[List[Any]] = None
+    ) -> Any:
+        """Create context coordinator.
+
+        Args:
+            compaction_strategies: Optional list of compaction strategies (ICompactionStrategy)
+
+        Returns:
+            ContextCoordinator instance
+        """
+        from victor.agent.coordinators.context_coordinator import ContextCoordinator
+
+        return ContextCoordinator(strategies=compaction_strategies or [])
+
+    def create_analytics_coordinator(
+        self,
+        analytics_exporters: Optional[List[Any]] = None,
+        enable_console_exporter: bool = False,
+    ) -> Any:
+        """Create analytics coordinator.
+
+        Args:
+            analytics_exporters: Optional list of analytics exporters (IAnalyticsExporter)
+            enable_console_exporter: If True, adds ConsoleAnalyticsExporter
+
+        Returns:
+            AnalyticsCoordinator instance
+        """
+        from victor.agent.coordinators.analytics_coordinator import (
+            AnalyticsCoordinator,
+            ConsoleAnalyticsExporter,
+        )
+
+        exporters = analytics_exporters or []
+
+        # Add console exporter if enabled
+        if enable_console_exporter:
+            exporters.append(ConsoleAnalyticsExporter())
+
+        return AnalyticsCoordinator(exporters=exporters)
+
     def create_core_services(
         self,
         tool_adapter: "BaseToolCallingAdapter",
@@ -2034,6 +2110,7 @@ class OrchestratorFactory(ModeAwareMixin):
         """
         import logging
         from victor.agent.protocols import DebugLoggerProtocol
+        from victor.config.config_loaders import get_provider_limits
 
         # Resolve from DI container
         debug_logger = self.container.get(DebugLoggerProtocol)
@@ -2044,7 +2121,21 @@ class OrchestratorFactory(ModeAwareMixin):
             or logging.getLogger("victor").level <= logging.DEBUG
         )
 
-        logger.debug(f"Debug logger initialized: enabled={debug_logger.enabled}")
+        # Set context window from provider/model configuration
+        try:
+            provider = getattr(self, "provider_name", "")
+            model = getattr(self, "model", "")
+            limits = get_provider_limits(provider, model)
+            debug_logger.context_window = limits.context_window
+            logger.debug(
+                f"Debug logger configured with context_window={debug_logger.context_window:,} "
+                f"(provider={provider}, model={model})"
+            )
+        except Exception as e:
+            # Fall back to default context_window if unable to get provider limits
+            logger.debug(f"Unable to set context_window from provider limits: {e}")
+
+        logger.debug(f"Debug logger initialized: enabled={debug_logger.enabled}, context_window={debug_logger.context_window:,}")
         return debug_logger
 
     def create_tool_access_controller(self, registry: Any = None) -> Any:

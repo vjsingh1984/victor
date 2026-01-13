@@ -36,7 +36,26 @@ from typing import Any, Dict, Optional
 class TestTaskCompletionDetection:
     """Tests for hard exit condition when task is complete."""
 
-    def test_finish_when_all_files_read(self):
+    @pytest.fixture
+    def mock_settings(self):
+        """Create mock settings with all required attributes."""
+        settings = MagicMock()
+        settings.max_continuation_prompts_analysis = 6
+        settings.max_continuation_prompts_action = 5
+        settings.max_continuation_prompts_default = 3
+        settings.continuation_prompt_overrides = {}
+        # Complexity-based continuation thresholds
+        settings.continuation_simple_max_interventions = 5
+        settings.continuation_simple_max_iterations = 10
+        settings.continuation_medium_max_interventions = 10
+        settings.continuation_medium_max_iterations = 25
+        settings.continuation_complex_max_interventions = 20
+        settings.continuation_complex_max_iterations = 50
+        settings.continuation_generation_max_interventions = 15
+        settings.continuation_generation_max_iterations = 35
+        return settings
+
+    def test_finish_when_all_files_read(self, mock_settings):
         """Should return 'finish' action when all required files are read."""
         from victor.agent.continuation_strategy import ContinuationStrategy
 
@@ -80,12 +99,7 @@ class TestTaskCompletionDetection:
             one_shot_mode=False,
             mentioned_tools=None,
             max_prompts_summary_requested=False,
-            settings=MagicMock(
-                max_continuation_prompts_analysis=6,
-                max_continuation_prompts_action=5,
-                max_continuation_prompts_default=3,
-                continuation_prompt_overrides={},
-            ),
+            settings=mock_settings,
             rl_coordinator=None,
             provider_name="anthropic",
             model="claude-3-5-sonnet",
@@ -97,7 +111,7 @@ class TestTaskCompletionDetection:
         assert result["action"] == "finish"
         assert "task completion" in result["reason"].lower()
 
-    def test_continue_when_files_missing(self):
+    def test_continue_when_files_missing(self, mock_settings):
         """Should continue prompting when required files are not yet read."""
         from victor.agent.continuation_strategy import ContinuationStrategy
 
@@ -128,12 +142,7 @@ class TestTaskCompletionDetection:
             one_shot_mode=False,
             mentioned_tools=None,
             max_prompts_summary_requested=False,
-            settings=MagicMock(
-                max_continuation_prompts_analysis=6,
-                max_continuation_prompts_action=5,
-                max_continuation_prompts_default=3,
-                continuation_prompt_overrides={},
-            ),
+            settings=mock_settings,
             rl_coordinator=None,
             provider_name="anthropic",
             model="claude-3-5-sonnet",
@@ -178,7 +187,26 @@ class TestCumulativeInterventionTracking:
     to detect excessive prompting across the entire session.
     """
 
-    def test_synthesis_nudge_on_cumulative_threshold(self):
+    @pytest.fixture
+    def mock_settings(self):
+        """Create mock settings with all required attributes."""
+        settings = MagicMock()
+        settings.max_continuation_prompts_analysis = 6
+        settings.max_continuation_prompts_action = 5
+        settings.max_continuation_prompts_default = 3
+        settings.continuation_prompt_overrides = {}
+        # Complexity-based continuation thresholds
+        settings.continuation_simple_max_interventions = 5
+        settings.continuation_simple_max_iterations = 10
+        settings.continuation_medium_max_interventions = 10
+        settings.continuation_medium_max_iterations = 25
+        settings.continuation_complex_max_interventions = 20
+        settings.continuation_complex_max_iterations = 50
+        settings.continuation_generation_max_interventions = 15
+        settings.continuation_generation_max_iterations = 35
+        return settings
+
+    def test_synthesis_nudge_on_cumulative_threshold(self, mock_settings):
         """Should nudge synthesis when cumulative interventions reach threshold."""
         from victor.agent.continuation_strategy import ContinuationStrategy
 
@@ -216,6 +244,9 @@ class TestCumulativeInterventionTracking:
                 max_continuation_prompts_action=5,
                 max_continuation_prompts_default=3,
                 continuation_prompt_overrides={},
+                # Add complexity-based thresholds
+                continuation_medium_max_interventions=10,  # Medium complexity threshold
+                continuation_medium_max_iterations=25,
             ),
             rl_coordinator=None,
             provider_name="anthropic",
@@ -223,6 +254,7 @@ class TestCumulativeInterventionTracking:
             tool_budget=25,
             unified_tracker_config={"max_total_iterations": 50},
             task_completion_signals=task_completion_signals,
+            task_complexity="medium",  # Pass task complexity
         )
 
         # Should trigger synthesis nudge, not just prompt_tool_call
@@ -240,14 +272,14 @@ class TestCumulativeInterventionTracking:
         intent_result.intent.name = "CONTINUATION"
         intent_result.confidence = 0.8
 
-        # Task completion signals with very high cumulative interventions (>= 8)
+        # Task completion signals with very high cumulative interventions (>= 10 for medium)
         # and all synthesis nudges exhausted (synthesis_nudge_count >= 3)
         task_completion_signals = {
             "required_files": ["file1.py"],
             "read_files": {"file1.py", "file2.py", "file3.py"},
             "required_outputs": ["findings table"],
             "all_files_read": False,  # Even if not all required read
-            "cumulative_prompt_interventions": 8,  # Excessive
+            "cumulative_prompt_interventions": 10,  # Excessive (>= medium threshold)
             "synthesis_nudge_count": 3,  # All nudges exhausted
         }
 
@@ -267,6 +299,9 @@ class TestCumulativeInterventionTracking:
                 max_continuation_prompts_action=5,
                 max_continuation_prompts_default=3,
                 continuation_prompt_overrides={},
+                # Add complexity-based thresholds
+                continuation_medium_max_interventions=10,  # Medium complexity threshold
+                continuation_medium_max_iterations=25,
             ),
             rl_coordinator=None,
             provider_name="anthropic",
@@ -274,13 +309,14 @@ class TestCumulativeInterventionTracking:
             tool_budget=25,
             unified_tracker_config={"max_total_iterations": 50},
             task_completion_signals=task_completion_signals,
+            task_complexity="medium",  # Pass task complexity
         )
 
         # Should force synthesis with request_summary
         assert result["action"] == "request_summary"
         assert "Excessive" in result["reason"] or "prompt interventions" in result["reason"]
 
-    def test_no_intervention_on_low_count(self):
+    def test_no_intervention_on_low_count(self, mock_settings):
         """Should not trigger intervention nudge when cumulative count is low."""
         from victor.agent.continuation_strategy import ContinuationStrategy
         from victor.storage.embeddings.intent_classifier import IntentType
@@ -312,12 +348,7 @@ class TestCumulativeInterventionTracking:
             one_shot_mode=False,
             mentioned_tools=None,
             max_prompts_summary_requested=False,
-            settings=MagicMock(
-                max_continuation_prompts_analysis=6,
-                max_continuation_prompts_action=5,
-                max_continuation_prompts_default=3,
-                continuation_prompt_overrides={},
-            ),
+            settings=mock_settings,
             rl_coordinator=None,
             provider_name="anthropic",
             model="claude-3-5-sonnet",

@@ -17,11 +17,12 @@
 This module contains framework-level capability providers that can be reused
 across all verticals to promote code reuse and maintain SOLID principles.
 
-Phase 3: Generic Capabilities - Framework Layer
+Phase 2: Generic Capabilities - Framework Layer (SOLID Refactoring)
 
 Capabilities:
 - BaseCapabilityProvider: Abstract base for vertical capability providers
 - CapabilityMetadata: Metadata for capability registration
+- ConfigurationCapabilityProvider: Generic configuration management (configure_X + get_X pattern)
 - FileOperationsCapability: Common file operation tools (read, write, edit, grep)
 - PromptContributionCapability: Common prompt hints for task types
 - PrivacyCapabilityProvider: Framework-level privacy and PII management (cross-vertical)
@@ -31,6 +32,7 @@ Capabilities:
 from .base import BaseCapabilityProvider, CapabilityMetadata
 
 # Concrete capability implementations
+from .configuration import ConfigurationCapabilityProvider, configure_capability, get_capability
 from .file_operations import FileOperationsCapability
 from .prompt_contributions import PromptContributionCapability
 from .privacy import PrivacyCapabilityProvider
@@ -40,6 +42,9 @@ __all__ = [
     "BaseCapabilityProvider",
     "CapabilityMetadata",
     # Concrete implementations
+    "ConfigurationCapabilityProvider",
+    "configure_capability",
+    "get_capability",
     "FileOperationsCapability",
     "PromptContributionCapability",
     "PrivacyCapabilityProvider",

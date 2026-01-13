@@ -264,19 +264,25 @@ All 7 phases of the SOLID migration plan are complete:
 
 ### Optional Future Enhancements
 
-1. **Universal Registry System** (from original plan)
-   - Replace BaseRegistry with UniversalRegistry
-   - Add to DI container
-   - Migrate existing usages
+1. **Universal Registry System** ✓ IMPLEMENTED
+   - ✓ UniversalRegistry implemented in `victor/core/registries/universal_registry.py`
+   - ✓ Features: Thread-safe, cache strategies (TTL, LRU, MANUAL, NONE), namespace isolation
+   - ✓ Singleton pattern via `get_registry()` - no DI container needed
+   - Optional: Migrate BaseRegistry usages (52 occurrences across 10 files)
 
-2. **Additional Performance Optimizations**
-   - Cache invalidation for ExtensionLoader
-   - Execution metrics for ToolPipeline
+2. **Performance Optimizations** ✓ COMPLETE
+   - ✓ Cache invalidation for ExtensionLoader (enhanced stats, global stats)
+   - ✓ Execution metrics for ToolPipeline (now properly records executions)
 
 3. **Advanced Features**
    - Hot-reload for configurations
    - Version tracking for configs
    - A/B testing for mode configs
+
+4. **Provider-Specific Timeouts** ✓ COMPLETE
+   - ✓ Provider-specific session_idle_timeout (600s for Ollama, 180s for cloud)
+   - ✓ Integrated with get_provider_limits() in config_loaders.py
+   - ✓ Orchestrator uses provider-specific timeout from provider_context_limits.yaml
 
 ---
 

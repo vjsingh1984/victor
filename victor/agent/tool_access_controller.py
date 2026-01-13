@@ -37,6 +37,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
@@ -47,6 +48,7 @@ from victor.agent.protocols import (
     ToolAccessContext,
     ToolAccessDecision,
 )
+from victor.core.vertical_types import TieredToolConfigProtocol
 from victor.protocols.mode_aware import ModeAwareMixin
 
 if TYPE_CHECKING:
@@ -268,13 +270,16 @@ class VerticalLayer(AccessLayer):
     PRECEDENCE = AccessPrecedence.VERTICAL.value
     NAME = "vertical"
 
-    def __init__(self, tiered_config: Optional[Any] = None):
+    def __init__(self, tiered_config: Optional[Any] = None, strict_mode: bool = False):
         """Initialize with vertical's tiered config.
 
         Args:
             tiered_config: TieredToolConfig from active vertical
+            strict_mode: If True, raise TypeError when config doesn't implement
+                        TieredToolConfigProtocol. If False, use fallback with warning.
         """
         self._tiered_config = tiered_config
+        self._strict_mode = strict_mode
 
     def set_tiered_config(self, config: Any) -> None:
         """Update the tiered config (e.g., when vertical changes)."""
@@ -285,7 +290,7 @@ class VerticalLayer(AccessLayer):
         if self._tiered_config is None:
             return True, "No vertical restrictions"
 
-        # Get all allowed tools from tiered config (ISP fix: support both interfaces)
+        # Get all allowed tools from tiered config (ISP-compliant)
         allowed = self._get_allowed_from_config()
 
         if not allowed:
@@ -300,27 +305,60 @@ class VerticalLayer(AccessLayer):
     def _get_allowed_from_config(self) -> Set[str]:
         """Extract allowed tools from tiered config (ISP-compliant).
 
-        Supports both legacy interface (core_tools/extension_tools/optional_tools)
-        and TieredToolConfig interface (mandatory/vertical_core/semantic_pool).
+        Uses isinstance() checks with TieredToolConfigProtocol.
+        Falls back to hasattr() for legacy configs with deprecation warning.
+        In strict mode, raises TypeError for non-protocol configs.
+
+        Returns:
+            Set of allowed tool names
         """
         if self._tiered_config is None:
             return set()
 
         allowed: Set[str] = set()
 
-        # TieredToolConfig interface (preferred)
+        # Protocol-based check (ISP-compliant)
+        if isinstance(self._tiered_config, TieredToolConfigProtocol):
+            # Use protocol methods directly (type-safe)
+            allowed.update(self._tiered_config.mandatory or set())
+            allowed.update(self._tiered_config.vertical_core or set())
+            allowed.update(self._tiered_config.semantic_pool or set())
+
+            # Use get_all_tools() if available
+            if hasattr(self._tiered_config, "get_all_tools"):
+                allowed.update(self._tiered_config.get_all_tools() or set())
+
+            return allowed
+
+        # Strict mode: raise TypeError for non-protocol configs
+        if self._strict_mode:
+            raise TypeError(
+                f"Tiered config must implement TieredToolConfigProtocol. "
+                f"Got {type(self._tiered_config).__name__} instead. "
+                f"Ensure your vertical's TieredToolConfig is properly configured."
+            )
+
+        # Legacy fallback with deprecation warning
+        warnings.warn(
+            f"Tiered config does not implement TieredToolConfigProtocol. "
+            f"Falling back to hasattr() checks for {type(self._tiered_config).__name__}. "
+            f"This is deprecated and will be removed in a future version. "
+            f"Please update your vertical's TieredToolConfig to match the protocol.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+        # Legacy interface fallback (deprecated)
         if hasattr(self._tiered_config, "mandatory"):
             allowed.update(self._tiered_config.mandatory or set())
         if hasattr(self._tiered_config, "vertical_core"):
             allowed.update(self._tiered_config.vertical_core or set())
         if hasattr(self._tiered_config, "semantic_pool"):
             allowed.update(self._tiered_config.semantic_pool or set())
-
-        # Use helper method if available (TieredToolConfig.get_all_tools())
         if hasattr(self._tiered_config, "get_all_tools"):
             allowed.update(self._tiered_config.get_all_tools() or set())
 
-        # Legacy interface fallback (deprecated)
+        # Very old legacy interface (core_tools/extension_tools/optional_tools)
         if hasattr(self._tiered_config, "core_tools"):
             allowed.update(self._tiered_config.core_tools or [])
         if hasattr(self._tiered_config, "extension_tools"):
@@ -731,6 +769,7 @@ def create_tool_access_controller(
     sandbox_mode: bool = False,
     tiered_config: Optional[Any] = None,
     preserved_tools: Optional[Set[str]] = None,
+    strict_mode: bool = False,
 ) -> ToolAccessController:
     """Create a configured ToolAccessController instance.
 
@@ -741,6 +780,7 @@ def create_tool_access_controller(
         sandbox_mode: If True, enable sandbox safety restrictions
         tiered_config: TieredToolConfig from active vertical
         preserved_tools: Tools to never filter during exploration
+        strict_mode: If True, raise TypeError when configs don't implement protocols
 
     Returns:
         Configured ToolAccessController instance
@@ -749,7 +789,7 @@ def create_tool_access_controller(
         SafetyLayer(sandbox_mode=sandbox_mode),
         ModeLayer(),
         SessionLayer(),
-        VerticalLayer(tiered_config=tiered_config),
+        VerticalLayer(tiered_config=tiered_config, strict_mode=strict_mode),
         StageLayer(preserved_tools=preserved_tools),
         IntentLayer(),
     ]

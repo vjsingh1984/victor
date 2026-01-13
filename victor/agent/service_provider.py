@@ -26,6 +26,26 @@ Design Pattern: Service Provider
 - Separates singleton vs scoped lifetimes
 - Provides factory functions for complex service creation
 
+Architecture Note (Phase 3 DI Migration):
+- 98 protocols defined across victor/agent/protocols.py and victor/protocols/
+- 55 protocols registered here (56.1% coverage of all protocols)
+- 43 protocols intentionally NOT registered - categorized as:
+  1. Orchestrator-specific components (StreamingController, ToolPipeline, ConversationController)
+     - These have orchestrator-specific dependencies (callbacks, state, budget)
+     - Created in OrchestratorFactory with those specific dependencies
+     - Resolved via get_optional() to allow factory flexibility
+  2. Framework-level protocols (team coordination, multi-agent, search, etc.)
+     - Used by verticals or other systems, not core orchestrator
+     - Registered elsewhere or intentionally not registered
+  3. Orchestrator-implemented protocols (VerticalStorageProtocol)
+     - The orchestrator itself implements these
+     - Not separate services to register
+
+The current architecture prioritizes flexibility over pure DI. Components with
+orchestrator-specific dependencies are created in OrchestratorFactory rather than
+registered in the container, enabling clean dependency injection without forcing
+complex registration logic.
+
 Usage:
     from victor.core.container import ServiceContainer
     from victor.agent.service_provider import (
@@ -48,6 +68,9 @@ import logging
 from typing import TYPE_CHECKING, Any, Optional
 
 from victor.core.container import ServiceContainer, ServiceLifetime
+
+# Import IToolSelector for DI container registration (Phase 9 migration)
+from victor.protocols.tool_selector import IToolSelector
 
 if TYPE_CHECKING:
     from victor.config.settings import Settings
@@ -156,7 +179,6 @@ class OrchestratorServiceProvider:
             # Infrastructure service protocols
             ToolDependencyGraphProtocol,
             ToolPluginRegistryProtocol,
-            SemanticToolSelectorProtocol,
             ProviderRegistryProtocol,
             # Analytics & observability protocols
             ConversationEmbeddingStoreProtocol,
@@ -167,7 +189,6 @@ class OrchestratorServiceProvider:
             IntentClassifierProtocol,
             # Helper/adapter service protocols
             SystemPromptBuilderProtocol,
-            ToolSelectorProtocol,
             ToolExecutorProtocol,
             ToolOutputFormatterProtocol,
             ParallelExecutorProtocol,
@@ -362,13 +383,6 @@ class OrchestratorServiceProvider:
             ServiceLifetime.SINGLETON,
         )
 
-        # SemanticToolSelector - singleton for semantic tool selection
-        container.register(
-            SemanticToolSelectorProtocol,
-            lambda c: self._create_semantic_tool_selector(),
-            ServiceLifetime.SINGLETON,
-        )
-
         # ProviderRegistry - singleton for provider management
         container.register(
             ProviderRegistryProtocol,
@@ -438,7 +452,7 @@ class OrchestratorServiceProvider:
 
         # ToolSelector - singleton for tool selection logic
         container.register(
-            ToolSelectorProtocol,
+            IToolSelector,
             lambda c: self._create_tool_selector(),
             ServiceLifetime.SINGLETON,
         )
@@ -1500,14 +1514,13 @@ class OrchestratorServiceProvider:
         )
         from victor.agent.protocols import (
             ToolPipelineProtocol,
-            ToolSelectorProtocol,
             IBudgetManager,
             ToolCacheProtocol,
         )
 
         # Get dependencies from DI container (optional for some)
         tool_pipeline = self.container.get_optional(ToolPipelineProtocol)
-        tool_selector = self.container.get_optional(ToolSelectorProtocol)
+        tool_selector = self.container.get_optional(IToolSelector)
         budget_manager = self.container.get_optional(IBudgetManager)
         tool_cache = self.container.get_optional(ToolCacheProtocol)
 
@@ -1630,6 +1643,72 @@ class OrchestratorServiceProvider:
             lambda c: EmojiPresentationAdapter(),
             ServiceLifetime.SINGLETON,
         )
+
+    # =========================================================================
+    # Architecture Documentation: Intentionally Unregistered Protocols
+    # =========================================================================
+
+    # The following protocols are intentionally NOT registered in the ServiceProvider.
+    # This is a deliberate architectural decision to prioritize flexibility over
+    # pure DI container usage. See PROTOCOL_ANALYSIS_REPORT.md for details.
+
+    # Category 1: Orchestrator-Specific Components
+    # -------------------------------------------
+    # These components have orchestrator-specific dependencies (callbacks, state,
+    # budget) that are provided during creation in OrchestratorFactory. They are
+    # resolved via get_optional() to allow the factory to create them with
+    # orchestrator-specific configuration.
+
+    # StreamingControllerProtocol:
+    #   - Requires: metrics_collector, on_session_complete callback
+    #   - Reason: Callback is orchestrator-specific
+    #   - Created in: OrchestratorFactory.create_streaming_controller()
+    #   - Resolution: container.get_optional(StreamingControllerProtocol)
+
+    # ToolPipelineProtocol:
+    #   - Requires: tool_registry, tool_executor, config, callbacks
+    #   - Reason: Many orchestrator-specific dependencies (on_tool_start, on_tool_complete)
+    #   - Created in: OrchestratorFactory.create_tool_pipeline()
+    #   - Resolution: container.get_optional(ToolPipelineProtocol)
+
+    # ConversationControllerProtocol:
+    #   - Requires: provider, model, conversation, state, callbacks
+    #   - Reason: Orchestrator-specific configuration and state
+    #   - Created in: OrchestratorFactory.create_conversation_controller()
+    #   - Resolution: container.get_optional(ConversationControllerProtocol)
+
+    # Category 2: Framework-Level Protocols
+    # ------------------------------------
+    # These protocols are defined for canonical typing but used by verticals
+    # or other systems, not the core orchestrator. They may be registered
+    # elsewhere or intentionally left unregistered.
+
+    # Team coordination: ITeamCoordinator, ITeamMember, IObservableCoordinator
+    # Multi-agent: IAgentFactory, IAgent
+    # Search: ISemanticSearch, IIndexable
+    # Provider infrastructure: IProviderAdapter, IProviderHealthMonitor
+    # Quality/Grounding: IQualityAssessor, IGroundingStrategy
+    # Coordination: ModeWorkflowTeamCoordinatorProtocol, TeamSelectionStrategyProtocol
+
+    # Category 3: Orchestrator-Implemented Protocols
+    # ---------------------------------------------
+    # These protocols are implemented BY the orchestrator itself, not as
+    # separate services.
+
+    # VerticalStorageProtocol:
+    #   - Implemented by: AgentOrchestrator
+    #   - Methods: set_middleware(), get_middleware(), set_safety_patterns(), etc.
+    #   - Reason: Orchestrator is the storage location for vertical data
+
+    # Design Rationale:
+    # -----------------
+    # 1. Flexibility: Factory can create components with specific dependencies
+    # 2. Testing: Components can be mocked via factory or container override
+    # 3. Simplicity: Avoid complex registration logic for orchestrator-specific deps
+    # 4. Performance: Services are created on-demand in factory, not pre-registered
+    #
+    # This design prioritizes practical flexibility over pure DI patterns while
+    # still maintaining loose coupling through protocols.
 
 
 # =============================================================================

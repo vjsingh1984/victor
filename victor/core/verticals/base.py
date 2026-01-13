@@ -219,6 +219,9 @@ class VerticalBase(
     # Config cache (keyed by class name, stores VerticalConfig)
     _config_cache: Dict[str, "VerticalConfig"] = {}
 
+    # Extension registry for dynamic extension registration (OCP-compliant)
+    _extension_registry: ClassVar[Optional["ExtensionRegistry"]] = None
+
     # =========================================================================
     # Required Abstract Methods
     # =========================================================================
@@ -488,6 +491,94 @@ class VerticalBase(
             cls._config_cache.pop(cache_key, None)
             # Clear extensions cache for this class too
             cls.clear_extension_cache(clear_all=False)
+
+    # =========================================================================
+    # Dynamic Extension Registry Integration (OCP-Compliant)
+    # =========================================================================
+
+    @classmethod
+    def _get_extension_registry(cls) -> "ExtensionRegistry":
+        """Get or create the shared extension registry.
+
+        Returns:
+            ExtensionRegistry instance for dynamic extension registration
+        """
+        from victor.core.verticals.extension_registry import ExtensionRegistry
+
+        if cls._extension_registry is None:
+            cls._extension_registry = ExtensionRegistry()
+        return cls._extension_registry
+
+    @classmethod
+    def register_extension(cls, extension: Any) -> None:
+        """Register a dynamic extension for this vertical.
+
+        Enables OCP compliance by allowing new extension types without
+        modifying core code.
+
+        Args:
+            extension: Extension object implementing IExtension protocol
+
+        Raises:
+            TypeError: If extension doesn't implement IExtension protocol
+            ValueError: If extension already registered
+
+        Example:
+            from dataclasses import dataclass
+
+            @dataclass
+            class AnalyticsExtension:
+                extension_type: ClassVar[str] = "analytics"
+                name: str
+                api_key: str
+
+                def validate(self) -> bool:
+                    return bool(self.api_key)
+
+                def get_metadata(self) -> Dict[str, Any]:
+                    return {"version": "1.0.0"}
+
+            # Register dynamically
+            MyVertical.register_extension(
+                AnalyticsExtension(name="my_analytics", api_key="key123")
+            )
+        """
+        from victor.core.verticals.protocols import IExtension
+
+        # Validate extension implements protocol
+        if not isinstance(extension, IExtension):
+            raise TypeError(
+                f"Extension must implement IExtension protocol, "
+                f"got {type(extension).__name__}"
+            )
+
+        # Register with shared registry
+        registry = cls._get_extension_registry()
+        registry.register_extension(extension)
+
+    @classmethod
+    def get_extensions_by_type(cls, extension_type: str) -> List[Any]:
+        """Get all registered extensions of a specific type.
+
+        Retrieves dynamic extensions from the registry, enabling OCP
+        compliance by supporting unlimited extension types.
+
+        Args:
+            extension_type: Type of extension to retrieve (e.g., "analytics",
+                          "tools", "middleware")
+
+        Returns:
+            List of extensions of the specified type (empty list if none)
+
+        Example:
+            # Get all analytics extensions
+            analytics_exts = MyVertical.get_extensions_by_type("analytics")
+
+            # Get all middleware extensions
+            middleware = MyVertical.get_extensions_by_type("middleware")
+        """
+        registry = cls._get_extension_registry()
+        return registry.get_extensions_by_type(extension_type)
 
     @classmethod
     def get_tool_set(cls) -> ToolSet:

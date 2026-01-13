@@ -131,6 +131,65 @@ from victor.protocols.tool_selector import (
     ToolSelectionStrategy,
 )
 
+# Configuration Protocol (for ConfigCoordinator)
+from victor.protocols.config import (
+    IConfigProvider,
+)
+
+# Prompt Protocol (for PromptCoordinator)
+from victor.protocols.prompt import (
+    IPromptContributor,
+    PromptContext,
+)
+
+# Context Protocol (for ContextCoordinator)
+from victor.protocols.context import (
+    ICompactionStrategy,
+    CompactionResult,
+    CompactionContext,
+    ContextBudget,
+)
+
+# Analytics Protocol (for AnalyticsCoordinator)
+from victor.protocols.analytics import (
+    IAnalyticsExporter,
+    ExportResult,
+    AnalyticsEvent,
+    AnalyticsQuery,
+    AnalyticsResult,
+)
+
+# Cache Protocol (for distributed caching)
+from victor.protocols.cache import (
+    ICacheBackend,
+    IIdempotentTool,
+)
+
+# Provider Manager Protocol (for provider lifecycle management)
+from victor.protocols.provider_manager import (
+    IProviderManager,
+    SwitchResult,
+    HealthStatus,
+)
+
+# Search Router Protocol (for search operations)
+from victor.protocols.search_router import (
+    SearchType,
+    SearchContext,
+    SearchResult,
+    ISearchRouter,
+    ISearchBackend,
+)
+
+# Lifecycle Manager Protocol (for session lifecycle management)
+from victor.protocols.lifecycle import (
+    SessionMetadata,
+    SessionConfig,
+    CleanupResult,
+    RecoveryResult,
+    ILifecycleManager,
+)
+
 __all__ = [
     # Provider Adapter
     "IProviderAdapter",
@@ -219,4 +278,39 @@ __all__ = [
     "ToolSelectionResult",
     "ToolSelectionContext",
     "ToolSelectionStrategy",
+    # Configuration Protocol
+    "IConfigProvider",
+    # Prompt Protocol
+    "IPromptContributor",
+    "PromptContext",
+    # Context Protocol
+    "ICompactionStrategy",
+    "CompactionResult",
+    "CompactionContext",
+    "ContextBudget",
+    # Analytics Protocol
+    "IAnalyticsExporter",
+    "ExportResult",
+    "AnalyticsEvent",
+    "AnalyticsQuery",
+    "AnalyticsResult",
+    # Cache Protocol
+    "ICacheBackend",
+    "IIdempotentTool",
+    # Provider Manager Protocol
+    "IProviderManager",
+    "SwitchResult",
+    "HealthStatus",
+    # Search Router Protocol
+    "SearchType",
+    "SearchContext",
+    "SearchResult",
+    "ISearchRouter",
+    "ISearchBackend",
+    # Lifecycle Manager Protocol
+    "ILifecycleManager",
+    "SessionMetadata",
+    "SessionConfig",
+    "CleanupResult",
+    "RecoveryResult",
 ]

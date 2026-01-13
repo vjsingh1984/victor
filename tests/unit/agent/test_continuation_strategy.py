@@ -207,6 +207,15 @@ class TestDetermineContinuationAction:
         settings.max_continuation_prompts_action = 5
         settings.max_continuation_prompts_default = 3
         settings.continuation_prompt_overrides = {}
+        # Complexity-based continuation thresholds
+        settings.continuation_simple_max_interventions = 5
+        settings.continuation_simple_max_iterations = 10
+        settings.continuation_medium_max_interventions = 10
+        settings.continuation_medium_max_iterations = 25
+        settings.continuation_complex_max_interventions = 20
+        settings.continuation_complex_max_iterations = 50
+        settings.continuation_generation_max_interventions = 15
+        settings.continuation_generation_max_iterations = 35
         return settings
 
     @pytest.fixture
@@ -400,6 +409,15 @@ class TestRLCoordinator:
         mock_settings.max_continuation_prompts_action = 5
         mock_settings.max_continuation_prompts_default = 3
         mock_settings.continuation_prompt_overrides = {}
+        # Complexity-based continuation thresholds
+        mock_settings.continuation_simple_max_interventions = 5
+        mock_settings.continuation_simple_max_iterations = 10
+        mock_settings.continuation_medium_max_interventions = 10
+        mock_settings.continuation_medium_max_iterations = 25
+        mock_settings.continuation_complex_max_interventions = 20
+        mock_settings.continuation_complex_max_iterations = 50
+        mock_settings.continuation_generation_max_interventions = 15
+        mock_settings.continuation_generation_max_iterations = 35
 
         mock_rl = MagicMock()
         mock_recommendation = MagicMock()

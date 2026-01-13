@@ -104,6 +104,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import (
@@ -149,7 +150,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-def _check_capability(obj: Any, capability_name: str) -> bool:
+def _check_capability(obj: Any, capability_name: str, strict_mode: bool = False) -> bool:
     """Check if object has capability via registry.
 
     Uses protocol-based capability discovery. Orchestrators must implement
@@ -162,16 +163,37 @@ def _check_capability(obj: Any, capability_name: str) -> bool:
     Args:
         obj: Object to check (should implement CapabilityRegistryProtocol)
         capability_name: Name of capability
+        strict_mode: If True, raise TypeError when obj doesn't implement protocol
 
     Returns:
         True if capability is available via the registry
+
+    Raises:
+        TypeError: If strict_mode=True and obj doesn't implement CapabilityRegistryProtocol
     """
     # Check capability registry (protocol-based only)
     if isinstance(obj, CapabilityRegistryProtocol):
         return obj.has_capability(capability_name)
 
-    # For objects not implementing protocol, check for public method
-    # Note: No private attribute fallbacks (SOLID compliant)
+    # Strict mode: raise TypeError for non-protocol objects
+    if strict_mode:
+        raise TypeError(
+            f"Object must implement CapabilityRegistryProtocol for capability checking. "
+            f"Got {type(obj).__name__} instead. "
+            f"Ensure your orchestrator uses CapabilityRegistryMixin."
+        )
+
+    # For objects not implementing protocol, show deprecation warning and fallback
+    warnings.warn(
+        f"Object {type(obj).__name__} does not implement CapabilityRegistryProtocol. "
+        f"Falling back to hasattr() checks for capability '{capability_name}'. "
+        f"This is deprecated and will be removed in a future version. "
+        f"Please add CapabilityRegistryMixin to your orchestrator.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
+    # Legacy fallback with public method mappings
     public_methods = {
         "enabled_tools": "set_enabled_tools",
         "prompt_builder": "prompt_builder",
@@ -188,7 +210,13 @@ def _check_capability(obj: Any, capability_name: str) -> bool:
     )
 
 
-def _invoke_capability(obj: Any, capability_name: str, *args: Any, **kwargs: Any) -> Any:
+def _invoke_capability(
+    obj: Any,
+    capability_name: str,
+    *args: Any,
+    strict_mode: bool = False,
+    **kwargs: Any,
+) -> Any:
     """Invoke capability via registry or public method call.
 
     Uses protocol-based capability invocation. Orchestrators must implement
@@ -202,12 +230,14 @@ def _invoke_capability(obj: Any, capability_name: str, *args: Any, **kwargs: Any
         obj: Object to invoke capability on (should implement CapabilityRegistryProtocol)
         capability_name: Name of capability
         *args: Arguments for capability
+        strict_mode: If True, raise TypeError when obj doesn't implement protocol
         **kwargs: Keyword arguments for capability
 
     Returns:
         Result of capability invocation
 
     Raises:
+        TypeError: If strict_mode=True and obj doesn't implement CapabilityRegistryProtocol
         AttributeError: If capability cannot be invoked
     """
     # Use capability registry if available (preferred)
@@ -217,6 +247,25 @@ def _invoke_capability(obj: Any, capability_name: str, *args: Any, **kwargs: Any
         except (KeyError, TypeError) as e:
             logger.debug(f"Registry invoke failed for {capability_name}: {e}")
             # Fall through to public method fallback
+
+    # Strict mode: raise TypeError for non-protocol objects
+    if strict_mode:
+        raise TypeError(
+            f"Object must implement CapabilityRegistryProtocol for capability invocation. "
+            f"Got {type(obj).__name__} instead. "
+            f"Ensure your orchestrator uses CapabilityRegistryMixin."
+        )
+
+    # Show deprecation warning when falling back to hasattr
+    if not isinstance(obj, CapabilityRegistryProtocol):
+        warnings.warn(
+            f"Object {type(obj).__name__} does not implement CapabilityRegistryProtocol. "
+            f"Falling back to hasattr() checks for capability '{capability_name}'. "
+            f"This is deprecated and will be removed in a future version. "
+            f"Please add CapabilityRegistryMixin to your orchestrator.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     # Fallback: use centralized capability method mappings
     # Import from capability_registry (single source of truth)
@@ -1612,22 +1661,35 @@ class TieredConfigStepHandler(BaseStepHandler):
             logger.debug("Applied tiered config via capability")
             return
 
-        # Fallback: try to set on ToolAccessController directly
+        # Fallback: try to set on ToolAccessController directly (ISP-compliant)
         tool_access_controller = None
-        if hasattr(orchestrator, "tool_access_controller"):
-            tool_access_controller = orchestrator.tool_access_controller
-        elif _check_capability(orchestrator, "tool_access_controller"):
+
+        # Use capability-first approach for getting tool_access_controller
+        if _check_capability(orchestrator, "tool_access_controller"):
             try:
-                # Use capability registry if available
                 if isinstance(orchestrator, CapabilityRegistryProtocol):
                     tool_access_controller = orchestrator.get_capability_value(
                         "tool_access_controller"
                     )
             except (KeyError, TypeError):
+                # Fall through to hasattr
                 pass
 
+        # Fallback to hasattr with deprecation warning
+        if tool_access_controller is None and hasattr(orchestrator, "tool_access_controller"):
+            warnings.warn(
+                f"Orchestrator {type(orchestrator).__name__} exposes tool_access_controller "
+                f"as an attribute but not via CapabilityRegistryProtocol. "
+                f"Please register tool_access_controller as a capability for ISP compliance.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            tool_access_controller = orchestrator.tool_access_controller
+
         if tool_access_controller is not None:
-            if hasattr(tool_access_controller, "set_tiered_config"):
+            # Use callable() check instead of hasattr (better practice)
+            set_tiered_config = getattr(tool_access_controller, "set_tiered_config", None)
+            if callable(set_tiered_config):
                 tool_access_controller.set_tiered_config(tiered_config)
                 logger.debug("Applied tiered config to ToolAccessController")
             else:

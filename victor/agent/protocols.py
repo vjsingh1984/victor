@@ -334,34 +334,8 @@ class ToolRegistryProtocol(Protocol):
         ...
 
 
-@runtime_checkable
-class ToolSelectorProtocol(Protocol):
-    """Protocol for tool selection.
-
-    Selects appropriate tools based on user prompt and context.
-    """
-
-    def select_tools(
-        self,
-        prompt: str,
-        max_tools: int,
-        stage: Optional["ConversationStage"] = None,
-    ) -> List[str]:
-        """Select tools for a given prompt.
-
-        Args:
-            prompt: User prompt
-            max_tools: Maximum tools to return
-            stage: Current conversation stage
-
-        Returns:
-            List of selected tool names
-        """
-        ...
-
-    def get_tools_for_stage(self, stage: "ConversationStage") -> Set[str]:
-        """Get recommended tools for a conversation stage."""
-        ...
+# NOTE: ToolSelectorProtocol removed in Phase 9 migration
+# Use IToolSelector from victor.protocols.tool_selector instead
 
 
 @runtime_checkable
@@ -476,6 +450,177 @@ class ToolExecutorProtocol(Protocol):
 
         Returns:
             True if arguments are valid for the tool, False otherwise
+        """
+        ...
+
+
+# =============================================================================
+# Coordinator Protocols
+# =============================================================================
+
+
+@runtime_checkable
+class IToolSelectionCoordinator(Protocol):
+    """Protocol for tool selection coordination.
+
+    Manages intelligent tool selection, routing, and classification
+    for optimizing tool usage based on conversation context and task type.
+
+    This coordinator extracts ~650 lines of tool selection logic from
+    the orchestrator, following SRP (Single Responsibility Principle).
+
+    Key Responsibilities:
+    - Tool selection and routing (semantic vs keyword matching)
+    - Task classification (analysis, action, creation)
+    - Tool mention detection from prompts
+    - Required files/outputs extraction
+    - Tool capability checking
+    """
+
+    def get_recommended_search_tool(
+        self,
+        query: str,
+        context: Optional["AgentToolSelectionContext"] = None,
+    ) -> Optional[str]:
+        """Get recommended search tool for a query.
+
+        Analyzes the query to determine which search tool (semantic, grep,
+        code_search, etc.) would be most appropriate.
+
+        Args:
+            query: Search query string
+            context: Optional selection context (stage, task type, history)
+
+        Returns:
+            Recommended tool name or None if no recommendation
+        """
+        ...
+
+    def route_search_query(
+        self,
+        query: str,
+        available_tools: Set[str],
+    ) -> str:
+        """Route a search query to the appropriate tool.
+
+        Determines the best search tool based on query characteristics
+        and available tools.
+
+        Args:
+            query: Search query string
+            available_tools: Set of available tool names
+
+        Returns:
+            Selected tool name
+        """
+        ...
+
+    def detect_mentioned_tools(
+        self,
+        prompt: str,
+        available_tools: Optional[Set[str]] = None,
+    ) -> Set[str]:
+        """Detect tools mentioned in a prompt.
+
+        Scans the prompt for explicit tool mentions (e.g., "use grep to
+        find...", "run the web_search tool").
+
+        Args:
+            prompt: Prompt text to scan
+            available_tools: Optional set of available tools (defaults to all)
+
+        Returns:
+            Set of detected tool names
+        """
+        ...
+
+    def classify_task_keywords(
+        self,
+        task: str,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+    ) -> str:
+        """Classify task type using keyword analysis.
+
+        Determines if a task is primarily analysis, action, or creation
+        based on keyword presence.
+
+        Args:
+            task: Task description
+            conversation_history: Optional conversation history for context
+
+        Returns:
+            Task type: "analysis", "action", or "creation"
+        """
+        ...
+
+    def classify_task_with_context(
+        self,
+        task: str,
+        context: Optional["AgentToolSelectionContext"] = None,
+    ) -> str:
+        """Classify task type with full context.
+
+        Enhanced task classification using conversation stage, recent tools,
+        and other context information.
+
+        Args:
+            task: Task description
+            context: Selection context with stage, history, recent tools
+
+        Returns:
+            Task type: "analysis", "action", or "creation"
+        """
+        ...
+
+    def should_use_tools(
+        self,
+        message: str,
+        model_supports_tools: bool = True,
+    ) -> bool:
+        """Determine if tools should be used for a message.
+
+        Analyzes the message to determine if tool use is appropriate.
+
+        Args:
+            message: User message
+            model_supports_tools: Whether the model supports tool calling
+
+        Returns:
+            True if tools should be used
+        """
+        ...
+
+    def extract_required_files(
+        self,
+        prompt: str,
+    ) -> Set[str]:
+        """Extract required files from a prompt.
+
+        Parses the prompt to find file paths that are explicitly mentioned
+        or implied as dependencies.
+
+        Args:
+            prompt: Prompt text to parse
+
+        Returns:
+            Set of required file paths
+        """
+        ...
+
+    def extract_required_outputs(
+        self,
+        prompt: str,
+    ) -> Set[str]:
+        """Extract required outputs from a prompt.
+
+        Parses the prompt to find output specifications (file paths,
+        variable names, etc.) that the task should produce.
+
+        Args:
+            prompt: Prompt text to parse
+
+        Returns:
+            Set of required output identifiers
         """
         ...
 
@@ -2027,44 +2172,8 @@ class ToolPluginRegistryProtocol(Protocol):
         ...
 
 
-@runtime_checkable
-class SemanticToolSelectorProtocol(Protocol):
-    """Protocol for semantic tool selection.
-
-    Uses embeddings to select relevant tools for a task.
-    """
-
-    def select_tools(
-        self,
-        query: str,
-        available_tools: List[Any],
-        max_tools: int = 10,
-        threshold: float = 0.3,
-    ) -> List[Any]:
-        """Select relevant tools using semantic similarity.
-
-        Args:
-            query: User query or task description
-            available_tools: List of available tools
-            max_tools: Maximum number of tools to select
-            threshold: Minimum similarity threshold
-
-        Returns:
-            List of selected tools
-        """
-        ...
-
-    def compute_similarity(self, query: str, tool_description: str) -> float:
-        """Compute semantic similarity between query and tool.
-
-        Args:
-            query: User query
-            tool_description: Tool description
-
-        Returns:
-            Similarity score (0-1)
-        """
-        ...
+# NOTE: SemanticToolSelectorProtocol removed in Phase 9 migration
+# Use IToolSelector from victor.protocols.tool_selector instead
 
 
 @runtime_checkable
@@ -2349,6 +2458,8 @@ __all__ = [
     "ToolSelectorProtocol",
     "ToolPipelineProtocol",
     "ToolExecutorProtocol",
+    # Coordinator protocols
+    "IToolSelectionCoordinator",
     # Conversation protocols
     "ConversationControllerProtocol",
     "ConversationStateMachineProtocol",

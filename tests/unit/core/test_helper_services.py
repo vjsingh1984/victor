@@ -4,9 +4,9 @@ import pytest
 from victor.agent.service_provider import OrchestratorServiceProvider
 from victor.core.container import ServiceContainer
 from victor.config.settings import Settings
+from victor.protocols.tool_selector import IToolSelector
 from victor.agent.protocols import (
     SystemPromptBuilderProtocol,
-    ToolSelectorProtocol,
     ToolExecutorProtocol,
     ToolOutputFormatterProtocol,
     ParallelExecutorProtocol,
@@ -44,7 +44,7 @@ def test_system_prompt_builder_resolution(container):
 
 def test_tool_selector_resolution(container):
     """Test ToolSelector resolves from DI container."""
-    service = container.get(ToolSelectorProtocol)
+    service = container.get(IToolSelector)
     assert service is not None
     print(f"✓ ToolSelector resolved: {type(service).__name__}")
 
@@ -90,7 +90,7 @@ def test_all_helper_services_resolve(container):
     """Verify all 7 Phase 2C helper/adapter services resolve correctly."""
     protocols = [
         (SystemPromptBuilderProtocol, "SystemPromptBuilder", False),
-        (ToolSelectorProtocol, "ToolSelector", False),
+        (IToolSelector, "ToolSelector", False),
         (ToolExecutorProtocol, "ToolExecutor", False),
         (ToolOutputFormatterProtocol, "ToolOutputFormatter", False),
         (ParallelExecutorProtocol, "ParallelExecutor", False),

@@ -102,6 +102,9 @@ class ExecutionMetrics:
     - Execution time statistics
     - Tool-specific metrics
 
+    Thread-safe: All operations are protected by threading.Lock for
+    parallel tool execution scenarios.
+
     Attributes:
         total_executions: Total number of tool executions
         cache_hits: Number of cache hits
@@ -130,6 +133,10 @@ class ExecutionMetrics:
     tool_counts: Dict[str, int] = field(default_factory=dict)
     tool_errors: Dict[str, int] = field(default_factory=dict)
 
+    def __post_init__(self):
+        """Initialize the lock after dataclass initialization."""
+        self._lock = threading.Lock()
+
     def record_execution(
         self,
         tool_name: str,
@@ -140,6 +147,8 @@ class ExecutionMetrics:
     ) -> None:
         """Record a tool execution.
 
+        Thread-safe: Protected by threading.Lock.
+
         Args:
             tool_name: Name of the tool executed
             execution_time: Time taken to execute (seconds)
@@ -147,107 +156,179 @@ class ExecutionMetrics:
             cached: Whether result was from cache
             skipped: Whether execution was skipped
         """
-        self.total_executions += 1
+        with self._lock:
+            self.total_executions += 1
 
-        if cached:
-            self.cache_hits += 1
-        else:
-            self.cache_misses += 1
+            if cached:
+                self.cache_hits += 1
+            else:
+                self.cache_misses += 1
 
-        if success:
-            self.successful_executions += 1
-        elif not skipped:
-            self.failed_executions += 1
-            # Track errors by tool
-            self.tool_errors[tool_name] = self.tool_errors.get(tool_name, 0) + 1
+            if success:
+                self.successful_executions += 1
+            elif not skipped:
+                self.failed_executions += 1
+                # Track errors by tool
+                self.tool_errors[tool_name] = self.tool_errors.get(tool_name, 0) + 1
 
-        if skipped:
-            self.skipped_executions += 1
+            if skipped:
+                self.skipped_executions += 1
 
-        # Track execution time
-        self.execution_times.append(execution_time)
-        self.total_execution_time += execution_time
-        self.min_execution_time = min(self.min_execution_time, execution_time)
-        self.max_execution_time = max(self.max_execution_time, execution_time)
+            # Track execution time
+            self.execution_times.append(execution_time)
+            self.total_execution_time += execution_time
+            self.min_execution_time = min(self.min_execution_time, execution_time)
+            self.max_execution_time = max(self.max_execution_time, execution_time)
 
-        # Track tool usage
-        self.tool_counts[tool_name] = self.tool_counts.get(tool_name, 0) + 1
+            # Track tool usage
+            self.tool_counts[tool_name] = self.tool_counts.get(tool_name, 0) + 1
 
     def get_cache_hit_rate(self) -> float:
-        """Calculate cache hit rate."""
-        if self.cache_hits + self.cache_misses == 0:
-            return 0.0
-        return self.cache_hits / (self.cache_hits + self.cache_misses)
+        """Calculate cache hit rate.
+
+        Thread-safe: Returns snapshot of current hit rate.
+        """
+        with self._lock:
+            if self.cache_hits + self.cache_misses == 0:
+                return 0.0
+            return self.cache_hits / (self.cache_hits + self.cache_misses)
 
     def get_success_rate(self) -> float:
-        """Calculate success rate (excluding skipped)."""
-        total = self.successful_executions + self.failed_executions
-        if total == 0:
-            return 0.0
-        return self.successful_executions / total
+        """Calculate success rate (excluding skipped).
+
+        Thread-safe: Returns snapshot of current success rate.
+        """
+        with self._lock:
+            total = self.successful_executions + self.failed_executions
+            if total == 0:
+                return 0.0
+            return self.successful_executions / total
 
     def get_avg_execution_time(self) -> float:
-        """Calculate average execution time."""
-        if not self.execution_times:
-            return 0.0
-        return self.total_execution_time / len(self.execution_times)
+        """Calculate average execution time.
+
+        Thread-safe: Returns snapshot of current average.
+        """
+        with self._lock:
+            if not self.execution_times:
+                return 0.0
+            return self.total_execution_time / len(self.execution_times)
 
     def get_median_execution_time(self) -> float:
-        """Calculate median execution time."""
-        if not self.execution_times:
-            return 0.0
-        sorted_times = sorted(self.execution_times)
+        """Calculate median execution time.
+
+        Thread-safe: Returns snapshot of current median.
+        """
+        with self._lock:
+            if not self.execution_times:
+                return 0.0
+            # Copy list to avoid holding lock during sort
+            times = list(self.execution_times)
+        sorted_times = sorted(times)
         n = len(sorted_times)
         if n % 2 == 0:
             return (sorted_times[n // 2 - 1] + sorted_times[n // 2]) / 2
         return sorted_times[n // 2]
 
     def get_p95_execution_time(self) -> float:
-        """Calculate 95th percentile execution time."""
-        if not self.execution_times:
-            return 0.0
-        sorted_times = sorted(self.execution_times)
+        """Calculate 95th percentile execution time.
+
+        Thread-safe: Returns snapshot of current p95.
+        """
+        with self._lock:
+            if not self.execution_times:
+                return 0.0
+            # Copy list to avoid holding lock during sort
+            times = list(self.execution_times)
+        sorted_times = sorted(times)
         idx = int(len(sorted_times) * 0.95)
         return sorted_times[min(idx, len(sorted_times) - 1)]
 
     def get_top_tools(self, n: int = 5) -> List[tuple[str, int]]:
-        """Get top N most used tools."""
-        return sorted(self.tool_counts.items(), key=lambda x: x[1], reverse=True)[:n]
+        """Get top N most used tools.
+
+        Thread-safe: Returns snapshot of current top tools.
+        """
+        with self._lock:
+            # Copy dict to avoid holding lock during sort
+            counts = dict(self.tool_counts)
+        return sorted(counts.items(), key=lambda x: x[1], reverse=True)[:n]
 
     def reset(self) -> None:
-        """Reset all metrics."""
-        self.total_executions = 0
-        self.cache_hits = 0
-        self.cache_misses = 0
-        self.successful_executions = 0
-        self.failed_executions = 0
-        self.skipped_executions = 0
-        self.total_execution_time = 0.0
-        self.min_execution_time = float('inf')
-        self.max_execution_time = 0.0
-        self.execution_times.clear()
-        self.tool_counts.clear()
-        self.tool_errors.clear()
+        """Reset all metrics.
+
+        Thread-safe: Acquires lock to reset all counters atomically.
+        """
+        with self._lock:
+            self.total_executions = 0
+            self.cache_hits = 0
+            self.cache_misses = 0
+            self.successful_executions = 0
+            self.failed_executions = 0
+            self.skipped_executions = 0
+            self.total_execution_time = 0.0
+            self.min_execution_time = float('inf')
+            self.max_execution_time = 0.0
+            self.execution_times.clear()
+            self.tool_counts.clear()
+            self.tool_errors.clear()
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert metrics to dictionary."""
+        """Convert metrics to dictionary.
+
+        Thread-safe: Returns snapshot of current metrics.
+        """
+        with self._lock:
+            # Copy mutable data to avoid holding lock during calculations
+            cache_hits = self.cache_hits
+            cache_misses = self.cache_misses
+            successful = self.successful_executions
+            failed = self.failed_executions
+            skipped = self.skipped_executions
+            total_time = self.total_execution_time
+            min_time = self.min_execution_time
+            max_time = self.max_execution_time
+            times = list(self.execution_times)
+            errors = dict(self.tool_errors)
+            counts = dict(self.tool_counts)
+            total = self.total_executions
+
+        # Calculate derived metrics outside lock
+        hit_rate = cache_hits / (cache_hits + cache_misses) if (cache_hits + cache_misses) > 0 else 0.0
+        success_rate = successful / (successful + failed) if (successful + failed) > 0 else 0.0
+        avg_time = total_time / len(times) if times else 0.0
+
+        # Median and p95 require sorting
+        sorted_times = sorted(times) if times else []
+        n = len(sorted_times)
+        if n % 2 == 0:
+            median = (sorted_times[n // 2 - 1] + sorted_times[n // 2]) / 2 if n > 0 else 0.0
+        else:
+            median = sorted_times[n // 2] if n > 0 else 0.0
+
+        idx = int(len(sorted_times) * 0.95)
+        p95 = sorted_times[min(idx, len(sorted_times) - 1)] if sorted_times else 0.0
+
+        # Top tools
+        top_tools = sorted(counts.items(), key=lambda x: x[1], reverse=True)[:5]
+
         return {
-            "total_executions": self.total_executions,
-            "cache_hits": self.cache_hits,
-            "cache_misses": self.cache_misses,
-            "cache_hit_rate": self.get_cache_hit_rate(),
-            "successful_executions": self.successful_executions,
-            "failed_executions": self.failed_executions,
-            "skipped_executions": self.skipped_executions,
-            "success_rate": self.get_success_rate(),
-            "total_execution_time": self.total_execution_time,
-            "avg_execution_time": self.get_avg_execution_time(),
-            "median_execution_time": self.get_median_execution_time(),
-            "p95_execution_time": self.get_p95_execution_time(),
-            "min_execution_time": self.min_execution_time if self.min_execution_time != float('inf') else 0.0,
-            "max_execution_time": self.max_execution_time,
-            "top_tools": self.get_top_tools(),
-            "tool_errors": self.tool_errors,
+            "total_executions": total,
+            "cache_hits": cache_hits,
+            "cache_misses": cache_misses,
+            "cache_hit_rate": hit_rate,
+            "successful_executions": successful,
+            "failed_executions": failed,
+            "skipped_executions": skipped,
+            "success_rate": success_rate,
+            "total_execution_time": total_time,
+            "avg_execution_time": avg_time,
+            "median_execution_time": median,
+            "p95_execution_time": p95,
+            "min_execution_time": min_time if min_time != float('inf') else 0.0,
+            "max_execution_time": max_time,
+            "top_tools": top_tools,
+            "tool_errors": errors,
         }
 
 
@@ -383,6 +464,9 @@ class LRUToolCache:
     This prevents stale results from being returned after files change and
     bounds memory growth for long-running sessions.
 
+    Thread-safe: All operations are protected by threading.Lock for
+    parallel tool execution scenarios.
+
     Attributes:
         _cache: OrderedDict maintaining insertion/access order
         _timestamps: Dict mapping keys to creation timestamps
@@ -410,6 +494,7 @@ class LRUToolCache:
         self._timestamps: Dict[str, float] = {}
         self._max_size = max_size
         self._ttl_seconds = ttl_seconds
+        self._lock = threading.Lock()
 
     def _is_expired(self, key: str) -> bool:
         """Check if a cache entry has expired.
@@ -443,23 +528,26 @@ class LRUToolCache:
         If found and not expired, the entry is moved to the end (most recently used).
         Expired entries are automatically removed.
 
+        Thread-safe: Protected by threading.Lock.
+
         Args:
             key: Cache key
 
         Returns:
             Cached value or None if not found or expired
         """
-        if key in self._cache:
-            # Check TTL expiration
-            if self._is_expired(key):
-                # Remove expired entry
-                del self._cache[key]
-                self._timestamps.pop(key, None)
-                return None
-            # Move to end (most recently used)
-            self._cache.move_to_end(key)
-            return self._cache[key]
-        return None
+        with self._lock:
+            if key in self._cache:
+                # Check TTL expiration
+                if self._is_expired(key):
+                    # Remove expired entry
+                    del self._cache[key]
+                    self._timestamps.pop(key, None)
+                    return None
+                # Move to end (most recently used)
+                self._cache.move_to_end(key)
+                return self._cache[key]
+            return None
 
     def set(self, key: str, value: Any) -> None:
         """Set a value in the cache.
@@ -467,43 +555,60 @@ class LRUToolCache:
         If the key exists, it's updated and moved to the end with refreshed TTL.
         If cache is full, expired entries are evicted first, then LRU eviction.
 
+        Thread-safe: Protected by threading.Lock.
+
         Args:
             key: Cache key
             value: Value to cache
         """
-        current_time = time.time()
+        with self._lock:
+            current_time = time.time()
 
-        if key in self._cache:
-            # Update existing and move to end
-            self._cache.move_to_end(key)
-        self._cache[key] = value
-        self._timestamps[key] = current_time
+            if key in self._cache:
+                # Update existing and move to end
+                self._cache.move_to_end(key)
+            self._cache[key] = value
+            self._timestamps[key] = current_time
 
-        # Evict expired entries first (cheaper than LRU for memory)
-        if len(self._cache) > self._max_size:
-            self._evict_expired()
+            # Evict expired entries first (cheaper than LRU for memory)
+            if len(self._cache) > self._max_size:
+                self._evict_expired()
 
-        # Still over capacity? LRU eviction
-        while len(self._cache) > self._max_size:
-            oldest_key, _ = self._cache.popitem(last=False)
-            self._timestamps.pop(oldest_key, None)
+            # Still over capacity? LRU eviction
+            while len(self._cache) > self._max_size:
+                oldest_key, _ = self._cache.popitem(last=False)
+                self._timestamps.pop(oldest_key, None)
 
     def clear(self) -> None:
-        """Clear all entries from the cache."""
-        self._cache.clear()
-        self._timestamps.clear()
+        """Clear all entries from the cache.
+
+        Thread-safe: Protected by threading.Lock.
+        """
+        with self._lock:
+            self._cache.clear()
+            self._timestamps.clear()
 
     def __len__(self) -> int:
-        """Return the number of entries in the cache."""
-        return len(self._cache)
+        """Return the number of entries in the cache.
+
+        Thread-safe: Returns snapshot of current size.
+        """
+        with self._lock:
+            return len(self._cache)
 
     def items(self):
-        """Return all non-expired items in the cache."""
-        # Filter out expired entries
-        return [(k, v) for k, v in self._cache.items() if not self._is_expired(k)]
+        """Return all non-expired items in the cache.
+
+        Thread-safe: Returns snapshot of current items.
+        """
+        with self._lock:
+            # Filter out expired entries
+            return [(k, v) for k, v in self._cache.items() if not self._is_expired(k)]
 
     def remove(self, key: str) -> bool:
         """Remove a specific key from the cache.
+
+        Thread-safe: Protected by threading.Lock.
 
         Args:
             key: Cache key to remove
@@ -511,26 +616,30 @@ class LRUToolCache:
         Returns:
             True if key was found and removed, False otherwise
         """
-        if key in self._cache:
-            del self._cache[key]
-            self._timestamps.pop(key, None)
-            return True
-        return False
+        with self._lock:
+            if key in self._cache:
+                del self._cache[key]
+                self._timestamps.pop(key, None)
+                return True
+            return False
 
     def get_stats(self) -> Dict[str, Any]:
         """Get cache statistics for monitoring.
 
+        Thread-safe: Returns snapshot of current stats.
+
         Returns:
-            Dict with size, max_size, ttl_seconds, expired_count
+            Dict with size, max_size, ttl_seconds, expired_count, active_count
         """
-        expired_count = sum(1 for k in self._cache if self._is_expired(k))
-        return {
-            "size": len(self._cache),
-            "max_size": self._max_size,
-            "ttl_seconds": self._ttl_seconds,
-            "expired_count": expired_count,
-            "active_count": len(self._cache) - expired_count,
-        }
+        with self._lock:
+            expired_count = sum(1 for k in self._cache if self._is_expired(k))
+            return {
+                "size": len(self._cache),
+                "max_size": self._max_size,
+                "ttl_seconds": self._ttl_seconds,
+                "expired_count": expired_count,
+                "active_count": len(self._cache) - expired_count,
+            }
 
 
 @dataclass
@@ -1506,6 +1615,17 @@ class ToolPipeline:
             logger.info(f"[Pipeline] Returning cached result for {tool_name}")
             # Still count as a tool call for tracking, but don't execute
             self._executed_tools.append(tool_name)
+
+            # Record execution metrics for cached result
+            if self.config.enable_analytics:
+                self._execution_metrics.record_execution(
+                    tool_name=tool_name,
+                    execution_time=0.0,  # Cached results have no execution time
+                    success=True,
+                    cached=True,
+                    skipped=False,
+                )
+
             # Notify callbacks about cached result
             if self.on_tool_start:
                 try:
@@ -1527,6 +1647,17 @@ class ToolPipeline:
                 if semantic_result is not None:
                     logger.info(f"[Pipeline] Semantic cache hit for {tool_name}")
                     self._executed_tools.append(tool_name)
+
+                    # Record execution metrics for semantic cache hit
+                    if self.config.enable_analytics:
+                        self._execution_metrics.record_execution(
+                            tool_name=tool_name,
+                            execution_time=0.0,  # Cached results have no execution time
+                            success=True,
+                            cached=True,
+                            skipped=False,
+                        )
+
                     # Build result from cached data
                     sem_cached_result = ToolCallResult(
                         tool_name=tool_name,
@@ -1561,6 +1692,17 @@ class ToolPipeline:
                     f"[Pipeline] Skipping duplicate read of {file_path} "
                     "(file was read recently in this session)"
                 )
+
+                # Record execution metrics for skipped duplicate read
+                if self.config.enable_analytics:
+                    self._execution_metrics.record_execution(
+                        tool_name=tool_name,
+                        execution_time=0.0,
+                        success=True,
+                        cached=False,
+                        skipped=True,
+                    )
+
                 return ToolCallResult(
                     tool_name=tool_name,
                     arguments=normalized_args,
@@ -1725,6 +1867,16 @@ class ToolPipeline:
                 logger.warning(f"Middleware chain process_after failed (data error): {e}")
             except AttributeError as e:
                 logger.debug(f"Middleware chain not properly configured: {e}")
+
+        # Record execution metrics
+        if self.config.enable_analytics:
+            self._execution_metrics.record_execution(
+                tool_name=tool_name,
+                execution_time=execution_time_ms / 1000.0,  # Convert to seconds
+                success=call_result.success,
+                cached=False,
+                skipped=False,
+            )
 
         # Record file read for deduplication (prompting loop fix)
         # Include capitalized variants for tool name normalization

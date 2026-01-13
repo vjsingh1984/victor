@@ -44,7 +44,8 @@ class TestServiceProtocols:
             ToolPipelineProtocol,
             StreamingControllerProtocol,
             TaskAnalyzerProtocol,
-            ToolSelectorProtocol,
+            # NOTE: ToolSelectorProtocol removed in Phase 9 migration
+            # Use IToolSelector from victor.protocols.tool_selector
             ObservabilityProtocol,
             MetricsCollectorProtocol,
             ToolCacheProtocol,

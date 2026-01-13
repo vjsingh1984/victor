@@ -860,6 +860,29 @@ class Settings(BaseSettings):
     # Can be overridden per profile in profiles.yaml
     session_idle_timeout: int = 180  # 3 minutes idle time, leaves 120s buffer for summary
 
+    # ==========================================================================
+    # Complexity-Based Continuation Thresholds
+    # ==========================================================================
+    # Different continuation limits based on task complexity to prevent
+    # premature synthesis nudging during complex exploration while still
+    # preventing runaway loops on simple tasks.
+
+    # Thresholds for SIMPLE tasks (e.g., "what is 2+2?", "read config.py")
+    continuation_simple_max_interventions: int = 5
+    continuation_simple_max_iterations: int = 10
+
+    # Thresholds for MEDIUM tasks (e.g., "analyze this file", "explain this function")
+    continuation_medium_max_interventions: int = 10
+    continuation_medium_max_iterations: int = 25
+
+    # Thresholds for COMPLEX tasks (e.g., "analyze entire codebase", "comprehensive audit")
+    continuation_complex_max_interventions: int = 20
+    continuation_complex_max_iterations: int = 50
+
+    # Thresholds for GENERATION tasks (e.g., "create new component", "generate code")
+    continuation_generation_max_interventions: int = 15
+    continuation_generation_max_iterations: int = 35
+
     # Future: session_time_limit will be separate config for total session duration
     # regardless of activity (for sub-task agents, resource limits, etc.)
 

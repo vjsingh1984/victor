@@ -149,6 +149,7 @@ class DebugLogger:
         max_preview: int = 80,
         enabled: bool = True,
         presentation: Optional["PresentationProtocol"] = None,
+        context_window: int = 128000,  # Default 128K tokens (~512K chars)
     ):
         """Initialize debug logger.
 
@@ -157,10 +158,12 @@ class DebugLogger:
             max_preview: Max characters for inline previews
             enabled: Whether logging is enabled
             presentation: Optional presentation adapter for icons (creates default if None)
+            context_window: Model context window in tokens (used for dynamic warning thresholds)
         """
         self.logger = logging.getLogger(name)
         self.max_preview = max_preview
         self.enabled = enabled
+        self.context_window = context_window
         self._last_iteration = 0
         self.stats = ConversationStats()
         # Lazy init for backward compatibility
@@ -292,19 +295,32 @@ class DebugLogger:
         )
 
     def log_context_size(self, char_count: int, estimated_tokens: int) -> None:
-        """Log context size warning if large."""
+        """Log context size warning if large.
+
+        Uses dynamic thresholds based on model context window:
+        - WARNING at 80% of context window
+        - INFO at 50% of context window
+        """
         if not self.enabled:
             return
 
-        if char_count > 100000:
+        # Convert context window from tokens to chars (assume 4 chars/token)
+        context_window_chars = self.context_window * 4
+        warning_threshold = int(context_window_chars * 0.80)  # 80% for warning
+        info_threshold = int(context_window_chars * 0.50)     # 50% for info
+
+        # Calculate percentage of context used
+        context_pct = (estimated_tokens / self.context_window * 100) if self.context_window > 0 else 0
+
+        if char_count > warning_threshold:
             warning_icon = self._presentation.icon("warning", with_color=False)
             self.logger.warning(
-                f"   {warning_icon} Large context: {char_count:,} chars (~{estimated_tokens:,} tokens)"
+                f"   {warning_icon} Large context: {char_count:,} chars (~{estimated_tokens:,} tokens, {context_pct:.0f}% of {self.context_window:,})"
             )
-        elif char_count > 50000:
+        elif char_count > info_threshold:
             chart_icon = self._presentation.icon("chart", with_color=False)
             self.logger.info(
-                f"   {chart_icon} Context: {char_count:,} chars (~{estimated_tokens:,} tokens)"
+                f"   {chart_icon} Context: {char_count:,} chars (~{estimated_tokens:,} tokens, {context_pct:.0f}% of {self.context_window:,})"
             )
 
     def log_conversation_summary(self, messages: List[Message]) -> None:

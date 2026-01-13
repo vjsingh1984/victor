@@ -66,8 +66,17 @@ from rich.console import Console
 
 # Coordinators (Phase 2 refactoring - being integrated)
 # NOTE: These are runtime imports, not type-checking only
+from victor.agent.coordinators.checkpoint_coordinator import (
+    CheckpointCoordinator,
+)  # noqa: F401  # imported for runtime use
+from victor.agent.coordinators.evaluation_coordinator import (
+    EvaluationCoordinator,
+)  # noqa: F401  # imported for runtime use
 from victor.agent.coordinators.metrics_coordinator import (
     MetricsCoordinator,
+)  # noqa: F401  # imported for runtime use
+from victor.agent.coordinators.workflow_coordinator import (
+    WorkflowCoordinator,
 )  # noqa: F401  # imported for runtime use
 
 if TYPE_CHECKING:
@@ -250,6 +259,7 @@ from victor.agent.streaming import (
     IntentClassificationHandler,
     IntentClassificationResult,
     IterationCoordinator,
+    ProgressMetrics,
     StreamingChatContext,
     StreamingChatHandler,
     ToolExecutionHandler,
@@ -662,6 +672,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Workflow registry (via factory, DI with fallback)
         self.workflow_registry = self._factory.create_workflow_registry()
+
+        # Initialize WorkflowCoordinator for workflow operations (SOLID refactoring)
+        # Extracts workflow registration logic to dedicated coordinator
+        self._workflow_coordinator = WorkflowCoordinator(
+            workflow_registry=self.workflow_registry,
+        )
         self._register_default_workflows()
 
         # Conversation history (via factory) - MessageHistory for better encapsulation
@@ -911,6 +927,20 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Initialize ToolSequenceTracker for intelligent next-tool suggestions (via factory)
         self._sequence_tracker = self._factory.create_sequence_tracker()
 
+        # Initialize EvaluationCoordinator for evaluation and analytics (SOLID refactoring)
+        # Extracts RL feedback, usage analytics, and intelligent outcome recording
+        self._evaluation_coordinator = EvaluationCoordinator(
+            usage_analytics=self._usage_analytics,
+            sequence_tracker=self._sequence_tracker,
+            get_rl_coordinator_fn=lambda: getattr(self, "_rl_coordinator", None),
+            get_vertical_context_fn=lambda: getattr(self, "_vertical_context", None),
+            get_stream_context_fn=lambda: getattr(self, "_current_stream_context", None),
+            get_provider_fn=lambda: getattr(self, "provider", None),
+            get_model_fn=lambda: getattr(self, "model", ""),
+            get_tool_calls_used_fn=lambda: getattr(self, "tool_calls_used", 0),
+            get_intelligent_integration_fn=lambda: getattr(self, "intelligent_integration", None),
+        )
+
         # Initialize ToolOutputFormatter for LLM-context-aware output formatting (via factory)
         self._tool_output_formatter = self._factory.create_tool_output_formatter(
             self._context_compactor
@@ -947,6 +977,22 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Provides save/restore/fork capabilities for conversation state
         self._checkpoint_manager = self._factory.create_checkpoint_manager()
 
+        # Initialize CheckpointCoordinator for checkpoint operations (SOLID refactoring)
+        # Extracts checkpoint logic to dedicated coordinator for better modularity
+        self._checkpoint_coordinator = CheckpointCoordinator(
+            checkpoint_manager=self._checkpoint_manager,
+            session_id=None,  # Will be set during session initialization
+            get_state_fn=self._get_checkpoint_state,
+            apply_state_fn=self._apply_checkpoint_state,
+        )
+
+        # Initialize ChatCoordinator for chat and streaming operations (SOLID refactoring)
+        # Extracts chat/streaming logic to dedicated coordinator for better modularity
+        # Pass self reference to coordinator for accessing shared state (standard pattern)
+        from victor.agent.coordinators import ChatCoordinator
+
+        self._chat_coordinator = ChatCoordinator(orchestrator=self)
+
         # =================================================================
         # Workflow Optimization Components - MODE workflow optimizations
         # These address issues identified during EXPLORE/PLAN/BUILD testing
@@ -956,6 +1002,56 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._workflow_optimization = self._factory.create_workflow_optimization_components(
             timeout_seconds=getattr(settings, "execution_timeout", None)
         )
+
+        # Initialize ProgressMetrics for tracking exploration progress
+        # This enables progress-aware continuation decisions instead of simple counters
+        self._progress_metrics: ProgressMetrics = ProgressMetrics()
+
+        # Initialize token budget based on provider/model context window
+        # This adds an additional signal for continuation decisions beyond iteration counts
+        # Also store provider-specific session_idle_timeout for local vs cloud providers
+        try:
+            from victor.config.config_loaders import get_provider_limits
+
+            # Use orchestrator's provider_name and model (set during initialization, line 528-529)
+            provider_name = self.provider_name or ""
+            model_name = self.model or ""
+
+            logger.debug(f"Fetching provider limits for provider={provider_name}, model={model_name}")
+
+            provider_limits = get_provider_limits(
+                provider=provider_name,
+                model=model_name,
+            )
+
+            logger.debug(f"Got provider_limits: session_idle_timeout={provider_limits.session_idle_timeout}")
+
+            self._progress_metrics.initialize_token_budget(provider_limits.context_window)
+            # Store provider-specific session idle timeout (e.g., 600s for Ollama, 180s for cloud)
+            self._session_idle_timeout = provider_limits.session_idle_timeout
+            logger.info(
+                f"Initialized token budget with context_window={provider_limits.context_window:,} "
+                f"(soft_limit={int(provider_limits.context_window * 0.3):,}, "
+                f"hard_limit={int(provider_limits.context_window * 0.7):,}), "
+                f"session_idle_timeout={self._session_idle_timeout}s"
+            )
+        except Exception as e:
+            # Fallback to default session idle timeout
+            self._session_idle_timeout = getattr(settings, "session_idle_timeout", 180)
+            logger.warning(f"Unable to initialize token budget, using default timeout: {e}")
+
+        # Update the streaming handler with provider-specific session idle timeout
+        # This must happen after handler creation (line 877) and after timeout computation (line 1015)
+        if hasattr(self._streaming_handler, 'session_idle_timeout'):
+            old_timeout = self._streaming_handler.session_idle_timeout
+            self._streaming_handler.session_idle_timeout = self._session_idle_timeout
+            logger.info(
+                f"Updated streaming handler session_idle_timeout: {old_timeout}s -> {self._session_idle_timeout}s"
+            )
+        else:
+            logger.warning(
+                f"Streaming handler does not have session_idle_timeout attribute (handler: {type(self._streaming_handler).__name__})"
+            )
 
         # Wire component dependencies (via factory)
         self._factory.wire_component_dependencies(
@@ -1026,6 +1122,19 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """Callback when tool execution completes (from ToolPipeline)."""
         self._metrics_collector.on_tool_complete(result)
 
+        # Track progress metrics for intelligent continuation decisions
+        if result.success:
+            self._progress_metrics.record_tool_used(result.tool_name)
+
+            # Track read files for progress-aware continuation
+            if result.tool_name in ("read", "Read", "read_file"):
+                # Extract file path from arguments
+                if result.arguments:
+                    file_path = result.arguments.get("path") or result.arguments.get("file_path")
+                    if file_path:
+                        self._progress_metrics.record_file_read(file_path)
+                        logger.debug(f"ProgressMetrics: Recorded file read: {file_path}")
+
         # Emit tool complete event
         from victor.core.events import get_observability_bus
 
@@ -1051,7 +1160,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             # Ignore errors during event emission
             pass
 
-        # Track read files for task completion detection
+        # Track read files for task completion detection (legacy support)
         if result.success and result.tool_name in ("read", "Read", "read_file"):
             # Extract file path from arguments
             if result.arguments:
@@ -1131,74 +1240,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         Converts StreamingSession data into RLOutcome and updates Q-values
         based on session outcome (success, latency, throughput, tool usage).
+
+        Delegates to EvaluationCoordinator for better modularity.
         """
-        try:
-            from victor.framework.rl.coordinator import get_rl_coordinator
-            from victor.framework.rl.base import RLOutcome
-
-            if not self._rl_coordinator:
-                return
-
-            # Extract metrics from session
-            token_count = 0
-            if session.metrics:
-                # Estimate tokens from chunks (streaming metrics)
-                token_count = session.metrics.total_chunks or 0
-
-            # Get tool execution count from metrics collector
-            tool_calls_made = 0
-            if hasattr(self, "_metrics_collector") and self._metrics_collector:
-                tool_calls_made = self._metrics_collector._selection_stats.total_tools_executed
-
-            # Determine success: no error and not cancelled
-            success = session.error is None and not session.cancelled
-
-            # Compute quality score (0-1) based on success and metrics
-            quality_score = 0.5
-            if success:
-                quality_score = 0.8
-                # Bonus for fast responses
-                if session.duration < 10:
-                    quality_score += 0.1
-                # Bonus for tool usage
-                if tool_calls_made > 0:
-                    quality_score += 0.1
-            quality_score = min(1.0, quality_score)
-
-            # Create outcome
-            outcome = RLOutcome(
-                provider=session.provider,
-                model=session.model,
-                task_type=getattr(session, "task_type", "unknown"),
-                success=success,
-                quality_score=quality_score,
-                metadata={
-                    "latency_seconds": session.duration,
-                    "token_count": token_count,
-                    "tool_calls_made": tool_calls_made,
-                    "session_id": session.session_id,
-                },
-                vertical=getattr(self._vertical_context, "vertical_name", None) or "default",
-            )
-
-            # Record outcome for model selector - use vertical from context
-            vertical_name = getattr(self._vertical_context, "vertical_name", None) or "default"
-            self._rl_coordinator.record_outcome("model_selector", outcome, vertical_name)
-
-            logger.debug(
-                f"RL feedback: provider={session.provider} success={success} "
-                f"quality={quality_score:.2f} duration={session.duration:.1f}s"
-            )
-
-        except ImportError:
-            # RL module not available - skip silently
-            pass
-        except (KeyError, AttributeError) as e:
-            # RL coordinator not properly initialized
-            logger.debug(f"RL reward signal skipped (not configured): {e}")
-        except (ValueError, TypeError) as e:
-            # Invalid reward data
-            logger.warning(f"Failed to send RL reward signal (invalid data): {e}")
+        self._evaluation_coordinator.send_rl_reward_signal(session)
 
     def _extract_required_files_from_prompt(self, user_message: str) -> List[str]:
         """Extract file paths mentioned in user prompt for task completion tracking.
@@ -1330,7 +1375,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             UsageAnalytics instance for data-driven optimization
         """
-        return self._usage_analytics
+        return self._evaluation_coordinator.usage_analytics
 
     @property
     def sequence_tracker(self) -> "ToolSequenceTracker":
@@ -1674,7 +1719,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             ConversationCheckpointManager instance or None if disabled
         """
-        return self._checkpoint_manager
+        return self._checkpoint_coordinator.checkpoint_manager
 
     @property
     def vertical_context(self) -> VerticalContext:
@@ -1860,28 +1905,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             Checkpoint ID if saved, None if checkpointing is disabled
         """
-        if not self._checkpoint_manager:
-            logger.debug("Checkpoint save skipped - manager not initialized")
-            return None
+        # Update session ID in coordinator
+        self._checkpoint_coordinator.update_session_id(self._memory_session_id)
 
-        # Build conversation state for checkpointing
-        state = self._get_checkpoint_state()
-
-        try:
-            checkpoint_id = await self._checkpoint_manager.save_checkpoint(
-                session_id=self._memory_session_id or "default",
-                state=state,
-                description=description,
-                tags=tags,
-            )
-            logger.info(f"Manual checkpoint saved: {checkpoint_id[:20]}...")
-            return checkpoint_id
-        except (OSError, IOError) as e:
-            logger.warning(f"Failed to save checkpoint (I/O error): {e}")
-            return None
-        except (ValueError, TypeError) as e:
-            logger.warning(f"Failed to save checkpoint (serialization error): {e}")
-            return None
+        # Delegate to coordinator
+        return await self._checkpoint_coordinator.save_checkpoint(
+            description=description,
+            tags=tags,
+        )
 
     async def restore_checkpoint(self, checkpoint_id: str) -> bool:
         """Restore conversation state from a checkpoint.
@@ -1892,21 +1923,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             True if restored successfully, False otherwise
         """
-        if not self._checkpoint_manager:
-            logger.warning("Cannot restore - checkpoint manager not initialized")
-            return False
+        # Update session ID in coordinator
+        self._checkpoint_coordinator.update_session_id(self._memory_session_id)
 
-        try:
-            state = await self._checkpoint_manager.restore_checkpoint(checkpoint_id)
-            self._apply_checkpoint_state(state)
-            logger.info(f"Restored checkpoint: {checkpoint_id[:20]}...")
-            return True
-        except (OSError, IOError) as e:
-            logger.warning(f"Failed to restore checkpoint (I/O error): {e}")
-            return False
-        except (KeyError, ValueError) as e:
-            logger.warning(f"Failed to restore checkpoint (invalid data): {e}")
-            return False
+        # Delegate to coordinator
+        return await self._checkpoint_coordinator.restore_checkpoint(checkpoint_id)
 
     async def maybe_auto_checkpoint(self) -> Optional[str]:
         """Trigger auto-checkpoint if interval threshold is met.
@@ -1917,22 +1938,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             Checkpoint ID if auto-checkpoint was created, None otherwise
         """
-        if not self._checkpoint_manager:
-            return None
+        # Update session ID in coordinator
+        self._checkpoint_coordinator.update_session_id(self._memory_session_id)
 
-        state = self._get_checkpoint_state()
-
-        try:
-            return await self._checkpoint_manager.maybe_auto_checkpoint(
-                session_id=self._memory_session_id or "default",
-                state=state,
-            )
-        except (OSError, IOError) as e:
-            logger.debug(f"Auto-checkpoint failed (I/O error): {e}")
-            return None
-        except (ValueError, TypeError) as e:
-            logger.debug(f"Auto-checkpoint failed (serialization error): {e}")
-            return None
+        # Delegate to coordinator
+        return await self._checkpoint_coordinator.maybe_auto_checkpoint()
 
     def _get_checkpoint_state(self) -> dict:
         """Build a dictionary representing current conversation state for checkpointing."""
@@ -2036,7 +2046,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> None:
         """Record outcome for Q-learning feedback.
 
-        Delegates to OrchestratorIntegration.record_intelligent_outcome().
+        Delegates to EvaluationCoordinator for better modularity.
 
         Args:
             success: Whether the task was completed successfully
@@ -2044,34 +2054,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             user_satisfied: Whether user seemed satisfied
             completed: Whether task reached completion
         """
-        integration = self.intelligent_integration
-        if not integration:
-            return
-
-        # Get orchestrator state to pass to integration
-        stream_context = getattr(self, "_current_stream_context", None)
-        continuation_prompts = getattr(self, "_continuation_prompts", 0)
-        max_continuation_prompts_used = getattr(self, "_max_continuation_prompts_used", 6)
-        stuck_loop_detected = getattr(self, "_stuck_loop_detected", False)
-
-        try:
-            integration.record_intelligent_outcome(
-                success=success,
-                quality_score=quality_score,
-                user_satisfied=user_satisfied,
-                completed=completed,
-                rl_coordinator=self._rl_coordinator,
-                stream_context=stream_context,
-                vertical_context=self._vertical_context,
-                provider_name=self.provider.name,
-                model=self.model,
-                tool_calls_used=self.tool_calls_used,
-                continuation_prompts=continuation_prompts,
-                max_continuation_prompts_used=max_continuation_prompts_used,
-                stuck_loop_detected=stuck_loop_detected,
-            )
-        except Exception as e:
-            logger.debug(f"IntelligentPipeline record_outcome failed: {e}")
+        self._evaluation_coordinator.record_intelligent_outcome(
+            success=success,
+            quality_score=quality_score,
+            user_satisfied=user_satisfied,
+            completed=completed,
+        )
 
     def _should_continue_intelligent(self) -> tuple[bool, str]:
         """Check if processing should continue using learned behaviors.
@@ -2878,37 +2866,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             - sequence_tracker: Whether patterns were saved
             - tool_cache: Whether cache was flushed
         """
-        results: Dict[str, bool] = {}
+        # Delegate to coordinator for core analytics flushing
+        results = self._evaluation_coordinator.flush_analytics()
 
-        # Flush usage analytics
-        if hasattr(self, "_usage_analytics") and self._usage_analytics:
-            try:
-                self._usage_analytics.flush()
-                results["usage_analytics"] = True
-                logger.debug("UsageAnalytics flushed to disk")
-            except Exception as e:
-                logger.warning(f"Failed to flush usage analytics: {e}")
-                results["usage_analytics"] = False
-        else:
-            results["usage_analytics"] = False
-
-        # Flush sequence tracker patterns
-        if hasattr(self, "_sequence_tracker") and self._sequence_tracker:
-            try:
-                # SequenceTracker learns patterns in memory; no explicit flush needed
-                # but we capture statistics for reporting
-                stats = self._sequence_tracker.get_statistics()
-                results["sequence_tracker"] = True
-                logger.debug(
-                    f"SequenceTracker has {stats.get('unique_transitions', 0)} learned patterns"
-                )
-            except Exception as e:
-                logger.warning(f"Failed to get sequence tracker stats: {e}")
-                results["sequence_tracker"] = False
-        else:
-            results["sequence_tracker"] = False
-
-        # Flush tool cache
+        # Handle tool cache separately (not managed by coordinator)
         if hasattr(self, "tool_cache") and self.tool_cache:
             try:
                 # Tool cache is already persistent; just report status
@@ -3424,6 +3385,19 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         # Delegate to ContinuationStrategy (extracted in Phase 2E)
         strategy = ContinuationStrategy()
+
+        # Get task complexity from task analyzer if available
+        task_complexity = None
+        try:
+            if hasattr(self, "_task_analyzer"):
+                # Get the last analyzed complexity from the task analyzer
+                # Note: This requires the task analyzer to have analyzed the current task
+                task_complexity = getattr(self._task_analyzer, "_last_complexity", None)
+                if task_complexity:
+                    task_complexity = task_complexity.value if hasattr(task_complexity, "value") else str(task_complexity)
+        except Exception as e:
+            logger.debug(f"Unable to get task complexity: {e}")
+
         return strategy.determine_continuation_action(
             intent_result=intent_result,
             is_analysis_task=is_analysis_task,
@@ -3445,6 +3419,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             task_completion_signals=None,  # Legacy caller doesn't use this
             # Task Completion Detection Enhancement (Phase 2 - Feature Flag Protected)
             task_completion_detector=self._task_completion_detector,
+            # Progress Metrics for intelligent continuation decisions
+            progress_metrics=self._progress_metrics,
+            # Complexity-based continuation thresholds
+            task_complexity=task_complexity,
         )
 
     def _format_tool_output(self, tool_name: str, args: Dict[str, Any], output: Any) -> str:
@@ -3487,8 +3465,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         Uses DIP-compliant workflow discovery to avoid hardcoded imports.
         Workflows are discovered from victor.workflows package automatically.
+
+        Delegates to WorkflowCoordinator for better modularity.
         """
-        count = register_builtin_workflows(self.workflow_registry)
+        count = self._workflow_coordinator.register_default_workflows()
         logger.debug(f"Dynamically registered {count} workflows")
 
     def _register_default_tools(self) -> None:
@@ -3600,163 +3580,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         Returns:
             CompletionResponse from the model with complete response
+
+        SOLID Design: Delegates to ChatCoordinator for modularity (SRP compliance).
+        The coordinator contains the full agentic loop implementation.
         """
-        # Ensure system prompt is included once at start of conversation
-        self.conversation.ensure_system_prompt()
-        self._system_added = True
-        # Add user message to history
-        self.add_message("user", user_message)
-
-        # Initialize tracking for this conversation turn
-        self.tool_calls_used = 0
-        failure_context = ToolFailureContext()
-        max_iterations = getattr(self.settings, "chat_max_iterations", 10)
-        iteration = 0
-
-        # Classify task complexity for appropriate budgeting
-        task_classification = self.task_classifier.classify(user_message)
-        iteration_budget = min(
-            task_classification.tool_budget * 2, max_iterations  # Allow 2x budget for iterations
-        )
-
-        # Agentic loop: continue until no tool calls or budget exhausted
-        final_response: Optional[CompletionResponse] = None
-
-        while iteration < iteration_budget:
-            iteration += 1
-
-            # Get tool definitions if provider supports them
-            tools = None
-            if self.provider.supports_tools() and self.tool_calls_used < self.tool_budget:
-                conversation_depth = self.conversation.message_count()
-                conversation_history = (
-                    [msg.model_dump() for msg in self.messages] if self.messages else None
-                )
-                tools = await self.tool_selector.select_tools(
-                    user_message,
-                    use_semantic=self.use_semantic_selection,
-                    conversation_history=conversation_history,
-                    conversation_depth=conversation_depth,
-                )
-                tools = self.tool_selector.prioritize_by_stage(user_message, tools)
-
-            # Prepare optional thinking parameter
-            provider_kwargs = {}
-            if self.thinking:
-                provider_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
-
-            # Check context and compact before API call to prevent overflow
-            if self._context_compactor:
-                compaction_action = self._context_compactor.check_and_compact(
-                    current_query=user_message,
-                    force=False,
-                    tool_call_count=self.tool_calls_used,
-                    task_complexity=task_classification.complexity.value,
-                )
-                if compaction_action.action_taken:
-                    logger.info(
-                        f"Compacted context before API call: {compaction_action.messages_removed} messages removed, "
-                        f"{compaction_action.tokens_freed} tokens freed"
-                    )
-
-            # Get response from provider
-            response = await self.provider.chat(
-                messages=self.messages,
-                model=self.model,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-                tools=tools,
-                **provider_kwargs,
-            )
-
-            # Accumulate token usage for evaluation tracking (P1: Token Tracking Fix)
-            if response.usage:
-                self._cumulative_token_usage["prompt_tokens"] += response.usage.get(
-                    "prompt_tokens", 0
-                )
-                self._cumulative_token_usage["completion_tokens"] += response.usage.get(
-                    "completion_tokens", 0
-                )
-                self._cumulative_token_usage["total_tokens"] += response.usage.get(
-                    "total_tokens", 0
-                )
-
-            # Add assistant response to history if has content
-            if response.content:
-                self.add_message("assistant", response.content)
-
-                # Check compaction after adding assistant response
-                if self._context_compactor:
-                    compaction_action = self._context_compactor.check_and_compact(
-                        current_query=user_message,
-                        force=False,
-                        tool_call_count=self.tool_calls_used,
-                        task_complexity=task_classification.complexity.value,
-                    )
-                    if compaction_action.action_taken:
-                        logger.info(
-                            f"Compacted context after response: {compaction_action.messages_removed} messages removed, "
-                            f"{compaction_action.tokens_freed} tokens freed"
-                        )
-
-            # Check if model wants to use tools
-            if response.tool_calls:
-                # Handle tool calls and track results
-                tool_results = await self._handle_tool_calls(response.tool_calls)
-
-                # Update failure context
-                for result in tool_results:
-                    if result.get("success"):
-                        failure_context.successful_tools.append(result)
-                    else:
-                        failure_context.failed_tools.append(result)
-                        failure_context.last_error = result.get("error")
-
-                # Continue loop to get follow-up response
-                continue
-
-            # No tool calls - this is the final response
-            final_response = response
-            break
-
-        # Ensure we have a complete response
-        if final_response is None or not final_response.content:
-            # Use response completer to generate a response
-            completion_result = await self.response_completer.ensure_response(
-                messages=self.messages,
-                model=self.model,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-                failure_context=failure_context if failure_context.failed_tools else None,
-            )
-
-            if completion_result.content:
-                self.add_message("assistant", completion_result.content)
-                # Create a synthetic response
-                final_response = CompletionResponse(
-                    content=completion_result.content,
-                    role="assistant",
-                    tool_calls=None,
-                )
-            else:
-                # Last resort fallback
-                fallback_content = (
-                    "I was unable to generate a complete response. "
-                    "Please try rephrasing your request."
-                )
-                if failure_context.failed_tools:
-                    fallback_content = self.response_completer.format_tool_failure_message(
-                        failure_context
-                    )
-                # Add fallback to history and return synthetic response
-                self.add_message("assistant", fallback_content)
-                final_response = CompletionResponse(
-                    content=fallback_content,
-                    role="assistant",
-                    tool_calls=None,
-                )
-
-        return final_response
+        return await self._chat_coordinator.chat(user_message)
 
     def _handle_cancellation(self, last_quality_score: float) -> Optional[StreamChunk]:
         """Handle user cancellation if requested."""
@@ -3910,231 +3738,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             return True, StreamChunk(content="", is_final=True)
 
         return False, None
-
-    async def _prepare_stream(self, user_message: str) -> tuple[
-        Any,
-        float,
-        float,
-        Dict[str, int],
-        int,
-        int,
-        int,
-        bool,
-        TrackerTaskType,
-        Any,
-        int,
-    ]:
-        """Prepare streaming state and return commonly used values."""
-        # Initialize cancellation support
-        self._cancel_event = asyncio.Event()
-        self._is_streaming = True
-
-        # Track performance metrics using StreamMetrics
-        stream_metrics = self._metrics_collector.init_stream_metrics()
-        start_time = stream_metrics.start_time
-        total_tokens: float = 0
-
-        # Cumulative token usage from provider (more accurate than estimates)
-        cumulative_usage: Dict[str, int] = {
-            "prompt_tokens": 0,
-            "completion_tokens": 0,
-            "total_tokens": 0,
-            "cache_creation_input_tokens": 0,
-            "cache_read_input_tokens": 0,
-        }
-
-        # Ensure system prompt is included once at start of conversation
-        self.conversation.ensure_system_prompt()
-        self._system_added = True
-        # Reset session state for new stream via SessionStateManager
-        self._session_state.reset_for_new_turn()
-
-        # Reset unified tracker for new conversation (single source of truth)
-        self.unified_tracker.reset()
-
-        # Reset context reminder manager for new conversation turn
-        self.reminder_manager.reset()
-
-        # Start UsageAnalytics session for this conversation
-        if hasattr(self, "_usage_analytics") and self._usage_analytics:
-            self._usage_analytics.start_session()
-
-        # Clear ToolSequenceTracker history for new conversation (keep learned patterns)
-        if hasattr(self, "_sequence_tracker") and self._sequence_tracker:
-            self._sequence_tracker.clear_history()
-
-        # PERF: Start background compaction for async context management
-        # This runs compaction checks periodically without blocking the main loop
-        if self._context_manager and hasattr(self._context_manager, "start_background_compaction"):
-            await self._context_manager.start_background_compaction(interval_seconds=15.0)
-
-        # Local aliases for frequently-used values
-        max_total_iterations = self.unified_tracker.config.get("max_total_iterations", 50)
-        total_iterations = 0
-        force_completion = False
-
-        # Add user message to history
-        self.add_message("user", user_message)
-
-        # Record this turn in UsageAnalytics
-        if hasattr(self, "_usage_analytics") and self._usage_analytics:
-            self._usage_analytics.record_turn()
-
-        # Detect task type using unified tracker (single source of truth)
-        unified_task_type = self.unified_tracker.detect_task_type(user_message)
-        logger.info(f"Task type detected: {unified_task_type.value}")
-
-        # Extract prompt requirements for dynamic budgets (e.g., "read 9 files", "top 3 fixes")
-        prompt_requirements = extract_prompt_requirements(user_message)
-        if prompt_requirements.has_explicit_requirements():
-            # Mark tracker as having prompt requirements (enables lenient limits)
-            self.unified_tracker._progress.has_prompt_requirements = True
-
-            # Apply dynamic tool budget if larger than current
-            if (
-                prompt_requirements.tool_budget
-                and prompt_requirements.tool_budget > self.unified_tracker._progress.tool_budget
-            ):
-                self.unified_tracker.set_tool_budget(prompt_requirements.tool_budget)
-                logger.info(
-                    f"Dynamic budget from prompt: {prompt_requirements.tool_budget} "
-                    f"(files={prompt_requirements.file_count}, fixes={prompt_requirements.fix_count})"
-                )
-
-            # Apply dynamic iteration budget if larger than current
-            if (
-                prompt_requirements.iteration_budget
-                and prompt_requirements.iteration_budget
-                > self.unified_tracker._task_config.max_exploration_iterations
-            ):
-                self.unified_tracker.set_max_iterations(prompt_requirements.iteration_budget)
-                logger.info(
-                    f"Dynamic iterations from prompt: {prompt_requirements.iteration_budget}"
-                )
-
-        # Intelligent pipeline pre-request hook: get Q-learning recommendations
-        # This enables RL-based mode transitions and optimal tool budget selection
-        # PERF: Start as background task to run in parallel with sync work below
-        intelligent_task = asyncio.create_task(
-            self._prepare_intelligent_request(
-                task=user_message,
-                task_type=unified_task_type.value,
-            )
-        )
-
-        # Get exploration iterations from unified tracker (replaces TASK_CONFIGS lookup)
-        max_exploration_iterations = self.unified_tracker.max_exploration_iterations
-
-        # Task prep: hints, complexity, reminders
-        # This runs while intelligent_task executes in background
-        task_classification, complexity_tool_budget = self._prepare_task(
-            user_message, unified_task_type
-        )
-
-        # PERF: Await intelligent request after sync work completes
-        intelligent_context = await intelligent_task
-        if intelligent_context:
-            # Inject optimized system prompt if provided
-            if intelligent_context.get("system_prompt_addition"):
-                self.add_message("system", intelligent_context["system_prompt_addition"])
-                logger.debug("Injected intelligent pipeline optimized prompt")
-
-        return (
-            stream_metrics,
-            start_time,
-            total_tokens,
-            cumulative_usage,
-            max_total_iterations,
-            max_exploration_iterations,
-            total_iterations,
-            force_completion,
-            unified_task_type,
-            task_classification,
-            complexity_tool_budget,
-        )
-
-    async def _create_stream_context(self, user_message: str) -> StreamingChatContext:
-        """Create a StreamingChatContext with all prepared data.
-
-        This method encapsulates _prepare_stream results into a StreamingChatContext,
-        enabling use of the StreamingChatHandler for testable iteration logic.
-
-        Args:
-            user_message: The user's message
-
-        Returns:
-            Populated StreamingChatContext ready for the streaming loop
-        """
-        # Get all prepared data from _prepare_stream
-        (
-            stream_metrics,
-            start_time,
-            total_tokens,
-            cumulative_usage,
-            max_total_iterations,
-            max_exploration_iterations,
-            total_iterations,
-            force_completion,
-            unified_task_type,
-            task_classification,
-            complexity_tool_budget,
-        ) = await self._prepare_stream(user_message)
-
-        # Classify task type based on keywords
-        task_keywords = self._classify_task_keywords(user_message)
-
-        # Create and populate context
-        ctx = create_stream_context(
-            user_message=user_message,
-            max_iterations=max_total_iterations,
-            max_exploration=max_exploration_iterations,
-            tool_budget=complexity_tool_budget,
-        )
-
-        # Populate context with prepared data
-        ctx.stream_metrics = stream_metrics
-        ctx.start_time = start_time
-        ctx.total_tokens = total_tokens
-        ctx.cumulative_usage = cumulative_usage
-        ctx.total_iterations = total_iterations
-        ctx.force_completion = force_completion
-        ctx.unified_task_type = unified_task_type
-        ctx.task_classification = task_classification
-        ctx.complexity_tool_budget = complexity_tool_budget
-
-        # Add task keyword results
-        # Reconcile is_analysis_task from both UnifiedClassifier (keyword-based) and
-        # UnifiedTaskTracker (semantic-based). Either source detecting analysis = analysis task.
-        # This fixes the mismatch where unified_task_type=ANALYZE but is_analysis_task=False
-        ctx.is_analysis_task = task_keywords["is_analysis_task"] or unified_task_type.value in (
-            "analyze",
-            "analysis",
-        )
-        ctx.is_action_task = task_keywords["is_action_task"]
-        ctx.needs_execution = task_keywords["needs_execution"]
-        ctx.coarse_task_type = task_keywords["coarse_task_type"]
-
-        # GAP-16: Set is_complex_task from ComplexityClassifier for lenient progress checking
-        # This allows COMPLEX tasks (like refactoring, multi-file changes) to continue exploring
-        # even when is_analysis_task and is_action_task are False
-        if task_classification and hasattr(task_classification, "complexity"):
-            ctx.is_complex_task = task_classification.complexity in (
-                TaskComplexity.COMPLEX,
-                TaskComplexity.ANALYSIS,
-            )
-
-        # Set goals for tool selection
-        ctx.goals = self._tool_planner.infer_goals_from_message(user_message)
-
-        # Sync tool tracking from orchestrator to context
-        ctx.tool_budget = self.tool_budget
-        ctx.tool_calls_used = self.tool_calls_used
-
-        # Task Completion Detection Enhancement (Phase 2 - Feature Flag Protected)
-        # Make detector available to intent classification for priority checks
-        ctx.task_completion_detector = self._task_completion_detector
-
-        return ctx
 
     def _prepare_task(
         self, user_message: str, unified_task_type: TrackerTaskType
@@ -4627,7 +4230,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 loop_detector=self.unified_tracker,
                 settings=self.settings,
                 config=CoordinatorConfig(
-                    session_idle_timeout=getattr(self.settings, "session_idle_timeout", 180.0),
+                    session_idle_timeout=self._session_idle_timeout,
                     budget_warning_threshold=getattr(
                         self.settings, "tool_call_budget_warning_threshold", 250
                     ),
@@ -5314,573 +4917,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         Returns:
             AsyncIterator yielding StreamChunk objects with incremental response
+
+        SOLID Design: Delegates to ChatCoordinator for modularity (SRP compliance).
+        The coordinator contains the full streaming implementation including
+        token usage tracking and cleanup.
         """
-        try:
-            async for chunk in self._stream_chat_impl(user_message):
-                yield chunk
-        finally:
-            # Update cumulative token usage after stream completes
-            # This enables accurate token tracking for evaluations/benchmarks
-            if hasattr(self, "_current_stream_context") and self._current_stream_context:
-                ctx = self._current_stream_context
-                if hasattr(ctx, "cumulative_usage"):
-                    for key in self._cumulative_token_usage:
-                        if key in ctx.cumulative_usage:
-                            self._cumulative_token_usage[key] += ctx.cumulative_usage[key]
-                    # Calculate total if not tracked by provider
-                    if self._cumulative_token_usage["total_tokens"] == 0:
-                        self._cumulative_token_usage["total_tokens"] = (
-                            self._cumulative_token_usage["prompt_tokens"]
-                            + self._cumulative_token_usage["completion_tokens"]
-                        )
-
-    async def _stream_chat_impl(self, user_message: str) -> AsyncIterator[StreamChunk]:
-        """Implementation for streaming chat.
-
-        Args:
-            user_message: User's message
-
-        Yields:
-            StreamChunk objects with incremental response
-
-        Note:
-            Stream metrics (TTFT, throughput) are available via get_last_stream_metrics()
-            after the stream completes.
-
-        The stream can be cancelled by calling request_cancellation(). When cancelled,
-        the stream will yield a final chunk indicating cancellation and stop.
-
-        This method now uses StreamingChatContext to centralize state management,
-        enabling testable iteration logic via StreamingChatHandler.
-        """
-        # Initialize and prepare using StreamingChatContext
-        stream_ctx = await self._create_stream_context(user_message)
-
-        # Store context reference for handler delegation methods
-        self._current_stream_context = stream_ctx
-
-        # Extract required files and outputs from user prompt for task completion tracking
-        # This enables early termination when all requirements are met
-        self._required_files = self._extract_required_files_from_prompt(user_message)
-        self._required_outputs = self._extract_required_outputs_from_prompt(user_message)
-        self._read_files_session.clear()  # Reset for new session
-        self._all_files_read_nudge_sent = False  # Reset nudge flag for new session
-        logger.debug(
-            f"Task requirements extracted - files: {self._required_files}, "
-            f"outputs: {self._required_outputs}"
-        )
-
-        # Emit task requirements extracted event
-        if self._required_files or self._required_outputs:
-            from victor.core.events import get_observability_bus
-
-            event_bus = get_observability_bus()
-            event_bus.emit(
-                topic="state.task.requirements_extracted",
-                data={
-                    "required_files": self._required_files,
-                    "required_outputs": self._required_outputs,
-                    "file_count": len(self._required_files),
-                    "output_count": len(self._required_outputs),
-                    "category": "state",
-                },
-            )
-
-        # Iteration limits - kept as read-only local references for readability
-        # (These are configuration values that don't change during the loop)
-        max_total_iterations = stream_ctx.max_total_iterations
-        max_exploration_iterations = stream_ctx.max_exploration_iterations
-        # Metrics aliases removed - use stream_ctx.stream_metrics, stream_ctx.start_time,
-        # stream_ctx.total_tokens, stream_ctx.cumulative_usage directly
-        # total_iterations removed - use stream_ctx.total_iterations directly
-        # force_completion already moved to context-only access (stream_ctx.force_completion)
-        # Task classification aliases removed - use stream_ctx.* directly:
-        #   - stream_ctx.unified_task_type
-        #   - stream_ctx.task_classification (unused in loop)
-        #   - stream_ctx.complexity_tool_budget (unused in loop)
-        #   - stream_ctx.coarse_task_type
-        #   - stream_ctx.context_msg (updates via update_context_message())
-        # Task classification flags - use stream_ctx.* directly for access
-        # Aliases removed for: is_action_task, is_analysis_task, needs_execution
-
-        # Detect intent and inject prompt guard for non-write tasks
-        self._apply_intent_guard(user_message)
-
-        # For compound analysis+edit tasks, unified_tracker handles exploration limits
-        if stream_ctx.is_analysis_task and stream_ctx.unified_task_type.value in ("edit", "create"):
-            logger.info(
-                f"Compound task detected (analysis+{stream_ctx.unified_task_type.value}): "
-                f"unified_tracker will use appropriate exploration limits"
-            )
-
-        logger.info(
-            f"Task type classification: coarse={stream_ctx.coarse_task_type}, "
-            f"unified={stream_ctx.unified_task_type.value}, is_analysis={stream_ctx.is_analysis_task}, "
-            f"is_action={stream_ctx.is_action_task}"
-        )
-
-        # Apply guidance for analysis/action tasks
-        self._apply_task_guidance(
-            user_message,
-            stream_ctx.unified_task_type,
-            stream_ctx.is_analysis_task,
-            stream_ctx.is_action_task,
-            stream_ctx.needs_execution,
-            max_exploration_iterations,
-        )
-
-        # Add guidance for action-oriented tasks
-        if stream_ctx.is_action_task:
-            logger.info(
-                f"Detected action-oriented task - allowing up to {max_exploration_iterations} exploration iterations"
-            )
-
-            # needs_execution is already computed by _classify_task_keywords
-            if stream_ctx.needs_execution:
-                self.add_message(
-                    "system",
-                    "This is an action-oriented task requiring execution. "
-                    "Follow this workflow: "
-                    "1. CREATE the file/script with write_file or edit_files "
-                    "2. EXECUTE it immediately with execute_bash (don't skip this step!) "
-                    "3. SHOW the output to the user. "
-                    "Minimize exploration and proceed directly to create→execute→show results.",
-                )
-            else:
-                self.add_message(
-                    "system",
-                    "This is an action-oriented task (create/write/build). "
-                    "Minimize exploration and proceed directly to creating what was requested. "
-                    "Only explore if absolutely necessary to complete the task.",
-                )
-
-        goals = self._tool_planner.infer_goals_from_message(user_message)
-
-        # Log all limits for debugging
-        logger.info(
-            f"Stream chat limits: "
-            f"tool_budget={self.tool_budget}, "
-            f"max_total_iterations={max_total_iterations}, "
-            f"max_exploration_iterations={max_exploration_iterations}, "
-            f"is_analysis_task={stream_ctx.is_analysis_task}, "
-            f"is_action_task={stream_ctx.is_action_task}"
-        )
-
-        # Reset debug logger for new conversation turn
-        self.debug_logger.reset()
-
-        # Quality score and content threshold - accessed directly from stream_ctx
-        # Quality updates use stream_ctx.update_quality_score()
-        # Content accumulation is handled by stream_ctx.accumulate_content()
-        # Aliases removed: last_quality_score, substantial_content_threshold
-
-        while True:
-            # === PRE-ITERATION CHECKS (via coordinator helper) ===
-            # Handles: cancellation, compaction, time limit, iteration increment, grounding feedback
-            cancelled = False
-            async for pre_chunk in self._run_iteration_pre_checks(stream_ctx, user_message):
-                yield pre_chunk
-                # Check if cancellation occurred (force_completion set with empty content)
-                if pre_chunk.content == "" and getattr(pre_chunk, "is_final", False):
-                    cancelled = True
-            if cancelled:
-                return
-
-            # Log iteration debug info
-            self._log_iteration_debug(stream_ctx, max_total_iterations)
-
-            # === CONTEXT AND ITERATION LIMIT CHECKS ===
-            max_context = self._get_max_context_chars()
-            handled, iter_chunk = await self._handle_context_and_iteration_limits(
-                user_message,
-                max_total_iterations,
-                max_context,
-                stream_ctx.total_iterations,
-                stream_ctx.last_quality_score,
-            )
-            if iter_chunk:
-                yield iter_chunk
-            if handled:
-                break
-
-            tools = await self._select_tools_for_turn(stream_ctx.context_msg, goals)
-
-            # Prepare optional thinking parameter for providers that support it (Anthropic)
-            provider_kwargs = {}
-            if self.thinking:
-                # Anthropic extended thinking format
-                provider_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
-
-            full_content, tool_calls, _, garbage_detected = await self._stream_provider_response(
-                tools=tools,
-                provider_kwargs=provider_kwargs,
-                stream_ctx=stream_ctx,
-            )
-
-            # Debug: Log response details
-            content_preview = full_content[:200] if full_content else "(empty)"
-            logger.debug(
-                f"_stream_provider_response returned: content_len={len(full_content) if full_content else 0}, "
-                f"native_tool_calls={len(tool_calls) if tool_calls else 0}, tokens={stream_ctx.total_tokens}, "
-                f"garbage={garbage_detected}, content_preview={content_preview!r}"
-            )
-
-            # If garbage was detected, force completion on next iteration
-            if garbage_detected and not tool_calls:
-                stream_ctx.force_completion = True
-                logger.info("Setting force_completion due to garbage detection")
-
-            # Parse, validate, and normalize tool calls (fallback parsing, filtering, arg coercion)
-            tool_calls, full_content = self._parse_and_validate_tool_calls(tool_calls, full_content)
-
-            # Task Completion Detection Enhancement (Phase 2 - Feature Flag Protected)
-            # Analyze response for explicit completion signals when feature flag is enabled
-            if self._task_completion_detector and full_content:
-                from victor.agent.task_completion import CompletionConfidence
-
-                self._task_completion_detector.analyze_response(full_content)
-                confidence = self._task_completion_detector.get_completion_confidence()
-
-                # HIGH confidence (active signal) triggers immediate completion
-                if confidence == CompletionConfidence.HIGH:
-                    logger.info(
-                        "Task completion: HIGH confidence detected (active signal), "
-                        "forcing completion after this response"
-                    )
-                    stream_ctx.force_completion = True
-
-                # MEDIUM confidence (file mods + passive) logs info but doesn't force
-                elif confidence == CompletionConfidence.MEDIUM:
-                    logger.info(
-                        "Task completion: MEDIUM confidence detected (file mods + passive signal)"
-                    )
-
-            # DEBUG: Log complete tool calls from LLM for diagnosis
-            if tool_calls:
-                logger.debug(f"LLM tool calls ({len(tool_calls)} total):")
-                for i, tc in enumerate(tool_calls):
-                    tc_name = tc.get("name", "unknown")
-                    tc_args = tc.get("arguments", {})
-                    # Truncate large args for readability
-                    args_str = str(tc_args)
-                    if len(args_str) > 500:
-                        args_str = args_str[:500] + "...(truncated)"
-                    logger.debug(f"  [{i+1}] {tc_name}: {args_str}")
-
-            # Initialize mentioned_tools_detected for later use in continuation action
-            mentioned_tools_detected: List[str] = []
-
-            # Check for mentioned tools early for recovery integration
-            if full_content and not tool_calls:
-                mentioned_tools_detected = ContinuationStrategy.detect_mentioned_tools(
-                    full_content, list(_ALL_TOOL_NAMES), TOOL_ALIASES
-                )
-
-            # Use recovery integration to detect and handle failures
-            # This runs after each response to check for stuck states, empty responses, etc.
-            recovery_action = await self._handle_recovery_with_integration(
-                stream_ctx=stream_ctx,
-                full_content=full_content,
-                tool_calls=tool_calls,
-                mentioned_tools=mentioned_tools_detected or None,
-            )
-
-            # Apply recovery action if not just "continue"
-            if recovery_action.action != "continue":
-                recovery_chunk = self._apply_recovery_action(recovery_action, stream_ctx)
-                if recovery_chunk:
-                    yield recovery_chunk
-                    if recovery_chunk.is_final:
-                        # Record outcome for Q-learning
-                        self._recovery_integration.record_outcome(success=False)
-                        return
-                # If action was retry/force_summary, continue the loop with updated state
-                if recovery_action.action in ("retry", "force_summary"):
-                    continue
-
-            if full_content:
-                # Sanitize response to remove malformed patterns from local models
-                sanitized = self.sanitizer.sanitize(full_content)
-                if sanitized:
-                    self.add_message("assistant", sanitized)
-                else:
-                    # If sanitization removed everything, use stripped markup as fallback
-                    plain_text = self.sanitizer.strip_markup(full_content)
-                    if plain_text:
-                        self.add_message("assistant", plain_text)
-
-                # Log info if model mentioned tools but didn't execute them
-                # (mentioned_tools_detected was already computed earlier for recovery integration)
-                # This is common with local models that struggle with native tool calling
-                if mentioned_tools_detected:
-                    tools_str = ", ".join(mentioned_tools_detected)
-                    logger.info(
-                        f"Model mentioned tool(s) [{tools_str}] in text without executing. "
-                        "Common with local models - tool syntax detected in response content."
-                    )
-            elif not tool_calls:
-                # No content and no tool calls - check for natural completion
-                # via recovery coordinator directly (checks if substantial content was provided)
-                recovery_ctx = self._create_recovery_context(stream_ctx)
-                final_chunk = self._recovery_coordinator.check_natural_completion(
-                    recovery_ctx, has_tool_calls=False, content_length=0
-                )
-                if final_chunk:
-                    yield final_chunk
-                    return
-
-                # No substantial content yet - attempt aggressive recovery
-                logger.warning("Model returned empty response - attempting aggressive recovery")
-
-                # Track empty responses - delegates to recovery coordinator
-                recovery_ctx = self._create_recovery_context(stream_ctx)
-                recovery_chunk, should_force = self._recovery_coordinator.handle_empty_response(
-                    recovery_ctx
-                )
-                if recovery_chunk:
-                    yield recovery_chunk
-                    # CRITICAL: Handler already set stream_ctx.force_completion if needed
-                    # The should_force flag confirms the handler's decision
-                    continue
-
-                # Delegate empty response recovery to helper method
-                recovery_success, recovered_tool_calls, final_chunk = (
-                    await self._handle_empty_response_recovery(stream_ctx, tools)
-                )
-
-                if recovery_success:
-                    if final_chunk:
-                        # Recovery produced text response - yield and return
-                        yield final_chunk
-                        return
-                    elif recovered_tool_calls:
-                        # Recovery produced tool calls - continue main loop
-                        tool_calls = recovered_tool_calls
-                        logger.info(
-                            f"Recovery produced {len(tool_calls)} tool call(s) - continuing main loop"
-                        )
-                else:
-                    # All recovery attempts failed - get fallback message
-                    recovery_ctx = self._create_recovery_context(stream_ctx)
-                    fallback_msg = self._recovery_coordinator.get_recovery_fallback_message(
-                        recovery_ctx
-                    )
-                    self._record_intelligent_outcome(
-                        success=False,
-                        quality_score=0.3,
-                        user_satisfied=False,
-                        completed=False,
-                    )
-                    yield self._chunk_generator.generate_content_chunk(fallback_msg, is_final=True)
-                    return
-
-            # Record tool calls in progress tracker for loop detection
-            # Progress tracker handles unique resource tracking internally
-            for tc in tool_calls or []:
-                tool_name = tc.get("name", "")
-                tool_args = tc.get("arguments", {})
-
-                # Record tool call in unified tracker (single source of truth)
-                self.unified_tracker.record_tool_call(tool_name, tool_args)
-
-            content_length = len(full_content.strip())
-
-            # Record iteration in unified tracker (single source of truth)
-            self.unified_tracker.record_iteration(content_length)
-
-            # Intelligent pipeline post-iteration hook: validate response quality
-            # This enables quality scoring, hallucination detection, and Q-learning feedback
-            if full_content and len(full_content.strip()) > 50:
-                quality_result = await self._validate_intelligent_response(
-                    response=full_content,
-                    query=user_message,
-                    tool_calls=self.tool_calls_used,
-                    task_type=stream_ctx.unified_task_type.value,
-                )
-                if quality_result and not quality_result.get("is_grounded", True):
-                    # Log grounding issues for debugging
-                    issues = quality_result.get("grounding_issues", [])
-                    if issues:
-                        logger.warning(
-                            f"IntelligentPipeline detected grounding issues: {issues[:3]}"
-                        )
-                    # If retry is allowed, inject grounding feedback as system message
-                    if quality_result.get("should_retry"):
-                        grounding_feedback = quality_result.get("grounding_feedback", "")
-                        if grounding_feedback:
-                            logger.info(
-                                f"Injecting grounding feedback for retry: {len(grounding_feedback)} chars"
-                            )
-                            # Store feedback for injection in next iteration
-                            stream_ctx.pending_grounding_feedback = grounding_feedback
-
-                # Update quality score for Q-learning outcome recording
-                if quality_result:
-                    new_score = quality_result.get("quality_score", stream_ctx.last_quality_score)
-                    stream_ctx.update_quality_score(new_score)
-
-                # Check for force finalize from grounding failures
-                # This prevents infinite loops when grounding keeps failing
-                if quality_result and quality_result.get("should_finalize"):
-                    finalize_reason = quality_result.get(
-                        "finalize_reason", "grounding limit exceeded"
-                    )
-                    logger.warning(
-                        f"Force finalize triggered: {finalize_reason}. "
-                        "Stopping continuation to prevent infinite loop."
-                    )
-                    # Set flag to force completion in continuation logic
-                    self._force_finalize = True
-
-            # Check for loop warning via streaming handler directly
-            unified_loop_warning = self.unified_tracker.check_loop_warning()
-            loop_warning_chunk = self._streaming_handler.handle_loop_warning(
-                stream_ctx, unified_loop_warning
-            )
-            if loop_warning_chunk:
-                logger.warning(f"UnifiedTaskTracker loop warning: {unified_loop_warning}")
-                yield loop_warning_chunk
-            else:
-                # PRIMARY: Check UnifiedTaskTracker for stop decision via recovery coordinator
-                recovery_ctx = self._create_recovery_context(stream_ctx)
-                was_triggered, hint = self._recovery_coordinator.check_force_action(recovery_ctx)
-                if was_triggered:
-                    logger.info(
-                        f"UnifiedTaskTracker forcing action: {hint}, "
-                        f"metrics={self.unified_tracker.get_metrics()}"
-                    )
-
-                logger.debug(f"After streaming pass, tool_calls = {tool_calls}")
-
-                if not tool_calls:
-                    # === INTENT CLASSIFICATION (P0 SRP refactor) ===
-                    # Delegated to IntentClassificationHandler for testability and SRP compliance.
-                    # The handler manages content yielding, intent classification (with caching),
-                    # response loop detection, and continuation action determination.
-
-                    # Create intent classification handler lazily (reused across iterations)
-                    if not hasattr(self, "_intent_classification_handler"):
-                        self._intent_classification_handler = create_intent_classification_handler(
-                            self
-                        )
-
-                    # Ensure tracking variables are initialized
-                    if not hasattr(self, "_continuation_prompts"):
-                        self._continuation_prompts = 0
-                    if not hasattr(self, "_asking_input_prompts"):
-                        self._asking_input_prompts = 0
-                    if not hasattr(self, "_consecutive_blocked_attempts"):
-                        self._consecutive_blocked_attempts = 0
-                    if not hasattr(self, "_cumulative_prompt_interventions"):
-                        self._cumulative_prompt_interventions = 0
-
-                    # Create tracking state from orchestrator
-                    tracking_state = create_tracking_state(self)
-
-                    # Delegate to IntentClassificationHandler
-                    intent_result = (
-                        self._intent_classification_handler.classify_and_determine_action(
-                            stream_ctx=stream_ctx,
-                            full_content=full_content,
-                            content_length=content_length,
-                            mentioned_tools=mentioned_tools_detected,
-                            tracking_state=tracking_state,
-                        )
-                    )
-
-                    # Yield chunks from handler (content yielded to UI)
-                    for chunk in intent_result.chunks:
-                        yield chunk
-
-                    # Clear full_content if handler yielded it
-                    if intent_result.content_cleared:
-                        full_content = ""
-
-                    # Apply state updates back to orchestrator
-                    force_finalize_used = (
-                        tracking_state.force_finalize and intent_result.action == "finish"
-                    )
-                    apply_tracking_state_updates(
-                        self, intent_result.state_updates, force_finalize_used
-                    )
-
-                    # Get action result for ContinuationHandler
-                    action_result = intent_result.action_result
-                    action = intent_result.action
-
-                    # Log the action
-                    logger.info(
-                        f"Continuation action: {action} - {action_result.get('reason', 'unknown')}"
-                    )
-
-                    # === CONTINUATION ACTION HANDLING (P0 SRP refactor) ===
-                    # Delegated to ContinuationHandler for testability and SRP compliance.
-                    # The handler processes actions like prompt_tool_call, request_summary,
-                    # execute_extracted_tool, force_tool_execution, finish, etc.
-
-                    # Create continuation handler lazily (reused across iterations)
-                    if not hasattr(self, "_continuation_handler"):
-                        self._continuation_handler = create_continuation_handler(self)
-
-                    # Update action in action_result if it was overridden
-                    action_result["action"] = action
-
-                    # Delegate to ContinuationHandler
-                    continuation_result = await self._continuation_handler.handle_action(
-                        action_result=action_result,
-                        stream_ctx=stream_ctx,
-                        full_content=full_content,
-                    )
-
-                    # Yield chunks from handler
-                    for chunk in continuation_result.chunks:
-                        yield chunk
-
-                    # Apply state updates from handler
-                    if "cumulative_prompt_interventions" in continuation_result.state_updates:
-                        self._cumulative_prompt_interventions = continuation_result.state_updates[
-                            "cumulative_prompt_interventions"
-                        ]
-
-                    # Check control flags
-                    if continuation_result.should_return:
-                        return
-                    # If should_skip_rest, continue to tool execution section
-                    # (which will be a no-op since tool_calls is empty)
-
-                # === TOOL EXECUTION PHASE (P0 SRP refactor) ===
-                # Delegated to ToolExecutionHandler for testability and SRP compliance.
-                # The handler manages budget checks, filtering, execution, and result generation.
-
-                # Create tool execution handler lazily (reused across iterations)
-                if not hasattr(self, "_tool_execution_handler"):
-                    self._tool_execution_handler = create_tool_execution_handler(self)
-
-                # Update observed files for reminder tracking
-                self._tool_execution_handler.update_observed_files(
-                    set(self.observed_files) if self.observed_files else set()
-                )
-
-                # Delegate to ToolExecutionHandler
-                tool_exec_result = await self._tool_execution_handler.execute_tools(
-                    stream_ctx=stream_ctx,
-                    tool_calls=tool_calls,
-                    user_message=user_message,
-                    full_content=full_content,
-                    tool_calls_used=self.tool_calls_used,
-                    tool_budget=self.tool_budget,
-                )
-
-                # Yield chunks from handler
-                for chunk in tool_exec_result.chunks:
-                    yield chunk
-
-                # Update tool calls counter
-                self.tool_calls_used += tool_exec_result.tool_calls_executed
-
-                # Check control flags
-                if tool_exec_result.should_return:
-                    return
+        async for chunk in self._chat_coordinator.stream_chat(user_message):
+            yield chunk
 
     async def _execute_tool_with_retry(
         self, tool_name: str, tool_args: Dict[str, Any], context: Dict[str, Any]

@@ -165,6 +165,96 @@ class ContinuationStrategy:
                 logger.debug(f"Failed to emit continuation event: {e}")
 
     @staticmethod
+    def _get_complexity_threshold(
+        settings: Any, complexity: Optional[str], threshold_type: str
+    ) -> int:
+        """Get complexity-based threshold from settings.
+
+        Args:
+            settings: Settings object
+            complexity: Task complexity level (simple/medium/complex/generation/action/analysis)
+            threshold_type: Type of threshold (max_interventions or max_iterations)
+
+        Returns:
+            Threshold value based on complexity, with sensible defaults
+        """
+        # Map complexity to setting names
+        complexity_map = {
+            "simple": "continuation_simple",
+            "medium": "continuation_medium",
+            "complex": "continuation_complex",
+            "generation": "continuation_generation",
+            "action": "continuation_medium",  # Use medium thresholds for action tasks
+            "analysis": "continuation_complex",  # Use complex thresholds for analysis tasks
+        }
+
+        # Default to medium if complexity not specified
+        complexity_key = complexity_map.get(complexity or "medium", "continuation_medium")
+
+        # Get threshold from settings
+        setting_name = f"{complexity_key}_{threshold_type}"
+        threshold = getattr(settings, setting_name, None)
+
+        # Fallback defaults if setting not available
+        if threshold is None:
+            if threshold_type == "max_interventions":
+                defaults = {"simple": 5, "medium": 10, "complex": 20, "generation": 15}
+            else:  # max_iterations
+                defaults = {"simple": 10, "medium": 25, "complex": 50, "generation": 35}
+
+            complexity_default = complexity or "medium"
+            threshold = defaults.get(complexity_default, 10)
+
+        return threshold
+
+    def _calculate_hybrid_score(
+        self,
+        progress_metrics: Optional[Any],
+        task_complexity: Optional[str],
+        cumulative_interventions: int,
+        max_interventions: int,
+        max_iterations: int,
+        estimated_tokens: int,
+        content_length: int,
+    ) -> Dict[str, Any]:
+        """Calculate hybrid continuation score combining all signals.
+
+        Uses the ContinuationSignals class to compute a weighted score from:
+        - Progress velocity (30%)
+        - Stuck loop penalty (25%)
+        - Token budget (20%)
+        - Intervention ratio (15%)
+        - Complexity adjustment (10%)
+
+        Args:
+            progress_metrics: ProgressMetrics instance
+            task_complexity: Task complexity level
+            cumulative_interventions: Total continuation prompts
+            max_interventions: Max interventions for this complexity
+            max_iterations: Max iterations for this complexity
+            estimated_tokens: Current token usage estimate
+            content_length: Content length
+
+        Returns:
+            Dict with score, recommendation, confidence, and signal breakdown
+        """
+        from victor.agent.streaming.continuation import ContinuationSignals
+
+        # Create signals container
+        signals = ContinuationSignals(
+            progress_metrics=progress_metrics,
+            task_complexity=task_complexity,
+            cumulative_interventions=cumulative_interventions,
+            max_interventions=max_interventions,
+            max_iterations=max_iterations,
+            estimated_tokens=estimated_tokens,
+            content_length=content_length,
+        )
+
+        # Calculate hybrid score
+        return signals.calculate_continuation_score()
+
+    @staticmethod
     def detect_mentioned_tools(
         text: str, all_tool_names: List[str], tool_aliases: Dict[str, str]
     ) -> List[str]:
@@ -251,6 +341,151 @@ class ContinuationStrategy:
 
         return True
 
+    def _get_continuation_prompt(
+        self,
+        provider_name: str,
+        model: str,
+        is_analysis_task: bool,
+        is_action_task: bool,
+        continuation_prompts: int,
+        full_content: Optional[str] = None,
+    ) -> str:
+        """Get model-specific continuation prompt to encourage tool usage.
+
+        Different models respond better to different prompting styles. This method
+        returns tailored prompts based on the provider/model combination.
+
+        Args:
+            provider_name: LLM provider (e.g., "ollama", "anthropic", "openai")
+            model: Model name (e.g., "qwen3-coder-tools:30b-64K")
+            is_analysis_task: Whether this is an analysis task
+            is_action_task: Whether this is an action/implementation task
+            continuation_prompts: Current number of continuation prompts sent
+            full_content: Optional full response content for context-aware prompts
+
+        Returns:
+            Continuation prompt message to send to the model
+        """
+        # Extract model family for targeted prompts
+        model_lower = model.lower()
+        provider_lower = provider_name.lower()
+
+        # Qwen models need more explicit, directive prompts
+        if "qwen" in model_lower or "alibaba" in provider_lower:
+            return self._get_qwen_continuation_prompt(
+                is_analysis_task, is_action_task, continuation_prompts, full_content
+            )
+
+        # DeepSeek models respond well to step-by-step breakdown
+        if "deepseek" in model_lower:
+            return self._get_deepseek_continuation_prompt(
+                is_analysis_task, is_action_task
+            )
+
+        # Default prompts for other models
+        if is_analysis_task:
+            return (
+                "Continue your analysis. Use tools like read_file, list_directory, "
+                "code_search to gather more information."
+            )
+        elif is_action_task:
+            return (
+                "Continue with the implementation. Use tools like write_file, "
+                "edit_files to make the necessary changes."
+            )
+        else:
+            return "Continue. Use appropriate tools if needed."
+
+    def _get_qwen_continuation_prompt(
+        self,
+        is_analysis_task: bool,
+        is_action_task: bool,
+        continuation_prompts: int,
+        full_content: Optional[str] = None,
+    ) -> str:
+        """Get Qwen-specific continuation prompt.
+
+        Qwen models (especially coder variants) need:
+        1. More explicit directives
+        2. Step-by-step instructions
+        3. Clear tool usage examples
+        """
+        if continuation_prompts >= 3:
+            # After 3 failed attempts, use very directive language
+            if is_analysis_task:
+                return (
+                    "⚠️ ACTION REQUIRED: You MUST use tools to complete this analysis.\n\n"
+                    "Next step: Choose ONE tool to execute NOW:\n"
+                    "1. read(path='path/to/file') - Read a specific file\n"
+                    "2. ls(path='directory') - List directory contents\n"
+                    "3. graph() - Analyze code architecture\n"
+                    "4. grep(pattern='text', path='path') - Search for patterns\n\n"
+                    "Example: read(path='victor/agent/orchestrator.py')\n\n"
+                    "Execute a tool call immediately. Do not repeat the task description."
+                )
+            elif is_action_task:
+                return (
+                    "⚠️ ACTION REQUIRED: You MUST use tools to implement the changes.\n\n"
+                    "Next step: Choose a tool to execute:\n"
+                    "1. write_file(path='path', content='...') - Create/overwrite file\n"
+                    "2. edit(path='path', ...) - Edit existing file\n\n"
+                    "Execute a tool call immediately."
+                )
+            else:
+                return (
+                    "⚠️ ACTION REQUIRED: Execute a tool call to continue.\n\n"
+                    "Use appropriate tools for your task. Do not repeat the task description."
+                )
+
+        # First/second attempt - more subtle
+        if is_analysis_task:
+            return (
+                "To complete your analysis, please start by examining the codebase:\n\n"
+                "1. First, use: ls(path='victor') to see the main directories\n"
+                "2. Then, use: read(path='victor/agent/orchestrator.py') to read key files\n"
+                "3. Use: graph() to understand the architecture\n\n"
+                "Begin with ls() now."
+            )
+        elif is_action_task:
+            return (
+                "To implement this task:\n\n"
+                "1. First, read the files you need to modify\n"
+                "2. Then, use write_file() or edit() to make changes\n\n"
+                "Start by reading the relevant file."
+            )
+        else:
+            return "Please use appropriate tools to continue with your task."
+
+    def _get_deepseek_continuation_prompt(
+        self,
+        is_analysis_task: bool,
+        is_action_task: bool,
+    ) -> str:
+        """Get DeepSeek-specific continuation prompt.
+
+        DeepSeek models respond well to:
+        1. Step-by-step breakdown
+        2. Clear reasoning chains
+        """
+        if is_analysis_task:
+            return (
+                "Let's continue the analysis step by step:\n\n"
+                "Step 1: List the directories to understand the structure\n"
+                "Step 2: Read key implementation files\n"
+                "Step 3: Analyze the integration patterns\n\n"
+                "Please start with Step 1 using the ls() tool."
+            )
+        elif is_action_task:
+            return (
+                "Let's proceed with implementation:\n\n"
+                "Step 1: Read the file to understand current implementation\n"
+                "Step 2: Make the necessary edits\n"
+                "Step 3: Verify the changes\n\n"
+                "Begin with Step 1."
+            )
+        else:
+            return "Continue step by step. Use tools as needed."
+
     def determine_continuation_action(
         self,
         intent_result: Any,  # IntentClassificationResult
@@ -271,6 +506,8 @@ class ContinuationStrategy:
         tool_budget: int,
         unified_tracker_config: Dict[str, Any],
         task_completion_signals: Optional[Dict[str, Any]] = None,
+        progress_metrics: Optional[Any] = None,  # ProgressMetrics instance
+        task_complexity: Optional[str] = None,  # Task complexity level (simple/medium/complex/generation)
     ) -> Dict[str, Any]:
         """Determine what continuation action to take when model doesn't call tools.
 
@@ -296,6 +533,8 @@ class ContinuationStrategy:
             tool_budget: Current tool budget
             unified_tracker_config: Config dict from unified tracker
             task_completion_signals: Optional signals for task completion detection
+            progress_metrics: Optional ProgressMetrics instance for progress tracking
+            task_complexity: Optional task complexity level (simple/medium/complex/generation)
 
         Returns:
             Dictionary with:
@@ -309,6 +548,113 @@ class ContinuationStrategy:
         from victor.storage.embeddings.intent_classifier import IntentType
 
         updates: Dict[str, Any] = {}
+
+        # Get complexity-based thresholds from settings
+        max_interventions = self._get_complexity_threshold(
+            settings, task_complexity, "max_interventions"
+        )
+        max_iterations = self._get_complexity_threshold(
+            settings, task_complexity, "max_iterations"
+        )
+
+        logger.debug(
+            f"Continuation action decision: complexity={task_complexity}, "
+            f"max_interventions={max_interventions}, max_iterations={max_iterations}"
+        )
+
+        # TOKEN BUDGET CHECK: Check if token limits require action
+        # This provides an additional signal beyond iteration counts
+        # Estimate current token usage from content length
+        estimated_tokens = int(content_length / 4) if content_length > 0 else 0
+
+        if progress_metrics and progress_metrics.token_budget:
+            # Get token status from progress metrics
+            token_status = progress_metrics.check_token_limits(estimated_tokens)
+
+            if token_status:
+                logger.debug(
+                    f"Token budget status: {token_status.get('usage_pct', 0)}% used, "
+                    f"should_nudge={token_status.get('should_nudge', False)}, "
+                    f"should_force={token_status.get('should_force', False)}"
+                )
+
+                # Force synthesis if hard limit reached
+                if token_status.get("should_force", False):
+                    return {
+                        "action": "request_summary",
+                        "message": (
+                            f"Token budget at {token_status.get('usage_pct', 0)}% of context window. "
+                            f"Please synthesize your findings now to avoid exceeding model capacity."
+                        ),
+                        "reason": f"Token limit reached ({token_status.get('usage_pct', 0)}% of context)",
+                        "updates": updates,
+                    }
+
+                # Add token status to logs for observability
+                if token_status.get("should_nudge", False):
+                    logger.info(
+                        f"Token budget at soft limit ({token_status.get('usage_pct', 0)}%) - "
+                        f"considering synthesis nudge"
+                    )
+
+        # Calculate cumulative interventions early for hybrid scoring
+        cumulative_interventions = 0
+        if task_completion_signals:
+            cumulative_interventions = task_completion_signals.get(
+                "cumulative_prompt_interventions", 0
+            )
+
+        # HYBRID SCORING: Combine all signals for intelligent continuation decision
+        # This is the primary decision mechanism for Phase 4
+        hybrid_result = self._calculate_hybrid_score(
+            progress_metrics=progress_metrics,
+            task_complexity=task_complexity,
+            cumulative_interventions=cumulative_interventions,
+            max_interventions=max_interventions,
+            max_iterations=max_iterations,
+            estimated_tokens=estimated_tokens,
+            content_length=content_length,
+        )
+
+        # Log hybrid scoring results for observability
+        logger.debug(
+            f"Hybrid continuation score: {hybrid_result['score']:.3f}, "
+            f"recommendation={hybrid_result['recommendation']}, "
+            f"confidence={hybrid_result['confidence']:.3f}"
+        )
+
+        # Emit event with detailed breakdown for observability
+        self._emit_event(
+            topic="state.continuation.hybrid_score",
+            data={
+                "score": hybrid_result["score"],
+                "recommendation": hybrid_result["recommendation"],
+                "confidence": hybrid_result["confidence"],
+                "signal_scores": hybrid_result["signal_scores"],
+                "task_complexity": task_complexity,
+            },
+        )
+
+        # Force synthesis if hybrid score is very low OR stuck loop detected
+        if (hybrid_result["recommendation"] == "force_synthesis" or
+            hybrid_result["score"] < 0.2 or
+            (progress_metrics and progress_metrics.is_stuck_loop)):
+            # Build detailed reason from hybrid result
+            reason_parts = []
+            if progress_metrics and progress_metrics.is_stuck_loop:
+                reason_parts.append("stuck loop detected")
+            if hybrid_result["score"] < 0.2:
+                reason_parts.append(f"low continuation score ({hybrid_result['score']:.2f})")
+
+            return {
+                "action": "request_summary",
+                "message": (
+                    f"Please synthesize your findings now. "
+                    f"Continuation score: {hybrid_result['score']:.2f}/1.0"
+                ),
+                "reason": f"Force synthesis: {', '.join(reason_parts)}",
+                "updates": updates,
+            }
 
         # TASK COMPLETION CHECK: If all required files read and output requirements met,
         # finish immediately to prevent prompting loop (prompting loop fix)
@@ -416,42 +762,54 @@ class ContinuationStrategy:
             cumulative_interventions = task_completion_signals.get(
                 "cumulative_prompt_interventions", 0
             )
-            if cumulative_interventions >= 5 and is_analysis_task:
-                # Calculate progress ratio (unique files per intervention)
-                file_count = len(read_files)
-                unique_files = len(set(read_files))  # Dedupe in case of re-reads
-                progress_ratio = unique_files / max(cumulative_interventions, 1)
 
-                # Log for observability
+            # Use ProgressMetrics if available for more accurate progress tracking
+            if progress_metrics:
+                # ProgressMetrics provides accurate tracking of files read, revisits, tool usage
+                unique_files = progress_metrics.unique_files_read
+                file_count = progress_metrics.total_file_reads
+                is_making_progress = progress_metrics.is_making_progress
+                is_stuck_loop = progress_metrics.is_stuck_loop
+                revisit_ratio = progress_metrics.revisit_ratio
+
+                # Log detailed progress metrics
                 logger.info(
-                    f"Intervention check: count={cumulative_interventions}, "
+                    f"ProgressMetrics check: interventions={cumulative_interventions}, "
                     f"unique_files={unique_files}, total_reads={file_count}, "
-                    f"progress_ratio={progress_ratio:.2f}"
+                    f"revisit_ratio={revisit_ratio:.2f}, is_making_progress={is_making_progress}, "
+                    f"is_stuck_loop={is_stuck_loop}"
                 )
 
-                # Only intervene if:
-                # 1. High interventions (>8) regardless of progress, OR
-                # 2. Low progress (<0.5 new files per intervention) AND >5 interventions
-                should_nudge = cumulative_interventions >= 8 or (
-                    progress_ratio < 0.5 and cumulative_interventions >= 5
+                # Decision logic using ProgressMetrics:
+                # 1. Stuck loop → force synthesis immediately
+                # 2. High interventions (>=max_interventions) regardless of progress
+                # 3. Low progress (revisit_ratio > 0.5) AND >5 interventions
+                should_nudge = (
+                    is_stuck_loop or
+                    cumulative_interventions >= max_interventions or
+                    (revisit_ratio > 0.5 and cumulative_interventions >= 5)
                 )
 
-                if should_nudge:
+                if cumulative_interventions >= 5 and is_analysis_task and should_nudge:
                     self._emit_event(
                         topic="state.continuation.cumulative_intervention_nudge",
                         data={
                             "cumulative_interventions": cumulative_interventions,
                             "unique_files": unique_files,
                             "total_reads": file_count,
-                            "progress_ratio": progress_ratio,
+                            "revisit_ratio": revisit_ratio,
+                            "is_making_progress": is_making_progress,
+                            "is_stuck_loop": is_stuck_loop,
                             "required_outputs": required_outputs,
+                            "max_interventions": max_interventions,
+                            "task_complexity": task_complexity,
                         },
                     )
                     output_hints = (
                         ", ".join(required_outputs[:3]) if required_outputs else "your findings"
                     )
-                    # After 10+ interventions, force synthesis; before that, just nudge
-                    if cumulative_interventions >= 10:
+                    # After max_interventions+ interventions or stuck loop, force synthesis; before that, just nudge
+                    if cumulative_interventions >= max_interventions or is_stuck_loop:
                         return {
                             "action": "request_summary",
                             "message": (
@@ -459,7 +817,7 @@ class ContinuationStrategy:
                                 f"{cumulative_interventions} intervention cycles. Please synthesize your analysis now "
                                 f"into {output_hints}. Provide your findings based on what you've already read."
                             ),
-                            "reason": f"Excessive prompt interventions ({cumulative_interventions}) - forcing synthesis",
+                            "reason": f"Prompt interventions ({cumulative_interventions}/{max_interventions}) or stuck loop - forcing synthesis",
                             "updates": updates,
                         }
                     elif synthesis_nudge_count < 3:
@@ -471,9 +829,71 @@ class ContinuationStrategy:
                                 f"your analysis into {output_hints}. You may continue exploring briefly, "
                                 f"but please produce the final output soon."
                             ),
-                            "reason": f"Interventions ({cumulative_interventions}) with low progress ({progress_ratio:.2f}) nudge",
+                            "reason": f"Interventions ({cumulative_interventions}) with progress ratio {revisit_ratio:.2f} nudge",
                             "updates": updates,
                         }
+            else:
+                # Fallback to simple progress calculation without ProgressMetrics
+                if cumulative_interventions >= 5 and is_analysis_task:
+                    # Calculate progress ratio (unique files per intervention)
+                    file_count = len(read_files)
+                    unique_files = len(set(read_files))  # Dedupe in case of re-reads
+                    progress_ratio = unique_files / max(cumulative_interventions, 1)
+
+                    # Log for observability
+                    logger.info(
+                        f"Intervention check: count={cumulative_interventions}, "
+                        f"unique_files={unique_files}, total_reads={file_count}, "
+                        f"progress_ratio={progress_ratio:.2f}"
+                    )
+
+                    # Only intervene if:
+                    # 1. High interventions (>=max_interventions) regardless of progress, OR
+                    # 2. Low progress (<0.5 new files per intervention) AND >5 interventions
+                    should_nudge = cumulative_interventions >= max_interventions or (
+                        progress_ratio < 0.5 and cumulative_interventions >= 5
+                    )
+
+                    if should_nudge:
+                        self._emit_event(
+                            topic="state.continuation.cumulative_intervention_nudge",
+                            data={
+                                "cumulative_interventions": cumulative_interventions,
+                                "unique_files": unique_files,
+                                "total_reads": file_count,
+                                "progress_ratio": progress_ratio,
+                                "required_outputs": required_outputs,
+                                "max_interventions": max_interventions,
+                                "task_complexity": task_complexity,
+                            },
+                        )
+                        output_hints = (
+                            ", ".join(required_outputs[:3]) if required_outputs else "your findings"
+                        )
+                        # After max_interventions+ interventions, force synthesis; before that, just nudge
+                        if cumulative_interventions >= max_interventions:
+                            return {
+                                "action": "request_summary",
+                                "message": (
+                                    f"You've explored extensively with {unique_files} unique files read and "
+                                    f"{cumulative_interventions} intervention cycles. Please synthesize your analysis now "
+                                    f"into {output_hints}. Provide your findings based on what you've already read."
+                                ),
+                                "reason": f"Excessive prompt interventions ({cumulative_interventions}/{max_interventions}) - forcing synthesis",
+                                "updates": updates,
+                            }
+                        elif synthesis_nudge_count < 3:
+                            updates["synthesis_nudge_count"] = synthesis_nudge_count + 1
+                            return {
+                                "action": "continue_with_synthesis_hint",
+                                "message": (
+                                    f"You've read {unique_files} unique files so far. When ready, please synthesize "
+                                    f"your analysis into {output_hints}. You may continue exploring briefly, "
+                                    f"but please produce the final output soon."
+                                ),
+                                "reason": f"Interventions ({cumulative_interventions}) with low progress ({progress_ratio:.2f}) nudge",
+                                "updates": updates,
+                            }
 
         # CRITICAL FIX: If summary was already requested in a previous iteration,
         # we should finish now - don't ask for another summary or loop again.
@@ -814,19 +1234,15 @@ class ContinuationStrategy:
             )
             updates["continuation_prompts"] = continuation_prompts + 1
 
-            # Determine message based on task type
-            if is_analysis_task:
-                message = (
-                    "Continue your analysis. Use tools like read_file, list_directory, "
-                    "code_search to gather more information."
-                )
-            elif is_action_task:
-                message = (
-                    "Continue with the implementation. Use tools like write_file, "
-                    "edit_files to make the necessary changes."
-                )
-            else:
-                message = "Continue. Use appropriate tools if needed."
+            # Get model-specific continuation prompt
+            message = self._get_continuation_prompt(
+                provider_name=provider_name,
+                model=model,
+                is_analysis_task=is_analysis_task,
+                is_action_task=is_action_task,
+                continuation_prompts=continuation_prompts,
+                full_content=full_content,
+            )
 
             return {
                 "action": "prompt_tool_call",

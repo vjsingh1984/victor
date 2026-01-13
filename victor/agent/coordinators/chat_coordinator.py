@@ -146,7 +146,7 @@ class ChatCoordinator:
                 )
                 tools = await orch.tool_selector.select_tools(
                     user_message,
-                    context,
+                    context=context,
                 )
                 tools = orch.tool_selector.prioritize_by_stage(user_message, tools)
 
@@ -1179,7 +1179,7 @@ class ChatCoordinator:
         )
         tools = await orch.tool_selector.select_tools(
             context_msg,
-            context,
+            context=context,
         )
         logger.info(
             f"context_msg={context_msg}\nconversation_stage={orch.conversation_state.state.stage.value if orch.conversation_state.state.stage else None}"

@@ -672,3 +672,178 @@ class TestWorkflowOptimizationComponents:
         # Cleanup
         components.resource_manager.reset()
         ResourceManager._instance = None
+
+
+# =============================================================================
+# Coordinator Components Tests (Phase 1.4)
+# =============================================================================
+
+
+class TestCreateConfigCoordinator:
+    """Tests for create_config_coordinator method."""
+
+    def test_create_config_coordinator_returns_coordinator(self, factory):
+        """create_config_coordinator returns ConfigCoordinator instance."""
+        from victor.agent.coordinators.config_coordinator import ConfigCoordinator
+
+        coordinator = factory.create_config_coordinator()
+
+        assert isinstance(coordinator, ConfigCoordinator)
+
+    def test_create_config_coordinator_empty_providers_by_default(self, factory):
+        """create_config_coordinator creates coordinator with no providers by default."""
+        from victor.agent.coordinators.config_coordinator import ConfigCoordinator
+
+        coordinator = factory.create_config_coordinator()
+
+        assert isinstance(coordinator, ConfigCoordinator)
+        assert coordinator._providers == []
+
+    def test_create_config_coordinator_with_providers(self, factory):
+        """create_config_coordinator accepts provider list."""
+        from victor.agent.coordinators.config_coordinator import ConfigCoordinator
+        from victor.protocols import IConfigProvider
+
+        # Create mock providers
+        mock_provider1 = MagicMock(spec=IConfigProvider)
+        mock_provider1.priority.return_value = 10
+        mock_provider2 = MagicMock(spec=IConfigProvider)
+        mock_provider2.priority.return_value = 20
+
+        coordinator = factory.create_config_coordinator(
+            config_providers=[mock_provider1, mock_provider2]
+        )
+
+        assert isinstance(coordinator, ConfigCoordinator)
+        assert len(coordinator._providers) == 2
+
+
+class TestCreatePromptCoordinator:
+    """Tests for create_prompt_coordinator method."""
+
+    def test_create_prompt_coordinator_returns_coordinator(self, factory):
+        """create_prompt_coordinator returns PromptCoordinator instance."""
+        from victor.agent.coordinators.prompt_coordinator import PromptCoordinator
+
+        coordinator = factory.create_prompt_coordinator()
+
+        assert isinstance(coordinator, PromptCoordinator)
+
+    def test_create_prompt_coordinator_empty_contributors_by_default(self, factory):
+        """create_prompt_coordinator creates coordinator with no contributors by default."""
+        from victor.agent.coordinators.prompt_coordinator import PromptCoordinator
+
+        coordinator = factory.create_prompt_coordinator()
+
+        assert isinstance(coordinator, PromptCoordinator)
+        assert coordinator._contributors == []
+
+    def test_create_prompt_coordinator_with_contributors(self, factory):
+        """create_prompt_coordinator accepts contributor list."""
+        from victor.agent.coordinators.prompt_coordinator import PromptCoordinator
+        from victor.protocols import IPromptContributor
+
+        # Create mock contributors
+        mock_contributor1 = MagicMock(spec=IPromptContributor)
+        mock_contributor1.priority.return_value = 10
+        mock_contributor2 = MagicMock(spec=IPromptContributor)
+        mock_contributor2.priority.return_value = 20
+
+        coordinator = factory.create_prompt_coordinator(
+            prompt_contributors=[mock_contributor1, mock_contributor2]
+        )
+
+        assert isinstance(coordinator, PromptCoordinator)
+        assert len(coordinator._contributors) == 2
+
+
+class TestCreateContextCoordinator:
+    """Tests for create_context_coordinator method."""
+
+    def test_create_context_coordinator_returns_coordinator(self, factory):
+        """create_context_coordinator returns ContextCoordinator instance."""
+        from victor.agent.coordinators.context_coordinator import ContextCoordinator
+
+        coordinator = factory.create_context_coordinator()
+
+        assert isinstance(coordinator, ContextCoordinator)
+
+    def test_create_context_coordinator_empty_strategies_by_default(self, factory):
+        """create_context_coordinator creates coordinator with no strategies by default."""
+        from victor.agent.coordinators.context_coordinator import ContextCoordinator
+
+        coordinator = factory.create_context_coordinator()
+
+        assert isinstance(coordinator, ContextCoordinator)
+        assert coordinator._strategies == []
+
+    def test_create_context_coordinator_with_strategies(self, factory):
+        """create_context_coordinator accepts strategy list."""
+        from victor.agent.coordinators.context_coordinator import ContextCoordinator
+        from victor.protocols import ICompactionStrategy
+
+        # Create mock strategies
+        mock_strategy1 = MagicMock(spec=ICompactionStrategy)
+        mock_strategy2 = MagicMock(spec=ICompactionStrategy)
+
+        coordinator = factory.create_context_coordinator(
+            compaction_strategies=[mock_strategy1, mock_strategy2]
+        )
+
+        assert isinstance(coordinator, ContextCoordinator)
+        assert len(coordinator._strategies) == 2
+
+
+class TestCreateAnalyticsCoordinator:
+    """Tests for create_analytics_coordinator method."""
+
+    def test_create_analytics_coordinator_returns_coordinator(self, factory):
+        """create_analytics_coordinator returns AnalyticsCoordinator instance."""
+        from victor.agent.coordinators.analytics_coordinator import AnalyticsCoordinator
+
+        coordinator = factory.create_analytics_coordinator()
+
+        assert isinstance(coordinator, AnalyticsCoordinator)
+
+    def test_create_analytics_coordinator_empty_exporters_by_default(self, factory):
+        """create_analytics_coordinator creates coordinator with no exporters by default."""
+        from victor.agent.coordinators.analytics_coordinator import AnalyticsCoordinator
+
+        coordinator = factory.create_analytics_coordinator()
+
+        assert isinstance(coordinator, AnalyticsCoordinator)
+        assert coordinator._exporters == []
+
+    def test_create_analytics_coordinator_with_exporters(self, factory):
+        """create_analytics_coordinator accepts exporter list."""
+        from victor.agent.coordinators.analytics_coordinator import AnalyticsCoordinator
+        from victor.protocols import IAnalyticsExporter
+
+        # Create mock exporters
+        mock_exporter1 = MagicMock(spec=IAnalyticsExporter)
+        mock_exporter1.exporter_type.return_value = "exporter1"
+        mock_exporter2 = MagicMock(spec=IAnalyticsExporter)
+        mock_exporter2.exporter_type.return_value = "exporter2"
+
+        coordinator = factory.create_analytics_coordinator(
+            analytics_exporters=[mock_exporter1, mock_exporter2]
+        )
+
+        assert isinstance(coordinator, AnalyticsCoordinator)
+        assert len(coordinator._exporters) == 2
+
+    def test_create_analytics_coordinator_with_console_exporter(self, factory):
+        """create_analytics_coordinator creates with console exporter when enabled."""
+        from victor.agent.coordinators.analytics_coordinator import (
+            AnalyticsCoordinator,
+            ConsoleAnalyticsExporter,
+        )
+
+        coordinator = factory.create_analytics_coordinator(
+            enable_console_exporter=True
+        )
+
+        assert isinstance(coordinator, AnalyticsCoordinator)
+        # Should have at least console exporter
+        assert len(coordinator._exporters) >= 1
+        assert any(isinstance(e, ConsoleAnalyticsExporter) for e in coordinator._exporters)

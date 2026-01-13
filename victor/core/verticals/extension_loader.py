@@ -700,6 +700,31 @@ class VerticalExtensionLoader(ABC):
         enrichment = _load_extension("enrichment", cls.get_enrichment_strategy)
         tiered_tools = _load_extension("tiered_tools", cls.get_tiered_tool_config)
 
+        # Load dynamic extensions from registry (OCP-compliant)
+        # This enables third-party extensions without modifying core code
+        dynamic_extensions: Dict[str, List[Any]] = {}
+        try:
+            # Check if this class has ExtensionRegistry integration
+            if hasattr(cls, "_get_extension_registry"):
+                registry = cls._get_extension_registry()
+                extension_types = registry.list_extension_types()
+
+                # Retrieve all dynamic extensions by type
+                for ext_type in extension_types:
+                    extensions = registry.get_extensions_by_type(ext_type)
+                    if extensions:
+                        dynamic_extensions[ext_type] = extensions
+
+                logger.debug(
+                    f"Loaded {len(dynamic_extensions)} dynamic extension type(s) "
+                    f"for vertical '{cls.name}'"
+                )
+        except Exception as e:
+            # Dynamic extensions are optional - don't fail if registry not available
+            logger.debug(
+                f"Could not load dynamic extensions for vertical '{cls.name}': {e}"
+            )
+
         # Check for critical failures (strict mode or required extensions)
         critical_errors = [e for e in errors if is_strict or e.is_required]
         if critical_errors:
@@ -726,6 +751,7 @@ class VerticalExtensionLoader(ABC):
             team_spec_provider=team_spec,
             enrichment_strategy=enrichment,
             tiered_tool_config=tiered_tools,
+            _dynamic_extensions=dynamic_extensions,
         )
 
         # Cache the extensions using ExtensionCacheEntry
@@ -832,8 +858,11 @@ class VerticalExtensionLoader(ABC):
         logger.debug(f"Updated extension version: {cache_key} -> {version}")
 
     @classmethod
-    def get_extension_cache_stats(cls) -> Dict[str, Any]:
+    def get_extension_cache_stats(cls, detailed: bool = False) -> Dict[str, Any]:
         """Get cache statistics for this vertical.
+
+        Args:
+            detailed: If True, include per-entry breakdown and additional metrics
 
         Returns:
             Dictionary with cache statistics including:
@@ -841,6 +870,11 @@ class VerticalExtensionLoader(ABC):
             - expired_entries: Number of expired entries
             - total_accesses: Sum of access counts
             - avg_age: Average age of cache entries
+            - min_age: Age of newest entry (seconds)
+            - max_age: Age of oldest entry (seconds)
+            - cache_hit_rate: Ratio of accesses to entries (effectiveness metric)
+            - ttl_remaining: Average TTL remaining across entries
+            - entries: (detailed=True) Per-entry breakdown
         """
         cache_prefix = f"{cls.__name__}:"
         entries = [
@@ -855,18 +889,101 @@ class VerticalExtensionLoader(ABC):
                 "expired_entries": 0,
                 "total_accesses": 0,
                 "avg_age": 0.0,
+                "min_age": 0.0,
+                "max_age": 0.0,
+                "cache_hit_rate": 0.0,
+                "ttl_remaining": 0.0,
             }
 
         expired_count = sum(1 for _, v in entries if v.is_expired())
         total_accesses = sum(v.access_count for _, v in entries)
-        avg_age = sum(v.get_age() for _, v in entries) / len(entries)
+        ages = [v.get_age() for _, v in entries]
+        avg_age = sum(ages) / len(entries)
 
-        return {
+        # Calculate cache hit rate (accesses per entry = effectiveness)
+        # Higher is better - means entries are being reused
+        cache_hit_rate = total_accesses / len(entries) if entries else 0.0
+
+        # Calculate min/max ages
+        min_age = min(ages) if ages else 0.0
+        max_age = max(ages) if ages else 0.0
+
+        # Calculate average TTL remaining (for entries with TTL)
+        ttl_entries = [v for _, v in entries if v.ttl is not None]
+        ttl_remaining = 0.0
+        if ttl_entries:
+            remaining = [
+                max(0, v.ttl - v.get_age())
+                for v in ttl_entries
+            ]
+            ttl_remaining = sum(remaining) / len(remaining)
+
+        stats = {
             "vertical": cls.__name__,
             "total_entries": len(entries),
             "expired_entries": expired_count,
             "total_accesses": total_accesses,
             "avg_age": avg_age,
+            "min_age": min_age,
+            "max_age": max_age,
+            "cache_hit_rate": cache_hit_rate,
+            "ttl_remaining": ttl_remaining,
+        }
+
+        if detailed:
+            # Add per-entry breakdown
+            stats["entries"] = [
+                {
+                    "key": k.split(":")[-1],  # Remove vertical prefix
+                    "age": v.get_age(),
+                    "ttl": v.ttl,
+                    "access_count": v.access_count,
+                    "version": v.version,
+                    "is_expired": v.is_expired(),
+                }
+                for k, v in entries
+            ]
+
+        return stats
+
+    @classmethod
+    def get_global_cache_stats(cls) -> Dict[str, Any]:
+        """Get global cache statistics across all verticals.
+
+        Returns:
+            Dictionary with global statistics including:
+            - total_entries: Total cached extensions across all verticals
+            - total_verticals: Number of verticals with cached extensions
+            - total_accesses: Sum of all access counts
+            - verticals: Per-vertical statistics
+        """
+        # Group entries by vertical
+        vertical_stats: Dict[str, Dict[str, Any]] = {}
+        for key, entry in cls._extensions_cache.items():
+            # Extract vertical name from composite key "ClassName:extension_key"
+            parts = key.split(":", 1)
+            vertical_name = parts[0] if parts else "unknown"
+
+            if vertical_name not in vertical_stats:
+                vertical_stats[vertical_name] = {
+                    "entries": 0,
+                    "accesses": 0,
+                    "expired": 0,
+                }
+
+            vertical_stats[vertical_name]["entries"] += 1
+            vertical_stats[vertical_name]["accesses"] += entry.access_count
+            if entry.is_expired():
+                vertical_stats[vertical_name]["expired"] += 1
+
+        total_entries = sum(s["entries"] for s in vertical_stats.values())
+        total_accesses = sum(s["accesses"] for s in vertical_stats.values())
+
+        return {
+            "total_entries": total_entries,
+            "total_verticals": len(vertical_stats),
+            "total_accesses": total_accesses,
+            "verticals": vertical_stats,
         }
 
     @classmethod
