@@ -317,7 +317,7 @@ class UnifiedSymbolExtractor:
 
         return symbols
 
-    def _extract_python_ast_info(self, tree: ast.AST) -> Dict[tuple, Dict[str, Any]]:
+    def _extract_python_ast_info(self, tree: ast.AST) -> Dict[tuple[str, int], Dict[str, Any]]:
         """Extract detailed info from Python AST.
 
         Returns:
@@ -328,7 +328,7 @@ class UnifiedSymbolExtractor:
             - decorators: List[str]
             - docstring: Optional[str]
         """
-        info: Dict[tuple, Dict[str, Any]] = {}
+        info: Dict[tuple[str, int], Dict[str, Any]] = {}
 
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -378,7 +378,7 @@ class UnifiedSymbolExtractor:
             return node.id
         elif isinstance(node, ast.Attribute):
             parts = []
-            current = node
+            current: ast.expr = node
             while isinstance(current, ast.Attribute):
                 parts.append(current.attr)
                 current = current.value

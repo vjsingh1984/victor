@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 # Install with: pip install tree-sitter-<language>
 # Format: "language_name": ("module_name", "function_name")
 # function_name is the function that returns the Language object (usually "language")
-LANGUAGE_MODULES: Dict[str, tuple] = {
+LANGUAGE_MODULES: Dict[str, tuple[str, str]] = {
     # Core languages (commonly used)
     "python": ("tree_sitter_python", "language"),
     "javascript": ("tree_sitter_javascript", "language"),

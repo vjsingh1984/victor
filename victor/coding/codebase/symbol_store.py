@@ -284,7 +284,7 @@ class SymbolStore:
             Statistics about the indexing operation
         """
         start_time = time.time()
-        stats = {
+        stats: Dict[str, Any] = {
             "files_indexed": 0,
             "files_skipped": 0,
             "files_deleted": 0,
@@ -324,7 +324,9 @@ class SymbolStore:
 
             for deleted_path in deleted_files:
                 self._delete_file_data(conn, deleted_path)
-                stats["files_deleted"] += 1
+                current = stats.get("files_deleted", 0)
+                assert isinstance(current, int)
+                stats["files_deleted"] = current + 1
 
             if deleted_files:
                 print(f"🗑️  Removed {len(deleted_files)} deleted files from index")
@@ -339,7 +341,9 @@ class SymbolStore:
 
                 # Check if file needs reindexing
                 if not force and not self._needs_reindex(conn, file_path):
-                    stats["files_skipped"] += 1
+                    current = stats.get("files_skipped", 0)
+                    assert isinstance(current, int)
+                    stats["files_skipped"] = current + 1
                     continue
 
                 # Delete old data for modified files before re-indexing
@@ -358,7 +362,9 @@ class SymbolStore:
                     # Store symbols
                     for symbol in symbols:
                         self._store_symbol(conn, symbol)
-                        stats["symbols_found"] += 1
+                        current = stats.get("symbols_found", 0)
+                        assert isinstance(current, int)
+                        stats["symbols_found"] = current + 1
 
                     # Store imports
                     for imp in imports:
@@ -367,30 +373,52 @@ class SymbolStore:
                             (rel_path, imp),
                         )
 
-                    stats["files_indexed"] += 1
-                    stats["languages"][language] = stats["languages"].get(language, 0) + 1
+                    current = stats.get("files_indexed", 0)
+                    assert isinstance(current, int)
+                    stats["files_indexed"] = current + 1
+
+                    languages_dict = stats.get("languages")
+                    assert isinstance(languages_dict, dict)
+                    languages_dict[language] = languages_dict.get(language, 0) + 1  # type: ignore[assignment]
 
                     # Track files that had parse errors but were still indexed
                     if parse_error:
-                        stats["files_with_errors"] += 1
-                        stats["errors"].append((rel_path, "parse_error", parse_error))
+                        current = stats.get("files_with_errors", 0)
+                        assert isinstance(current, int)
+                        stats["files_with_errors"] = current + 1
+
+                        errors_list = stats.get("errors")
+                        assert isinstance(errors_list, list)
+                        errors_list.append((rel_path, "parse_error", parse_error))
                         logger.debug(f"Indexed {rel_path} with parse errors: {parse_error}")
 
                 except UnicodeDecodeError as e:
                     # Binary file or encoding issue - skip but track
-                    stats["files_failed"] += 1
-                    stats["errors"].append((rel_path, "encoding", str(e)))
+                    current = stats.get("files_failed", 0)
+                    assert isinstance(current, int)
+                    stats["files_failed"] = current + 1
+
+                    errors_list = stats.get("errors")
+                    assert isinstance(errors_list, list)
+                    errors_list.append((rel_path, "encoding", str(e)))
                     logger.debug(f"Skipping binary/encoding issue: {rel_path}")
 
                 except Exception as e:
                     # Unexpected error - log at warning level for visibility
-                    stats["files_failed"] += 1
+                    current = stats.get("files_failed", 0)
+                    assert isinstance(current, int)
+                    stats["files_failed"] = current + 1
                     error_type = type(e).__name__
-                    stats["errors"].append((rel_path, error_type, str(e)))
+                    errors_list = stats.get("errors")
+                    assert isinstance(errors_list, list)
+                    errors_list.append((rel_path, error_type, str(e)))
                     logger.warning(f"Failed to index {rel_path}: {error_type}: {e}")
 
             # Step 3: Refresh architecture patterns (only if we indexed something)
-            if stats["files_indexed"] > 0 or stats["files_deleted"] > 0 or force:
+            files_indexed = stats.get("files_indexed", 0)
+            files_deleted = stats.get("files_deleted", 0)
+            assert isinstance(files_indexed, int) and isinstance(files_deleted, int)
+            if files_indexed > 0 or files_deleted > 0 or force:
                 # Clear old patterns and regenerate
                 conn.execute("DELETE FROM patterns")
                 patterns = self._detect_patterns(conn)
@@ -400,7 +428,9 @@ class SymbolStore:
                            VALUES (?, ?, ?, ?, ?, ?)""",
                         pattern,
                     )
-                    stats["patterns_detected"] += 1
+                    current = stats.get("patterns_detected", 0)
+                    assert isinstance(current, int)
+                    stats["patterns_detected"] = current + 1
 
             # Update metadata
             conn.execute(
@@ -795,7 +825,7 @@ class SymbolStore:
 
         queries = SYMBOL_QUERIES.get(language, [])
 
-        def walk_tree(node):
+        def walk_tree(node: Any) -> None:
             """Recursively walk tree and extract symbols."""
             for query_type, name_field, default_symbol_type in queries:
                 if node.type == query_type:
@@ -969,9 +999,9 @@ class SymbolStore:
 
         return None
 
-    def _detect_patterns(self, conn: sqlite3.Connection) -> List[Tuple]:
+    def _detect_patterns(self, conn: sqlite3.Connection) -> List[Tuple[Any, ...]]:
         """Detect architecture patterns from indexed symbols."""
-        patterns = []
+        patterns: List[Tuple[Any, ...]] = []
 
         # Check for Provider pattern
         cursor = conn.execute(
@@ -1312,7 +1342,7 @@ class SymbolStore:
     def get_stats(self) -> Dict[str, Any]:
         """Get statistics about the symbol store."""
         with sqlite3.connect(str(self._db_path)) as conn:
-            stats = {}
+            stats: Dict[str, Any] = {}
 
             # File count by language
             cursor = conn.execute("SELECT language, COUNT(*) FROM files GROUP BY language")
@@ -1345,7 +1375,7 @@ class SymbolStore:
 
             return stats
 
-    def _row_to_symbol(self, row: tuple) -> SymbolInfo:
+    def _row_to_symbol(self, row: tuple[Any, ...]) -> SymbolInfo:
         """Convert a database row to SymbolInfo."""
         # Parse modifiers from comma-separated string
         modifiers_str = row[9] if len(row) > 9 else None

@@ -78,6 +78,21 @@ class TreeSitterExtractor:
     by delegating all language-specific logic to the registered plugins.
     """
 
+    @staticmethod
+    def _safe_decode_node_text(node: "Node") -> Optional[str]:
+        """Safely decode node.text, returning None if text is None.
+
+        Args:
+            node: Tree-sitter node
+
+        Returns:
+            Decoded text string or None
+        """
+        text_bytes = node.text
+        if text_bytes is None:
+            return None
+        return text_bytes.decode("utf-8", errors="ignore")
+
     def __init__(self, registry: Optional[LanguageRegistry] = None, auto_discover: bool = True):
         """Initialize extractor with optional custom registry.
 
@@ -196,7 +211,7 @@ class TreeSitterExtractor:
                 def_by_start_line[def_node.start_point[0]] = def_node
 
             for node in name_nodes:
-                text = node.text.decode("utf-8", errors="ignore")
+                text = self._safe_decode_node_text(node)
                 if text:
                     # Look up corresponding def node for end_line
                     # The def node contains the name node, so they share the same start area
@@ -265,7 +280,7 @@ class TreeSitterExtractor:
         for capture_name, nodes in captures.items():
             if capture_name == "callee":
                 for node in nodes:
-                    callee = node.text.decode("utf-8", errors="ignore")
+                    callee = self._safe_decode_node_text(node)
                     if callee:
                         caller = self._find_enclosing_symbol(node, queries.enclosing_scopes)
                         if caller:
@@ -329,10 +344,10 @@ class TreeSitterExtractor:
 
         # Match child and base by position (they appear in order)
         for i, child_node in enumerate(child_nodes):
-            child = child_node.text.decode("utf-8", errors="ignore")
+            child = self._safe_decode_node_text(child_node)
             # Find corresponding base(s)
             if i < len(base_nodes):
-                base = base_nodes[i].text.decode("utf-8", errors="ignore")
+                base = self._safe_decode_node_text(base_nodes[i])
                 if child and base:
                     edges.append(
                         ExtractedEdge(
@@ -392,9 +407,9 @@ class TreeSitterExtractor:
         interface_nodes = captures.get("interface", []) or captures.get("base", [])
 
         for i, child_node in enumerate(child_nodes):
-            child = child_node.text.decode("utf-8", errors="ignore")
+            child = self._safe_decode_node_text(child_node)
             if i < len(interface_nodes):
-                interface = interface_nodes[i].text.decode("utf-8", errors="ignore")
+                interface = self._safe_decode_node_text(interface_nodes[i])
                 if child and interface:
                     edges.append(
                         ExtractedEdge(
@@ -454,9 +469,9 @@ class TreeSitterExtractor:
         type_nodes = captures.get("type", [])
 
         for i, owner_node in enumerate(owner_nodes):
-            owner = owner_node.text.decode("utf-8", errors="ignore")
+            owner = self._safe_decode_node_text(owner_node)
             if i < len(type_nodes):
-                member_type = type_nodes[i].text.decode("utf-8", errors="ignore")
+                member_type = self._safe_decode_node_text(type_nodes[i])
                 if owner and member_type:
                     edges.append(
                         ExtractedEdge(
@@ -517,7 +532,7 @@ class TreeSitterExtractor:
         for capture_name, nodes in captures.items():
             if capture_name == "name":
                 for node in nodes:
-                    name = node.text.decode("utf-8", errors="ignore")
+                    name = self._safe_decode_node_text(node)
                     if name:
                         enclosing = self._find_enclosing_symbol(node, queries.enclosing_scopes)
                         references.append(
@@ -611,7 +626,7 @@ class TreeSitterExtractor:
                 if current.type == node_type:
                     field = current.child_by_field_name(field_name)
                     if field:
-                        text = field.text.decode("utf-8", errors="ignore")
+                        text = self._safe_decode_node_text(field)
                         # Determine if this is a class or method
                         if node_type in (
                             "class_declaration",

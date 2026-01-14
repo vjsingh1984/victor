@@ -172,7 +172,10 @@ class ASTAwareChunker:
                                 # Find the parent definition node
                                 parent = self._find_definition_parent(node, language)
                                 if parent:
-                                    name = node.text.decode("utf-8", errors="ignore")
+                                    text_bytes = node.text
+                                    if text_bytes is None:
+                                        continue
+                                    name = text_bytes.decode("utf-8", errors="ignore")
                                     symbol_nodes.append((parent, pattern.symbol_type, name))
                 except Exception:
                     continue

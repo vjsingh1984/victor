@@ -25,9 +25,12 @@ This separation allows mixing and matching:
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from victor.storage.embeddings.service import EmbeddingService
 
 
 class EmbeddingModelConfig(BaseModel):
@@ -126,7 +129,7 @@ class SentenceTransformerModel(BaseEmbeddingModel):
     def __init__(self, config: EmbeddingModelConfig):
         """Initialize sentence-transformers model."""
         super().__init__(config)
-        self._embedding_service = None
+        self._embedding_service: Optional["EmbeddingService"] = None
 
     async def initialize(self) -> None:
         """Initialize using shared EmbeddingService singleton."""
@@ -143,6 +146,8 @@ class SentenceTransformerModel(BaseEmbeddingModel):
         self._embedding_service = EmbeddingService.get_instance(model_name=self.config.model_name)
 
         # Ensure model is loaded (lazy loading)
+        if self._embedding_service is None:
+            raise RuntimeError("EmbeddingService not initialized")
         self._embedding_service._ensure_model_loaded()
 
         self._initialized = True
@@ -153,14 +158,20 @@ class SentenceTransformerModel(BaseEmbeddingModel):
         if not self._initialized:
             await self.initialize()
 
+        if self._embedding_service is None:
+            raise RuntimeError("EmbeddingService not initialized")
+
         # Use async method from EmbeddingService
         embedding = await self._embedding_service.embed_text(text)
-        return embedding.tolist()
+        return embedding.tolist()  # type: ignore[no-any-return]
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for multiple texts (batch optimized)."""
         if not self._initialized:
             await self.initialize()
+
+        if self._embedding_service is None:
+            raise RuntimeError("EmbeddingService not initialized")
 
         # Use async batch method from EmbeddingService
         embeddings = await self._embedding_service.embed_batch(texts)
