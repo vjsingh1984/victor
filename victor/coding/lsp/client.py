@@ -51,15 +51,15 @@ class LSPClient:
         """
         self.config = config
         self.root_uri = root_uri
-        self._process: Optional[subprocess.Popen] = None
+        self._process: Optional[subprocess.Popen[bytes]] = None
         self._request_id = 0
-        self._pending_requests: Dict[int, asyncio.Future] = {}
+        self._pending_requests: Dict[int, asyncio.Future[Any]] = {}
         self._initialized = False
         self._capabilities: Dict[str, Any] = {}
         self._open_documents: Dict[str, int] = {}  # uri -> version
         self._diagnostics: Dict[str, List[Diagnostic]] = {}
-        self._notification_handlers: Dict[str, List[Callable]] = {}
-        self._reader_task: Optional[asyncio.Task] = None
+        self._notification_handlers: Dict[str, List[Callable[..., Any]]] = {}
+        self._reader_task: Optional[asyncio.Task[None]] = None
 
     @property
     def is_running(self) -> bool:
@@ -209,7 +209,7 @@ class LSPClient:
             "params": params,
         }
 
-        future: asyncio.Future = asyncio.Future()
+        future: asyncio.Future[Any] = asyncio.Future()
         self._pending_requests[request_id] = future
 
         self._write_message(message)
@@ -350,7 +350,7 @@ class LSPClient:
 
     # Public API methods
 
-    def open_document(self, uri: str, text: str, language_id: str = None) -> None:
+    def open_document(self, uri: str, text: str, language_id: Optional[str] = None) -> None:
         """Open a document in the server.
 
         Args:
@@ -539,7 +539,7 @@ class LSPClient:
         """
         return self._diagnostics.get(uri, [])
 
-    def register_notification_handler(self, method: str, handler: Callable) -> None:
+    def register_notification_handler(self, method: str, handler: Callable[..., Any]) -> None:
         """Register a handler for server notifications.
 
         Args:

@@ -270,7 +270,7 @@ class RuleRegistry:
     Manages loading, configuration, and retrieval of rules.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the registry with default rules."""
         self._rules: dict[str, ReviewRule] = {r.id: r for r in DEFAULT_RULES}
         self._rulesets: dict[str, ReviewRuleSet] = DEFAULT_RULESETS.copy()

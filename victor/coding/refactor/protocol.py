@@ -166,7 +166,7 @@ class RefactorRequest:
     new_name: Optional[str] = None  # For rename
     extract_name: Optional[str] = None  # For extract
     destination_file: Optional[Path] = None  # For move
-    parameter_changes: list[dict] = field(default_factory=list)  # For signature changes
+    parameter_changes: list[dict[str, Any]] = field(default_factory=list)  # For signature changes
 
     # Options
     preview: bool = True  # Generate preview without applying

@@ -108,7 +108,7 @@ class ComplexityAnalyzer(BaseAnalyzer):
         rules: list[ReviewRule],
     ) -> list[ReviewFinding]:
         """Analyze code complexity."""
-        findings = []
+        findings: list[ReviewFinding] = []
 
         try:
             tree = ast.parse(source)
@@ -136,7 +136,7 @@ class ComplexityAnalyzer(BaseAnalyzer):
         lines: list[str],
     ) -> list[ReviewFinding]:
         """Analyze a function for complexity issues."""
-        findings = []
+        findings: list[ReviewFinding] = []
 
         # Calculate cyclomatic complexity
         cc = self._cyclomatic_complexity(node)
@@ -213,7 +213,7 @@ class ComplexityAnalyzer(BaseAnalyzer):
         lines: list[str],
     ) -> list[ReviewFinding]:
         """Analyze a class for complexity issues."""
-        findings = []
+        findings: list[ReviewFinding] = []
 
         # Count methods
         methods = [n for n in node.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
@@ -319,7 +319,7 @@ class NamingAnalyzer(BaseAnalyzer):
         rules: list[ReviewRule],
     ) -> list[ReviewFinding]:
         """Analyze naming conventions."""
-        findings = []
+        findings: list[ReviewFinding] = []
 
         try:
             tree = ast.parse(source)
@@ -348,7 +348,7 @@ class NamingAnalyzer(BaseAnalyzer):
         lines: list[str],
     ) -> list[ReviewFinding]:
         """Check class naming."""
-        findings = []
+        findings: list[ReviewFinding] = []
 
         for rule in rules:
             if rule.id == "naming-class-case":
@@ -374,7 +374,7 @@ class NamingAnalyzer(BaseAnalyzer):
         lines: list[str],
     ) -> list[ReviewFinding]:
         """Check function naming."""
-        findings = []
+        findings: list[ReviewFinding] = []
 
         # Skip dunder methods
         if node.name.startswith("__") and node.name.endswith("__"):
@@ -428,7 +428,7 @@ class NamingAnalyzer(BaseAnalyzer):
         lines: list[str],
     ) -> list[ReviewFinding]:
         """Check variable naming."""
-        findings = []
+        findings: list[ReviewFinding] = []
         name = node.id
 
         # Skip private/protected
@@ -489,7 +489,7 @@ class DocumentationAnalyzer(BaseAnalyzer):
         rules: list[ReviewRule],
     ) -> list[ReviewFinding]:
         """Analyze documentation."""
-        findings = []
+        findings: list[ReviewFinding] = []
 
         try:
             tree = ast.parse(source)
@@ -529,7 +529,7 @@ class DocumentationAnalyzer(BaseAnalyzer):
         lines: list[str],
     ) -> list[ReviewFinding]:
         """Check class documentation."""
-        findings = []
+        findings: list[ReviewFinding] = []
 
         docstring = ast.get_docstring(node)
 
@@ -556,7 +556,7 @@ class DocumentationAnalyzer(BaseAnalyzer):
         lines: list[str],
     ) -> list[ReviewFinding]:
         """Check function documentation."""
-        findings = []
+        findings: list[ReviewFinding] = []
 
         # Skip private functions and dunder methods
         if node.name.startswith("_"):
@@ -639,7 +639,7 @@ class SecurityAnalyzer(BaseAnalyzer):
         rules: list[ReviewRule],
     ) -> list[ReviewFinding]:
         """Analyze for security issues."""
-        findings = []
+        findings: list[ReviewFinding] = []
 
         try:
             tree = ast.parse(source)
@@ -669,7 +669,7 @@ class SecurityAnalyzer(BaseAnalyzer):
         lines: list[str],
     ) -> list[ReviewFinding]:
         """Check for dangerous function calls."""
-        findings = []
+        findings: list[ReviewFinding] = []
 
         # Get function name
         func_name = None
@@ -706,7 +706,7 @@ class SecurityAnalyzer(BaseAnalyzer):
         rules: list[ReviewRule],
     ) -> list[ReviewFinding]:
         """Check for SQL injection vulnerabilities."""
-        findings = []
+        findings: list[ReviewFinding] = []
 
         for rule in rules:
             if rule.id != "security-sql-injection":
@@ -736,7 +736,7 @@ class SecurityAnalyzer(BaseAnalyzer):
         rules: list[ReviewRule],
     ) -> list[ReviewFinding]:
         """Check for hardcoded secrets."""
-        findings = []
+        findings: list[ReviewFinding] = []
 
         SECRET_PATTERNS = [
             (r'(?i)password\s*=\s*["\'][^"\']+["\']', "hardcoded password"),
@@ -782,7 +782,7 @@ class BestPracticesAnalyzer(BaseAnalyzer):
         rules: list[ReviewRule],
     ) -> list[ReviewFinding]:
         """Analyze for best practices."""
-        findings = []
+        findings: list[ReviewFinding] = []
 
         try:
             tree = ast.parse(source)
@@ -817,7 +817,7 @@ class BestPracticesAnalyzer(BaseAnalyzer):
         lines: list[str],
     ) -> list[ReviewFinding]:
         """Check exception handling."""
-        findings = []
+        findings: list[ReviewFinding] = []
 
         for rule in rules:
             if rule.id == "bp-bare-except":
@@ -858,7 +858,7 @@ class BestPracticesAnalyzer(BaseAnalyzer):
         lines: list[str],
     ) -> list[ReviewFinding]:
         """Check import statements."""
-        findings = []
+        findings: list[ReviewFinding] = []
 
         for rule in rules:
             if rule.id == "bp-wildcard-import":
@@ -884,7 +884,7 @@ class BestPracticesAnalyzer(BaseAnalyzer):
         lines: list[str],
     ) -> list[ReviewFinding]:
         """Check from imports."""
-        findings = []
+        findings: list[ReviewFinding] = []
 
         for rule in rules:
             if rule.id == "bp-wildcard-import":
@@ -910,7 +910,7 @@ class BestPracticesAnalyzer(BaseAnalyzer):
         lines: list[str],
     ) -> list[ReviewFinding]:
         """Check comparison expressions."""
-        findings = []
+        findings: list[ReviewFinding] = []
 
         for rule in rules:
             if rule.id == "bp-none-comparison":

@@ -21,12 +21,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 
-from victor.coding.lsp.client import (
-    LSPClient,
-    CompletionItem,
-    Hover,
-    Position,
-)
+from victor.coding.lsp.client import LSPClient
+from victor.protocols import CompletionItem, Hover, Position
 from victor.coding.lsp.config import (
     LANGUAGE_SERVERS,
     get_server_for_file,

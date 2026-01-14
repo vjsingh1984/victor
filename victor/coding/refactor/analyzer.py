@@ -179,7 +179,7 @@ class PythonAnalyzer(BaseCodeAnalyzer):
         if tree is None:
             return []
 
-        symbols = []
+        symbols: list[RefactorSymbol] = []
         self._collect_symbols(tree, file_path, "", symbols)
         return symbols
 
@@ -341,7 +341,7 @@ class PythonAnalyzer(BaseCodeAnalyzer):
         scope: str,
     ) -> list[Symbol]:
         """Convert assignment to Symbols."""
-        symbols = []
+        symbols: list[RefactorSymbol] = []
 
         if isinstance(node, ast.AnnAssign):
             if isinstance(node.target, ast.Name):

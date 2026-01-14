@@ -69,7 +69,7 @@ class SourceLocation:
     end_line: Optional[int] = None
     end_column: Optional[int] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.end_line is None:
             self.end_line = self.start_line
 
@@ -196,7 +196,7 @@ class ReviewResult:
         category: ReviewCategory,
     ) -> list[ReviewFinding]:
         """Get all findings for a category."""
-        findings = []
+        findings: list[ReviewFinding] = []
         for fr in self.file_reviews:
             findings.extend(f for f in fr.findings if f.category == category)
         return findings
@@ -206,7 +206,7 @@ class ReviewResult:
         severity: ReviewSeverity,
     ) -> list[ReviewFinding]:
         """Get all findings for a severity level."""
-        findings = []
+        findings: list[ReviewFinding] = []
         for fr in self.file_reviews:
             findings.extend(f for f in fr.findings if f.severity == severity)
         return findings
