@@ -395,10 +395,12 @@ class TestProviderSwitching:
         mock_adapter_registry.get_adapter.return_value = mock_adapter
 
         # Mock health check to fail then succeed (for fallback)
-        health_check_results = [False, True]  # First fails, second succeeds
+        # Provide enough results for all health checks (google fails, then multiple checks for openai)
+        health_check_results = [False, True, True, True, True, True]
 
         async def mock_check_health(provider):
-            return health_check_results.pop(0)
+            result = health_check_results.pop(0)
+            return result
 
         with patch.object(
             manager._provider_switcher._health_monitor,
@@ -671,3 +673,270 @@ class TestCleanup:
         await manager.close()
 
         manager.provider.close.assert_called_once()
+
+
+class TestGetProvider:
+    """Tests for get_provider method (IProviderManager protocol)."""
+
+    @pytest.fixture
+    def manager(self):
+        """Create manager with mock provider."""
+        settings = MagicMock()
+        provider = MagicMock()
+        provider.supports_tools.return_value = True
+
+        return ProviderManager(
+            settings=settings,
+            initial_provider=provider,
+            initial_model="test-model",
+            provider_name="anthropic",
+        )
+
+    @pytest.mark.asyncio
+    @patch("victor.agent.provider_manager.ProviderRegistry")
+    async def test_get_provider_current(self, mock_registry, manager):
+        """Test getting current provider instance."""
+        result = await manager.get_provider("anthropic")
+
+        assert result is manager.provider
+
+    @pytest.mark.asyncio
+    @patch("victor.agent.provider_manager.ProviderRegistry")
+    async def test_get_provider_new(self, mock_registry, manager):
+        """Test getting a new provider instance."""
+        new_provider = MagicMock()
+        new_provider.name = "openai"
+        mock_registry.create.return_value = new_provider
+
+        result = await manager.get_provider("openai")
+
+        assert result is new_provider
+        mock_registry.create.assert_called_once()
+
+    @pytest.mark.asyncio
+    @patch("victor.agent.provider_manager.ProviderRegistry")
+    async def test_get_provider_not_found(self, mock_registry, manager):
+        """Test getting non-existent provider raises error."""
+        from victor.core.errors import ProviderNotFoundError
+
+        mock_registry.create.side_effect = ProviderNotFoundError("openai")
+
+        with pytest.raises(ProviderNotFoundError):
+            await manager.get_provider("openai")
+
+
+class TestCheckHealth:
+    """Tests for check_health method (IProviderManager protocol)."""
+
+    @pytest.fixture
+    def manager(self):
+        """Create manager with mock provider."""
+        settings = MagicMock()
+        provider = MagicMock()
+        provider.supports_tools.return_value = True
+
+        return ProviderManager(
+            settings=settings,
+            initial_provider=provider,
+            initial_model="test-model",
+            provider_name="anthropic",
+        )
+
+    @pytest.mark.asyncio
+    async def test_check_health_healthy(self, manager):
+        """Test health check for healthy provider."""
+        from victor.protocols.provider_manager import HealthStatus
+
+        # Mock the health monitor to return healthy
+        with patch.object(
+            manager._health_monitor,
+            "check_health",
+            return_value=True,
+        ):
+            status = await manager.check_health("anthropic")
+
+            assert status.provider_name == "anthropic"
+            assert status.healthy is True
+            assert status.latency_ms is not None
+            assert status.error_message is None
+            assert status.last_check is not None
+
+    @pytest.mark.asyncio
+    async def test_check_health_unhealthy(self, manager):
+        """Test health check for unhealthy provider."""
+        from victor.protocols.provider_manager import HealthStatus
+
+        # Mock the health monitor to return unhealthy
+        with patch.object(
+            manager._health_monitor,
+            "check_health",
+            return_value=False,
+        ):
+            status = await manager.check_health("anthropic")
+
+            assert status.provider_name == "anthropic"
+            assert status.healthy is False
+            assert status.latency_ms is not None
+
+    @pytest.mark.asyncio
+    async def test_check_health_error_handling(self, manager):
+        """Test health check error handling."""
+        from victor.protocols.provider_manager import HealthStatus
+
+        # Mock the health monitor to raise exception
+        with patch.object(
+            manager._health_monitor,
+            "check_health",
+            side_effect=Exception("Connection timeout"),
+        ):
+            status = await manager.check_health("anthropic")
+
+            assert status.provider_name == "anthropic"
+            assert status.healthy is False
+            assert "Connection timeout" in status.error_message
+
+
+class TestSwitchProviderProtocol:
+    """Tests for switch_provider returning SwitchResult (IProviderManager protocol)."""
+
+    @pytest.fixture
+    def manager(self):
+        """Create manager with mock provider."""
+        settings = MagicMock()
+        settings.get_provider_settings.return_value = {}
+        provider = MagicMock()
+        provider.supports_tools.return_value = True
+        provider.supports_streaming.return_value = True
+        provider.discover_capabilities = AsyncMock(return_value=MagicMock())
+
+        return ProviderManager(
+            settings=settings,
+            initial_provider=provider,
+            initial_model="test-model",
+            provider_name="anthropic",
+            config=ProviderManagerConfig(enable_health_checks=False),
+        )
+
+    @pytest.mark.asyncio
+    @patch("victor.agent.provider.switcher.ProviderRegistry")
+    @patch("victor.agent.provider_manager.ToolCallingAdapterRegistry")
+    async def test_switch_provider_returns_switch_result_success(
+        self, mock_adapter_registry, mock_provider_registry, manager
+    ):
+        """Test that switch_provider returns SwitchResult on success."""
+        from victor.protocols.provider_manager import SwitchResult
+
+        new_provider = MagicMock()
+        new_provider.supports_tools.return_value = True
+        new_provider.supports_streaming.return_value = True
+        new_provider.discover_capabilities = AsyncMock(return_value=MagicMock())
+        mock_provider_registry.create.return_value = new_provider
+
+        mock_adapter = MagicMock()
+        mock_caps = MagicMock()
+        mock_caps.native_tool_calls = True
+        mock_caps.tool_call_format = MagicMock()
+        mock_caps.tool_call_format.value = "native"
+        mock_adapter.get_capabilities.return_value = mock_caps
+        mock_adapter_registry.get_adapter.return_value = mock_adapter
+
+        # Mock health check to pass
+        with patch.object(
+            manager._provider_switcher._health_monitor, "check_health", return_value=True
+        ):
+            result = await manager.switch_provider("openai", "gpt-4", return_result_object=True)
+
+        assert isinstance(result, SwitchResult)
+        assert result.success is True
+        assert result.from_provider == "anthropic"
+        assert result.to_provider == "openai"
+        assert result.model == "gpt-4"
+        assert result.error_message is None
+
+    @pytest.mark.asyncio
+    @patch("victor.agent.provider.switcher.ProviderRegistry")
+    async def test_switch_provider_returns_switch_result_failure(
+        self, mock_provider_registry, manager
+    ):
+        """Test that switch_provider returns SwitchResult on failure."""
+        from victor.protocols.provider_manager import SwitchResult
+
+        # Disable auto-fallback to get the original error
+        manager.config.auto_fallback = False
+        mock_provider_registry.create.side_effect = Exception("Connection failed")
+
+        result = await manager.switch_provider("openai", "gpt-4", return_result_object=True)
+
+        assert isinstance(result, SwitchResult)
+        assert result.success is False
+        assert result.from_provider == "anthropic"
+        assert result.to_provider == "openai"
+        assert result.model == "gpt-4"
+        # Error message should contain information about the failure
+        assert result.error_message is not None
+        assert "openai" in result.error_message.lower()
+
+    @pytest.mark.asyncio
+    @patch("victor.agent.provider.switcher.ProviderRegistry")
+    @patch("victor.agent.provider_manager.ToolCallingAdapterRegistry")
+    async def test_switch_provider_with_metadata(
+        self, mock_adapter_registry, mock_provider_registry, manager
+    ):
+        """Test that SwitchResult includes metadata."""
+        from victor.protocols.provider_manager import SwitchResult
+
+        new_provider = MagicMock()
+        new_provider.supports_tools.return_value = True
+        new_provider.supports_streaming.return_value = True
+        new_provider.discover_capabilities = AsyncMock(
+            return_value=MagicMock(context_window=128000)
+        )
+        mock_provider_registry.create.return_value = new_provider
+
+        mock_adapter = MagicMock()
+        mock_caps = MagicMock()
+        mock_caps.native_tool_calls = True
+        mock_caps.tool_call_format = MagicMock()
+        mock_caps.tool_call_format.value = "native"
+        mock_adapter.get_capabilities.return_value = mock_caps
+        mock_adapter_registry.get_adapter.return_value = mock_adapter
+
+        with patch.object(
+            manager._provider_switcher._health_monitor, "check_health", return_value=True
+        ):
+            result = await manager.switch_provider("openai", "gpt-4", return_result_object=True)
+
+        assert isinstance(result, SwitchResult)
+        assert result.success is True
+        assert result.metadata is not None
+        assert "context_window" in result.metadata
+
+    @pytest.mark.asyncio
+    @patch("victor.agent.provider.switcher.ProviderRegistry")
+    @patch("victor.agent.provider_manager.ToolCallingAdapterRegistry")
+    async def test_switch_provider_backward_compatible_bool_return(
+        self, mock_adapter_registry, mock_provider_registry, manager
+    ):
+        """Test that switch_provider still returns bool when return_result_object=False."""
+        new_provider = MagicMock()
+        new_provider.supports_tools.return_value = True
+        new_provider.supports_streaming.return_value = True
+        new_provider.discover_capabilities = AsyncMock(return_value=MagicMock())
+        mock_provider_registry.create.return_value = new_provider
+
+        mock_adapter = MagicMock()
+        mock_caps = MagicMock()
+        mock_caps.native_tool_calls = True
+        mock_caps.tool_call_format = MagicMock()
+        mock_caps.tool_call_format.value = "native"
+        mock_adapter.get_capabilities.return_value = mock_caps
+        mock_adapter_registry.get_adapter.return_value = mock_adapter
+
+        with patch.object(
+            manager._provider_switcher._health_monitor, "check_health", return_value=True
+        ):
+            result = await manager.switch_provider("openai", "gpt-4")
+
+        # Should return bool, not SwitchResult
+        assert isinstance(result, bool)
+        assert result is True

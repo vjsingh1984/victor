@@ -150,7 +150,8 @@ class LoopSignature:
 
         # Hash for compact signature (but keep first part readable for debugging)
         readable_part = base_sig[:80] if len(base_sig) > 80 else base_sig
-        hash_part = hashlib.md5(base_sig.encode()).hexdigest()[:8]
+        # MD5 used for loop detection signature, not security
+        hash_part = hashlib.md5(base_sig.encode(), usedforsecurity=False).hexdigest()[:8]
 
         return f"{readable_part}|{hash_part}"
 

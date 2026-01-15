@@ -104,16 +104,29 @@ from victor.teams.types import (
     TeamResult,
 )
 
-# Protocols
-from victor.teams.protocols import (
-    IEnhancedTeamCoordinator,
-    IMessageBusProvider,
-    IObservableCoordinator,
-    IRLCoordinator,
-    ISharedMemoryProvider,
-    ITeamCoordinator,
-    ITeamMember,
-)
+# Protocols - use lazy loading to avoid circular import with victor.protocols.team
+# The canonical location is victor.protocols.team
+def __getattr__(name: str):
+    """Lazy import protocols to avoid circular dependency."""
+    import importlib
+
+    protocol_map = {
+        "IEnhancedTeamCoordinator": ("victor.protocols.team", "IEnhancedTeamCoordinator"),
+        "IMessageBusProvider": ("victor.protocols.team", "IMessageBusProvider"),
+        "IObservableCoordinator": ("victor.protocols.team", "IObservableCoordinator"),
+        "IRLCoordinator": ("victor.protocols.team", "IRLCoordinator"),
+        "ISharedMemoryProvider": ("victor.protocols.team", "ISharedMemoryProvider"),
+        "ITeamCoordinator": ("victor.protocols.team", "ITeamCoordinator"),
+        "ITeamMember": ("victor.protocols.team", "IAgent"),  # IAgent is the canonical name
+    }
+
+    if name in protocol_map:
+        module_path, attr_name = protocol_map[name]
+        module = importlib.import_module(module_path)
+        globals()[name] = getattr(module, attr_name)
+        return globals()[name]
+
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 # Coordinator
 from victor.teams.unified_coordinator import UnifiedTeamCoordinator

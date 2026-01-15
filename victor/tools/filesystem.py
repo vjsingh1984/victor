@@ -34,20 +34,32 @@ logger = logging.getLogger(__name__)
 
 # Global PathResolver instance (lazy initialized)
 _path_resolver: Optional[PathResolver] = None
+_path_resolver_lock = threading.Lock()
 
 
 def get_path_resolver() -> PathResolver:
-    """Get or create the global PathResolver instance."""
+    """Get or create the global PathResolver instance.
+
+    Uses double-checked locking pattern for thread-safe lazy initialization.
+    Multiple threads can safely call this function concurrently.
+    """
     global _path_resolver
     if _path_resolver is None:
-        _path_resolver = create_path_resolver()
+        with _path_resolver_lock:
+            # Double-check: another thread may have initialized while we waited for lock
+            if _path_resolver is None:
+                _path_resolver = create_path_resolver()
     return _path_resolver
 
 
 def reset_path_resolver() -> None:
-    """Reset the path resolver (useful when cwd changes)."""
+    """Reset the path resolver (useful when cwd changes).
+
+    Thread-safe: Uses lock to prevent race conditions during reset.
+    """
     global _path_resolver
-    _path_resolver = None
+    with _path_resolver_lock:
+        _path_resolver = None
 
 
 # ============================================================================

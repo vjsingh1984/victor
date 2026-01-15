@@ -9,7 +9,7 @@ from victor.tools.common import EXCLUDE_DIRS, DEFAULT_CODE_EXTENSIONS, latest_mt
 from victor.tools.decorators import tool
 
 if TYPE_CHECKING:
-    from victor.tools.cache_manager import CacheNamespace
+    from victor.protocols.cache import ICacheNamespace
 
 logger = logging.getLogger(__name__)
 
@@ -18,14 +18,14 @@ logger = logging.getLogger(__name__)
 _INDEX_CACHE: Dict[str, Dict[str, Any]] = {}
 
 
-def _get_index_cache(exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def _get_index_cache(exec_ctx: Optional[Dict[str, Any]] = None) -> "ICacheNamespace":
     """Get the index cache, preferring DI-injected cache if available.
 
     Args:
         exec_ctx: Execution context that may contain cache_manager
 
     Returns:
-        Cache dict-like object for index storage
+        ICacheNamespace dict-like object for index storage
     """
     # Try to get from execution context (DI pattern)
     if exec_ctx is not None:

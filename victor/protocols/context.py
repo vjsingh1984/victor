@@ -45,7 +45,14 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Dict, List, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    # Forward reference - ConversationContext is defined in victor/framework/conversations/
+    # This avoids circular imports
+    class ConversationContext:
+        """Placeholder for type checking."""
+        token_count: int
 
 
 @dataclass

@@ -120,7 +120,8 @@ class QueryEnhancementCache:
             Cache key string
         """
         key_data = f"{query}|{context.domain}|{','.join(context.get_entity_names())}"
-        return hashlib.md5(key_data.encode()).hexdigest()
+        # MD5 used for cache key generation, not security
+        return hashlib.md5(key_data.encode(), usedforsecurity=False).hexdigest()
 
     def get(self, query: str, context: EnhancementContext) -> Optional[EnhancedQuery]:
         """Get cached enhanced query.

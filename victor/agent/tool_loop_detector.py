@@ -398,7 +398,8 @@ class ToolLoopDetector:
         # Sort keys for consistent hashing
         sorted_items = sorted(normalized.items())
         content = str(sorted_items).encode("utf-8")
-        return hashlib.md5(content).hexdigest()[:12]
+        # MD5 used for tool loop detection, not security
+        return hashlib.md5(content, usedforsecurity=False).hexdigest()[:12]
 
     def _extract_resource_key(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
         """Extract resource key from tool call (e.g., file path).

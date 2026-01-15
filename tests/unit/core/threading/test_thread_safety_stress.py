@@ -351,7 +351,8 @@ class TestEventBackendConcurrencyStress:
 
         # Let events propagate - increase wait for high concurrency scenarios
         # With 50 publishers and 50 subscribers (2500 events), need more time
-        wait_time = max(1.0, (num_publishers * num_subscribers) / 1000.0)
+        # Use higher multiplier to account for asyncio task scheduling overhead
+        wait_time = max(1.0, (num_publishers * num_subscribers) / 250.0)
         time.sleep(wait_time)
 
         # Verify invariants

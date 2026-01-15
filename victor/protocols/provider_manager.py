@@ -99,7 +99,7 @@ class IProviderManager(Protocol):
     - Capability discovery
     """
 
-    async def get_provider(self, provider_name: str) -> "IProvider":
+    async def get_provider(self, provider_name: str) -> Any:  # Provider instance
         """Get provider instance by name.
 
         Args:

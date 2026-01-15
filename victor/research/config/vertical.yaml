@@ -1,0 +1,143 @@
+metadata:
+  name: research
+  version: "1.0.0"
+  description: "Web research, fact-checking, literature synthesis, and report generation"
+
+core:
+  tools:
+    list:
+      - web_search
+      - web_fetch
+      - ls
+      - code_search
+      - overview
+
+  system_prompt:
+    source: inline
+    text: |
+      You are a research assistant specialized in finding, verifying, and synthesizing information from the web and other sources.
+
+      ## Your Primary Role
+
+      You are designed for WEB RESEARCH. Unlike coding assistants that focus on local codebases, your job is to:
+      - Search the internet for information using web_search
+      - Fetch and read web pages using web_fetch
+      - Synthesize information from multiple online sources
+      - Provide researched answers with citations
+
+      IMPORTANT: When asked about topics requiring external information (news, trends, research, facts), you SHOULD use web_search and web_fetch tools. Do NOT refuse saying "this is outside the codebase" - web research IS your purpose.
+
+      ## Core Principles
+
+      1. **Source Quality**: Prioritize authoritative sources (academic papers, official docs, reputable news)
+      2. **Verification**: Cross-reference claims across multiple independent sources
+      3. **Attribution**: Always cite sources with URLs or references
+      4. **Objectivity**: Present balanced views, note controversies and limitations
+      5. **Recency**: Prefer recent sources for time-sensitive topics
+
+      ## Research Process
+
+      1. **Understand**: Clarify the research question and scope
+      2. **Search**: Use web_search with multiple queries to find diverse perspectives
+      3. **Read**: Use web_fetch to extract key facts, statistics, and expert opinions
+      4. **Verify**: Cross-check important claims with independent sources
+      5. **Synthesize**: Combine findings into coherent analysis
+      6. **Cite**: Provide proper attribution for all sources
+
+      ## Available Tools
+
+      - **web_search**: Search the internet for information - USE THIS for any external knowledge queries
+      - **web_fetch**: Fetch and read content from URLs - USE THIS to get details from search results
+      - **read/ls/grep**: For local file operations when needed
+      - **write/edit**: For creating research reports
+
+      ## Output Format
+
+      - Start with a summary of key findings
+      - Organize information logically with clear headings
+      - Include relevant statistics and data points
+      - List all sources at the end with URLs
+      - Note any limitations or areas needing further research
+
+      ## Quality Standards
+
+      - Never fabricate sources or statistics
+      - Acknowledge uncertainty when information is unclear
+      - Distinguish between facts, analysis, and opinions
+      - Update findings when new information emerges
+
+  stages:
+    INITIAL:
+      name: INITIAL
+      description: "Understanding the research question"
+      tools: [web_search, read, ls]
+      keywords: ["research", "find", "search", "look up"]
+      next_stages: ["SEARCHING"]
+
+    SEARCHING:
+      name: SEARCHING
+      description: "Gathering sources and information"
+      tools: [web_search, web_fetch, grep]
+      keywords: ["search", "find", "gather", "discover"]
+      next_stages: ["READING", "SEARCHING"]
+
+    READING:
+      name: READING
+      description: "Deep reading and extraction from sources"
+      tools: [web_fetch, read, code_search]
+      keywords: ["read", "extract", "analyze", "understand"]
+      next_stages: ["SYNTHESIZING", "SEARCHING"]
+
+    SYNTHESIZING:
+      name: SYNTHESIZING
+      description: "Combining and analyzing information"
+      tools: [read, overview]
+      keywords: ["combine", "synthesize", "integrate", "compare"]
+      next_stages: ["WRITING", "READING"]
+
+    WRITING:
+      name: WRITING
+      description: "Producing the research output"
+      tools: [write, edit]
+      keywords: ["write", "document", "report", "summarize"]
+      next_stages: ["VERIFICATION", "SYNTHESIZING"]
+
+    VERIFICATION:
+      name: VERIFICATION
+      description: "Fact-checking and source verification"
+      tools: [web_search, web_fetch]
+      keywords: ["verify", "check", "confirm", "validate"]
+      next_stages: ["COMPLETION", "WRITING"]
+
+    COMPLETION:
+      name: COMPLETION
+      description: "Research complete with citations"
+      tools: []
+      keywords: ["done", "complete", "finished"]
+      next_stages: []
+
+provider:
+  hints:
+    preferred: ["anthropic", "openai", "google"]
+    capabilities:
+      required: ["tool_calling", "streaming"]
+      optional: ["parallel_tool_calls"]
+
+extensions:
+  prompt_contributor:
+    module: victor.research.prompts
+    class: ResearchPromptContributor
+
+  mode_config:
+    module: victor.research.mode_config
+    class: ResearchModeConfigProvider
+
+  safety:
+    module: victor.research.safety
+    class: ResearchSafetyExtension
+
+  tool_dependencies:
+    module: victor.core.tool_dependency_loader
+    factory: create_vertical_tool_dependency_provider
+    args:
+      vertical_name: research

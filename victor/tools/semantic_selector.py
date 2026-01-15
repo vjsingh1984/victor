@@ -30,6 +30,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import httpx
 import numpy as np
 
+from victor.core.errors import FileError, ConfigurationError
 from victor.providers.base import ToolDefinition
 from victor.tools.base import CostTier, ToolMetadataRegistry, ToolRegistry
 from victor.storage.embeddings.service import EmbeddingService
@@ -51,11 +52,8 @@ from victor.config.tool_selection_defaults import (
     QueryPatterns,
 )
 
-# Import for type checking only (avoid circular imports)
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from victor.agent.unified_classifier import ClassificationResult
+# Import classification protocol to avoid circular imports
+from victor.protocols.classification import IClassificationResult
 
 logger = logging.getLogger(__name__)
 
@@ -318,8 +316,11 @@ class SemanticToolSelector:
             # Use absolute path for consistent hashing
             path_str = str(project_root.resolve())
             return hashlib.sha256(path_str.encode()).hexdigest()[:8]
+        except (FileError, ConfigurationError, OSError):
+            # Known error types - fallback to "global" if project detection fails
+            return "global"
         except Exception:
-            # Fallback to "global" if project detection fails
+            # Catch-all for truly unexpected errors
             return "global"
 
     def _calculate_tools_hash(self, tools: ToolRegistry) -> str:
@@ -359,7 +360,11 @@ class SemanticToolSelector:
             if self.cache_file.exists():
                 self.cache_file.unlink()
                 logger.info(f"Tool embeddings: deleted stale cache ({reason})")
+        except (FileError, ConfigurationError) as e:
+            # Known error types
+            logger.warning(f"Tool embeddings: failed to delete cache: {e}")
         except Exception as e:
+            # Catch-all for truly unexpected errors
             logger.warning(f"Tool embeddings: failed to delete cache: {e}")
 
     def _load_from_cache(self, tools_hash: str) -> bool:
@@ -476,9 +481,15 @@ class SemanticToolSelector:
             logger.warning(f"Tool embeddings: cache file corrupted: {e}")
             self._delete_cache("unpickling error")
             return False
-        except Exception as e:
+        except (FileError, ConfigurationError, pickle.PickleError) as e:
+            # Known error types - file or pickle errors
             logger.warning(f"Failed to load embedding cache (corrupted?): {e}, will rebuild")
             self._delete_cache("load error")
+            return False
+        except Exception as e:
+            # Catch-all for truly unexpected errors
+            logger.warning(f"Failed to load embedding cache: {e}, will rebuild")
+            self._delete_cache("unexpected error")
             return False
 
     def _save_to_cache(self, tools_hash: str) -> None:
@@ -507,7 +518,11 @@ class SemanticToolSelector:
                 f"({cache_size:.1f} KB, {len(tool_names)} tools, v{self.CACHE_VERSION})"
             )
 
+        except (FileError, ConfigurationError, pickle.PickleError) as e:
+            # Known error types - file or pickle errors
+            logger.warning(f"Failed to save embedding cache: {e}")
         except Exception as e:
+            # Catch-all for truly unexpected errors
             logger.warning(f"Failed to save embedding cache: {e}")
 
     # Category alias mappings for logical category names
@@ -2123,7 +2138,7 @@ class SemanticToolSelector:
         self,
         user_message: str,
         tools: ToolRegistry,
-        classification_result: "ClassificationResult",
+        classification_result: IClassificationResult,
         conversation_history: Optional[List[Dict[str, Any]]] = None,
         max_tools: int = 5,
         base_similarity_threshold: float = SemanticSelectorDefaults.SIMILARITY_THRESHOLD,

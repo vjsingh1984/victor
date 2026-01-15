@@ -117,15 +117,8 @@ class VertexAIProvider(BaseProvider):
             timeout: Request timeout
             **kwargs: Additional configuration
         """
-        # Resolution order: parameter → env var → keyring → warning
-        resolved_key = api_key or os.environ.get("VERTEX_API_KEY", "")
-        if not resolved_key:
-            try:
-                from victor.config.api_keys import get_api_key
-
-                resolved_key = get_api_key("vertex") or get_api_key("gcp") or ""
-            except ImportError:
-                pass
+        # Resolve API key using centralized helper
+        resolved_key = self._resolve_api_key(api_key, "vertex")
 
         self._project_id = project_id or os.environ.get("GOOGLE_CLOUD_PROJECT", "")
         self._location = location

@@ -55,6 +55,8 @@ if TYPE_CHECKING:
     from victor.storage.embeddings.task_classifier import TaskTypeClassifier
     from victor.agent.task_analyzer import TaskAnalyzer
 
+from victor.observability.events import create_task_classified_event
+
 logger = logging.getLogger(__name__)
 
 # Try to import native extensions for fast keyword detection
@@ -527,7 +529,7 @@ class UnifiedTaskClassifier:
             Hash string suitable for cache key
         """
         # Use MD5 for speed (not security-sensitive)
-        return hashlib.md5(message.encode()).hexdigest()
+        return hashlib.md5(message.encode(), usedforsecurity=False).hexdigest()
 
     def _check_cache(self, message: str) -> Optional[ClassificationResult]:
         """Check cache for a classification result.
@@ -747,6 +749,37 @@ class UnifiedTaskClassifier:
         # Cache the result
         if use_cache:
             self._add_to_cache(message, result)
+
+        # Publish classification event (non-blocking, best-effort)
+        try:
+            from victor.core.events.backends import get_observability_bus
+
+            bus = get_observability_bus()
+            event = create_task_classified_event(
+                query=message,
+                task_type=best_type.value,
+                confidence=confidence,
+                is_action_task=result.is_action_task,
+                is_analysis_task=result.is_analysis_task,
+                is_generation_task=result.is_generation_task,
+                method="keyword",
+            )
+            import asyncio
+
+            # Fire and forget - don't wait for event emission
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(bus.emit(event.to_messaging_event()))
+                else:
+                    # Sync context, emit synchronously
+                    pass  # Event bus requires async context
+            except RuntimeError:
+                # No event loop, skip event emission
+                pass
+        except Exception:
+            # Event bus not available or other error - don't break classification
+            pass
 
         return result
 

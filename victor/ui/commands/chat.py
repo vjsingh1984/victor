@@ -11,8 +11,8 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 
-from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import load_settings, ProfileConfig
+from victor.protocols import UIAgentProtocol
 from victor.framework.shim import FrameworkShim
 from victor.core.verticals import get_vertical, list_verticals
 from victor.ui.output_formatter import InputReader, create_formatter
@@ -24,6 +24,7 @@ from victor.ui.commands.utils import (
     setup_logging,
     graceful_shutdown,
 )
+from victor.agent import AgentOrchestrator
 from victor.workflows import (
     load_workflow_from_file,
     YAMLWorkflowError,
@@ -776,7 +777,7 @@ async def run_interactive(
 
 
 async def _run_cli_repl(
-    agent: AgentOrchestrator,
+    agent: "UIAgentProtocol",
     settings: Any,
     cmd_handler: Any,
     profile_config: Any,

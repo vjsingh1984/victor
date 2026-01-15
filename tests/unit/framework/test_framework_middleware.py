@@ -19,6 +19,8 @@ These tests verify the framework-level middleware implementations:
 - SecretMaskingMiddleware
 - MetricsMiddleware
 - GitSafetyMiddleware
+- ValidationMiddleware (from common.py)
+- SafetyCheckMiddleware (from common.py)
 """
 
 import logging
@@ -27,14 +29,19 @@ from unittest.mock import MagicMock, patch
 
 from victor.core.vertical_types import MiddlewarePriority
 from victor.framework.middleware import (
+    CacheMiddleware,
+    CacheResult,
     GitSafetyMiddleware,
     LoggingMiddleware,
     MetricsMiddleware,
     OutputValidationMiddleware,
+    RateLimitMiddleware,
+    SafetyCheckMiddleware,
     SecretMaskingMiddleware,
     ToolMetrics,
     ValidationIssue,
     ContentValidationResult,
+    ValidationMiddleware,
     ValidationSeverity,
     ValidatorProtocol,
 )
@@ -1153,6 +1160,177 @@ class TestRateLimitMiddleware:
         assert edit_result.proceed is True
 
 
+# =============================================================================
+# Tests for ValidationMiddleware (from common.py)
+# =============================================================================
+
+
+class TestValidationMiddleware:
+    """Tests for ValidationMiddleware."""
+
+    @pytest.mark.asyncio
+    async def test_valid_schema_passes(self):
+        """Valid arguments against schema should pass."""
+        schemas = {
+            "write_file": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "content": {"type": "string"},
+                },
+                "required": ["path", "content"],
+            }
+        }
+        middleware = ValidationMiddleware(schemas=schemas)
+
+        result = await middleware.before_tool_call(
+            "write_file", {"path": "test.txt", "content": "hello"}
+        )
+
+        assert result.proceed is True
+        assert result.error_message is None
+
+    @pytest.mark.asyncio
+    async def test_missing_required_property_fails(self):
+        """Missing required property should fail validation."""
+        schemas = {
+            "write_file": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "content": {"type": "string"},
+                },
+                "required": ["path", "content"],
+            }
+        }
+        middleware = ValidationMiddleware(schemas=schemas)
+
+        result = await middleware.before_tool_call("write_file", {"path": "test.txt"})
+
+        assert result.proceed is False
+        assert "Missing required property" in result.error_message
+        assert "content" in result.error_message
+
+    @pytest.mark.asyncio
+    async def test_wrong_type_fails(self):
+        """Wrong type should fail validation."""
+        schemas = {
+            "write_file": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "content": {"type": "string"},
+                },
+                "required": ["path"],
+            }
+        }
+        middleware = ValidationMiddleware(schemas=schemas)
+
+        result = await middleware.before_tool_call("write_file", {"path": 12345})
+
+        assert result.proceed is False
+        assert "expected string" in result.error_message
+
+    @pytest.mark.asyncio
+    async def test_no_schema_allows(self):
+        """Tools without schema should be allowed."""
+        middleware = ValidationMiddleware(schemas={})
+
+        result = await middleware.before_tool_call("any_tool", {"any": "args"})
+
+        assert result.proceed is True
+
+    @pytest.mark.asyncio
+    async def test_disabled_middleware_allows(self):
+        """Disabled middleware should not validate."""
+        schemas = {"write_file": {"type": "object", "properties": {"path": {"type": "string"}}}}
+        middleware = ValidationMiddleware(schemas=schemas, enabled=False)
+
+        result = await middleware.before_tool_call("write_file", {"invalid": "args"})
+
+        assert result.proceed is True
+
+
+class TestSafetyCheckMiddleware:
+    """Tests for SafetyCheckMiddleware."""
+
+    @pytest.mark.asyncio
+    async def test_blocks_dangerous_tool(self):
+        """Should block completely blocked tools."""
+        middleware = SafetyCheckMiddleware(blocked_tools={"rm", "format_disk"})
+
+        result = await middleware.before_tool_call("rm", {"path": "/test"})
+
+        assert result.proceed is False
+        assert "blocked for safety reasons" in result.error_message
+
+    @pytest.mark.asyncio
+    async def test_allows_safe_tool(self):
+        """Should allow tools not in blocked list."""
+        middleware = SafetyCheckMiddleware(blocked_tools={"rm"})
+
+        result = await middleware.before_tool_call("ls", {"path": "/test"})
+
+        assert result.proceed is True
+
+    @pytest.mark.asyncio
+    async def test_blocks_write_outside_allowed_paths(self):
+        """Should block writes to paths outside allowed list."""
+        middleware = SafetyCheckMiddleware(
+            allowed_paths={"/tmp", "/home/user/workspace"}
+        )
+
+        result = await middleware.before_tool_call("write_file", {"path": "/etc/passwd"})
+
+        assert result.proceed is False
+        assert "not in allowed paths" in result.error_message
+
+    @pytest.mark.asyncio
+    async def test_allows_write_in_allowed_paths(self):
+        """Should allow writes to allowed paths."""
+        middleware = SafetyCheckMiddleware(
+            allowed_paths={"/tmp", "/home/user/workspace"}
+        )
+
+        result = await middleware.before_tool_call("write_file", {"path": "/tmp/test.txt"})
+
+        assert result.proceed is True
+
+    @pytest.mark.asyncio
+    async def test_blocks_dangerous_command(self):
+        """Should block dangerous shell commands."""
+        middleware = SafetyCheckMiddleware(blocked_tools=set())
+
+        result = await middleware.before_tool_call(
+            "execute_bash", {"command": "rm -rf /"}
+        )
+
+        assert result.proceed is False
+        assert "blocked for safety reasons" in result.error_message
+
+    @pytest.mark.asyncio
+    async def test_allows_safe_command(self):
+        """Should allow safe shell commands."""
+        middleware = SafetyCheckMiddleware(blocked_tools=set())
+
+        result = await middleware.before_tool_call("execute_bash", {"command": "ls -la"})
+
+        assert result.proceed is True
+
+    @pytest.mark.asyncio
+    async def test_disabled_middleware_allows(self):
+        """Disabled middleware should not check safety."""
+        middleware = SafetyCheckMiddleware(
+            blocked_tools={"rm"},
+            allowed_paths={"/tmp"},
+            enabled=False,
+        )
+
+        # Would normally be blocked
+        result = await middleware.before_tool_call("rm", {"path": "/"})
+        assert result.proceed is True
+
+
 __all__ = [
     "TestLoggingMiddleware",
     "TestSecretMaskingMiddleware",
@@ -1164,4 +1342,6 @@ __all__ = [
     "TestMiddlewareIntegration",
     "TestCacheMiddleware",
     "TestRateLimitMiddleware",
+    "TestValidationMiddleware",
+    "TestSafetyCheckMiddleware",
 ]

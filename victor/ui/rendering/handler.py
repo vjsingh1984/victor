@@ -12,11 +12,11 @@ from victor.agent.response_sanitizer import StreamingContentFilter
 from victor.ui.rendering.protocol import StreamRenderer
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    from victor.protocols import UIAgentProtocol
 
 
 async def stream_response(
-    agent: AgentOrchestrator,
+    agent: "UIAgentProtocol",
     message: str,
     renderer: StreamRenderer,
     suppress_thinking: bool = False,

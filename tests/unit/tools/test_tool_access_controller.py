@@ -37,6 +37,7 @@ from victor.agent.tool_access_controller import (
     ToolAccessController,
     VerticalLayer,
 )
+from victor.core.vertical_types import TieredToolConfig
 
 
 # =============================================================================
@@ -330,22 +331,24 @@ class TestVerticalLayer:
         assert "no vertical restrictions" in reason.lower()
 
     def test_allows_core_tools(self):
-        """Test allows tools in core_tools."""
-        config = MagicMock()
-        config.core_tools = ["read_file", "shell"]
-        config.extension_tools = []
-        config.optional_tools = []
+        """Test allows tools in mandatory."""
+        config = TieredToolConfig(
+            mandatory={"read_file", "shell"},
+            vertical_core=set(),
+            semantic_pool=set(),
+        )
 
         layer = VerticalLayer(tiered_config=config)
         allowed, reason = layer.check("read_file", None)
         assert allowed is True
 
     def test_allows_extension_tools(self):
-        """Test allows tools in extension_tools."""
-        config = MagicMock()
-        config.core_tools = []
-        config.extension_tools = ["semantic_search"]
-        config.optional_tools = []
+        """Test allows tools in vertical_core."""
+        config = TieredToolConfig(
+            mandatory=set(),
+            vertical_core={"semantic_search"},
+            semantic_pool=set(),
+        )
 
         layer = VerticalLayer(tiered_config=config)
         allowed, reason = layer.check("semantic_search", None)
@@ -353,10 +356,11 @@ class TestVerticalLayer:
 
     def test_blocks_non_vertical_tools(self):
         """Test blocks tools not in any tier."""
-        config = MagicMock()
-        config.core_tools = ["read_file"]
-        config.extension_tools = []
-        config.optional_tools = []
+        config = TieredToolConfig(
+            mandatory={"read_file"},
+            vertical_core=set(),
+            semantic_pool=set(),
+        )
 
         layer = VerticalLayer(tiered_config=config)
         allowed, reason = layer.check("shell", None)
@@ -366,10 +370,11 @@ class TestVerticalLayer:
     def test_set_tiered_config(self):
         """Test set_tiered_config updates config."""
         layer = VerticalLayer()
-        config = MagicMock()
-        config.core_tools = ["read_file"]
-        config.extension_tools = []
-        config.optional_tools = []
+        config = TieredToolConfig(
+            mandatory={"read_file"},
+            vertical_core=set(),
+            semantic_pool=set(),
+        )
 
         layer.set_tiered_config(config)
         allowed, reason = layer.check("shell", None)
@@ -646,10 +651,11 @@ class TestVerticalLayerExtended:
 
     def test_empty_tool_sets_allows_all(self):
         """Test vertical with empty tool sets allows all."""
-        config = MagicMock()
-        config.core_tools = []
-        config.extension_tools = []
-        config.optional_tools = []
+        config = TieredToolConfig(
+            mandatory=set(),
+            vertical_core=set(),
+            semantic_pool=set(),
+        )
 
         layer = VerticalLayer(tiered_config=config)
         allowed, reason = layer.check("any_tool", None)
@@ -665,10 +671,11 @@ class TestVerticalLayerExtended:
 
     def test_get_allowed_tools_with_config(self):
         """Test get_allowed_tools filters based on config."""
-        config = MagicMock()
-        config.core_tools = ["read_file"]
-        config.extension_tools = ["list_directory"]
-        config.optional_tools = ["semantic_search"]
+        config = TieredToolConfig(
+            mandatory={"read_file"},
+            vertical_core={"list_directory"},
+            semantic_pool={"semantic_search"},
+        )
 
         layer = VerticalLayer(tiered_config=config)
         all_tools = {"read_file", "write_file", "shell", "list_directory"}
@@ -677,10 +684,11 @@ class TestVerticalLayerExtended:
 
     def test_get_allowed_tools_empty_sets(self):
         """Test get_allowed_tools with empty config returns all."""
-        config = MagicMock()
-        config.core_tools = []
-        config.extension_tools = []
-        config.optional_tools = []
+        config = TieredToolConfig(
+            mandatory=set(),
+            vertical_core=set(),
+            semantic_pool=set(),
+        )
 
         layer = VerticalLayer(tiered_config=config)
         all_tools = {"read_file", "write_file"}
@@ -794,16 +802,17 @@ class TestToolAccessControllerMethods:
             layers=[VerticalLayer()],
         )
 
-        config = MagicMock()
-        config.core_tools = ["read_file"]
-        config.extension_tools = []
-        config.optional_tools = []
+        config = TieredToolConfig(
+            mandatory={"read_file"},
+            vertical_core=set(),
+            semantic_pool=set(),
+        )
 
         controller.set_tiered_config(config)
 
         # Verify config was set by checking tool access
         decision = controller.check_access("write_file")
-        # write_file is not in core_tools, so should be blocked
+        # write_file is not in mandatory, so should be blocked
         assert decision.allowed is False
 
     def test_set_preserved_tools_on_controller(self, mock_registry):

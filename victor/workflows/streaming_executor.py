@@ -74,7 +74,7 @@ from victor.workflows.streaming import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    from victor.protocols import WorkflowAgentProtocol
     from victor.framework.rl.checkpoint_store import CheckpointStore
     from victor.workflows.cache import WorkflowCache, WorkflowCacheConfig
 
@@ -158,7 +158,7 @@ class StreamingWorkflowExecutor(WorkflowExecutor):
 
     def __init__(
         self,
-        orchestrator: "AgentOrchestrator",
+        orchestrator: "WorkflowAgentProtocol",
         *,
         max_parallel: int = 4,
         default_timeout: float = 300.0,

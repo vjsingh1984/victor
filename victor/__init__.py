@@ -46,8 +46,25 @@ __email__ = "singhvjd@gmail.com"
 __license__ = "Apache-2.0"
 
 # Core classes (existing API - for backward compatibility)
-from victor.agent.orchestrator import AgentOrchestrator
+# AgentOrchestrator is lazy-loaded to improve startup time
+# Most users should use `from victor import Agent` instead
 from victor.config.settings import Settings
+
+
+def __getattr__(name: str):
+    """Lazy import AgentOrchestrator to improve startup time.
+
+    The recommended API is `from victor import Agent`, which is imported immediately.
+    AgentOrchestrator is only needed for advanced use cases, so it's loaded on-demand.
+    """
+    import importlib
+
+    if name == "AgentOrchestrator":
+        from victor.agent import AgentOrchestrator as AO
+        globals()["AgentOrchestrator"] = AO
+        return AO
+
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 # Framework API (simplified - new golden path)
 from victor.framework import (

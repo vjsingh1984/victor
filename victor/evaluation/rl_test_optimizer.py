@@ -164,7 +164,8 @@ class TestDependencyLearner:
 
     def _file_hash(self, file_path: str) -> str:
         """Create a hash for a file path."""
-        return hashlib.md5(file_path.encode()).hexdigest()[:16]
+        # MD5 used for file path hashing, not security
+        return hashlib.md5(file_path.encode(), usedforsecurity=False).hexdigest()[:16]
 
     def get_failure_probability(self, test_name: str, changed_files: List[str]) -> float:
         """Get estimated failure probability for a test given changed files.

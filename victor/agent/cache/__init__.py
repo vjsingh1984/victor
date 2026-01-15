@@ -19,10 +19,14 @@ This package provides hierarchical caching for tool results with:
 - Tool-to-tool dependency tracking
 - Tool-to-file dependency tracking
 - Cascading cache invalidation
+- File change detection for automatic invalidation
+- Automatic dependency extraction from tool arguments
 - Pluggable cache backends via ICacheBackend protocol
 """
 
+from victor.agent.cache.dependency_extractor import DependencyExtractor
 from victor.agent.cache.dependency_graph import ToolDependencyGraph
+from victor.agent.cache.file_watcher import FileWatcher, FileChangeHandler
 from victor.agent.cache.tool_cache_manager import (
     ToolCacheManager,
     CacheNamespace,
@@ -30,8 +34,14 @@ from victor.agent.cache.tool_cache_manager import (
 )
 
 __all__ = [
+    # Core cache management
     "ToolCacheManager",
     "ToolDependencyGraph",
     "CacheNamespace",
     "CacheEntry",
+    # File watching
+    "FileWatcher",
+    "FileChangeHandler",
+    # Dependency extraction
+    "DependencyExtractor",
 ]

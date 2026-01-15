@@ -42,7 +42,7 @@ This module provides a single source of truth for all orchestrator-related const
 **Note:** These constants are defaults. Most can be overridden via Settings or ProfileConfig.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict
 
 
@@ -186,13 +186,13 @@ class ToolSelectionPresets:
     - cloud (Claude/GPT): Optimized for commercial models
     """
 
-    tiny: Dict[str, float] = None  # Will be set in __post_init__
-    small: Dict[str, float] = None
-    medium: Dict[str, float] = None
-    large: Dict[str, float] = None
-    cloud: Dict[str, float] = None
+    tiny: Dict[str, float] = field(default_factory=dict)
+    small: Dict[str, float] = field(default_factory=dict)
+    medium: Dict[str, float] = field(default_factory=dict)
+    large: Dict[str, float] = field(default_factory=dict)
+    cloud: Dict[str, float] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # Use object.__setattr__ since dataclass is frozen
         object.__setattr__(
             self,

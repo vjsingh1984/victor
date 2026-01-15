@@ -244,7 +244,7 @@ class PromptTemplate:
             return 0.5  # Prior probability
         return self.success_count / self.usage_count
 
-    def format(self, **kwargs) -> str:
+    def format(self, **kwargs: Any) -> str:
         """Format template with provided variables."""
         return self.template.format(**kwargs)
 

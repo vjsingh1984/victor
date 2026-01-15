@@ -264,6 +264,9 @@ class TestVerticalYAMLConfig:
             stages={},
             middleware=[],
             safety_extension=None,
+            prompt_contributor=None,
+            mode_config=None,
+            tool_dependencies=None,
             workflows={"source": "directory"},
             provider_hints={}
         )
@@ -282,6 +285,9 @@ class TestVerticalYAMLConfig:
             stages={},
             middleware=[],
             safety_extension=None,
+            prompt_contributor=None,
+            mode_config=None,
+            tool_dependencies=None,
             workflows={},
             provider_hints={}
         )

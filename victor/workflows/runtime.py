@@ -85,7 +85,7 @@ from victor.workflows.unified_executor import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    from victor.protocols import WorkflowAgentProtocol
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import WorkflowDefinition
 
@@ -102,7 +102,8 @@ def _get_icon(name: str) -> str:
         from victor.agent.presentation import create_presentation_adapter
 
         _presentation = create_presentation_adapter()
-    return _presentation.icon(name, with_color=False)
+    result: Any = _presentation.icon(name, with_color=False)
+    return str(result) if result is not None else ""
 
 
 @dataclass
@@ -171,12 +172,14 @@ class RuntimeResult:
     @property
     def success(self) -> bool:
         """Whether execution succeeded."""
-        return self.execution.success
+        result: Any = self.execution.success
+        return bool(result) if result is not None else False
 
     @property
     def state(self) -> Dict[str, Any]:
         """Final workflow state."""
-        return self.execution.state
+        result: Any = self.execution.state
+        return dict(result) if result is not None else {}
 
     def get(self, key: str, default: Any = None) -> Any:
         """Get value from final state."""
@@ -218,7 +221,7 @@ class WorkflowRuntime:
     def __init__(
         self,
         config: Optional[RuntimeConfig] = None,
-        orchestrator: Optional["AgentOrchestrator"] = None,
+        orchestrator: Optional["WorkflowAgentProtocol"] = None,
         tool_registry: Optional["ToolRegistry"] = None,
     ):
         """Initialize the workflow runtime.
@@ -239,7 +242,7 @@ class WorkflowRuntime:
         self._service_handles: Dict[str, Any] = {}
 
         # HITL server management
-        self._hitl_server_task: Optional[asyncio.Task] = None
+        self._hitl_server_task: Optional[asyncio.Task[None]] = None
         self._hitl_server_running = False
         self._hitl_store: Optional[Any] = None
         self._hitl_url: Optional[str] = None
@@ -399,7 +402,7 @@ class WorkflowRuntime:
         initial_context: Optional[Dict[str, Any]] = None,
         *,
         thread_id: Optional[str] = None,
-    ) -> AsyncIterator[tuple]:
+    ) -> AsyncIterator[tuple[str, Dict[str, Any]]]:
         """Stream workflow execution with lifecycle management.
 
         Args:
@@ -577,14 +580,20 @@ class WorkflowRuntime:
         Returns:
             Dictionary of service name -> health status
         """
-        return await self._service_manager.health_check_all()
+        result: Any = await self._service_manager.health_check_all()
+        return dict(result) if result is not None else {}
 
     async def __aenter__(self) -> "WorkflowRuntime":
         """Enter context manager - start runtime."""
         await self.start()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self,
+        exc_type: Optional[type],
+        exc_val: Optional[Exception],
+        exc_tb: Optional[Any],
+    ) -> None:
         """Exit context manager - stop runtime."""
         await self.stop()
 

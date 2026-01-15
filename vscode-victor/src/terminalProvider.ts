@@ -6,10 +6,12 @@
  * - Command history tracking
  * - Output capture and streaming
  * - Interactive command approval
+ * - Input validation and sanitization (security)
  */
 
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { TerminalCommandValidator, ValidationError } from './terminalCommandValidator';
 
 export interface CommandExecution {
     id: string;
@@ -115,6 +117,48 @@ export class TerminalProvider implements vscode.Disposable {
             this._executions.pop();
         }
 
+        // Validate command before execution
+        const validationResult = TerminalCommandValidator.validateCommand(command);
+        if (!validationResult.valid) {
+            execution.status = 'failed';
+            execution.endTime = new Date();
+            execution.output = `Command validation failed: ${validationResult.error?.message}`;
+
+            vscode.window.showErrorMessage(
+                `Command validation failed: ${validationResult.error?.message}`,
+                'OK'
+            );
+
+            this._outputChannel.appendLine(
+                `\n[${new Date().toLocaleTimeString()}] ❌ Command validation failed: ${validationResult.error?.message}`
+            );
+            this._outputChannel.appendLine(`  Command: ${command}`);
+
+            return execution;
+        }
+
+        // Validate workspace path if provided
+        if (cwd) {
+            const pathValidation = TerminalCommandValidator.validateWorkspacePath(cwd);
+            if (!pathValidation.valid) {
+                execution.status = 'failed';
+                execution.endTime = new Date();
+                execution.output = `Workspace path validation failed: ${pathValidation.error?.message}`;
+
+                vscode.window.showErrorMessage(
+                    `Invalid workspace path: ${pathValidation.error?.message}`,
+                    'OK'
+                );
+
+                this._outputChannel.appendLine(
+                    `\n[${new Date().toLocaleTimeString()}] ❌ Path validation failed: ${pathValidation.error?.message}`
+                );
+                this._outputChannel.appendLine(`  Path: ${cwd}`);
+
+                return execution;
+            }
+        }
+
         // Check for dangerous commands
         const isDangerous = this._isDangerousCommand(command);
 
@@ -182,6 +226,46 @@ export class TerminalProvider implements vscode.Disposable {
         };
 
         this._executions.unshift(execution);
+
+        // Validate command before execution
+        const validationResult = TerminalCommandValidator.validateCommand(command);
+        if (!validationResult.valid) {
+            execution.status = 'failed';
+            execution.endTime = new Date();
+            execution.output = `Command validation failed: ${validationResult.error?.message}`;
+
+            vscode.window.showErrorMessage(
+                `Command validation failed: ${validationResult.error?.message}`,
+                'OK'
+            );
+
+            this._outputChannel.appendLine(
+                `\n[${new Date().toLocaleTimeString()}] ❌ Command validation failed: ${validationResult.error?.message}`
+            );
+
+            return execution;
+        }
+
+        // Validate workspace path if provided
+        if (cwd) {
+            const pathValidation = TerminalCommandValidator.validateWorkspacePath(cwd);
+            if (!pathValidation.valid) {
+                execution.status = 'failed';
+                execution.endTime = new Date();
+                execution.output = `Workspace path validation failed: ${pathValidation.error?.message}`;
+
+                vscode.window.showErrorMessage(
+                    `Invalid workspace path: ${pathValidation.error?.message}`,
+                    'OK'
+                );
+
+                this._outputChannel.appendLine(
+                    `\n[${new Date().toLocaleTimeString()}] ❌ Path validation failed: ${pathValidation.error?.message}`
+                );
+
+                return execution;
+            }
+        }
 
         // Check for dangerous commands
         const isDangerous = this._isDangerousCommand(command);

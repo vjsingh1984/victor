@@ -316,7 +316,8 @@ class FileChangeHistory:
     @staticmethod
     def compute_checksum(content: str) -> str:
         """Compute MD5 checksum of content."""
-        return hashlib.md5(content.encode("utf-8")).hexdigest()
+        # MD5 used for change detection, not security
+        return hashlib.md5(content.encode("utf-8"), usedforsecurity=False).hexdigest()
 
     def begin_change_group(self, tool_name: str, description: str = "") -> str:
         """Begin a new change group.

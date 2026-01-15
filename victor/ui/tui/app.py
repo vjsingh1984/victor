@@ -17,19 +17,23 @@ from textual.binding import Binding
 from textual.containers import Container, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Footer, Input, Label
+
+from victor.ui.common.constants import SESSION_TYPE_INDEX, SESSION_UUID_INDEX
 from victor.ui.tui.session import Message
 from victor.ui.tui.theme import THEME_CSS
 from victor.ui.tui.widgets import (
-    EnhancedConversationLog,
+    VirtualScrollContainer,
     InputWidget,
     StatusBar,
     ThinkingWidget,
     ToolCallWidget,
 )
+from victor.config.tui_themes import THEMES, get_theme
+from victor.config.keybindings import KeybindingConfig, DEFAULT_KEYBINDINGS
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
     from victor.config.settings import Settings
+    from victor.protocols import UIAgentProtocol
 
 
 class TUIConsoleAdapter:
@@ -73,6 +77,57 @@ class TUIConsoleAdapter:
     def __getattr__(self, name):
         """Delegate other console methods to the internal console."""
         return getattr(self._console, name)
+
+
+class SessionRestoreProgress(ModalScreen[None]):
+    """Progress modal for session restore.
+
+    Shows a progress bar and message count during session restoration.
+    """
+
+    BINDINGS = [("escape", "app.pop_screen", "Close")]
+
+    def __init__(self, total: int, session_name: str, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.total = total
+        self.current = 0
+        self.session_name = session_name
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="restore-progress-container"):
+            yield Label(
+                f"Restoring: {self.session_name}",
+                classes="progress-title",
+                id="progress-title"
+            )
+            yield ProgressBar(
+                total=100,
+                show_eta=False,
+                classes="session-progress",
+                id="progress-bar"
+            )
+            yield Label("0/0 messages (0%)", id="progress-label")
+
+    def on_mount(self) -> None:
+        """Initialize progress bar."""
+        self.update(0)
+
+    def update(self, current: int) -> None:
+        """Update progress bar.
+
+        Args:
+            current: Current message count
+        """
+        self.current = current
+        try:
+            progress_bar = self.query_one("#progress-bar", ProgressBar)
+            percentage = (current / self.total) * 100 if self.total > 0 else 0
+            progress_bar.update(progress=percentage)
+
+            label = self.query_one("#progress-label", Label)
+            label.update(f"{current}/{self.total} messages ({percentage:.0f}%)")
+        except Exception:
+            pass
 
 
 class SessionPicker(ModalScreen[Optional[str]]):
@@ -256,7 +311,7 @@ class VictorTUI(App):
         layout: vertical;
     }
 
-    EnhancedConversationLog {
+    VirtualScrollContainer {
         height: 1fr;
         min-height: 0;
         background: $background;
@@ -417,6 +472,11 @@ class VictorTUI(App):
         text-style: bold;
     }
 
+    InputWidget .prompt-indicator.will-submit {
+        color: $success;
+        text-style: bold;
+    }
+
     InputWidget SubmitTextArea,
     InputWidget TextArea {
         width: 1fr;
@@ -455,6 +515,7 @@ class VictorTUI(App):
         margin: 0 0 1 0;
         background: $panel;
         border: round $border-muted;
+        height: auto;
     }
 
     ToolCallWidget.pending { border: round $warning; }
@@ -465,6 +526,24 @@ class VictorTUI(App):
     ToolCallWidget .tool-status { color: $warning; }
     ToolCallWidget.success .tool-status { color: $success; }
     ToolCallWidget.error .tool-status { color: $error; }
+
+    ToolCallWidget .tool-hint {
+        height: 1;
+        color: $text-muted;
+        text-style: italic;
+        margin-top: 0;
+    }
+
+    /* Collapsed state */
+    ToolCallWidget.collapsed {
+        height: 2;
+        max-height: 2;
+        overflow: hidden;
+    }
+
+    ToolCallWidget.collapsed .tool-hint {
+        display: none;
+    }
 
     /* Thinking - compact */
     ThinkingWidget {
@@ -527,6 +606,35 @@ class VictorTUI(App):
         margin-top: 1;
     }
 
+    /* Session restore progress modal */
+    #restore-progress-container {
+        width: 60%;
+        max-width: 80;
+        height: auto;
+        padding: 2 3;
+        background: $panel;
+        border: round $border-strong;
+        align: center_middle;
+    }
+
+    .progress-title {
+        text-style: bold;
+        text-align: center;
+        margin-bottom: 2;
+        color: $primary;
+    }
+
+    .session-progress {
+        width: 100%;
+        margin: 1 0;
+    }
+
+    #progress-label {
+        text-align: center;
+        color: $text-muted;
+        margin-top: 1;
+    }
+
     Footer {
         background: $panel;
         color: $text-muted;
@@ -554,27 +662,34 @@ class VictorTUI(App):
         Binding("ctrl+down", "scroll_down", "Scroll Down", show=False),
         Binding("ctrl+home", "scroll_top", "Scroll Top", show=False),
         Binding("ctrl+end", "scroll_bottom", "Scroll Bottom", show=False),
+        # Phase 3: Theme switching
+        Binding("ctrl+right", "next_theme", "Next Theme", show=True),
+        Binding("ctrl+left", "prev_theme", "Previous Theme", show=False),
     ]
 
     def __init__(
         self,
-        agent: Optional["AgentOrchestrator"] = None,
+        agent: Optional["UIAgentProtocol"] = None,
         provider: str = "anthropic",
         model: str = "claude-3-5-sonnet",
         stream: bool = True,
         on_message: Optional[Callable[[str], Any]] = None,
         settings: Optional["Settings"] = None,
+        theme: str = "default",
+        keybindings: Optional[KeybindingConfig] = None,
         **kwargs,
     ) -> None:
         """Initialize Victor TUI.
 
         Args:
-            agent: Optional AgentOrchestrator instance
+            agent: Optional UIAgentProtocol instance (orchestrator or compatible)
             provider: Provider name for display
             model: Model name for display
             stream: Whether to stream responses
             on_message: Callback when user sends a message
             settings: Optional Settings instance for slash commands
+            theme: Theme name (default, dark, light, high_contrast, dracula, nord)
+            keybindings: Optional keybinding configuration
         """
         super().__init__(**kwargs)
         self.agent = agent
@@ -583,7 +698,7 @@ class VictorTUI(App):
         self.stream = stream
         self.on_message = on_message
         self.settings = settings
-        self._conversation_log: EnhancedConversationLog | None = None
+        self._conversation_log: VirtualScrollContainer | None = None
         self._input_widget: InputWidget | None = None
         self._status_bar: StatusBar | None = None
         self._jump_button: Button | None = None
@@ -595,13 +710,25 @@ class VictorTUI(App):
         self._slash_handler = None  # Initialized in on_mount when conversation_log is ready
         self._console_adapter = None
         self._session_messages: list[Message] = []
+        self._cancellation_timer = None
+        self._poll_timer = None
+
+        # Theme support
+        self._current_theme = theme
+        self._apply_theme(theme)
+
+        # Keybinding support
+        self._keybindings = keybindings or KeybindingConfig(
+            bindings=DEFAULT_KEYBINDINGS.copy(),
+            preset_name="default"
+        )
 
     def compose(self) -> ComposeResult:
         """Compose the TUI layout."""
         yield StatusBar(provider=self.provider, model=self.model)
         with Container(id="main-container"):
             with Vertical(id="conversation-area"):
-                yield EnhancedConversationLog(id="conversation-log")
+                yield VirtualScrollContainer(id="conversation-log")
                 yield Button("Jump to bottom", id="jump-to-bottom", variant="default")
             with Container(id="thinking-container"):
                 yield ThinkingWidget(id="thinking-widget")
@@ -612,7 +739,7 @@ class VictorTUI(App):
 
     def on_mount(self) -> None:
         """Handle mount event."""
-        self._conversation_log = self.query_one("#conversation-log", EnhancedConversationLog)
+        self._conversation_log = self.query_one("#conversation-log", VirtualScrollContainer)
         self._input_widget = self.query_one("#input-widget", InputWidget)
         self._thinking_widget = self.query_one("#thinking-widget", ThinkingWidget)
         self._status_bar = self.query_one(StatusBar)
@@ -814,6 +941,7 @@ class VictorTUI(App):
                             self._finish_tool_call(
                                 success=chunk.success if hasattr(chunk, "success") else True,
                                 elapsed=chunk.elapsed if hasattr(chunk, "elapsed") else None,
+                                error_message=chunk.error if hasattr(chunk, "error") else None,
                             )
                         except Exception:
                             pass
@@ -881,12 +1009,19 @@ class VictorTUI(App):
         self,
         success: bool = True,
         elapsed: float | None = None,
+        error_message: str | None = None,
     ) -> None:
-        """Finish current tool call."""
+        """Finish current tool call.
+
+        Args:
+            success: Whether the tool call succeeded
+            elapsed: Optional elapsed time in seconds
+            error_message: Optional error message for failed calls
+        """
         if self._current_tool_widget:
             status = "success" if success else "error"
             finished_widget = self._current_tool_widget
-            finished_widget.update_status(status, elapsed)
+            finished_widget.update_status(status, elapsed, error_message)
             self._current_tool_widget = None
             self._schedule_tool_widget_cleanup(finished_widget)
             self._prune_tool_widgets()
@@ -983,19 +1118,57 @@ class VictorTUI(App):
             self._add_system_message("Details panels shown")
 
     def action_cancel_stream(self) -> None:
-        """Request cancellation of the current stream if active."""
+        """Request cancellation of the current stream if active with enhanced feedback."""
         if not self.agent:
             self._add_system_message("No active agent to cancel")
             return
+
         if not hasattr(self.agent, "is_streaming") or not self.agent.is_streaming():
             self._add_system_message("No active stream to cancel")
             return
+
         if hasattr(self.agent, "request_cancellation"):
             self.agent.request_cancellation()
-            self._add_system_message("Cancellation requested")
-            self._set_status("Canceling", "busy")
+            self._add_system_message("Cancellation requested...")
+            self._set_status("Canceling...", "busy")
+
+            # Use timer for polling (100ms intervals, up to 5 seconds)
+            self._poll_timer = self.set_timer(
+                0.1,
+                self._poll_cancellation_sync,
+                repeat=50  # Poll for 5 seconds (50 * 0.1)
+            )
+
+            # Set timeout for cancellation
+            self._cancellation_timer = self.set_timer(
+                5.0,
+                self._on_cancellation_timeout
+            )
         else:
             self._add_system_message("Streaming cancellation not supported")
+
+    def _poll_cancellation_sync(self) -> None:
+        """Check if cancellation completed (synchronous version for Textual timer)."""
+        if not self.agent or not self.agent.is_streaming():
+            # Cancellation succeeded
+            self._set_status("Canceled", "idle")
+            self._add_system_message("✓ Stream canceled successfully")
+
+            # Stop timers
+            if hasattr(self, '_poll_timer') and self._poll_timer:
+                self._poll_timer.stop()
+            if hasattr(self, '_cancellation_timer') and self._cancellation_timer:
+                self._cancellation_timer.stop()
+
+    def _on_cancellation_timeout(self) -> None:
+        """Handle cancellation timeout."""
+        if self.agent and self.agent.is_streaming():
+            self._set_status("Cancellation timed out", "error")
+            self._add_system_message("⚠ Cancellation timed out - stream may still be active")
+
+        # Stop poll timer
+        if hasattr(self, '_poll_timer') and self._poll_timer:
+            self._poll_timer.stop()
 
     def action_resume_session(self) -> None:
         """Show session picker and load a saved session."""
@@ -1089,7 +1262,7 @@ class VictorTUI(App):
             self._add_system_message("Session restore cancelled")
             return
         if session_id.startswith("tui:"):
-            self._load_session(session_id.split(":", 1)[1])
+            self._load_session(session_id.split(":", 1)[SESSION_UUID_INDEX])
         else:
             self._load_session(session_id)
 
@@ -1098,7 +1271,7 @@ class VictorTUI(App):
             self._add_system_message("Project session restore cancelled")
             return
         if session_id.startswith("project:"):
-            self._load_project_session(session_id.split(":", 1)[1])
+            self._load_project_session(session_id.split(":", 1)[SESSION_UUID_INDEX])
         else:
             self._load_project_session(session_id)
 
@@ -1107,14 +1280,15 @@ class VictorTUI(App):
             self._add_system_message("Session restore cancelled")
             return
         if session_key.startswith("tui:"):
-            self._load_session(session_key.split(":", 1)[1])
+            self._load_session(session_key.split(":", 1)[SESSION_UUID_INDEX])
         elif session_key.startswith("project:"):
-            self._load_project_session(session_key.split(":", 1)[1])
+            self._load_project_session(session_key.split(":", 1)[SESSION_UUID_INDEX])
         else:
             self._load_session(session_key)
 
     def _load_session(self, session_id: str) -> None:
         """Load a TUI session with progress indication."""
+        import asyncio
         from victor.ui.tui.session import SessionManager
 
         manager = SessionManager()
@@ -1124,26 +1298,49 @@ class VictorTUI(App):
             return
 
         message_count = len(session.messages)
-        if message_count > 50:
-            self._add_system_message(f"Loading {message_count} messages...")
+        session_name = session.name or session.id[:8]
 
-        if self._conversation_log:
-            self._conversation_log.clear()
+        # Show progress modal for sessions > 20 messages
+        if message_count > 20:
+            progress = SessionRestoreProgress(message_count, session_name)
+            self.push_screen(progress)
 
-        self._session_messages = list(session.messages)
-        for i, msg in enumerate(session.messages):
-            self._render_message(msg.role, msg.content)
-            # Show progress for large sessions
-            if message_count > 50 and (i + 1) % 25 == 0:
-                self._add_system_message(f"Loading... {i + 1}/{message_count}")
+            try:
+                if self._conversation_log:
+                    self._conversation_log.clear()
 
-        self._restore_agent_conversation(session.messages)
-        self._add_system_message(
-            f"Session loaded: {session.name or session.id[:8]} ({message_count} messages)"
-        )
+                self._session_messages = list(session.messages)
+                for i, msg in enumerate(session.messages):
+                    self._render_message(msg.role, msg.content)
+                    progress.update(i + 1)
+                    # Yield to UI to update progress bar
+                    asyncio.sleep(0)
+
+                self._restore_agent_conversation(session.messages)
+            finally:
+                self.pop_screen()
+        else:
+            # Fast path for small sessions
+            if message_count > 50:
+                self._add_system_message(f"Loading {message_count} messages...")
+
+            if self._conversation_log:
+                self._conversation_log.clear()
+
+            self._session_messages = list(session.messages)
+            for i, msg in enumerate(session.messages):
+                self._render_message(msg.role, msg.content)
+                # Show progress for large sessions (old behavior)
+                if message_count > 50 and (i + 1) % 25 == 0:
+                    self._add_system_message(f"Loading... {i + 1}/{message_count}")
+
+            self._restore_agent_conversation(session.messages)
+
+        self._add_system_message(f"Session loaded: {session_name} ({message_count} messages)")
 
     def _load_project_session(self, session_id: str) -> None:
         """Load a project session with progress indication."""
+        import asyncio
         from victor.agent.conversation_state import ConversationStateMachine
         from victor.agent.message_history import MessageHistory
         from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
@@ -1159,31 +1356,66 @@ class VictorTUI(App):
         messages = history.messages
 
         message_count = len(messages)
-        if message_count > 50:
-            self._add_system_message(f"Loading {message_count} messages from project session...")
+        metadata = session.get("metadata", {})
+        session_name = metadata.get("title") or session_id[:8]
 
-        if self._conversation_log:
-            self._conversation_log.clear()
+        # Show progress modal for sessions > 20 messages
+        if message_count > 20:
+            progress = SessionRestoreProgress(message_count, f"Project: {session_name}")
+            self.push_screen(progress)
 
-        self._session_messages = []
-        for i, msg in enumerate(messages):
-            role = msg.role
-            content = msg.content
-            if role == "tool":
-                role = "system"
-                if msg.name:
-                    content = f"Tool result ({msg.name}): {content}"
-                else:
-                    content = f"Tool result: {content}"
-            if not content and getattr(msg, "tool_calls", None):
-                content = "Tool calls requested."
-            if not content:
-                continue
-            self._render_message(role, content)
-            self._session_messages.append(Message(role=role, content=content, metadata={}))
-            # Show progress for large sessions
-            if message_count > 50 and (i + 1) % 25 == 0:
-                self._add_system_message(f"Loading... {i + 1}/{message_count}")
+            try:
+                if self._conversation_log:
+                    self._conversation_log.clear()
+
+                self._session_messages = []
+                for i, msg in enumerate(messages):
+                    role = msg.role
+                    content = msg.content
+                    if role == "tool":
+                        role = "system"
+                        if msg.name:
+                            content = f"Tool result ({msg.name}): {content}"
+                        else:
+                            content = f"Tool result: {content}"
+                    if not content and getattr(msg, "tool_calls", None):
+                        content = "Tool calls requested."
+                    if not content:
+                        continue
+                    self._render_message(role, content)
+                    self._session_messages.append(Message(role=role, content=content, metadata={}))
+                    progress.update(i + 1)
+                    # Yield to UI to update progress bar
+                    asyncio.sleep(0)
+            finally:
+                self.pop_screen()
+        else:
+            # Fast path for small sessions
+            if message_count > 50:
+                self._add_system_message(f"Loading {message_count} messages from project session...")
+
+            if self._conversation_log:
+                self._conversation_log.clear()
+
+            self._session_messages = []
+            for i, msg in enumerate(messages):
+                role = msg.role
+                content = msg.content
+                if role == "tool":
+                    role = "system"
+                    if msg.name:
+                        content = f"Tool result ({msg.name}): {content}"
+                    else:
+                        content = f"Tool result: {content}"
+                if not content and getattr(msg, "tool_calls", None):
+                    content = "Tool calls requested."
+                if not content:
+                    continue
+                self._render_message(role, content)
+                self._session_messages.append(Message(role=role, content=content, metadata={}))
+                # Show progress for large sessions (old behavior)
+                if message_count > 50 and (i + 1) % 25 == 0:
+                    self._add_system_message(f"Loading... {i + 1}/{message_count}")
 
         if self.agent:
             self.agent.conversation = history
@@ -1197,9 +1429,7 @@ class VictorTUI(App):
                 except Exception as exc:
                     self._add_error_message(f"Failed to restore conversation state: {exc}")
 
-        metadata = session.get("metadata", {})
-        title = metadata.get("title") or session_id[:8]
-        self._add_system_message(f"Project session loaded: {title} ({message_count} messages)")
+        self._add_system_message(f"Project session loaded: {session_name} ({message_count} messages)")
 
     def _render_message(self, role: str, content: str) -> None:
         if not self._conversation_log:
@@ -1301,6 +1531,7 @@ Keyboard Shortcuts:
   Ctrl+S       Save session
   Ctrl+E       Export session to markdown
   Ctrl+/       Show this help
+  Ctrl+→/←     Next/Previous theme
   Ctrl+↑/↓     Scroll conversation
   Ctrl+Home/End Jump to top/bottom
   ↑/↓          Navigate input history
@@ -1312,6 +1543,14 @@ Slash Commands:
   /model       Switch model
   /provider    Switch provider
   /exit        Exit TUI
+
+Available Themes:
+  default      Default dark theme
+  dark         GitHub dark theme
+  light        Light theme
+  high_contrast High contrast theme
+  dracula      Dracula theme
+  nord         Nord theme
 """
         self._add_system_message(help_text.strip())
 
@@ -1436,22 +1675,139 @@ Slash Commands:
             self._conversation_log.add_error_message(content)
         self._record_message("error", content)
 
+    # =========================================================================
+    # THEME MANAGEMENT
+    # =========================================================================
+
+    def _apply_theme(self, theme_name: str) -> None:
+        """Apply a theme to the TUI.
+
+        Args:
+            theme_name: Name of the theme to apply
+        """
+        try:
+            theme = get_theme(theme_name)
+            # Update CSS variables
+            self.stylesheet._update_colors(theme.to_dict())
+            self._current_theme = theme_name
+        except Exception as e:
+            # Silently fail if theme not found
+            pass
+
+    def action_next_theme(self) -> None:
+        """Cycle to the next available theme."""
+        theme_names = list(THEMES.keys())
+        if not theme_names:
+            return
+
+        try:
+            current_idx = theme_names.index(self._current_theme)
+        except ValueError:
+            current_idx = 0
+
+        next_idx = (current_idx + 1) % len(theme_names)
+        next_theme = theme_names[next_idx]
+        self._apply_theme(next_theme)
+        self._add_system_message(f"Theme changed to: {THEMES[next_theme].display_name}")
+
+    def action_prev_theme(self) -> None:
+        """Cycle to the previous available theme."""
+        theme_names = list(THEMES.keys())
+        if not theme_names:
+            return
+
+        try:
+            current_idx = theme_names.index(self._current_theme)
+        except ValueError:
+            current_idx = 0
+
+        prev_idx = (current_idx - 1) % len(theme_names)
+        prev_theme = theme_names[prev_idx]
+        self._apply_theme(prev_theme)
+        self._add_system_message(f"Theme changed to: {THEMES[prev_theme].display_name}")
+
+    def set_theme(self, theme_name: str) -> None:
+        """Set a specific theme by name.
+
+        Args:
+            theme_name: Name of the theme to apply
+        """
+        self._apply_theme(theme_name)
+        try:
+            theme = get_theme(theme_name)
+            self._add_system_message(f"Theme changed to: {theme.display_name}")
+        except Exception:
+            self._add_system_message(f"Failed to load theme: {theme_name}")
+
+    def get_theme(self) -> str:
+        """Get the current theme name.
+
+        Returns:
+            Current theme name
+        """
+        return self._current_theme
+
+    # =========================================================================
+    # KEYBINDING MANAGEMENT
+    # =========================================================================
+
+    def get_keybinding(self, action: str) -> Optional[str]:
+        """Get the keybinding for an action.
+
+        Args:
+            action: Action name (e.g., "quit", "clear", "toggle_thinking")
+
+        Returns:
+            Key combination string or None if not found
+        """
+        return self._keybindings.get_binding(action)
+
+    def set_keybinding(self, action: str, keys: str) -> None:
+        """Set a custom keybinding for an action.
+
+        Args:
+            action: Action name
+            keys: Key combination (e.g., "ctrl+x")
+        """
+        self._keybindings.set_binding(action, keys)
+        self._add_system_message(f"Keybinding changed: {action} → {keys}")
+
+    def reset_keybindings(self) -> None:
+        """Reset keybindings to default preset."""
+        self._keybindings = KeybindingConfig(
+            bindings=DEFAULT_KEYBINDINGS.copy(),
+            preset_name="default"
+        )
+        self._add_system_message("Keybindings reset to default")
+
+    def get_keybindings(self) -> Dict[str, str]:
+        """Get all keybindings.
+
+        Returns:
+            Dictionary of action → keybinding
+        """
+        return self._keybindings.to_dict()
+
 
 async def run_tui(
-    agent: Optional["AgentOrchestrator"] = None,
+    agent: Optional["UIAgentProtocol"] = None,
     provider: str = "anthropic",
     model: str = "claude-3-5-sonnet",
     stream: bool = True,
     settings: Optional["Settings"] = None,
+    theme: str = "default",
+    keybindings: Optional[KeybindingConfig] = None,
 ) -> None:
     """Run the Victor TUI.
 
     Args:
-        agent: Optional AgentOrchestrator instance
+        agent: Optional UIAgentProtocol instance (orchestrator or compatible)
         provider: Provider name for display
         model: Model name for display
         stream: Whether to stream responses
         settings: Optional Settings instance for slash commands
+        theme: Theme name (default, dark, light, high_contrast, dracula, nord)
+        keybindings: Optional keybinding configuration
     """
     import os
 
@@ -1465,6 +1821,8 @@ async def run_tui(
         model=model,
         stream=stream,
         settings=settings,
+        theme=theme,
+        keybindings=keybindings,
     )
     try:
         await app.run_async()

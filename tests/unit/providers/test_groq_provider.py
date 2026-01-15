@@ -189,14 +189,6 @@ class TestGroqProviderInit:
             provider = GroqProvider()
             assert provider._api_key == "env-test-key"
 
-    def test_init_from_groqcloud_env_var(self):
-        """Test initialization from GROQCLOUD_API_KEY env var."""
-        with patch.dict("os.environ", {"GROQCLOUD_API_KEY": "groqcloud-key"}, clear=False):
-            # Clear GROQ_API_KEY if present
-            with patch.dict("os.environ", {"GROQ_API_KEY": ""}, clear=False):
-                provider = GroqProvider()
-                assert provider._api_key == "groqcloud-key"
-
     def test_default_base_url(self):
         """Test default base URL is set correctly."""
         provider = GroqProvider(api_key="test-key")

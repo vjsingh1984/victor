@@ -14,16 +14,18 @@
 
 """Configuration management for CodingAgent."""
 
+import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Union, List
 
 import yaml
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict, PydanticBaseSettingsSource
 from victor.config.model_capabilities import _load_tool_capable_patterns_from_yaml
 from victor.config.orchestrator_constants import BUDGET_LIMITS, TOOL_SELECTION_PRESETS
 
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # CENTRALIZED PATH CONFIGURATION
@@ -418,6 +420,65 @@ class ProfileConfig(BaseSettings):
         return v
 
 
+class ProfilesYAMLSettingsSource(PydanticBaseSettingsSource):
+    """Custom settings source that loads from profiles.yaml.
+
+    This allows settings to be configured in ~/.victor/profiles.yaml
+    in addition to environment variables and .env files.
+    """
+
+    def __init__(self, settings_cls: type[BaseSettings]):
+        super().__init__(settings_cls)
+        self.profiles_path = GLOBAL_VICTOR_DIR / "profiles.yaml"
+
+    def get_field_value(self, field: Field, field_name: str) -> Any:
+        """Get field value from profiles.yaml."""
+        if not self.profiles_path.exists():
+            return None
+
+        try:
+            with open(self.profiles_path, "r") as f:
+                data = yaml.safe_load(f) or {}
+
+            # Field names are case-insensitive in pydantic-settings
+            # Try exact match first, then case-insensitive
+            if field_name in data:
+                return data[field_name]
+
+            # Try case-insensitive match
+            for key in data:
+                if key.lower() == field_name.lower():
+                    return data[key]
+
+            return None
+
+        except Exception as e:
+            logger.warning(f"Failed to load field '{field_name}' from {self.profiles_path}: {e}")
+            return None
+
+    def __call__(self) -> Dict[str, Any]:
+        """Load all settings from profiles.yaml."""
+        if not self.profiles_path.exists():
+            return {}
+
+        try:
+            with open(self.profiles_path, "r") as f:
+                data = yaml.safe_load(f) or {}
+
+            # Return all fields from the top-level YAML
+            # Only include fields that are actually defined in the Settings class
+            result = {}
+            for field_name in self.settings_cls.model_fields:
+                if field_name in data:
+                    result[field_name] = data[field_name]
+
+            return result
+
+        except Exception as e:
+            logger.warning(f"Failed to load settings from {self.profiles_path}: {e}")
+            return {}
+
+
 class Settings(BaseSettings):
     """Main application settings."""
 
@@ -475,6 +536,7 @@ class Settings(BaseSettings):
     default_vertical: str = "coding"  # Default vertical when --vertical not specified
     auto_detect_vertical: bool = False  # Auto-detect vertical from project context (experimental)
 
+    # ==========================================================================
     # Server Security (FastAPI/WebSocket layer)
     # When set, API key is required for HTTP + WebSocket requests (Authorization: Bearer <token>)
     server_api_key: Optional[str] = None
@@ -609,6 +671,32 @@ class Settings(BaseSettings):
                         DeprecationWarning,
                         stacklevel=2,
                     )
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Customize settings sources to include profiles.yaml.
+
+        This allows settings to be loaded from ~/.victor/profiles.yaml in addition
+        to environment variables and .env files. Priority order (highest to lowest):
+        1. Environment variables
+        2. .env file
+        3. profiles.yaml
+        4. Default values
+        """
+        return (
+            init_settings,  # Highest priority: passed to __init__
+            env_settings,  # Environment variables
+            dotenv_settings,  # .env file
+            ProfilesYAMLSettingsSource(settings_cls),  # profiles.yaml
+            file_secret_settings,  # Secret files (lowest priority)
+        )
 
     embedding_provider: str = (
         "sentence-transformers"  # sentence-transformers (local), ollama, vllm, lmstudio
@@ -1058,7 +1146,8 @@ class Settings(BaseSettings):
             values = [float(x.strip()) for x in output.splitlines() if x.strip()]
             if values:
                 return max(values) / 1024.0
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Failed to detect NVIDIA GPU VRAM: {e}")
             pass
 
         # macOS: try system_profiler for VRAM
@@ -1081,7 +1170,8 @@ class Settings(BaseSettings):
                             and parts[i + 1].upper().startswith("MB")
                         ):
                             return float(part.replace(",", "")) / 1024.0
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Failed to detect macOS VRAM: {e}")
             pass
 
         return None
@@ -1115,7 +1205,8 @@ class Settings(BaseSettings):
 
         try:
             import httpx  # Local network call only; safe in airgapped mode
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Failed to import httpx for model detection: {e}")
             return preferred_models[0]
 
         for url in urls:
@@ -1152,7 +1243,8 @@ class Settings(BaseSettings):
                     if pref in models:
                         return pref
                 return str(models[0])
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Failed to fetch models from {url}: {e}")
                 continue
 
         return str(preferred_models[0])

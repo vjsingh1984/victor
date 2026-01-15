@@ -40,6 +40,7 @@ if TYPE_CHECKING:
 
 # Import protocols for type hints (available at runtime since protocols.py has no heavy deps)
 from victor.core.protocols import TaskClassifierProtocol, IntentClassifierProtocol
+from victor.observability.events import create_classification_ensemble_event
 
 logger = logging.getLogger(__name__)
 
@@ -245,6 +246,63 @@ class TaskAnalyzer:
                 analysis.analysis_details["intent_confidence"] = intent_result.confidence
             except Exception as e:
                 logger.warning(f"Intent classification failed: {e}")
+
+        # Publish ensemble classification event (non-blocking, best-effort)
+        try:
+            from victor.core.events.backends import get_observability_bus
+
+            bus = get_observability_bus()
+
+            # Build event data from analysis results
+            task_type_dict = None
+            if analysis.task_type:
+                task_type_dict = {
+                    "type": analysis.task_type.value if hasattr(analysis.task_type, 'value') else str(analysis.task_type),
+                    "confidence": analysis.task_type_confidence,
+                }
+
+            intent_type_dict = None
+            if analysis.intent_type:
+                intent_type_dict = {
+                    "type": analysis.intent_type.value if hasattr(analysis.intent_type, 'value') else str(analysis.intent_type),
+                    "confidence": analysis.analysis_details.get("intent_confidence", 0.0),
+                }
+
+            complexity_dict = {
+                "level": analysis.complexity.value if hasattr(analysis.complexity, 'value') else str(analysis.complexity),
+                "confidence": analysis.complexity_confidence,
+                "tool_budget": analysis.tool_budget,
+            }
+
+            event = create_classification_ensemble_event(
+                query=message,
+                session_id=f"task_analyzer_{id(message)}",  # Use message id as pseudo-session
+                task_type=task_type_dict or {},
+                intent_type=intent_type_dict,
+                complexity=complexity_dict,
+                unified_type=analysis.unified_task_type.value if hasattr(analysis.unified_task_type, 'value') else str(analysis.unified_task_type),
+                confidence=analysis.unified_confidence,
+                tool_budget=analysis.tool_budget,
+                requires_confirmation=analysis.requires_confirmation,
+                matched_patterns=analysis.matched_patterns,
+            )
+
+            import asyncio
+
+            # Fire and forget - don't wait for event emission
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(bus.emit(event.to_messaging_event()))
+                else:
+                    # Sync context, emit synchronously
+                    pass  # Event bus requires async context
+            except RuntimeError:
+                # No event loop, skip event emission
+                pass
+        except Exception:
+            # Event bus not available or other error - don't break classification
+            pass
 
         return analysis
 

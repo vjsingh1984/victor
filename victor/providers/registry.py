@@ -26,12 +26,16 @@ class _ProviderRegistryImpl(BaseRegistry[str, Type[BaseProvider]]):
     """Internal registry implementation for provider management.
 
     Extends BaseRegistry to provide provider-specific functionality including:
+    - Lazy import of provider classes (startup optimization)
     - Factory method for instantiating providers
     - Raises ProviderNotFoundError on missing providers
     """
 
     def get_or_raise(self, name: str) -> Type[BaseProvider]:
         """Get a provider class by name, raising if not found.
+
+        This method implements lazy loading - provider classes are only imported
+        when first requested. This significantly improves startup time.
 
         Args:
             name: Provider name
@@ -42,13 +46,40 @@ class _ProviderRegistryImpl(BaseRegistry[str, Type[BaseProvider]]):
         Raises:
             ProviderNotFoundError: If provider not found
         """
+        # First check if already in registry (custom registered provider)
         provider = self.get(name)
-        if provider is None:
-            raise ProviderNotFoundError(
-                message=f"Provider '{name}' not found. Available: {', '.join(self.list_all())}",
-                provider=name,
-            )
-        return provider
+        if provider is not None:
+            return provider
+
+        # Try lazy import from _PROVIDER_IMPORTS
+        if name in _PROVIDER_IMPORTS:
+            module_path, class_name = _PROVIDER_IMPORTS[name]
+            import importlib
+
+            try:
+                module = importlib.import_module(module_path)
+                provider_class = getattr(module, class_name)
+
+                # Cache it in the registry for faster subsequent access
+                self.register(name, provider_class)
+
+                # Also register any aliases
+                canonical_name = _PROVIDER_ALIASES.get(name, name)
+                if canonical_name != name and canonical_name not in self:
+                    self.register(canonical_name, provider_class)
+
+                return provider_class
+            except (ImportError, AttributeError) as e:
+                raise ProviderNotFoundError(
+                    message=f"Failed to import provider '{name}': {e}",
+                    provider=name,
+                ) from e
+
+        # Provider not found
+        raise ProviderNotFoundError(
+            message=f"Provider '{name}' not found. Available: {', '.join(sorted(_PROVIDER_IMPORTS.keys()))}",
+            provider=name,
+        )
 
     def create(self, name: str, **kwargs: Any) -> BaseProvider:
         """Create a provider instance.
@@ -65,6 +96,17 @@ class _ProviderRegistryImpl(BaseRegistry[str, Type[BaseProvider]]):
         """
         provider_class = self.get_or_raise(name)
         return provider_class(**kwargs)
+
+    def list_all(self) -> List[str]:
+        """List all available provider names (including lazy-loaded providers).
+
+        Returns:
+            List of all available provider names
+        """
+        # Combine registered providers with lazy import providers
+        registered = set(super().list_all())
+        lazy_providers = set(_PROVIDER_IMPORTS.keys())
+        return sorted(registered | lazy_providers)
 
 
 # Singleton instance for backward compatibility
@@ -185,89 +227,79 @@ def get_provider_registry() -> _ProviderRegistryImpl:
     return _registry_instance
 
 
-# Auto-register all providers
-def _register_default_providers() -> None:
-    """Register all default providers."""
-    from victor.providers.ollama_provider import OllamaProvider
-    from victor.providers.anthropic_provider import AnthropicProvider
-    from victor.providers.openai_provider import OpenAIProvider
-    from victor.providers.google_provider import GoogleProvider
-    from victor.providers.xai_provider import XAIProvider
-    from victor.providers.zai_provider import ZAIProvider
-    from victor.providers.lmstudio_provider import LMStudioProvider
-    from victor.providers.moonshot_provider import MoonshotProvider
-    from victor.providers.deepseek_provider import DeepSeekProvider
-    from victor.providers.groq_provider import GroqProvider
-    from victor.providers.mistral_provider import MistralProvider
-    from victor.providers.together_provider import TogetherProvider
-    from victor.providers.openrouter_provider import OpenRouterProvider
-    from victor.providers.fireworks_provider import FireworksProvider
-    from victor.providers.cerebras_provider import CerebrasProvider
-
-    ProviderRegistry.register("ollama", OllamaProvider)
-    ProviderRegistry.register("anthropic", AnthropicProvider)
-    ProviderRegistry.register("openai", OpenAIProvider)
-    # LMStudio uses dedicated provider (similar to Ollama)
-    # with httpx, tiered URL selection, and 300s timeout
-    ProviderRegistry.register("lmstudio", LMStudioProvider)
-    # vLLM high-throughput inference server
-    from victor.providers.vllm_provider import VLLMProvider
-
-    ProviderRegistry.register("vllm", VLLMProvider)
-    # llama.cpp server (CPU-friendly local inference)
-    from victor.providers.llamacpp_provider import LlamaCppProvider
-
-    ProviderRegistry.register("llamacpp", LlamaCppProvider)
-    ProviderRegistry.register("llama-cpp", LlamaCppProvider)  # Alias
-    ProviderRegistry.register("llama.cpp", LlamaCppProvider)  # Alias
-    ProviderRegistry.register("google", GoogleProvider)
-    ProviderRegistry.register("xai", XAIProvider)
-    ProviderRegistry.register("grok", XAIProvider)  # Alias for xai
-    # z.ai (ZhipuAI/智谱AI) - GLM models with OpenAI-compatible API
-    ProviderRegistry.register("zai", ZAIProvider)
-    ProviderRegistry.register("zhipuai", ZAIProvider)  # Alias
-    ProviderRegistry.register("zhipu", ZAIProvider)  # Alias
-    # Moonshot AI for Kimi K2 models (OpenAI-compatible with reasoning traces)
-    ProviderRegistry.register("moonshot", MoonshotProvider)
-    ProviderRegistry.register("kimi", MoonshotProvider)  # Alias for moonshot
-    # DeepSeek for DeepSeek-V3 models (chat and reasoner)
-    ProviderRegistry.register("deepseek", DeepSeekProvider)
-    # Groq Cloud for ultra-fast LLM inference (free tier available)
-    ProviderRegistry.register("groqcloud", GroqProvider)
-
-    # New free-tier providers (2025)
-    # Mistral AI - 500K tokens/min free tier
-    ProviderRegistry.register("mistral", MistralProvider)
-    # Together AI - $25 free credits
-    ProviderRegistry.register("together", TogetherProvider)
-    # OpenRouter - unified gateway, free tier with daily limits
-    ProviderRegistry.register("openrouter", OpenRouterProvider)
-    # Fireworks AI - $1 free credits, fast inference
-    ProviderRegistry.register("fireworks", FireworksProvider)
-    # Cerebras - ultra-fast inference, free tier
-    ProviderRegistry.register("cerebras", CerebrasProvider)
-
+# Lazy provider import map for startup performance optimization
+# Maps provider names to their (module_path, class_name) tuples
+# Providers are only imported when actually requested via ProviderRegistry.get()
+_PROVIDER_IMPORTS: Dict[str, tuple[str, str]] = {
+    # Local providers
+    "ollama": ("victor.providers.ollama_provider", "OllamaProvider"),
+    "lmstudio": ("victor.providers.lmstudio_provider", "LMStudioProvider"),
+    "vllm": ("victor.providers.vllm_provider", "VLLMProvider"),
+    "llamacpp": ("victor.providers.llamacpp_provider", "LlamaCppProvider"),
+    "llama-cpp": ("victor.providers.llamacpp_provider", "LlamaCppProvider"),  # Alias
+    "llama.cpp": ("victor.providers.llamacpp_provider", "LlamaCppProvider"),  # Alias
+    # Major cloud providers
+    "anthropic": ("victor.providers.anthropic_provider", "AnthropicProvider"),
+    "claude": ("victor.providers.anthropic_provider", "AnthropicProvider"),  # Alias
+    "openai": ("victor.providers.openai_provider", "OpenAIProvider"),
+    "google": ("victor.providers.google_provider", "GoogleProvider"),
+    "gemini": ("victor.providers.google_provider", "GoogleProvider"),  # Alias
+    # AI research companies
+    "xai": ("victor.providers.xai_provider", "XAIProvider"),
+    "grok": ("victor.providers.xai_provider", "XAIProvider"),  # Alias for xai
+    "zai": ("victor.providers.zai_provider", "ZAIProvider"),
+    "zhipuai": ("victor.providers.zai_provider", "ZAIProvider"),  # Alias
+    "zhipu": ("victor.providers.zai_provider", "ZAIProvider"),  # Alias
+    "moonshot": ("victor.providers.moonshot_provider", "MoonshotProvider"),
+    "kimi": ("victor.providers.moonshot_provider", "MoonshotProvider"),  # Alias
+    "deepseek": ("victor.providers.deepseek_provider", "DeepSeekProvider"),
+    # Free-tier providers (2025)
+    "groqcloud": ("victor.providers.groq_provider", "GroqProvider"),
+    "mistral": ("victor.providers.mistral_provider", "MistralProvider"),
+    "together": ("victor.providers.together_provider", "TogetherProvider"),
+    "openrouter": ("victor.providers.openrouter_provider", "OpenRouterProvider"),
+    "fireworks": ("victor.providers.fireworks_provider", "FireworksProvider"),
+    "cerebras": ("victor.providers.cerebras_provider", "CerebrasProvider"),
     # Enterprise cloud providers
-    from victor.providers.vertex_provider import VertexAIProvider
-    from victor.providers.azure_openai_provider import AzureOpenAIProvider
-    from victor.providers.bedrock_provider import BedrockProvider
-    from victor.providers.huggingface_provider import HuggingFaceProvider
-    from victor.providers.replicate_provider import ReplicateProvider
+    "vertex": ("victor.providers.vertex_provider", "VertexAIProvider"),
+    "vertexai": ("victor.providers.vertex_provider", "VertexAIProvider"),  # Alias
+    "azure": ("victor.providers.azure_openai_provider", "AzureOpenAIProvider"),
+    "azure-openai": ("victor.providers.azure_openai_provider", "AzureOpenAIProvider"),  # Alias
+    "bedrock": ("victor.providers.bedrock_provider", "BedrockProvider"),
+    "aws": ("victor.providers.bedrock_provider", "BedrockProvider"),  # Alias
+    "huggingface": ("victor.providers.huggingface_provider", "HuggingFaceProvider"),
+    "hf": ("victor.providers.huggingface_provider", "HuggingFaceProvider"),  # Alias
+    "replicate": ("victor.providers.replicate_provider", "ReplicateProvider"),
+}
 
-    # Google Cloud Vertex AI - Enterprise Gemini access
-    ProviderRegistry.register("vertex", VertexAIProvider)
-    ProviderRegistry.register("vertexai", VertexAIProvider)  # Alias
-    # Azure OpenAI - Enterprise OpenAI + Phi models
-    ProviderRegistry.register("azure", AzureOpenAIProvider)
-    ProviderRegistry.register("azure-openai", AzureOpenAIProvider)  # Alias
-    # AWS Bedrock - Claude, Llama, Mistral, Titan
-    ProviderRegistry.register("bedrock", BedrockProvider)
-    ProviderRegistry.register("aws", BedrockProvider)  # Alias
-    # Hugging Face Inference API - 1000s of open models
-    ProviderRegistry.register("huggingface", HuggingFaceProvider)
-    ProviderRegistry.register("hf", HuggingFaceProvider)  # Alias
-    # Replicate - Neocloud for open models
-    ProviderRegistry.register("replicate", ReplicateProvider)
+# Reverse alias map to canonical name (for listing providers)
+_PROVIDER_ALIASES: Dict[str, str] = {
+    "claude": "anthropic",
+    "gemini": "google",
+    "grok": "xai",
+    "zhipuai": "zai",
+    "zhipu": "zai",
+    "kimi": "moonshot",
+    "llama-cpp": "llamacpp",
+    "llama.cpp": "llamacpp",
+    "vertexai": "vertex",
+    "azure-openai": "azure",
+    "aws": "bedrock",
+    "hf": "huggingface",
+}
+
+
+# Auto-register all providers (lazy loading - only registers metadata)
+def _register_default_providers() -> None:
+    """Register all default providers using lazy loading.
+
+    This function only registers the provider metadata, not the actual classes.
+    Provider classes are imported lazily when first requested via ProviderRegistry.get().
+    This significantly improves startup time by avoiding importing all 21 providers.
+    """
+    # No actual imports happen here - just metadata registration
+    # The real imports happen in _ProviderRegistryImpl.get_or_raise()
+    pass
 
 
 # Register providers on module import

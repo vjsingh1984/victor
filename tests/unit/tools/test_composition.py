@@ -387,8 +387,10 @@ class TestResultExtractors:
 
     def test_extract_if_success_failure(self):
         """Test extract_if_success with failed result."""
+        from victor.core.errors import ToolExecutionError
+
         result = {"success": False, "error": "Test error"}
-        with pytest.raises(RuntimeError, match="Test error"):
+        with pytest.raises(ToolExecutionError, match="Test error"):
             extract_if_success(result)
 
     def test_map_keys(self):

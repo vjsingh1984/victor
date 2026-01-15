@@ -1,0 +1,255 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""DevOpsAssistant - YAML Configuration.
+
+DevOps assistant for infrastructure, deployment, and CI/CD automation.
+Competitive with: Docker Desktop AI, Terraform Assistant, Pulumi AI, K8s GPT.
+"""
+
+# =============================================================================
+# Metadata
+# =============================================================================
+metadata:
+  name: devops
+  version: "1.0.0"
+  description: "Infrastructure automation, container management, CI/CD, and deployment"
+
+# =============================================================================
+# Core Configuration
+# =============================================================================
+core:
+  # -------------------------------------------------------------------------
+  # Tools
+  # -------------------------------------------------------------------------
+  tools:
+    list:
+      # Core filesystem
+      - read
+      - write
+      - edit
+      - ls
+
+      # Shell for infrastructure commands
+      - shell
+
+      # Git for version control
+      - git
+
+      # Container and infrastructure tools
+      - docker  # Docker operations - essential for DevOps
+      - test  # Run tests - essential for validation
+
+      # Code search for configurations
+      - grep
+      - code_search
+      - overview
+
+      # Web for documentation
+      - web_search
+      - web_fetch
+
+  # -------------------------------------------------------------------------
+  # System Prompt
+  # -------------------------------------------------------------------------
+  system_prompt:
+    source: inline
+    text: |
+      You are a DevOps engineer assistant specializing in infrastructure automation.
+
+      ## Core Capabilities
+
+      1. **Containerization**: Docker, Docker Compose, container best practices
+      2. **CI/CD**: GitHub Actions, GitLab CI, Jenkins, CircleCI
+      3. **Infrastructure as Code**: Terraform, Ansible, CloudFormation, Pulumi
+      4. **Orchestration**: Kubernetes, Helm, ArgoCD
+      5. **Monitoring**: Prometheus, Grafana, ELK, Datadog
+
+      ## Security-First Principles
+
+      1. **Never commit secrets**: Use environment variables, secrets managers
+      2. **Least privilege**: Minimize permissions in all configurations
+      3. **Encrypted at rest**: Enable encryption for data storage
+      4. **Network isolation**: Use proper network segmentation
+
+      ## DevOps Workflow
+
+      1. **ASSESS**: Understand current infrastructure state
+      2. **PLAN**: Design solution with security and scalability in mind
+      3. **IMPLEMENT**: Write declarative configurations
+      4. **VALIDATE**: Test in staging before production
+      5. **DEPLOY**: Use blue-green or canary deployments when possible
+      6. **MONITOR**: Set up metrics, logs, and alerts
+
+      ## Configuration Best Practices
+
+      - Always use multi-stage builds in Dockerfiles
+      - Pin versions in all dependencies
+      - Include health checks in container configs
+      - Use resource limits in Kubernetes
+      - Document all configuration decisions
+      - Keep infrastructure code DRY with modules/templates
+
+      ## Output Format
+
+      When creating configurations:
+      1. Provide complete, runnable configurations
+      2. Include inline comments explaining key decisions
+      3. Note any prerequisites or dependencies
+      4. Suggest validation commands to verify correctness
+
+  # -------------------------------------------------------------------------
+  # Stages
+  # -------------------------------------------------------------------------
+  stages:
+    INITIAL:
+      name: INITIAL
+      description: "Understanding the infrastructure request"
+      tools: [read, ls, overview]
+      keywords: ["what", "how", "explain", "infrastructure", "setup"]
+      next_stages: ["ASSESSMENT", "PLANNING"]
+
+    ASSESSMENT:
+      name: ASSESSMENT
+      description: "Assessing current infrastructure state"
+      tools: [read, shell, grep, git]
+      keywords: ["check", "status", "current", "existing", "review"]
+      next_stages: ["PLANNING", "IMPLEMENTATION"]
+
+    PLANNING:
+      name: PLANNING
+      description: "Planning infrastructure changes"
+      tools: [read, grep, web_search, web_fetch]
+      keywords: ["plan", "design", "architecture", "strategy"]
+      next_stages: ["IMPLEMENTATION"]
+
+    IMPLEMENTATION:
+      name: IMPLEMENTATION
+      description: "Implementing infrastructure changes"
+      tools: [write, edit, shell, docker]
+      keywords: ["create", "build", "configure", "implement", "deploy"]
+      next_stages: ["VALIDATION", "DEPLOYMENT"]
+
+    VALIDATION:
+      name: VALIDATION
+      description: "Validating configurations and testing"
+      tools: [shell, read, test]
+      keywords: ["test", "validate", "verify", "check"]
+      next_stages: ["DEPLOYMENT", "IMPLEMENTATION"]
+
+    DEPLOYMENT:
+      name: DEPLOYMENT
+      description: "Deploying to target environment"
+      tools: [shell, git, docker]
+      keywords: ["deploy", "push", "release", "launch"]
+      next_stages: ["MONITORING", "COMPLETION"]
+
+    MONITORING:
+      name: MONITORING
+      description: "Setting up monitoring and observability"
+      tools: [write, edit, shell]
+      keywords: ["monitor", "observe", "alert", "metrics"]
+      next_stages: ["COMPLETION"]
+
+    COMPLETION:
+      name: COMPLETION
+      description: "Documenting and finalizing"
+      tools: [write, git]
+      keywords: ["done", "complete", "document", "finish"]
+      next_stages: []
+
+# =============================================================================
+# Provider Hints
+# =============================================================================
+provider:
+  hints:
+    preferred: ["anthropic", "openai", "google"]
+    capabilities:
+      required: ["tool_calling", "streaming"]
+      optional: ["parallel_tool_calls"]
+
+# =============================================================================
+# Extensions
+# =============================================================================
+extensions:
+  # -------------------------------------------------------------------------
+  # Middleware
+  # -------------------------------------------------------------------------
+  middleware:
+    # DevOps has stricter git safety since infrastructure changes are critical
+    - class: victor.framework.middleware.GitSafetyMiddleware
+      enabled: true
+      priority: critical
+      config:
+        block_dangerous: true
+        warn_on_risky: true
+        protected_branches: ["production", "staging"]
+
+    # Always mask secrets in infrastructure output
+    - class: victor.framework.middleware.SecretMaskingMiddleware
+      enabled: true
+      priority: high
+      config:
+        replacement: "[REDACTED]"
+        mask_in_arguments: true
+
+    # Audit logging for compliance
+    - class: victor.framework.middleware.LoggingMiddleware
+      enabled: true
+      priority: normal
+      config:
+        include_arguments: true
+        sanitize_arguments: true
+
+  # -------------------------------------------------------------------------
+  # Prompt Contributor
+  # -------------------------------------------------------------------------
+  prompt_contributor:
+    module: victor.devops.prompts
+    class: DevOpsPromptContributor
+
+  # -------------------------------------------------------------------------
+  # Mode Configuration
+  # -------------------------------------------------------------------------
+  mode_config:
+    module: victor.devops.mode_config
+    class: DevOpsModeConfigProvider
+
+  # -------------------------------------------------------------------------
+  # Safety Extension
+  # -------------------------------------------------------------------------
+  safety:
+    module: victor.devops.safety
+    class: DevOpsSafetyExtension
+
+  # -------------------------------------------------------------------------
+  # Tool Dependencies
+  # -------------------------------------------------------------------------
+  tool_dependencies:
+    module: victor.core.tool_dependency_loader
+    factory: create_vertical_tool_dependency_provider
+    args:
+      vertical_name: devops
+
+# =============================================================================
+# Additional Metadata
+# =============================================================================
+metadata:
+  infrastructure_types:
+    - containers
+    - kubernetes
+    - cicd
+    - monitoring
+  security_level: "high"
+  requires_secrets_management: true

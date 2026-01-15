@@ -1,0 +1,177 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# =============================================================================
+# CodingAssistant - YAML Configuration
+# =============================================================================
+# This file defines the complete configuration for the CodingAssistant vertical.
+# Configuration is loaded automatically by VerticalBase.get_config().
+
+# =============================================================================
+# Metadata
+# =============================================================================
+metadata:
+  name: coding
+  version: "2.0.0"
+  description: "Software development assistant for code exploration, writing, and refactoring"
+
+# =============================================================================
+# Core Configuration
+# =============================================================================
+core:
+  tools:
+    list:
+      - ls
+      - overview
+      - code_search
+      - plan
+      - git
+      - shell
+      - lsp
+      - symbol
+      - refs
+      - rename
+      - extract
+      - test
+      - docker
+      - web_search
+      - web_fetch
+
+  system_prompt:
+    source: inline
+    text: |
+      You are Victor, an expert software development assistant.
+
+      Your capabilities:
+      - Deep code understanding through semantic search and LSP integration
+      - Safe file operations with automatic backup and undo
+      - Git operations for version control
+      - Test execution and validation
+      - Multi-language support (Python, TypeScript, Rust, Go, and more)
+
+      Guidelines:
+      1. **Understand before modifying**: Always read and understand code before making changes
+      2. **Incremental changes**: Make small, focused changes rather than large rewrites
+      3. **Verify changes**: Run tests or validation after modifications
+      4. **Explain reasoning**: Briefly explain your approach when making non-trivial changes
+      5. **Preserve style**: Match existing code style and patterns
+      6. **Handle errors gracefully**: If something fails, diagnose and recover
+
+      When exploring code:
+      - Use semantic_code_search for conceptual queries ("authentication logic")
+      - Use code_search for exact patterns ("def authenticate")
+      - Use overview to understand file structure
+
+      When modifying code:
+      - Use edit for surgical changes to existing code
+      - Use write only for new files or complete rewrites
+      - Always verify changes compile/pass tests when possible
+
+      You have access to 45+ tools. Use them efficiently to accomplish tasks.
+
+  stages:
+    INITIAL:
+      name: INITIAL
+      description: "Understanding the coding request"
+      tools: [read, ls, overview, grep]
+      keywords: ["what", "how", "explain", "where", "show me"]
+      next_stages: ["PLANNING", "READING"]
+
+    PLANNING:
+      name: PLANNING
+      description: "Planning the implementation approach"
+      tools: [grep, plan, overview, read]
+      keywords: ["plan", "approach", "design", "architecture", "strategy"]
+      next_stages: ["READING", "EXECUTION"]
+
+    READING:
+      name: READING
+      description: "Reading code and gathering context"
+      tools: [read, code_search, grep, lsp, symbol, refs]
+      keywords: ["read", "show", "find", "look", "check", "search"]
+      next_stages: ["ANALYSIS", "EXECUTION"]
+
+    ANALYSIS:
+      name: ANALYSIS
+      description: "Analyzing code structure and dependencies"
+      tools: [lsp, symbol, refs, overview]
+      keywords: ["analyze", "review", "understand", "why", "how does"]
+      next_stages: ["EXECUTION", "PLANNING"]
+
+    EXECUTION:
+      name: EXECUTION
+      description: "Implementing changes"
+      tools: [write, edit, shell, git, rename]
+      keywords: ["change", "modify", "create", "add", "remove", "fix", "implement", "write", "update", "refactor"]
+      next_stages: ["VERIFICATION", "COMPLETION"]
+
+    VERIFICATION:
+      name: VERIFICATION
+      description: "Testing and validating changes"
+      tools: [shell, test, git, read]
+      keywords: ["test", "verify", "check", "validate", "run", "build"]
+      next_stages: ["COMPLETION", "EXECUTION"]
+
+    COMPLETION:
+      name: COMPLETION
+      description: "Committing and summarizing"
+      tools: [git]
+      keywords: ["done", "finish", "complete", "commit", "summarize"]
+      next_stages: []
+
+# =============================================================================
+# Provider Hints
+# =============================================================================
+provider:
+  hints:
+    preferred: ["anthropic", "openai", "google"]
+    capabilities:
+      required: ["tool_calling", "streaming"]
+      optional: ["parallel_tool_calls", "native_tool_calls"]
+
+# =============================================================================
+# Extensions
+# =============================================================================
+extensions:
+  middleware:
+    - class: victor.coding.middleware.CodeCorrectionMiddleware
+      enabled: true
+      priority: high
+      config:
+        auto_fix: true
+
+    - class: victor.coding.middleware.GitSafetyMiddleware
+      enabled: true
+      priority: critical
+      config:
+        block_dangerous: false
+        warn_on_risky: true
+
+  safety:
+    module: victor.coding.safety
+    class: CodingSafetyExtension
+
+  prompt_contributor:
+    module: victor.coding.prompts
+    class: CodingPromptContributor
+
+  mode_config:
+    module: victor.coding.mode_config
+    class: CodingModeConfigProvider
+
+  tool_dependencies:
+    module: victor.core.tool_dependency_loader
+    factory: create_vertical_tool_dependency_provider
+    args:
+      vertical_name: coding

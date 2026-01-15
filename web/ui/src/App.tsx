@@ -62,7 +62,7 @@ function App() {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
   const [isTyping, setIsTyping] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const [_reconnectAttempts, setReconnectAttempts] = useState(0);
 
   const ws = useRef<WebSocket | null>(null);
   const wsSessionIdRef = useRef<string | null>(null);

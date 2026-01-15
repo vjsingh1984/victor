@@ -257,31 +257,40 @@ class SlidingWindowRateLimiter:
         Returns:
             Time waited in seconds
         """
+        # Copy data while holding lock (minimal time)
         async with self._lock:
+            requests_copy = self._requests.copy()
             now = time.monotonic()
 
-            # Remove old requests outside window
-            cutoff = now - self.window_seconds
-            self._requests = [t for t in self._requests if t > cutoff]
+        # Process OUTSIDE lock to reduce contention
+        cutoff = now - self.window_seconds
+        filtered_requests = [t for t in requests_copy if t > cutoff]
 
-            if len(self._requests) < self.max_requests:
+        if len(filtered_requests) < self.max_requests:
+            # Update shared state under lock
+            async with self._lock:
+                self._requests = filtered_requests
                 self._requests.append(now)
-                return 0.0
+            return 0.0
 
-            # Calculate wait time until oldest request expires
-            oldest = self._requests[0]
-            wait_time = oldest + self.window_seconds - now + 0.01  # Small buffer
+        # Calculate wait time until oldest request expires
+        oldest = filtered_requests[0]
+        wait_time = oldest + self.window_seconds - now + 0.01  # Small buffer
 
-            if wait_time > 0:
-                await asyncio.sleep(wait_time)
-                now = time.monotonic()
+        if wait_time > 0:
+            await asyncio.sleep(wait_time)
+            now = time.monotonic()
 
-            # Clean up and add new request
-            cutoff = now - self.window_seconds
-            self._requests = [t for t in self._requests if t > cutoff]
+        # Clean up and add new request
+        cutoff = now - self.window_seconds
+        final_requests = [t for t in filtered_requests if t > cutoff]
+
+        # Update shared state under lock
+        async with self._lock:
+            self._requests = final_requests
             self._requests.append(now)
 
-            return max(0, wait_time)
+        return max(0, wait_time)
 
     def try_acquire(self) -> bool:
         """Try to acquire permission without waiting.

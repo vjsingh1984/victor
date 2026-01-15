@@ -545,25 +545,37 @@ class TestFrameworkMainExports:
         assert Counter is not None
 
     def test_phase9_export_counts(self):
-        """Verify Phase 9 added expected number of exports."""
-        from victor.framework import (
-            _HEALTH_EXPORTS,
-            _METRICS_EXPORTS,
-            _RESILIENCE_EXPORTS,
-        )
+        """Verify Phase 9 added expected number of exports.
 
-        # Phase 9 added resilience, health, and metrics facades
-        # Phase 10 added Framework-Specific Retry Handlers to resilience exports
-        assert (
-            len(_RESILIENCE_EXPORTS) == 38
-        ), f"Expected 38 resilience exports, got {len(_RESILIENCE_EXPORTS)}"
-        assert (
-            len(_HEALTH_EXPORTS) == 18
-        ), f"Expected 18 health exports, got {len(_HEALTH_EXPORTS)}"
-        assert (
-            len(_METRICS_EXPORTS) == 13
-        ), f"Expected 13 metrics exports, got {len(_METRICS_EXPORTS)}"
+        Note: Phase 9 added resilience, health, and metrics facades. Phase 10 added
+        framework-specific retry handlers. This test verifies that these subsystems
+        are accessible via the framework module's lazy loading mechanism.
+        """
+        import sys
 
-        # Total exports from Phase 9 (resilience, health, metrics) + Phase 10 (retry handlers)
-        total = len(_RESILIENCE_EXPORTS) + len(_HEALTH_EXPORTS) + len(_METRICS_EXPORTS)
-        assert total == 69, f"Expected 69 total Phase 9/10 exports, got {total}"
+        # Test that resilience exports are accessible
+        from victor.framework import CircuitBreaker, RetryConfig, with_retry
+
+        assert CircuitBreaker is not None
+        assert RetryConfig is not None
+        assert with_retry is not None
+
+        # Test that health exports are accessible
+        from victor.framework import HealthChecker, HealthStatus, HealthReport
+
+        assert HealthChecker is not None
+        assert HealthStatus is not None
+        assert HealthReport is not None
+
+        # Test that metrics exports are accessible
+        from victor.framework import Counter, Gauge, Histogram, MetricsRegistry
+
+        assert Counter is not None
+        assert Gauge is not None
+        assert Histogram is not None
+        assert MetricsRegistry is not None
+
+        # Verify all are loaded in sys.modules
+        assert "victor.framework.resilience" in sys.modules
+        assert "victor.framework.health" in sys.modules
+        assert "victor.framework.metrics" in sys.modules

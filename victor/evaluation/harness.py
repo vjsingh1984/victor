@@ -478,7 +478,8 @@ class EvaluationHarness:
         config_str = f"{config.benchmark.value}_{config.model}_{config.max_tasks}"
         if config.task_ids:
             config_str += "_" + "_".join(sorted(config.task_ids))
-        checkpoint_id = hashlib.md5(config_str.encode()).hexdigest()[:12]
+        # MD5 used for checkpoint ID generation, not security
+        checkpoint_id = hashlib.md5(config_str.encode(), usedforsecurity=False).hexdigest()[:12]
 
         return self._checkpoint_dir / f"checkpoint_{config.benchmark.value}_{checkpoint_id}.json"
 

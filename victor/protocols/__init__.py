@@ -162,7 +162,19 @@ from victor.protocols.analytics import (
 # Cache Protocol (for distributed caching)
 from victor.protocols.cache import (
     ICacheBackend,
+    ICacheInvalidator,
+    ICacheDependencyTracker,
     IIdempotentTool,
+    IAdvancedCacheBackend,
+    ICacheManager,
+    CacheNamespace,
+    CacheEntryMetadata,
+    InvalidationResult,
+    CacheStatistics,
+    FileChangeType,
+    FileChangeEvent,
+    IFileWatcher,
+    IDependencyExtractor,
 )
 
 # Provider Manager Protocol (for provider lifecycle management)
@@ -188,6 +200,94 @@ from victor.protocols.lifecycle import (
     CleanupResult,
     RecoveryResult,
     ILifecycleManager,
+)
+
+# UI Agent Protocol (for UI-orchestrator decoupling)
+from victor.protocols.ui_agent import (
+    UIAgentProtocol,
+    UIAgent,
+)
+
+# Workflow Agent Protocol (for workflow-orchestrator decoupling)
+from victor.protocols.workflow_agent import (
+    WorkflowAgentProtocol,
+)
+
+# Agent Conversation Protocols (from victor.agent.protocols split)
+from victor.protocols.agent_conversation import (
+    ConversationControllerProtocol,
+    ConversationStateMachineProtocol,
+    MessageHistoryProtocol,
+    StreamingToolChunk,
+    StreamingToolAdapterProtocol,
+    StreamingControllerProtocol,
+    ContextCompactorProtocol,
+    ConversationEmbeddingStoreProtocol,
+    ReminderManagerProtocol,
+)
+
+# Agent Tools Protocols (from victor.agent.protocols split)
+from victor.protocols.agent_tools import (
+    ToolRegistryProtocol,
+    ToolPipelineProtocol,
+    ToolExecutorProtocol,
+    ToolCacheProtocol,
+    ToolOutputFormatterProtocol,
+    ResponseSanitizerProtocol,
+    ArgumentNormalizerProtocol,
+    ProjectContextProtocol,
+    ToolDependencyGraphProtocol,
+    ToolPluginRegistryProtocol,
+)
+
+# Agent Providers Protocols (from victor.agent.protocols split)
+from victor.protocols.agent_providers import (
+    IProviderHealthMonitor,
+    IProviderSwitcher,
+    IToolAdapterCoordinator,
+    IProviderEventEmitter,
+    IProviderClassificationStrategy,
+    ProviderRegistryProtocol,
+)
+
+# Agent Conversation Refined Protocols (from victor.agent.protocols split)
+from victor.protocols.agent_conversation_refined import (
+    IMessageStore,
+    IContextOverflowHandler,
+    ISessionManager,
+    IEmbeddingManager,
+)
+
+# Session Repository Protocol (for UI-database decoupling)
+from victor.protocols.session_repository import (
+    SessionRepositoryProtocol,
+)
+
+# Agent Budget and Utility Protocols (from victor.agent.protocols split)
+from victor.protocols.agent_budget import (
+    IBudgetTracker,
+    IMultiplierCalculator,
+    IModeCompletionChecker,
+    IToolCallClassifier,
+    DebugLoggerProtocol,
+    TaskTypeHinterProtocol,
+    SafetyCheckerProtocol,
+    AutoCommitterProtocol,
+    MCPBridgeProtocol,
+    SystemPromptBuilderProtocol,
+    ParallelExecutorProtocol,
+    ResponseCompleterProtocol,
+    StreamingHandlerProtocol,
+    UsageLoggerProtocol,
+    StreamingMetricsCollectorProtocol,
+    IntentClassifierProtocol,
+    RLCoordinatorProtocol,
+)
+
+# Classification Protocol (breaks circular dependencies)
+from victor.protocols.classification import (
+    IClassificationResult,
+    IKeywordMatch,
 )
 
 __all__ = [
@@ -296,7 +396,19 @@ __all__ = [
     "AnalyticsResult",
     # Cache Protocol
     "ICacheBackend",
+    "ICacheInvalidator",
+    "ICacheDependencyTracker",
     "IIdempotentTool",
+    "IAdvancedCacheBackend",
+    "ICacheManager",
+    "CacheNamespace",
+    "CacheEntryMetadata",
+    "InvalidationResult",
+    "CacheStatistics",
+    "FileChangeType",
+    "FileChangeEvent",
+    "IFileWatcher",
+    "IDependencyExtractor",
     # Provider Manager Protocol
     "IProviderManager",
     "SwitchResult",
@@ -313,4 +425,65 @@ __all__ = [
     "SessionConfig",
     "CleanupResult",
     "RecoveryResult",
+    # UI Agent Protocol
+    "UIAgentProtocol",
+    "UIAgent",
+    # Workflow Agent Protocol
+    "WorkflowAgentProtocol",
+    # Agent Conversation Protocols
+    "ConversationControllerProtocol",
+    "ConversationStateMachineProtocol",
+    "MessageHistoryProtocol",
+    "StreamingToolChunk",
+    "StreamingToolAdapterProtocol",
+    "StreamingControllerProtocol",
+    "ContextCompactorProtocol",
+    "ConversationEmbeddingStoreProtocol",
+    "ReminderManagerProtocol",
+    # Agent Tools Protocols
+    "ToolRegistryProtocol",
+    "ToolPipelineProtocol",
+    "ToolExecutorProtocol",
+    "ToolCacheProtocol",
+    "ToolOutputFormatterProtocol",
+    "ResponseSanitizerProtocol",
+    "ArgumentNormalizerProtocol",
+    "ProjectContextProtocol",
+    "ToolDependencyGraphProtocol",
+    "ToolPluginRegistryProtocol",
+    # Agent Providers Protocols
+    "IProviderHealthMonitor",
+    "IProviderSwitcher",
+    "IToolAdapterCoordinator",
+    "IProviderEventEmitter",
+    "IProviderClassificationStrategy",
+    "ProviderRegistryProtocol",
+    # Agent Conversation Refined Protocols
+    "IMessageStore",
+    "IContextOverflowHandler",
+    "ISessionManager",
+    "IEmbeddingManager",
+    # Session Repository Protocol
+    "SessionRepositoryProtocol",
+    # Agent Budget and Utility Protocols
+    "IBudgetTracker",
+    "IMultiplierCalculator",
+    "IModeCompletionChecker",
+    "IToolCallClassifier",
+    "DebugLoggerProtocol",
+    "TaskTypeHinterProtocol",
+    "SafetyCheckerProtocol",
+    "AutoCommitterProtocol",
+    "MCPBridgeProtocol",
+    "SystemPromptBuilderProtocol",
+    "ParallelExecutorProtocol",
+    "ResponseCompleterProtocol",
+    "StreamingHandlerProtocol",
+    "UsageLoggerProtocol",
+    "StreamingMetricsCollectorProtocol",
+    "IntentClassifierProtocol",
+    "RLCoordinatorProtocol",
+    # Classification Protocol
+    "IClassificationResult",
+    "IKeywordMatch",
 ]

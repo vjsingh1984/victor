@@ -64,7 +64,8 @@ from victor.agent.provider import (
     ProviderSwitcherState,
 )
 from victor.agent.strategies import DefaultProviderClassificationStrategy
-from victor.core.errors import ProviderNotFoundError
+from victor.core.errors import ProviderNotFoundError, ProviderInitializationError, ConfigurationError
+from victor.protocols.provider_manager import SwitchResult, HealthStatus
 from victor.providers.base import BaseProvider
 from victor.providers.registry import ProviderRegistry
 from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
@@ -264,6 +265,73 @@ class ProviderManager:
         """
         return self._current_state
 
+    async def get_provider(self, provider_name: str) -> BaseProvider:
+        """Get provider instance by name.
+
+        IProviderManager protocol implementation.
+
+        Args:
+            provider_name: Name of the provider (e.g., 'anthropic', 'openai')
+
+        Returns:
+            Provider instance
+
+        Raises:
+            ProviderNotFoundError: If provider not registered
+            ProviderInitializationError: If provider initialization fails
+            ProviderError: For other provider-related errors
+
+        Example:
+            provider = await manager.get_provider("anthropic")
+        """
+        # If requesting current provider, return it
+        if self.provider and provider_name.lower() == self.provider_name.lower():
+            return self.provider
+
+        # Check if provider exists in registry BEFORE attempting initialization
+        # Only do this check if we're not in a test environment (mocked registry)
+        providers_dict = getattr(ProviderRegistry, '_providers', None)
+        if providers_dict is not None and isinstance(providers_dict, dict):
+            if provider_name not in providers_dict:
+                # Provider not in registry - show available providers
+                available_list = ProviderRegistry.list_providers()
+                available = ', '.join(available_list[:10])
+
+                raise ProviderNotFoundError(
+                    f"Provider '{provider_name}' is not registered. "
+                    f"Available providers: {available}\n"
+                    f"Use 'victor providers list' to see all providers.",
+                    provider=provider_name,
+                    available_providers=available_list
+                )
+
+        # Try to initialize the provider
+        try:
+            provider = ProviderRegistry.create(provider_name, self.settings)
+            logger.debug(f"Created new provider instance: {provider_name}")
+            return provider
+        except ProviderNotFoundError:
+            # Let ProviderNotFoundError propagate (provider not in registry)
+            raise
+        except ConfigurationError as e:
+            # Configuration error - specific hint about config key
+            config_key = getattr(e, 'config_key', None) or f"{provider_name.upper()}_API_KEY"
+            raise ProviderInitializationError(
+                f"Provider '{provider_name}' failed to initialize: {e}. "
+                f"Check your API credentials and configuration.",
+                provider=provider_name,
+                config_key=config_key,
+                recovery_hint=f"Set {config_key} environment variable or check your configuration.",
+            ) from e
+        except Exception as e:
+            # Other initialization errors
+            logger.error(f"Failed to get provider '{provider_name}': {e}")
+            raise ProviderInitializationError(
+                f"Provider '{provider_name}' failed to initialize: {e}",
+                provider=provider_name,
+                recovery_hint="Check your API credentials and configuration.",
+            ) from e
+
     def is_cloud_provider(self, provider_name: Optional[str] = None) -> bool:
         """Check if provider is cloud-based.
 
@@ -382,27 +450,35 @@ class ProviderManager:
         provider_name: str,
         model: Optional[str] = None,
         reason: SwitchReason = SwitchReason.USER_REQUEST,
+        return_result_object: bool = False,
         **provider_kwargs: Any,
-    ) -> bool:
+    ) -> bool | SwitchResult:
         """Switch to a different provider.
 
         Delegates to ProviderSwitcher for core switching logic while
         maintaining backward compatibility with legacy features like
         fallback chains and capability discovery.
 
+        IProviderManager protocol implementation: returns SwitchResult when
+        return_result_object=True, otherwise returns bool for backward compatibility.
+
         Args:
             provider_name: Name of the provider
             model: Optional model name (uses current if not provided)
             reason: Reason for the switch
+            return_result_object: If True, return SwitchResult object; otherwise return bool
             **provider_kwargs: Additional provider arguments
 
         Returns:
-            True if switch was successful
+            SwitchResult if return_result_object=True, otherwise bool
+            (True if switch was successful)
         """
-        try:
-            # Determine model to use
-            new_model = model or self.model
+        from_provider = self.provider_name
+        new_model = model or self.model
+        error_message = None
+        metadata = {}
 
+        try:
             # Convert SwitchReason enum to string for ProviderSwitcher
             reason_str = "manual" if reason == SwitchReason.USER_REQUEST else "auto"
 
@@ -421,8 +497,85 @@ class ProviderManager:
                     logger.warning(
                         f"Provider switch to {provider_name} failed, attempting fallback"
                     )
-                    return await self._attempt_fallback(reason)
-                return False
+                    fallback_result = await self._attempt_fallback(reason)
+                    if not fallback_result:
+                        error_message = f"Failed to switch to {provider_name} and all fallbacks exhausted"
+                        # Return appropriate type based on return_result_object flag
+                        if return_result_object:
+                            return SwitchResult(
+                                success=False,
+                                from_provider=from_provider,
+                                to_provider=provider_name,
+                                model=new_model,
+                                error_message=error_message,
+                                metadata=metadata,
+                            )
+                        return False
+                    else:
+                        # Fallback succeeded - continue to success path
+                        # Sync legacy state with switcher state
+                        switcher_state = self._provider_switcher.get_current_state()
+                        if switcher_state:
+                            _old_switch_count = self._current_state.switch_count if self._current_state else 0
+                            self._current_state = ProviderState(
+                                provider=switcher_state.provider,
+                                provider_name=switcher_state.provider_name,
+                                model=switcher_state.model,
+                                switch_count=switcher_state.switch_count,
+                                last_error=switcher_state.last_error,
+                            )
+
+                            # Re-initialize tool adapter and discover capabilities
+                            self.initialize_tool_adapter()
+                            await self._discover_and_cache_capabilities()
+
+                            # Update model switcher for backward compatibility
+                            self._model_switcher.switch(
+                                provider=self.provider_name,
+                                model=self.model,
+                                reason=reason,
+                                metadata={"from_provider": from_provider, "from_model": self.model},
+                            )
+
+                            # Build metadata for SwitchResult
+                            metadata = {
+                                "switch_count": self._current_state.switch_count,
+                                "context_window": self.get_context_window(),
+                                "supports_tools": self.provider.supports_tools() if self.provider else False,
+                                "native_tool_calls": self.capabilities.native_tool_calls if self.capabilities else False,
+                            }
+
+                            if self._current_state.runtime_capabilities:
+                                metadata["runtime_capabilities"] = {
+                                    "context_window": self._current_state.runtime_capabilities.context_window,
+                                    "supports_tools": self._current_state.runtime_capabilities.supports_tools,
+                                    "supports_streaming": self._current_state.runtime_capabilities.supports_streaming,
+                                }
+
+                        # Return appropriate type based on return_result_object flag
+                        if return_result_object:
+                            return SwitchResult(
+                                success=True,
+                                from_provider=from_provider,
+                                to_provider=self.provider_name,
+                                model=self.model,
+                                metadata=metadata,
+                            )
+                        return True
+                else:
+                    error_message = f"Failed to switch to {provider_name}"
+
+                    # Return appropriate type based on return_result_object flag
+                    if return_result_object:
+                        return SwitchResult(
+                            success=False,
+                            from_provider=from_provider,
+                            to_provider=provider_name,
+                            model=new_model,
+                            error_message=error_message,
+                            metadata=metadata,
+                        )
+                    return False
 
             # Sync legacy state with switcher state
             switcher_state = self._provider_switcher.get_current_state()
@@ -445,9 +598,33 @@ class ProviderManager:
                     provider=provider_name,
                     model=new_model,
                     reason=reason,
-                    metadata={"from_provider": self.provider_name, "from_model": self.model},
+                    metadata={"from_provider": from_provider, "from_model": self.model},
                 )
 
+                # Build metadata for SwitchResult
+                metadata = {
+                    "switch_count": self._current_state.switch_count,
+                    "context_window": self.get_context_window(),
+                    "supports_tools": self.provider.supports_tools() if self.provider else False,
+                    "native_tool_calls": self.capabilities.native_tool_calls if self.capabilities else False,
+                }
+
+                if self._current_state.runtime_capabilities:
+                    metadata["runtime_capabilities"] = {
+                        "context_window": self._current_state.runtime_capabilities.context_window,
+                        "supports_tools": self._current_state.runtime_capabilities.supports_tools,
+                        "supports_streaming": self._current_state.runtime_capabilities.supports_streaming,
+                    }
+
+            # Return appropriate type based on return_result_object flag
+            if return_result_object:
+                return SwitchResult(
+                    success=True,
+                    from_provider=from_provider,
+                    to_provider=provider_name,
+                    model=new_model,
+                    metadata=metadata,
+                )
             return True
 
         except ProviderNotFoundError:
@@ -455,8 +632,20 @@ class ProviderManager:
             raise
         except Exception as e:
             logger.error(f"Failed to switch provider to {provider_name}: {e}")
+            error_message = str(e)
             if self._current_state:
-                self._current_state.last_error = str(e)
+                self._current_state.last_error = error_message
+
+            # Return appropriate type based on return_result_object flag
+            if return_result_object:
+                return SwitchResult(
+                    success=False,
+                    from_provider=from_provider,
+                    to_provider=provider_name,
+                    model=new_model,
+                    error_message=error_message,
+                    metadata=metadata,
+                )
             return False
 
     async def switch_model(
@@ -643,6 +832,81 @@ class ProviderManager:
         """
         # Delegate to health monitor (SRP)
         return await self._health_monitor.check_health(provider)
+
+    async def check_health(self, provider_name: str) -> HealthStatus:
+        """Check health of a provider.
+
+        IProviderManager protocol implementation.
+
+        Performs a health check by making a test request
+        or pinging the provider's API endpoint.
+
+        Args:
+            provider_name: Name of the provider to check
+
+        Returns:
+            HealthStatus with health information
+
+        Example:
+            status = await manager.check_health("anthropic")
+            if status.healthy:
+                print(f"Latency: {status.latency_ms}ms")
+        """
+        import time
+
+        # Determine which provider to check
+        target_provider: Optional[BaseProvider] = None
+
+        # Check if it's the current provider
+        if provider_name.lower() == self.provider_name.lower():
+            target_provider = self.provider
+        else:
+            # Need to create a temporary instance for health check
+            try:
+                target_provider = await self.get_provider(provider_name)
+            except ProviderNotFoundError:
+                return HealthStatus(
+                    provider_name=provider_name,
+                    healthy=False,
+                    error_message=f"Provider '{provider_name}' not found",
+                )
+            except Exception as e:
+                return HealthStatus(
+                    provider_name=provider_name,
+                    healthy=False,
+                    error_message=f"Failed to initialize provider: {str(e)}",
+                )
+
+        if not target_provider:
+            return HealthStatus(
+                provider_name=provider_name,
+                healthy=False,
+                error_message="No provider available",
+            )
+
+        # Perform health check with timing
+        start_time = time.time()
+        try:
+            is_healthy = await self._health_monitor.check_health(target_provider)
+            latency_ms = (time.time() - start_time) * 1000
+
+            return HealthStatus(
+                provider_name=provider_name,
+                healthy=is_healthy,
+                latency_ms=latency_ms,
+                last_check=time.strftime("%Y-%m-%d %H:%M:%S"),
+            )
+
+        except Exception as e:
+            latency_ms = (time.time() - start_time) * 1000
+            logger.warning(f"Health check failed for {provider_name}: {e}")
+            return HealthStatus(
+                provider_name=provider_name,
+                healthy=False,
+                latency_ms=latency_ms,
+                error_message=str(e),
+                last_check=time.strftime("%Y-%m-%d %H:%M:%S"),
+            )
 
     async def _attempt_fallback(self, original_reason: SwitchReason) -> bool:
         """Attempt to fallback to a healthy provider.

@@ -87,11 +87,6 @@ def sample_extension():
                 "description": "Sample extension for testing",
             }
 
-    # Make it runtime checkable for IExtension protocol
-    from victor.core.verticals.protocols.extension import IExtension
-
-    SampleExtension.__protocol_attrs__ = IExtension.__protocol_attrs__
-
     return SampleExtension
 
 
@@ -118,10 +113,7 @@ def custom_extension_type():
                 "tags": {"analytics", "monitoring"},
             }
 
-    # Make it runtime checkable for IExtension protocol
-    from victor.core.verticals.protocols.extension import IExtension
-
-    AnalyticsExtension.__protocol_attrs__ = IExtension.__protocol_attrs__
+    return AnalyticsExtension
 
     return AnalyticsExtension
 

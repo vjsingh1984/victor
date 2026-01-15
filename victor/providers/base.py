@@ -493,3 +493,61 @@ class BaseProvider(ABC):
         """Manually reset the circuit breaker to closed state."""
         if self._circuit_breaker:
             self._circuit_breaker.reset()
+
+    @classmethod
+    def _resolve_api_key(cls, api_key: Optional[str], provider_name: str) -> str:
+        """Resolve API key from multiple sources with proper fallback order.
+
+        Resolution order:
+        1. Provided api_key parameter
+        2. Environment variable ({PROVIDER_NAME}_API_KEY)
+        3. Keyring (via victor.config.api_keys.get_api_key)
+        4. Empty string with warning logged
+
+        Args:
+            api_key: API key provided as parameter (highest priority)
+            provider_name: Name of the provider (e.g., "anthropic", "openai")
+
+        Returns:
+            Resolved API key (empty string if not found, but doesn't raise)
+
+        Example:
+            class MyProvider(BaseProvider):
+                def __init__(self, api_key=None):
+                    resolved_key = self._resolve_api_key(api_key, "myprovider")
+                    super().__init__(api_key=resolved_key)
+        """
+        import os
+        import logging
+
+        # 1. Use provided key if available
+        if api_key:
+            return api_key
+
+        # 2. Try environment variable
+        env_var_name = f"{provider_name.upper()}_API_KEY"
+        env_key = os.environ.get(env_var_name, "")
+        if env_key:
+            return env_key
+
+        # 3. Try keyring
+        try:
+            from victor.config.api_keys import get_api_key
+
+            keyring_key = get_api_key(provider_name)
+            if keyring_key:
+                return keyring_key
+        except ImportError:
+            pass
+
+        # 4. Not found - log warning and return empty string
+        logger = logging.getLogger(__name__)
+        logger.warning(
+            "%s API key not provided. Set %s environment variable, "
+            "use 'victor keys --set %s --keyring', or pass api_key parameter.",
+            provider_name.capitalize(),
+            env_var_name,
+            provider_name,
+        )
+
+        return ""

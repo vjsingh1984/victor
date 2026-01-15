@@ -165,7 +165,7 @@ class MessagingEvent:
         return self.topic.split(".")[0] if self.topic else "unknown"
 
     @property
-    def datetime(self) -> "datetime":
+    def datetime(self) -> "datetime":  # type: ignore[name-defined]
         """Convert timestamp to datetime object for display purposes.
 
         Returns:

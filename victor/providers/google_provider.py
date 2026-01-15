@@ -115,21 +115,8 @@ class GoogleProvider(BaseProvider):
         Raises:
             ImportError: If google-genai package is not installed
         """
-        # Resolution order: parameter → env var → keyring → warning
-        resolved_key = api_key or os.environ.get("GOOGLE_API_KEY", "")
-        if not resolved_key:
-            try:
-                from victor.config.api_keys import get_api_key
-
-                resolved_key = get_api_key("google") or ""
-            except ImportError:
-                pass
-
-        if not resolved_key:
-            logger.warning(
-                "Google API key not provided. Set GOOGLE_API_KEY environment variable, "
-                "use 'victor keys --set google --keyring', or pass api_key parameter."
-            )
+        # Resolve API key using centralized helper
+        resolved_key = self._resolve_api_key(api_key, "google")
 
         if not HAS_GOOGLE_GENAI:
             raise ImportError(

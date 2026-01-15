@@ -49,10 +49,21 @@ from typing import (
 )
 
 # Import types from victor.teams.types (canonical location for types)
-from victor.teams.types import AgentMessage, TeamFormation
-
+# Use TYPE_CHECKING to avoid circular import during module initialization
 if TYPE_CHECKING:
-    from victor.teams.types import MemberResult, TeamResult
+    from victor.teams.types import AgentMessage, MemberResult, TeamFormation, TeamResult
+else:
+    # Import at runtime but use lazy loading to avoid circular dependency
+    def __getattr__(name: str):
+        """Lazy import types from victor.teams.types to avoid circular dependency."""
+        import importlib
+
+        if name in ("AgentMessage", "TeamFormation", "MemberResult", "TeamResult"):
+            module = importlib.import_module("victor.teams.types")
+            globals()[name] = getattr(module, name)
+            return globals()[name]
+
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 @runtime_checkable

@@ -73,7 +73,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    from victor.protocols import WorkflowAgentProtocol
     from victor.framework.graph import CompiledGraph, GraphExecutionResult, GraphConfig
     from victor.tools.registry import ToolRegistry
     from victor.workflows.cache import (
@@ -98,6 +98,15 @@ if TYPE_CHECKING:
         WorkflowDefinitionCompiler,
     )
     from victor.workflows.yaml_loader import YAMLWorkflowConfig
+
+from victor.core.errors import (
+    WorkflowExecutionError,
+    ConfigurationValidationError,
+    ToolExecutionError,
+    ToolTimeoutError,
+    ValidationError,
+    ConfigurationError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -186,7 +195,7 @@ class NodeExecutorFactory:
 
     def __init__(
         self,
-        orchestrator: Optional["AgentOrchestrator"] = None,
+        orchestrator: Optional["WorkflowAgentProtocol"] = None,
         tool_registry: Optional["ToolRegistry"] = None,
         runner_registry: Optional["NodeRunnerRegistry"] = None,
         emitter: Optional[Any] = None,  # ObservabilityEmitter
@@ -422,10 +431,22 @@ class NodeExecutorFactory:
                         output=output,
                     )
 
-            except Exception as e:
-                logger.error(f"Agent node '{node.id}' failed: {e}", exc_info=True)
+            except (ToolExecutionError, ToolTimeoutError, ValidationError, ConfigurationError) as e:
+                # Known workflow errors - handle with specific logging
                 duration = time.time() - start_time
-                state["_error"] = f"Agent node '{node.id}' failed: {e}"
+                correlation_id = getattr(e, 'correlation_id', str(uuid.uuid4())[:8])
+                workflow_id = state.get("_workflow_name", "unknown")
+                checkpoint_id = state.get("_checkpoint_id") or state.get("thread_id")
+
+                # Log with correlation ID
+                logger.error(
+                    f"[{correlation_id}] Agent node '{node.id}' failed in workflow '{workflow_id}': {e}",
+                    exc_info=True,
+                )
+
+                # Store error in state
+                error_msg = f"Agent node '{node.id}' failed: {e}"
+                state["_error"] = error_msg
                 if "_node_results" not in state:
                     state["_node_results"] = {}
                 state["_node_results"][node.id] = NodeExecutionResult(
@@ -443,6 +464,67 @@ class NodeExecutorFactory:
                         node_name=node_name,
                         duration=duration,
                     )
+
+                # Raise WorkflowExecutionError if not continuing on error
+                if not node.continue_on_error:
+                    raise WorkflowExecutionError(
+                        message=error_msg,
+                        workflow_id=workflow_id,
+                        node_id=node.id,
+                        node_type="agent",
+                        checkpoint_id=checkpoint_id,
+                        execution_context={"duration": duration, "original_error": str(e)},
+                    ) from e
+
+            except Exception as e:
+                # Catch-all for truly unexpected errors
+                duration = time.time() - start_time
+                correlation_id = str(uuid.uuid4())[:8]
+                workflow_id = state.get("_workflow_name", "unknown")
+                checkpoint_id = state.get("_checkpoint_id") or state.get("thread_id")
+
+                # Log with correlation ID
+                logger.error(
+                    f"[{correlation_id}] Agent node '{node.id}' failed in workflow '{workflow_id}': {e}",
+                    exc_info=True,
+                )
+
+                # Store error in state
+                error_msg = f"Agent node '{node.id}' failed: {e}"
+                state["_error"] = error_msg
+                if "_node_results" not in state:
+                    state["_node_results"] = {}
+                state["_node_results"][node.id] = NodeExecutionResult(
+                    node_id=node.id,
+                    success=False,
+                    error=str(e),
+                    duration_seconds=duration,
+                )
+
+                # Emit NODE_ERROR if emitter is configured
+                if emitter and hasattr(emitter, "emit_node_error"):
+                    emitter.emit_node_error(
+                        node.id,
+                        error=str(e),
+                        node_name=node_name,
+                        duration=duration,
+                    )
+
+                # Raise WorkflowExecutionError if not continuing on error
+                if not node.continue_on_error:
+                    raise WorkflowExecutionError(
+                        error_msg,
+                        workflow_id=workflow_id,
+                        node_id=node.id,
+                        node_type="agent",
+                        checkpoint_id=checkpoint_id,
+                        execution_context={
+                            "duration": duration,
+                            "role": node.role if hasattr(node, "role") else "unknown",
+                            "goal": node.goal if hasattr(node, "goal") else "unknown",
+                        },
+                        correlation_id=correlation_id,
+                    ) from e
 
             return state
 
@@ -578,7 +660,14 @@ class NodeExecutorFactory:
                                 outputs[tool_name] = {"error": "Timeout"}
                                 if node.fail_fast:
                                     break
+                            except (ToolExecutionError, ToolTimeoutError, ValidationError) as e:
+                                # Known tool errors
+                                outputs[tool_name] = {"error": str(e)}
+                                if node.fail_fast:
+                                    break
                             except Exception as e:
+                                # Catch-all for unexpected errors
+                                logger.warning(f"Unexpected error executing tool '{tool_name}': {e}")
                                 outputs[tool_name] = {"error": str(e)}
                                 if node.fail_fast:
                                     break
@@ -613,9 +702,20 @@ class NodeExecutorFactory:
                     )
 
             except Exception as e:
-                logger.error(f"Compute node '{node.id}' failed: {e}", exc_info=True)
                 duration = time.time() - start_time
-                state["_error"] = f"Compute node '{node.id}' failed: {e}"
+                correlation_id = str(uuid.uuid4())[:8]
+                workflow_id = state.get("_workflow_name", "unknown")
+                checkpoint_id = state.get("_checkpoint_id") or state.get("thread_id")
+
+                # Log with correlation ID
+                logger.error(
+                    f"[{correlation_id}] Compute node '{node.id}' failed in workflow '{workflow_id}': {e}",
+                    exc_info=True,
+                )
+
+                # Store error in state
+                error_msg = f"Compute node '{node.id}' failed: {e}"
+                state["_error"] = error_msg
                 if "_node_results" not in state:
                     state["_node_results"] = {}
                 state["_node_results"][node.id] = NodeExecutionResult(
@@ -634,6 +734,22 @@ class NodeExecutorFactory:
                         node_name=node_name,
                         duration=duration,
                     )
+
+                # Raise WorkflowExecutionError if not continuing on error
+                if not node.continue_on_error:
+                    raise WorkflowExecutionError(
+                        error_msg,
+                        workflow_id=workflow_id,
+                        node_id=node.id,
+                        node_type="compute",
+                        checkpoint_id=checkpoint_id,
+                        execution_context={
+                            "duration": duration,
+                            "handler": node.handler if hasattr(node, "handler") else "unknown",
+                            "tool_calls_used": tool_calls_used,
+                        },
+                        correlation_id=correlation_id,
+                    ) from e
 
             return state
 
@@ -805,9 +921,20 @@ class NodeExecutorFactory:
                     )
 
             except Exception as e:
-                logger.error(f"Parallel node '{node.id}' failed: {e}", exc_info=True)
                 duration = time.time() - start_time
-                state["_error"] = f"Parallel node '{node.id}' failed: {e}"
+                correlation_id = str(uuid.uuid4())[:8]
+                workflow_id = state.get("_workflow_name", "unknown")
+                checkpoint_id = state.get("_checkpoint_id") or state.get("thread_id")
+
+                # Log with correlation ID
+                logger.error(
+                    f"[{correlation_id}] Parallel node '{node.id}' failed in workflow '{workflow_id}': {e}",
+                    exc_info=True,
+                )
+
+                # Store error in state
+                error_msg = f"Parallel node '{node.id}' failed: {e}"
+                state["_error"] = error_msg
 
                 if emitter and hasattr(emitter, "emit_node_error"):
                     emitter.emit_node_error(
@@ -816,6 +943,21 @@ class NodeExecutorFactory:
                         node_name=node_name,
                         duration=duration,
                     )
+
+                # Raise WorkflowExecutionError if not continuing on error
+                if not node.continue_on_error:
+                    raise WorkflowExecutionError(
+                        error_msg,
+                        workflow_id=workflow_id,
+                        node_id=node.id,
+                        node_type="parallel",
+                        checkpoint_id=checkpoint_id,
+                        execution_context={
+                            "duration": duration,
+                            "branches": len(node.branches) if hasattr(node, "branches") else 0,
+                        },
+                        correlation_id=correlation_id,
+                    ) from e
 
             return state
 
@@ -1022,9 +1164,20 @@ class NodeExecutorFactory:
                 return merged_state
 
             except Exception as e:
-                logger.error(f"Team node '{node.id}' failed: {e}", exc_info=True)
                 duration = time.time() - start_time
-                state["_error"] = f"Team node '{node.id}' failed: {e}"
+                correlation_id = str(uuid.uuid4())[:8]
+                workflow_id = state.get("_workflow_name", "unknown")
+                checkpoint_id = state.get("_checkpoint_id") or state.get("thread_id")
+
+                # Log with correlation ID
+                logger.error(
+                    f"[{correlation_id}] Team node '{node.id}' failed in workflow '{workflow_id}': {e}",
+                    exc_info=True,
+                )
+
+                # Store error in state
+                error_msg = f"Team node '{node.id}' failed: {e}"
+                state["_error"] = error_msg
                 if "_node_results" not in state:
                     state["_node_results"] = {}
                 state["_node_results"][node.id] = NodeExecutionResult(
@@ -1043,8 +1196,23 @@ class NodeExecutorFactory:
                         duration=duration,
                     )
 
-                # Return state with error
-                return state if node.continue_on_error else state
+                # Raise WorkflowExecutionError if not continuing on error
+                if not node.continue_on_error:
+                    raise WorkflowExecutionError(
+                        error_msg,
+                        workflow_id=workflow_id,
+                        node_id=node.id,
+                        node_type="team",
+                        checkpoint_id=checkpoint_id,
+                        execution_context={
+                            "duration": duration,
+                            "team_formation": node.formation if hasattr(node, "formation") else "unknown",
+                        },
+                        correlation_id=correlation_id,
+                    ) from e
+
+                # Return state with error if continuing on error
+                return state
 
         return execute_team
 
@@ -1252,7 +1420,7 @@ class UnifiedWorkflowCompiler:
         self,
         definition_cache: Optional["WorkflowDefinitionCache"] = None,
         execution_cache: Optional["WorkflowCacheManager"] = None,
-        orchestrator: Optional["AgentOrchestrator"] = None,
+        orchestrator: Optional["WorkflowAgentProtocol"] = None,
         tool_registry: Optional["ToolRegistry"] = None,
         runner_registry: Optional["NodeRunnerRegistry"] = None,
         emitter: Optional[Any] = None,  # ObservabilityEmitter
@@ -1492,7 +1660,11 @@ class UnifiedWorkflowCompiler:
         # Handle dict or single workflow result
         if isinstance(result, dict):
             if not result:
-                raise ValueError(f"No workflows found in {yaml_path}")
+                raise ConfigurationValidationError(
+                    message=f"No workflows found in YAML file",
+                    config_key=str(yaml_path),
+                    recovery_hint=f"Check that the YAML file contains at least one workflow definition. Ensure the 'workflows:' key exists."
+                )
             workflow_def = next(iter(result.values()))
         else:
             workflow_def = result
@@ -1594,13 +1766,33 @@ class UnifiedWorkflowCompiler:
             CachedCompiledGraph ready for execution
 
         Raises:
-            ValueError: If workflow validation fails
+            ConfigurationValidationError: If workflow validation fails
         """
         # Validate if configured
         if self._config.validate_before_compile:
             errors = definition.validate()
             if errors:
-                raise ValueError(f"Workflow validation failed: {'; '.join(errors)}")
+                # Extract field names from error messages for better error reporting
+                invalid_fields = []
+                field_errors = {}
+                for error in errors:
+                    # Try to extract field name from error message
+                    # Format: "Node 'node_id' has error" or "Field 'field_name' error"
+                    import re
+                    match = re.search(r"'([^']+)'", error)
+                    if match:
+                        field_name = match.group(1)
+                        invalid_fields.append(field_name)
+                        field_errors[field_name] = error
+
+                raise ConfigurationValidationError(
+                    message=f"Workflow '{definition.name}' validation failed with {len(errors)} error(s)",
+                    config_key=definition.name,
+                    invalid_fields=invalid_fields,
+                    field_errors=field_errors,
+                    validation_errors=errors,
+                    recovery_hint=f"Fix validation errors in workflow '{definition.name}'. Use 'victor workflow validate <path>' to check."
+                )
 
         # Generate cache key if not provided
         if not cache_key:
@@ -1839,7 +2031,11 @@ def compile_workflow(
             return compiler.compile_yaml(Path(source), workflow_name, **kwargs)
         else:
             if not workflow_name:
-                raise ValueError("workflow_name required for YAML content")
+                raise ConfigurationValidationError(
+                    message="workflow_name required for YAML content",
+                    config_key="<yaml_content>",
+                    recovery_hint="Provide workflow_name parameter when compiling YAML content string."
+                )
             return compiler.compile_yaml_content(source, workflow_name, **kwargs)
     else:
         # Assume WorkflowDefinition

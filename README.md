@@ -25,6 +25,9 @@
 - **Multi-Agent Teams** - Coordinate specialized agents for complex tasks
 - **MCP Protocol Support** - Model Context Protocol for IDE integration
 - **Provider Switching** - Change models mid-conversation without losing context
+- **Multi-Provider Workflows** - Use different providers for optimal cost/quality balance
+- **Plugin System** - Extend workflow compilation with custom sources (JSON, S3, databases)
+- **Coordinator Architecture** - Modular, testable orchestrator design (experimental)
 
 ## At a glance
 
@@ -34,6 +37,49 @@
                                       |                     +--> Local: Ollama, LM Studio, vLLM
                                       +--> Files, tests, git       Cloud: Anthropic, OpenAI, etc
 ```
+
+## Architecture
+
+Victor uses a **two-layer coordinator architecture** that separates application-specific orchestration from framework-agnostic workflow infrastructure:
+
+### Application Layer (`victor/agent/coordinators/`)
+
+Manages the AI agent conversation lifecycle with Victor-specific business logic:
+
+- **ChatCoordinator**: LLM chat operations and streaming
+- **ToolCoordinator**: Tool validation, execution, and budget enforcement
+- **ContextCoordinator**: Context management and compaction strategies
+- **AnalyticsCoordinator**: Session metrics and analytics collection
+- **PromptCoordinator**: System prompt building from contributors
+- **SessionCoordinator**: Conversation session lifecycle
+- **ProviderCoordinator**: Provider switching and management
+- **ModeCoordinator**: Agent modes (build, plan, explore)
+- **ToolSelectionCoordinator**: Semantic tool selection
+- **CheckpointCoordinator**: Workflow checkpoint management
+- **EvaluationCoordinator**: LLM evaluation and benchmarking
+- **MetricsCoordinator**: System metrics collection
+
+### Framework Layer (`victor/framework/coordinators/`)
+
+Provides domain-agnostic workflow infrastructure reusable across all verticals:
+
+- **YAMLWorkflowCoordinator**: YAML workflow loading and execution
+- **GraphExecutionCoordinator**: StateGraph/CompiledGraph execution
+- **HITLCoordinator**: Human-in-the-loop workflow integration
+- **CacheCoordinator**: Workflow caching system
+
+### Key Benefits
+
+- **Single Responsibility**: Each coordinator has one clear purpose
+- **Layered Design**: Application layer builds on framework foundation
+- **Reusability**: Framework coordinators work across all verticals (Coding, DevOps, RAG, DataAnalysis, Research)
+- **Testability**: Coordinators can be tested independently
+- **Maintainability**: Clear boundaries reduce coupling
+
+**For detailed architecture documentation**, see:
+- [Coordinator Architecture](docs/architecture/coordinator_separation.md) - Two-layer design principles
+- [Architecture Diagrams](docs/architecture/diagrams/coordinators.mmd) - Visual representations
+- [Architecture Overview](ARCHITECTURE.md) - System overview and components
 
 ## Choose your path
 
@@ -52,6 +98,39 @@
 | **Local model** | `pipx install victor-ai`<br>`ollama pull qwen2.5-coder:7b`<br>`victor chat "Hello"` | Privacy, offline, free tier |
 | **Cloud model** | `pipx install victor-ai`<br>`export ANTHROPIC_API_KEY=...`<br>`victor chat --provider anthropic` | Max capability |
 | **Docker** | `docker pull ghcr.io/vjsingh1984/victor:latest`<br>`docker run -it -v ~/.victor:/root/.victor ghcr.io/vjsingh1984/victor:latest` | Isolated env |
+
+## Optional Dependencies
+
+Victor supports several optional dependency groups for extended functionality:
+
+### Development Tools
+```bash
+pip install victor-ai[dev]  # Testing, linting, type checking
+```
+
+### API Server
+```bash
+pip install victor-ai[api]  # FastAPI server for IDE integrations
+```
+
+### Checkpoint Persistence
+```bash
+pip install victor-ai[checkpoints]  # SQLite backend for workflow checkpoints
+```
+
+### Language Grammars
+```bash
+pip install victor-ai[lang-all]  # All tree-sitter language grammars
+pip install victor-ai[lang-c]  # C language support
+pip install victor-ai[lang-web]  # HTML, CSS, JavaScript
+```
+
+### Experimental Features
+```bash
+pip install victor-ai[vector-experimental]  # Experimental vector stores (ProximaDB)
+```
+
+**Note**: Victor includes LanceDB as the default vector store for semantic code search and conversation embeddings. The `vector-experimental` group provides additional vector stores like ProximaDB, which are optional and not required for core functionality.
 
 ## Supported Providers
 
@@ -122,6 +201,18 @@ agent = await Agent.create(
 session = agent.chat()
 await session.send("What files are in this project?")
 await session.send("Now explain the main entry point")
+
+# Multi-provider workflow (cost optimization)
+from victor import Agent
+
+# Use different providers for different tasks
+brainstormer = await Agent.create(provider="ollama", model="qwen2.5-coder:7b")  # FREE
+implementer = await Agent.create(provider="openai", model="gpt-4o-mini")  # CHEAP
+reviewer = await Agent.create(provider="anthropic", model="claude-sonnet-4-5")  # QUALITY
+
+ideas = await brainstormer.run("Brainstorm 3 feature ideas")
+code = await implementer.run(f"Implement: {ideas.content[0]}")
+review = await reviewer.run(f"Review this code: {code.content}")
 ```
 
 ### StateGraph Workflows
@@ -151,10 +242,13 @@ result = await compiled.invoke({"query": "AI trends 2025"})
 | Capability | What it means | Docs |
 |------------|---------------|------|
 | **Provider switching** | Change models mid-thread without losing context | [Provider switching](docs/user-guide/index.md#1-provider-switching) |
+| **Multi-provider workflows** | Use different providers for cost/quality optimization | [Multi-provider guide](docs/features/multi_provider_workflows.md) |
 | **Workflows** | YAML DSL for multi-step automation | [Workflow development](docs/guides/workflow-development/) |
+| **Plugins** | Custom workflow compilers (JSON, S3, databases) | [Plugin development](docs/features/plugin_development.md) |
 | **Multi-agent teams** | Coordinate specialized agents | [Multi-agent](docs/guides/multi-agent/) |
 | **Tooling** | File ops, git, tests, search, web | [Tool catalog](docs/reference/tools/) |
 | **Verticals** | Domain-focused assistants | [Verticals](docs/reference/verticals/) |
+| **Coordinator mode** | Modular orchestrator architecture | [Coordinator guide](docs/features/orchestrator_modes.md) |
 
 ## Command quick reference
 
@@ -180,7 +274,15 @@ result = await compiled.invoke({"query": "AI trends 2025"})
 ## Documentation
 
 - [Getting Started](docs/getting-started/)
+- [Quick Start Guides](docs/quickstart/)
+  - [Multi-Provider Workflows](docs/quickstart/multi_provider_quickstart.md)
+  - [Plugin Development](docs/quickstart/plugin_development_quickstart.md)
+  - [Coordinator Mode](docs/quickstart/coordinator_mode_quickstart.md)
 - [User Guide](docs/user-guide/)
+- [Features](docs/features/)
+  - [Multi-Provider Workflows](docs/features/multi_provider_workflows.md)
+  - [Plugin Development](docs/features/plugin_development.md)
+  - [Orchestrator Modes](docs/features/orchestrator_modes.md)
 - [Guides](docs/guides/)
 - [Reference](docs/reference/)
 - [Operations](docs/operations/)

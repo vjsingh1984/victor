@@ -29,26 +29,70 @@ Architecture (Phase 2.3 - SRP Compliance):
     - VerticalExtensionLoader: Extension loading and caching
     - VerticalWorkflowProvider: Workflow and handler providers
 
-Example:
-    class MyCustomVertical(VerticalBase):
-        name = "my_vertical"
-        description = "Custom assistant for X"
+YAML Configuration (NEW):
+    Verticals can now define their configuration in YAML files instead of
+    implementing multiple get_* methods. This reduces boilerplate by ~90%.
 
-        @classmethod
-        def get_tools(cls) -> List[str]:
-            return ["read", "write", "custom_tool"]
+    YAML Configuration Priority:
+        1. If vertical.yaml exists, load from YAML
+        2. Otherwise, fall back to programmatic get_* methods
+        3. YAML loading failures fall back to programmatic methods with a warning
 
-        @classmethod
-        def get_system_prompt(cls) -> str:
-            return "You are an expert in X..."
+    YAML File Location:
+        victor/{vertical_name}/config/vertical.yaml (preferred)
+        victor/{vertical_name}/vertical.yaml (fallback)
+
+    Example YAML (victor/coding/config/vertical.yaml):
+        metadata:
+          name: coding
+          description: Software development assistant
+          version: "2.0.0"
+
+        core:
+          tools:
+            list: [read, write, edit, code_search]
+          system_prompt:
+            source: inline
+            text: "You are an expert software developer..."
+          stages:
+            INITIAL:
+              name: INITIAL
+              description: Understanding the request
+              tools: [read, ls]
+              keywords: [what, how]
+              next_stages: [PLANNING]
+
+        provider:
+          hints:
+            preferred: [anthropic, openai]
+
+    Programmatic Example (Legacy):
+        class MyCustomVertical(VerticalBase):
+            name = "my_vertical"
+            description = "Custom assistant for X"
+
+            @classmethod
+            def get_tools(cls) -> List[str]:
+                return ["read", "write", "custom_tool"]
+
+            @classmethod
+            def get_system_prompt(cls) -> str:
+                return "You are an expert in X..."
+
+    Backward Compatibility:
+        All existing verticals work unchanged. The programmatic get_* methods
+        are used as fallback when YAML is not available. To disable YAML loading
+        for a specific call, use: get_config(use_yaml=False)
 """
 
 from __future__ import annotations
 
 import logging
+import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Dict, List, Optional, Set, Type, TYPE_CHECKING
+from pathlib import Path
+from typing import Any, ClassVar, Dict, KeysView, List, Optional, Set, Type, TYPE_CHECKING, Union
 
 from victor.framework.tools import ToolSet
 
@@ -59,6 +103,8 @@ from victor.core.verticals.workflow_provider import VerticalWorkflowProvider
 
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import VerticalExtensions
+    from importlib.metadata import EntryPoint
+    from victor.core.verticals.extension_registry import ExtensionRegistry
 
 # Import StageDefinition from core for centralized definition
 # Re-export for backward compatibility
@@ -117,7 +163,7 @@ class VerticalConfig:
             "metadata": self.metadata,
         }
 
-    def keys(self):
+    def keys(self) -> KeysView[str]:
         """Return keys for dict-like access compatibility.
 
         Returns:
@@ -175,18 +221,44 @@ class VerticalBase(
       prompt_contributor, mode_config, tool_deps, etc.)
     - VerticalWorkflowProvider: Workflow and handler providers
 
+    YAML Configuration (NEW):
+        Verticals can now define configuration in YAML files instead of
+        implementing get_* methods. Place vertical.yaml in:
+        - victor/{vertical_name}/config/vertical.yaml (preferred)
+        - victor/{vertical_name}/vertical.yaml (fallback)
+
+        YAML config is loaded automatically when available. Set use_yaml=False
+        in get_config() to disable YAML loading.
+
     Subclasses must override:
     - name: Vertical identifier
     - description: Human-readable description
-    - get_tools(): List of tool names
-    - get_system_prompt(): System prompt text
+    - get_tools(): List of tool names (used as fallback if no YAML)
+    - get_system_prompt(): System prompt text (used as fallback if no YAML)
 
     Optional overrides:
-    - get_stages(): Stage definitions
+    - get_stages(): Stage definitions (used as fallback if no YAML)
     - customize_config(): Hook for final config customization
     - Extension methods: get_middleware(), get_safety_extension(), etc.
 
-    Example:
+    Example (YAML-first):
+        # victor/coding/config/vertical.yaml
+        metadata:
+          name: coding
+          description: Software development assistant
+        core:
+          tools:
+            list: [read, write, edit]
+          system_prompt:
+            source: inline
+            text: "You are an expert developer..."
+
+        # victor/coding/assistant.py
+        class CodingAssistant(VerticalBase):
+            name = "coding"
+            # Config loaded from YAML automatically!
+
+    Example (Legacy/Programmatic):
         class SecurityAuditor(VerticalBase):
             name = "security_auditor"
             description = "Security vulnerability analysis"
@@ -213,7 +285,8 @@ class VerticalBase(
     Backward Compatibility:
         All methods from the original VerticalBase are preserved through
         inheritance from the focused provider classes. Existing verticals
-        that inherit from VerticalBase require no changes.
+        that inherit from VerticalBase require no changes. YAML config is
+        optional and programmatic get_* methods work as fallback.
     """
 
     # Config cache (keyed by class name, stores VerticalConfig)
@@ -428,15 +501,22 @@ class VerticalBase(
     # =========================================================================
 
     @classmethod
-    def get_config(cls, *, use_cache: bool = True) -> VerticalConfig:
+    def get_config(cls, *, use_cache: bool = True, use_yaml: bool = True) -> VerticalConfig:
         """Get the complete configuration for this vertical.
 
         This is the main template method that assembles the configuration
         by calling the various override points.
 
+        YAML Configuration Priority:
+            1. If use_yaml=True and vertical.yaml exists, load from YAML
+            2. Otherwise, fall back to programmatic get_* methods
+            3. YAML loading failures fall back to programmatic methods with a warning
+
         Args:
             use_cache: If True (default), return cached config if available.
                        Set to False to force rebuild.
+            use_yaml: If True (default), attempt to load config from YAML file.
+                     Set to False to skip YAML and use programmatic methods only.
 
         Returns:
             Complete VerticalConfig for agent creation.
@@ -447,12 +527,115 @@ class VerticalBase(
         if use_cache and cache_key in cls._config_cache:
             return cls._config_cache[cache_key]
 
+        # Try YAML configuration first (if enabled)
+        config = None
+        if use_yaml:
+            config = cls._load_config_from_yaml()
+
+        # Fallback to programmatic methods
+        if config is None:
+            config = cls._build_config_from_methods()
+
+        # Allow final customization
+        config = cls.customize_config(config)
+
+        # Cache the config
+        cls._config_cache[cache_key] = config
+        return config
+
+    @classmethod
+    def _get_yaml_config_path(cls) -> Optional[Path]:
+        """Get the path to the YAML configuration file for this vertical.
+
+        Searches for vertical.yaml in the following locations:
+        1. victor/{vertical_name}/config/vertical.yaml (preferred)
+        2. victor/{vertical_name}/vertical.yaml (fallback)
+
+        Returns:
+            Path to YAML file if found, None otherwise
+        """
+        from pathlib import Path
+
+        # Try to find the module's directory
+        module_dir = None
+
+        # Method 1: Try using __file__ from the module
+        try:
+            module = sys.modules.get(cls.__module__)
+            if module and hasattr(module, "__file__") and module.__file__:
+                module_file = module.__file__
+                module_dir = Path(module_file).parent
+        except (AttributeError, KeyError, TypeError):
+            pass
+
+        # Method 2: Try using the class's module path string
+        if module_dir is None or not module_dir.exists():
+            # Convert module path to file path (e.g., victor.coding -> victor/coding)
+            module_path_str = cls.__module__.replace(".", "/")
+            module_dir = Path(module_path_str)
+
+        # Check for config/vertical.yaml (preferred location)
+        yaml_path = module_dir / "config" / "vertical.yaml"
+        if yaml_path.exists():
+            return yaml_path
+
+        # Check for vertical.yaml in vertical root (fallback)
+        yaml_path = module_dir / "vertical.yaml"
+        if yaml_path.exists():
+            return yaml_path
+
+        return None
+
+    @classmethod
+    def _load_config_from_yaml(cls) -> Optional[VerticalConfig]:
+        """Load configuration from YAML file.
+
+        Attempts to load vertical.yaml for this vertical. If loading fails
+        for any reason, returns None and logs a warning.
+
+        Returns:
+            VerticalConfig if YAML loaded successfully, None otherwise
+        """
+        yaml_path = cls._get_yaml_config_path()
+        if yaml_path is None:
+            return None
+
+        try:
+            from victor.core.verticals.config import VerticalConfigLoader
+
+            loader = VerticalConfigLoader()
+            config = loader.load_from_yaml(yaml_path)
+
+            if config is not None:
+                logger.info(f"Loaded YAML config for {cls.name} from {yaml_path}")
+                return config
+            else:
+                logger.warning(f"Failed to load YAML config from {yaml_path}")
+                return None
+
+        except Exception as e:
+            logger.warning(
+                f"Error loading YAML config for {cls.name} from {yaml_path}: {e}. "
+                f"Falling back to programmatic methods."
+            )
+            return None
+
+    @classmethod
+    def _build_config_from_methods(cls) -> VerticalConfig:
+        """Build configuration from programmatic get_* methods.
+
+        This is the legacy approach that calls the various get_* methods
+        to build the configuration.
+
+        Returns:
+            VerticalConfig built from programmatic methods
+        """
         # Build tool set
         tool_names = cls.get_tools()
         tools = ToolSet.from_tools(tool_names)
 
         # Build config
-        config = VerticalConfig(
+        return VerticalConfig(
             tools=tools,
             system_prompt=cls.get_system_prompt(),
             stages=cls.get_stages(),
@@ -464,13 +647,6 @@ class VerticalBase(
                 "description": cls.description,
             },
         )
-
-        # Allow final customization
-        config = cls.customize_config(config)
-
-        # Cache the config
-        cls._config_cache[cache_key] = config
-        return config
 
     @classmethod
     def clear_config_cache(cls, *, clear_all: bool = False) -> None:
@@ -596,7 +772,9 @@ class VerticalBase(
     # =========================================================================
 
     @classmethod
-    def get_mode_config(cls, mode_name: str):
+    def get_mode_config(  # type: ignore[override]
+        cls, mode_name: str
+    ) -> Any:  # AgentMode
         """Get mode configuration from centralized registry.
 
         This replaces the legacy get_mode_config() method with a canonical
@@ -640,7 +818,7 @@ class VerticalBase(
     # =========================================================================
 
     @classmethod
-    def get_rl_config(cls):
+    def get_rl_config(cls) -> Any:  # RLConfig
         """Get RL configuration from centralized registry.
 
         This provides data-driven RL configuration that complements the
@@ -664,7 +842,7 @@ class VerticalBase(
     # =========================================================================
 
     @classmethod
-    def get_capabilities(cls):
+    def get_capabilities(cls) -> Any:  # VerticalCapabilities
         """Get capability configurations from centralized registry.
 
         This provides data-driven capability configuration that complements
@@ -694,14 +872,14 @@ class VerticalBase(
             List of capability names available for this vertical.
         """
         caps = cls.get_capabilities()
-        return caps.list_capabilities()
+        return caps.list_capabilities()  # type: ignore[no-any-return]
 
     # =========================================================================
     # Capability Provider (Canonical - using CapabilityLoader)
     # =========================================================================
 
     @classmethod
-    def get_capability_provider(cls):
+    def get_capability_provider(cls) -> Any:  # CapabilitySet
         """Get capability provider for this vertical.
 
         This provides access to the centralized CapabilityLoader with YAML-based
@@ -744,7 +922,7 @@ class VerticalBase(
     # =========================================================================
 
     @classmethod
-    def get_team_provider(cls):
+    def get_team_provider(cls) -> Any:  # BaseYAMLTeamProvider
         """Get team provider for this vertical.
 
         This provides access to the centralized BaseYAMLTeamProvider with
@@ -763,7 +941,7 @@ class VerticalBase(
         return BaseYAMLTeamProvider.get_provider(cls.name)
 
     @classmethod
-    def get_team(cls, team_name: str):
+    def get_team(cls, team_name: str) -> Any:  # TeamSpecification | None
         """Get specific team specification.
 
         Args:
@@ -792,7 +970,7 @@ class VerticalBase(
             # ["code_review_team", "feature_implementation_team"]
         """
         provider = cls.get_team_provider()
-        return provider.list_teams()
+        return provider.list_teams()  # type: ignore[no-any-return]
 
     @classmethod
     async def create_agent(
@@ -811,7 +989,7 @@ class VerticalBase(
         Returns:
             Configured Agent instance.
         """
-        from victor.framework import Agent
+        from victor.framework.agent import Agent
 
         config = cls.get_config()
         agent_kwargs = config.to_agent_kwargs()
@@ -962,7 +1140,9 @@ class VerticalRegistry:
         except TypeError:
             # Fallback for older Python versions (shouldn't happen with Python 3.10+)
             all_eps = entry_points()
-            eps = all_eps.get(cls.ENTRY_POINT_GROUP, [])
+            # Type ignore for compatibility with different importlib.metadata versions
+            eps_list: Any = all_eps.get(cls.ENTRY_POINT_GROUP, [])
+            eps = eps_list if isinstance(eps_list, list) else list(eps_list)  # type: ignore[assignment]
 
         for ep in eps:
             try:

@@ -21,6 +21,7 @@ import logging
 from rich.panel import Panel
 from rich.table import Table
 
+from victor.ui.common.constants import FIRST_ARG_INDEX, MODEL_PART_INDEX, PROVIDER_PART_INDEX
 from victor.ui.slash.protocol import BaseSlashCommand, CommandContext, CommandMetadata
 from victor.ui.slash.registry import register_command
 
@@ -89,15 +90,15 @@ class SwitchCommand(BaseSlashCommand):
             return
 
         # Parse model/provider argument
-        target = args[0]
+        target = args[FIRST_ARG_INDEX]
         provider = None
         model = None
 
         if ":" in target:
             # Format: provider:model
             parts = target.split(":", 1)
-            provider = parts[0]
-            model = parts[1]
+            provider = parts[PROVIDER_PART_INDEX]
+            model = parts[MODEL_PART_INDEX]
         else:
             # Just model name - use current provider
             model = target

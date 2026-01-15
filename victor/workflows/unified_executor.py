@@ -56,7 +56,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    from victor.protocols import WorkflowAgentProtocol
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import WorkflowDefinition
     from victor.workflows.yaml_to_graph_compiler import (
@@ -165,8 +165,8 @@ class StateGraphExecutor:
 
     def __init__(
         self,
-        orchestrator: Optional["AgentOrchestrator"] = None,
-        orchestrators: Optional[Dict[str, "AgentOrchestrator"]] = None,
+        orchestrator: Optional["WorkflowAgentProtocol"] = None,
+        orchestrators: Optional[Dict[str, "WorkflowAgentProtocol"]] = None,
         tool_registry: Optional["ToolRegistry"] = None,
         config: Optional[ExecutorConfig] = None,
     ):
@@ -362,7 +362,7 @@ _default_executor: Optional[StateGraphExecutor] = None
 
 
 def get_executor(
-    orchestrator: Optional["AgentOrchestrator"] = None,
+    orchestrator: Optional["WorkflowAgentProtocol"] = None,
     config: Optional[ExecutorConfig] = None,
 ) -> StateGraphExecutor:
     """Get or create the default StateGraph executor.
@@ -388,7 +388,7 @@ async def execute_workflow(
     workflow: "WorkflowDefinition",
     initial_context: Optional[Dict[str, Any]] = None,
     *,
-    orchestrator: Optional["AgentOrchestrator"] = None,
+    orchestrator: Optional["WorkflowAgentProtocol"] = None,
     thread_id: Optional[str] = None,
 ) -> ExecutorResult:
     """Execute a workflow using the StateGraph executor.

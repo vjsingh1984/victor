@@ -339,6 +339,22 @@ from victor.workflows.unified_compiler import (
     UnifiedWorkflowCompiler,
     create_unified_compiler,
 )
+from victor.workflows.create import (
+    create_compiler,
+    register_scheme_alias,
+    list_supported_schemes,
+    is_scheme_supported,
+    get_default_scheme,
+    set_default_scheme,
+)
+from victor.workflows.compiler_registry import (
+    WorkflowCompilerRegistry,
+    register_compiler,
+    unregister_compiler,
+    get_compiler,
+    is_registered,
+    list_compilers,
+)
 
 # Register framework handlers on module load
 # Domain-specific handlers are registered by each vertical when loaded
@@ -594,4 +610,18 @@ __all__ = [
     # Unified Compiler (Consistent Compilation and Caching)
     "UnifiedWorkflowCompiler",
     "create_unified_compiler",
+    # Plugin Creation API
+    "create_compiler",
+    "register_scheme_alias",
+    "list_supported_schemes",
+    "is_scheme_supported",
+    "get_default_scheme",
+    "set_default_scheme",
+    # Plugin Registry
+    "WorkflowCompilerRegistry",
+    "register_compiler",
+    "unregister_compiler",
+    "get_compiler",
+    "is_registered",
+    "list_compilers",
 ]

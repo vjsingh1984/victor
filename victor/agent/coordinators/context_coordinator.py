@@ -444,9 +444,399 @@ class TruncationCompactionStrategy(BaseCompactionStrategy):
         return 2000  # Estimate for removing older messages
 
 
+class SummarizationCompactionStrategy(BaseCompactionStrategy):
+    """Compaction strategy that summarizes old messages using LLM.
+
+    This strategy uses an LLM to summarize older messages, preserving
+    important information while reducing token count.
+    """
+
+    def __init__(
+        self,
+        reserve_messages: int = 5,
+        summarize_threshold: int = 1000,
+    ):
+        """Initialize the summarization strategy.
+
+        Args:
+            reserve_messages: Minimum number of recent messages to keep
+            summarize_threshold: Minimum token count to trigger summarization
+        """
+        super().__init__("summarization")
+        self._reserve_messages = reserve_messages
+        self._summarize_threshold = summarize_threshold
+
+    async def can_apply(
+        self,
+        context: CompactionContext,
+        budget: ContextBudget,
+    ) -> bool:
+        """Check if summarization can be applied.
+
+        Only applies if context significantly exceeds budget.
+
+        Args:
+            context: Current conversation context
+            budget: Context budget
+
+        Returns:
+            True if summarization should be applied
+        """
+        token_count = context.get("token_count", 0)
+        max_tokens = budget.get("max_tokens", 4096)
+
+        # Only apply if significantly over budget (by at least threshold)
+        return token_count > max_tokens + self._summarize_threshold
+
+    async def compact(
+        self,
+        context: CompactionContext,
+        budget: ContextBudget,
+    ) -> CompactionResult:
+        """Apply summarization compaction.
+
+        Summarizes older messages and keeps recent messages intact.
+        For testing purposes, creates a simple summary placeholder.
+
+        Args:
+            context: Current conversation context
+            budget: Context budget
+
+        Returns:
+            CompactionResult with summarized context
+        """
+        messages = context.get("messages", [])
+        original_count = len(messages)
+        original_tokens = context.get("token_count", 0)
+
+        if len(messages) <= self._reserve_messages:
+            # Not enough messages to summarize
+            return CompactionResult(
+                compacted_context=context,
+                tokens_saved=0,
+                messages_removed=0,
+                strategy_used=self._name,
+                metadata={"reason": "not_enough_messages"},
+            )
+
+        # Split into old and recent messages
+        old_messages = messages[: -self._reserve_messages]
+        recent_messages = messages[-self._reserve_messages :]
+
+        # Create a summary placeholder
+        # In production, this would use an LLM to summarize
+        summary_message = {
+            "role": "system",
+            "content": f"[Summary of {len(old_messages)} earlier messages compacted]",
+        }
+
+        # Estimate tokens saved (assume 50% reduction for old messages)
+        tokens_per_message = original_tokens / original_count if original_count > 0 else 100
+        old_tokens = int(len(old_messages) * tokens_per_message)
+        summary_tokens = 100  # Rough estimate for summary
+        tokens_saved = old_tokens - summary_tokens
+
+        # Build compacted context
+        compacted_messages = [summary_message] + recent_messages
+        new_tokens = original_tokens - tokens_saved
+
+        compacted_context: CompactionContext = {
+            **context,
+            "messages": compacted_messages,
+            "token_count": new_tokens,
+        }
+
+        return CompactionResult(
+            compacted_context=compacted_context,
+            tokens_saved=tokens_saved,
+            messages_removed=len(old_messages),
+            strategy_used=self._name,
+            metadata={
+                "reserve_messages": self._reserve_messages,
+                "summarized_count": len(old_messages),
+                "original_tokens": original_tokens,
+                "new_tokens": new_tokens,
+            },
+        )
+
+    def estimated_savings(self) -> int:
+        """Estimated token savings.
+
+        Returns higher estimate since summarization is more effective.
+        """
+        return 5000  # Estimate for summarization
+
+
+class SemanticCompactionStrategy(BaseCompactionStrategy):
+    """Compaction strategy that uses semantic similarity to remove redundant messages.
+
+    This strategy removes messages that are semantically similar to each other,
+    preserving diverse content while reducing redundancy.
+    """
+
+    def __init__(
+        self,
+        reserve_messages: int = 8,
+        similarity_threshold: float = 0.85,
+    ):
+        """Initialize the semantic compaction strategy.
+
+        Args:
+            reserve_messages: Minimum number of recent messages to keep
+            similarity_threshold: Similarity threshold for considering messages redundant
+        """
+        super().__init__("semantic")
+        self._reserve_messages = reserve_messages
+        self._similarity_threshold = similarity_threshold
+
+    async def can_apply(
+        self,
+        context: CompactionContext,
+        budget: ContextBudget,
+    ) -> bool:
+        """Check if semantic compaction can be applied.
+
+        Args:
+            context: Current conversation context
+            budget: Context budget
+
+        Returns:
+            True if semantic compaction should be applied
+        """
+        token_count = context.get("token_count", 0)
+        max_tokens = budget.get("max_tokens", 4096)
+
+        # Apply if context exceeds budget
+        return token_count > max_tokens
+
+    async def compact(
+        self,
+        context: CompactionContext,
+        budget: ContextBudget,
+    ) -> CompactionResult:
+        """Apply semantic compaction.
+
+        Removes semantically similar messages while preserving diverse content.
+        For testing purposes, uses simple length-based deduplication.
+
+        Args:
+            context: Current conversation context
+            budget: Context budget
+
+        Returns:
+            CompactionResult with semantically compacted context
+        """
+        messages = context.get("messages", [])
+        original_count = len(messages)
+        original_tokens = context.get("token_count", 0)
+
+        if len(messages) <= self._reserve_messages:
+            return CompactionResult(
+                compacted_context=context,
+                tokens_saved=0,
+                messages_removed=0,
+                strategy_used=self._name,
+                metadata={"reason": "not_enough_messages"},
+            )
+
+        # Simple semantic deduplication based on content length similarity
+        # In production, this would use embeddings
+        seen_signatures = set()
+        compacted_messages = []
+
+        # Always keep recent messages
+        recent_messages = messages[-self._reserve_messages :]
+        compacted_messages.extend(recent_messages)
+
+        # Process older messages, removing similar ones
+        old_messages = messages[: -self._reserve_messages]
+        for msg in old_messages:
+            # Create a simple signature based on content length and first few chars
+            content = msg.get("content", "")
+            signature = (len(content), content[:50] if content else "")
+
+            if signature not in seen_signatures:
+                seen_signatures.add(signature)
+                compacted_messages.insert(0, msg)  # Insert at beginning
+
+        messages_removed = original_count - len(compacted_messages)
+
+        # Estimate new token count
+        if original_count > 0:
+            new_tokens = int(original_tokens * (len(compacted_messages) / original_count))
+        else:
+            new_tokens = 0
+
+        tokens_saved = original_tokens - new_tokens
+
+        compacted_context: CompactionContext = {
+            **context,
+            "messages": compacted_messages,
+            "token_count": new_tokens,
+        }
+
+        return CompactionResult(
+            compacted_context=compacted_context,
+            tokens_saved=tokens_saved,
+            messages_removed=messages_removed,
+            strategy_used=self._name,
+            metadata={
+                "reserve_messages": self._reserve_messages,
+                "similarity_threshold": self._similarity_threshold,
+                "original_tokens": original_tokens,
+                "new_tokens": new_tokens,
+            },
+        )
+
+    def estimated_savings(self) -> int:
+        """Estimated token savings.
+
+        Returns moderate estimate for semantic deduplication.
+        """
+        return 3500  # Estimate for semantic compaction
+
+
+class HybridCompactionStrategy(BaseCompactionStrategy):
+    """Compaction strategy that combines multiple approaches.
+
+    This strategy first applies semantic compaction to remove redundant messages,
+    then applies summarization if still over budget, and finally truncation as
+    a last resort.
+    """
+
+    def __init__(
+        self,
+        reserve_messages: int = 6,
+        summarize_threshold: int = 1000,
+    ):
+        """Initialize the hybrid compaction strategy.
+
+        Args:
+            reserve_messages: Minimum number of recent messages to keep
+            summarize_threshold: Minimum token count to trigger summarization
+        """
+        super().__init__("hybrid")
+        self._reserve_messages = reserve_messages
+        self._summarize_threshold = summarize_threshold
+        # Initialize sub-strategies
+        self._semantic_strategy = SemanticCompactionStrategy(
+            reserve_messages=reserve_messages + 2
+        )
+        self._summarization_strategy = SummarizationCompactionStrategy(
+            reserve_messages=reserve_messages,
+            summarize_threshold=summarize_threshold,
+        )
+        self._truncation_strategy = TruncationCompactionStrategy(
+            reserve_messages=reserve_messages
+        )
+
+    async def can_apply(
+        self,
+        context: CompactionContext,
+        budget: ContextBudget,
+    ) -> bool:
+        """Check if hybrid compaction can be applied.
+
+        Args:
+            context: Current conversation context
+            budget: Context budget
+
+        Returns:
+            True if hybrid compaction should be applied
+        """
+        token_count = context.get("token_count", 0)
+        max_tokens = budget.get("max_tokens", 4096)
+
+        # Apply if context exceeds budget
+        return token_count > max_tokens
+
+    async def compact(
+        self,
+        context: CompactionContext,
+        budget: ContextBudget,
+    ) -> CompactionResult:
+        """Apply hybrid compaction.
+
+        Tries multiple strategies in sequence:
+        1. Semantic compaction (remove redundant messages)
+        2. Summarization (summarize older messages)
+        3. Truncation (remove oldest messages)
+
+        Args:
+            context: Current conversation context
+            budget: Context budget
+
+        Returns:
+            CompactionResult with compacted context
+        """
+        original_tokens = context.get("token_count", 0)
+        max_tokens = budget.get("max_tokens", 4096)
+
+        # Step 1: Try semantic compaction
+        context_after_semantic = context
+        result = await self._semantic_strategy.compact(context, budget)
+
+        if result.compacted_context.get("token_count", 0) <= max_tokens:
+            result.strategy_used = f"{self._name}_semantic"
+            return result
+
+        context_after_semantic = result.compacted_context
+
+        # Step 2: Try summarization
+        result = await self._summarization_strategy.compact(
+            context_after_semantic, budget
+        )
+
+        if result.compacted_context.get("token_count", 0) <= max_tokens:
+            result.strategy_used = f"{self._name}_summarization"
+            return result
+
+        context_after_summarization = result.compacted_context
+
+        # Step 3: Fall back to truncation
+        result = await self._truncation_strategy.compact(
+            context_after_summarization, budget
+        )
+
+        result.strategy_used = f"{self._name}_truncation"
+
+        # Calculate total tokens saved
+        final_tokens = result.compacted_context.get("token_count", 0)
+        total_tokens_saved = original_tokens - final_tokens
+
+        # Update metadata to reflect hybrid approach
+        result.metadata = {
+            **result.metadata,
+            "hybrid_steps": ["semantic", "summarization", "truncation"],
+            "original_tokens": original_tokens,
+            "final_tokens": final_tokens,
+        }
+
+        # Override tokens_saved with total
+        result = CompactionResult(
+            compacted_context=result.compacted_context,
+            tokens_saved=total_tokens_saved,
+            messages_removed=result.messages_removed,
+            strategy_used=result.strategy_used,
+            metadata=result.metadata,
+        )
+
+        return result
+
+    def estimated_savings(self) -> int:
+        """Estimated token savings.
+
+        Returns highest estimate since hybrid combines multiple strategies.
+        """
+        return 7000  # Estimate for hybrid approach
+
+
 __all__ = [
     "ContextCoordinator",
     "ContextCompactionError",
     "BaseCompactionStrategy",
     "TruncationCompactionStrategy",
+    "SummarizationCompactionStrategy",
+    "SemanticCompactionStrategy",
+    "HybridCompactionStrategy",
 ]

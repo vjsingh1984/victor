@@ -20,6 +20,7 @@ import logging
 
 from rich.panel import Panel
 
+from victor.ui.common.constants import FIRST_ARG_INDEX, SECOND_ARG_INDEX
 from victor.ui.slash.protocol import BaseSlashCommand, CommandContext, CommandMetadata
 from victor.ui.slash.registry import register_command
 
@@ -72,7 +73,7 @@ class ModeCommand(BaseSlashCommand):
             )
             return
 
-        mode_name = ctx.args[0].lower()
+        mode_name = ctx.args[FIRST_ARG_INDEX].lower()
         valid_modes = {"build", "plan", "explore"}
 
         if mode_name not in valid_modes:
@@ -178,7 +179,7 @@ class PlanCommand(BaseSlashCommand):
 
         # Check for subcommands
         if ctx.args:
-            subcommand = ctx.args[0].lower()
+            subcommand = ctx.args[FIRST_ARG_INDEX].lower()
             if subcommand == "save":
                 await self._save_plan(ctx)
                 return
@@ -275,7 +276,7 @@ class PlanCommand(BaseSlashCommand):
             store = get_plan_store(Path.cwd())
 
             # Optional custom filename
-            filename = ctx.args[1] if len(ctx.args) > 1 else None
+            filename = ctx.args[SECOND_ARG_INDEX] if len(ctx.args) > 1 else None
             filepath = store.save(current_plan, filename)
 
             ctx.console.print(
@@ -305,7 +306,7 @@ class PlanCommand(BaseSlashCommand):
             )
             return
 
-        plan_id = ctx.args[1]
+        plan_id = ctx.args[SECOND_ARG_INDEX]
 
         try:
             store = get_plan_store(Path.cwd())

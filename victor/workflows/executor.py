@@ -52,7 +52,7 @@ from victor.workflows.resilience import (
 CHAIN_HANDLER_PREFIX = "chain:"
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    from victor.protocols import WorkflowAgentProtocol
     from victor.agent.subagents import SubAgentOrchestrator
     from victor.framework.rl.checkpoint_store import CheckpointStore
     from victor.tools.registry import ToolRegistry
@@ -440,7 +440,7 @@ class WorkflowExecutor:
 
     def __init__(
         self,
-        orchestrator: "AgentOrchestrator",
+        orchestrator: "WorkflowAgentProtocol",
         *,
         max_parallel: int = 4,
         default_timeout: float = 300.0,

@@ -534,7 +534,7 @@ class GoogleAdapter(BaseProviderAdapter):
                         _ToolCall(
                             id=call.get("id", f"call_{i}"),
                             name=call.get("name", ""),
-                            arguments=call.get("args", call.get("arguments", {})),
+                            arguments=call.get("args", call.get("arguments", {})) or {},
                             raw=call,
                         )
                     )

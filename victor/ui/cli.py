@@ -16,38 +16,45 @@
 
 import typer
 from rich.console import Console
-from typing import Optional
+from typing import Optional, Any, Callable
+import importlib
 
 from victor import __version__
-from victor.ui.commands.benchmark import benchmark_app
-from victor.ui.commands.capabilities import capabilities_app
-from victor.ui.commands.chat import chat_app, _run_default_interactive
-from victor.ui.commands.checkpoint import checkpoint_app
-from victor.ui.commands.config import config_app
-from victor.ui.commands.dashboard import dashboard_app
-from victor.ui.commands.docs import docs_app
-from victor.ui.commands.embeddings import embeddings_app
-from victor.ui.commands.examples import examples_app
-from victor.ui.commands.experiments import experiment_app
-from victor.ui.commands.fep import fep_app
-from victor.ui.commands.index import index_app
-from victor.ui.commands.init import init_app
-from victor.ui.commands.keys import keys_app
-from victor.ui.commands.mcp import mcp_app
-from victor.ui.commands.memory import memory_app
-from victor.ui.commands.models import models_app
-from victor.ui.commands.profiles import profiles_app
-from victor.ui.commands.providers import providers_app
-from victor.ui.commands.rag import rag_app
-from victor.ui.commands.security import security_app
-from victor.ui.commands.serve import serve_app
-from victor.ui.commands.test_provider import test_provider_app
-from victor.ui.commands.tools import tools_app
-from victor.ui.commands.scaffold import scaffold_app
-from victor.ui.commands.scheduler import scheduler_app
-from victor.ui.commands.sessions import sessions_app
-from victor.ui.commands.vertical import vertical_app
-from victor.ui.commands.workflow import workflow_app
+
+
+class LazyTyper:
+    """Lazy loading wrapper for Typer subcommands.
+
+    This class defers importing command modules until they are actually needed,
+    significantly improving CLI startup time.
+    """
+
+    def __init__(self, import_path: str) -> None:
+        """Initialize lazy loader.
+
+        Args:
+            import_path: Module path in format "module.submodule:attribute"
+        """
+        self.import_path = import_path
+        self._module = None
+        self._typer_instance = None
+
+    def _load(self) -> typer.Typer:
+        """Load the actual Typer instance on first access."""
+        if self._typer_instance is None:
+            module_path, attr_name = self.import_path.split(":")
+            module = importlib.import_module(module_path)
+            self._typer_instance = getattr(module, attr_name)
+        return self._typer_instance
+
+    def __getattr__(self, name: str) -> Any:
+        """Proxy attribute access to the wrapped Typer instance."""
+        return getattr(self._load(), name)
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        """Proxy callable to the wrapped Typer instance."""
+        return self._load()(*args, **kwargs)
+
 
 app = typer.Typer(
     name="victor",
@@ -55,37 +62,75 @@ app = typer.Typer(
     add_completion=False,
 )
 
-# Register all the subcommands
-app.add_typer(benchmark_app)
-app.add_typer(capabilities_app)
-app.add_typer(chat_app)
-app.add_typer(checkpoint_app)
-app.add_typer(config_app)
-app.add_typer(dashboard_app)
-app.add_typer(docs_app)
-app.add_typer(embeddings_app)
-app.add_typer(examples_app)
-app.add_typer(experiment_app)
-app.add_typer(fep_app)
-app.add_typer(index_app)
-app.add_typer(init_app)
-app.add_typer(keys_app)
-app.add_typer(mcp_app)
-app.add_typer(memory_app)
-app.add_typer(models_app)
-app.add_typer(profiles_app)
-app.add_typer(providers_app)
-app.add_typer(rag_app)
-app.add_typer(security_app)
-app.add_typer(serve_app)
-app.add_typer(test_provider_app)
-app.add_typer(tools_app)
-# Register scaffold_app as "vertical scaffold" subcommand under vertical_app
-vertical_app.add_typer(scaffold_app, name="scaffold")
-app.add_typer(scheduler_app)
-app.add_typer(sessions_app)
-app.add_typer(vertical_app)
-app.add_typer(workflow_app)
+# Lazy load all commands to improve startup time
+# Commands are only imported when actually invoked
+# Format: LazyTyper("module.path:typer_instance")
+app.add_typer(LazyTyper("victor.ui.commands.benchmark:benchmark_app"))
+app.add_typer(LazyTyper("victor.ui.commands.capabilities:capabilities_app"))
+app.add_typer(LazyTyper("victor.ui.commands.chat:chat_app"))
+app.add_typer(LazyTyper("victor.ui.commands.checkpoint:checkpoint_app"))
+app.add_typer(LazyTyper("victor.ui.commands.config:config_app"))
+app.add_typer(LazyTyper("victor.ui.commands.dashboard:dashboard_app"))
+app.add_typer(LazyTyper("victor.ui.commands.docs:docs_app"))
+app.add_typer(LazyTyper("victor.ui.commands.embeddings:embeddings_app"))
+app.add_typer(LazyTyper("victor.ui.commands.errors:errors_app"))
+app.add_typer(LazyTyper("victor.ui.commands.examples:examples_app"))
+app.add_typer(LazyTyper("victor.ui.commands.experiments:experiment_app"))
+app.add_typer(LazyTyper("victor.ui.commands.fep:fep_app"))
+app.add_typer(LazyTyper("victor.ui.commands.index:index_app"))
+app.add_typer(LazyTyper("victor.ui.commands.init:init_app"))
+app.add_typer(LazyTyper("victor.ui.commands.keys:keys_app"))
+app.add_typer(LazyTyper("victor.ui.commands.mcp:mcp_app"))
+app.add_typer(LazyTyper("victor.ui.commands.memory:memory_app"))
+app.add_typer(LazyTyper("victor.ui.commands.models:models_app"))
+app.add_typer(LazyTyper("victor.ui.commands.profiles:profiles_app"))
+app.add_typer(LazyTyper("victor.ui.commands.providers:providers_app"))
+app.add_typer(LazyTyper("victor.ui.commands.rag:rag_app"))
+app.add_typer(LazyTyper("victor.ui.commands.security:security_app"))
+app.add_typer(LazyTyper("victor.ui.commands.serve:serve_app"))
+app.add_typer(LazyTyper("victor.ui.commands.test_provider:test_provider_app"))
+app.add_typer(LazyTyper("victor.ui.commands.tools:tools_app"))
+app.add_typer(LazyTyper("victor.ui.commands.scheduler:scheduler_app"))
+app.add_typer(LazyTyper("victor.ui.commands.sessions:sessions_app"))
+vertical_lazy = LazyTyper("victor.ui.commands.vertical:vertical_app")
+app.add_typer(vertical_lazy)
+app.add_typer(LazyTyper("victor.ui.commands.workflow:workflow_app"))
+
+# Add scaffold as subcommand of vertical
+# We need to import it and add it to the vertical app
+# This is deferred until vertical is actually loaded
+def _ensure_scaffold_registered():
+    """Ensure scaffold is registered as a subcommand of vertical.
+
+    This is called lazily when vertical command is first accessed.
+    """
+    from victor.ui.commands.vertical import vertical_app
+    from victor.ui.commands.scaffold import scaffold_app
+
+    # Only add if not already added
+    if not any(cmd.name == "scaffold" for cmd in vertical_app.registered_commands):
+        vertical_app.add_typer(scaffold_app, name="scaffold")
+
+
+# Monkey-patch LazyTyper to register scaffold on first load
+original_load = vertical_lazy._load
+
+
+def _load_with_scaffold(self):
+    """Load vertical app and ensure scaffold is registered."""
+    result = original_load()
+    _ensure_scaffold_registered()
+    return result
+
+
+vertical_lazy._load = lambda: _load_with_scaffold(vertical_lazy)
+
+
+def _get_default_interactive():
+    """Lazy load the default interactive function."""
+    from victor.ui.commands.chat import _run_default_interactive
+    return _run_default_interactive
+
 
 console = Console()
 
@@ -111,7 +156,7 @@ def callback(
 ) -> None:
     """Victor - Open-source AI coding assistant with multi-provider support."""
     if ctx.invoked_subcommand is None:
-        _run_default_interactive()
+        _get_default_interactive()()
 
 
 if __name__ == "__main__":

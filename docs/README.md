@@ -85,9 +85,16 @@ docs/
 │   ├── tools.md
 │   └── workflows.md
 ├── tutorials/                        # Tutorials
+│   ├── coordinator_quickstart.md     # Coordinator-based architecture quick start
+│   ├── coordinator_recipes.md        # Coordinator customization recipes
+│   ├── coordinator_video_tutorial.md # Video tutorial script
 │   ├── build-custom-tool.md
 │   ├── create-workflow.md
 │   └── integrate-provider.md
+├── examples/                         # Usage examples
+│   ├── coordinator_examples.md       # Coordinator usage examples
+│   ├── migration_examples.md         # Before/after migration examples
+│   └── cache_invalidation_example.md
 ├── reference/                        # Reference documentation
 │   ├── index.md
 │   ├── cli-commands.md

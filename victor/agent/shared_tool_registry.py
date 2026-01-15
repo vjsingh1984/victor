@@ -105,6 +105,11 @@ class SharedToolRegistry:
         self._initialized: bool = False
         self._discovery_lock: threading.Lock = threading.Lock()
 
+        # OPTIMIZATION: Cache tool instances to avoid repeated instantiation
+        # This significantly improves performance when get_all_tools_for_registration()
+        # is called multiple times
+        self._tool_instances_cache: Optional[Dict[str, Any]] = None
+
         logger.debug("SharedToolRegistry instance created")
 
     @classmethod
@@ -135,11 +140,16 @@ class SharedToolRegistry:
         This method is primarily intended for test isolation. It allows
         tests to start with a fresh SharedToolRegistry instance.
 
+        OPTIMIZATION: Also clears the tool instances cache.
+
         Note:
             This method is thread-safe but should only be called during
             test setup/teardown, not during normal operation.
         """
         with cls._lock:
+            # Clear instance cache before resetting
+            if cls._instance is not None:
+                cls._instance._tool_instances_cache = None
             cls._instance = None
             logger.debug("SharedToolRegistry instance reset")
 
@@ -328,6 +338,8 @@ class SharedToolRegistry:
         This method returns a list suitable for registering with ToolRegistry.
         It includes both class-based tool instances and decorated functions.
 
+        OPTIMIZATION: Caches tool instances to avoid repeated instantiation.
+
         Args:
             airgapped_mode: If True, filter out web tools that require network
 
@@ -337,21 +349,36 @@ class SharedToolRegistry:
         # Ensure tools are discovered
         self.get_tool_classes()
 
-        result: List[Any] = []
+        # OPTIMIZATION: Use cached instances if available and airgapped_mode matches
+        # Check if we need to rebuild the cache (first call or airgapped_mode changed)
+        cache_key = "airgapped" if airgapped_mode else "full"
 
-        # Add decorated tools (functions with @tool decorator)
-        for name, func in self.get_decorated_tools(airgapped_mode=airgapped_mode).items():
-            result.append(func)
+        # Simple cache invalidation check
+        if self._tool_instances_cache is None:
+            self._tool_instances_cache = {}
 
-        # Add class-based tools (create fresh instances)
-        # Note: We skip tools that are already in decorated_tools to avoid duplicates
-        decorated_names = set(self._decorated_tools.keys())
-        for name, cls in self.get_tool_classes(airgapped_mode=airgapped_mode).items():
-            if name not in decorated_names:
-                try:
-                    instance = cls()
-                    result.append(instance)
-                except Exception as e:
-                    logger.debug(f"Skipped creating instance of {name}: {e}")
+        if cache_key not in self._tool_instances_cache:
+            result: List[Any] = []
 
-        return result
+            # Add decorated tools (functions with @tool decorator)
+            for name, func in self.get_decorated_tools(airgapped_mode=airgapped_mode).items():
+                result.append(func)
+
+            # Add class-based tools (create fresh instances)
+            # Note: We skip tools that are already in decorated_tools to avoid duplicates
+            decorated_names = set(self._decorated_tools.keys())
+            for name, cls in self.get_tool_classes(airgapped_mode=airgapped_mode).items():
+                if name not in decorated_names:
+                    try:
+                        instance = cls()
+                        result.append(instance)
+                    except Exception as e:
+                        logger.debug(f"Skipped creating instance of {name}: {e}")
+
+            # Cache the result
+            self._tool_instances_cache[cache_key] = result
+            logger.debug(f"Built and cached {len(result)} tools for registration (mode={cache_key})")
+        else:
+            logger.debug(f"Using cached tool instances (mode={cache_key})")
+
+        return self._tool_instances_cache[cache_key]

@@ -120,6 +120,31 @@ class VictorError(Exception):
         self.cause = cause
         self.timestamp = datetime.now(timezone.utc)
 
+        # Track error in global error tracker (lazy import to avoid circular dependency)
+        try:
+            from victor.observability.error_tracker import get_error_tracker
+
+            tracker = get_error_tracker()
+            # Include details directly in context for easier access
+            context = {
+                "category": category.value,
+                "severity": severity.value,
+            }
+            # Add all details to context for direct access
+            if details:
+                context.update(details)
+
+            tracker.record_error(
+                error_type=self.__class__.__name__,
+                error_message=str(message),
+                correlation_id=self.correlation_id,
+                context=context,
+            )
+        except Exception:
+            # Silently fail if error tracker is not available
+            # (e.g., during early initialization or testing)
+            pass
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
@@ -273,6 +298,57 @@ class ProviderNotFoundError(ProviderError):
         # Backward compatibility with base.py signature
         self.status_code = status_code
         self.raw_error = raw_error
+        # Add provider_name alias for backward compatibility
+        self.provider_name = provider
+        if provider:
+            self.details["provider_name"] = provider
+
+
+class ProviderInitializationError(ProviderError):
+    """Provider failed to initialize.
+
+    This error is raised when a provider exists in the registry but fails
+    during initialization, typically due to missing configuration or invalid
+    credentials.
+
+    Attributes:
+        provider: The provider name that failed to initialize
+        provider_name: Alias for provider (backward compatibility)
+        config_key: The configuration key that is missing or invalid (if known)
+        original_error: The underlying exception that caused the failure
+    """
+
+    def __init__(
+        self,
+        message: str,
+        provider: Optional[str] = None,
+        provider_name: Optional[str] = None,  # Backward compatibility
+        config_key: Optional[str] = None,
+        recovery_hint: Optional[str] = None,
+        **kwargs: Any,
+    ):
+        # Support both provider and provider_name for backward compatibility
+        if provider_name is not None and provider is None:
+            provider = provider_name
+
+        # Generate recovery hint if not provided
+        if recovery_hint is None:
+            if config_key:
+                recovery_hint = f"Set {config_key} environment variable or check your configuration."
+            else:
+                recovery_hint = "Check your API credentials and configuration."
+
+        super().__init__(
+            message,
+            provider=provider,
+            category=ErrorCategory.CONFIG_INVALID,
+            recovery_hint=recovery_hint,
+            **kwargs,
+        )
+        self.config_key = config_key
+        self.details["config_key"] = config_key
+        # Add provider_name alias for backward compatibility
+        self.provider_name = provider or provider_name
 
 
 class ProviderInvalidResponseError(ProviderError):
@@ -306,17 +382,34 @@ class ToolError(VictorError):
         tool_name: Optional[str] = None,
         **kwargs: Any,
     ):
+        # Add tool_name to details before calling super().__init__
+        # so it's available in error tracking
+        if "details" not in kwargs:
+            kwargs["details"] = {}
+        kwargs["details"]["tool_name"] = tool_name
+
         super().__init__(message, **kwargs)
         self.tool_name = tool_name
-        self.details["tool_name"] = tool_name
 
 
 class ToolNotFoundError(ToolError):
     """Tool not found in registry."""
 
-    def __init__(self, tool_name: str, **kwargs: Any):
+    def __init__(self, message: Optional[str] = None, tool_name: Optional[str] = None, **kwargs: Any):
+        # Support both positional and keyword arguments
+        # If called with positional arg, it's the tool_name
+        # If called with keyword arg, it's tool_name
+        # If message is provided, use it instead of default
+        if message is not None and tool_name is None and isinstance(message, str):
+            # First positional arg is tool_name (backward compatibility)
+            tool_name = message
+            message = None
+
+        if message is None:
+            message = f"Tool not found: {tool_name}"
+
         super().__init__(
-            f"Tool not found: {tool_name}",
+            message,
             tool_name=tool_name,
             category=ErrorCategory.TOOL_NOT_FOUND,
             recovery_hint="Check tool name spelling. Use list_tools() to see available tools.",
@@ -331,14 +424,29 @@ class ToolExecutionError(ToolError):
         self,
         message: str,
         tool_name: Optional[str] = None,
+        arguments: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ):
+        # Add recovery hint if not provided
+        if kwargs.get("recovery_hint") is None:
+            kwargs["recovery_hint"] = (
+                "Check tool arguments and permissions. "
+                "Verify the tool is compatible with your current environment."
+            )
+
+        # Initialize details if not present, then add arguments
+        if "details" not in kwargs:
+            kwargs["details"] = {}
+        kwargs["details"]["arguments"] = arguments or {}
+
         super().__init__(
             message,
             tool_name=tool_name,
             category=ErrorCategory.TOOL_EXECUTION,
             **kwargs,
         )
+        self.arguments = arguments or {}
+        # Note: arguments already in details from super().__init__
 
 
 class ToolValidationError(ToolError):
@@ -367,15 +475,19 @@ class ToolTimeoutError(ToolError):
 
     def __init__(
         self,
+        message: Optional[str] = None,
         tool_name: Optional[str] = None,
         timeout: Optional[int] = None,
         **kwargs: Any,
     ):
-        message = (
-            f"Tool '{tool_name}' timed out after {timeout} seconds"
-            if timeout
-            else f"Tool '{tool_name}' timed out"
-        )
+        # If message is not provided, generate one
+        if message is None:
+            message = (
+                f"Tool '{tool_name}' timed out after {timeout} seconds"
+                if timeout
+                else f"Tool '{tool_name}' timed out"
+            )
+
         super().__init__(
             message,
             tool_name=tool_name,
@@ -394,8 +506,16 @@ class ConfigurationError(VictorError):
         self,
         message: str,
         config_key: Optional[str] = None,
+        invalid_fields: Optional[List[str]] = None,
         **kwargs: Any,
     ):
+        # Add recovery hint if not provided
+        if kwargs.get("recovery_hint") is None:
+            if config_key:
+                kwargs["recovery_hint"] = f"Check configuration for '{config_key}'. Set the correct value in config or environment variables."
+            else:
+                kwargs["recovery_hint"] = "Check your configuration file and environment variables."
+
         super().__init__(
             message,
             category=ErrorCategory.CONFIG_INVALID,
@@ -403,6 +523,115 @@ class ConfigurationError(VictorError):
         )
         self.config_key = config_key
         self.details["config_key"] = config_key
+        self.invalid_fields = invalid_fields or []
+        self.details["invalid_fields"] = self.invalid_fields
+
+
+class ConfigurationValidationError(ConfigurationError):
+    """Configuration validation errors with detailed field information.
+
+    This exception is raised when configuration validation fails,
+    providing structured information about which fields are invalid
+    and how to fix them.
+
+    Attributes:
+        config_key: The configuration key or file path that failed validation
+        invalid_fields: List of field names that failed validation
+        field_errors: Dictionary mapping field names to their error messages
+        line_numbers: Dictionary mapping field names to line numbers (if available)
+        validation_errors: List of detailed validation error messages
+
+    Example:
+        raise ConfigurationValidationError(
+            message="Workflow validation failed with 3 errors",
+            config_key="/path/to/workflow.yaml",
+            invalid_fields=["start_node", "tool_budget"],
+            field_errors={
+                "start_node": "Start node 'init' not found in workflow",
+                "tool_budget": "Tool budget must be positive integer"
+            },
+            line_numbers={"start_node": 15, "tool_budget": 23},
+            recovery_hint="Fix validation errors in YAML file. Use 'victor workflow validate <path>' to check."
+        )
+    """
+
+    def __init__(
+        self,
+        message: str,
+        config_key: Optional[str] = None,
+        invalid_fields: Optional[List[str]] = None,
+        field_errors: Optional[Dict[str, str]] = None,
+        line_numbers: Optional[Dict[str, int]] = None,
+        validation_errors: Optional[List[str]] = None,
+        **kwargs: Any,
+    ):
+        # Build detailed error message if not provided
+        if validation_errors and len(message) < 200:
+            # message is short, let's enhance it
+            error_list = "\n  - ".join(validation_errors[:5])
+            if len(validation_errors) > 5:
+                error_list += f"\n  - ... and {len(validation_errors) - 5} more"
+            message = f"Configuration validation failed with {len(validation_errors)} error(s):\n  - {error_list}"
+
+        # Build recovery hint if not provided
+        if kwargs.get("recovery_hint") is None:
+            if config_key and config_key.endswith('.yaml'):
+                kwargs["recovery_hint"] = f"Fix validation errors in '{config_key}'. Use 'victor workflow validate <path>' to check."
+            elif config_key:
+                kwargs["recovery_hint"] = f"Fix validation errors in '{config_key}'. Check configuration format and required fields."
+            else:
+                kwargs["recovery_hint"] = "Fix validation errors. Check configuration format and required fields."
+
+        # Initialize parent ConfigurationError
+        super().__init__(
+            message,
+            config_key=config_key,
+            invalid_fields=invalid_fields,
+            **kwargs,
+        )
+
+        # Add additional structured error information
+        self.field_errors = field_errors or {}
+        self.line_numbers = line_numbers or {}
+        self.validation_errors = validation_errors or []
+
+        # Add to details for logging/tracking
+        if self.field_errors:
+            self.details["field_errors"] = self.field_errors
+        if self.line_numbers:
+            self.details["line_numbers"] = self.line_numbers
+        if self.validation_errors:
+            self.details["validation_errors"] = self.validation_errors
+
+    def get_field_error(self, field_name: str) -> Optional[str]:
+        """Get error message for a specific field.
+
+        Args:
+            field_name: Name of the field to get error for
+
+        Returns:
+            Error message for the field, or None if no error
+        """
+        return self.field_errors.get(field_name)
+
+    def get_line_number(self, field_name: str) -> Optional[int]:
+        """Get line number for a specific field error.
+
+        Args:
+            field_name: Name of the field
+
+        Returns:
+            Line number, or None if not available
+        """
+        return self.line_numbers.get(field_name)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary with full validation details."""
+        result = super().to_dict()
+        result["field_errors"] = self.field_errors
+        result["line_numbers"] = self.line_numbers
+        result["validation_errors"] = self.validation_errors
+        return result
 
 
 class ValidationError(VictorError):
@@ -415,6 +644,13 @@ class ValidationError(VictorError):
         value: Optional[Any] = None,
         **kwargs: Any,
     ):
+        # Add recovery hint if not provided
+        if kwargs.get("recovery_hint") is None:
+            if field:
+                kwargs["recovery_hint"] = f"Check the value for '{field}'. Ensure it matches the expected format and type."
+            else:
+                kwargs["recovery_hint"] = "Check your input values and ensure they match the expected format."
+
         super().__init__(
             message,
             category=ErrorCategory.VALIDATION_ERROR,
@@ -443,9 +679,18 @@ class FileError(VictorError):
 class FileNotFoundError(FileError):
     """File not found errors."""
 
-    def __init__(self, path: str, **kwargs: Any):
+    def __init__(self, message: Optional[str] = None, path: Optional[str] = None, **kwargs: Any):
+        # Support both positional and keyword arguments
+        # If called with positional arg, it's the path
+        if message is not None and path is None and isinstance(message, str):
+            path = message
+            message = None
+
+        if message is None:
+            message = f"File not found: {path}"
+
         super().__init__(
-            f"File not found: {path}",
+            message,
             path=path,
             category=ErrorCategory.FILE_NOT_FOUND,
             recovery_hint="Check the file path. The file may have been moved or deleted.",
@@ -538,6 +783,163 @@ class ExtensionLoadError(VictorError):
         if original_error:
             self.details["original_error_type"] = type(original_error).__name__
             self.details["original_error_message"] = str(original_error)
+
+
+class SearchError(VictorError):
+    """Errors related to search backend operations.
+
+    This exception is raised when search backends fail or encounter errors
+    during query execution. It provides detailed information about which
+    backends failed and why.
+
+    Attributes:
+        search_type: The type of search that failed (semantic, keyword, hybrid)
+        failed_backends: List of backend names that failed
+        failure_details: Dictionary mapping backend names to their error messages
+        query: The search query that failed (optional)
+
+    Example:
+        raise SearchError(
+            message="All 2 search backends failed for 'semantic'",
+            search_type="semantic",
+            failed_backends=["SemanticSearchBackend", "VectorSearchBackend"],
+            failure_details={
+                "SemanticSearchBackend": "Connection timeout",
+                "VectorSearchBackend": "Index not found"
+            },
+            query="authentication logic"
+        )
+    """
+
+    def __init__(
+        self,
+        message: str,
+        search_type: Optional[str] = None,
+        failed_backends: Optional[List[str]] = None,
+        failure_details: Optional[Dict[str, str]] = None,
+        query: Optional[str] = None,
+        **kwargs: Any,
+    ):
+        # Generate recovery hint if not provided
+        if kwargs.get("recovery_hint") is None:
+            if failed_backends:
+                backend_list = ", ".join(failed_backends[:3])
+                if len(failed_backends) > 3:
+                    backend_list += f" (and {len(failed_backends) - 3} more)"
+
+                kwargs["recovery_hint"] = (
+                    f"Check backend configuration and connectivity for: {backend_list}. "
+                    f"Try: 1) Check network connection, 2) Verify API keys, "
+                    f"3) Try alternative search type with 'victor config search.type=<type>'"
+                )
+            else:
+                kwargs["recovery_hint"] = (
+                    "Check search backend configuration. Try alternative search type."
+                )
+
+        super().__init__(
+            message,
+            category=ErrorCategory.NETWORK_ERROR,
+            **kwargs,
+        )
+        self.search_type = search_type
+        self.failed_backends = failed_backends or []
+        self.failure_details = failure_details or {}
+        self.query = query
+
+        # Add to details
+        if search_type:
+            self.details["search_type"] = search_type
+        if failed_backends:
+            self.details["failed_backends"] = failed_backends
+        if failure_details:
+            self.details["failure_details"] = failure_details
+        if query:
+            self.details["query"] = query
+
+
+class WorkflowExecutionError(VictorError):
+    """Errors related to workflow execution failures.
+
+    This exception is raised when a workflow fails during execution,
+    providing detailed information about where the failure occurred
+    and how to recover.
+
+    Attributes:
+        workflow_id: Identifier of the workflow that failed
+        node_id: Identifier of the node where failure occurred
+        node_type: Type of node (agent, compute, condition, etc.)
+        checkpoint_id: Checkpoint ID for resuming (if available)
+        execution_context: Additional context about the execution
+
+    Example:
+        raise WorkflowExecutionError(
+            message="Workflow execution failed at node 'data_processor'",
+            workflow_id="deep_research",
+            node_id="data_processor",
+            node_type="compute",
+            checkpoint_id="chk_abc123",
+            execution_context={"iteration": 3, "input_size": 1000}
+        )
+    """
+
+    def __init__(
+        self,
+        message: str,
+        workflow_id: Optional[str] = None,
+        node_id: Optional[str] = None,
+        node_type: Optional[str] = None,
+        checkpoint_id: Optional[str] = None,
+        execution_context: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ):
+        # Generate recovery hint if not provided
+        if kwargs.get("recovery_hint") is None:
+            if checkpoint_id:
+                if node_id:
+                    kwargs["recovery_hint"] = (
+                        f"Check workflow logs with correlation ID. "
+                        f"Use checkpoint '{checkpoint_id}' to resume from node '{node_id}'. "
+                        f"Fix the node and retry workflow."
+                    )
+                else:
+                    kwargs["recovery_hint"] = (
+                        f"Use checkpoint '{checkpoint_id}' to resume workflow execution. "
+                        f"Fix the error and retry."
+                    )
+            elif node_id:
+                kwargs["recovery_hint"] = (
+                    f"Fix node '{node_id}' and retry workflow execution. "
+                    f"Check logs for detailed error information."
+                )
+            else:
+                kwargs["recovery_hint"] = (
+                    "Check workflow logs for detailed error information. "
+                    "Fix the error and retry workflow execution."
+                )
+
+        super().__init__(
+            message,
+            category=ErrorCategory.INTERNAL_ERROR,
+            **kwargs,
+        )
+        self.workflow_id = workflow_id
+        self.node_id = node_id
+        self.node_type = node_type
+        self.checkpoint_id = checkpoint_id
+        self.execution_context = execution_context or {}
+
+        # Add to details
+        if workflow_id:
+            self.details["workflow_id"] = workflow_id
+        if node_id:
+            self.details["node_id"] = node_id
+        if node_type:
+            self.details["node_type"] = node_type
+        if checkpoint_id:
+            self.details["checkpoint_id"] = checkpoint_id
+        if execution_context:
+            self.details["execution_context"] = execution_context
 
 
 # =============================================================================

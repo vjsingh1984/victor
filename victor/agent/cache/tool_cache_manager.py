@@ -46,13 +46,15 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
+import logging
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set
 
-from victor.protocols import ICacheBackend
+from victor.protocols import ICacheBackend, FileChangeEvent
 from victor.agent.cache.dependency_graph import ToolDependencyGraph
 
 
@@ -64,12 +66,59 @@ class CacheNamespace(Enum):
     - SESSION: Shared within a session (e.g., file read results)
     - REQUEST: Isolated to a single request (e.g., intermediate computations)
     - TOOL: Isolated per tool (e.g., tool-specific state)
+
+    Hierarchy (parent to children):
+    - GLOBAL → SESSION → REQUEST → TOOL
     """
 
     GLOBAL = "global"
     SESSION = "session"
     REQUEST = "request"
     TOOL = "tool"
+
+    def get_child_namespaces(self) -> List[CacheNamespace]:
+        """Get child namespaces in the hierarchy.
+
+        Returns:
+            List of child namespaces (more specific levels)
+
+        Example:
+            CacheNamespace.GLOBAL.get_child_namespaces()
+            # [CacheNamespace.SESSION, CacheNamespace.REQUEST, CacheNamespace.TOOL]
+
+            CacheNamespace.TOOL.get_child_namespaces()
+            # []
+        """
+        hierarchy = [
+            CacheNamespace.GLOBAL,
+            CacheNamespace.SESSION,
+            CacheNamespace.REQUEST,
+            CacheNamespace.TOOL,
+        ]
+        try:
+            current_index = hierarchy.index(self)
+            return hierarchy[current_index + 1 :]
+        except ValueError:
+            return []
+        except IndexError:
+            return []
+
+
+@dataclass
+class InvalidationResult:
+    """Result of a cache invalidation operation.
+
+    Attributes:
+        namespace: The namespace that was invalidated
+        keys_cleared: Number of cache keys cleared
+        recursive: Whether child namespaces were also cleared
+        metadata: Additional metadata about the invalidation
+    """
+
+    namespace: str
+    keys_cleared: int
+    recursive: bool = False
+    metadata: Dict[str, Any] | None = None
 
 
 @dataclass
@@ -117,6 +166,7 @@ class ToolCacheManager:
         backend: ICacheBackend,
         default_ttl: int = 3600,
         enable_dependency_tracking: bool = True,
+        enable_file_watching: bool = False,
     ) -> None:
         """Initialize the tool cache manager.
 
@@ -124,6 +174,7 @@ class ToolCacheManager:
             backend: Cache backend for storage (implements ICacheBackend)
             default_ttl: Default TTL for cache entries in seconds
             enable_dependency_tracking: Enable dependency graph tracking
+            enable_file_watching: Enable automatic file watching for invalidation
         """
         self._backend = backend
         self._default_ttl = default_ttl
@@ -138,6 +189,12 @@ class ToolCacheManager:
         # Track cache keys by tool name for invalidation
         # Structure: {(tool_name, namespace): set(cache_keys)}
         self._tool_keys: Dict[tuple[str, str], Set[str]] = {}
+
+        # File watching support
+        self._enable_file_watching = enable_file_watching
+        self._file_watcher: Optional[Any] = None  # FileWatcher instance
+        self._file_watch_task: Optional[asyncio.Task] = None
+        self._logger = logging.getLogger(__name__)
 
     def _make_cache_key(
         self,
@@ -354,21 +411,53 @@ class ToolCacheManager:
     async def invalidate_namespace(
         self,
         namespace: CacheNamespace,
-    ) -> int:
-        """Invalidate all entries in a namespace.
+        recursive: bool = False,
+    ) -> InvalidationResult:
+        """Invalidate all entries in a namespace with optional recursive clearing.
 
         Args:
             namespace: Namespace to clear
+            recursive: If True, also clear all child namespaces
 
         Returns:
-            Number of cache entries cleared
+            InvalidationResult with keys_cleared count and metadata
 
         Example:
-            count = await manager.invalidate_namespace(CacheNamespace.SESSION)
-            print(f"Cleared {count} session entries")
+            # Clear single namespace
+            result = await manager.invalidate_namespace(CacheNamespace.SESSION)
+            print(f"Cleared {result.keys_cleared} session entries")
+
+            # Clear namespace and all children
+            result = await manager.invalidate_namespace(
+                CacheNamespace.GLOBAL, recursive=True
+            )
+            print(f"Cleared {result.keys_cleared} entries across {result.metadata['child_count'] + 1} namespaces")
         """
-        namespace_str = namespace.value
-        return await self._backend.clear_namespace(namespace_str)
+        count = 0
+        namespaces_to_clear = [namespace]
+
+        # Add child namespaces if recursive
+        if recursive:
+            children = namespace.get_child_namespaces()
+            namespaces_to_clear.extend(children)
+
+        # Clear each namespace
+        cleared_namespace_strings = []
+        for ns in namespaces_to_clear:
+            namespace_str = ns.value
+            cleared = await self._backend.clear_namespace(namespace_str)
+            count += cleared
+            cleared_namespace_strings.append(namespace_str)
+
+        return InvalidationResult(
+            namespace=namespace.value,
+            keys_cleared=count,
+            recursive=recursive,
+            metadata={
+                "cleared_namespaces": cleared_namespace_strings,
+                "child_count": len(namespaces_to_clear) - 1,
+            },
+        )
 
     async def clear_all(self) -> int:
         """Clear all cached entries across all namespaces.
@@ -378,8 +467,8 @@ class ToolCacheManager:
         """
         total = 0
         for namespace in CacheNamespace:
-            count = await self.invalidate_namespace(namespace)
-            total += count
+            result = await self.invalidate_namespace(namespace)
+            total += result.keys_cleared
         return total
 
     async def get_stats(self) -> Dict[str, Any]:
@@ -442,9 +531,151 @@ class ToolCacheManager:
         """
         return await self._backend.clear_namespace(namespace)
 
+    # =========================================================================
+    # File Watching Integration
+    # =========================================================================
+
+    async def start_file_watching(self, file_paths: List[str]) -> None:
+        """Start file watching for automatic cache invalidation.
+
+        Monitors the specified files and directories for changes and
+        automatically invalidates dependent cache entries when changes occur.
+
+        Args:
+            file_paths: List of file or directory paths to watch
+
+        Raises:
+            RuntimeError: If file watching is not enabled or already running
+            ImportError: If watchdog library is not installed
+
+        Example:
+            # Watch specific files
+            await manager.start_file_watching(["/src/main.py", "/src/auth.py"])
+
+            # Watch directories
+            await manager.start_file_watching(["/src", "/tests"])
+
+            # File changes will automatically invalidate dependent caches
+        """
+        if not self._enable_file_watching:
+            raise RuntimeError(
+                "File watching is not enabled. "
+                "Set enable_file_watching=True in constructor."
+            )
+
+        if self._file_watcher is not None:
+            raise RuntimeError("File watching is already running")
+
+        try:
+            from victor.agent.cache.file_watcher import FileWatcher
+        except ImportError as e:
+            raise ImportError(
+                "File watching requires the 'watchdog' library. "
+                "Install it with: pip install watchdog"
+            ) from e
+
+        # Create and start file watcher
+        self._file_watcher = FileWatcher()
+        await self._file_watcher.start()
+
+        # Watch each path
+        for path in file_paths:
+            from pathlib import Path
+
+            p = Path(path)
+            if p.is_file():
+                await self._file_watcher.watch_file(path)
+            elif p.is_dir():
+                await self._file_watcher.watch_directory(path, recursive=True)
+            else:
+                self._logger.warning(
+                    f"Path does not exist, skipping: {path}"
+                )
+
+        # Start background task to process file changes
+        self._file_watch_task = asyncio.create_task(self._process_file_changes())
+
+        self._logger.info(
+            f"File watching started for {len(file_paths)} path(s)"
+        )
+
+    async def stop_file_watching(self) -> None:
+        """Stop file watching and clean up resources.
+
+        Stops monitoring file system changes and cancels the background
+        processing task.
+
+        Example:
+            await manager.stop_file_watching()
+        """
+        if self._file_watch_task is not None:
+            self._file_watch_task.cancel()
+            try:
+                await self._file_watch_task
+            except asyncio.CancelledError:
+                pass
+            self._file_watch_task = None
+
+        if self._file_watcher is not None:
+            await self._file_watcher.stop()
+            self._file_watcher = None
+
+        self._logger.info("File watching stopped")
+
+    async def _process_file_changes(self) -> None:
+        """Background task to process file change events.
+
+        Automatically invalidates cache entries when watched files change.
+        """
+        if self._file_watcher is None:
+            return
+
+        try:
+            while True:
+                # Get pending changes (non-blocking)
+                changes = await self._file_watcher.get_changes()
+
+                if not changes:
+                    # No changes, wait a bit before checking again
+                    await asyncio.sleep(0.5)
+                    continue
+
+                # Process each change
+                for change in changes:
+                    await self._on_file_changed(change)
+
+        except asyncio.CancelledError:
+            # Task was cancelled, exit gracefully
+            raise
+        except Exception as e:
+            self._logger.error(f"Error processing file changes: {e}")
+
+    async def _on_file_changed(self, event: FileChangeEvent) -> None:
+        """Handle file change event for cache invalidation.
+
+        Args:
+            event: File change event
+        """
+        file_path = event.file_path
+
+        # Invalidate dependent caches
+        try:
+            invalidated = await self.invalidate_file_dependencies(file_path)
+
+            if invalidated > 0:
+                self._logger.info(
+                    f"Invalidated {invalidated} cache entries "
+                    f"due to file change: {file_path}"
+                )
+        except Exception as e:
+            self._logger.error(
+                f"Failed to invalidate cache for {file_path}: {e}"
+            )
+
 
 __all__ = [
     "ToolCacheManager",
     "CacheNamespace",
     "CacheEntry",
+    "InvalidationResult",
 ]

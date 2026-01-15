@@ -180,6 +180,17 @@ vscode-victor/.vscode-test/
 vscode-victor/*.vsix
 vscode-victor/webview-ui/node_modules/
 
+# Backup files (manual backups before changes)
+*.bak
+*.bak2
+*.bak3
+*.old
+*~
+
+# Generated artifacts (test coverage, documentation)
+htmlcov/
+site/
+
 # Audit logs (contain sensitive metadata - never commit)
 # Use /audit/ to only match root-level audit dir, not victor/security/audit/ source code
 /audit/
@@ -231,3 +242,43 @@ models/
 **/sentence-transformers/
 **/bge-*/
 embeddings/
+
+# Archived and misc implementation reports (development artifacts)
+ARCHITECTURAL_CLEANUP_COMPLETE.md
+Architectural_Review_Report.md
+ARCHITECTURAL_REVIEW_VERIFICATION.md
+BASELINE_TEST_RESULTS.md
+BENCHMARK_SUMMARY.md
+CANCELLATION_FIX_SUMMARY.md
+COMPREHENSIVE_REFACTORING_PLAN.md
+DOCUMENTATION_SUMMARY.md
+FILE_INVENTORY.md
+FINAL_IMPLEMENTATION_REPORT.md
+FINAL_REPORT_INDEX.md
+IMPLEMENTATION_STATUS.md
+IMPLEMENTATION_SUMMARY.md
+METRICS_SUMMARY.md
+MIGRATION_GUIDE.md
+MIGRATION.md
+PERFORMANCE_OPTIMIZATIONS.md
+PHASE_*.md
+PHASE*.md
+PHASE*.*
+REPORT_GUIDE.md
+SERVER_MIGRATION_REPORT.md
+SOLID_MIGRATION_PLAN.md
+STARTUP_PERFORMANCE_OPTIMIZATIONS.md
+TOOL_SELECTION_OPTIMIZATION_SUMMARY.md
+TUI_ADVANCED_FEATURES_GUIDE.md
+TUI_IMPROVEMENTS_SUMMARY.md
+TYPE_SAFETY_PLAN.md
+VERIFICATION_CHECKLIST.md
+roadmap.md
+
+# Misc development artifacts
+safety-report.json
+fep-XXXX-test.md
+
+# Oddly named files from shell script errors
+=1.0
+=3.0

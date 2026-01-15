@@ -382,6 +382,18 @@ class PathResolver(IPathResolver):
                 strip_common_prefix,
             ]
 
+    @property
+    def _cwd(self) -> Path:
+        """Get cwd as non-None Path (always set in __post_init__).
+
+        Returns:
+            Current working directory as Path
+        """
+        if self.cwd is None:
+            # This should never happen after __post_init__
+            return Path.cwd()
+        return self.cwd
+
     def _auto_detect_nested_roots(self) -> None:
         """Auto-detect nested project structure and add as additional root.
 
@@ -397,8 +409,8 @@ class PathResolver(IPathResolver):
         my_project/my_project/ for files referenced as 'utils/foo.py'.
         """
         # Check for directory with same name as cwd
-        cwd_name = self.cwd.name
-        nested_dir = self.cwd / cwd_name
+        cwd_name = self._cwd.name
+        nested_dir = self._cwd / cwd_name
 
         if nested_dir.is_dir() and nested_dir not in self.additional_roots:
             # Check if it looks like a Python package (has __init__.py or .py files)
@@ -426,7 +438,7 @@ class PathResolver(IPathResolver):
         applied_normalizations: List[str] = []
 
         for normalizer in self.normalizers:
-            result, description = normalizer(current_path, self.cwd)
+            result, description = normalizer(current_path, self._cwd)
             if result is not None:
                 current_path = result
                 applied_normalizations.append(description)
@@ -463,7 +475,7 @@ class PathResolver(IPathResolver):
         if not path:
             result = PathResolution(
                 original_path=path,
-                resolved_path=self.cwd,
+                resolved_path=self._cwd,
                 exists=True,
                 is_directory=True,
             )
@@ -471,7 +483,7 @@ class PathResolver(IPathResolver):
             return result
 
         # Build list of search roots: cwd first, then additional roots
-        search_roots = [self.cwd] + self.additional_roots
+        search_roots = [self._cwd] + self.additional_roots
 
         # Try original path from each root
         for root in search_roots:
@@ -509,7 +521,7 @@ class PathResolver(IPathResolver):
                     if resolved.exists():
                         # Build combined description
                         full_description = description
-                        if root != self.cwd:
+                        if root != self._cwd:
                             full_description = f"{description}, resolved_from:{root.name}"
 
                         result = PathResolution(
@@ -540,9 +552,9 @@ class PathResolver(IPathResolver):
         try:
             resolved = Path(path).expanduser()
             if not resolved.is_absolute():
-                resolved = (self.cwd / resolved).resolve()
+                resolved = (self._cwd / resolved).resolve()
         except (OSError, ValueError):
-            resolved = self.cwd / path
+            resolved = self._cwd / path
 
         result = PathResolution(
             original_path=path,
@@ -664,7 +676,7 @@ class PathResolver(IPathResolver):
             except PermissionError:
                 pass
 
-        _scan(self.cwd, 0)
+        _scan(self._cwd, 0)
         return names
 
     def _get_relative_file_paths(self, max_depth: int = 4) -> List[str]:
@@ -694,7 +706,7 @@ class PathResolver(IPathResolver):
             except PermissionError:
                 pass
 
-        _scan(self.cwd, 0, "")
+        _scan(self._cwd, 0, "")
         return paths
 
     def set_cwd(self, cwd: Path) -> None:
@@ -746,7 +758,7 @@ class PathResolver(IPathResolver):
     @property
     def search_roots(self) -> List[Path]:
         """Get all search roots (cwd + additional roots)."""
-        return [self.cwd] + self.additional_roots
+        return [self._cwd] + self.additional_roots
 
     def clear_cache(self) -> None:
         """Clear all cached resolutions."""

@@ -1,0 +1,75 @@
+# Semgrep ignore patterns for Victor AI
+# This file excludes directories and files from Semgrep scanning
+
+# Test directories
+tests/
+victor/test/
+victor/tests/
+
+# Archive and legacy code
+archive/
+victor_test/
+
+# Generated files
+*.pb.go
+*.pb.gw.go
+*.gen.ts
+*.gen.js
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+.eggs/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Documentation
+docs/
+*.md
+
+# Configuration files
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Dependencies
+node_modules/
+vendor/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Web UI (TypeScript/JavaScript)
+# These have their own security scanning
+web/ui/src/
+web/ui/dist/
+vscode-victor/webview-ui/
+
+# Rust source (has its own linting)
+rust/
+
+# Examples and demos
+examples/
+docker/demos/
+
+# Temporary files
+*.tmp
+*.bak
+*.backup
+*.log
+
+# Large files that slow down scanning
+*.parquet
+*.arrow
+*.db
+*.sqlite

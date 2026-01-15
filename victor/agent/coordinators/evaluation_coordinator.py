@@ -24,9 +24,15 @@ and analytics operations for the orchestrator including:
 
 Extracted from AgentOrchestrator as part of SOLID refactoring
 to improve modularity and testability.
+
+Event-Driven Architecture:
+This coordinator now publishes events instead of using direct callbacks,
+breaking circular dependencies with the orchestrator.
 """
 
+import asyncio
 import logging
+import time
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -45,8 +51,10 @@ class EvaluationCoordinator:
     - Intelligent outcome recording for Q-learning
     - Analytics flushing for graceful shutdown
 
-    The coordinator uses callback functions for accessing orchestrator
-    state to maintain loose coupling.
+    Event-Driven Communication:
+    Instead of direct method calls, this coordinator publishes events to
+    break circular dependencies with the orchestrator. Events are published
+    via ObservabilityBus for loose coupling.
 
     Example:
         coordinator = EvaluationCoordinator(
@@ -57,13 +65,13 @@ class EvaluationCoordinator:
             get_stream_context_fn=lambda: getattr(orchestrator, '_current_stream_context', None),
         )
 
-        # Record outcome
+        # Record outcome (publishes event)
         coordinator.record_intelligent_outcome(
             success=True,
             quality_score=0.9,
         )
 
-        # Flush analytics
+        # Flush analytics (publishes event)
         results = await coordinator.flush_analytics()
     """
 
@@ -78,6 +86,7 @@ class EvaluationCoordinator:
         get_model_fn: Callable[[], str],
         get_tool_calls_used_fn: Callable[[], int],
         get_intelligent_integration_fn: Callable[[], Optional[Any]],
+        enable_event_publishing: bool = True,
     ) -> None:
         """Initialize the evaluation coordinator.
 
@@ -91,6 +100,7 @@ class EvaluationCoordinator:
             get_model_fn: Function to get current model name
             get_tool_calls_used_fn: Function to get tool calls used count
             get_intelligent_integration_fn: Function to get intelligent integration
+            enable_event_publishing: Whether to publish events (default: True)
         """
         self._usage_analytics = usage_analytics
         self._sequence_tracker = sequence_tracker
@@ -101,6 +111,45 @@ class EvaluationCoordinator:
         self._get_model_fn = get_model_fn
         self._get_tool_calls_used_fn = get_tool_calls_used_fn
         self._get_intelligent_integration_fn = get_intelligent_integration_fn
+        self._enable_event_publishing = enable_event_publishing
+        self._event_bus = None  # Lazy-loaded
+
+    def _get_event_bus(self):
+        """Get the event bus (lazy-loaded).
+
+        Returns:
+            ObservabilityBus instance or None if event publishing disabled
+        """
+        if not self._enable_event_publishing:
+            return None
+
+        if self._event_bus is None:
+            try:
+                from victor.core.events.backends import get_observability_bus
+                self._event_bus = get_observability_bus()
+            except ImportError:
+                logger.debug("Event bus not available, event publishing disabled")
+                self._enable_event_publishing = False
+
+        return self._event_bus
+
+    async def _publish_event(self, topic: str, data: Dict[str, Any]) -> None:
+        """Publish an event to the observability bus.
+
+        Args:
+            topic: Event topic
+            data: Event payload
+        """
+        if not self._enable_event_publishing:
+            return
+
+        try:
+            bus = self._get_event_bus()
+            if bus:
+                await bus.emit(topic=topic, data=data, source="evaluation_coordinator")
+        except Exception as e:
+            # Don't let event publishing failures break the coordinator
+            logger.debug(f"Failed to publish event {topic}: {e}")
 
     @property
     def usage_analytics(self) -> Optional["UsageAnalytics"]:
@@ -111,7 +160,7 @@ class EvaluationCoordinator:
         """
         return self._usage_analytics
 
-    def record_intelligent_outcome(
+    async def record_intelligent_outcome(
         self,
         success: bool,
         quality_score: float = 0.5,
@@ -121,6 +170,9 @@ class EvaluationCoordinator:
         """Record outcome for Q-learning feedback.
 
         Delegates to OrchestratorIntegration.record_intelligent_outcome().
+
+        This method now publishes an event after recording to notify
+        subscribers about the outcome without creating circular dependencies.
 
         Args:
             success: Whether the task was completed successfully
@@ -164,11 +216,29 @@ class EvaluationCoordinator:
         except Exception as e:
             logger.debug(f"IntelligentPipeline record_outcome failed: {e}")
 
-    def send_rl_reward_signal(self, session: Any) -> None:
+        # Publish outcome recorded event (event-driven communication)
+        await self._publish_event(
+            topic="evaluation.outcome_recorded",
+            data={
+                "success": success,
+                "quality_score": quality_score,
+                "user_satisfied": user_satisfied,
+                "completed": completed,
+                "provider": provider.name if provider else "unknown",
+                "model": model,
+                "tool_calls_used": tool_calls_used,
+                "continuation_prompts": continuation_prompts,
+            },
+        )
+
+    async def send_rl_reward_signal(self, session: Any) -> None:
         """Send reward signal to RL model selector for Q-value updates.
 
         Converts StreamingSession data into RLOutcome and updates Q-values
         based on session outcome (success, latency, throughput, tool usage).
+
+        Note: This method is now async to support event-driven communication.
+        It publishes an RL feedback event after processing.
 
         Args:
             session: StreamingSession instance
@@ -236,6 +306,21 @@ class EvaluationCoordinator:
                 f"quality={quality_score:.2f} duration={getattr(session, 'duration', 0):.1f}s"
             )
 
+            # Publish RL feedback event (event-driven communication)
+            await self._publish_event(
+                topic="evaluation.rl_feedback",
+                data={
+                    "session_id": getattr(session, "session_id", "unknown"),
+                    "reward": quality_score,
+                    "outcome_type": "success" if success else "failure",
+                    "provider": provider,
+                    "model": model,
+                    "latency_ms": int(getattr(session, "duration", 0) * 1000),
+                    "tool_calls": tool_calls_made,
+                    "vertical": vertical_name or "default",
+                },
+            )
+
         except ImportError:
             # RL module not available - skip silently
             pass
@@ -246,12 +331,15 @@ class EvaluationCoordinator:
             # Invalid reward data
             logger.warning(f"Failed to send RL reward signal (invalid data): {e}")
 
-    def flush_analytics(self) -> Dict[str, bool]:
+    async def flush_analytics(self) -> Dict[str, bool]:
         """Flush all analytics and cached data to persistent storage.
 
         Call this method before shutdown or when you need to ensure
         all analytics data is persisted to disk. Useful for graceful
         shutdown scenarios.
+
+        This method now publishes an event after flushing to notify
+        subscribers (e.g., orchestrator) about the flush completion.
 
         Returns:
             Dictionary indicating success/failure for each component:
@@ -259,6 +347,7 @@ class EvaluationCoordinator:
             - sequence_tracker: Whether patterns were saved
             - tool_cache: Whether cache was flushed
         """
+        start_time = time.time()
         results: Dict[str, bool] = {}
 
         # Flush usage analytics
@@ -293,5 +382,17 @@ class EvaluationCoordinator:
         # as it's not directly managed by this coordinator
         results["tool_cache"] = False
 
+        flush_duration_ms = int((time.time() - start_time) * 1000)
         logger.info(f"Analytics flush complete: {results}")
+
+        # Publish analytics flushed event (event-driven communication)
+        await self._publish_event(
+            topic="evaluation.analytics_flushed",
+            data={
+                "records_written": sum(1 for v in results.values() if v),
+                "components": results,
+                "flush_duration_ms": flush_duration_ms,
+            },
+        )
+
         return results

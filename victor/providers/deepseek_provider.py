@@ -96,20 +96,8 @@ class DeepSeekProvider(BaseProvider):
             timeout: Request timeout (default: 120s)
             **kwargs: Additional configuration
         """
-        # Get API key from parameter, environment, or keyring
-        self._api_key = api_key or os.environ.get("DEEPSEEK_API_KEY", "")
-        if not self._api_key:
-            try:
-                from victor.config.api_keys import get_api_key
-
-                self._api_key = get_api_key("deepseek") or ""
-            except ImportError:
-                pass
-        if not self._api_key:
-            logger.warning(
-                "DeepSeek API key not provided. Set DEEPSEEK_API_KEY environment variable, "
-                "use 'victor keys --set deepseek --keyring', or pass api_key parameter."
-            )
+        # Resolve API key using centralized helper
+        self._api_key = self._resolve_api_key(api_key, "deepseek")
 
         super().__init__(base_url=base_url, timeout=timeout, **kwargs)
 

@@ -497,8 +497,9 @@ class LanceDBService(ServiceLifecycle):
         """Check LanceDB is accessible."""
         if handle.get("provider"):
             try:
-                stats = await handle["provider"].get_stats()
-                return stats.get("total_documents", 0) >= 0
+                stats: Any = await handle["provider"].get_stats()
+                doc_count = stats.get("total_documents", 0) if stats else 0
+                return int(doc_count) >= 0
             except Exception:
                 return False
         return True
@@ -526,7 +527,7 @@ class ServiceManager:
         "lancedb": LanceDBService,
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._services: Dict[str, Any] = {}
         self._configs: Dict[str, ServiceConfig] = {}
         self._handlers: Dict[str, ServiceLifecycle] = {}

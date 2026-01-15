@@ -28,6 +28,8 @@ import asyncio
 import logging
 
 from rich.panel import Panel
+
+from victor.ui.common.constants import FIRST_ARG_INDEX, SECOND_ARG_INDEX
 from rich.table import Table
 from rich.text import Text
 
@@ -59,7 +61,7 @@ class CheckpointCommand(BaseSlashCommand):
             self._show_help(ctx)
             return
 
-        subcommand = ctx.args[0].lower()
+        subcommand = ctx.args[FIRST_ARG_INDEX].lower()
         subargs = ctx.args[1:]
 
         if subcommand == "save":
@@ -161,9 +163,9 @@ class CheckpointCommand(BaseSlashCommand):
         limit = 10
         if args:
             try:
-                limit = int(args[0])
+                limit = int(args[FIRST_ARG_INDEX])
             except ValueError:
-                ctx.console.print(f"[yellow]Invalid limit:[/] {args[0]}")
+                ctx.console.print(f"[yellow]Invalid limit:[/] {args[FIRST_ARG_INDEX]}")
                 return
 
         try:
@@ -228,7 +230,7 @@ class CheckpointCommand(BaseSlashCommand):
             )
             return
 
-        checkpoint_id = args[0]
+        checkpoint_id = args[FIRST_ARG_INDEX]
 
         try:
             # Run async method
@@ -275,7 +277,7 @@ class CheckpointCommand(BaseSlashCommand):
             )
             return
 
-        checkpoint_a, checkpoint_b = args[0], args[1]
+        checkpoint_a, checkpoint_b = args[FIRST_ARG_INDEX], args[SECOND_ARG_INDEX]
 
         try:
             # Run async method

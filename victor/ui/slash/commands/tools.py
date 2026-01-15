@@ -23,6 +23,8 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 
+from victor.ui.common.constants import FIRST_ARG_INDEX
+
 from victor.config.settings import VICTOR_CONTEXT_FILE, VICTOR_DIR_NAME
 from victor.ui.slash.protocol import BaseSlashCommand, CommandContext, CommandMetadata
 from victor.ui.slash.registry import register_command
@@ -48,7 +50,7 @@ class ToolsCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        search = ctx.args[0].lower() if ctx.args else None
+        search = ctx.args[FIRST_ARG_INDEX].lower() if ctx.args else None
 
         # Get tool objects from the tool registry
         tool_registry = getattr(ctx.agent, "tools", None)
@@ -281,7 +283,7 @@ class SearchCommand(BaseSlashCommand):
             ctx.console.print("[dim]Toggle: /search on|off[/]")
             return
 
-        action = ctx.args[0].lower()
+        action = ctx.args[FIRST_ARG_INDEX].lower()
         if action in ("on", "enable", "1", "true"):
             ctx.settings.airgapped_mode = False
             ctx.console.print("[green]Web search enabled[/]")
@@ -312,7 +314,7 @@ class ReviewCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        target = ctx.args[0] if ctx.args else "."
+        target = ctx.args[FIRST_ARG_INDEX] if ctx.args else "."
         target_path = Path(target).resolve()
 
         if not target_path.exists():

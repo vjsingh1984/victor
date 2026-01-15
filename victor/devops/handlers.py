@@ -48,20 +48,21 @@ Usage:
 from __future__ import annotations
 
 import logging
-import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any, Dict, Tuple
+
+from victor.framework.workflows.base_handler import BaseHandler
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
+    from victor.workflows.executor import WorkflowContext
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class ContainerOpsHandler:
+class ContainerOpsHandler(BaseHandler):
     """Docker/Podman container operations.
 
     Manages container lifecycle (build, run, stop, etc.).
@@ -79,16 +80,13 @@ class ContainerOpsHandler:
 
     runtime: str = "docker"
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
-        start_time = time.time()
-
+    ) -> Tuple[Any, int]:
+        """Execute container operations."""
         operation = node.input_mapping.get("operation", "build")
         dockerfile = node.input_mapping.get("dockerfile", "Dockerfile")
         tag = node.input_mapping.get("tag", "latest")
@@ -106,45 +104,25 @@ class ContainerOpsHandler:
             container_id = node.input_mapping.get("container_id", "")
             cmd = f"{self.runtime} stop {container_id}"
         else:
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error=f"Unknown operation: {operation}",
-                duration_seconds=time.time() - start_time,
-            )
+            raise ValueError(f"Unknown operation: {operation}")
 
-        try:
-            result = await tool_registry.execute("shell", command=cmd)
+        result = await tool_registry.execute("shell", command=cmd)
 
-            output = {
-                "operation": operation,
-                "success": result.success,
-                "output": result.output,
-            }
+        # Raise exception if operation failed
+        if not result.success:
+            raise Exception(f"Container operation failed: {result.error}")
 
-            output_key = node.output_key or node.id
-            context.set(output_key, output)
+        output = {
+            "operation": operation,
+            "success": result.success,
+            "output": result.output,
+        }
 
-            return NodeResult(
-                node_id=node.id,
-                status=(
-                    ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED
-                ),
-                output=output,
-                duration_seconds=time.time() - start_time,
-                tool_calls_used=1,
-            )
-        except Exception as e:
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
-            )
+        return output, 1
 
 
 @dataclass
-class TerraformHandler:
+class TerraformHandler(BaseHandler):
     """Terraform/OpenTofu IaC operations.
 
     Manages infrastructure provisioning.
@@ -162,26 +140,25 @@ class TerraformHandler:
 
     binary: str = "terraform"
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
-        start_time = time.time()
-
+    ) -> Tuple[Any, int]:
+        """Execute Terraform operations."""
         operation = node.input_mapping.get("operation", "plan")
         workspace = node.input_mapping.get("workspace")
         auto_approve = node.input_mapping.get("auto_approve", False)
         tool_calls = 0
 
         if workspace:
-            await tool_registry.execute(
+            result = await tool_registry.execute(
                 "shell", command=f"{self.binary} workspace select {workspace}"
             )
             tool_calls += 1
+            if not result.success:
+                raise Exception(f"Workspace selection failed: {result.error}")
 
         if operation == "init":
             cmd = f"{self.binary} init"
@@ -198,47 +175,27 @@ class TerraformHandler:
             if auto_approve:
                 cmd += " -auto-approve"
         else:
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error=f"Unknown operation: {operation}",
-                duration_seconds=time.time() - start_time,
-            )
+            raise ValueError(f"Unknown operation: {operation}")
 
-        try:
-            result = await tool_registry.execute("shell", command=cmd)
-            tool_calls += 1
+        result = await tool_registry.execute("shell", command=cmd)
+        tool_calls += 1
 
-            output = {
-                "operation": operation,
-                "workspace": workspace,
-                "success": result.success,
-                "output": result.output,
-            }
+        # Raise exception if operation failed
+        if not result.success:
+            raise Exception(f"Terraform operation failed: {result.error}")
 
-            output_key = node.output_key or node.id
-            context.set(output_key, output)
+        output = {
+            "operation": operation,
+            "workspace": workspace,
+            "success": result.success,
+            "output": result.output,
+        }
 
-            return NodeResult(
-                node_id=node.id,
-                status=(
-                    ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED
-                ),
-                output=output,
-                duration_seconds=time.time() - start_time,
-                tool_calls_used=tool_calls,
-            )
-        except Exception as e:
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
-            )
+        return output, tool_calls
 
 
 @dataclass
-class MLOpsHandler:
+class MLOpsHandler(BaseHandler):
     """MLOps pipeline operations handler.
 
     Supports model lifecycle management using MLflow:
@@ -278,16 +235,13 @@ class MLOpsHandler:
 
     tracking_uri: str = "mlruns"
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
-        start_time = time.time()
-
+    ) -> Tuple[Any, int]:
+        """Execute MLOps operations."""
         operation = node.input_mapping.get("operation", "register")
         model_name = node.input_mapping.get("model_name")
         model_path = node.input_mapping.get("model_path")
@@ -298,42 +252,23 @@ class MLOpsHandler:
         version = node.input_mapping.get("version")
         port = node.input_mapping.get("port", 5001)
 
-        try:
-            result = await self._run_mlops(
-                operation=operation,
-                model_name=model_name,
-                model_path=model_path,
-                metrics=metrics,
-                params=params,
-                experiment_name=experiment_name,
-                stage=stage,
-                version=version,
-                port=port,
-            )
+        result = await self._run_mlops(
+            operation=operation,
+            model_name=model_name,
+            model_path=model_path,
+            metrics=metrics,
+            params=params,
+            experiment_name=experiment_name,
+            stage=stage,
+            version=version,
+            port=port,
+        )
 
-            output_key = node.output_key or node.id
-            context.set(output_key, result)
+        # Raise exception if MLOps operation failed
+        if not result.get("success"):
+            raise Exception(result.get("error", "MLOps operation failed"))
 
-            return NodeResult(
-                node_id=node.id,
-                status=(
-                    ExecutorNodeStatus.COMPLETED
-                    if result.get("success")
-                    else ExecutorNodeStatus.FAILED
-                ),
-                output=result,
-                duration_seconds=time.time() - start_time,
-                error=result.get("error"),
-            )
-
-        except Exception as e:
-            logger.exception(f"MLOps operation failed: {e}")
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
-            )
+        return result, 0
 
     async def _run_mlops(
         self,

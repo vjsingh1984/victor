@@ -20,21 +20,15 @@ class TestHuggingFaceProviderInitialization:
         assert provider._api_key == "hf_test_key_123"
         assert provider.name == "huggingface"
 
-    def test_initialization_from_hf_token_env(self):
-        """Test API key loading from HF_TOKEN environment variable."""
-        with patch.dict("os.environ", {"HF_TOKEN": "hf_env_token", "HUGGINGFACE_API_KEY": ""}):
-            provider = HuggingFaceProvider()
-            assert provider._api_key == "hf_env_token"
-
     def test_initialization_from_huggingface_api_key_env(self):
         """Test API key loading from HUGGINGFACE_API_KEY environment variable."""
-        with patch.dict("os.environ", {"HF_TOKEN": "", "HUGGINGFACE_API_KEY": "hf_api_key"}):
+        with patch.dict("os.environ", {"HUGGINGFACE_API_KEY": "hf_api_key"}):
             provider = HuggingFaceProvider()
             assert provider._api_key == "hf_api_key"
 
     def test_initialization_from_keyring(self):
         """Test API key loading from keyring when env var not set."""
-        with patch.dict("os.environ", {"HF_TOKEN": "", "HUGGINGFACE_API_KEY": ""}, clear=False):
+        with patch.dict("os.environ", {"HUGGINGFACE_API_KEY": ""}, clear=False):
             with patch(
                 "victor.config.api_keys.get_api_key",
                 return_value="keyring-hf-key",
@@ -44,22 +38,13 @@ class TestHuggingFaceProviderInitialization:
 
     def test_initialization_warning_without_key(self, caplog):
         """Test warning is logged when no API key provided."""
-        with patch.dict("os.environ", {"HF_TOKEN": "", "HUGGINGFACE_API_KEY": ""}, clear=False):
+        with patch.dict("os.environ", {"HUGGINGFACE_API_KEY": ""}, clear=False):
             with patch(
                 "victor.config.api_keys.get_api_key",
                 return_value=None,
             ):
                 provider = HuggingFaceProvider()
                 assert provider._api_key == ""
-
-    def test_hf_token_priority_over_huggingface_api_key(self):
-        """Test HF_TOKEN takes priority over HUGGINGFACE_API_KEY."""
-        with patch.dict(
-            "os.environ", {"HF_TOKEN": "primary_token", "HUGGINGFACE_API_KEY": "secondary_key"}
-        ):
-            provider = HuggingFaceProvider()
-            assert provider._api_key == "primary_token"
-
 
 class TestHuggingFaceProviderCapabilities:
     """Tests for HuggingFaceProvider capability reporting."""

@@ -39,8 +39,7 @@ from victor.config.tool_selection_defaults import HybridSelectorDefaults
 if TYPE_CHECKING:
     from victor.agent.protocols import ToolSelectionContext, ToolSelectorFeatures
     from victor.framework.rl.learners.tool_selector import ToolSelectorLearner
-    from victor.tools.keyword_tool_selector import KeywordToolSelector
-    from victor.tools.semantic_selector import SemanticToolSelector
+    from victor.protocols.tool_selector import IToolSelector
 
 logger = logging.getLogger(__name__)
 
@@ -109,8 +108,8 @@ class HybridToolSelector:
 
     def __init__(
         self,
-        semantic_selector: "SemanticToolSelector",
-        keyword_selector: "KeywordToolSelector",
+        semantic_selector: "IToolSelector",
+        keyword_selector: "IToolSelector",
         config: Optional[HybridSelectorConfig] = None,
     ):
         """Initialize hybrid tool selector.

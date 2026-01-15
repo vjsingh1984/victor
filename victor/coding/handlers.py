@@ -35,20 +35,21 @@ Usage:
 from __future__ import annotations
 
 import logging
-import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, Tuple
+
+from victor.framework.workflows.base_handler import BaseHandler
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
+    from victor.workflows.executor import WorkflowContext
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class CodeValidationHandler:
+class CodeValidationHandler(BaseHandler):
     """Validate code syntax and style.
 
     Runs linters and type checkers on code files without LLM.
@@ -63,17 +64,13 @@ class CodeValidationHandler:
           output: validation_results
     """
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
-        start_time = time.time()
-        tool_calls = 0
-
+    ) -> Tuple[Any, int]:
+        """Execute code validation checks."""
         files = node.input_mapping.get("files", [])
         checks = node.input_mapping.get("checks", ["lint"])
 
@@ -82,6 +79,7 @@ class CodeValidationHandler:
 
         results = {}
         all_passed = True
+        tool_calls = 0
 
         for check in checks:
             check_result = await self._run_check(check, files, tool_registry)
@@ -91,16 +89,7 @@ class CodeValidationHandler:
                 all_passed = False
 
         output = {"checks": results, "all_passed": all_passed}
-        output_key = node.output_key or node.id
-        context.set(output_key, output)
-
-        return NodeResult(
-            node_id=node.id,
-            status=ExecutorNodeStatus.COMPLETED,
-            output=output,
-            duration_seconds=time.time() - start_time,
-            tool_calls_used=tool_calls,
-        )
+        return output, tool_calls
 
     async def _run_check(
         self, check: str, files: List[str], tool_registry: "ToolRegistry"
@@ -131,7 +120,7 @@ class CodeValidationHandler:
 
 
 @dataclass
-class TestRunnerHandler:
+class TestRunnerHandler(BaseHandler):
     """Run tests and collect results.
 
     Executes test suites and parses results.
@@ -147,16 +136,13 @@ class TestRunnerHandler:
           output: test_results
     """
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
-        start_time = time.time()
-
+    ) -> Tuple[Any, int]:
+        """Execute test runner."""
         test_path = node.input_mapping.get("test_path", "tests/")
         framework = node.input_mapping.get("framework", "pytest")
         coverage = node.input_mapping.get("coverage", False)
@@ -170,34 +156,19 @@ class TestRunnerHandler:
         else:
             cmd = f"{framework} {test_path}"
 
-        try:
-            result = await tool_registry.execute("shell", command=cmd)
+        result = await tool_registry.execute("shell", command=cmd)
 
-            output = {
-                "framework": framework,
-                "passed": result.success,
-                "output": result.output,
-            }
+        # Raise exception if test execution failed
+        if not result.success:
+            raise Exception(f"Test execution failed: {result.error}")
 
-            output_key = node.output_key or node.id
-            context.set(output_key, output)
+        output = {
+            "framework": framework,
+            "passed": result.success,
+            "output": result.output,
+        }
 
-            return NodeResult(
-                node_id=node.id,
-                status=(
-                    ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED
-                ),
-                output=output,
-                duration_seconds=time.time() - start_time,
-                tool_calls_used=1,
-            )
-        except Exception as e:
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
-            )
+        return output, 1
 
 
 HANDLERS = {

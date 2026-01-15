@@ -93,7 +93,7 @@ from victor.workflows.definition import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    from victor.protocols import WorkflowAgentProtocol
     from victor.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
@@ -188,8 +188,8 @@ class NodeExecutorFactory:
 
     def __init__(
         self,
-        orchestrator: Optional["AgentOrchestrator"] = None,
-        orchestrators: Optional[Dict[str, "AgentOrchestrator"]] = None,
+        orchestrator: Optional["WorkflowAgentProtocol"] = None,
+        orchestrators: Optional[Dict[str, "WorkflowAgentProtocol"]] = None,
         tool_registry: Optional["ToolRegistry"] = None,
     ):
         """Initialize the factory.
@@ -787,8 +787,8 @@ class YAMLToStateGraphCompiler:
 
     def __init__(
         self,
-        orchestrator: Optional["AgentOrchestrator"] = None,
-        orchestrators: Optional[Dict[str, "AgentOrchestrator"]] = None,
+        orchestrator: Optional["WorkflowAgentProtocol"] = None,
+        orchestrators: Optional[Dict[str, "WorkflowAgentProtocol"]] = None,
         tool_registry: Optional["ToolRegistry"] = None,
         config: Optional[CompilerConfig] = None,
     ):
@@ -1067,7 +1067,7 @@ class YAMLToStateGraphCompiler:
 
 def compile_yaml_workflow(
     workflow: WorkflowDefinition,
-    orchestrator: Optional["AgentOrchestrator"] = None,
+    orchestrator: Optional["WorkflowAgentProtocol"] = None,
     tool_registry: Optional["ToolRegistry"] = None,
     config: Optional[CompilerConfig] = None,
 ) -> CompiledGraph[WorkflowState]:
@@ -1091,7 +1091,7 @@ def compile_yaml_workflow(
 async def execute_yaml_workflow(
     workflow: WorkflowDefinition,
     initial_state: Optional[Dict[str, Any]] = None,
-    orchestrator: Optional["AgentOrchestrator"] = None,
+    orchestrator: Optional["WorkflowAgentProtocol"] = None,
     tool_registry: Optional["ToolRegistry"] = None,
     thread_id: Optional[str] = None,
     config: Optional[CompilerConfig] = None,

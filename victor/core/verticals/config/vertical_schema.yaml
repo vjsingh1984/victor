@@ -1,0 +1,331 @@
+# YAML Configuration Schema for Victor Verticals
+# Version: 1.0.0
+#
+# This schema defines the structure for YAML-based vertical configuration.
+# Verticals can define their configuration in YAML instead of implementing
+# multiple get_* methods, reducing boilerplate by 90%.
+#
+# File Location: victor/{vertical}/config/vertical.yaml
+#
+# Example:
+#   victor/coding/config/vertical.yaml
+#   victor/devops/config/vertical.yaml
+#   victor/research/config/vertical.yaml
+
+version: "1.0"
+
+# =============================================================================
+# Vertical Metadata
+# =============================================================================
+metadata:
+  # Vertical identifier (required)
+  name: "vertical_name"
+
+  # Human-readable description (required)
+  description: "Vertical description"
+
+  # Vertical version (optional, default: "1.0.0")
+  version: "1.0.0"
+
+  # Author/maintainer (optional)
+  author: "optional"
+
+  # Additional metadata (optional)
+  tags: []
+  categories: []
+
+# =============================================================================
+# Core Configuration (Required)
+# =============================================================================
+core:
+  # ==============================================================================
+  # Tools Configuration
+  # ==============================================================================
+  tools:
+    # List of canonical tool names (required)
+    # Examples: ["read", "write", "edit", "shell", "git", "search"]
+    list:
+      - read
+      - write
+      - edit
+
+    # OR specify tools by capability groups (optional)
+    # This will be expanded to actual tool names by the loader
+    # capabilities:
+    #   - file_read
+    #   - file_write
+    #   - code_analysis
+
+    # Exclude specific tools (optional)
+    exclude: []
+
+  # ==============================================================================
+  # System Prompt Configuration
+  # ==============================================================================
+  system_prompt:
+    # Prompt source type: "inline", "file", or "template" (default: "inline")
+    source: "inline"
+
+    # Inline prompt text (used when source: "inline")
+    text: |
+      You are an expert assistant for {vertical} tasks...
+      Follow these guidelines:
+      - Be concise and accurate
+      - Use tools efficiently
+      - Think before acting
+
+    # OR load from file (used when source: "file")
+    file_path: "prompts/system_prompt.txt"
+
+    # OR use template with variable substitution (used when source: "template")
+    template: |
+      You are a {role} specializing in {domain}.
+      Your expertise includes: {expertise_areas}
+
+  # ==============================================================================
+  # Stage Definitions (Optional)
+  # =============================================================================
+  stages:
+    # Stage name maps to StageDefinition
+    INITIAL:
+      name: "INITIAL"
+      description: "Understanding the request"
+      # Tools allowed in this stage
+      tools: ["read", "ls", "grep"]
+      # Keywords that trigger this stage
+      keywords: ["what", "how", "explain", "help"]
+      # Next possible stages
+      next_stages: ["PLANNING", "READING"]
+      # Stage priority (higher = preferred)
+      priority: 10
+
+    PLANNING:
+      name: "PLANNING"
+      description: "Creating implementation plan"
+      tools: ["read", "grep", "code_search"]
+      keywords: ["plan", "design", "approach"]
+      next_stages: ["EXECUTING"]
+      priority: 8
+
+    # Additional stages...
+
+# =============================================================================
+# Provider Configuration (Optional)
+# =============================================================================
+provider:
+  # Provider hints for model selection
+  hints:
+    # Preferred providers (optional)
+    preferred: ["anthropic", "openai"]
+
+    # Minimum context window required (optional)
+    min_context_window: 100000
+
+    # Tool calling support required (optional, default: true)
+    requires_tool_calling: true
+
+    # Recommended models (optional)
+    recommended_models:
+      anthropic: ["claude-sonnet-4-5", "claude-3-5-sonnet-20241022"]
+      openai: ["gpt-4", "gpt-4-turbo"]
+
+  # Generation parameters (optional)
+  parameters:
+    temperature: 0.7
+    max_tokens: 4096
+    top_p: 0.95
+    frequency_penalty: 0.0
+
+# =============================================================================
+# Tiered Tools Configuration (Optional)
+# =============================================================================
+tiered_tools:
+  # Mandatory tools available in all stages (optional)
+  mandatory: ["read", "ls", "grep"]
+
+  # Core tools for this vertical (optional)
+  vertical_core: ["edit", "write", "code_search"]
+
+  # Semantic pool tools for intelligent selection (optional)
+  semantic_pool: ["symbol", "refs", "definition"]
+
+  # Stage-specific tools (optional)
+  # Maps stage names to tool lists
+  stage_tools:
+    INITIAL: ["read", "ls", "overview"]
+    PLANNING: ["code_search", "grep"]
+    EXECUTING: ["edit", "write", "test"]
+
+  # Feature flags (optional)
+  flags:
+    enable_tiered_selection: true
+    enable_semantic_pool: true
+
+# =============================================================================
+# Extension Configuration (Optional)
+# =============================================================================
+extensions:
+  # ==============================================================================
+  # Middleware Configuration
+  # ==============================================================================
+  middleware:
+    enabled: true
+
+    # List of middleware to apply (in order)
+    list:
+      - name: "CodeCorrectionMiddleware"
+        module: "victor.coding.middleware"
+        priority: HIGH
+        enabled: true
+        config:
+          max_fix_attempts: 3
+          auto_fix: true
+
+      - name: "GitSafetyMiddleware"
+        module: "victor.coding.middleware"
+        priority: MEDIUM
+        enabled: true
+
+  # ==============================================================================
+  # Safety Patterns Configuration
+  # ==============================================================================
+  safety:
+    enabled: true
+
+    # Safety patterns to apply
+    patterns:
+      - name: "DangerousGitOperations"
+        category: "version_control"
+        risk_level: HIGH
+        check: "git push --force"
+        action: "block"
+        message: "Dangerous operation blocked"
+
+      - name: "FileDeleteProtection"
+        category: "file_operations"
+        risk_level: MEDIUM
+        check: "rm -rf"
+        action: "confirm"
+        message: "This will delete files. Continue?"
+
+  # ==============================================================================
+  # Prompt Contributors (Optional)
+  # ==============================================================================
+  prompt_contributor:
+    enabled: true
+
+    # Module containing prompt contribution functions
+    module: "victor.coding.prompts"
+    class: "CodingPromptContributor"
+
+    # Task-specific hints (optional)
+    task_hints:
+      - task_type: "edit"
+        hint: "[EDIT] Read target file first, then make focused modifications."
+        tool_budget: 15
+        priority_tools: ["read", "edit", "grep"]
+
+      - task_type: "refactor"
+        hint: "[REFACTOR] Analyze code structure before making changes."
+        tool_budget: 25
+        priority_tools: ["read", "code_search", "symbol"]
+
+  # ==============================================================================
+  # Mode Configuration (Optional)
+  # ==============================================================================
+  mode_config:
+    enabled: true
+
+    # Module containing mode configuration
+    module: "victor.coding.mode_config"
+    class: "CodingModeConfigProvider"
+
+  # ==============================================================================
+  # Tool Dependencies (Optional)
+  # ==============================================================================
+  tool_dependencies:
+    enabled: true
+
+    # Module containing tool dependency provider
+    module: "victor.core.tool_dependency_loader"
+
+  # ==============================================================================
+  # Workflow Provider (Optional)
+  # ==============================================================================
+  workflow_provider:
+    enabled: true
+
+    # Type: "yaml_provider" for YAML-based workflows
+    type: "yaml_provider"
+
+    # YAML workflow configuration
+    config:
+      # Module with escape hatches (conditions/transforms)
+      escape_hatches_module: "victor.coding.escape_hatches"
+
+      # Workflows directory (relative to vertical root)
+      workflows_directory: "./workflows"
+
+      # Capabilities module (optional)
+      capabilities_module: "victor.coding.capabilities"
+
+  # ==============================================================================
+  # Service Provider (Optional)
+  # ==============================================================================
+  service_provider:
+    enabled: false
+
+    # Module and class for service provider
+    module: "victor.coding.service_provider"
+    class: "CodingServiceProvider"
+
+  # ==============================================================================
+  # RL Configuration (Optional)
+  # ==============================================================================
+  rl_config:
+    enabled: false
+
+    # RL-specific configuration
+    config:
+      enable_learning: true
+      enable_outcome_tracking: true
+
+# =============================================================================
+# Evaluation Configuration (Optional)
+# =============================================================================
+evaluation:
+  # Criteria for evaluating vertical performance
+  criteria:
+    - "Code correctness and functionality"
+    - "Test coverage and validation"
+    - "Code quality and maintainability"
+    - "Documentation completeness"
+
+  # Success metrics (optional)
+  metrics:
+    - name: "test_success_rate"
+      threshold: 0.95
+      description: "Percentage of tests passing"
+
+    - name: "code_quality_score"
+      threshold: 0.8
+      description: "Code quality rating"
+
+# =============================================================================
+# Advanced Configuration (Optional)
+# =============================================================================
+advanced:
+  # Custom configuration for vertical-specific features
+  custom: {}
+
+  # Feature flags
+  features:
+    enable_code_completion: true
+    enable_context_awareness: true
+    enable_proactive_suggestions: false
+
+  # Performance tuning
+  performance:
+    cache_ttl: 3600
+    lazy_loading: true
+    parallel_processing: false

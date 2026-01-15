@@ -12,84 +12,120 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Agent module - orchestrator and supporting components."""
+"""Agent module - orchestrator and supporting components.
 
-from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
+This module uses lazy loading for all components to improve startup time.
+Components are loaded on-demand via __getattr__(), providing the same API
+with faster import times.
 
-# OBSOLETE: ConfigLoader moved to victor/agent/archive/obsolete/config_loader.py
-# Configuration is now loaded via Settings objects and composed by OrchestratorFactory
-from victor.agent.config import UnifiedAgentConfig, AgentMode
-from victor.agent.tool_selection import get_critical_tools
-from victor.agent.message_history import MessageHistory
+Startup optimization: All imports are deferred until first access.
+"""
 
-# OBSOLETE: observability moved to victor/agent/archive/obsolete/observability.py
-# Observability is now handled by victor.core.events (get_observability_bus)
-from victor.agent.orchestrator import AgentOrchestrator
-from victor.agent.stream_handler import StreamHandler, StreamResult, StreamMetrics, StreamBuffer
-from victor.agent.tool_executor import ToolExecutor, ToolExecutionResult
+from typing import Any
 
-# New decomposed components
-from victor.agent.conversation_controller import (
-    ConversationController,
-    ConversationConfig,
-    ContextMetrics,
-)
-from victor.agent.tool_pipeline import (
-    ToolPipeline,
-    ToolPipelineConfig,
-    ToolCallResult,
-    PipelineExecutionResult,
-)
-from victor.agent.streaming_controller import (
-    StreamingController,
-    StreamingControllerConfig,
-    StreamingSession,
-)
-from victor.agent.task_analyzer import (
-    TaskAnalyzer,
-    TaskAnalysis,
-    get_task_analyzer,
-    reset_task_analyzer,
-)
+# NO other imports at module level - everything is lazy-loaded via __getattr__()
+# This significantly improves `import victor` startup time
 
-# Phase 1 extraction components (Task 1)
-from victor.agent.configuration_manager import (
-    ConfigurationManager,
-    create_configuration_manager,
-    get_configuration_manager,
-    reset_configuration_manager,
-)
-from victor.agent.memory_manager import (
-    MemoryManager,
-    SessionRecoveryManager,
-    create_memory_manager,
-    create_session_recovery_manager,
-)
-from victor.agent.search_router import (
-    SearchRouter,
-    SearchRoute,
-    SearchType,
-    route_query,
-    suggest_search_tool,
-    is_keyword_query,
-    is_semantic_query,
-)
 
-# Intelligent agent components (RL-based learning, quality scoring, prompt optimization)
-from victor.agent.intelligent_pipeline import (
-    IntelligentAgentPipeline,
-    RequestContext,
-    ResponseResult,
-    PipelineStats,
-    get_pipeline,
-    clear_pipeline_cache,
-)
-from victor.agent.orchestrator_integration import (
-    OrchestratorIntegration,
-    IntegrationConfig,
-    IntegrationMetrics,
-    enhance_orchestrator,
-)
+def __getattr__(name: str) -> Any:
+    """Lazy import agent components on first access.
+
+    This function is called by Python when an attribute is not found in the module.
+    It dynamically imports the requested component, providing transparent lazy loading.
+
+    Args:
+        name: The name of the component to import
+
+    Returns:
+        The requested component
+
+    Raises:
+        AttributeError: If the component is not recognized
+    """
+    import importlib
+
+    # Map of component names to their (module_path, attribute_name) tuples
+    # Only import the specific module when the component is accessed
+    lazy_imports = {
+        # Core configuration
+        "UnifiedAgentConfig": ("victor.agent.config", "UnifiedAgentConfig"),
+        "AgentMode": ("victor.agent.config", "AgentMode"),
+        # Orchestrator
+        "AgentOrchestrator": ("victor.agent.orchestrator", "AgentOrchestrator"),
+        # Argument normalization
+        "ArgumentNormalizer": ("victor.agent.argument_normalizer", "ArgumentNormalizer"),
+        "NormalizationStrategy": ("victor.agent.argument_normalizer", "NormalizationStrategy"),
+        # Message history
+        "MessageHistory": ("victor.agent.message_history", "MessageHistory"),
+        # Tool selection
+        "get_critical_tools": ("victor.agent.tool_selection", "get_critical_tools"),
+        # Stream handling
+        "StreamHandler": ("victor.agent.stream_handler", "StreamHandler"),
+        "StreamResult": ("victor.agent.stream_handler", "StreamResult"),
+        "StreamMetrics": ("victor.agent.stream_handler", "StreamMetrics"),
+        "StreamBuffer": ("victor.agent.stream_handler", "StreamBuffer"),
+        # Tool execution
+        "ToolExecutor": ("victor.agent.tool_executor", "ToolExecutor"),
+        "ToolExecutionResult": ("victor.agent.tool_executor", "ToolExecutionResult"),
+        # Conversation control
+        "ConversationController": ("victor.agent.conversation_controller", "ConversationController"),
+        "ConversationConfig": ("victor.agent.conversation_controller", "ConversationConfig"),
+        "ContextMetrics": ("victor.agent.conversation_controller", "ContextMetrics"),
+        # Tool pipeline
+        "ToolPipeline": ("victor.agent.tool_pipeline", "ToolPipeline"),
+        "ToolPipelineConfig": ("victor.agent.tool_pipeline", "ToolPipelineConfig"),
+        "ToolCallResult": ("victor.agent.tool_pipeline", "ToolCallResult"),
+        "PipelineExecutionResult": ("victor.agent.tool_pipeline", "PipelineExecutionResult"),
+        # Streaming controller
+        "StreamingController": ("victor.agent.streaming_controller", "StreamingController"),
+        "StreamingControllerConfig": ("victor.agent.streaming_controller", "StreamingControllerConfig"),
+        "StreamingSession": ("victor.agent.streaming_controller", "StreamingSession"),
+        # Task analyzer
+        "TaskAnalyzer": ("victor.agent.task_analyzer", "TaskAnalyzer"),
+        "TaskAnalysis": ("victor.agent.task_analyzer", "TaskAnalysis"),
+        "get_task_analyzer": ("victor.agent.task_analyzer", "get_task_analyzer"),
+        "reset_task_analyzer": ("victor.agent.task_analyzer", "reset_task_analyzer"),
+        # Configuration manager
+        "ConfigurationManager": ("victor.agent.configuration_manager", "ConfigurationManager"),
+        "create_configuration_manager": ("victor.agent.configuration_manager", "create_configuration_manager"),
+        "get_configuration_manager": ("victor.agent.configuration_manager", "get_configuration_manager"),
+        "reset_configuration_manager": ("victor.agent.configuration_manager", "reset_configuration_manager"),
+        # Memory manager
+        "MemoryManager": ("victor.agent.memory_manager", "MemoryManager"),
+        "SessionRecoveryManager": ("victor.agent.memory_manager", "SessionRecoveryManager"),
+        "create_memory_manager": ("victor.agent.memory_manager", "create_memory_manager"),
+        "create_session_recovery_manager": ("victor.agent.memory_manager", "create_session_recovery_manager"),
+        # Search router
+        "SearchRouter": ("victor.agent.search_router", "SearchRouter"),
+        "SearchRoute": ("victor.agent.search_router", "SearchRoute"),
+        "SearchType": ("victor.agent.search_router", "SearchType"),
+        "route_query": ("victor.agent.search_router", "route_query"),
+        "suggest_search_tool": ("victor.agent.search_router", "suggest_search_tool"),
+        "is_keyword_query": ("victor.agent.search_router", "is_keyword_query"),
+        "is_semantic_query": ("victor.agent.search_router", "is_semantic_query"),
+        # Intelligent pipeline
+        "IntelligentAgentPipeline": ("victor.agent.intelligent_pipeline", "IntelligentAgentPipeline"),
+        "RequestContext": ("victor.agent.intelligent_pipeline", "RequestContext"),
+        "ResponseResult": ("victor.agent.intelligent_pipeline", "ResponseResult"),
+        "PipelineStats": ("victor.agent.intelligent_pipeline", "PipelineStats"),
+        "get_pipeline": ("victor.agent.intelligent_pipeline", "get_pipeline"),
+        "clear_pipeline_cache": ("victor.agent.intelligent_pipeline", "clear_pipeline_cache"),
+        # Orchestrator integration
+        "OrchestratorIntegration": ("victor.agent.orchestrator_integration", "OrchestratorIntegration"),
+        "IntegrationConfig": ("victor.agent.orchestrator_integration", "IntegrationConfig"),
+        "IntegrationMetrics": ("victor.agent.orchestrator_integration", "IntegrationMetrics"),
+        "enhance_orchestrator": ("victor.agent.orchestrator_integration", "enhance_orchestrator"),
+    }
+
+    if name in lazy_imports:
+        module_path, attr_name = lazy_imports[name]
+        module = importlib.import_module(module_path)
+        # Cache the imported attribute in module globals for faster subsequent access
+        globals()[name] = getattr(module, attr_name)
+        return globals()[name]
+
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "AgentOrchestrator",

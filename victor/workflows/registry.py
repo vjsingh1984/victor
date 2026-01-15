@@ -21,11 +21,12 @@ including support for dynamic loading and caching.
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.workflows.definition import (
     WorkflowDefinition,
@@ -102,7 +103,7 @@ class WorkflowRegistry:
         workflow = registry.get("my_workflow")
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the registry."""
         self._definitions: Dict[str, WorkflowDefinition] = {}
         self._factories: Dict[str, Callable[[], WorkflowDefinition]] = {}
@@ -164,7 +165,9 @@ class WorkflowRegistry:
 
                 # Update node's allowed_tools
                 try:
-                    node.allowed_tools = canonical_tools
+                    # Type narrowing: check if node has allowed_tools attribute
+                    if hasattr(node, "allowed_tools"):
+                        setattr(node, "allowed_tools", canonical_tools)
                 except AttributeError:
                     if legacy:
                         logger.warning(

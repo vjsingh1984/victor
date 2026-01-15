@@ -45,6 +45,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -108,6 +109,9 @@ class LifecycleManager:
         self._sequence_tracker = sequence_tracker
         self._usage_analytics = usage_analytics
         self._reminder_manager = reminder_manager
+
+        # Session configuration
+        self._session_config: Optional[Any] = None
 
         # Optional components for shutdown
         self._provider: Optional[Any] = None
@@ -298,7 +302,12 @@ class LifecycleManager:
         """
         message_count = 0
         if hasattr(self._conversation_controller, "message_count"):
-            message_count = self._conversation_controller.message_count()
+            method = self._conversation_controller.message_count
+            if callable(method):
+                try:
+                    message_count = method()
+                except (TypeError, AttributeError):
+                    message_count = 0
 
         return {
             "message_count": message_count,
@@ -347,6 +356,143 @@ class LifecycleManager:
         except Exception as e:
             logger.warning(f"Failed to recover session {session_id}: {e}")
             return False
+
+    async def initialize_session(
+        self,
+        session_id: str,
+        config: Any,
+    ) -> Any:
+        """Initialize a new session.
+
+        This method:
+        - Resets conversation state
+        - Initializes analytics session
+        - Configures session parameters
+        - Returns SessionMetadata with allocated resources
+
+        Args:
+            session_id: Unique session identifier
+            config: Session configuration (SessionConfig from protocol)
+
+        Returns:
+            SessionMetadata with session info
+        """
+        from victor.protocols.lifecycle import SessionMetadata
+
+        # Reset conversation
+        self._conversation_controller.reset()
+
+        # Initialize analytics
+        if self._usage_analytics is not None:
+            if self._usage_analytics._current_session is not None:
+                self._usage_analytics.end_session()
+            self._usage_analytics.start_session()
+
+        # Initialize metrics
+        if self._metrics_collector is not None:
+            self._metrics_collector.reset_stats()
+
+        # Store config
+        self._session_config = config
+
+        # Build resources metadata
+        resources = {
+            "conversation_controller": True,
+            "metrics_collector": self._metrics_collector is not None,
+            "usage_analytics": self._usage_analytics is not None,
+            "context_compactor": self._context_compactor is not None,
+        }
+
+        logger.info(f"Initialized session {session_id} with config: {config}")
+
+        return SessionMetadata(
+            session_id=session_id,
+            created_at=time.strftime("%Y-%m-%d %H:%M:%S"),
+            config=config,
+            resources=resources,
+            metadata={"initialized": True},
+        )
+
+    async def cleanup_session(self, session_id: str) -> Any:
+        """Cleanup session resources.
+
+        This method:
+        - Ends analytics session
+        - Frees resources
+        - Returns CleanupResult with freed resources
+
+        Args:
+            session_id: Session to cleanup
+
+        Returns:
+            CleanupResult with cleanup status
+        """
+        from victor.protocols.lifecycle import CleanupResult
+
+        freed_resources = []
+
+        # Reset conversation
+        self._conversation_controller.reset()
+        freed_resources.append("conversation")
+
+        # End analytics
+        if self._usage_analytics is not None:
+            if self._usage_analytics._current_session is not None:
+                self._usage_analytics.end_session()
+            freed_resources.append("analytics")
+
+        # Reset metrics
+        if self._metrics_collector is not None:
+            self._metrics_collector.reset_stats()
+            freed_resources.append("metrics")
+
+        # Reset context compactor
+        if self._context_compactor is not None:
+            self._context_compactor.reset_statistics()
+            freed_resources.append("context_compactor")
+
+        logger.info(f"Cleaned up session {session_id}, freed resources: {freed_resources}")
+
+        return CleanupResult(
+            success=True,
+            session_id=session_id,
+            resources_freed=freed_resources,
+            error_message=None,
+            metadata={"cleanup_type": "full"},
+        )
+
+    async def get_session_status(
+        self,
+        session_id: str,
+    ) -> Dict[str, Any]:
+        """Get status of a session.
+
+        Returns health and resource usage information for
+        monitoring and debugging.
+
+        Args:
+            session_id: Session to query
+
+        Returns:
+            Dictionary with session status information
+        """
+        # Get basic stats
+        stats = self.get_session_stats()
+
+        # Build status dictionary
+        status = {
+            "healthy": True,
+            "session_id": session_id,
+            "message_count": stats.get("message_count", 0),
+            "resources": {
+                "conversation_controller": self._conversation_controller is not None,
+                "metrics_collector": self._metrics_collector is not None,
+                "usage_analytics": self._usage_analytics is not None,
+                "context_compactor": self._context_compactor is not None,
+            },
+        }
+
+        return status
 
     # =========================================================================
     # INTERNAL METHODS (for orchestrator integration)

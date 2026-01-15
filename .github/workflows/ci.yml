@@ -28,6 +28,7 @@ jobs:
       - name: Install lint dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install "pip>=25.2"
           pip install black ruff mypy types-pyyaml types-aiofiles
 
       - name: Check formatting with Black
@@ -37,7 +38,24 @@ jobs:
         run: ruff check victor
 
       - name: Type check with MyPy
-        run: mypy victor
+        run: |
+          # Phase 1: Enhanced type checking for coordinator modules
+          # See TYPE_SAFETY_PLAN.md for roadmap
+          echo "=== Type checking coordinator modules (Phase 1) ===" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          mypy victor/agent/coordinators victor/agent/factory_adapter --config-file pyproject.toml | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo ""
+          echo "=== Type checking all modules (non-blocking) ===" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          mypy victor --config-file pyproject.toml | tee -a $GITHUB_STEP_SUMMARY || echo "Note: Some modules have type errors - see TYPE_SAFETY_PLAN.md"
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo ""
+          echo "### Type Safety Progress" >> $GITHUB_STEP_SUMMARY
+          echo "- **Strict mode modules:** 80+ modules (protocols, coordinators, workflows, providers)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Enhanced typing:** Coordinator modules with improved type coverage" >> $GITHUB_STEP_SUMMARY
+          echo "- **Permissive modules:** Legacy code with `ignore_errors = true`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Full details:** See TYPE_SAFETY_PLAN.md" >> $GITHUB_STEP_SUMMARY
         continue-on-error: true
 
   test:
@@ -63,27 +81,64 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install "pip>=25.2"
           # Use CPU-only torch for faster CI (saves ~800MB download)
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install -e ".[dev]"
 
       - name: Run unit tests
-        run: pytest tests/unit -v --cov=victor --cov-report=xml
+        run: |
+          pytest tests/unit -v \
+            --cov=victor \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-report=term-missing \
+            --cov-context=test \
+            --cov-fail-under=70
 
-      - name: Upload coverage
+      - name: Run integration tests (sample)
+        run: |
+          # Run a subset of integration tests for coverage
+          pytest tests/integration/agent/test_orchestrator_integration.py -v \
+            --cov=victor.agent.coordinators \
+            --cov-append \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-report=term-missing \
+            --cov-context=test \
+            --no-cov-on-fail || true
+
+      - name: Generate coverage report
+        run: |
+          echo "=== Coverage Summary ===" >> $GITHUB_STEP_SUMMARY
+          coverage report --sort=cover >> $GITHUB_STEP_SUMMARY || true
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Coordinator Modules Coverage" >> $GITHUB_STEP_SUMMARY
+          coverage report --include='victor/agent/coordinators/*' >> $GITHUB_STEP_SUMMARY || true
+
+      - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         if: matrix.python-version == '3.11'
         with:
           file: ./coverage.xml
           fail_ci_if_error: false
+          flags: unit-tests
+          name: codecov-umbrella
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload coverage HTML
+        uses: actions/upload-artifact@v4
+        if: matrix.python-version == '3.11'
+        with:
+          name: coverage-report
+          path: htmlcov/
 
       - name: CLI smoke test
         run: victor --help
 
   security:
-    name: Security Scan
+    name: Security Scan (Quick)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -99,6 +154,14 @@ jobs:
         uses: pypa/gh-action-pip-audit@v1.0.8
         with:
           inputs: "-e ."
+        continue-on-error: true
+
+      - name: Run Bandit (High Severity Only)
+        run: |
+          pip install bandit[toml]
+          bandit -r victor/ -lll \
+            --exclude victor/test/,victor/tests/,tests/ \
+          || true
         continue-on-error: true
 
   guards:

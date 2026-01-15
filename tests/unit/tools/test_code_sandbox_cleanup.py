@@ -65,15 +65,57 @@ class TestSandboxCleanupRegistry:
 
     def test_sandbox_added_to_registry_on_start(self):
         """Verify sandbox is added to active set when started."""
-        with patch("victor.tools.code_executor_tool.DOCKER_AVAILABLE", False):
-            sandbox = CodeSandbox(require_docker=False)
+        # Mock Docker to be available but prevent actual container creation
+        mock_container = Mock()
+        mock_container.short_id = "test123"
+
+        mock_client = Mock()
+        mock_client.images.pull.return_value = None
+        mock_client.containers.run.return_value = mock_container
+
+        with (
+            patch("victor.tools.code_executor_tool._check_docker_available", return_value=True),
+            patch("victor.tools.code_executor_tool._get_docker_components") as mock_get_components,
+        ):
+            # Mock the docker module and client
+            mock_docker_module = Mock()
+            mock_docker_module.from_env.return_value = mock_client
+            mock_get_components.return_value = (mock_docker_module, Mock(), Mock())
+
+            sandbox = CodeSandbox()
             # Should not be in registry before start
             assert sandbox not in _active_sandboxes
+            # Start the sandbox
+            sandbox.start()
+            # Should now be in registry
+            assert sandbox in _active_sandboxes
+            # Clean up
+            _active_sandboxes.discard(sandbox)
 
     def test_sandbox_removed_from_registry_on_stop(self):
         """Verify sandbox is removed from active set when stopped."""
-        with patch("victor.tools.code_executor_tool.DOCKER_AVAILABLE", False):
-            sandbox = CodeSandbox(require_docker=False)
+        # Mock Docker to be available but prevent actual container creation
+        mock_container = Mock()
+        mock_container.short_id = "test123"
+
+        mock_client = Mock()
+        mock_client.images.pull.return_value = None
+        mock_client.containers.run.return_value = mock_container
+
+        with (
+            patch("victor.tools.code_executor_tool._check_docker_available", return_value=True),
+            patch("victor.tools.code_executor_tool._get_docker_components") as mock_get_components,
+        ):
+            # Mock the docker module and client
+            mock_docker_module = Mock()
+            mock_docker_module.from_env.return_value = mock_client
+            mock_get_components.return_value = (mock_docker_module, Mock(), Mock())
+
+            sandbox = CodeSandbox()
+            # Start first to add to registry
+            sandbox.start()
+            assert sandbox in _active_sandboxes
+            # Stop to remove from registry
             sandbox.stop()
             assert sandbox not in _active_sandboxes
 
@@ -110,10 +152,13 @@ class TestCleanupFunctions:
         mock_client.containers.list.return_value = [mock_container1, mock_container2]
 
         with (
-            patch("victor.tools.code_executor_tool.DOCKER_AVAILABLE", True),
-            patch("victor.tools.code_executor_tool.docker") as mock_docker,
+            patch("victor.tools.code_executor_tool._check_docker_available", return_value=True),
+            patch("victor.tools.code_executor_tool._get_docker_components") as mock_get_components,
         ):
-            mock_docker.from_env.return_value = mock_client
+            # Mock the docker module and client
+            mock_docker_module = Mock()
+            mock_docker_module.from_env.return_value = mock_client
+            mock_get_components.return_value = (mock_docker_module, Mock(), Mock())
 
             cleaned = cleanup_orphaned_containers()
 
@@ -138,10 +183,13 @@ class TestCleanupFunctions:
         mock_client.containers.list.return_value = [mock_container]
 
         with (
-            patch("victor.tools.code_executor_tool.DOCKER_AVAILABLE", True),
-            patch("victor.tools.code_executor_tool.docker") as mock_docker,
+            patch("victor.tools.code_executor_tool._check_docker_available", return_value=True),
+            patch("victor.tools.code_executor_tool._get_docker_components") as mock_get_components,
         ):
-            mock_docker.from_env.return_value = mock_client
+            # Mock the docker module and client
+            mock_docker_module = Mock()
+            mock_docker_module.from_env.return_value = mock_client
+            mock_get_components.return_value = (mock_docker_module, Mock(), Mock())
 
             # Should not raise, just log warning
             cleaned = cleanup_orphaned_containers()
@@ -149,7 +197,7 @@ class TestCleanupFunctions:
 
     def test_cleanup_orphaned_returns_zero_when_docker_unavailable(self):
         """Verify orphaned cleanup returns 0 when Docker not available."""
-        with patch("victor.tools.code_executor_tool.DOCKER_AVAILABLE", False):
+        with patch("victor.tools.code_executor_tool._check_docker_available", return_value=False):
             cleaned = cleanup_orphaned_containers()
             assert cleaned == 0
 
@@ -167,20 +215,24 @@ class TestContainerLabeling:
         mock_client.containers.run.return_value = mock_container
 
         with (
-            patch("victor.tools.code_executor_tool.DOCKER_AVAILABLE", True),
-            patch("victor.tools.code_executor_tool.docker") as mock_docker,
+            patch("victor.tools.code_executor_tool._check_docker_available", return_value=True),
+            patch("victor.tools.code_executor_tool._get_docker_components") as mock_get_components,
         ):
-            mock_docker.from_env.return_value = mock_client
+            # Mock the docker module and client
+            mock_docker_module = Mock()
+            mock_docker_module.from_env.return_value = mock_client
+            mock_get_components.return_value = (mock_docker_module, Mock(), Mock())
 
             sandbox = CodeSandbox()
-            sandbox.docker_client = mock_client
-            sandbox.docker_available = True
             sandbox.start()
 
             # Verify labels were passed to container creation
             call_kwargs = mock_client.containers.run.call_args[1]
             assert "labels" in call_kwargs
             assert call_kwargs["labels"] == {SANDBOX_CONTAINER_LABEL: SANDBOX_CONTAINER_VALUE}
+
+            # Clean up
+            _active_sandboxes.discard(sandbox)
 
 
 class TestSandboxResourceCleanup:

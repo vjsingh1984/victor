@@ -21,6 +21,7 @@ import logging
 from rich.panel import Panel
 from rich.table import Table
 
+from victor.ui.common.constants import FIRST_ARG_INDEX
 from victor.ui.slash.protocol import BaseSlashCommand, CommandContext, CommandMetadata
 from victor.ui.slash.registry import register_command
 
@@ -135,7 +136,7 @@ class LoadCommand(BaseSlashCommand):
         from victor.agent.message_history import MessageHistory
         from victor.agent.session import get_session_manager
 
-        session_id = ctx.args[0]
+        session_id = ctx.args[FIRST_ARG_INDEX]
 
         try:
             session_manager = get_session_manager()
@@ -270,7 +271,7 @@ class ResumeCommand(BaseSlashCommand):
 
         # If session_id provided as argument, load it directly
         if ctx.args:
-            session_id = ctx.args[0]
+            session_id = ctx.args[FIRST_ARG_INDEX]
             self._load_session(ctx, session_id)
             return
 

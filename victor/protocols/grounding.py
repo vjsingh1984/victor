@@ -519,7 +519,7 @@ class CompositeGroundingVerifier:
         """
         all_claims = []
         results = []
-        strategy_scores = {}
+        strategy_scores: dict[str, list[float]] = {}
 
         # Extract claims from each strategy
         for strategy in self._strategies:

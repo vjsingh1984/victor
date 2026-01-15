@@ -114,21 +114,8 @@ class XAIProvider(BaseProvider):
             max_retries: Maximum retry attempts
             **kwargs: Additional configuration
         """
-        # Get API key from parameter, environment, or keyring
-        self._api_key = api_key or os.environ.get("XAI_API_KEY", "")
-        if not self._api_key:
-            try:
-                from victor.config.api_keys import get_api_key
-
-                # Try "xai" first, then "grok" alias
-                self._api_key = get_api_key("xai") or get_api_key("grok") or ""
-            except ImportError:
-                pass
-        if not self._api_key:
-            logger.warning(
-                "xAI API key not provided. Set XAI_API_KEY environment variable, "
-                "use 'victor keys --set xai --keyring', or pass api_key parameter."
-            )
+        # Resolve API key using centralized helper
+        self._api_key = self._resolve_api_key(api_key, "xai")
 
         super().__init__(
             api_key=self._api_key,

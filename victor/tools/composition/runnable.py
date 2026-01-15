@@ -63,6 +63,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import (
@@ -83,6 +84,8 @@ from typing import (
 
 if TYPE_CHECKING:
     from victor.tools.base import BaseTool, ToolResult
+
+from victor.core.errors import ToolExecutionError
 
 logger = logging.getLogger(__name__)
 
@@ -720,6 +723,10 @@ class ToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
                 "tool_name": self._tool.name,
             }
 
+            # Add arguments to metadata for error tracking
+            if output["metadata"]:
+                output["metadata"]["arguments"] = mapped_input
+
             # Extract specific key if requested
             if self._output_key and isinstance(result.output, dict):
                 output["extracted"] = result.output.get(self._output_key)
@@ -727,12 +734,30 @@ class ToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
             return output
 
         except Exception as e:
-            logger.error(f"Tool '{self._tool.name}' execution failed: {e}")
+            # Generate correlation ID for tracking
+            correlation_id = str(uuid.uuid4())[:8]
+
+            # Log detailed error with context
+            logger.error(
+                f"[{correlation_id}] Tool '{self._tool.name}' execution failed: {e}",
+                exc_info=True,
+                extra={
+                    "tool_name": self._tool.name,
+                    "arguments": mapped_input,
+                    "correlation_id": correlation_id,
+                }
+            )
+
+            # Return error result with correlation ID
             return {
                 "success": False,
                 "output": None,
                 "error": str(e),
-                "metadata": {"exception": type(e).__name__},
+                "metadata": {
+                    "exception": type(e).__name__,
+                    "arguments": mapped_input,
+                    "correlation_id": correlation_id,
+                },
                 "tool_name": self._tool.name,
             }
 
@@ -1019,11 +1044,22 @@ def extract_if_success(result: Dict[str, Any]) -> Any:
         Output if success, raises if failed
 
     Raises:
-        RuntimeError: If tool execution failed
+        ToolExecutionError: If tool execution failed
     """
     if not result.get("success", False):
         error = result.get("error", "Unknown error")
-        raise RuntimeError(f"Tool failed: {error}")
+        tool_name = result.get("tool_name", "unknown")
+
+        # Include arguments in error details if available
+        args = result.get("metadata", {}).get("arguments", {})
+
+        raise ToolExecutionError(
+            f"Tool '{tool_name}' execution failed: {error}",
+            tool_name=tool_name,
+            arguments=args,
+            correlation_id=str(uuid.uuid4())[:8],
+            recovery_hint="Check tool arguments or try with different parameters.",
+        )
     return result.get("output")
 
 

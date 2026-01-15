@@ -958,3 +958,291 @@ class TestIntentClassificationDataclass:
         result.safe_actions.add("new_action")
         # Modifying result should not affect SAFE_ACTIONS constant
         assert "new_action" not in SAFE_ACTIONS[ActionIntent.DISPLAY_ONLY]
+
+
+class TestSecurityCriticalPaths:
+    """Security-critical tests for action authorization."""
+
+    def test_write_tools_blocked_by_default(self):
+        """Test that write tools are blocked by default (secure by default)."""
+        from victor.agent.action_authorizer import (
+            WRITE_TOOLS,
+            READ_ONLY_TOOLS,
+            INTENT_BLOCKED_TOOLS,
+        )
+
+        # Verify WRITE_TOOLS contains all dangerous tools
+        assert "write_file" in WRITE_TOOLS
+        assert "execute_bash" in WRITE_TOOLS
+        assert "git" in WRITE_TOOLS
+        assert "apply_patch" in WRITE_TOOLS
+
+        # Verify these are blocked for DISPLAY_ONLY intent
+        display_blocked = INTENT_BLOCKED_TOOLS[ActionIntent.DISPLAY_ONLY]
+        assert "write_file" in display_blocked
+        assert "execute_bash" in display_blocked
+
+        # Verify write tools are not in read-only tools
+        assert WRITE_TOOLS.isdisjoint(READ_ONLY_TOOLS)
+
+    def test_generation_tools_blocked_for_read_only(self):
+        """Test that code generation is blocked for read-only intent."""
+        from victor.agent.action_authorizer import (
+            GENERATION_TOOLS,
+            INTENT_BLOCKED_TOOLS,
+        )
+
+        # Verify generation tools are defined
+        assert "generate_code" in GENERATION_TOOLS
+        assert "generate_docs" in GENERATION_TOOLS
+
+        # Verify they're blocked for READ_ONLY
+        read_blocked = INTENT_BLOCKED_TOOLS[ActionIntent.READ_ONLY]
+        assert "generate_code" in read_blocked
+        assert "generate_docs" in read_blocked
+
+    def test_safe_by_default_intent(self):
+        """Test that default intent is DISPLAY_ONLY (safe by default)."""
+        detector = IntentDetector()
+
+        # No clear signals should default to safe intent
+        result = detector.detect("hello world")
+        assert result.intent == ActionIntent.DISPLAY_ONLY
+
+        # Verify write actions are not in safe_actions
+        assert "write_file" not in result.safe_actions
+        assert "execute_bash" not in result.safe_actions
+        assert "edit_file" not in result.safe_actions
+
+    def test_prompt_guards_prevent_unauthorized_writes(self):
+        """Test that prompt guards explicitly prevent unauthorized writes."""
+        detector = IntentDetector()
+
+        # Display-only prompt guard should be protective
+        result = detector.detect("show me a function")
+        guard = result.prompt_guard
+
+        # Verify guard contains restrictive language
+        assert len(guard) > 0
+        assert "IMPORTANT" in guard or "NOTE" in guard
+        assert "NOT" in guard or "Do not" in guard.lower()
+
+    def test_explicit_write_authorization_required(self):
+        """Test that writes require explicit authorization signals."""
+        detector = IntentDetector()
+
+        # Ambiguous messages should not authorize writes
+        ambiguous_messages = [
+            "help me",
+            "do something",
+            "work on this",
+            "process the file",
+        ]
+
+        for msg in ambiguous_messages:
+            result = detector.detect(msg)
+            # Should not be WRITE_ALLOWED unless explicit
+            if result.intent == ActionIntent.WRITE_ALLOWED:
+                # If it is write allowed, should have matched signals
+                assert len(result.matched_signals) > 0
+                assert result.confidence > 0.5
+
+    def test_write_authorization_confidence_threshold(self):
+        """Test that write authorization requires sufficient confidence."""
+        detector = IntentDetector()
+
+        # Write signals with low confidence should not authorize
+        # (they become AMBIGUOUS instead)
+        weak_signals = [
+            "maybe edit it",
+            "consider changing something",
+        ]
+
+        for msg in weak_signals:
+            result = detector.detect(msg)
+            # Weak signals should not result in WRITE_ALLOWED
+            # (either AMBIGUOUS or DISPLAY_ONLY)
+            if result.intent == ActionIntent.WRITE_ALLOWED:
+                assert result.confidence >= 0.5
+
+    def test_no_write_permission_without_clear_signal(self):
+        """Test that write permission is never granted without clear signal."""
+        detector = IntentDetector()
+
+        # Test various non-explicit messages
+        non_explicit = [
+            "look at this code",
+            "check the function",
+            "analyze the module",
+            "review the implementation",
+        ]
+
+        for msg in non_explicit:
+            authorized = detector.is_write_authorized(msg)
+            assert authorized is False, f"Message should not authorize writes: {msg}"
+
+    def test_compound_write_signals_require_explicit_fix(self):
+        """Test that compound signals require explicit fix/modify keywords."""
+        detector = IntentDetector()
+
+        # "Analyze" alone should not authorize writes
+        result = detector.detect("analyze the codebase")
+        assert result.intent != ActionIntent.WRITE_ALLOWED
+
+        # "Analyze and fix" should authorize writes
+        result = detector.detect("analyze the code and fix any bugs")
+        assert result.intent == ActionIntent.WRITE_ALLOWED
+        assert any("fix" in signal for signal in result.matched_signals)
+
+    def test_all_intents_have_safe_actions_defined(self):
+        """Test that all intents have safe actions defined (no gaps)."""
+        from victor.agent.action_authorizer import SAFE_ACTIONS
+
+        for intent in ActionIntent:
+            assert intent in SAFE_ACTIONS, f"Intent {intent} has no safe actions defined"
+            # Safe actions should be a set
+            assert isinstance(SAFE_ACTIONS[intent], set)
+
+    def test_read_only_most_restrictive(self):
+        """Test that READ_ONLY is most restrictive intent."""
+        from victor.agent.action_authorizer import (
+            INTENT_BLOCKED_TOOLS,
+            WRITE_TOOLS,
+            GENERATION_TOOLS,
+        )
+
+        # READ_ONLY should block both write and generation tools
+        read_blocked = INTENT_BLOCKED_TOOLS[ActionIntent.READ_ONLY]
+        display_blocked = INTENT_BLOCKED_TOOLS[ActionIntent.DISPLAY_ONLY]
+
+        # READ_ONLY blocks more tools than DISPLAY_ONLY
+        assert len(read_blocked) >= len(display_blocked)
+        assert GENERATION_TOOLS.issubset(read_blocked)
+
+    def test_prompt_guards_exist_for_restrictive_intents(self):
+        """Test that restrictive intents have prompt guards."""
+        from victor.agent.action_authorizer import PROMPT_GUARDS
+
+        # DISPLAY_ONLY should have a guard
+        display_guard = PROMPT_GUARDS[ActionIntent.DISPLAY_ONLY]
+        assert len(display_guard) > 0
+        assert "NOT" in display_guard or "Do not" in display_guard.lower()
+
+        # READ_ONLY should have a guard
+        read_guard = PROMPT_GUARDS[ActionIntent.READ_ONLY]
+        assert len(read_guard) > 0
+
+        # WRITE_ALLOWED should have no guard (full permissions)
+        write_guard = PROMPT_GUARDS[ActionIntent.WRITE_ALLOWED]
+        assert len(write_guard) == 0
+
+
+class TestSecurityEdgeCases:
+    """Tests for security edge cases and potential bypasses."""
+
+    def test_attempted_bypass_with_whitespace(self):
+        """Test that extra whitespace doesn't bypass detection."""
+        detector = IntentDetector()
+
+        # Should still detect intent with irregular whitespace
+        result = detector.detect("show     me     a     function")
+        assert result.intent == ActionIntent.DISPLAY_ONLY
+
+    def test_attempted_bypass_with_line_breaks(self):
+        """Test that line breaks don't bypass detection."""
+        detector = IntentDetector()
+
+        result = detector.detect("show me\na\nfunction")
+        assert result.intent == ActionIntent.DISPLAY_ONLY
+
+    def test_attempted_bypass_with_special_chars(self):
+        """Test that special characters don't bypass detection."""
+        detector = IntentDetector()
+
+        # Should still detect despite special chars
+        result = detector.detect("show me a function! @#$%^&*()")
+        assert result.intent == ActionIntent.DISPLAY_ONLY
+
+    def test_no_false_positive_write_authorization(self):
+        """Test that innocent phrases don't falsely authorize writes."""
+        detector = IntentDetector()
+
+        innocent_phrases = [
+            "show me how to write a function",
+            "display the write operations",
+            "list files with write permission",
+            "explain write() method",
+        ]
+
+        for phrase in innocent_phrases:
+            result = detector.detect(phrase)
+            # These should NOT authorize writes
+            assert result.intent != ActionIntent.WRITE_ALLOWED or result.confidence < 0.8
+
+    def test_context_aware_write_detection(self):
+        """Test that write authorization considers context."""
+        detector = IntentDetector()
+
+        # "write a function" in display context
+        result = detector.detect("show me how to write a function")
+        # This is DISPLAY_ONLY (show me), not WRITE_ALLOWED
+        assert result.intent == ActionIntent.DISPLAY_ONLY
+
+        # "write to file" is explicit write
+        result = detector.detect("write this to file.py")
+        assert result.intent == ActionIntent.WRITE_ALLOWED
+
+    def test_case_variations_detected_consistently(self):
+        """Test that case variations don't bypass security."""
+        detector = IntentDetector()
+
+        variations = [
+            "Show me a function",
+            "SHOW ME A FUNCTION",
+            "sHoW mE a fUnCtIoN",
+        ]
+
+        for variation in variations:
+            result = detector.detect(variation)
+            assert result.intent == ActionIntent.DISPLAY_ONLY
+
+
+class TestAuditTrailLogging:
+    """Tests for audit trail and security logging."""
+
+    def test_classification_contains_decision_metadata(self):
+        """Test that classification contains decision metadata for audit."""
+        detector = IntentDetector()
+        result = detector.detect("show me a function")
+
+        # Should have intent
+        assert result.intent is not None
+
+        # Should have confidence
+        assert 0.0 <= result.confidence <= 1.0
+
+        # Should have matched signals for audit trail
+        assert isinstance(result.matched_signals, list)
+
+        # Should have safe actions
+        assert isinstance(result.safe_actions, set)
+
+        # Should have prompt guard if needed
+        assert isinstance(result.prompt_guard, str)
+
+    def test_high_confidence_decisions_have_signals(self):
+        """Test that high-confidence decisions have signal evidence."""
+        detector = IntentDetector()
+
+        result = detector.detect("just show me an example, display only please")
+        assert result.confidence > 0.8
+        assert len(result.matched_signals) >= 2  # Multiple signals matched
+
+    def test_all_signals_logged_in_classification(self):
+        """Test that all matched signals are logged."""
+        detector = IntentDetector()
+
+        result = detector.detect("show me this, just display it")
+        # Should have logged all matched signals
+        assert len(result.matched_signals) >= 2
+        assert "show_me" in result.matched_signals

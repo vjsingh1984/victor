@@ -5,9 +5,22 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import mermaid from 'mermaid';
 import Asciidoctor from '@asciidoctor/core';
+import DOMPurify from 'dompurify';
 import 'katex/dist/katex.min.css';
 
 const asciidoctor = Asciidoctor();
+
+// Configure DOMPurify for SVG content
+const configureDOMPurify = () => {
+  DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
+    // Allow data-* attributes for SVG functionality
+    if (data.attrName.startsWith('data-')) {
+      node.setAttribute(data.attrName, data.attrValue);
+    }
+  });
+};
+
+configureDOMPurify();
 
 type Sender = 'user' | 'assistant';
 type Kind = 'normal' | 'tool';
@@ -31,7 +44,14 @@ function MermaidDiagram({ code }: { code: string }) {
       mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
       mermaid.render(id, code, (svgCode: string) => {
         if (ref.current) {
-          ref.current.innerHTML = svgCode;
+          // Sanitize SVG content to prevent XSS attacks
+          const cleanSvgCode = DOMPurify.sanitize(svgCode, {
+            USE_PROFILES: { svg: true, svgFilters: true },
+            ALLOWED_TAGS: ['svg', 'path', 'circle', 'rect', 'g', 'text', 'defs', 'linearGradient', 'stop', 'polygon', 'polyline', 'ellipse', 'line', 'marker', 'style', 'foreignObject'],
+            ALLOWED_ATTR: ['d', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'viewBox', 'xmlns', 'id', 'class', 'text-anchor', 'font-size', 'font-family', 'font-weight', 'dominant-baseline', 'alignment-baseline', 'transform', 'opacity', 'stroke-linecap', 'stroke-linejoin', 'stroke-opacity', 'fill-opacity', 'x1', 'y1', 'x2', 'y2', 'points', 'offset', 'stop-color', 'stop-opacity'],
+            ALLOW_DATA_ATTR: true,
+          });
+          ref.current.innerHTML = cleanSvgCode;
         }
       });
     } catch (err) {
@@ -118,7 +138,13 @@ function CodeBlock({ className, children, viewMode }: { className?: string; chil
     if (!plantSvg) {
       return <div className="text-sm text-gray-500">Rendering PlantUML…</div>;
     }
-    return <div className="overflow-auto" dangerouslySetInnerHTML={{ __html: plantSvg }} />;
+    const cleanPlantSvg = DOMPurify.sanitize(plantSvg, {
+      USE_PROFILES: { svg: true, svgFilters: true },
+      ALLOWED_TAGS: ['svg', 'path', 'circle', 'rect', 'g', 'text', 'defs', 'linearGradient', 'stop', 'polygon', 'polyline', 'ellipse', 'line', 'marker', 'style', 'foreignObject'],
+      ALLOWED_ATTR: ['d', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'viewBox', 'xmlns', 'id', 'class', 'text-anchor', 'font-size', 'font-family', 'font-weight', 'dominant-baseline', 'alignment-baseline', 'transform', 'opacity', 'stroke-linecap', 'stroke-linejoin', 'stroke-opacity', 'fill-opacity', 'x1', 'y1', 'x2', 'y2', 'points', 'offset', 'stop-color', 'stop-opacity'],
+      ALLOW_DATA_ATTR: true,
+    });
+    return <div className="overflow-auto" dangerouslySetInnerHTML={{ __html: cleanPlantSvg }} />;
   }
 
   if (language === 'drawio' || language === 'lucid' || language === 'drawio-xml') {
@@ -156,7 +182,13 @@ function CodeBlock({ className, children, viewMode }: { className?: string; chil
     if (!diagramSvg) {
       return <div className="text-sm text-gray-500">Rendering Draw.io…</div>;
     }
-    return <div className="overflow-auto" dangerouslySetInnerHTML={{ __html: diagramSvg }} />;
+    const cleanDiagramSvg = DOMPurify.sanitize(diagramSvg, {
+      USE_PROFILES: { svg: true, svgFilters: true },
+      ALLOWED_TAGS: ['svg', 'path', 'circle', 'rect', 'g', 'text', 'defs', 'linearGradient', 'stop', 'polygon', 'polyline', 'ellipse', 'line', 'marker', 'style', 'foreignObject', 'image'],
+      ALLOWED_ATTR: ['d', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'viewBox', 'xmlns', 'id', 'class', 'text-anchor', 'font-size', 'font-family', 'font-weight', 'dominant-baseline', 'alignment-baseline', 'transform', 'opacity', 'stroke-linecap', 'stroke-linejoin', 'stroke-opacity', 'fill-opacity', 'x1', 'y1', 'x2', 'y2', 'points', 'offset', 'stop-color', 'stop-opacity', 'href', 'xlink:href', 'preserveAspectRatio'],
+      ALLOW_DATA_ATTR: true,
+    });
+    return <div className="overflow-auto" dangerouslySetInnerHTML={{ __html: cleanDiagramSvg }} />;
   }
 
   if (language === 'graphviz' || language === 'dot') {
@@ -194,7 +226,13 @@ function CodeBlock({ className, children, viewMode }: { className?: string; chil
     if (!graphvizSvg) {
       return <div className="text-sm text-gray-500">Rendering Graphviz…</div>;
     }
-    return <div className="overflow-auto" dangerouslySetInnerHTML={{ __html: graphvizSvg }} />;
+    const cleanGraphvizSvg = DOMPurify.sanitize(graphvizSvg, {
+      USE_PROFILES: { svg: true, svgFilters: true },
+      ALLOWED_TAGS: ['svg', 'path', 'circle', 'rect', 'g', 'text', 'defs', 'linearGradient', 'stop', 'polygon', 'polyline', 'ellipse', 'line', 'marker', 'style', 'foreignObject', 'ellipse'],
+      ALLOWED_ATTR: ['d', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'viewBox', 'xmlns', 'id', 'class', 'text-anchor', 'font-size', 'font-family', 'font-weight', 'dominant-baseline', 'alignment-baseline', 'transform', 'opacity', 'stroke-linecap', 'stroke-linejoin', 'stroke-opacity', 'fill-opacity', 'x1', 'y1', 'x2', 'y2', 'points', 'offset', 'stop-color', 'stop-opacity', 'rx', 'ry'],
+      ALLOW_DATA_ATTR: true,
+    });
+    return <div className="overflow-auto" dangerouslySetInnerHTML={{ __html: cleanGraphvizSvg }} />;
   }
 
   if (language === 'd2') {
@@ -232,15 +270,28 @@ function CodeBlock({ className, children, viewMode }: { className?: string; chil
     if (!d2Svg) {
       return <div className="text-sm text-gray-500">Rendering D2…</div>;
     }
-    return <div className="overflow-auto" dangerouslySetInnerHTML={{ __html: d2Svg }} />;
+    const cleanD2Svg = DOMPurify.sanitize(d2Svg, {
+      USE_PROFILES: { svg: true, svgFilters: true },
+      ALLOWED_TAGS: ['svg', 'path', 'circle', 'rect', 'g', 'text', 'defs', 'linearGradient', 'stop', 'polygon', 'polyline', 'ellipse', 'line', 'marker', 'style', 'foreignObject'],
+      ALLOWED_ATTR: ['d', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'viewBox', 'xmlns', 'id', 'class', 'text-anchor', 'font-size', 'font-family', 'font-weight', 'dominant-baseline', 'alignment-baseline', 'transform', 'opacity', 'stroke-linecap', 'stroke-linejoin', 'stroke-opacity', 'fill-opacity', 'x1', 'y1', 'x2', 'y2', 'points', 'offset', 'stop-color', 'stop-opacity'],
+      ALLOW_DATA_ATTR: true,
+    });
+    return <div className="overflow-auto" dangerouslySetInnerHTML={{ __html: cleanD2Svg }} />;
   }
 
   if (language === 'asciidoc' || language === 'adoc') {
     try {
       const html = asciidoctor.convert(String(children)) as string;
+      // Sanitize HTML content to prevent XSS attacks
+      const cleanHtml = DOMPurify.sanitize(html, {
+        USE_PROFILES: { html: true },
+        ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'div', 'span', 'img', 'hr', 'sup', 'sub'],
+        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'id', 'style', 'width', 'height', 'colspan', 'rowspan'],
+        ALLOW_DATA_ATTR: false,
+      });
       return (
         <div className="bg-white dark:bg-gray-800 text-sm rounded border border-gray-200 dark:border-gray-700 p-3 overflow-auto prose dark:prose-invert"
-             dangerouslySetInnerHTML={{ __html: html }} />
+             dangerouslySetInnerHTML={{ __html: cleanHtml }} />
       );
     } catch (err) {
       return (

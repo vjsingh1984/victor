@@ -35,6 +35,9 @@ from victor.core.errors import (
     FileError,
     FileNotFoundError as VictorFileNotFoundError,
     NetworkError,
+    SearchError,
+    WorkflowExecutionError,
+    ExtensionLoadError,
     ErrorInfo,
     ErrorHandler,
     handle_errors,
@@ -629,3 +632,180 @@ class TestGlobalHandler:
 
         assert info.message == "Test error"
         assert info.details.get("test") is True
+
+
+# =============================================================================
+# PHASE 2 ERROR TYPE TESTS
+# =============================================================================
+
+
+class TestSearchError:
+    """Tests for SearchError with improved error messages."""
+
+    def test_search_error_with_failed_backends(self):
+        """Test SearchError with multiple failed backends."""
+        error = SearchError(
+            message="All 2 search backends failed for 'semantic'",
+            search_type="semantic",
+            failed_backends=["SemanticSearchBackend", "VectorSearchBackend"],
+            failure_details={
+                "SemanticSearchBackend": "Connection timeout",
+                "VectorSearchBackend": "Index not found"
+            },
+            query="authentication logic",
+        )
+
+        assert error.search_type == "semantic"
+        assert len(error.failed_backends) == 2
+        assert "SemanticSearchBackend" in error.failed_backends
+        assert error.failure_details["SemanticSearchBackend"] == "Connection timeout"
+        assert error.query == "authentication logic"
+        assert error.category == ErrorCategory.NETWORK_ERROR
+        assert error.correlation_id is not None
+
+    def test_search_error_message_format(self):
+        """Test SearchError message includes recovery hint."""
+        error = SearchError(
+            message="All backends failed",
+            search_type="keyword",
+            failed_backends=["KeywordBackend"],
+        )
+
+        error_str = str(error)
+        assert "All backends failed" in error_str
+        assert "Recovery hint:" in error_str or error.recovery_hint is not None
+        assert error.correlation_id in error_str
+
+    def test_search_error_to_dict(self):
+        """Test SearchError serialization to dict."""
+        error = SearchError(
+            message="Search failed",
+            search_type="hybrid",
+            failed_backends=["Backend1", "Backend2"],
+            failure_details={"Backend1": "Error 1"},
+        )
+
+        error_dict = error.to_dict()
+        # Search-specific attributes are in the details sub-dictionary
+        assert error_dict["details"]["search_type"] == "hybrid"
+        assert "Backend1" in error_dict["details"]["failed_backends"]
+        assert error_dict["category"] == "network_error"
+        assert "correlation_id" in error_dict
+
+
+class TestWorkflowExecutionError:
+    """Tests for WorkflowExecutionError with improved error messages."""
+
+    def test_workflow_execution_error_with_node_info(self):
+        """Test WorkflowExecutionError with node tracking."""
+        error = WorkflowExecutionError(
+            message="Workflow execution failed at node 'data_processor'",
+            workflow_id="deep_research",
+            node_id="data_processor",
+            node_type="compute",
+            checkpoint_id="chk_abc123",
+            execution_context={"iteration": 3, "input_size": 1000},
+        )
+
+        assert error.workflow_id == "deep_research"
+        assert error.node_id == "data_processor"
+        assert error.node_type == "compute"
+        assert error.checkpoint_id == "chk_abc123"
+        assert error.execution_context["iteration"] == 3
+        assert error.category == ErrorCategory.INTERNAL_ERROR
+        assert error.correlation_id is not None
+
+    def test_workflow_execution_error_recovery_hint(self):
+        """Test WorkflowExecutionError includes recovery hint."""
+        error = WorkflowExecutionError(
+            message="Node failed",
+            workflow_id="test_workflow",
+            node_id="test_node",
+            checkpoint_id="chk_123",
+        )
+
+        # Should have auto-generated recovery hint
+        assert error.recovery_hint is not None
+        assert "chk_123" in error.recovery_hint
+        assert "test_node" in error.recovery_hint
+
+    def test_workflow_execution_error_message_format(self):
+        """Test WorkflowExecutionError message format."""
+        error = WorkflowExecutionError(
+            message="Workflow failed",
+            workflow_id="my_workflow",
+            node_id="my_node",
+        )
+
+        error_str = str(error)
+        assert error.correlation_id in error_str
+
+    def test_workflow_execution_error_to_dict(self):
+        """Test WorkflowExecutionError serialization."""
+        error = WorkflowExecutionError(
+            message="Workflow error",
+            workflow_id="workflow1",
+            node_id="node1",
+            node_type="agent",
+        )
+
+        error_dict = error.to_dict()
+        # Workflow-specific attributes are in the details sub-dictionary
+        assert error_dict["details"]["workflow_id"] == "workflow1"
+        assert error_dict["details"]["node_id"] == "node1"
+        assert error_dict["details"]["node_type"] == "agent"
+        assert error_dict["category"] == "internal_error"
+
+
+class TestExtensionLoadError:
+    """Tests for ExtensionLoadError."""
+
+    def test_extension_load_error_required(self):
+        """Test ExtensionLoadError for required extension."""
+        error = ExtensionLoadError(
+            message="Failed to load safety extension",
+            extension_type="safety",
+            vertical_name="coding",
+            original_error=ImportError("Module not found"),
+            is_required=True,
+        )
+
+        assert error.extension_type == "safety"
+        assert error.vertical_name == "coding"
+        assert error.is_required is True
+        assert error.severity == ErrorSeverity.CRITICAL
+        assert error.original_error is not None
+
+    def test_extension_load_error_optional(self):
+        """Test ExtensionLoadError for optional extension."""
+        error = ExtensionLoadError(
+            message="Failed to load optional extension",
+            extension_type="middleware",
+            vertical_name="research",
+            is_required=False,
+        )
+
+        assert error.is_required is False
+        assert error.severity == ErrorSeverity.WARNING
+
+    def test_extension_load_error_recovery_hint(self):
+        """Test ExtensionLoadError recovery hint."""
+        # Required extension
+        error_required = ExtensionLoadError(
+            message="Required extension failed",
+            extension_type="safety",
+            vertical_name="coding",
+            is_required=True,
+        )
+
+        assert "required" in error_required.recovery_hint.lower()
+
+        # Optional extension
+        error_optional = ExtensionLoadError(
+            message="Optional extension failed",
+            extension_type="analytics",
+            vertical_name="dataanalysis",
+            is_required=False,
+        )
+
+        assert "reduced capabilities" in error_optional.recovery_hint.lower()

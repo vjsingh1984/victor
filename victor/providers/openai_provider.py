@@ -14,12 +14,17 @@
 
 """OpenAI GPT provider implementation."""
 
+import logging
 import os
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
+from victor.core.errors import (
+    ProviderConnectionError as CoreProviderConnectionError,
+    ProviderTimeoutError as CoreProviderTimeoutError,
+)
 from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
@@ -33,6 +38,8 @@ from victor.providers.base import (
 from victor.providers.openai_compat import (
     convert_tools_to_openai_format,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAIProvider(BaseProvider):
@@ -60,23 +67,8 @@ class OpenAIProvider(BaseProvider):
             max_retries: Maximum retry attempts
             **kwargs: Additional configuration
         """
-        # Resolution order: parameter → env var → keyring → warning
-        resolved_key = api_key or os.environ.get("OPENAI_API_KEY", "")
-        if not resolved_key:
-            try:
-                from victor.config.api_keys import get_api_key
-
-                resolved_key = get_api_key("openai") or ""
-            except ImportError:
-                pass
-
-        if not resolved_key:
-            import logging
-
-            logging.getLogger(__name__).warning(
-                "OpenAI API key not provided. Set OPENAI_API_KEY environment variable, "
-                "use 'victor keys --set openai --keyring', or pass api_key parameter."
-            )
+        # Resolve API key using centralized helper
+        resolved_key = self._resolve_api_key(api_key, "openai")
 
         super().__init__(
             api_key=resolved_key,
@@ -185,7 +177,17 @@ class OpenAIProvider(BaseProvider):
 
             return self._parse_response(response, model)
 
+        except (ProviderError, ProviderAuthError, ProviderRateLimitError):
+            # Re-raise already-converted provider errors
+            raise
+        except (ConnectionError, TimeoutError) as e:
+            # Network-related errors
+            raise CoreProviderConnectionError(
+                message=f"Connection error during OpenAI API request: {e}",
+                provider=self.name,
+            ) from e
         except Exception as e:
+            # Catch-all for truly unexpected errors
             return self._handle_error(e)
 
     async def stream(
@@ -259,7 +261,17 @@ class OpenAIProvider(BaseProvider):
                 if parsed_chunk:
                     yield parsed_chunk
 
+        except (ProviderError, ProviderAuthError, ProviderRateLimitError):
+            # Re-raise already-converted provider errors
+            raise
+        except (ConnectionError, TimeoutError) as e:
+            # Network-related errors
+            raise CoreProviderConnectionError(
+                message=f"Connection error during OpenAI streaming: {e}",
+                provider=self.name,
+            ) from e
         except Exception as e:
+            # Catch-all for truly unexpected errors
             raise self._handle_error(e)
 
     def _convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
@@ -467,7 +479,17 @@ class OpenAIProvider(BaseProvider):
             # Sort by name for consistent output
             models.sort(key=lambda x: x["id"])
             return models
+        except (ProviderError, ProviderAuthError, ProviderRateLimitError):
+            # Re-raise already-converted provider errors
+            raise
+        except (ConnectionError, TimeoutError) as e:
+            # Network-related errors
+            raise CoreProviderConnectionError(
+                message=f"Connection error during OpenAI model listing: {e}",
+                provider=self.name,
+            ) from e
         except Exception as e:
+            # Catch-all for truly unexpected errors
             raise ProviderError(
                 message=f"Failed to list models: {str(e)}",
                 provider=self.name,

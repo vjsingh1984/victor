@@ -33,8 +33,8 @@ from typing import TYPE_CHECKING, Any, List, Optional, Protocol, runtime_checkab
 if TYPE_CHECKING:
     from rich.console import Console
 
-    from victor.agent.orchestrator import AgentOrchestrator
     from victor.config.settings import Settings
+    from victor.protocols import UIAgentProtocol
 
 
 @dataclass
@@ -56,7 +56,7 @@ class CommandContext:
 
     console: Console
     settings: Settings
-    agent: Optional[AgentOrchestrator] = None
+    agent: Optional["UIAgentProtocol"] = None
     args: List[str] = field(default_factory=list)
 
 

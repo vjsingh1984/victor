@@ -32,6 +32,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -53,7 +54,7 @@ def encode_base62(num: int) -> str:
 
     Example:
         >>> encode_base62(123456789)
-        '8M0KX'
+        '8M0kX'
     """
     if num == 0:
         return BASE62_ALPHABET[0]
@@ -76,7 +77,7 @@ def decode_base62(encoded: str) -> int:
         Decoded integer
 
     Example:
-        >>> decode_base62('8M0KX')
+        >>> decode_base62('8M0kX')
         123456789
     """
     num = 0
@@ -111,7 +112,8 @@ def get_project_root_hash(project_root: Path) -> str:
         return dirname[:6].lower()
 
     # Otherwise, hash the directory name and encode to base62
-    hash_bytes = hashlib.md5(dirname.encode()).digest()
+    # MD5 used for session ID generation, not security
+    hash_bytes = hashlib.md5(dirname.encode(), usedforsecurity=False).digest()
     hash_num = int.from_bytes(hash_bytes[:4], byteorder="big")
     return encode_base62(hash_num).zfill(6)[:6].lower()
 
@@ -171,6 +173,9 @@ def parse_session_id(session_id: str) -> dict[str, str | int]:
         - timestamp_ms: Decoded timestamp in milliseconds
         - timestamp_iso: ISO format timestamp
 
+    Raises:
+        ValueError: If session ID format is invalid
+
     Example:
         >>> parse = parse_session_id("abc123-9Kx7Z2")
         >>> parse['project_root']
@@ -180,13 +185,64 @@ def parse_session_id(session_id: str) -> dict[str, str | int]:
         >>> isinstance(parse['timestamp_ms'], int)
         True
     """
+    correlation_id = str(uuid.uuid4())[:8]
+
     try:
+        # Check if session_id is a string
+        if not isinstance(session_id, str):
+            raise ValueError(
+                f"Invalid session ID format: expected string, got {type(session_id).__name__}\n"
+                f"  Provided: {repr(session_id)}\n"
+                f"  Expected format: <project_hash>-<base62_timestamp>\n"
+                f"  Example: 'myproj-9Kx7Z2'\n"
+                f"  Use 'victor sessions list' to see active sessions.\n"
+                f"  Use 'victor sessions new' to create a new session.\n"
+                f"  [Correlation ID: {correlation_id}]"
+            )
+
         parts = session_id.split("-")
 
         if len(parts) != 2:
-            raise ValueError(f"Invalid session ID format: {session_id}")
+            # Provide helpful error message with examples
+            error_parts = [
+                f"Invalid session ID format: '{session_id}'",
+                f"  Expected format: <project_hash>-<base62_timestamp>",
+                f"  - project_hash: 6-character project identifier",
+                f"  - base62_timestamp: Base62 encoded timestamp",
+                f"",
+                f"  Examples:",
+                f"    - 'myproj-9Kx7Z2' (valid)",
+                f"    - 'victor-8M0kX' (valid)",
+                f"    - 'abc123-def456' (valid format, but may not exist)",
+                f"",
+                f"  Your session ID has {len(parts)} parts, expected 2",
+                f"  Parts found: {parts}",
+                f"",
+                f"  Recovery:",
+                f"    - Use 'victor sessions list' to see active sessions",
+                f"    - Use 'victor sessions new' to create a new session",
+                f"    - Check session ID for typos or missing dash",
+                f"  [Correlation ID: {correlation_id}]",
+            ]
+            raise ValueError("\n".join(error_parts))
 
         project_root, base62_timestamp = parts
+
+        # Validate project_root length
+        if len(project_root) != 6:
+            logger.warning(
+                f"[{correlation_id}] Session ID '{session_id}' has non-standard project hash "
+                f"length ({len(project_root)} chars, expected 6)"
+            )
+
+        # Validate base62_timestamp
+        if not base62_timestamp or not all(c in BASE62_ALPHABET for c in base62_timestamp):
+            raise ValueError(
+                f"Invalid base62 timestamp in session ID: '{base62_timestamp}'\n"
+                f"  Session ID: '{session_id}'\n"
+                f"  Base62 timestamp should only contain: 0-9, A-Z, a-z\n"
+                f"  [Correlation ID: {correlation_id}]"
+            )
 
         # Decode timestamp
         timestamp_ms = decode_base62(base62_timestamp)
@@ -202,9 +258,20 @@ def parse_session_id(session_id: str) -> dict[str, str | int]:
             "timestamp_ms": timestamp_ms,
             "timestamp_iso": timestamp_iso,
         }
+    except ValueError as e:
+        # Re-raise ValueError with our detailed message
+        logger.error(f"[{correlation_id}] Failed to parse session ID '{session_id}': {e}")
+        raise
     except Exception as e:
-        logger.error(f"Failed to parse session ID {session_id}: {e}")
-        raise ValueError(f"Invalid session ID: {session_id}") from e
+        # Catch any other exceptions and wrap them
+        logger.error(f"[{correlation_id}] Unexpected error parsing session ID '{session_id}': {e}")
+        raise ValueError(
+            f"Invalid session ID: '{session_id}'\n"
+            f"  Error: {str(e)}\n"
+            f"  Expected format: <project_hash>-<base62_timestamp>\n"
+            f"  Example: 'myproj-9Kx7Z2'\n"
+            f"  [Correlation ID: {correlation_id}]"
+        ) from e
 
 
 def validate_session_id(session_id: str) -> bool:

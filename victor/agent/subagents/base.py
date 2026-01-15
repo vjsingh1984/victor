@@ -62,9 +62,9 @@ if TYPE_CHECKING:
 
 # Import from canonical location to avoid circular dependencies
 from victor.protocols.team import IAgent
-from victor.teams.types import AgentMessage
 
 if TYPE_CHECKING:
+    from victor.teams.types import AgentMessage
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.core.container import ServiceContainer
     from victor.providers.base import StreamChunk
@@ -273,7 +273,7 @@ class SubAgent(IAgent):
         result = await self.execute()
         return result.summary if result.summary else ""
 
-    async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:
+    async def receive_message(self, message: "AgentMessage") -> Optional["AgentMessage"]:
         """Receive a message (SubAgents don't support direct messaging).
 
         SubAgents are isolated execution units that don't participate in

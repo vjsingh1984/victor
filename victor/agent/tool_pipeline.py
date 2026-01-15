@@ -42,6 +42,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
+from victor.agent.cache.dependency_extractor import DependencyExtractor
 from victor.agent.tool_executor import ToolExecutor
 from victor.agent.parallel_executor import (
     ParallelToolExecutor,
@@ -723,6 +724,7 @@ class ToolPipeline:
         deduplication_tracker: Optional[Any] = None,
         middleware_chain: Optional["MiddlewareChain"] = None,
         semantic_cache: Optional["ToolResultCache"] = None,
+        dependency_extractor: Optional[DependencyExtractor] = None,
     ):
         """Initialize tool pipeline.
 
@@ -739,6 +741,7 @@ class ToolPipeline:
             deduplication_tracker: Optional tracker for detecting redundant tool calls
             middleware_chain: Optional middleware chain for processing tool calls
             semantic_cache: Optional FAISS-based semantic cache for tool results
+            dependency_extractor: Optional dependency extractor for automatic file tracking
         """
         self.tools = tool_registry
         self.executor = tool_executor
@@ -750,6 +753,9 @@ class ToolPipeline:
         self.deduplication_tracker = deduplication_tracker
         self.middleware_chain = middleware_chain
         self.semantic_cache = semantic_cache
+
+        # Dependency extractor for automatic file dependency tracking
+        self._dependency_extractor = dependency_extractor or DependencyExtractor()
 
         # Callbacks
         self.on_tool_start = on_tool_start
@@ -1892,7 +1898,40 @@ class ToolPipeline:
 
         # Cache successful results for idempotent tools
         if call_result.success:
+            # Extract file dependencies automatically
+            file_dependencies = self._dependency_extractor.extract_file_dependencies(
+                tool_name, normalized_args
+            )
+
+            # Cache with extracted dependencies
             self.cache_result(tool_name, normalized_args, call_result)
+
+            # Store dependencies in cache manager if available
+            if self.tool_cache and file_dependencies:
+                try:
+                    # Import ToolCacheManager if available
+                    from victor.agent.cache.tool_cache_manager import ToolCacheManager
+                    from victor.agent.cache.tool_cache_manager import CacheNamespace
+
+                    # Check if tool_cache is a ToolCacheManager
+                    if isinstance(self.tool_cache, ToolCacheManager):
+                        # Update the cached entry with file dependencies
+                        args_hash = self._get_call_signature(tool_name, normalized_args)
+                        await self.tool_cache.set_tool_result(
+                            tool_name=tool_name,
+                            args=normalized_args,
+                            result=call_result.result,
+                            namespace=CacheNamespace.SESSION,
+                            file_dependencies=file_dependencies,
+                        )
+                        logger.debug(
+                            f"Tracked {len(file_dependencies)} file dependencies "
+                            f"for {tool_name}"
+                        )
+                except ImportError:
+                    pass  # ToolCacheManager not available
+                except Exception as e:
+                    logger.debug(f"Failed to store file dependencies: {e}")
 
             # Store in semantic cache (FAISS-based with mtime tracking)
             if self.config.enable_semantic_caching and self.semantic_cache is not None:

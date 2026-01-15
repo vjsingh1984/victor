@@ -18,6 +18,17 @@ from pathlib import Path
 from typing import Any, Optional
 
 from victor.core.database import get_database
+from victor.ui.common.constants import (
+    CURSOR_COL_INDEX,
+    CURSOR_ROW_INDEX,
+    SESSION_CREATED_AT_INDEX,
+    SESSION_DATA_INDEX,
+    SESSION_ID_INDEX,
+    SESSION_MODEL_INDEX,
+    SESSION_NAME_INDEX,
+    SESSION_PROVIDER_INDEX,
+    SESSION_UPDATED_AT_INDEX,
+)
 from victor.core.schema import Tables
 
 
@@ -123,21 +134,37 @@ class Session:
 
 
 class SessionManager:
-    """Manages session persistence using SQLite."""
+    """Manages session persistence using SQLite.
 
-    def __init__(self, db_path: Optional[Path] = None):
+    This class now supports dependency injection of a SessionRepositoryProtocol
+    for decoupling from database implementation. If no repository is provided,
+    it uses direct database access for backward compatibility.
+    """
+
+    def __init__(
+        self,
+        db_path: Optional[Path] = None,
+        repository: Optional[Any] = None,
+    ):
         """Initialize session manager.
 
         Args:
             db_path: Path to SQLite database - legacy, now uses unified database
+            repository: Optional SessionRepositoryProtocol for dependency injection
         """
-        # Use unified database from victor.core.database
-        self._db_manager = get_database()
-        self.db_path = self._db_manager.db_path
-        self._init_db()
+        # Store repository if provided (DIP compliance)
+        self._repository = repository
+
+        # Use unified database from victor.core.database (legacy path)
+        if self._repository is None:
+            self._db_manager = get_database()
+            self.db_path = self._db_manager.db_path
+            self._init_db()
 
     def _get_conn(self) -> sqlite3.Connection:
         """Get database connection."""
+        if self._repository is not None:
+            raise RuntimeError("Cannot get DB connection when using repository pattern")
         return self._db_manager.get_connection()
 
     def _init_db(self) -> None:
@@ -167,7 +194,30 @@ class SessionManager:
 
     def save(self, session: Session) -> None:
         """Save or update a session."""
+        import asyncio
+
         session.updated_at = datetime.now().isoformat()
+
+        # Use repository if available
+        if self._repository is not None:
+            # Convert Session to dict and save via repository
+            session_dict = session.to_dict()
+
+            # Handle sync/async context
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # We're in an async context, create task
+                    asyncio.create_task(self._repository.save_session(session_dict))
+                else:
+                    # We're in sync context, run async
+                    loop.run_until_complete(self._repository.save_session(session_dict))
+            except RuntimeError:
+                # No event loop, create new one
+                asyncio.run(self._repository.save_session(session_dict))
+            return
+
+        # Legacy direct database access
         conn = self._get_conn()
         conn.execute(
             f"""
@@ -189,6 +239,32 @@ class SessionManager:
 
     def load(self, session_id: str) -> Optional[Session]:
         """Load a session by ID."""
+        import asyncio
+
+        # Use repository if available
+        if self._repository is not None:
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # In async context, need to handle differently
+                    # For now, fall back to creating new loop
+                    session_dict = asyncio.run(
+                        self._repository.get_session(session_id)
+                    )
+                else:
+                    session_dict = loop.run_until_complete(
+                        self._repository.get_session(session_id)
+                    )
+            except RuntimeError:
+                session_dict = asyncio.run(
+                    self._repository.get_session(session_id)
+                )
+
+            if session_dict is None:
+                return None
+            return Session.from_dict(session_dict)
+
+        # Legacy direct database access
         conn = self._get_conn()
         cursor = conn.execute(
             f"SELECT data FROM {Tables.UI_SESSION} WHERE id = ?",
@@ -196,17 +272,43 @@ class SessionManager:
         )
         row = cursor.fetchone()
         if row:
+            # When selecting only data column, it's at index 0
             return Session.from_dict(json.loads(row[0]))
         return None
 
     def get_latest(self) -> Optional[Session]:
         """Get the most recently updated session."""
+        import asyncio
+
+        # Use repository if available
+        if self._repository is not None:
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    session_dict = asyncio.run(
+                        self._repository.get_latest_session()
+                    )
+                else:
+                    session_dict = loop.run_until_complete(
+                        self._repository.get_latest_session()
+                    )
+            except RuntimeError:
+                session_dict = asyncio.run(
+                    self._repository.get_latest_session()
+                )
+
+            if session_dict is None:
+                return None
+            return Session.from_dict(session_dict)
+
+        # Legacy direct database access
         conn = self._get_conn()
         cursor = conn.execute(
             f"SELECT data FROM {Tables.UI_SESSION} ORDER BY updated_at DESC LIMIT 1"
         )
         row = cursor.fetchone()
         if row:
+            # When selecting only data column, it's at index 0
             return Session.from_dict(json.loads(row[0]))
         return None
 
@@ -217,6 +319,27 @@ class SessionManager:
             List of session metadata dicts with id, name, provider, model,
             created_at, updated_at, and message_count.
         """
+        import asyncio
+
+        # Use repository if available
+        if self._repository is not None:
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    sessions = asyncio.run(
+                        self._repository.list_sessions(limit=limit)
+                    )
+                else:
+                    sessions = loop.run_until_complete(
+                        self._repository.list_sessions(limit=limit)
+                    )
+            except RuntimeError:
+                sessions = asyncio.run(
+                    self._repository.list_sessions(limit=limit)
+                )
+            return sessions
+
+        # Legacy direct database access
         conn = self._get_conn()
         cursor = conn.execute(
             f"""
@@ -229,15 +352,15 @@ class SessionManager:
         )
         sessions = []
         for row in cursor:
-            data = json.loads(row[6])
+            data = json.loads(row[SESSION_DATA_INDEX])
             sessions.append(
                 {
-                    "id": row[0],
-                    "name": row[1] or f"Session {row[0][:8]}",
-                    "provider": row[2],
-                    "model": row[3],
-                    "created_at": row[4],
-                    "updated_at": row[5],
+                    "id": row[SESSION_ID_INDEX],
+                    "name": row[SESSION_NAME_INDEX] or f"Session {row[SESSION_ID_INDEX][:8]}",
+                    "provider": row[SESSION_PROVIDER_INDEX],
+                    "model": row[SESSION_MODEL_INDEX],
+                    "created_at": row[SESSION_CREATED_AT_INDEX],
+                    "updated_at": row[SESSION_UPDATED_AT_INDEX],
                     "message_count": len(data.get("messages", [])),
                 }
             )
@@ -249,6 +372,27 @@ class SessionManager:
         Returns:
             True if session was deleted, False if not found.
         """
+        import asyncio
+
+        # Use repository if available
+        if self._repository is not None:
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    deleted = asyncio.run(
+                        self._repository.delete_session(session_id)
+                    )
+                else:
+                    deleted = loop.run_until_complete(
+                        self._repository.delete_session(session_id)
+                    )
+            except RuntimeError:
+                deleted = asyncio.run(
+                    self._repository.delete_session(session_id)
+                )
+            return deleted
+
+        # Legacy direct database access
         conn = self._get_conn()
         cursor = conn.execute(
             f"DELETE FROM {Tables.UI_SESSION} WHERE id = ?",

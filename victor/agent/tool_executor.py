@@ -1091,3 +1091,139 @@ class ToolExecutor:
 
         if paths_to_invalidate:
             self.cache.invalidate_paths(paths_to_invalidate)
+
+    async def execute_batch(
+        self,
+        tool_calls: List[Tuple[str, Dict[str, Any]]],
+        max_concurrency: int = 5,
+        skip_cache: bool = False,
+        context: Optional[Dict[str, Any]] = None,
+        skip_normalization: bool = False,
+        group_dependent: bool = True,
+    ) -> List[ToolExecutionResult]:
+        """Execute multiple tools in parallel with bounded concurrency.
+
+        This method provides significant performance improvements for independent
+        tool calls by executing them in parallel using asyncio.gather with a
+        semaphore to bound concurrency.
+
+        Args:
+            tool_calls: List of (tool_name, arguments) tuples
+            max_concurrency: Maximum number of concurrent executions (default: 5)
+            skip_cache: Skip cache lookup for all calls
+            context: Optional context to pass to all tools
+            skip_normalization: Skip argument normalization for all calls
+            group_dependent: Group dependent tools for sequential execution
+
+        Returns:
+            List of ToolExecutionResult in the same order as tool_calls
+
+        Example:
+            results = await executor.execute_batch([
+                ("read_file", {"path": "/tmp/file1.txt"}),
+                ("read_file", {"path": "/tmp/file2.txt"}),
+                ("list_directory", {"path": "/tmp"}),
+            ], max_concurrency=3)
+
+        Performance:
+            - 4 independent tools with 0.05s delay each:
+              * Sequential: ~0.20s
+              * Batch (concurrency=4): ~0.05s (75% faster)
+            - Ideal for parallel file reads, API calls, and independent operations
+        """
+        if not tool_calls:
+            return []
+
+        # Group tools by dependency if enabled
+        if group_dependent:
+            independent_groups = self._group_independent_tools(tool_calls)
+        else:
+            independent_groups = [tool_calls]
+
+        # Create semaphore for bounded concurrency
+        semaphore = asyncio.Semaphore(max_concurrency)
+
+        async def execute_with_semaphore(
+            tool_name: str,
+            arguments: Dict[str, Any],
+        ) -> ToolExecutionResult:
+            """Execute a single tool call with semaphore protection."""
+            async with semaphore:
+                return await self.execute(
+                    tool_name=tool_name,
+                    arguments=arguments,
+                    skip_cache=skip_cache,
+                    context=context,
+                    skip_normalization=skip_normalization,
+                )
+
+        # Execute each group sequentially, but tools within group in parallel
+        all_results: List[ToolExecutionResult] = []
+
+        for group in independent_groups:
+            # Execute all tools in this group in parallel
+            group_tasks = [
+                execute_with_semaphore(tool_name, args)
+                for tool_name, args in group
+            ]
+            group_results = await asyncio.gather(*group_tasks, return_exceptions=True)
+
+            # Handle exceptions and build results list
+            for i, result in enumerate(group_results):
+                if isinstance(result, Exception):
+                    tool_name, args = group[i]
+                    # Create failure result for exceptions
+                    error_result = ToolExecutionResult(
+                        tool_name=tool_name,
+                        success=False,
+                        result=None,
+                        error=f"Batch execution error: {str(result)}",
+                    )
+                    all_results.append(error_result)
+                else:
+                    all_results.append(result)
+
+        return all_results
+
+    def _group_independent_tools(
+        self,
+        tool_calls: List[Tuple[str, Dict[str, Any]]],
+    ) -> List[List[Tuple[str, Dict[str, Any]]]]:
+        """Group tool calls into independent batches.
+
+        Tools that modify state (cache-invalidating) cannot be parallelized
+        with tools that might depend on their results.
+
+        Args:
+            tool_calls: List of (tool_name, arguments) tuples
+
+        Returns:
+            List of groups, where each group can be executed in parallel
+        """
+        if not tool_calls:
+            return []
+
+        groups: List[List[Tuple[str, Dict[str, Any]]]] = []
+        current_group: List[Tuple[str, Dict[str, Any]]] = []
+        has_write_tool_in_current_group = False
+
+        for tool_name, args in tool_calls:
+            is_write_tool = self.is_cache_invalidating_tool(tool_name)
+
+            # If current group has write tools and this is a read, start new group
+            if has_write_tool_in_current_group and not is_write_tool:
+                groups.append(current_group)
+                current_group = []
+                has_write_tool_in_current_group = False
+
+            # Add to current group
+            current_group.append((tool_name, args))
+
+            if is_write_tool:
+                has_write_tool_in_current_group = True
+
+        # Add final group
+        if current_group:
+            groups.append(current_group)
+
+        return groups

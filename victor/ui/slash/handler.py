@@ -32,8 +32,8 @@ from rich.panel import Panel
 from rich.table import Table
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
     from victor.config.settings import Settings
+    from victor.protocols import UIAgentProtocol
 
 from victor.ui.slash.protocol import CommandContext, CommandMetadata
 from victor.ui.slash.registry import CommandRegistry, get_command_registry
@@ -52,7 +52,7 @@ class SlashCommandHandler:
         self,
         console: Console,
         settings: "Settings",
-        agent: Optional["AgentOrchestrator"] = None,
+        agent: Optional["UIAgentProtocol"] = None,
         registry: Optional[CommandRegistry] = None,
         auto_discover: bool = True,
     ) -> None:
@@ -61,7 +61,7 @@ class SlashCommandHandler:
         Args:
             console: Rich console for output.
             settings: Application settings.
-            agent: Optional agent orchestrator (can be set later).
+            agent: Optional UI agent (can be set later).
             registry: Optional custom registry (defaults to global).
             auto_discover: Whether to auto-discover commands on init.
         """
@@ -87,7 +87,7 @@ class SlashCommandHandler:
 
             self._registry.register_class(HelpCommand)
 
-    def set_agent(self, agent: "AgentOrchestrator") -> None:
+    def set_agent(self, agent: "UIAgentProtocol") -> None:
         """Set the agent reference (for commands that need it)."""
         self.agent = agent
 

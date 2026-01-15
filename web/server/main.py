@@ -31,6 +31,36 @@ from victor.agent.orchestrator import AgentOrchestrator
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+# =============================================================================
+# DEPRECATION NOTICE
+# =============================================================================
+#
+# **This server implementation is DEPRECATED and will be removed in v0.6.0**
+#
+# Please migrate to the canonical FastAPI server:
+#   victor/integrations/api/fastapi_server.py
+#
+# Migration Guide:
+# ----------------
+# 1. Import: from victor.integrations.api import create_fastapi_app
+# 2. Create app: app = create_fastapi_app()
+# 3. Run: uvicorn.run(app, host="0.0.0.0", port=8765)
+#
+# Feature Comparison:
+# - Legacy server (web/server/main.py): Basic WebSocket chat, render endpoints
+# - Canonical server (victor/integrations/api/): Full REST API + WebSocket + SSE
+#
+# Timeline:
+# - v0.5.x: Maintenance mode (bug fixes only)
+# - v0.6.0: Complete removal (scheduled for 2026-02-15)
+#
+# For migration assistance, see:
+# - MIGRATION.md in the repository root
+# - GitHub Issues tagged with "migration"
+#
+# Last updated: 2025-01-14
+# =============================================================================
+
 app = FastAPI(title="Victor AI Assistant API", version="2.0.0")
 
 # CORS configuration for cross-origin requests

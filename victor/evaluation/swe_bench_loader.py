@@ -462,7 +462,8 @@ class SWEBenchWorkspaceManager:
             Path to the prepared workspace
         """
         # Create unique workspace directory
-        workspace_id = hashlib.md5(f"{task.task_id}_{task.base_commit}".encode()).hexdigest()[:12]
+        # MD5 used for workspace ID generation, not security
+        workspace_id = hashlib.md5(f"{task.task_id}_{task.base_commit}".encode(), usedforsecurity=False).hexdigest()[:12]
         workspace_dir = self.workspace_base / f"task_{workspace_id}"
 
         if workspace_dir.exists():
@@ -583,7 +584,8 @@ class SWEBenchWorkspaceManager:
             return None
 
         # Create cache key from repo URL
-        repo_hash = hashlib.md5(task.repo.encode()).hexdigest()[:16]
+        # MD5 used for cache key generation, not security
+        repo_hash = hashlib.md5(task.repo.encode(), usedforsecurity=False).hexdigest()[:16]
         cached_path = self.cache_dir / repo_hash
 
         if cached_path.exists():
@@ -596,7 +598,8 @@ class SWEBenchWorkspaceManager:
         if not task.repo:
             return
 
-        repo_hash = hashlib.md5(task.repo.encode()).hexdigest()[:16]
+        # MD5 used for cache key generation, not security
+        repo_hash = hashlib.md5(task.repo.encode(), usedforsecurity=False).hexdigest()[:16]
         cache_path = self.cache_dir / repo_hash
 
         if cache_path.exists():
@@ -634,7 +637,8 @@ class SWEBenchWorkspaceManager:
         if not task.repo:
             raise ValueError(f"Task {task.task_id} has no repository URL")
 
-        repo_hash = hashlib.md5(task.repo.encode()).hexdigest()[:16]
+        # MD5 used for cache key generation, not security
+        repo_hash = hashlib.md5(task.repo.encode(), usedforsecurity=False).hexdigest()[:16]
         cache_path = self.cache_dir / repo_hash
 
         # Clone if not cached
@@ -677,7 +681,8 @@ class SWEBenchWorkspaceManager:
         if not task.repo:
             return False
 
-        repo_hash = hashlib.md5(task.repo.encode()).hexdigest()[:16]
+        # MD5 used for cache key generation, not security
+        repo_hash = hashlib.md5(task.repo.encode(), usedforsecurity=False).hexdigest()[:16]
         cache_path = self.cache_dir / repo_hash
         index_marker = cache_path / ".victor" / "indexed_at"
 
@@ -688,7 +693,8 @@ class SWEBenchWorkspaceManager:
         if not task.repo:
             return None
 
-        repo_hash = hashlib.md5(task.repo.encode()).hexdigest()[:16]
+        # MD5 used for cache key generation, not security
+        repo_hash = hashlib.md5(task.repo.encode(), usedforsecurity=False).hexdigest()[:16]
         cache_path = self.cache_dir / repo_hash
 
         if cache_path.exists():

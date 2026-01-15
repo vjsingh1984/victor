@@ -1,0 +1,337 @@
+# Prometheus Alerting Rules for Victor Coordinator Orchestrator
+#
+# This file defines alerting rules for monitoring the coordinator-based
+# orchestrator in production. Configure Prometheus to load these rules.
+#
+# Installation:
+#   1. Save this file to /etc/prometheus/rules/victor-alerts.yml
+#   2. Add to prometheus.yml:
+#      rule_files:
+#        - "/etc/prometheus/rules/victor-alerts.yml"
+#   3. Reload Prometheus: systemctl reload prometheus
+#
+# Testing:
+#   Use promtool to validate:
+#   promtool check rules /etc/prometheus/rules/victor-alerts.yml
+
+groups:
+  - name: victor_coordinators
+    interval: 30s
+    rules:
+      # ========================================================================
+      # High Error Rate Alerts
+      # ========================================================================
+
+      - alert: VictorCoordinatorHighErrorRate
+        expr: |
+          rate(victor_coordinator_errors_total{coordinator!~".*Test.*"}[5m])
+          /
+          rate(victor_coordinator_executions_total{coordinator!~".*Test.*"}[5m])
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: coordinators
+        annotations:
+          summary: "High error rate detected for coordinator {{ $labels.coordinator }}"
+          description: |
+            Coordinator {{ $labels.coordinator }} has error rate of {{ $value | humanizePercentage }}
+            for the last 5 minutes. Threshold: 5%.
+          runbook_url: "https://docs.victor.ai/production/coordinator_runbook.html#error-rate-issues"
+
+      - alert: VictorCoordinatorCriticalErrorRate
+        expr: |
+          rate(victor_coordinator_errors_total{coordinator!~".*Test.*"}[5m])
+          /
+          rate(victor_coordinator_executions_total{coordinator!~".*Test.*"}[5m])
+          > 0.15
+        for: 2m
+        labels:
+          severity: critical
+          component: coordinators
+          pagerduty: "true"
+        annotations:
+          summary: "CRITICAL: Error rate critical for coordinator {{ $labels.coordinator }}"
+          description: |
+            Coordinator {{ $labels.coordinator }} has error rate of {{ $value | humanizePercentage }}
+            for the last 5 minutes. Threshold: 15%. Immediate action required.
+          runbook_url: "https://docs.victor.ai/production/coordinator_runbook.html#critical-error-rate"
+
+      # ========================================================================
+      # High Latency Alerts
+      # ========================================================================
+
+      - alert: VictorCoordinatorHighLatency
+        expr: |
+          (
+            rate(victor_coordinator_duration_seconds_total{coordinator!~".*Test.*"}[5m])
+            /
+            rate(victor_coordinator_executions_total{coordinator!~".*Test.*"}[5m])
+          ) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: coordinators
+        annotations:
+          summary: "High latency detected for coordinator {{ $labels.coordinator }}"
+          description: |
+            Coordinator {{ $labels.coordinator }} has average latency of {{ $value | humanizeDuration }}
+            over the last 5 minutes. Threshold: 5 seconds.
+          runbook_url: "https://docs.victor.ai/production/coordinator_runbook.html#high-latency"
+
+      - alert: VictorCoordinatorCriticalLatency
+        expr: |
+          (
+            rate(victor_coordinator_duration_seconds_total{coordinator!~".*Test.*"}[5m])
+            /
+            rate(victor_coordinator_executions_total{coordinator!~".*Test.*"}[5m])
+          ) > 15
+        for: 2m
+        labels:
+          severity: critical
+          component: coordinators
+          pagerduty: "true"
+        annotations:
+          summary: "CRITICAL: Latency critical for coordinator {{ $labels.coordinator }}"
+          description: |
+            Coordinator {{ $labels.coordinator }} has average latency of {{ $value | humanizeDuration }}
+            over the last 5 minutes. Threshold: 15 seconds. Immediate action required.
+          runbook_url: "https://docs.victor.ai/production/coordinator_runbook.html#critical-latency"
+
+      # ========================================================================
+      # Cache Performance Alerts
+      # ========================================================================
+
+      - alert: VictorCoordinatorLowCacheHitRate
+        expr: |
+          victor_coordinator_cache_hit_rate{coordinator!~".*Test.*"} < 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Low cache hit rate for coordinator {{ $labels.coordinator }}"
+          description: |
+            Coordinator {{ $labels.coordinator }} has cache hit rate of {{ $value | humanizePercentage }}.
+            Threshold: 50%. Check cache configuration and data access patterns.
+          runbook_url: "https://docs.victor.ai/production/coordinator_runbook.html#cache-performance"
+
+      - alert: VictorCoordinatorCacheMissBurst
+        expr: |
+          rate(victor_coordinator_cache_misses_total{coordinator!~".*Test.*"}[2m])
+          >
+          5 * rate(victor_coordinator_cache_misses_total{coordinator!~".*Test.*"}[10m])
+        for: 5m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Cache miss burst detected for coordinator {{ $labels.coordinator }}"
+          description: |
+            Coordinator {{ $labels.coordinator }} is experiencing a cache miss burst.
+            Current miss rate is 5x higher than the 10-minute average.
+          runbook_url: "https://docs.victor.ai/production/coordinator_runbook.html#cache-miss-burst"
+
+      # ========================================================================
+      # Coordinator Availability Alerts
+      # ========================================================================
+
+      - alert: VictorCoordinatorUnavailable
+        expr: |
+          absent(victor_coordinator_executions_total{coordinator!~".*Test.*"})
+          or
+          rate(victor_coordinator_executions_total{coordinator!~".*Test.*"}[5m]) == 0
+        for: 10m
+        labels:
+          severity: critical
+          component: coordinators
+          pagerduty: "true"
+        annotations:
+          summary: "Coordinator {{ $labels.coordinator }} is unavailable"
+          description: |
+            Coordinator {{ $labels.coordinator }} has not executed any requests in the last 10 minutes.
+            This may indicate the coordinator is down or not receiving traffic.
+          runbook_url: "https://docs.victor.ai/production/coordinator_runbook.html#coordinator-unavailable"
+
+      - alert: VictorCoordinatorNotScraping
+        expr: up{job="victor-coordinators"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: monitoring
+        annotations:
+          summary: "Victor coordinator metrics endpoint is down"
+          description: |
+            Prometheus cannot scrape metrics from Victor coordinator endpoints.
+            Check if the service is running and the /metrics endpoint is accessible.
+          runbook_url: "https://docs.victor.ai/production/coordinator_runbook.html#metrics-endpoint-down"
+
+      # ========================================================================
+      # Memory Alerts
+      # ========================================================================
+
+      - alert: VictorCoordinatorHighMemory
+        expr: |
+          victor_coordinator_memory_bytes{coordinator!~".*Test.*"} > 2 * 1024 * 1024 * 1024
+        for: 10m
+        labels:
+          severity: warning
+          component: resources
+        annotations:
+          summary: "High memory usage for coordinator {{ $labels.coordinator }}"
+          description: |
+            Coordinator {{ $labels.coordinator }} is using {{ $value | humanize }} of memory.
+            Threshold: 2GB. Monitor for memory leaks.
+          runbook_url: "https://docs.victor.ai/production/coordinator_runbook.html#high-memory-usage"
+
+      - alert: VictorCoordinatorCriticalMemory
+        expr: |
+          victor_coordinator_memory_bytes{coordinator!~".*Test.*"} > 4 * 1024 * 1024 * 1024
+        for: 5m
+        labels:
+          severity: critical
+          component: resources
+        annotations:
+          summary: "CRITICAL: Memory usage critical for coordinator {{ $labels.coordinator }}"
+          description: |
+            Coordinator {{ $labels.coordinator }} is using {{ $value | humanize }} of memory.
+            Threshold: 4GB. Immediate action required to prevent OOM.
+          runbook_url: "https://docs.victor.ai/production/coordinator_runbook.html#critical-memory-usage"
+
+      # ========================================================================
+      # Throughput Alerts
+      # ========================================================================
+
+      - alert: VictorCoordinatorLowThroughput
+        expr: |
+          victor_coordinator_throughput < 0.1
+        for: 15m
+        labels:
+          severity: info
+          component: performance
+        annotations:
+          summary: "Low throughput detected"
+          description: |
+            Overall coordinator throughput is {{ $value | humanize }} req/sec.
+            This may indicate low traffic or performance issues.
+          runbook_url: "https://docs.victor.ai/production/coordinator_runbook.html#low-throughput"
+
+      - alert: VictorCoordinatorThroughputDrop
+        expr: |
+          victor_coordinator_throughput
+          <
+          0.5 * (victor_coordinator_throughput offset 10m)
+        for: 10m
+        labels:
+          severity: warning
+          component: performance
+        annotations:
+          summary: "Throughput has dropped by more than 50%"
+          description: |
+            Current throughput is {{ $value | humanize }} req/sec,
+            which is less than 50% of the throughput 10 minutes ago.
+          runbook_url: "https://docs.victor.ai/production/coordinator_runbook.html#throughput-drop"
+
+      # ========================================================================
+      # Health Status Alerts
+      # ========================================================================
+
+      - alert: VictorCoordinatorDegraded
+        expr: |
+          victor_coordinator_error_rate > 0.01 and victor_coordinator_error_rate < 0.05
+        for: 10m
+        labels:
+          severity: warning
+          component: health
+        annotations:
+          summary: "Coordinator system is degraded"
+          description: |
+            Overall coordinator error rate is {{ $value | humanizePercentage }}.
+            System is operational but experiencing issues.
+          runbook_url: "https://docs.victor.ai/production/coordinator_runbook.html#degraded-system"
+
+      - alert: VictorCoordinatorUnhealthy
+        expr: |
+          victor_coordinator_error_rate >= 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: health
+          pagerduty: "true"
+        annotations:
+          summary: "Coordinator system is unhealthy"
+          description: |
+            Overall coordinator error rate is {{ $value | humanizePercentage }}.
+            System requires immediate attention.
+          runbook_url: "https://docs.victor.ai/production/coordinator_runbook.html#unhealthy-system"
+
+  - name: victor_infrastructure
+    interval: 1m
+    rules:
+      # ========================================================================
+      # Infrastructure Alerts
+      # ========================================================================
+
+      - alert: VictorHighCPUUsage
+        expr: |
+          avg(victor_coordinator_cpu_percent) > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "High CPU usage detected"
+          description: |
+            Average coordinator CPU usage is {{ $value }}%.
+            Consider scaling or optimizing.
+          runbook_url: "https://docs.victor.ai/production/coordinator_runbook.html#high-cpu-usage"
+
+      - alert: VictorServiceDown
+        expr: |
+          up{job="victor-coordinators"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: infrastructure
+          pagerduty: "true"
+        annotations:
+          summary: "Victor coordinator service is down"
+          description: |
+            Victor coordinator service is not responding to health checks.
+            Immediate investigation required.
+          runbook_url: "https://docs.victor.ai/production/coordinator_runbook.html#service-down"
+
+  - name: victor_analytics
+    interval: 5m
+    rules:
+      # ========================================================================
+      # Analytics Events Monitoring
+      # ========================================================================
+
+      - alert: VictorAnalyticsEventSpike
+        expr: |
+          rate(victor_analytics_events_total[5m])
+          >
+          3 * rate(victor_analytics_events_total[10m] offset 5m)
+        for: 5m
+        labels:
+          severity: info
+          component: analytics
+        annotations:
+          summary: "Analytics event spike detected: {{ $labels.event }}"
+          description: |
+            Event type {{ $labels.event }} has spiked to {{ $value }} events/sec.
+            Current rate is 3x higher than normal.
+
+      - alert: VictorNoAnalyticsEvents
+        expr: |
+          rate(victor_analytics_events_total[10m]) == 0
+        for: 15m
+        labels:
+          severity: warning
+          component: analytics
+        annotations:
+          summary: "No analytics events received"
+          description: |
+            No analytics events have been received in the last 15 minutes.
+            Check if analytics collection is enabled.

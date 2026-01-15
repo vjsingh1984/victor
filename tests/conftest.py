@@ -167,6 +167,15 @@ def reset_singletons():
         except ImportError:
             pass
 
+        # Reset VerticalBase config cache
+        # Clear config cache to prevent stale config across tests
+        try:
+            from victor.core.verticals.base import VerticalBase
+
+            VerticalBase.clear_config_cache(clear_all=True)
+        except ImportError:
+            pass
+
     # Reset before test
     _reset_all()
 

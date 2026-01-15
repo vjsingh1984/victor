@@ -162,6 +162,7 @@ class ConfigCoordinator:
         else:
             # Load from all providers
             config = {}
+            errors = []
 
             # Try each provider and merge results
             for provider in self._providers:
@@ -171,12 +172,16 @@ class ConfigCoordinator:
                         # Merge with existing config (later providers override)
                         config = self._deep_merge(config, provider_config)
                 except Exception as e:
-                    # Log error but continue to next provider
-                    import logging
+                    # Collect errors for later
+                    errors.append((provider.__class__.__name__, str(e)))
 
-                    logging.getLogger(__name__).warning(
-                        f"Config provider {provider.__class__.__name__} failed: {e}"
-                    )
+            # If no providers returned config and we had errors, raise the first one
+            if not config and errors and not self._providers:
+                # No providers configured
+                raise ValueError("No configuration providers configured")
+            elif not config and errors:
+                # All providers failed, re-raise the first error
+                raise ValueError(f"Configuration loading failed: {errors[0][1]}")
 
             # Cache the merged config
             if self._enable_cache and config:
@@ -367,6 +372,67 @@ class ConfigCoordinator:
 
         return result
 
+    async def create_provider_from_config(
+        self,
+        config: Dict[str, Any],
+        settings: Any,
+        provider_registry: Any = None,
+    ) -> Any:
+        """Create a provider instance from configuration.
+
+        Args:
+            config: Configuration dictionary with provider/model info
+            settings: Settings object for provider-level settings
+            provider_registry: Optional provider registry (for testing)
+
+        Returns:
+            Provider instance
+
+        Raises:
+            ValueError: If provider creation fails
+        """
+        # Import here to allow mocking in tests
+        if provider_registry is None:
+            from victor.providers.registry import ProviderRegistry
+
+            provider_registry = ProviderRegistry
+
+        provider_name = config.get("provider")
+        if not provider_name:
+            raise ValueError("Configuration missing 'provider' field")
+
+        # Get provider-level settings
+        provider_settings = settings.get_provider_settings(provider_name)
+
+        # Merge profile-level overrides if present
+        profile_overrides = config.get("profile_overrides")
+        if profile_overrides:
+            provider_settings.update(profile_overrides)
+            logger.debug(
+                f"Applied profile overrides: {list(profile_overrides.keys())}"
+            )
+
+        # Apply timeout multiplier from model capabilities
+        # Slow local models (Ollama, LMStudio) get longer timeouts
+        from victor.agent.tool_calling.capabilities import ModelCapabilityLoader
+
+        cap_loader = ModelCapabilityLoader()
+        caps = cap_loader.get_capabilities(
+            provider_name, config.get("model", "")
+        )
+        if caps and caps.timeout_multiplier > 1.0:
+            base_timeout = provider_settings.get("timeout", 300)
+            adjusted_timeout = int(base_timeout * caps.timeout_multiplier)
+            provider_settings["timeout"] = adjusted_timeout
+            logger.info(
+                f"Adjusted timeout for {provider_name}/{config.get('model')}: "
+                f"{base_timeout}s -> {adjusted_timeout}s (multiplier: {caps.timeout_multiplier}x)"
+            )
+
+        # Create provider instance
+        provider = provider_registry.create(provider_name, **provider_settings)
+        return provider
+
 
 # Built-in config providers
 
@@ -479,10 +545,90 @@ class EnvironmentConfigProvider(IConfigProvider):
         return self._priority
 
 
+class ProfileConfigProvider(IConfigProvider):
+    """Configuration provider that reads from Victor profiles.
+
+    This provider extracts configuration from Victor's profile system,
+    which stores provider, model, and other settings in profiles.yaml.
+
+    Attributes:
+        settings: The Settings object
+        profile_name: Profile name to load
+        _priority: Provider priority (higher = tried first)
+    """
+
+    def __init__(self, settings: Any, profile_name: str = "default", priority: int = 200):
+        """Initialize the profile config provider.
+
+        Args:
+            settings: Victor Settings object
+            profile_name: Profile name to load (default: "default")
+            priority: Provider priority (default: 200, higher than Settings)
+        """
+        self._settings = settings
+        self._profile_name = profile_name
+        self._priority = priority
+
+    async def get_config(self, session_id: str) -> Dict[str, Any]:
+        """Get configuration from profile.
+
+        Args:
+            session_id: Session identifier (not used for profiles)
+
+        Returns:
+            Configuration dictionary from profile
+
+        Raises:
+            ValueError: If profile not found
+        """
+        # Load profiles
+        profiles = self._settings.load_profiles()
+        profile = profiles.get(self._profile_name)
+
+        if not profile:
+            available = list(profiles.keys())
+            # Use difflib for similar name suggestions
+            import difflib
+
+            suggestions = difflib.get_close_matches(
+                self._profile_name, available, n=3, cutoff=0.4
+            )
+
+            error_msg = f"Profile not found: '{self._profile_name}'"
+            if suggestions:
+                error_msg += f"\n  Did you mean: {', '.join(suggestions)}?"
+            if available:
+                error_msg += f"\n  Available profiles: {', '.join(sorted(available))}"
+            else:
+                error_msg += "\n  No profiles configured. Run 'victor init' or create ~/.victor/profiles.yaml'"
+            raise ValueError(error_msg)
+
+        # Extract configuration from profile
+        config = {
+            "provider": profile.provider,
+            "model": profile.model,
+            "temperature": profile.temperature,
+            "max_tokens": profile.max_tokens,
+            "tool_selection": profile.tool_selection,
+            "profile_name": self._profile_name,
+        }
+
+        # Add profile-level overrides if present
+        if hasattr(profile, "__pydantic_extra__") and profile.__pydantic_extra__:
+            config["profile_overrides"] = profile.__pydantic_extra__
+
+        return config
+
+    def priority(self) -> int:
+        """Get provider priority."""
+        return self._priority
+
+
 __all__ = [
     "ConfigCoordinator",
     "ValidationResult",
     "OrchestratorConfig",
     "SettingsConfigProvider",
     "EnvironmentConfigProvider",
+    "ProfileConfigProvider",
 ]

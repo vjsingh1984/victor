@@ -97,12 +97,15 @@ import logging
 import operator
 import os
 import re
+import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TYPE_CHECKING, Union
 
 import yaml
+
+from victor.core.errors import ConfigurationError
 
 
 # =============================================================================
@@ -211,14 +214,14 @@ def _interpolate_env_vars(value: Any) -> Any:
     """
     if isinstance(value, str):
         # Handle $env.VAR_NAME syntax
-        def replace_env(match: re.Match) -> str:
+        def replace_env(match: re.Match[str]) -> str:
             var_name = match.group(1)
             return os.environ.get(var_name, f"$env.{var_name}")
 
         result = ENV_VAR_PATTERN.sub(replace_env, value)
 
         # Handle ${VAR:-default} syntax
-        def replace_shell(match: re.Match) -> str:
+        def replace_shell(match: re.Match[str]) -> str:
             var_name = match.group(1)
             default = match.group(2) if match.group(2) is not None else ""
             return os.environ.get(var_name, default)
@@ -1409,7 +1412,30 @@ def load_workflow_from_dict(
     # Validate
     errors = workflow.validate()
     if errors:
-        raise YAMLWorkflowError(f"Workflow validation failed: {'; '.join(errors)}")
+        # Build structured error message with field names and recovery hints
+        error_list = "\n  - ".join([f"{err}" for err in errors])
+
+        # Try to identify specific fields/nodes from errors
+        invalid_fields = []
+        for err in errors:
+            # Extract field/node names if present
+            if ":" in err:
+                field_name = err.split(":", 1)[0].strip()
+                invalid_fields.append(field_name)
+
+        # Raise ConfigurationError with structured details
+        raise ConfigurationError(
+            f"Workflow validation failed with {len(errors)} error(s):\n  - {error_list}\n\n"
+            f"Workflow: {name}\n"
+            f"File: {config.base_dir if config else 'unknown'}",
+            config_key=f"workflow.{name}",
+            invalid_fields=invalid_fields,
+            recovery_hint=(
+                "Fix validation errors in YAML file. "
+                "Use 'victor workflow validate <path>' to check. "
+                "Common issues: missing 'id' fields, invalid node types, circular dependencies."
+            ),
+        )
 
     return workflow
 

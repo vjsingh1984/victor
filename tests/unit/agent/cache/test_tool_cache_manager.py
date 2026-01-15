@@ -23,6 +23,7 @@ from unittest.mock import AsyncMock, MagicMock
 from victor.agent.cache.tool_cache_manager import (
     ToolCacheManager,
     CacheNamespace,
+    InvalidationResult,
 )
 from victor.protocols import ICacheBackend
 
@@ -85,9 +86,7 @@ class TestToolCacheManager:
 
     def test_init_without_dependency_tracking(self, backend):
         """Test initialization with dependency tracking disabled."""
-        manager = ToolCacheManager(
-            backend=backend, enable_dependency_tracking=False
-        )
+        manager = ToolCacheManager(backend=backend, enable_dependency_tracking=False)
 
         assert manager._enable_dependency_tracking is False
 
@@ -234,10 +233,15 @@ class TestToolCacheManager:
         )
 
         # Clear namespace
-        count = await manager.invalidate_namespace(CacheNamespace.SESSION)
+        result = await manager.invalidate_namespace(CacheNamespace.SESSION)
 
-        assert count == 2
+        assert isinstance(result, InvalidationResult)
+        assert result.keys_cleared == 2
+        assert result.namespace == "session"
+        assert result.recursive is False
         assert "session" in backend._clear_calls
+        assert result.metadata["cleared_namespaces"] == ["session"]
+        assert result.metadata["child_count"] == 0
 
     @pytest.mark.asyncio
     async def test_clear_all(self, manager):
@@ -375,3 +379,188 @@ class TestToolCacheManager:
         args_reordered = {"line": 10, "path": "/src/main.py"}
         hash3 = manager._hash_args(args_reordered)
         assert hash1 == hash3
+
+    @pytest.mark.asyncio
+    async def test_invalidate_namespace_recursive(self, manager, backend):
+        """Test recursive namespace invalidation."""
+        # Cache results in multiple namespaces
+        await manager.set_tool_result(
+            tool_name="read",
+            args={"path": "/src/main.py"},
+            result={"content": "global"},
+            namespace=CacheNamespace.GLOBAL,
+        )
+        await manager.set_tool_result(
+            tool_name="read",
+            args={"path": "/src/main.py"},
+            result={"content": "session"},
+            namespace=CacheNamespace.SESSION,
+        )
+        await manager.set_tool_result(
+            tool_name="grep",
+            args={"pattern": "test"},
+            result={"matches": []},
+            namespace=CacheNamespace.REQUEST,
+        )
+
+        # Clear GLOBAL namespace recursively
+        result = await manager.invalidate_namespace(CacheNamespace.GLOBAL, recursive=True)
+
+        # Should clear GLOBAL and all children (SESSION, REQUEST, TOOL)
+        assert isinstance(result, InvalidationResult)
+        assert result.keys_cleared == 3
+        assert result.namespace == "global"
+        assert result.recursive is True
+        assert result.metadata["child_count"] == 3
+        assert set(result.metadata["cleared_namespaces"]) == {
+            "global",
+            "session",
+            "request",
+            "tool",
+        }
+        # Verify backend was called for all namespaces
+        assert "global" in backend._clear_calls
+        assert "session" in backend._clear_calls
+        assert "request" in backend._clear_calls
+
+    @pytest.mark.asyncio
+    async def test_invalidate_namespace_recursive_session(self, manager, backend):
+        """Test recursive namespace invalidation starting from SESSION."""
+        # Cache results in SESSION, REQUEST, and TOOL
+        await manager.set_tool_result(
+            tool_name="read",
+            args={"path": "/src/main.py"},
+            result={"content": "session"},
+            namespace=CacheNamespace.SESSION,
+        )
+        await manager.set_tool_result(
+            tool_name="grep",
+            args={"pattern": "test"},
+            result={"matches": []},
+            namespace=CacheNamespace.REQUEST,
+        )
+        await manager.set_tool_result(
+            tool_name="ast",
+            args={"node": "function"},
+            result={"type": "def"},
+            namespace=CacheNamespace.TOOL,
+        )
+
+        # Clear SESSION namespace recursively
+        result = await manager.invalidate_namespace(CacheNamespace.SESSION, recursive=True)
+
+        # Should clear SESSION, REQUEST, and TOOL
+        assert isinstance(result, InvalidationResult)
+        assert result.keys_cleared == 3
+        assert result.namespace == "session"
+        assert result.recursive is True
+        assert result.metadata["child_count"] == 2
+        assert set(result.metadata["cleared_namespaces"]) == {"session", "request", "tool"}
+
+    @pytest.mark.asyncio
+    async def test_invalidate_namespace_recursive_tool(self, manager, backend):
+        """Test recursive namespace invalidation starting from TOOL (leaf namespace)."""
+        # Cache result in TOOL namespace
+        await manager.set_tool_result(
+            tool_name="ast",
+            args={"node": "function"},
+            result={"type": "def"},
+            namespace=CacheNamespace.TOOL,
+        )
+
+        # Clear TOOL namespace recursively (should only clear TOOL)
+        result = await manager.invalidate_namespace(CacheNamespace.TOOL, recursive=True)
+
+        # Should clear only TOOL (no children)
+        assert isinstance(result, InvalidationResult)
+        assert result.keys_cleared == 1
+        assert result.namespace == "tool"
+        assert result.recursive is True
+        assert result.metadata["child_count"] == 0
+        assert result.metadata["cleared_namespaces"] == ["tool"]
+
+    @pytest.mark.asyncio
+    async def test_invalidate_namespace_empty(self, manager, backend):
+        """Test invalidating an empty namespace."""
+        # Clear empty namespace
+        result = await manager.invalidate_namespace(CacheNamespace.REQUEST)
+
+        assert isinstance(result, InvalidationResult)
+        assert result.keys_cleared == 0
+        assert result.namespace == "request"
+        assert result.recursive is False
+        assert result.metadata["cleared_namespaces"] == ["request"]
+
+    @pytest.mark.asyncio
+    async def test_invalidate_namespace_recursive_empty(self, manager, backend):
+        """Test recursive invalidation of empty namespaces."""
+        # Clear all namespaces recursively when empty
+        result = await manager.invalidate_namespace(CacheNamespace.GLOBAL, recursive=True)
+
+        assert isinstance(result, InvalidationResult)
+        assert result.keys_cleared == 0
+        assert result.namespace == "global"
+        assert result.recursive is True
+        assert result.metadata["child_count"] == 3
+
+    @pytest.mark.asyncio
+    async def test_get_child_namespaces(self):
+        """Test CacheNamespace.get_child_namespaces() method."""
+        # GLOBAL has all children
+        global_children = CacheNamespace.GLOBAL.get_child_namespaces()
+        assert global_children == [
+            CacheNamespace.SESSION,
+            CacheNamespace.REQUEST,
+            CacheNamespace.TOOL,
+        ]
+
+        # SESSION has REQUEST and TOOL as children
+        session_children = CacheNamespace.SESSION.get_child_namespaces()
+        assert session_children == [
+            CacheNamespace.REQUEST,
+            CacheNamespace.TOOL,
+        ]
+
+        # REQUEST has only TOOL as child
+        request_children = CacheNamespace.REQUEST.get_child_namespaces()
+        assert request_children == [CacheNamespace.TOOL]
+
+        # TOOL has no children
+        tool_children = CacheNamespace.TOOL.get_child_namespaces()
+        assert tool_children == []
+
+    @pytest.mark.asyncio
+    async def test_invalidate_namespace_non_recursive_does_not_clear_children(
+        self, manager, backend
+    ):
+        """Test that non-recursive invalidation does not clear child namespaces."""
+        # Cache results in GLOBAL and SESSION
+        await manager.set_tool_result(
+            tool_name="read",
+            args={"path": "/src/main.py"},
+            result={"content": "global"},
+            namespace=CacheNamespace.GLOBAL,
+        )
+        await manager.set_tool_result(
+            tool_name="read",
+            args={"path": "/src/main.py"},
+            result={"content": "session"},
+            namespace=CacheNamespace.SESSION,
+        )
+
+        # Clear GLOBAL without recursive
+        result = await manager.invalidate_namespace(CacheNamespace.GLOBAL, recursive=False)
+
+        # Should only clear GLOBAL, not SESSION
+        assert isinstance(result, InvalidationResult)
+        assert result.keys_cleared == 1
+        assert result.recursive is False
+        assert result.metadata["cleared_namespaces"] == ["global"]
+
+        # Verify SESSION still has data
+        session_result = await manager.get_tool_result(
+            tool_name="read",
+            args={"path": "/src/main.py"},
+            namespace=CacheNamespace.SESSION,
+        )
+        assert session_result == {"content": "session"}

@@ -1,0 +1,188 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""RAGAssistant - YAML Configuration.
+
+Retrieval-Augmented Generation assistant for document Q&A.
+Features: Document ingestion, vector search, query generation, source attribution.
+"""
+
+# =============================================================================
+# Metadata
+# =============================================================================
+metadata:
+  name: rag
+  version: "1.0.0"
+  description: "Retrieval-Augmented Generation assistant for document Q&A"
+
+# =============================================================================
+# Core Configuration
+# =============================================================================
+core:
+  # -------------------------------------------------------------------------
+  # Tools
+  # -------------------------------------------------------------------------
+  tools:
+    list:
+      # RAG-specific tools
+      - rag_ingest  # Ingest documents into the store
+      - rag_search  # Search for relevant chunks
+      - rag_query  # Query with context retrieval
+      - rag_list  # List indexed documents
+      - rag_delete  # Delete documents
+      - rag_stats  # Get store statistics
+
+      # Filesystem for document access
+      - read
+      - ls
+
+      # Web for fetching web content
+      - web_fetch
+
+      # Shell for document processing
+      - shell
+
+  # -------------------------------------------------------------------------
+  # System Prompt
+  # -------------------------------------------------------------------------
+  system_prompt:
+    source: inline
+    text: |
+      You are Victor, a Retrieval-Augmented Generation (RAG) assistant.
+
+      Your capabilities:
+      - Ingest documents from files (PDF, Markdown, Text, Code)
+      - Index documents with semantic embeddings using LanceDB
+      - Search for relevant information using hybrid search
+      - Answer questions with source citations
+      - Manage the document knowledge base
+
+      Guidelines:
+      - Always search the knowledge base before answering questions
+      - Cite sources by referencing document names and page/section numbers
+      - If information isn't in the knowledge base, say so clearly
+      - Use rag_ingest to add new documents when requested
+      - Use rag_search for exploratory queries
+      - Use rag_query for direct Q&A with automatic context retrieval
+
+      Workflow:
+      1. For questions: Use rag_query to search and get relevant context
+      2. For exploration: Use rag_search to find related chunks
+      3. For adding docs: Use rag_ingest with file paths or URLs
+      4. Always cite your sources in answers
+
+      Example interaction:
+      User: "What does the documentation say about authentication?"
+      You: [Use rag_query tool with query="authentication"]
+           Then synthesize the results with citations.
+
+  # -------------------------------------------------------------------------
+  # Stages
+  # -------------------------------------------------------------------------
+  stages:
+    INITIAL:
+      name: INITIAL
+      description: "Ready to accept RAG queries"
+      tools: [rag_search, rag_query, rag_list, rag_stats]
+      keywords: ["what", "how", "find", "search", "query"]
+      next_stages: ["INGESTING", "SEARCHING", "QUERYING"]
+
+    INGESTING:
+      name: INGESTING
+      description: "Ingesting documents into knowledge base"
+      tools: [rag_ingest, read, ls, web_fetch]
+      keywords: ["ingest", "add", "index", "load", "import"]
+      next_stages: ["INITIAL", "SEARCHING"]
+
+    SEARCHING:
+      name: SEARCHING
+      description: "Searching knowledge base"
+      tools: [rag_search, rag_query]
+      keywords: ["search", "find", "look for", "locate"]
+      next_stages: ["INITIAL", "QUERYING", "SYNTHESIZING"]
+
+    QUERYING:
+      name: QUERYING
+      description: "Processing query with retrieved context"
+      tools: [rag_query]
+      keywords: ["query", "ask", "question", "answer"]
+      next_stages: ["SYNTHESIZING", "SEARCHING"]
+
+    SYNTHESIZING:
+      name: SYNTHESIZING
+      description: "Synthesizing answer from retrieved context"
+      tools: []
+      keywords: ["synthesize", "combine", "summarize"]
+      next_stages: ["INITIAL"]
+
+# =============================================================================
+# Provider Hints
+# =============================================================================
+provider:
+  hints:
+    preferred: ["anthropic", "openai", "google"]
+    capabilities:
+      required: ["tool_calling", "streaming"]
+      optional: ["parallel_tool_calls"]
+
+# =============================================================================
+# Extensions
+# =============================================================================
+extensions:
+  # -------------------------------------------------------------------------
+  # Middleware
+  # -------------------------------------------------------------------------
+  middleware: []  # RAG doesn't use custom middleware
+
+  # -------------------------------------------------------------------------
+  # Safety Extension
+  # -------------------------------------------------------------------------
+  safety:
+    module: victor.rag.safety
+    class: RAGSafetyExtension
+
+  # -------------------------------------------------------------------------
+  # Prompt Contributor
+  # -------------------------------------------------------------------------
+  prompt_contributor:
+    module: victor.rag.prompts
+    class: RAGPromptContributor
+
+  # -------------------------------------------------------------------------
+  # Mode Configuration
+  # -------------------------------------------------------------------------
+  mode_config:
+    module: victor.rag.mode_config
+    class: RAGModeConfigProvider
+
+  # -------------------------------------------------------------------------
+  # Tool Dependencies
+  # -------------------------------------------------------------------------
+  tool_dependencies:
+    module: victor.rag.tool_dependencies
+    class: RAGToolDependencyProvider
+
+# =============================================================================
+# Additional Metadata
+# =============================================================================
+metadata:
+  vector_store: "lancedb"
+  supported_formats:
+    - pdf
+    - markdown
+    - txt
+    - code
+  embedding_model: "default"
+  chunk_size: 1000
+  chunk_overlap: 200

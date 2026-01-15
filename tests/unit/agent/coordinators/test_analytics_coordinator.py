@@ -24,6 +24,7 @@ from victor.agent.coordinators.analytics_coordinator import (
     SessionAnalytics,
     BaseAnalyticsExporter,
     ConsoleAnalyticsExporter,
+    FileAnalyticsExporter,
 )
 from victor.protocols import IAnalyticsExporter, ExportResult, AnalyticsQuery
 
@@ -139,6 +140,207 @@ class TestConsoleAnalyticsExporter:
         assert "tool_call" in captured.out
 
 
+class TestFileAnalyticsExporter:
+    """Tests for FileAnalyticsExporter."""
+
+    def test_init_json_format(self, tmp_path):
+        """Test initialization with JSON format."""
+        file_path = tmp_path / "analytics.json"
+        exporter = FileAnalyticsExporter(str(file_path), format="json")
+
+        assert exporter.exporter_type() == "file"
+        assert exporter._format == "json"
+        assert exporter._append is True
+
+    def test_init_csv_format(self, tmp_path):
+        """Test initialization with CSV format."""
+        file_path = tmp_path / "analytics.csv"
+        exporter = FileAnalyticsExporter(str(file_path), format="csv")
+
+        assert exporter._format == "csv"
+
+    def test_init_invalid_format(self, tmp_path):
+        """Test initialization with invalid format raises ValueError."""
+        file_path = tmp_path / "analytics.txt"
+        with pytest.raises(ValueError, match="Invalid format"):
+            FileAnalyticsExporter(str(file_path), format="txt")
+
+    def test_init_no_append(self, tmp_path):
+        """Test initialization with append=False."""
+        file_path = tmp_path / "analytics.json"
+        exporter = FileAnalyticsExporter(str(file_path), append=False)
+
+        assert exporter._append is False
+
+    @pytest.mark.asyncio
+    async def test_export_json_new_file(self, tmp_path):
+        """Test exporting to JSON new file."""
+        import json
+
+        file_path = tmp_path / "analytics.json"
+        exporter = FileAnalyticsExporter(str(file_path), format="json", append=False)
+
+        data = {
+            "session_id": "test123",
+            "events": [
+                {"type": "tool_call", "timestamp": "2025-01-01T00:00:00", "data": {"tool": "read"}}
+            ],
+        }
+
+        result = await exporter.export(data)
+
+        assert result.success is True
+        assert result.records_exported == 1
+        assert result.metadata["format"] == "json"
+
+        # Verify file was created
+        assert file_path.exists()
+
+        # Verify file contents
+        with open(file_path, "r") as f:
+            content = json.load(f)
+            assert isinstance(content, list)
+            assert len(content) == 1
+            assert content[0]["session_id"] == "test123"
+
+    @pytest.mark.asyncio
+    async def test_export_json_append(self, tmp_path):
+        """Test appending to JSON file."""
+        import json
+
+        file_path = tmp_path / "analytics.json"
+        exporter = FileAnalyticsExporter(str(file_path), format="json", append=True)
+
+        data1 = {
+            "session_id": "test123",
+            "events": [{"type": "tool_call", "timestamp": "2025-01-01T00:00:00"}],
+        }
+        data2 = {
+            "session_id": "test456",
+            "events": [{"type": "llm_request", "timestamp": "2025-01-01T00:01:00"}],
+        }
+
+        await exporter.export(data1)
+        await exporter.export(data2)
+
+        # Verify both exports are in file
+        with open(file_path, "r") as f:
+            content = json.load(f)
+            assert len(content) == 2
+            assert content[0]["session_id"] == "test123"
+            assert content[1]["session_id"] == "test456"
+
+    @pytest.mark.asyncio
+    async def test_export_csv_new_file(self, tmp_path):
+        """Test exporting to CSV new file."""
+        import csv
+
+        file_path = tmp_path / "analytics.csv"
+        exporter = FileAnalyticsExporter(str(file_path), format="csv", append=False)
+
+        data = {
+            "session_id": "test123",
+            "events": [
+                {"type": "tool_call", "timestamp": "2025-01-01T00:00:00", "data": {"tool": "read"}}
+            ],
+        }
+
+        result = await exporter.export(data)
+
+        assert result.success is True
+        assert result.records_exported == 1
+        assert result.metadata["format"] == "csv"
+
+        # Verify file was created
+        assert file_path.exists()
+
+        # Verify file contents
+        with open(file_path, "r") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+            assert len(rows) == 1
+            assert rows[0]["session_id"] == "test123"
+            assert rows[0]["event_type"] == "tool_call"
+
+    @pytest.mark.asyncio
+    async def test_export_csv_append(self, tmp_path):
+        """Test appending to CSV file."""
+        import csv
+
+        file_path = tmp_path / "analytics.csv"
+        exporter = FileAnalyticsExporter(str(file_path), format="csv", append=True)
+
+        data1 = {
+            "session_id": "test123",
+            "events": [{"type": "tool_call", "timestamp": "2025-01-01T00:00:00"}],
+        }
+        data2 = {
+            "session_id": "test456",
+            "events": [{"type": "llm_request", "timestamp": "2025-01-01T00:01:00"}],
+        }
+
+        await exporter.export(data1)
+        await exporter.export(data2)
+
+        # Verify both exports are in file (excluding header)
+        with open(file_path, "r") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+            assert len(rows) == 2
+            assert rows[0]["session_id"] == "test123"
+            assert rows[1]["session_id"] == "test456"
+
+    @pytest.mark.asyncio
+    async def test_export_creates_directory(self, tmp_path):
+        """Test that export creates parent directories."""
+        import json
+
+        file_path = tmp_path / "nested" / "dir" / "analytics.json"
+        exporter = FileAnalyticsExporter(str(file_path), format="json", append=False)
+
+        data = {
+            "session_id": "test123",
+            "events": [{"type": "tool_call"}],
+        }
+
+        await exporter.export(data)
+
+        # Verify directory and file were created
+        assert file_path.exists()
+        assert file_path.parent.exists()
+
+    @pytest.mark.asyncio
+    async def test_export_with_nested_data(self, tmp_path):
+        """Test exporting events with nested data structures."""
+        import json
+
+        file_path = tmp_path / "analytics.json"
+        exporter = FileAnalyticsExporter(str(file_path), format="json", append=False)
+
+        data = {
+            "session_id": "test123",
+            "events": [
+                {
+                    "type": "tool_call",
+                    "timestamp": "2025-01-01T00:00:00",
+                    "data": {
+                        "tool": "read",
+                        "args": {"file_path": "/src/main.py", "limit": 100},
+                    },
+                }
+            ],
+        }
+
+        result = await exporter.export(data)
+
+        assert result.success is True
+
+        # Verify nested data is preserved
+        with open(file_path, "r") as f:
+            content = json.load(f)
+            assert content[0]["events"][0]["data"]["args"]["file_path"] == "/src/main.py"
+
+
 class TestAnalyticsCoordinator:
     """Tests for AnalyticsCoordinator."""
 
@@ -175,11 +377,14 @@ class TestAnalyticsCoordinator:
     @pytest.mark.asyncio
     async def test_track_event(self, coordinator):
         """Test tracking an event."""
-        event = {
-            "type": "tool_call",
-            "timestamp": "2025-01-01T00:00:00",
-            "data": {"tool": "read"},
-        }
+        from victor.protocols import AnalyticsEvent
+
+        event = AnalyticsEvent(
+            event_type="tool_call",
+            timestamp="2025-01-01T00:00:00",
+            session_id="session123",
+            data={"tool": "read"},
+        )
 
         await coordinator.track_event("session123", event)
 
@@ -190,9 +395,21 @@ class TestAnalyticsCoordinator:
     @pytest.mark.asyncio
     async def test_track_multiple_events(self, coordinator):
         """Test tracking multiple events."""
+        from victor.protocols import AnalyticsEvent
+
         events = [
-            {"type": "tool_call", "timestamp": "2025-01-01T00:00:00"},
-            {"type": "llm_request", "timestamp": "2025-01-01T00:01:00"},
+            AnalyticsEvent(
+                event_type="tool_call",
+                timestamp="2025-01-01T00:00:00",
+                session_id="session123",
+                data={}
+            ),
+            AnalyticsEvent(
+                event_type="llm_request",
+                timestamp="2025-01-01T00:01:00",
+                session_id="session123",
+                data={}
+            ),
         ]
 
         for event in events:
@@ -212,8 +429,18 @@ class TestAnalyticsCoordinator:
     @pytest.mark.asyncio
     async def test_export_analytics_no_exporters(self, coordinator):
         """Test exporting analytics when no exporters configured."""
+        from victor.protocols import AnalyticsEvent
+
         # Track an event first
-        await coordinator.track_event("session123", {"type": "test"})
+        await coordinator.track_event(
+            "session123",
+            AnalyticsEvent(
+                event_type="test",
+                timestamp="2025-01-01T00:00:00",
+                session_id="session123",
+                data={}
+            )
+        )
 
         result = await coordinator.export_analytics("session123")
 
@@ -223,12 +450,26 @@ class TestAnalyticsCoordinator:
     @pytest.mark.asyncio
     async def test_export_analytics_success(self, coordinator_with_exporters):
         """Test successful analytics export."""
+        from victor.protocols import AnalyticsEvent
+
         # Track events
         await coordinator_with_exporters.track_event(
-            "session123", {"type": "tool_call", "timestamp": "2025-01-01T00:00:00"}
+            "session123",
+            AnalyticsEvent(
+                event_type="tool_call",
+                timestamp="2025-01-01T00:00:00",
+                session_id="session123",
+                data={}
+            )
         )
         await coordinator_with_exporters.track_event(
-            "session123", {"type": "llm_request", "timestamp": "2025-01-01T00:01:00"}
+            "session123",
+            AnalyticsEvent(
+                event_type="llm_request",
+                timestamp="2025-01-01T00:01:00",
+                session_id="session123",
+                data={}
+            )
         )
 
         result = await coordinator_with_exporters.export_analytics("session123")
@@ -240,8 +481,16 @@ class TestAnalyticsCoordinator:
     @pytest.mark.asyncio
     async def test_export_analytics_specific_exporters(self, coordinator_with_exporters):
         """Test exporting to specific exporters only."""
+        from victor.protocols import AnalyticsEvent
+
         await coordinator_with_exporters.track_event(
-            "session123", {"type": "test"}
+            "session123",
+            AnalyticsEvent(
+                event_type="test",
+                timestamp="2025-01-01T00:00:00",
+                session_id="session123",
+                data={}
+            )
         )
 
         # Export to first exporter only
@@ -255,11 +504,21 @@ class TestAnalyticsCoordinator:
     @pytest.mark.asyncio
     async def test_export_analytics_handles_errors(self):
         """Test that exporter errors are handled gracefully."""
+        from victor.protocols import AnalyticsEvent
+
         failing_exporter = FailingAnalyticsExporter()
         working_exporter = MockAnalyticsExporter(exporter_type="working")
         coordinator = AnalyticsCoordinator(exporters=[failing_exporter, working_exporter])
 
-        await coordinator.track_event("session123", {"type": "test"})
+        await coordinator.track_event(
+            "session123",
+            AnalyticsEvent(
+                event_type="test",
+                timestamp="2025-01-01T00:00:00",
+                session_id="session123",
+                data={}
+            )
+        )
 
         result = await coordinator.export_analytics("session123")
 
@@ -270,10 +529,28 @@ class TestAnalyticsCoordinator:
     @pytest.mark.asyncio
     async def test_query_analytics_all(self, coordinator):
         """Test querying all analytics."""
-        await coordinator.track_event("session1", {"type": "tool_call", "timestamp": "2025-01-01T00:00:00"})
-        await coordinator.track_event("session2", {"type": "llm_request", "timestamp": "2025-01-01T00:01:00"})
+        from victor.protocols import AnalyticsEvent, AnalyticsQuery
 
-        result = await coordinator.query_analytics({})
+        await coordinator.track_event(
+            "session1",
+            AnalyticsEvent(
+                event_type="tool_call",
+                timestamp="2025-01-01T00:00:00",
+                session_id="session1",
+                data={}
+            )
+        )
+        await coordinator.track_event(
+            "session2",
+            AnalyticsEvent(
+                event_type="llm_request",
+                timestamp="2025-01-01T00:01:00",
+                session_id="session2",
+                data={}
+            )
+        )
+
+        result = await coordinator.query_analytics(AnalyticsQuery())
 
         assert len(result.events) == 2
         assert result.total_count == 2
@@ -281,32 +558,78 @@ class TestAnalyticsCoordinator:
     @pytest.mark.asyncio
     async def test_query_analytics_by_session(self, coordinator):
         """Test querying by session ID."""
-        await coordinator.track_event("session1", {"type": "tool_call", "timestamp": "2025-01-01T00:00:00"})
-        await coordinator.track_event("session2", {"type": "llm_request", "timestamp": "2025-01-01T00:01:00"})
+        from victor.protocols import AnalyticsEvent, AnalyticsQuery
 
-        result = await coordinator.query_analytics({"session_id": "session1"})
+        await coordinator.track_event(
+            "session1",
+            AnalyticsEvent(
+                event_type="tool_call",
+                timestamp="2025-01-01T00:00:00",
+                session_id="session1",
+                data={}
+            )
+        )
+        await coordinator.track_event(
+            "session2",
+            AnalyticsEvent(
+                event_type="llm_request",
+                timestamp="2025-01-01T00:01:00",
+                session_id="session2",
+                data={}
+            )
+        )
+
+        result = await coordinator.query_analytics(AnalyticsQuery(session_id="session1"))
 
         assert len(result.events) == 1
-        assert result.events[0]["type"] == "tool_call"
+        assert result.events[0].event_type == "tool_call"
 
     @pytest.mark.asyncio
     async def test_query_analytics_by_event_type(self, coordinator):
         """Test querying by event type."""
-        await coordinator.track_event("session1", {"type": "tool_call", "timestamp": "2025-01-01T00:00:00"})
-        await coordinator.track_event("session1", {"type": "llm_request", "timestamp": "2025-01-01T00:01:00"})
+        from victor.protocols import AnalyticsEvent, AnalyticsQuery
 
-        result = await coordinator.query_analytics({"event_type": "tool_call"})
+        await coordinator.track_event(
+            "session1",
+            AnalyticsEvent(
+                event_type="tool_call",
+                timestamp="2025-01-01T00:00:00",
+                session_id="session1",
+                data={}
+            )
+        )
+        await coordinator.track_event(
+            "session1",
+            AnalyticsEvent(
+                event_type="llm_request",
+                timestamp="2025-01-01T00:01:00",
+                session_id="session1",
+                data={}
+            )
+        )
+
+        result = await coordinator.query_analytics(AnalyticsQuery(event_types=["tool_call"]))
 
         assert len(result.events) == 1
-        assert result.events[0]["type"] == "tool_call"
+        assert result.events[0].event_type == "tool_call"
 
     @pytest.mark.asyncio
     async def test_query_analytics_with_limit(self, coordinator):
         """Test querying with limit."""
-        for i in range(10):
-            await coordinator.track_event("session1", {"type": f"event_{i}", "timestamp": "2025-01-01T00:00:00"})
+        from victor.protocols import AnalyticsEvent, AnalyticsQuery
 
-        result = await coordinator.query_analytics({"limit": 5})
+        for i in range(10):
+            await coordinator.track_event(
+                "session1",
+                AnalyticsEvent(
+                    event_type=f"event_{i}",
+                    timestamp="2025-01-01T00:00:00",
+                    session_id="session1",
+                    data={}
+                )
+            )
+
+        result = await coordinator.query_analytics(AnalyticsQuery(limit=5))
 
         assert len(result.events) == 5
 
@@ -321,9 +644,35 @@ class TestAnalyticsCoordinator:
     @pytest.mark.asyncio
     async def test_get_session_stats(self, coordinator):
         """Test getting session statistics."""
-        await coordinator.track_event("session123", {"type": "tool_call", "timestamp": "2025-01-01T00:00:00"})
-        await coordinator.track_event("session123", {"type": "tool_call", "timestamp": "2025-01-01T00:01:00"})
-        await coordinator.track_event("session123", {"type": "llm_request", "timestamp": "2025-01-01T00:02:00"})
+        from victor.protocols import AnalyticsEvent
+
+        await coordinator.track_event(
+            "session123",
+            AnalyticsEvent(
+                event_type="tool_call",
+                timestamp="2025-01-01T00:00:00",
+                session_id="session123",
+                data={}
+            )
+        )
+        await coordinator.track_event(
+            "session123",
+            AnalyticsEvent(
+                event_type="tool_call",
+                timestamp="2025-01-01T00:01:00",
+                session_id="session123",
+                data={}
+            )
+        )
+        await coordinator.track_event(
+            "session123",
+            AnalyticsEvent(
+                event_type="llm_request",
+                timestamp="2025-01-01T00:02:00",
+                session_id="session123",
+                data={}
+            )
+        )
 
         stats = await coordinator.get_session_stats("session123")
 
@@ -366,20 +715,48 @@ class TestAnalyticsCoordinator:
 
         assert len(coordinator._exporters) == 0
 
-    def test_clear_session(self, coordinator_with_exporters):
+    @pytest.mark.asyncio
+    async def test_clear_session(self, coordinator_with_exporters):
         """Test clearing a session."""
-        import asyncio
-        asyncio.run(coordinator_with_exporters.track_event("session123", {"type": "test"}))
+        from victor.protocols import AnalyticsEvent
+
+        await coordinator_with_exporters.track_event(
+            "session123",
+            AnalyticsEvent(
+                event_type="test",
+                timestamp="2025-01-01T00:00:00",
+                session_id="session123",
+                data={}
+            )
+        )
 
         coordinator_with_exporters.clear_session("session123")
 
         assert "session123" not in coordinator_with_exporters._session_analytics
 
-    def test_clear_all_sessions(self, coordinator_with_exporters):
+    @pytest.mark.asyncio
+    async def test_clear_all_sessions(self, coordinator_with_exporters):
         """Test clearing all sessions."""
-        import asyncio
-        asyncio.run(coordinator_with_exporters.track_event("session1", {"type": "test"}))
-        asyncio.run(coordinator_with_exporters.track_event("session2", {"type": "test"}))
+        from victor.protocols import AnalyticsEvent
+
+        await coordinator_with_exporters.track_event(
+            "session1",
+            AnalyticsEvent(
+                event_type="test",
+                timestamp="2025-01-01T00:00:00",
+                session_id="session1",
+                data={}
+            )
+        )
+        await coordinator_with_exporters.track_event(
+            "session2",
+            AnalyticsEvent(
+                event_type="test",
+                timestamp="2025-01-01T00:00:00",
+                session_id="session2",
+                data={}
+            )
+        )
 
         coordinator_with_exporters.clear_all_sessions()
 
@@ -389,13 +766,30 @@ class TestAnalyticsCoordinator:
     async def test_track_event_updates_timestamp(self, coordinator):
         """Test that tracking an event updates the session timestamp."""
         import time
+        from victor.protocols import AnalyticsEvent
 
-        await coordinator.track_event("session123", {"type": "test"})
+        await coordinator.track_event(
+            "session123",
+            AnalyticsEvent(
+                event_type="test",
+                timestamp="2025-01-01T00:00:00",
+                session_id="session123",
+                data={}
+            )
+        )
         first_timestamp = coordinator._session_analytics["session123"].updated_at
 
         # Wait a bit and track another event
         time.sleep(0.01)
-        await coordinator.track_event("session123", {"type": "test2"})
+        await coordinator.track_event(
+            "session123",
+            AnalyticsEvent(
+                event_type="test2",
+                timestamp="2025-01-01T00:00:01",
+                session_id="session123",
+                data={}
+            )
+        )
 
         second_timestamp = coordinator._session_analytics["session123"].updated_at
 
@@ -405,11 +799,21 @@ class TestAnalyticsCoordinator:
     @pytest.mark.asyncio
     async def test_export_to_multiple_exporters(self):
         """Test that export reaches all exporters."""
+        from victor.protocols import AnalyticsEvent
+
         exporter1 = MockAnalyticsExporter(exporter_type="exporter1")
         exporter2 = MockAnalyticsExporter(exporter_type="exporter2")
         coordinator = AnalyticsCoordinator(exporters=[exporter1, exporter2])
 
-        await coordinator.track_event("session123", {"type": "test", "timestamp": "2025-01-01T00:00:00"})
+        await coordinator.track_event(
+            "session123",
+            AnalyticsEvent(
+                event_type="test",
+                timestamp="2025-01-01T00:00:00",
+                session_id="session123",
+                data={}
+            )
+        )
 
         result = await coordinator.export_analytics("session123")
 
@@ -420,15 +824,43 @@ class TestAnalyticsCoordinator:
     @pytest.mark.asyncio
     async def test_query_analytics_filters_by_time(self, coordinator):
         """Test querying with time range filters."""
-        await coordinator.track_event("session1", {"type": "test", "timestamp": "2025-01-01T00:00:00"})
-        await coordinator.track_event("session1", {"type": "test", "timestamp": "2025-01-02T00:00:00"})
-        await coordinator.track_event("session1", {"type": "test", "timestamp": "2025-01-03T00:00:00"})
+        from victor.protocols import AnalyticsEvent, AnalyticsQuery
 
-        result = await coordinator.query_analytics({
-            "start_time": "2025-01-02T00:00:00",
-            "end_time": "2025-01-02T23:59:59",
-        })
+        await coordinator.track_event(
+            "session1",
+            AnalyticsEvent(
+                event_type="test",
+                timestamp="2025-01-01T00:00:00",
+                session_id="session1",
+                data={}
+            )
+        )
+        await coordinator.track_event(
+            "session1",
+            AnalyticsEvent(
+                event_type="test",
+                timestamp="2025-01-02T00:00:00",
+                session_id="session1",
+                data={}
+            )
+        )
+        await coordinator.track_event(
+            "session1",
+            AnalyticsEvent(
+                event_type="test",
+                timestamp="2025-01-03T00:00:00",
+                session_id="session1",
+                data={}
+            )
+        )
+
+        result = await coordinator.query_analytics(
+            AnalyticsQuery(
+                start_time="2025-01-02T00:00:00",
+                end_time="2025-01-02T23:59:59",
+            )
+        )
 
         assert len(result.events) == 1
-        assert result.events[0]["timestamp"] == "2025-01-02T00:00:00"
+        assert result.events[0].timestamp == "2025-01-02T00:00:00"
 

@@ -150,7 +150,7 @@ class UniversalRegistry(Generic[T]):
     """
 
     # Class-level registry for singleton instances
-    _instances: Dict[str, "UniversalRegistry"] = {}
+    _instances: Dict[str, "UniversalRegistry[Any]"] = {}
     _lock = threading.RLock()
 
     def __init__(
@@ -462,7 +462,7 @@ def create_universal_registry(
     registry_type: str,
     cache_strategy: CacheStrategy = CacheStrategy.LRU,
     max_size: int = 1000,
-) -> UniversalRegistry:
+) -> UniversalRegistry[Any]:
     """Create a UniversalRegistry instance for DI registration.
 
     Factory function for registering with dependency injection container.

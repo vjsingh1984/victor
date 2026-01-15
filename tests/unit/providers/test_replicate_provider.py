@@ -22,13 +22,13 @@ class TestReplicateProviderInitialization:
 
     def test_initialization_from_env_var(self):
         """Test API key loading from environment variable."""
-        with patch.dict("os.environ", {"REPLICATE_API_TOKEN": "r8_env_token"}):
+        with patch.dict("os.environ", {"REPLICATE_API_KEY": "r8_env_token"}):
             provider = ReplicateProvider()
             assert provider._api_key == "r8_env_token"
 
     def test_initialization_from_keyring(self):
         """Test API key loading from keyring when env var not set."""
-        with patch.dict("os.environ", {"REPLICATE_API_TOKEN": ""}, clear=False):
+        with patch.dict("os.environ", {"REPLICATE_API_KEY": ""}, clear=False):
             with patch(
                 "victor.config.api_keys.get_api_key",
                 return_value="keyring-replicate-key",
@@ -38,7 +38,7 @@ class TestReplicateProviderInitialization:
 
     def test_initialization_warning_without_key(self, caplog):
         """Test warning is logged when no API key provided."""
-        with patch.dict("os.environ", {"REPLICATE_API_TOKEN": ""}, clear=False):
+        with patch.dict("os.environ", {"REPLICATE_API_KEY": ""}, clear=False):
             with patch(
                 "victor.config.api_keys.get_api_key",
                 return_value=None,

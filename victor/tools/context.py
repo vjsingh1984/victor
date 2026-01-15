@@ -57,7 +57,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 if TYPE_CHECKING:
-    from victor.tools.cache_manager import ToolCacheManager, CacheNamespace
+    from victor.tools.cache_manager import ToolCacheManager
+    from victor.protocols.cache import ICacheNamespace
 
 
 class Permission(Enum):
@@ -323,7 +324,7 @@ class ToolExecutionContext:
     # DI Accessors (with fallback to global state)
     # ==========================================================================
 
-    def get_cache(self, namespace: str) -> "CacheNamespace":
+    def get_cache(self, namespace: str) -> "ICacheNamespace":
         """Get a namespaced cache.
 
         Uses injected cache_manager if available, otherwise falls back
@@ -333,7 +334,7 @@ class ToolExecutionContext:
             namespace: Cache namespace name (e.g., "code_search_index")
 
         Returns:
-            CacheNamespace for the requested namespace
+            ICacheNamespace for the requested namespace
         """
         if self.cache_manager is not None:
             return self.cache_manager.get_namespace(namespace)
@@ -377,17 +378,17 @@ class ToolExecutionContext:
         return logging.getLogger(name)
 
     @property
-    def index_cache(self) -> "CacheNamespace":
+    def index_cache(self) -> "ICacheNamespace":
         """Get code search index cache (convenience property)."""
         return self.get_cache("code_search_index")
 
     @property
-    def file_content_cache(self) -> "CacheNamespace":
+    def file_content_cache(self) -> "ICacheNamespace":
         """Get file content cache (convenience property)."""
         return self.get_cache("file_content")
 
     @property
-    def connection_pool(self) -> "CacheNamespace":
+    def connection_pool(self) -> "ICacheNamespace":
         """Get database connection pool (convenience property)."""
         return self.get_cache("database_connections")
 

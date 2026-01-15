@@ -125,24 +125,8 @@ class ZAIProvider(BaseProvider):
             max_retries: Maximum retry attempts
             **kwargs: Additional configuration
         """
-        # Resolution order: parameter → env var → keyring → warning
-        resolved_key = api_key or os.environ.get("ZAI_API_KEY", "")
-        if not resolved_key:
-            try:
-                from victor.config.api_keys import get_api_key
-
-                # Try multiple aliases: zai, zhipuai, zhipu
-                resolved_key = (
-                    get_api_key("zai") or get_api_key("zhipuai") or get_api_key("zhipu") or ""
-                )
-            except ImportError:
-                pass
-
-        if not resolved_key:
-            logger.warning(
-                "ZhipuAI API key not provided. Set ZAI_API_KEY environment variable, "
-                "use 'victor keys --set zai --keyring', or pass api_key parameter."
-            )
+        # Resolve API key using centralized helper
+        resolved_key = self._resolve_api_key(api_key, "zai")
 
         super().__init__(
             api_key=resolved_key,

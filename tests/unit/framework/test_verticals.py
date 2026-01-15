@@ -36,7 +36,9 @@ class TestVerticalBase:
         assert isinstance(config.tools, ToolSet)
         assert config.system_prompt is not None
         assert len(config.stages) > 0
-        assert "vertical_name" in config.metadata
+        # Metadata contains 'name' (not 'vertical_name') when loaded from YAML
+        assert "name" in config.metadata
+        assert config.metadata["name"] == "coding"
 
     def test_get_tool_set(self):
         """get_tool_set should return configured ToolSet."""

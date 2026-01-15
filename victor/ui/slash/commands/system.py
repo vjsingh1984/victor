@@ -19,6 +19,7 @@ from __future__ import annotations
 from rich.panel import Panel
 from rich.table import Table
 
+from victor.ui.common.constants import FIRST_ARG_INDEX
 from victor.ui.slash.protocol import BaseSlashCommand, CommandContext, CommandMetadata
 from victor.ui.slash.registry import get_command_registry, register_command
 
@@ -42,7 +43,7 @@ class HelpCommand(BaseSlashCommand):
 
         if ctx.args:
             # Help for specific command
-            cmd_name = ctx.args[0].lstrip("/")
+            cmd_name = ctx.args[FIRST_ARG_INDEX].lstrip("/")
             command = registry.get(cmd_name)
             if command:
                 meta = command.metadata
@@ -225,7 +226,7 @@ class ThemeCommand(BaseSlashCommand):
         current_theme = getattr(ctx.settings, "theme", "dark")
 
         if ctx.args:
-            new_theme = ctx.args[0].lower()
+            new_theme = ctx.args[FIRST_ARG_INDEX].lower()
             if new_theme not in ("dark", "light"):
                 ctx.console.print(f"[red]Invalid theme:[/] {new_theme}")
                 ctx.console.print("[dim]Available: dark, light[/]")
@@ -302,7 +303,7 @@ class ApprovalsCommand(BaseSlashCommand):
             )
             return
 
-        mode = ctx.args[0].lower()
+        mode = ctx.args[FIRST_ARG_INDEX].lower()
         if mode not in ("suggest", "auto", "full-auto"):
             ctx.console.print(f"[red]Invalid mode:[/] {mode}")
             ctx.console.print("[dim]Available: suggest, auto, full-auto[/]")

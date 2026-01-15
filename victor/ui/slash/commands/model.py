@@ -21,6 +21,7 @@ import logging
 from rich.panel import Panel
 from rich.table import Table
 
+from victor.ui.common.constants import FIRST_ARG_INDEX, FIRST_MATCH_INDEX, SECOND_ARG_INDEX
 from victor.ui.slash.protocol import BaseSlashCommand, CommandContext, CommandMetadata
 from victor.ui.slash.registry import register_command
 
@@ -49,7 +50,7 @@ class ModelCommand(BaseSlashCommand):
 
         if ctx.args:
             # Switch model
-            model_name = ctx.args[0]
+            model_name = ctx.args[FIRST_ARG_INDEX]
             if ctx.agent.switch_model(model_name):
                 info = ctx.agent.get_current_provider_info()
                 ctx.console.print(f"[green]Switched to model:[/] [cyan]{model_name}[/]")
@@ -126,7 +127,7 @@ class ProfileCommand(BaseSlashCommand):
 
         if ctx.args:
             # Switch to specified profile
-            profile_name = ctx.args[0]
+            profile_name = ctx.args[FIRST_ARG_INDEX]
             if profile_name not in profiles:
                 ctx.console.print(f"[red]Profile not found:[/] {profile_name}")
                 ctx.console.print(f"Available: {', '.join(profiles.keys())}")
@@ -178,7 +179,7 @@ class ProfileCommand(BaseSlashCommand):
                 rankings = learner.get_provider_rankings()
                 rl_rankings = {r["provider"].lower(): r["q_value"] for r in rankings}
                 if rankings:
-                    rl_best_provider = rankings[0]["provider"].lower()
+                    rl_best_provider = rankings[FIRST_MATCH_INDEX]["provider"].lower()
         except Exception:
             pass
 
@@ -275,8 +276,8 @@ class ProviderCommand(BaseSlashCommand):
             return
 
         # Switch provider
-        provider_name = ctx.args[0]
-        model = ctx.args[1] if len(ctx.args) > 1 else None
+        provider_name = ctx.args[FIRST_ARG_INDEX]
+        model = ctx.args[SECOND_ARG_INDEX] if len(ctx.args) > 1 else None
 
         # Handle provider:model syntax
         if ":" in provider_name and model is None:

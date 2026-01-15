@@ -149,7 +149,7 @@ class AnalyticsCoordinator:
         self._session_analytics[session_id].updated_at = datetime.utcnow().isoformat()
 
         logger.debug(
-            f"Tracked analytics event {event.get('type', 'unknown')} " f"for session {session_id}"
+            f"Tracked analytics event {event.event_type} for session {session_id}"
         )
 
     async def export_analytics(
@@ -199,7 +199,7 @@ class AnalyticsCoordinator:
         export_data = {
             "session_id": session_id,
             "events": [
-                {"type": e.get("type"), "data": e.get("data"), "timestamp": e.get("timestamp")}
+                {"type": e.event_type, "data": e.data, "timestamp": e.timestamp}
                 for e in session_analytics.events
             ],
             "metadata": session_analytics.metadata,
@@ -260,30 +260,30 @@ class AnalyticsCoordinator:
 
         for session_id, session_analytics in self._session_analytics.items():
             # Filter by session_id if specified
-            if query.get("session_id") and session_id != query.get("session_id"):
+            if query.session_id and session_id != query.session_id:
                 continue
 
             # Filter events
             for event in session_analytics.events:
                 # Filter by event_type if specified
-                if query.get("event_type") and event.get("type") != query.get("event_type"):
+                if query.event_types and event.event_type not in query.event_types:
                     continue
 
                 # Filter by date range if specified
-                event_timestamp = event.get("timestamp")
-                if query.get("start_time") and event_timestamp < query.get("start_time"):
+                event_timestamp = event.timestamp
+                if query.start_time and event_timestamp < query.start_time:
                     continue
-                if query.get("end_time") and event_timestamp > query.get("end_time"):
+                if query.end_time and event_timestamp > query.end_time:
                     continue
 
                 matching_events.append(event)
 
                 # Apply limit if specified
-                if query.get("limit") and len(matching_events) >= query.get("limit"):
+                if query.limit and len(matching_events) >= query.limit:
                     break
 
             # Apply limit if specified
-            if query.get("limit") and len(matching_events) >= query.get("limit"):
+            if query.limit and len(matching_events) >= query.limit:
                 break
 
         return AnalyticsResult(
@@ -319,7 +319,7 @@ class AnalyticsCoordinator:
         # Count events by type
         event_counts: Dict[str, int] = {}
         for event in session_analytics.events:
-            event_type = event.get("type", "unknown")
+            event_type = event.event_type
             event_counts[event_type] = event_counts.get(event_type, 0) + 1
 
         return {
@@ -659,9 +659,163 @@ class ConsoleAnalyticsExporter(BaseAnalyticsExporter):
         )
 
 
+class FileAnalyticsExporter(BaseAnalyticsExporter):
+    """Analytics exporter that writes to files.
+
+    This exporter writes analytics data to JSON or CSV files for
+    persistent storage and offline analysis.
+
+    Attributes:
+        _file_path: Path to output file
+        _format: Output format ('json' or 'csv')
+        _append: Whether to append to existing file
+    """
+
+    def __init__(
+        self,
+        file_path: str,
+        format: str = "json",
+        append: bool = True,
+    ):
+        """Initialize the file exporter.
+
+        Args:
+            file_path: Path to output file
+            format: Output format ('json' or 'csv')
+            append: Whether to append to existing file (default: True)
+
+        Raises:
+            ValueError: If format is not 'json' or 'csv'
+        """
+        super().__init__("file")
+        if format not in ("json", "csv"):
+            raise ValueError(f"Invalid format: {format}. Must be 'json' or 'csv'")
+        self._file_path = file_path
+        self._format = format
+        self._append = append
+
+    async def export(self, data: Dict[str, Any]) -> ExportResult:
+        """Export analytics to file.
+
+        Args:
+            data: Analytics data to export
+
+        Returns:
+            ExportResult with export status
+        """
+        import json
+        from pathlib import Path
+
+        events = data.get("events", [])
+        event_count = len(events)
+
+        try:
+            # Ensure directory exists
+            file_path = Path(self._file_path)
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+
+            if self._format == "json":
+                self._export_json(data, file_path)
+            else:  # csv
+                self._export_csv(data, file_path)
+
+            return ExportResult(
+                success=True,
+                exporter_type=self._exporter_type,
+                records_exported=event_count,
+                metadata={
+                    "file_path": str(file_path),
+                    "format": self._format,
+                },
+            )
+
+        except Exception as e:
+            logger.error(f"File export failed: {e}")
+            return ExportResult(
+                success=False,
+                exporter_type=self._exporter_type,
+                records_exported=0,
+                error_message=str(e),
+            )
+
+    def _export_json(self, data: Dict[str, Any], file_path) -> None:
+        """Export data to JSON format.
+
+        Args:
+            data: Analytics data to export
+            file_path: Path to output file
+        """
+        import json
+
+        if self._append and file_path.exists():
+            # Read existing data
+            with open(file_path, "r") as f:
+                try:
+                    existing_data = json.load(f)
+                    if isinstance(existing_data, list):
+                        existing_data.append(data)
+                    elif isinstance(existing_data, dict):
+                        existing_data = [existing_data, data]
+                    else:
+                        existing_data = [data]
+                except json.JSONDecodeError:
+                    existing_data = [data]
+        else:
+            existing_data = [data]
+
+        # Write combined data
+        with open(file_path, "w") as f:
+            json.dump(existing_data, f, indent=2)
+
+    def _export_csv(self, data: Dict[str, Any], file_path) -> None:
+        """Export data to CSV format.
+
+        Args:
+            data: Analytics data to export
+            file_path: Path to output file
+        """
+        import csv
+        from io import StringIO
+
+        events = data.get("events", [])
+
+        # Prepare CSV data
+        output = StringIO()
+        if events:
+            # Flatten event data for CSV
+            fieldnames = ["session_id", "event_type", "timestamp"]
+            if events:
+                # Add all unique data keys
+                data_keys = set()
+                for event in events:
+                    if event.get("data"):
+                        data_keys.update(event["data"].keys())
+                fieldnames.extend(sorted(data_keys))
+
+            writer = csv.DictWriter(output, fieldnames=fieldnames)
+            if not self._append or not file_path.exists():
+                writer.writeheader()
+
+            for event in events:
+                row = {
+                    "session_id": data.get("session_id", ""),
+                    "event_type": event.get("type", ""),
+                    "timestamp": event.get("timestamp", ""),
+                }
+                if event.get("data"):
+                    row.update(event["data"])
+                writer.writerow(row)
+
+        # Write to file
+        mode = "a" if self._append and file_path.exists() else "w"
+        with open(file_path, mode, newline="") as f:
+            f.write(output.getvalue())
+
+
 __all__ = [
     "AnalyticsCoordinator",
     "SessionAnalytics",
     "BaseAnalyticsExporter",
     "ConsoleAnalyticsExporter",
+    "FileAnalyticsExporter",
 ]

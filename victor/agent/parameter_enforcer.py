@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from functools import wraps
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -48,18 +49,88 @@ class InferenceStrategy(Enum):
 class ParameterValidationError(Exception):
     """Raised when parameter validation fails."""
 
-    def __init__(self, param_name: str, message: str):
+    def __init__(
+        self,
+        param_name: str,
+        message: str,
+        provided_value: Any = None,
+        expected_type: Optional[str] = None,
+        examples: Optional[List[str]] = None,
+        valid_range: Optional[Dict[str, Any]] = None,
+    ):
         self.param_name = param_name
-        super().__init__(f"Validation error for '{param_name}': {message}")
+        self.provided_value = provided_value
+        self.expected_type = expected_type
+        self.examples = examples or []
+        self.valid_range = valid_range
+        self.correlation_id = str(uuid.uuid4())[:8]
+
+        # Build detailed error message
+        error_parts = [f"Validation error for parameter '{param_name}': {message}"]
+
+        if provided_value is not None:
+            provided_type = type(provided_value).__name__
+            error_parts.append(f"  Provided: '{provided_value}' (type: {provided_type})")
+
+        if expected_type:
+            error_parts.append(f"  Expected type: {expected_type}")
+
+        if examples:
+            error_parts.append(f"  Valid examples: {', '.join(examples[:3])}")
+
+        if valid_range:
+            range_parts = []
+            if "min" in valid_range:
+                range_parts.append(f"min={valid_range['min']}")
+            if "max" in valid_range:
+                range_parts.append(f"max={valid_range['max']}")
+            if range_parts:
+                error_parts.append(f"  Valid range: {', '.join(range_parts)}")
+
+        # Add recovery hint
+        error_parts.append(f"\n  [Correlation ID: {self.correlation_id}]")
+        error_parts.append(f"  Recovery: Provide a valid value for '{param_name}'")
+
+        full_message = "\n".join(error_parts)
+        super().__init__(full_message)
 
 
 class ParameterInferenceError(Exception):
     """Raised when a required parameter cannot be inferred."""
 
-    def __init__(self, param_name: str, tool_name: str):
+    def __init__(
+        self,
+        param_name: str,
+        tool_name: str,
+        inference_strategy: Optional[str] = None,
+        available_context_keys: Optional[List[str]] = None,
+    ):
         self.param_name = param_name
         self.tool_name = tool_name
-        super().__init__(f"Cannot infer required parameter '{param_name}' for tool '{tool_name}'")
+        self.inference_strategy = inference_strategy
+        self.available_context_keys = available_context_keys or []
+        self.correlation_id = str(uuid.uuid4())[:8]
+
+        # Build detailed error message
+        error_parts = [
+            f"Cannot infer required parameter '{param_name}' for tool '{tool_name}'"
+        ]
+
+        if inference_strategy:
+            error_parts.append(f"  Inference strategy: {inference_strategy}")
+
+        if available_context_keys:
+            error_parts.append(f"  Available context keys: {', '.join(available_context_keys[:5])}")
+
+        # Add recovery hint
+        error_parts.append(f"\n  [Correlation ID: {self.correlation_id}]")
+        error_parts.append(
+            f"  Recovery: Provide value for '{param_name}' explicitly, "
+            f"or ensure it's available in context"
+        )
+
+        full_message = "\n".join(error_parts)
+        super().__init__(full_message)
 
 
 @dataclass
@@ -271,7 +342,7 @@ class ParameterEnforcer:
             Coerced value
 
         Raises:
-            ValueError: If coercion fails
+            ParameterValidationError: If coercion fails
         """
         if spec.param_type == ParameterType.STRING:
             return str(value) if value is not None else value
@@ -280,17 +351,47 @@ class ParameterEnforcer:
             if isinstance(value, int):
                 return value
             if isinstance(value, str):
-                return int(value)
+                try:
+                    return int(value)
+                except ValueError:
+                    raise ParameterValidationError(
+                        spec.name,
+                        f"Cannot convert string '{value}' to integer",
+                        provided_value=value,
+                        expected_type="integer",
+                        examples=["42", "100", "0"],
+                    )
             if isinstance(value, float):
                 return int(value)
-            raise ValueError(f"Cannot convert {type(value).__name__} to integer")
+            raise ParameterValidationError(
+                spec.name,
+                f"Cannot convert {type(value).__name__} to integer",
+                provided_value=value,
+                expected_type="integer",
+                examples=["42", "100", "0"],
+            )
 
         if spec.param_type == ParameterType.FLOAT:
             if isinstance(value, (int, float)):
                 return float(value)
             if isinstance(value, str):
-                return float(value)
-            raise ValueError(f"Cannot convert {type(value).__name__} to float")
+                try:
+                    return float(value)
+                except ValueError:
+                    raise ParameterValidationError(
+                        spec.name,
+                        f"Cannot convert string '{value}' to float",
+                        provided_value=value,
+                        expected_type="float",
+                        examples=["3.14", "2.5", "0.0"],
+                    )
+            raise ParameterValidationError(
+                spec.name,
+                f"Cannot convert {type(value).__name__} to float",
+                provided_value=value,
+                expected_type="float",
+                examples=["3.14", "2.5", "0.0"],
+            )
 
         if spec.param_type == ParameterType.BOOLEAN:
             if isinstance(value, bool):
@@ -301,22 +402,46 @@ class ParameterEnforcer:
                     return True
                 if lower in ("false", "0", "no", "off"):
                     return False
-                raise ValueError(f"Cannot convert '{value}' to boolean")
+                raise ParameterValidationError(
+                    spec.name,
+                    f"Cannot convert string '{value}' to boolean",
+                    provided_value=value,
+                    expected_type="boolean",
+                    examples=["true", "false", "yes", "no", "1", "0"],
+                )
             if isinstance(value, (int, float)):
                 return bool(value)
-            raise ValueError(f"Cannot convert {type(value).__name__} to boolean")
+            raise ParameterValidationError(
+                spec.name,
+                f"Cannot convert {type(value).__name__} to boolean",
+                provided_value=value,
+                expected_type="boolean",
+                examples=["true", "false", "1", "0"],
+            )
 
         if spec.param_type == ParameterType.ARRAY:
             if isinstance(value, list):
                 return value
             if isinstance(value, (tuple, set)):
                 return list(value)
-            raise ValueError(f"Cannot convert {type(value).__name__} to array")
+            raise ParameterValidationError(
+                spec.name,
+                f"Cannot convert {type(value).__name__} to array",
+                provided_value=value,
+                expected_type="array",
+                examples=['["item1", "item2"]', '["a", "b", "c"]'],
+            )
 
         if spec.param_type == ParameterType.OBJECT:
             if isinstance(value, dict):
                 return value
-            raise ValueError(f"Cannot convert {type(value).__name__} to object")
+            raise ParameterValidationError(
+                spec.name,
+                f"Cannot convert {type(value).__name__} to object",
+                provided_value=value,
+                expected_type="object",
+                examples=['{"key": "value"}', '{"name": "test", "count": 5}'],
+            )
 
         return value
 

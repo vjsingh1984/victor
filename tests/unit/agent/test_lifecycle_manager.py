@@ -20,6 +20,7 @@ from unittest.mock import AsyncMock, MagicMock, call
 from typing import Any, Dict, Optional
 
 from victor.agent.lifecycle_manager import LifecycleManager
+from victor.protocols.lifecycle import SessionConfig, SessionMetadata, CleanupResult
 
 
 class TestLifecycleManager:
@@ -356,6 +357,274 @@ class TestLifecycleManager:
 
         # Verify failure
         assert result is False
+
+    @pytest.mark.asyncio
+    async def test_initialize_session_basic(self, lifecycle_manager):
+        """Test basic session initialization."""
+        # Create session config
+        config = SessionConfig(
+            provider="anthropic",
+            model="claude-sonnet-4-5",
+            temperature=0.7,
+        )
+
+        # Initialize session
+        metadata = await lifecycle_manager.initialize_session(
+            session_id="test-session-123",
+            config=config,
+        )
+
+        # Verify metadata structure
+        assert isinstance(metadata, SessionMetadata)
+        assert metadata.session_id == "test-session-123"
+        assert metadata.config is config
+        assert isinstance(metadata.created_at, str)
+        assert len(metadata.created_at) > 0
+
+        # Verify resources tracked
+        assert "conversation_controller" in metadata.resources
+        assert "metrics_collector" in metadata.resources
+        assert "usage_analytics" in metadata.resources
+        assert "context_compactor" in metadata.resources
+
+        # Verify all resources marked as available
+        assert metadata.resources["conversation_controller"] is True
+        assert metadata.resources["metrics_collector"] is True
+        assert metadata.resources["usage_analytics"] is True
+        assert metadata.resources["context_compactor"] is True
+
+        # Verify conversation was reset
+        lifecycle_manager._conversation_controller.reset.assert_called_once()
+
+        # Verify metrics were reset
+        lifecycle_manager._metrics_collector.reset_stats.assert_called_once()
+
+        # Verify analytics session was restarted
+        lifecycle_manager._usage_analytics.end_session.assert_called_once()
+        lifecycle_manager._usage_analytics.start_session.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_initialize_session_without_analytics(
+        self, lifecycle_manager, conversation_controller
+    ):
+        """Test session initialization when usage analytics is None."""
+        # Remove analytics
+        lifecycle_manager._usage_analytics = None
+
+        # Create session config
+        config = SessionConfig(provider="openai", model="gpt-4")
+
+        # Initialize session - should not fail
+        metadata = await lifecycle_manager.initialize_session(
+            session_id="test-session-no-analytics",
+            config=config,
+        )
+
+        # Verify success
+        assert metadata.session_id == "test-session-no-analytics"
+        assert metadata.resources["usage_analytics"] is False
+        conversation_controller.reset.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_initialize_session_without_metrics(
+        self, lifecycle_manager, conversation_controller
+    ):
+        """Test session initialization when metrics collector is None."""
+        # Remove metrics collector
+        lifecycle_manager._metrics_collector = None
+
+        # Create session config
+        config = SessionConfig(provider="google", model="gemini-pro")
+
+        # Initialize session - should not fail
+        metadata = await lifecycle_manager.initialize_session(
+            session_id="test-session-no-metrics",
+            config=config,
+        )
+
+        # Verify success
+        assert metadata.session_id == "test-session-no-metrics"
+        assert metadata.resources["metrics_collector"] is False
+        conversation_controller.reset.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_initialize_session_with_various_configs(self, lifecycle_manager):
+        """Test session initialization with various configurations."""
+        configs = [
+            SessionConfig(provider="anthropic", model="claude-sonnet-4-5", temperature=0.5),
+            SessionConfig(provider="openai", model="gpt-4", temperature=1.0, max_tokens=8192),
+            SessionConfig(
+                provider="google",
+                model="gemini-pro",
+                temperature=0.0,
+                vertical="coding",
+            ),
+        ]
+
+        for i, config in enumerate(configs):
+            metadata = await lifecycle_manager.initialize_session(
+                session_id=f"session-{i}",
+                config=config,
+            )
+
+            assert metadata.config is config
+            assert metadata.session_id == f"session-{i}"
+
+    @pytest.mark.asyncio
+    async def test_cleanup_session_basic(
+        self, lifecycle_manager, conversation_controller, metrics_collector
+    ):
+        """Test basic session cleanup."""
+        # Cleanup session
+        result = await lifecycle_manager.cleanup_session("test-session-123")
+
+        # Verify result structure
+        assert isinstance(result, CleanupResult)
+        assert result.success is True
+        assert result.session_id == "test-session-123"
+        assert result.error_message is None
+
+        # Verify resources were freed
+        assert "conversation" in result.resources_freed
+        assert "analytics" in result.resources_freed
+        assert "metrics" in result.resources_freed
+        assert "context_compactor" in result.resources_freed
+
+        # Verify conversation was reset
+        conversation_controller.reset.assert_called()
+
+        # Verify metrics were reset
+        metrics_collector.reset_stats.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_cleanup_session_without_analytics(
+        self, lifecycle_manager, conversation_controller
+    ):
+        """Test session cleanup when usage analytics is None."""
+        # Remove analytics
+        lifecycle_manager._usage_analytics = None
+
+        # Cleanup session - should not fail
+        result = await lifecycle_manager.cleanup_session("test-session-no-analytics")
+
+        # Verify success
+        assert result.success is True
+        assert "analytics" not in result.resources_freed
+        assert "conversation" in result.resources_freed
+        conversation_controller.reset.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_cleanup_session_without_metrics(
+        self, lifecycle_manager, conversation_controller, metrics_collector
+    ):
+        """Test session cleanup when metrics collector is None."""
+        # Remove metrics collector
+        lifecycle_manager._metrics_collector = None
+
+        # Cleanup session - should not fail
+        result = await lifecycle_manager.cleanup_session("test-session-no-metrics")
+
+        # Verify success
+        assert result.success is True
+        assert "metrics" not in result.resources_freed
+        assert "conversation" in result.resources_freed
+        conversation_controller.reset.assert_called_once()
+        metrics_collector.reset_stats.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_cleanup_session_without_compactor(
+        self, lifecycle_manager, context_compactor
+    ):
+        """Test session cleanup when context compactor is None."""
+        # Remove context compactor
+        lifecycle_manager._context_compactor = None
+
+        # Cleanup session - should not fail
+        result = await lifecycle_manager.cleanup_session("test-session-no-compactor")
+
+        # Verify success
+        assert result.success is True
+        assert "context_compactor" not in result.resources_freed
+        context_compactor.reset_statistics.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_cleanup_session_metadata(self, lifecycle_manager):
+        """Test that cleanup result contains correct metadata."""
+        # Cleanup session
+        result = await lifecycle_manager.cleanup_session("test-session-metadata")
+
+        # Verify metadata
+        assert result.metadata is not None
+        assert "cleanup_type" in result.metadata
+        assert result.metadata["cleanup_type"] == "full"
+
+    @pytest.mark.asyncio
+    async def test_initialize_then_cleanup_session_cycle(
+        self, lifecycle_manager, conversation_controller
+    ):
+        """Test complete initialize -> cleanup cycle."""
+        config = SessionConfig(provider="anthropic", model="claude-sonnet-4-5")
+
+        # Initialize session
+        metadata = await lifecycle_manager.initialize_session(
+            session_id="cycle-session",
+            config=config,
+        )
+        assert metadata.session_id == "cycle-session"
+
+        # Verify session was initialized
+        assert lifecycle_manager._session_config is config
+
+        # Cleanup session
+        result = await lifecycle_manager.cleanup_session("cycle-session")
+        assert result.success is True
+        assert "conversation" in result.resources_freed
+
+        # Verify conversation was reset during both operations
+        assert conversation_controller.reset.call_count >= 2
+
+    @pytest.mark.asyncio
+    async def test_get_session_status(self, lifecycle_manager):
+        """Test getting session status."""
+        # Setup message count
+        lifecycle_manager._conversation_controller.message_count = MagicMock(
+            return_value=42
+        )
+
+        # Get status
+        status = await lifecycle_manager.get_session_status("test-session-status")
+
+        # Verify status structure
+        assert isinstance(status, dict)
+        assert "healthy" in status
+        assert "session_id" in status
+        assert "message_count" in status
+        assert "resources" in status
+
+        # Verify values
+        assert status["healthy"] is True
+        assert status["session_id"] == "test-session-status"
+        assert status["message_count"] == 42
+        assert isinstance(status["resources"], dict)
+
+        # Verify resources are tracked
+        assert "conversation_controller" in status["resources"]
+        assert "metrics_collector" in status["resources"]
+        assert "usage_analytics" in status["resources"]
+        assert "context_compactor" in status["resources"]
+
+    @pytest.mark.asyncio
+    async def test_get_session_status_without_message_count(self, lifecycle_manager):
+        """Test getting session status when message_count not available."""
+        # Setup controller without message_count
+        lifecycle_manager._conversation_controller.message_count = None
+
+        # Get status - should not fail
+        status = await lifecycle_manager.get_session_status("test-session-no-count")
+
+        # Verify defaults
+        assert status["message_count"] == 0
+        assert status["healthy"] is True
 
 
 class TestLifecycleManagerIntegration:

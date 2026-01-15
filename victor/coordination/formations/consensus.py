@@ -20,10 +20,12 @@ Multiple rounds if needed until consensus or timeout.
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
-from victor.teams.types import AgentMessage, MemberResult, MessageType
+
+if TYPE_CHECKING:
+    from victor.teams.types import AgentMessage, MemberResult, MessageType
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +56,12 @@ class ConsensusFormation(BaseFormationStrategy):
         self,
         agents: List[Any],
         context: TeamContext,
-        task: AgentMessage,
-    ) -> List[MemberResult]:
+        task: "AgentMessage",
+    ) -> List["MemberResult"]:
         """Execute agents until consensus reached."""
+        # Lazy import to avoid circular dependency
+        from victor.teams.types import AgentMessage, MemberResult, MessageType
+
         all_results = []
         current_task = task
 
@@ -138,15 +143,15 @@ class ConsensusFormation(BaseFormationStrategy):
     async def _execute_agent(
         self,
         agent: Any,
-        task: AgentMessage,
+        task: "AgentMessage",
         context: TeamContext,
         round_num: int,
-    ) -> MemberResult:
+    ) -> "MemberResult":
         """Execute a single agent."""
         logger.debug(f"ConsensusFormation: round {round_num + 1}, agent {agent.id}")
         return await agent.execute(task, context)
 
-    def _check_consensus(self, results: List[MemberResult]) -> bool:
+    def _check_consensus(self, results: List["MemberResult"]) -> bool:
         """Check if results indicate consensus.
 
         Args:

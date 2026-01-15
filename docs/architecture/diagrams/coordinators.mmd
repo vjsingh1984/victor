@@ -1,0 +1,393 @@
+# Coordinator Architecture Diagram
+
+## Overview
+
+This diagram illustrates Victor's two-layer coordinator architecture, showing the separation between application-specific orchestration and framework-agnostic workflow infrastructure.
+
+## Architecture Diagram
+
+```mermaid
+graph TB
+    subgraph "Application Layer"
+        direction TB
+        ChatCoord[Chat Coordinator<br/>LLM chat & streaming]
+        ToolCoord[Tool Coordinator<br/>Tool validation & execution]
+        ContextCoord[Context Coordinator<br/>Context management]
+        AnalyticsCoord[Analytics Coordinator<br/>Session metrics]
+        PromptCoord[Prompt Coordinator<br/>System prompt building]
+        SessionCoord[Session Coordinator<br/>Session lifecycle]
+        ProviderCoord[Provider Coordinator<br/>Provider switching]
+        ModeCoord[Mode Coordinator<br/>Agent modes]
+        ToolSelCoord[Tool Selection Coordinator<br/>Semantic tool selection]
+        ConfigCoord[Config Coordinator<br/>Configuration loading]
+    end
+
+    subgraph "Framework Layer"
+        direction TB
+        YAMLCoord[YAML Workflow Coordinator<br/>YAML workflow execution]
+        GraphCoord[Graph Execution Coordinator<br/>StateGraph execution]
+        HITLCoord[HITL Coordinator<br/>Human-in-the-loop]
+        CacheCoord[Cache Coordinator<br/>Workflow caching]
+    end
+
+    subgraph "Core Components"
+        Orchestrator[Agent Orchestrator<br/>Facade]
+        ToolPipeline[Tool Pipeline]
+        Providers[Provider Registry]
+        WorkflowEngine[Workflow Engine]
+    end
+
+    %% Application layer relationships
+    ChatCoord --> Orchestrator
+    ToolCoord --> Orchestrator
+    ContextCoord --> Orchestrator
+    AnalyticsCoord --> Orchestrator
+    PromptCoord --> Orchestrator
+    SessionCoord --> Orchestrator
+    ProviderCoord --> Orchestrator
+    ModeCoord --> Orchestrator
+    ToolSelCoord --> ToolCoord
+    ConfigCoord --> Orchestrator
+
+    %% Application to Framework layer relationships
+    ChatCoord -.->|uses| GraphCoord
+    ChatCoord -.->|uses| YAMLCoord
+    ToolCoord -.->|uses| GraphCoord
+    WorkflowEngine --> YAMLCoord
+    WorkflowEngine --> GraphCoord
+    WorkflowEngine --> HITLCoord
+    WorkflowEngine --> CacheCoord
+
+    %% Framework layer to core
+    YAMLCoord --> WorkflowEngine
+    GraphCoord --> WorkflowEngine
+    HITLCoord --> WorkflowEngine
+    CacheCoord --> WorkflowEngine
+
+    %% Styling
+    classDef appLayer fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    classDef frameworkLayer fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef coreLayer fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+
+    class ChatCoord,ToolCoord,ContextCoord,AnalyticsCoord,PromptCoord,SessionCoord,ProviderCoord,ModeCoord,ToolSelCoord,ConfigCoord appLayer
+    class YAMLCoord,GraphCoord,HITLCoord,CacheCoord frameworkLayer
+    class Orchestrator,ToolPipeline,Providers,WorkflowEngine coreLayer
+```
+
+## Layer Interaction Diagram
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant App as Application Layer<br/>(ChatCoordinator)
+    participant Framework as Framework Layer<br/>(GraphExecutionCoordinator)
+    participant Core as Core Components<br/>(Providers, Tools)
+
+    User->>App: chat(messages)
+    App->>App: Build context<br/>(ContextCoordinator)
+    App->>App: Select tools<br/>(ToolCoordinator)
+    App->>App: Build prompt<br/>(PromptCoordinator)
+
+    alt Workflow Enabled
+        App->>Framework: execute(graph, state)
+        Framework->>Core: Execute nodes
+        Core-->>Framework: Results
+        Framework-->>App: Workflow result
+    else Direct Chat
+        App->>Core: Provider chat
+        Core-->>App: Response
+    end
+
+    App->>App: Track analytics<br/>(AnalyticsCoordinator)
+    App-->>User: Response
+```
+
+## Responsibility Matrix
+
+```mermaid
+graph LR
+    subgraph "Responsibilities"
+        direction LR
+        Conv[Conversation Management]
+        Tool[Tool Execution]
+        Workflow[Workflow Execution]
+        Cache[Caching Strategy]
+        Config[Configuration]
+    end
+
+    subgraph "Owners"
+        direction LR
+        AppLayer[Application Layer]
+        FrameworkLayer[Framework Layer]
+    end
+
+    Conv --> AppLayer
+    Tool --> AppLayer
+    Workflow --> FrameworkLayer
+    Cache --> FrameworkLayer
+    Config --> AppLayer
+
+    classDef responsibility fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef owner fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+
+    class Conv,Tool,Workflow,Cache,Config responsibility
+    class AppLayer,FrameworkLayer owner
+```
+
+## Dependency Flow
+
+```mermaid
+graph TD
+    A[Application Layer<br/>victor/agent/coordinators/] -->|depends on| B[Framework Layer<br/>victor/framework/coordinators/]
+    B -->|depends on| C[Core Protocols<br/>victor/protocols/]
+
+    A1[ChatCoordinator] --> B1[GraphExecutionCoordinator]
+    A2[ToolCoordinator] --> B1
+    A3[WorkflowCoordinator] --> B2[YAMLWorkflowCoordinator]
+
+    B1 --> C1[IWorkflowExecutor]
+    B2 --> C1
+    B1 --> C2[IGraphExecutor]
+
+    classDef appLayer fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    classDef frameworkLayer fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef protocols fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+
+    class A,A1,A2,A3 appLayer
+    class B,B1,B2 frameworkLayer
+    class C,C1,C2 protocols
+```
+
+## SOLID Principles Illustration
+
+```mermaid
+graph TB
+    subgraph "Single Responsibility Principle"
+        direction LR
+        SRP1[ChatCoordinator<br/>Only chat operations]
+        SRP2[ToolCoordinator<br/>Only tool operations]
+        SRP3[YAMLCoordinator<br/>Only YAML workflows]
+    end
+
+    subgraph "Interface Segregation Principle"
+        direction LR
+        ISP1[IToolCoordinator<br/>Tool methods only]
+        ISP2[IChatCoordinator<br/>Chat methods only]
+        ISP3[IWorkflowExecutor<br/>Workflow methods only]
+    end
+
+    subgraph "Dependency Inversion Principle"
+        direction LR
+        DIP1[Depends on protocols<br/>not implementations]
+        DIP2[ChatCoordinator<br/>uses IAgentOrchestrator]
+        DIP3[ToolCoordinator<br/>uses IToolPipeline]
+    end
+
+    subgraph "Open/Closed Principle"
+        direction LR
+        OCP1[Open for extension<br/>Closed for modification]
+        OCP2[Add new strategies<br/>without changing code]
+        OCP3[CompactionStrategy<br/>ToolSelectionStrategy]
+    end
+
+    classDef solid fill:#ffebee,stroke:#c62828,stroke-width:2px
+    class SRP1,SRP2,SRP3,ISP1,ISP2,ISP3,DIP1,DIP2,DIP3,OCP1,OCP2,OCP3 solid
+```
+
+## Vertical Reuse Pattern
+
+```mermaid
+graph LR
+    subgraph "Framework Coordinators"
+        YAML[YAMLWorkflowCoordinator]
+        GRAPH[GraphExecutionCoordinator]
+        HITL[HITLCoordinator]
+        CACHE[CacheCoordinator]
+    end
+
+    subgraph "Verticals"
+        CODING[Coding Vertical]
+        DEVOPS[DevOps Vertical]
+        RAG[RAG Vertical]
+        DATA[DataAnalysis Vertical]
+        RESEARCH[Research Vertical]
+        EXT[External Vertical]
+    end
+
+    CODING --> YAML
+    CODING --> GRAPH
+    DEVOPS --> YAML
+    DEVOPS --> GRAPH
+    RAG --> YAML
+    RAG --> GRAPH
+    DATA --> YAML
+    DATA --> GRAPH
+    RESEARCH --> YAML
+    RESEARCH --> GRAPH
+    EXT --> YAML
+    EXT --> GRAPH
+
+    HITL -.-> CODING
+    HITL -.-> DEVOPS
+    HITL -.-> RAG
+    CACHE -.-> CODING
+    CACHE -.-> DEVOPS
+    CACHE -.-> RAG
+
+    classDef framework fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef vertical fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+
+    class YAML,GRAPH,HITL,CACHE framework
+    class CODING,DEVOPS,RAG,DATA,RESEARCH,EXT vertical
+```
+
+## Data Flow Example
+
+```mermaid
+flowchart TD
+    Start[User Input] --> App{Application Layer}
+    App --> ChatCoord[ChatCoordinator]
+
+    ChatCoord --> Context[ContextCoordinator<br/>Build context]
+    ChatCoord --> Tool[ToolCoordinator<br/>Select tools]
+    ChatCoord --> Prompt[PromptCoordinator<br/>Build prompt]
+
+    Context --> ChatCoord
+    Tool --> ChatCoord
+    Prompt --> ChatCoord
+
+    ChatCoord --> Workflow{Use Workflow?}
+
+    Workflow -->|Yes| Framework[Framework Layer]
+    Framework --> YAML[YAMLWorkflowCoordinator<br/>or]
+    Framework --> GRAPH[GraphExecutionCoordinator]
+
+    YAML --> Core[Core Components<br/>Providers, Tools]
+    GRAPH --> Core
+
+    Core --> Framework
+    Framework --> ChatCoord
+
+    Workflow -->|No| Core
+
+    Core --> ChatCoord
+    ChatCoord --> Analytics[AnalyticsCoordinator<br/>Track metrics]
+    Analytics --> Response[Response to User]
+
+    classDef appLayer fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    classDef frameworkLayer fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef coreLayer fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef io fill:#fff3e0,stroke:#e65100,stroke-width:2px
+
+    class ChatCoord,Context,Tool,Prompt,Analytics appLayer
+    class Framework,YAML,GRAPH frameworkLayer
+    class Core coreLayer
+    class Start,Response io
+```
+
+## Testing Strategy
+
+```mermaid
+graph TB
+    subgraph "Unit Tests"
+        direction TB
+        UT1[ChatCoordinator Tests]
+        UT2[ToolCoordinator Tests]
+        UT3[YAMLCoordinator Tests]
+        UT4[GraphCoordinator Tests]
+    end
+
+    subgraph "Integration Tests"
+        direction TB
+        IT1[Orchestrator Integration]
+        IT2[Workflow Integration]
+        IT3[Tool Pipeline Integration]
+    end
+
+    subgraph "Test Helpers"
+        direction TB
+        TH1[Mock Orchestrator]
+        TH2[Mock Providers]
+        TH3[Mock Tools]
+    end
+
+    UT1 --> TH1
+    UT1 --> TH2
+    UT2 --> TH1
+    UT2 --> TH3
+    UT3 --> TH2
+    UT4 --> TH3
+
+    IT1 --> UT1
+    IT1 --> UT2
+    IT2 --> UT3
+    IT2 --> UT4
+    IT3 --> UT2
+
+    classDef unit fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef integration fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef helpers fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+
+    class UT1,UT2,UT3,UT4 unit
+    class IT1,IT2,IT3 integration
+    class TH1,TH2,TH3 helpers
+```
+
+## Migration Path
+
+```mermaid
+graph LR
+    subgraph "Phase 1: Monolithic"
+        M1[AgentOrchestrator<br/>2000+ lines]
+    end
+
+    subgraph "Phase 2: Extraction"
+        direction TB
+        E1[Extract ConfigCoordinator]
+        E2[Extract PromptCoordinator]
+        E3[Extract ContextCoordinator]
+        E4[Extract ToolCoordinator]
+        E5[Extract ChatCoordinator]
+    end
+
+    subgraph "Phase 3: Refinement"
+        direction TB
+        R1[Add Protocol Interfaces]
+        R2[Implement Tool Selection]
+        R3[Add Session Management]
+        R4[Add Provider Switching]
+        R5[Add Analytics Tracking]
+    end
+
+    subgraph "Phase 4: Framework Layer"
+        direction TB
+        F1[Extract YAMLWorkflowCoordinator]
+        F2[Extract GraphExecutionCoordinator]
+        F3[Extract HITLCoordinator]
+        F4[Extract CacheCoordinator]
+    end
+
+    subgraph "Phase 5: Complete"
+        C1[AgentOrchestrator<br/>Facade with 10+ coordinators]
+    end
+
+    M1 --> E1
+    E1 --> E2
+    E2 --> E3
+    E3 --> E4
+    E4 --> E5
+    E5 --> R1
+    R1 --> R2
+    R2 --> R3
+    R3 --> R4
+    R4 --> R5
+    R5 --> F1
+    F1 --> F2
+    F2 --> F3
+    F3 --> F4
+    F4 --> C1
+
+    classDef phase fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+
+    class M1,E1,E2,E3,E4,E5,R1,R2,R3,R4,R5,F1,F2,F3,F4,C1 phase
+```

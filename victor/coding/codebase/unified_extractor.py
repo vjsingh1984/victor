@@ -53,6 +53,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from victor.core.errors import FileError, ValidationError
+
+logger = logging.getLogger(__name__)
+
 from victor.coding.languages.tiers import LanguageTier, get_tier
 
 if TYPE_CHECKING:
@@ -189,7 +193,12 @@ class UnifiedSymbolExtractor:
         if content is None:
             try:
                 content = file_path.read_text()
+            except (FileError, OSError, UnicodeDecodeError) as e:
+                # Known error types - file read errors
+                logger.warning(f"Failed to read {file_path}: {e}")
+                return []
             except Exception as e:
+                # Catch-all for truly unexpected errors
                 logger.warning(f"Failed to read {file_path}: {e}")
                 return []
 
@@ -197,7 +206,12 @@ class UnifiedSymbolExtractor:
         try:
             ts_symbols = self._ts.extract_symbols(file_path, lang)
             enriched = [self._convert_ts_symbol(s, file_path, tier_config.tier) for s in ts_symbols]
+        except (ValidationError, FileError) as e:
+            # Known error types - validation or file errors
+            logger.warning(f"Tree-sitter extraction failed for {file_path}: {e}")
+            enriched = []
         except Exception as e:
+            # Catch-all for truly unexpected errors
             logger.warning(f"Tree-sitter extraction failed for {file_path}: {e}")
             enriched = []
 
@@ -248,13 +262,21 @@ class UnifiedSymbolExtractor:
         if content is None:
             try:
                 content = file_path.read_text()
+            except (FileError, OSError, UnicodeDecodeError):
+                # Known error types - file read errors
+                return []
             except Exception:
+                # Catch-all for truly unexpected errors
                 return []
 
         try:
             ts_symbols = self._ts.extract_symbols(file_path, lang)
             enriched = [self._convert_ts_symbol(s, file_path, tier_config.tier) for s in ts_symbols]
+        except (ValidationError, FileError):
+            # Known error types - validation or file errors
+            return []
         except Exception:
+            # Catch-all for truly unexpected errors
             return []
 
         # Tier 1: Add native AST enrichment for Python

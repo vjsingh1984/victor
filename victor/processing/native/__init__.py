@@ -206,7 +206,8 @@ def _split_into_blocks(content: str) -> List[str]:
 def _hash_block(block: str) -> str:
     """Compute hash of a normalized block (pure Python)."""
     normalized = normalize_block(block)
-    return hashlib.md5(normalized.encode()).hexdigest()[:12]
+    # MD5 used for code deduplication, not security
+    return hashlib.md5(normalized.encode(), usedforsecurity=False).hexdigest()[:12]
 
 
 # =============================================================================
@@ -560,7 +561,8 @@ def compute_signature(tool_name: str, arguments: Dict[str, Any]) -> str:
     sorted_args = sorted(arguments.items())
     args_str = ",".join(f"{k}={_value_to_str(v)}" for k, v in sorted_args)
     combined = f"{tool_name}:{args_str}"
-    return hashlib.md5(combined.encode()).hexdigest()[:16]
+    # MD5 used for tool call signature, not security
+    return hashlib.md5(combined.encode(), usedforsecurity=False).hexdigest()[:16]
 
 
 def compute_batch_signatures(tool_calls: List[Tuple[str, Dict[str, Any]]]) -> List[str]:

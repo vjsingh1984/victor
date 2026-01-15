@@ -1,0 +1,591 @@
+profiles:
+  default:
+    provider: ollama
+    model: qwen3-coder-tools:30b-64K
+    endpoint: http://192.168.1.20:11434
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'Default: Qwen3-Coder 30B (ada) - 64K context, tools'
+  m1:
+    provider: ollama
+    model: qwen3-coder-tools:14b
+    endpoint: http://localhost:11434
+    temperature: 0.7
+    max_tokens: 4096
+    description: 'M1 Max: Qwen3-Coder 14B - fits in 48GB'
+  m1-small:
+    provider: ollama
+    model: qwen2.5-coder:7b
+    endpoint: http://localhost:11434
+    temperature: 0.7
+    max_tokens: 4096
+    description: 'M1 Max: Qwen2.5-Coder 7B - fast, low memory'
+  m1-deepseek:
+    provider: ollama
+    model: deepseek-r1-tools:14b
+    endpoint: http://localhost:11434
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'M1 Max: DeepSeek-R1 14B with thinking'
+  m4:
+    provider: ollama
+    model: qwen3-coder-tools:30b-128K
+    endpoint: http://192.168.1.227:11434
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'M4 Max: Qwen3-Coder 30B - 128K context'
+  m4-deepseek:
+    provider: ollama
+    model: deepseek-r1-tools:32b
+    endpoint: http://192.168.1.227:11434
+    temperature: 0.7
+    max_tokens: 16384
+    description: 'M4 Max: DeepSeek-R1 32B with thinking'
+  m4-heavy:
+    provider: ollama
+    model: deepseek-r1-tools:70b
+    endpoint: http://192.168.1.227:11434
+    temperature: 0.7
+    max_tokens: 16384
+    description: 'M4 Max: DeepSeek-R1 70B - heavy, may need offload'
+  m4-devstral:
+    provider: ollama
+    model: devstral-tools:latest
+    endpoint: http://192.168.1.227:11434
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'M4 Max: Devstral 24B - agentic coder'
+  m4-gemma:
+    provider: ollama
+    model: gemma3-tools:27b
+    endpoint: http://192.168.1.227:11434
+    temperature: 1.0
+    max_tokens: 4096
+    description: 'M4 Max: Gemma3 27B - multimodal'
+  ada:
+    provider: ollama
+    model: qwen2.5-coder:14b
+    endpoint: http://192.168.1.20:11434
+    temperature: 0.7
+    max_tokens: 4096
+    description: 'ADA: Qwen2.5-Coder 14B - fits in 20GB VRAM'
+  ada-small:
+    provider: ollama
+    model: mistral-tools:7b-instruct
+    endpoint: http://192.168.1.20:11434
+    temperature: 0.5
+    max_tokens: 2048
+    description: 'ADA: Mistral 7B - fast responses'
+  ada-heavy:
+    provider: ollama
+    model: deepseek-r1-tools:32b
+    endpoint: http://192.168.1.20:11434
+    temperature: 0.7
+    max_tokens: 16384
+    description: 'ADA: DeepSeek-R1 32B - offloaded to system RAM'
+  ada-huge:
+    provider: ollama
+    model: deepseek-r1-tools:70b
+    endpoint: http://192.168.1.20:11434
+    temperature: 0.7
+    max_tokens: 16384
+    description: 'ADA: DeepSeek-R1 70B - uses 108GB system RAM for offload'
+  quick:
+    provider: ollama
+    model: mistral-tools:7b-instruct
+    endpoint: http://localhost:11434
+    temperature: 0.5
+    max_tokens: 2048
+    description: 'Quick: Mistral 7B - fastest local'
+  groq:
+    provider: groqcloud
+    model: llama-3.3-70b-versatile
+    temperature: 0.7
+    max_tokens: 4096
+    description: 'Groq: Llama 3.3 70B - ultra-fast cloud inference'
+  groq-fast:
+    provider: groqcloud
+    model: llama-3.1-8b-instant
+    temperature: 0.7
+    max_tokens: 2048
+    description: 'Groq: Llama 3.1 8B - fastest cloud'
+  groq-gpt:
+    provider: groqcloud
+    model: openai/gpt-oss-20b
+    temperature: 0.7
+    max_tokens: 4096
+    description: 'Groq: GPT-OSS 20B - efficient open-source GPT'
+  claude:
+    provider: anthropic
+    model: claude-sonnet-4-5
+    temperature: 1.0
+    max_tokens: 8192
+    description: Claude Sonnet 4.5 - best for complex tasks
+  claude-haiku:
+    provider: anthropic
+    model: claude-3-5-haiku-20241022
+    temperature: 1.0
+    max_tokens: 4096
+    description: Claude 3.5 Haiku - fast, cost-effective
+  claude-opus:
+    provider: anthropic
+    model: claude-opus-4-5-20251101
+    temperature: 1.0
+    max_tokens: 8192
+    description: Claude Opus 4.5 - most capable
+  gpt-4.1:
+    provider: openai
+    model: gpt-4.1
+    temperature: 0.7
+    max_tokens: 8192
+    description: GPT-4.1 - latest flagship model
+  gpt-4.1-mini:
+    provider: openai
+    model: gpt-4.1-mini
+    temperature: 0.7
+    max_tokens: 4096
+    description: GPT-4.1 Mini - cost effective
+  gpt-4.1-nano:
+    provider: openai
+    model: gpt-4.1-nano
+    temperature: 0.7
+    max_tokens: 2048
+    description: GPT-4.1 Nano - cheapest, fastest
+  gpt:
+    provider: openai
+    model: gpt-4o
+    temperature: 0.7
+    max_tokens: 4096
+    description: GPT-4o - multimodal, stable
+  gpt-mini:
+    provider: openai
+    model: gpt-4o-mini
+    temperature: 0.7
+    max_tokens: 4096
+    description: GPT-4o Mini - cost effective
+  o1:
+    provider: openai
+    model: o1
+    temperature: 1.0
+    max_tokens: 32768
+    description: OpenAI o1 - reasoning model
+  o1-pro:
+    provider: openai
+    model: o1-pro
+    temperature: 1.0
+    max_tokens: 32768
+    description: OpenAI o1 Pro - advanced reasoning
+  o3:
+    provider: openai
+    model: o3
+    temperature: 1.0
+    max_tokens: 65536
+    description: OpenAI o3 - latest reasoning model
+  o3-mini:
+    provider: openai
+    model: o3-mini
+    temperature: 1.0
+    max_tokens: 32768
+    description: OpenAI o3-mini - fast reasoning
+  gemini2.5:
+    provider: google
+    model: gemini-2.5-flash
+    temperature: 1.0
+    max_tokens: 8192
+    description: Gemini 2.5 Flash - fast multimodal
+  gemini-2.5-pro:
+    provider: google
+    model: gemini-2.5-pro
+    temperature: 1.0
+    max_tokens: 8192
+    description: Gemini 2.5 Pro - 1M context
+  gemini:
+    provider: google
+    model: gemini-2.0-flash
+    temperature: 1.0
+    max_tokens: 8192
+    description: Gemini 2.0 Flash - fast multimodal
+  gemini-pro:
+    provider: google
+    model: gemini-2.5-pro
+    temperature: 1.0
+    max_tokens: 8192
+    description: Gemini 2.5 Pro - 1M context
+  grok:
+    provider: xai
+    model: grok-3
+    temperature: 0.7
+    max_tokens: 16384
+    description: Grok 3 - 128K context, tools
+  grok-mini:
+    provider: xai
+    model: grok-3-mini
+    temperature: 0.7
+    max_tokens: 16384
+    description: Grok 3 Mini - fast reasoning
+  grok-2:
+    provider: xai
+    model: grok-2
+    temperature: 0.7
+    max_tokens: 4096
+    description: Grok 2 - balanced
+  deepseek:
+    provider: deepseek
+    model: deepseek-chat
+    temperature: 0.7
+    max_tokens: 8192
+    description: DeepSeek-V3.2 - coding with tools
+  deepseek-reason:
+    provider: deepseek
+    model: deepseek-reasoner
+    max_tokens: 32768
+    description: DeepSeek Reasoner - CoT (no tools)
+  kimi:
+    provider: moonshot
+    model: kimi-k2-thinking
+    temperature: 1.0
+    max_tokens: 8192
+    description: Kimi K2 Thinking - 256K context
+  kimi-fast:
+    provider: moonshot
+    model: kimi-k2-thinking-turbo
+    temperature: 0.7
+    max_tokens: 4096
+    description: Kimi K2 Turbo - faster reasoning
+  cerebras:
+    provider: cerebras
+    model: llama-3.3-70b
+    temperature: 0.7
+    max_tokens: 4096
+    description: 'Cerebras: Llama 3.3 70B - ultra fast (1000+ tok/s)'
+  cerebras-small:
+    provider: cerebras
+    model: llama3.1-8b
+    temperature: 0.7
+    max_tokens: 2048
+    description: 'Cerebras: Llama 3.1 8B - fastest'
+  cerebras-qwen:
+    provider: cerebras
+    model: qwen-3-32b
+    temperature: 0.7
+    max_tokens: 4096
+    description: 'Cerebras: Qwen 3 32B - strong reasoning'
+  cerebras-gpt:
+    provider: cerebras
+    model: gpt-oss-120b
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'Cerebras: GPT-OSS 120B - largest open model'
+  mistral:
+    provider: mistral
+    model: mistral-large-latest
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'Mistral: Large - 131K context, tools'
+  mistral-small:
+    provider: mistral
+    model: mistral-small-latest
+    temperature: 0.7
+    max_tokens: 4096
+    description: 'Mistral: Small - fast, cost-effective'
+  codestral:
+    provider: mistral
+    model: codestral-latest
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'Mistral: Codestral - optimized for code'
+  openrouter:
+    provider: openrouter
+    model: nvidia/nemotron-3-nano-30b-a3b:free
+    temperature: 0.7
+    max_tokens: 4096
+    description: 'OpenRouter: Nemotron 30B - free, fast'
+  openrouter-llama:
+    provider: openrouter
+    model: meta-llama/llama-3.3-70b-instruct
+    temperature: 0.7
+    max_tokens: 4096
+    description: 'OpenRouter: Llama 3.3 70B - tool calling'
+  openrouter-deepseek:
+    provider: openrouter
+    model: deepseek/deepseek-chat
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'OpenRouter: DeepSeek V3 - 128K context'
+  fireworks:
+    provider: fireworks
+    model: accounts/fireworks/models/llama-v3p3-70b-instruct
+    temperature: 0.7
+    max_tokens: 4096
+    description: 'Fireworks: Llama 3.3 70B - fast, tool calling'
+  fireworks-qwen:
+    provider: fireworks
+    model: accounts/fireworks/models/qwen3-coder-480b-a35b-instruct
+    temperature: 0.7
+    max_tokens: 4096
+    description: 'Fireworks: Qwen3 Coder 480B - large code model'
+  fireworks-deepseek:
+    provider: fireworks
+    model: accounts/fireworks/models/deepseek-v3p2
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'Fireworks: DeepSeek V3.2 - latest MoE'
+  fireworks-thinking:
+    provider: fireworks
+    model: accounts/fireworks/models/deepseek-r1-0528
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'Fireworks: DeepSeek R1 - reasoning model'
+  testprof:
+    provider: ollama
+    model: llama
+    temperature: 0.7
+    max_tokens: 4096
+providers:
+  ollama:
+    base_url:
+    - http://192.168.1.20:11434
+    - http://192.168.1.227:11434
+    - http://localhost:11434
+    timeout: 300
+  lmstudio:
+    base_url:
+    - http://192.168.1.20:1234
+    - http://localhost:1234
+    timeout: 300
+  anthropic:
+    api_key: ${ANTHROPIC_API_KEY}
+  openai:
+    api_key: ${OPENAI_API_KEY}
+  google:
+    api_key: ${GOOGLE_API_KEY}
+  xai:
+    api_key: ${XAI_API_KEY}
+  moonshot:
+    api_key: ${MOONSHOT_API_KEY}
+    base_url: https://api.moonshot.cn/v1
+    timeout: 120
+  deepseek:
+    api_key: ${DEEPSEEK_API_KEY}
+    base_url: https://api.deepseek.com/v1
+    timeout: 120
+  groqcloud:
+    api_key: ${GROQCLOUD_API_KEY}
+    base_url: https://api.groq.com/openai/v1
+    timeout: 60
+  cerebras:
+    api_key: ${CEREBRAS_API_KEY}
+    base_url: https://api.cerebras.ai/v1
+    timeout: 60
+  mistral:
+    api_key: ${MISTRAL_API_KEY}
+    base_url: https://api.mistral.ai/v1
+    timeout: 120
+  together:
+    api_key: ${TOGETHER_API_KEY}
+    base_url: https://api.together.xyz/v1
+    timeout: 120
+  fireworks:
+    api_key: ${FIREWORKS_API_KEY}
+    base_url: https://api.fireworks.ai/inference/v1
+    timeout: 120
+  openrouter:
+    api_key: ${OPENROUTER_API_KEY}
+    base_url: https://openrouter.ai/api/v1
+    timeout: 120
+tools:
+  disabled: []
+web_tools:
+  summarize_fetch_top: 5
+  summarize_fetch_pool: 10
+  summarize_max_content_length: 50000
+model_capabilities:
+  defaults:
+    native_tool_calls: false
+    streaming_tool_calls: false
+    parallel_tool_calls: false
+    thinking_mode: false
+    requires_strict_prompting: true
+    recommended_tool_budget: 10
+  providers:
+    anthropic:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+    openai:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+    google:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+    xai:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+    moonshot:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 30
+    deepseek:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+    groqcloud:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+    cerebras:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+    mistral:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+    openrouter:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+    ollama:
+      native_tool_calls: false
+      requires_strict_prompting: true
+      recommended_tool_budget: 12
+    lmstudio:
+      native_tool_calls: false
+      requires_strict_prompting: true
+      recommended_tool_budget: 12
+  models:
+    '*-tools:*':
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+    '*-tools':
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+    qwen3*:
+      native_tool_calls: true
+      parallel_tool_calls: true
+      thinking_mode: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+    qwen2.5*:
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+    llama3.1*:
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+    llama3.2*:
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+    llama3.3*:
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+    llama-3.*:
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+    deepseek*:
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+    deepseek-r1*:
+      native_tool_calls: true
+      parallel_tool_calls: true
+      thinking_mode: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+    deepseek-reasoner*:
+      native_tool_calls: false
+      thinking_mode: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 5
+    mistral*:
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+    mixtral*:
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+    gemma3*:
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 12
+    devstral*:
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+    kimi-k2*:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      thinking_mode: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 30
+    grok*:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+    llama-3.3-70b-versatile*:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 25
+    qwen/qwen3-32b*:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      thinking_mode: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+    codellama*:
+      native_tool_calls: false
+      requires_strict_prompting: true
+      recommended_tool_budget: 8
+    phi*:
+      native_tool_calls: false
+      requires_strict_prompting: true
+      recommended_tool_budget: 8
+use_coordinator_orchestrator: true

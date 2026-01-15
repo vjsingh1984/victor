@@ -60,20 +60,21 @@ Usage:
 from __future__ import annotations
 
 import logging
-import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+from victor.framework.workflows.base_handler import BaseHandler, HandlerError
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
+    from victor.workflows.executor import WorkflowContext
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class StatsComputeHandler:
+class StatsComputeHandler(BaseHandler):
     """Compute statistical measures on datasets.
 
     Runs statistical computations without LLM involvement.
@@ -89,55 +90,30 @@ class StatsComputeHandler:
           output: statistics
     """
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
+    ) -> Tuple[Any, int]:
+        """Execute statistical computations."""
+        data = None
+        operations = []
 
-        start_time = time.time()
+        for key, value in node.input_mapping.items():
+            if key == "data":
+                data = context.get(value) if isinstance(value, str) else value
+            elif key == "operations":
+                operations = value if isinstance(value, list) else [value]
 
-        try:
-            data = None
-            operations = []
+        if data is None:
+            raise ValueError("No 'data' input provided")
 
-            for key, value in node.input_mapping.items():
-                if key == "data":
-                    data = context.get(value) if isinstance(value, str) else value
-                elif key == "operations":
-                    operations = value if isinstance(value, list) else [value]
+        results = {}
+        for op in operations:
+            results[op] = self._compute_stat(data, op)
 
-            if data is None:
-                return NodeResult(
-                    node_id=node.id,
-                    status=ExecutorNodeStatus.FAILED,
-                    error="No 'data' input provided",
-                    duration_seconds=time.time() - start_time,
-                )
-
-            results = {}
-            for op in operations:
-                results[op] = self._compute_stat(data, op)
-
-            output_key = node.output_key or node.id
-            context.set(output_key, results)
-
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.COMPLETED,
-                output=results,
-                duration_seconds=time.time() - start_time,
-            )
-
-        except Exception as e:
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
-            )
+        return results, 0
 
     def _compute_stat(self, data: Any, operation: str) -> Any:
         """Compute a single statistic."""
@@ -178,7 +154,7 @@ class StatsComputeHandler:
 
 
 @dataclass
-class MLTrainingHandler:
+class MLTrainingHandler(BaseHandler):
     """Orchestrate ML model training.
 
     Manages training workflow including data split, training,
@@ -195,53 +171,36 @@ class MLTrainingHandler:
           output: trained_model
     """
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
-        start_time = time.time()
-
+    ) -> Tuple[Any, int]:
+        """Execute ML training."""
         model_type = node.input_mapping.get("model_type", "linear")
         _features_key = node.input_mapping.get("features")  # noqa: F841
         _target_key = node.input_mapping.get("target")  # noqa: F841
 
-        try:
-            train_cmd = f"python -m victor.ml.train --model {model_type}"
-            result = await tool_registry.execute("shell", command=train_cmd)
+        train_cmd = f"python -m victor.ml.train --model {model_type}"
+        result = await tool_registry.execute("shell", command=train_cmd)
 
-            output = {
-                "model_type": model_type,
-                "status": "trained" if result.success else "failed",
-                "output": result.output,
-            }
+        # Build output structure
+        output = {
+            "model_type": model_type,
+            "status": "trained" if result.success else "failed",
+            "output": result.output,
+        }
 
-            output_key = node.output_key or node.id
-            context.set(output_key, output)
+        # Raise exception if training failed, preserving output structure
+        if not result.success:
+            raise HandlerError(result.error or "ML training failed", output=output)
 
-            return NodeResult(
-                node_id=node.id,
-                status=(
-                    ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED
-                ),
-                output=output,
-                duration_seconds=time.time() - start_time,
-                tool_calls_used=1,
-            )
-        except Exception as e:
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
-            )
+        return output, 1
 
 
 @dataclass
-class PyCaretHandler:
+class PyCaretHandler(BaseHandler):
     """Automated ML using PyCaret.
 
     Supports classification, regression, clustering, and anomaly detection.
@@ -271,16 +230,13 @@ class PyCaretHandler:
         - metrics: Performance metrics for best model
     """
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
-        start_time = time.time()
-
+    ) -> Tuple[Any, int]:
+        """Execute PyCaret AutoML."""
         # Extract inputs
         data_key = node.input_mapping.get("data")
         target = node.input_mapping.get("target")
@@ -290,76 +246,42 @@ class PyCaretHandler:
         fold = node.input_mapping.get("fold", 5)
         sort_by = node.input_mapping.get("sort_by")  # Metric to sort by
 
+        # Check if PyCaret is available
         try:
-            # Check if PyCaret is available
-            try:
-                import pandas as pd
-            except ImportError:
-                return NodeResult(
-                    node_id=node.id,
-                    status=ExecutorNodeStatus.FAILED,
-                    error="pandas is required for PyCaret. Install with: pip install pandas",
-                    duration_seconds=time.time() - start_time,
-                )
+            import pandas as pd
+        except ImportError:
+            raise ImportError("pandas is required for PyCaret. Install with: pip install pandas")
 
-            # Get data from context
-            data = context.get(data_key) if isinstance(data_key, str) else data_key
-            if data is None:
-                return NodeResult(
-                    node_id=node.id,
-                    status=ExecutorNodeStatus.FAILED,
-                    error="No 'data' input provided",
-                    duration_seconds=time.time() - start_time,
-                )
+        # Get data from context
+        data = context.get(data_key) if isinstance(data_key, str) else data_key
+        if data is None:
+            raise ValueError("No 'data' input provided")
 
-            # Convert to DataFrame if needed
-            if not isinstance(data, pd.DataFrame):
-                if isinstance(data, dict):
-                    data = pd.DataFrame(data)
-                elif isinstance(data, list):
-                    data = pd.DataFrame(data)
-                else:
-                    return NodeResult(
-                        node_id=node.id,
-                        status=ExecutorNodeStatus.FAILED,
-                        error=f"Unsupported data type: {type(data).__name__}",
-                        duration_seconds=time.time() - start_time,
-                    )
+        # Convert to DataFrame if needed
+        if not isinstance(data, pd.DataFrame):
+            if isinstance(data, dict):
+                data = pd.DataFrame(data)
+            elif isinstance(data, list):
+                data = pd.DataFrame(data)
+            else:
+                raise ValueError(f"Unsupported data type: {type(data).__name__}")
 
-            # Import appropriate PyCaret module based on task
-            result = await self._run_pycaret(
-                data=data,
-                target=target,
-                task=task,
-                top_n=top_n,
-                time_budget=time_budget,
-                fold=fold,
-                sort_by=sort_by,
-            )
+        # Import appropriate PyCaret module based on task
+        result = await self._run_pycaret(
+            data=data,
+            target=target,
+            task=task,
+            top_n=top_n,
+            time_budget=time_budget,
+            fold=fold,
+            sort_by=sort_by,
+        )
 
-            output_key = node.output_key or node.id
-            context.set(output_key, result)
+        # Raise exception if AutoML failed
+        if not result.get("success"):
+            raise Exception(result.get("error", "PyCaret AutoML failed"))
 
-            return NodeResult(
-                node_id=node.id,
-                status=(
-                    ExecutorNodeStatus.COMPLETED
-                    if result.get("success")
-                    else ExecutorNodeStatus.FAILED
-                ),
-                output=result,
-                duration_seconds=time.time() - start_time,
-                error=result.get("error"),
-            )
-
-        except Exception as e:
-            logger.exception(f"PyCaret AutoML failed: {e}")
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
-            )
+        return result, 0
 
     async def _run_pycaret(
         self,
@@ -516,7 +438,7 @@ class PyCaretHandler:
 
 
 @dataclass
-class AutoSklearnHandler:
+class AutoSklearnHandler(BaseHandler):
     """Automated ML using Auto-sklearn.
 
     Auto-sklearn automates algorithm selection and hyperparameter tuning
@@ -545,16 +467,13 @@ class AutoSklearnHandler:
         - ensemble: Final ensemble (if applicable)
     """
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
-        start_time = time.time()
-
+    ) -> Tuple[Any, int]:
+        """Execute Auto-sklearn AutoML."""
         # Extract inputs
         X_key = node.input_mapping.get("X")
         y_key = node.input_mapping.get("y")
@@ -568,69 +487,40 @@ class AutoSklearnHandler:
         try:
             import numpy as np
         except ImportError:
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error="numpy is required. Install with: pip install numpy",
-                duration_seconds=time.time() - start_time,
-            )
+            raise ImportError("numpy is required. Install with: pip install numpy")
 
-        try:
-            # Get data from context
-            X = context.get(X_key) if isinstance(X_key, str) else X_key
-            y = context.get(y_key) if isinstance(y_key, str) else y_key
+        # Get data from context
+        X = context.get(X_key) if isinstance(X_key, str) else X_key
+        y = context.get(y_key) if isinstance(y_key, str) else y_key
 
-            if X is None or y is None:
-                return NodeResult(
-                    node_id=node.id,
-                    status=ExecutorNodeStatus.FAILED,
-                    error="Both 'X' (features) and 'y' (target) inputs are required",
-                    duration_seconds=time.time() - start_time,
-                )
+        if X is None or y is None:
+            raise ValueError("Both 'X' (features) and 'y' (target) inputs are required")
 
-            # Convert to numpy arrays if needed
-            if hasattr(X, "values"):  # DataFrame
-                X = X.values
-            if hasattr(y, "values"):  # Series
-                y = y.values
-            X = np.asarray(X)
-            y = np.asarray(y)
+        # Convert to numpy arrays if needed
+        if hasattr(X, "values"):  # DataFrame
+            X = X.values
+        if hasattr(y, "values"):  # Series
+            y = y.values
+        X = np.asarray(X)
+        y = np.asarray(y)
 
-            # Run Auto-sklearn
-            result = await self._run_autosklearn(
-                X=X,
-                y=y,
-                task=task,
-                time_limit=time_limit,
-                memory_limit=memory_limit,
-                metric=metric,
-                n_jobs=n_jobs,
-                ensemble_size=ensemble_size,
-            )
+        # Run Auto-sklearn
+        result = await self._run_autosklearn(
+            X=X,
+            y=y,
+            task=task,
+            time_limit=time_limit,
+            memory_limit=memory_limit,
+            metric=metric,
+            n_jobs=n_jobs,
+            ensemble_size=ensemble_size,
+        )
 
-            output_key = node.output_key or node.id
-            context.set(output_key, result)
+        # Raise exception if AutoML failed
+        if not result.get("success"):
+            raise Exception(result.get("error", "Auto-sklearn AutoML failed"))
 
-            return NodeResult(
-                node_id=node.id,
-                status=(
-                    ExecutorNodeStatus.COMPLETED
-                    if result.get("success")
-                    else ExecutorNodeStatus.FAILED
-                ),
-                output=result,
-                duration_seconds=time.time() - start_time,
-                error=result.get("error"),
-            )
-
-        except Exception as e:
-            logger.exception(f"Auto-sklearn AutoML failed: {e}")
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
-            )
+        return result, 0
 
     async def _run_autosklearn(
         self,
@@ -750,7 +640,7 @@ class AutoSklearnHandler:
 
 
 @dataclass
-class RLTrainingHandler:
+class RLTrainingHandler(BaseHandler):
     """Reinforcement Learning training handler.
 
     Supports training RL agents using Stable-Baselines3 and Gymnasium.
@@ -780,16 +670,13 @@ class RLTrainingHandler:
         - training_time: Time taken to train
     """
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
-        start_time = time.time()
-
+    ) -> Tuple[Any, int]:
+        """Execute RL training."""
         # Extract inputs
         env_id = node.input_mapping.get("env", "CartPole-v1")
         algorithm = node.input_mapping.get("algorithm", "PPO")
@@ -799,40 +686,21 @@ class RLTrainingHandler:
         n_eval_episodes = node.input_mapping.get("n_eval_episodes", 10)
         save_path = node.input_mapping.get("save_path")
 
-        try:
-            result = await self._train_rl_agent(
-                env_id=env_id,
-                algorithm=algorithm,
-                total_timesteps=total_timesteps,
-                policy=policy,
-                learning_rate=learning_rate,
-                n_eval_episodes=n_eval_episodes,
-                save_path=save_path,
-            )
+        result = await self._train_rl_agent(
+            env_id=env_id,
+            algorithm=algorithm,
+            total_timesteps=total_timesteps,
+            policy=policy,
+            learning_rate=learning_rate,
+            n_eval_episodes=n_eval_episodes,
+            save_path=save_path,
+        )
 
-            output_key = node.output_key or node.id
-            context.set(output_key, result)
+        # Raise exception if RL training failed
+        if not result.get("success"):
+            raise Exception(result.get("error", "RL training failed"))
 
-            return NodeResult(
-                node_id=node.id,
-                status=(
-                    ExecutorNodeStatus.COMPLETED
-                    if result.get("success")
-                    else ExecutorNodeStatus.FAILED
-                ),
-                output=result,
-                duration_seconds=time.time() - start_time,
-                error=result.get("error"),
-            )
-
-        except Exception as e:
-            logger.exception(f"RL training failed: {e}")
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
-            )
+        return result, 0
 
     async def _train_rl_agent(
         self,

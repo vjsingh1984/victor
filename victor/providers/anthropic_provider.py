@@ -15,12 +15,20 @@
 """Anthropic Claude provider implementation."""
 
 import json
+import logging
 import os
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from anthropic import AsyncAnthropic
 from anthropic.types import Message as AnthropicMessage
 
+logger = logging.getLogger(__name__)
+
+from victor.core.errors import (
+    ProviderConnectionError as CoreProviderConnectionError,
+    ProviderTimeoutError as CoreProviderTimeoutError,
+    ValidationError,
+)
 from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
@@ -54,23 +62,8 @@ class AnthropicProvider(BaseProvider):
             max_retries: Maximum retry attempts
             **kwargs: Additional configuration
         """
-        # Resolution order: parameter → env var → keyring → warning
-        resolved_key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
-        if not resolved_key:
-            try:
-                from victor.config.api_keys import get_api_key
-
-                resolved_key = get_api_key("anthropic") or ""
-            except ImportError:
-                pass
-
-        if not resolved_key:
-            import logging
-
-            logging.getLogger(__name__).warning(
-                "Anthropic API key not provided. Set ANTHROPIC_API_KEY environment variable, "
-                "use 'victor keys --set anthropic --keyring', or pass api_key parameter."
-            )
+        # Resolve API key using centralized helper
+        resolved_key = self._resolve_api_key(api_key, "anthropic")
 
         super().__init__(
             api_key=resolved_key,
@@ -163,7 +156,17 @@ class AnthropicProvider(BaseProvider):
 
             return self._parse_response(response, model)
 
+        except (ProviderError, ProviderAuthError, ProviderRateLimitError):
+            # Re-raise already-converted provider errors
+            raise
+        except (ConnectionError, TimeoutError) as e:
+            # Network-related errors
+            raise CoreProviderConnectionError(
+                message=f"Connection error during Anthropic API request: {e}",
+                provider=self.name,
+            ) from e
         except Exception as e:
+            # Catch-all for truly unexpected errors
             return self._handle_error(e)
 
     async def stream(
@@ -316,7 +319,17 @@ class AnthropicProvider(BaseProvider):
                             usage=usage,
                         )
 
+        except (ProviderError, ProviderAuthError, ProviderRateLimitError):
+            # Re-raise already-converted provider errors
+            raise
+        except (ConnectionError, TimeoutError) as e:
+            # Network-related errors
+            raise CoreProviderConnectionError(
+                message=f"Connection error during Anthropic streaming: {e}",
+                provider=self.name,
+            ) from e
         except Exception as e:
+            # Catch-all for truly unexpected errors
             raise self._handle_error(e)
 
     def _convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
@@ -378,7 +391,12 @@ class AnthropicProvider(BaseProvider):
         if isinstance(raw_args, str):
             try:
                 return json.loads(raw_args)
-            except Exception:
+            except json.JSONDecodeError:
+                # Invalid JSON, return as-is
+                return raw_args
+            except ValueError as e:
+                # Other parsing errors
+                logger.debug(f"Failed to parse tool arguments as JSON: {e}")
                 return raw_args
         return raw_args
 

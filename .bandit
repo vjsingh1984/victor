@@ -1,0 +1,49 @@
+# Bandit Configuration for Victor AI
+# This file documents security findings that are acceptable in the context of this project
+#
+# For more information: https://bandit.readthedocs.io/
+
+[exclude_dirs]
+# Test directories
+victor/test/
+victor/tests/
+tests/
+
+# Archive and legacy code
+archive/
+victor_test/
+
+[skips]
+# B101: assert_used
+# We use assert statements in test files and some validation code
+# This is acceptable because:
+# 1. Test files are not production code
+# 2. Python's -O flag optimizes out asserts
+# B101
+
+# B324: hashlib.md5
+# MD5 is used for non-security purposes (caching, deduplication, identifiers)
+# This is acceptable because:
+# 1. Not used for cryptographic security
+# 2. Used for deterministic hashing of code/content for caching
+# 3. Used for deduplication and duplicate detection
+# 4. Used for generating short identifiers from strings
+# To fix: Add usedforsecurity=False parameter where appropriate
+# Example: hashlib.md5(data.encode(), usedforsecurity=False)
+# B324
+
+# B602: subprocess_popen_with_shell_equals_true
+# shell=True is used intentionally in subprocess_executor.py for flexibility
+# This is acceptable because:
+# 1. The tool is explicitly designed to execute shell commands
+# 2. Input is controlled by the AI agent (not external users)
+# 3. Warning messages are shown to users
+# B602
+
+# B701: jinja2_autoescape_false
+# Jinja2 is used without autoescape in scaffold.py for code generation
+# This is acceptable because:
+# 1. Not rendering user-provided content
+# 2. Generating code templates that are saved to files (not displayed in browser)
+# To fix: Add autoescape=True or select_autoescape()
+# B701

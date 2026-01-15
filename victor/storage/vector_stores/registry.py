@@ -23,6 +23,9 @@ from victor.storage.vector_stores.base import BaseEmbeddingProvider, EmbeddingCo
 
 logger = logging.getLogger(__name__)
 
+# Flag to track if ProximaDB is available
+PROXIMADB_AVAILABLE = False
+
 
 class EmbeddingRegistry:
     """Central registry for embedding providers.
@@ -133,7 +136,26 @@ class EmbeddingRegistry:
 
         Returns:
             Initialized provider instance (cached if exists)
+
+        Raises:
+            KeyError: If provider is not available
         """
+        # Warn if trying to use ProximaDB when not available
+        if config.vector_store == "proximadb" and not PROXIMADB_AVAILABLE:
+            logger.warning(
+                f"ProximaDB is configured but not installed. "
+                f"Install with: pip install victor-ai[vector-experimental]. "
+                f"Using LanceDB as fallback."
+            )
+            # Fallback to LanceDB
+            config = EmbeddingConfig(
+                vector_store="lancedb",
+                persist_directory=config.persist_directory,
+                embedding_model_type=config.embedding_model_type,
+                embedding_model_name=config.embedding_model_name,
+                distance_metric=config.distance_metric,
+            )
+
         # Generate cache key from configuration
         cache_key = cls._get_config_key(config)
 
@@ -218,26 +240,45 @@ class EmbeddingRegistry:
 # Auto-discovery: Import and register all providers
 def _auto_register_providers() -> None:
     """Automatically discover and register embedding providers."""
+    global PROXIMADB_AVAILABLE
+
+    # ChromaDB (optional)
     try:
         from victor.storage.vector_stores.chromadb_provider import ChromaDBProvider
 
         EmbeddingRegistry.register("chromadb", ChromaDBProvider)
+        logger.debug("Registered ChromaDB provider")
     except ImportError:
-        pass  # ChromaDB not installed
+        logger.debug("ChromaDB not installed - skipping registration")
 
+    # LanceDB (default, always installed)
     try:
         from victor.storage.vector_stores.lancedb_provider import LanceDBProvider
 
         EmbeddingRegistry.register("lancedb", LanceDBProvider)
+        logger.info("Registered LanceDB provider (default)")
     except ImportError:
-        pass  # LanceDB not installed
+        logger.error(
+            "LanceDB is required but not installed. "
+            "Please reinstall victor-ai to ensure all dependencies are available."
+        )
 
+    # ProximaDB (experimental, optional)
     try:
+        # First check if the actual proximaDB package is importable
+        import proximadb
+
         from victor.storage.vector_stores.proximadb_provider import ProximaDBProvider
 
         EmbeddingRegistry.register("proximadb", ProximaDBProvider)
+        PROXIMADB_AVAILABLE = True
+        logger.info("Registered ProximaDB provider (experimental)")
     except ImportError:
-        pass  # ProximaDB not installed
+        logger.debug(
+            "ProximaDB not installed (optional). "
+            "Install with: pip install victor-ai[vector-experimental]"
+        )
+        PROXIMADB_AVAILABLE = False
 
 
 # Auto-register on module import

@@ -2730,8 +2730,13 @@ def create_orchestrator_factory(
         **kwargs: Additional factory configuration
 
     Returns:
-        Configured OrchestratorFactory
+        Configured OrchestratorFactory instance
+
+    Example:
+        factory = create_orchestrator_factory(settings, provider, "gpt-4")
     """
+    logger.debug("Creating OrchestratorFactory")
+
     return OrchestratorFactory(
         settings=settings,
         provider=provider,

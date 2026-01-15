@@ -122,6 +122,23 @@ from victor.observability.tracing import (
     ToolCallRecord,
     ToolCallTracer,
 )
+from victor.observability.coordinator_metrics import (
+    CoordinatorExecution,
+    CoordinatorMetricsCollector,
+    CoordinatorSnapshot,
+    get_coordinator_metrics_collector,
+    track_coordinator_metrics,
+)
+from victor.observability.prometheus_metrics import (
+    Counter as PrometheusCounter,
+    Gauge as PrometheusGauge,
+    Histogram as PrometheusHistogram,
+    PrometheusMetricsExporter,
+    PrometheusRegistry,
+    get_prometheus_exporter,
+    get_prometheus_registry,
+    track_prometheus_metrics,
+)
 
 # Conditional OTEL exports
 try:
@@ -148,6 +165,21 @@ __all__ = [
     "BufferedExporter",
     "AsyncBatchingExporter",
     "create_otel_exporter",
+    # Coordinator Metrics
+    "CoordinatorExecution",
+    "CoordinatorMetricsCollector",
+    "CoordinatorSnapshot",
+    "get_coordinator_metrics_collector",
+    "track_coordinator_metrics",
+    # Prometheus Metrics
+    "PrometheusCounter",
+    "PrometheusGauge",
+    "PrometheusHistogram",
+    "PrometheusMetricsExporter",
+    "PrometheusRegistry",
+    "get_prometheus_exporter",
+    "get_prometheus_registry",
+    "track_prometheus_metrics",
     # Hooks
     "StateHookManager",
     "StateTransitionHook",

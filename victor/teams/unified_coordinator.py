@@ -41,13 +41,6 @@ import time
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
-from victor.coordination.formations import (
-    SequentialFormation,
-    ParallelFormation,
-    HierarchicalFormation,
-    PipelineFormation,
-    ConsensusFormation,
-)
 from victor.teams.mixins.observability import ObservabilityMixin
 from victor.teams.mixins.rl import RLMixin
 from victor.teams.types import (
@@ -59,6 +52,13 @@ from victor.teams.types import (
 )
 
 if TYPE_CHECKING:
+    from victor.coordination.formations import (
+        ConsensusFormation,
+        HierarchicalFormation,
+        ParallelFormation,
+        PipelineFormation,
+        SequentialFormation,
+    )
     from victor.teams.protocols import ITeamMember
 
 logger = logging.getLogger(__name__)
@@ -181,14 +181,8 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         self._message_history: List[AgentMessage] = []
         self._shared_context: Dict[str, Any] = {}
 
-        # Formation strategies (composition over inheritance)
-        self._formations: Dict[TeamFormation, BaseFormationStrategy] = {
-            TeamFormation.SEQUENTIAL: SequentialFormation(),
-            TeamFormation.PARALLEL: ParallelFormation(),
-            TeamFormation.HIERARCHICAL: HierarchicalFormation(),
-            TeamFormation.PIPELINE: PipelineFormation(),
-            TeamFormation.CONSENSUS: ConsensusFormation(),
-        }
+        # Formation strategies (lazy loaded to avoid circular imports)
+        self._formations: Optional[Dict[TeamFormation, BaseFormationStrategy]] = None
 
     # =========================================================================
     # ITeamCoordinator Protocol Methods
@@ -408,7 +402,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             Result dictionary
         """
         # Get the formation strategy
-        strategy = self._formations[self._formation]
+        strategy = self._get_formations()[self._formation]
 
         # Wrap team members with adapters
         adapted_members = [_TeamMemberAdapter(m, context) for m in self._members]
@@ -504,3 +498,24 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
     def manager(self) -> Optional["ITeamMember"]:
         """Get team manager (for hierarchical formation)."""
         return self._manager
+
+    def _get_formations(self) -> Dict[TeamFormation, BaseFormationStrategy]:
+        """Get formation strategies, lazy loading to avoid circular imports."""
+        if self._formations is None:
+            # Lazy import to avoid circular dependency
+            from victor.coordination.formations import (
+                ConsensusFormation,
+                HierarchicalFormation,
+                ParallelFormation,
+                PipelineFormation,
+                SequentialFormation,
+            )
+
+            self._formations = {
+                TeamFormation.SEQUENTIAL: SequentialFormation(),
+                TeamFormation.PARALLEL: ParallelFormation(),
+                TeamFormation.HIERARCHICAL: HierarchicalFormation(),
+                TeamFormation.PIPELINE: PipelineFormation(),
+                TeamFormation.CONSENSUS: ConsensusFormation(),
+            }
+        return self._formations

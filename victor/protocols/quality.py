@@ -524,14 +524,14 @@ class CompositeQualityAssessor:
             overall = sum(s.score for s in scores) / len(scores)
 
         # Combine dimension scores
-        combined_dimensions = {}
+        combined_dimensions: dict[ProtocolQualityDimension, list[DimensionScore]] = {}
         for score in scores:
             for dim, ds in score.dimension_scores.items():
                 if dim not in combined_dimensions:
                     combined_dimensions[dim] = []
                 combined_dimensions[dim].append(ds)
 
-        merged_dimensions = {}
+        merged_dimensions: dict[ProtocolQualityDimension, DimensionScore] = {}
         for dim, scores_list in combined_dimensions.items():
             avg_score = sum(s.score for s in scores_list) / len(scores_list)
             merged_dimensions[dim] = DimensionScore(

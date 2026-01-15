@@ -162,23 +162,8 @@ class HuggingFaceProvider(BaseProvider):
             timeout: Request timeout
             **kwargs: Additional configuration
         """
-        # Try provided key, then env vars, then keyring/api_keys.yaml
-        self._api_key = (
-            api_key or os.environ.get("HF_TOKEN", "") or os.environ.get("HUGGINGFACE_API_KEY", "")
-        )
-        if not self._api_key:
-            try:
-                from victor.config.api_keys import get_api_key
-
-                # Try both huggingface and hf aliases
-                self._api_key = get_api_key("huggingface") or get_api_key("hf") or ""
-            except ImportError:
-                pass
-        if not self._api_key:
-            logger.warning(
-                "Hugging Face API key not provided. Set HF_TOKEN or HUGGINGFACE_API_KEY environment variable "
-                "or add to keyring with: victor keys --set huggingface --keyring"
-            )
+        # Resolve API key using centralized helper
+        self._api_key = self._resolve_api_key(api_key, "huggingface")
 
         super().__init__(base_url=base_url, timeout=timeout, **kwargs)
 

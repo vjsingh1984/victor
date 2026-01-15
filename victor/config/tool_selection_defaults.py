@@ -185,14 +185,14 @@ class FallbackTools:
 
     # Fallback tools for conceptual/architectural queries
     # Used when query appears to be about design patterns, inheritance, etc.
-    CONCEPTUAL_FALLBACK_TOOLS: Final[List[str]] = (
+    CONCEPTUAL_FALLBACK_TOOLS: Final[tuple[str, ...]] = (
         "search",
         "read",
     )
 
     # General fallback tools for any query type
     # Used when selection returns fewer than MIN_TOOLS_THRESHOLD tools
-    COMMON_FALLBACK_TOOLS: Final[List[str]] = (
+    COMMON_FALLBACK_TOOLS: Final[tuple[str, ...]] = (
         "read",
         "grep",
         "search",
@@ -260,7 +260,7 @@ class QueryPatterns:
     """
 
     # Patterns indicating conceptual/architectural queries
-    CONCEPTUAL_PATTERNS: Final[List[str]] = (
+    CONCEPTUAL_PATTERNS: Final[tuple[str, ...]] = (
         "inherit",
         "implement",
         "extend",
@@ -311,19 +311,19 @@ class CategoryAliases:
     """
 
     # File operations
-    FILE_OPS: Final[Set[str]] = frozenset({"file", "files", "file_ops", "filesystem"})
+    FILE_OPS: Final[frozenset[str]] = frozenset({"file", "files", "file_ops", "filesystem"})
 
     # Git operations
-    GIT_OPS: Final[Set[str]] = frozenset({"git", "version_control", "vcs", "scm"})
+    GIT_OPS: Final[frozenset[str]] = frozenset({"git", "version_control", "vcs", "scm"})
 
     # Code analysis
-    CODE_ANALYSIS: Final[Set[str]] = frozenset({"code", "analysis", "ast", "lint", "parse"})
+    CODE_ANALYSIS: Final[frozenset[str]] = frozenset({"code", "analysis", "ast", "lint", "parse"})
 
     # Search operations
-    SEARCH: Final[Set[str]] = frozenset({"search", "find", "grep", "locate", "query"})
+    SEARCH: Final[frozenset[str]] = frozenset({"search", "find", "grep", "locate", "query"})
 
     # Edit operations
-    EDIT: Final[Set[str]] = frozenset({"edit", "write", "modify", "change", "update"})
+    EDIT: Final[frozenset[str]] = frozenset({"edit", "write", "modify", "change", "update"})
 
     @classmethod
     def get_canonical_category(cls, category: str) -> str:

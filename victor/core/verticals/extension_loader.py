@@ -129,6 +129,11 @@ class ExtensionCacheEntry:
         return time.time() - self.timestamp
 
 
+# =============================================================================
+# Extension Loader Base Class
+# =============================================================================
+
+
 class VerticalExtensionLoader(ABC):
     """Loader of vertical extensions.
 
@@ -143,6 +148,34 @@ class VerticalExtensionLoader(ABC):
             raises ExtensionLoadError.
         required_extensions: Extensions that must load successfully even
             when strict_extension_loading=False.
+
+    Auto-Generated Extension Getters (Phase 2):
+        This class uses __init_subclass__ to automatically generate
+        extension getter methods, eliminating ~800 lines of duplication
+        across verticals.
+
+        Supported patterns:
+        - get_middleware() -> _get_cached_extension("middleware", factory)
+        - get_safety_extension() -> _get_extension_factory("safety_extension", import_path)
+        - get_prompt_contributor() -> _get_extension_factory("prompt_contributor", import_path)
+        - get_mode_config_provider() -> _get_extension_factory("mode_config_provider", import_path)
+        - get_tool_dependency_provider() -> _get_extension_factory("tool_dependency_provider", import_path)
+        - get_workflow_provider() -> _get_extension_factory("workflow_provider", import_path)
+        - get_service_provider() -> _get_extension_factory("service_provider", import_path)
+        - get_rl_config_provider() -> _get_extension_factory("rl_config_provider", import_path)
+        - get_rl_hooks() -> _get_extension_factory("rl_hooks", import_path)
+        - get_team_spec_provider() -> _get_extension_factory("team_spec_provider", import_path)
+        - get_capability_provider() -> _get_extension_factory("capability_provider", import_path)
+
+        The __init_subclass__ hook automatically adds these methods to subclasses
+        unless they're already defined. Verticals can override any getter
+        for custom behavior (e.g., middleware with custom initialization).
+
+        Benefits:
+        - Eliminates ~800 lines of duplication (50 methods × 5 verticals × ~16 lines each)
+        - Maintains backward compatibility - all existing getter calls still work
+        - Verticals can override any getter for custom logic
+        - New extension types automatically supported by adding to _extension_patterns
     """
 
     # Extension loading configuration
@@ -165,6 +198,130 @@ class VerticalExtensionLoader(ABC):
 
     # Version tracker for cache invalidation
     _extension_versions: Dict[str, str] = {}
+
+    # Mapping of extension types to their import path patterns
+    # Format: extension_key -> (module_path_suffix, class_name_suffix)
+    _extension_patterns: ClassVar[Dict[str, tuple]] = {
+        "safety_extension": ("safety", "SafetyExtension"),
+        "prompt_contributor": ("prompts", "PromptContributor"),
+        "mode_config_provider": ("mode_config", "ModeConfigProvider"),
+        "tool_dependency_provider": ("tool_dependencies", "ToolDependencyProvider"),
+        "workflow_provider": ("workflows", "WorkflowProvider"),
+        "service_provider": ("service_provider", "ServiceProvider"),
+        "rl_config_provider": ("rl", "RLConfig"),
+        "rl_hooks": ("rl", "RLHooks"),
+        "team_spec_provider": ("teams", "TeamSpecProvider"),
+        "capability_provider": ("capabilities", "CapabilityProvider"),
+        "enrichment_strategy": ("enrichment", "EnrichmentStrategy"),
+    }
+
+    # Extensions that use _get_cached_extension instead of _get_extension_factory
+    _cached_extensions: ClassVar[Set[str]] = {
+        "middleware",
+        "composed_chains",
+        "personas",
+    }
+
+    def __init_subclass__(cls, **kwargs):
+        """Auto-generate extension getter methods for subclasses.
+
+        This hook is called when a subclass of VerticalExtensionLoader is created.
+        It automatically adds getter methods for common extension types unless
+        the subclass already defines them.
+        """
+        super().__init_subclass__(**kwargs)
+
+        # Auto-generate getters for each extension pattern
+        for extension_type, (module_suffix, class_suffix) in cls._extension_patterns.items():
+            method_name = f"get_{extension_type}"
+
+            # Only add if not already defined in the class
+            if method_name not in cls.__dict__:
+
+                def _make_getter(ext_type, mod_suffix, cls_suffix):
+                    """Factory to create getter methods with proper closure."""
+                    def _getter(subcls):
+                        """Auto-generated getter method."""
+                        # Build import path from vertical name
+                        vertical_name = subcls.name.lower()
+                        import_path = f"victor.{vertical_name}.{mod_suffix}"
+
+                        # Auto-generate class name
+                        vertical_class_name = subcls.__name__.replace("Assistant", "")
+                        class_name = f"{vertical_class_name}{cls_suffix}"
+
+                        # Use _get_extension_factory to load the extension
+                        return subcls._get_extension_factory(ext_type, import_path, class_name)
+                    return classmethod(_getter)
+
+                # Add the method to the class
+                setattr(cls, method_name, _make_getter(extension_type, module_suffix, class_suffix))
+
+        # Auto-generate getters for cached extensions
+        for extension_type in cls._cached_extensions:
+            method_name = f"get_{extension_type}"
+
+            # Only add if not already defined in the class
+            if method_name not in cls.__dict__:
+
+                def _make_cached_getter(ext_type):
+                    """Factory to create cached getter methods with proper closure."""
+                    def _getter(subcls):
+                        """Auto-generated cached getter method."""
+                        # Special handling for middleware
+                        if ext_type == "middleware":
+                            def _create_middleware():
+                                # Try to import from vertical.middleware
+                                try:
+                                    vertical_name = subcls.name.lower()
+                                    module = __import__(
+                                        f"victor.{vertical_name}.middleware", fromlist=[""]
+                                    )
+
+                                    # Look for common middleware classes
+                                    middleware_classes = []
+                                    for attr_name in dir(module):
+                                        attr = getattr(module, attr_name)
+                                        if isinstance(attr, type) and "Middleware" in attr_name:
+                                            # Try to instantiate with default args
+                                            try:
+                                                middleware_classes.append(attr())
+                                            except Exception:
+                                                pass
+
+                                    return middleware_classes
+                                except Exception:
+                                    # Return empty list on any error
+                                    return []
+
+                            return subcls._get_cached_extension(ext_type, _create_middleware)
+
+                        # Special handling for composed_chains and personas
+                        if ext_type in ("composed_chains", "personas"):
+                            def _create_extension():
+                                vertical_name = subcls.name.lower()
+                                try:
+                                    if ext_type == "composed_chains":
+                                        module = __import__(
+                                            f"victor.{vertical_name}.composed_chains", fromlist=[""]
+                                        )
+                                        return getattr(module, "COMPOSED_CHAINS", {})
+                                    else:  # personas
+                                        module = __import__(
+                                            f"victor.{vertical_name}.teams", fromlist=[""]
+                                        )
+                                        return getattr(module, "PERSONAS", {})
+                                except Exception:
+                                    return {}
+
+                            return subcls._get_cached_extension(ext_type, _create_extension)
+
+                        # Default: return None
+                        return None
+                    return classmethod(_getter)
+
+                # Add the method to the class
+                setattr(cls, method_name, _make_cached_getter(extension_type))
 
     # =========================================================================
     # Extension Caching Infrastructure
@@ -315,50 +472,29 @@ class VerticalExtensionLoader(ABC):
     # Override them to integrate with the framework's middleware, safety,
     # prompt, and configuration systems.
 
-    @classmethod
-    def get_middleware(cls) -> List[Any]:
-        """Get middleware implementations for this vertical.
-
-        Override to provide vertical-specific middleware for tool
-        execution processing.
-
-        Returns:
-            List of middleware implementations (MiddlewareProtocol)
-        """
-        return []
-
-    @classmethod
-    def get_safety_extension(cls) -> Optional[Any]:
-        """Get safety extension for this vertical.
-
-        Override to provide vertical-specific dangerous operation patterns.
-
-        Returns:
-            Safety extension (SafetyExtensionProtocol) or None
-        """
-        return None
-
-    @classmethod
-    def get_prompt_contributor(cls) -> Optional[Any]:
-        """Get prompt contributor for this vertical.
-
-        Override to provide vertical-specific task hints and prompt sections.
-
-        Returns:
-            Prompt contributor (PromptContributorProtocol) or None
-        """
-        return None
-
-    @classmethod
-    def get_mode_config_provider(cls) -> Optional[Any]:
-        """Get mode configuration provider for this vertical.
-
-        Override to provide vertical-specific operational modes.
-
-        Returns:
-            Mode config provider (ModeConfigProviderProtocol) or None
-        """
-        return None
+    # NOTE: Most extension getters are now auto-generated by VerticalExtensionLoaderMeta
+    # to eliminate duplication. Only override for custom behavior.
+    #
+    # Auto-generated getters (via metaclass __getattr__):
+    # - get_safety_extension()
+    # - get_prompt_contributor()
+    # - get_mode_config_provider()
+    # - get_tool_dependency_provider()
+    # - get_workflow_provider()
+    # - get_service_provider()
+    # - get_rl_config_provider()
+    # - get_rl_hooks()
+    # - get_team_spec_provider()
+    # - get_capability_provider()
+    # - get_enrichment_strategy()
+    # - get_middleware() (if not overridden)
+    #
+    # Default implementations below are only for methods NOT auto-generated:
+    # - get_mode_config()
+    # - get_task_type_hints()
+    # - get_tool_graph()
+    # - get_tiered_tool_config()
+    # - get_tiered_tools()
 
     @classmethod
     def get_mode_config(cls) -> Dict[str, Any]:

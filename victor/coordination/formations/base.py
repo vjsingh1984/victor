@@ -32,9 +32,10 @@ following the Open/Closed Principle (OCP) and Strategy pattern.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from victor.teams.types import AgentMessage, MemberResult
+if TYPE_CHECKING:
+    from victor.teams.types import AgentMessage, MemberResult
 
 
 class TeamContext:
@@ -176,8 +177,8 @@ class BaseFormationStrategy(ABC):
         self,
         agents: List[Any],
         context: TeamContext,
-        task: AgentMessage,
-    ) -> List[MemberResult]:
+        task: "AgentMessage",
+    ) -> List["MemberResult"]:
         """Execute agents using this formation strategy.
 
         Args:
@@ -221,7 +222,7 @@ class BaseFormationStrategy(ABC):
     async def prepare_context(
         self,
         context: "TeamContext",
-        task: AgentMessage,
+        task: "AgentMessage",
     ) -> "TeamContext":
         """Prepare context before execution.
 
@@ -236,9 +237,9 @@ class BaseFormationStrategy(ABC):
 
     async def process_results(
         self,
-        results: List[MemberResult],
+        results: List["MemberResult"],
         context: "TeamContext",
-    ) -> List[MemberResult]:
+    ) -> List["MemberResult"]:
         """Process results after execution.
 
         Args:

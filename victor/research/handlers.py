@@ -37,20 +37,21 @@ Usage:
 from __future__ import annotations
 
 import logging
-import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, Tuple
+
+from victor.framework.workflows.base_handler import BaseHandler
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
+    from victor.workflows.executor import WorkflowContext
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class WebScraperHandler:
+class WebScraperHandler(BaseHandler):
     """Structured web content extraction.
 
     Fetches and parses web content.
@@ -67,59 +68,41 @@ class WebScraperHandler:
           output: scraped_data
     """
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
-        start_time = time.time()
-
+    ) -> Tuple[Any, int]:
+        """Execute web scraping."""
         url = node.input_mapping.get("url", "")
         if isinstance(url, str) and url.startswith("$ctx."):
             url = context.get(url[5:]) or url
 
         selectors = node.input_mapping.get("selectors", {})
 
-        try:
-            result = await tool_registry.execute(
-                "web_fetch",
-                url=url,
-                selectors=selectors,
-            )
+        result = await tool_registry.execute(
+            "web_fetch",
+            url=url,
+            selectors=selectors,
+        )
 
-            output = {
-                "url": url,
-                "success": result.success,
-                "data": result.output if result.success else None,
-                "error": result.error if not result.success else None,
-            }
+        # Raise exception if tool execution failed
+        if not result.success:
+            raise Exception(result.error or "Web fetch failed")
 
-            output_key = node.output_key or node.id
-            context.set(output_key, output)
+        output = {
+            "url": url,
+            "success": result.success,
+            "data": result.output if result.success else None,
+            "error": result.error if not result.success else None,
+        }
 
-            return NodeResult(
-                node_id=node.id,
-                status=(
-                    ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED
-                ),
-                output=output,
-                duration_seconds=time.time() - start_time,
-                tool_calls_used=1,
-            )
-        except Exception as e:
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
-            )
+        return output, 1
 
 
 @dataclass
-class CitationFormatterHandler:
+class CitationFormatterHandler(BaseHandler):
     """Format references and citations.
 
     Converts references to standard citation formats.
@@ -134,46 +117,27 @@ class CitationFormatterHandler:
           output: formatted_citations
     """
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
-        start_time = time.time()
-
+    ) -> Tuple[Any, int]:
+        """Execute citation formatting."""
         refs_key = node.input_mapping.get("references")
         references = context.get(refs_key) if refs_key else []
         style = node.input_mapping.get("style", "apa")
 
-        try:
-            ref_list = references if isinstance(references, list) else [references]
-            formatted = [self._format_citation(ref, style) for ref in ref_list]
+        ref_list = references if isinstance(references, list) else [references]
+        formatted = [self._format_citation(ref, style) for ref in ref_list]
 
-            output = {
-                "style": style,
-                "count": len(formatted),
-                "citations": formatted,
-            }
+        output = {
+            "style": style,
+            "count": len(formatted),
+            "citations": formatted,
+        }
 
-            output_key = node.output_key or node.id
-            context.set(output_key, output)
-
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.COMPLETED,
-                output=output,
-                duration_seconds=time.time() - start_time,
-            )
-        except Exception as e:
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
-            )
+        return output, 0
 
     def _format_citation(self, ref: Dict[str, Any], style: str) -> str:
         """Format a single citation."""

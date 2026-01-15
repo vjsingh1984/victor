@@ -65,10 +65,13 @@ from __future__ import annotations
 import logging
 import time
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
 from victor.teams.types import AgentMessage, MemberResult
+
+if TYPE_CHECKING:
+    pass
 
 logger = logging.getLogger(__name__)
 

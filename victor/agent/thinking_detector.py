@@ -401,7 +401,8 @@ class ThinkingPatternDetector:
 
         # Compute content hash
         content_normalized = " ".join(content.split())  # Normalize whitespace
-        content_hash = hashlib.md5(content_normalized.encode()).hexdigest()[:12]
+        # MD5 used for content fingerprinting, not security
+        content_hash = hashlib.md5(content_normalized.encode(), usedforsecurity=False).hexdigest()[:12]
 
         # Extract keywords
         keywords = self._extract_keywords(content)
