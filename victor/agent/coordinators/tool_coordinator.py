@@ -49,9 +49,11 @@ Usage:
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import json
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
@@ -78,6 +80,8 @@ if TYPE_CHECKING:
     from victor.agent.tool_calling import ToolCallingAdapter, ToolCallParseResult
     from victor.agent.protocols import ToolAccessContext
     from victor.tools.tool_names import ToolNames
+
+from victor.agent.coordinators.base_config import BaseCoordinatorConfig
 
 logger = logging.getLogger(__name__)
 
@@ -111,8 +115,16 @@ class TaskContext:
 
 
 @dataclass
-class ToolCoordinatorConfig:
+class ToolCoordinatorConfig(BaseCoordinatorConfig):
     """Configuration for ToolCoordinator.
+
+    Inherits common configuration from BaseCoordinatorConfig:
+        enabled: Whether the coordinator is enabled
+        timeout: Default timeout in seconds for operations
+        max_retries: Maximum number of retry attempts for failed operations
+        retry_enabled: Whether retry logic is enabled
+        log_level: Logging level for coordinator messages
+        enable_metrics: Whether to collect metrics
 
     Attributes:
         default_budget: Default tool call budget
@@ -121,8 +133,6 @@ class ToolCoordinatorConfig:
         enable_sequence_tracking: Whether to track tool sequences
         max_tools_per_selection: Maximum tools to select per turn
         selection_threshold: Minimum similarity threshold for tool selection
-        retry_enabled: Whether to retry failed tool calls
-        max_retry_attempts: Maximum retry attempts for failed tools
         retry_base_delay: Base delay for exponential backoff (seconds)
         retry_max_delay: Maximum delay for retry (seconds)
     """
@@ -133,8 +143,6 @@ class ToolCoordinatorConfig:
     enable_sequence_tracking: bool = True
     max_tools_per_selection: int = 15
     selection_threshold: float = 0.3
-    retry_enabled: bool = True
-    max_retry_attempts: int = 3
     retry_base_delay: float = 1.0
     retry_max_delay: float = 10.0
 
@@ -766,6 +774,201 @@ class ToolCoordinator:
 
         # Should not reach here, but handle it anyway
         return None, False, last_error or "Unknown error"
+
+    async def handle_tool_calls(
+        self,
+        tool_calls: List[Dict[str, Any]],
+        execution_context: Optional[Dict[str, Any]] = None,
+        message_adder: Optional[Any] = None,
+        formatter: Optional[Any] = None,
+    ) -> List[Dict[str, Any]]:
+        """Handle tool calls from the model with full orchestration.
+
+        This method orchestrates the complete tool execution flow:
+        1. Validates tool calls (structure, names, permissions)
+        2. Normalizes arguments (JSON parsing, type coercion)
+        3. Executes tools via ToolPipeline with retry logic
+        4. Tracks failed signatures to avoid tight loops
+        5. Formats results and adds them to conversation
+
+        This method extracts the core logic from AgentOrchestrator._handle_tool_calls
+        to provide a reusable, testable component.
+
+        Args:
+            tool_calls: List of tool call requests from model
+            execution_context: Context dict for tool execution
+            message_adder: Optional callback to add tool results to conversation
+            formatter: Optional formatter for tool output
+
+        Returns:
+            List of tool call results with success/error information
+        """
+        if not tool_calls:
+            return []
+
+        execution_context = execution_context or {}
+        results: List[Dict[str, Any]] = []
+
+        for tool_call in tool_calls:
+            # Validate structure
+            if not isinstance(tool_call, dict):
+                logger.warning(f"Skipping invalid tool call (not a dict): {tool_call}")
+                continue
+
+            tool_name = tool_call.get("name")
+            if not tool_name:
+                results.append(
+                    {
+                        "name": "",
+                        "success": False,
+                        "result": None,
+                        "error": "Tool call missing name. Each tool call must include a 'name' field.",
+                    }
+                )
+                continue
+
+            # Validate tool name format
+            if self._tool_adapter and hasattr(self._tool_adapter, "sanitizer"):
+                sanitizer = self._tool_adapter.sanitizer
+                if sanitizer and not sanitizer.is_valid_tool_name(tool_name):
+                    results.append(
+                        {
+                            "name": tool_name,
+                            "success": False,
+                            "result": None,
+                            "error": f"Invalid tool name '{tool_name}'. This tool does not exist.",
+                        }
+                    )
+                    continue
+
+            # Resolve legacy/alias names to canonical form
+            canonical_tool_name = self._resolve_tool_alias(tool_name)
+
+            # Check tool access
+            if not self.is_tool_enabled(canonical_tool_name):
+                results.append(
+                    {
+                        "name": tool_name,
+                        "success": False,
+                        "result": None,
+                        "error": f"Tool '{tool_name}' is not available or not enabled.",
+                    }
+                )
+                continue
+
+            # Check budget
+            if self.is_budget_exhausted():
+                results.append(
+                    {
+                        "name": tool_name,
+                        "success": False,
+                        "result": None,
+                        "error": f"Tool budget reached. No more tool calls allowed.",
+                    }
+                )
+                break
+
+            # Extract and normalize arguments
+            tool_args = tool_call.get("arguments", {})
+
+            # Handle string arguments
+            if isinstance(tool_args, str):
+                try:
+                    tool_args = json.loads(tool_args)
+                except Exception:
+                    try:
+                        tool_args = ast.literal_eval(tool_args)
+                    except Exception:
+                        tool_args = {"value": tool_args}
+            elif tool_args is None:
+                tool_args = {}
+
+            # Normalize arguments
+            normalized_args, strategy = self.normalize_tool_arguments(tool_args, tool_name)
+
+            # Apply adapter-based normalization
+            if self._tool_adapter:
+                before_adapter = normalized_args.copy()
+                normalized_args = self._tool_adapter.normalize_arguments(
+                    normalized_args, tool_name
+                )
+
+            # Check for repeated failures
+            try:
+                signature = (
+                    canonical_tool_name,
+                    json.dumps(normalized_args, sort_keys=True, default=str),
+                )
+            except Exception:
+                signature = (canonical_tool_name, str(normalized_args))
+
+            if signature in self._failed_tool_signatures:
+                logger.debug(f"Skipping repeated failing call: {canonical_tool_name}")
+                continue
+
+            # Execute the tool
+            start = time.monotonic()
+            exec_result, success, error_msg = await self.execute_tool_with_retry(
+                canonical_tool_name, normalized_args, execution_context
+            )
+            elapsed = time.monotonic() - start
+
+            # Update tracking
+            self._execution_count += 1
+            self.consume_budget(1)
+            self._executed_tools.append(canonical_tool_name)
+
+            if success:
+                # Format and add result
+                output = exec_result.result if hasattr(exec_result, "result") else exec_result
+
+                if formatter:
+                    formatted_output = formatter.format_tool_output(
+                        canonical_tool_name, normalized_args, output
+                    )
+                else:
+                    formatted_output = f"TOOL_OUTPUT: {canonical_tool_name}\n{output}"
+
+                # Add to conversation via callback
+                if message_adder:
+                    message_adder("user", formatted_output)
+
+                results.append(
+                    {
+                        "name": canonical_tool_name,
+                        "success": True,
+                        "result": output,
+                        "elapsed": elapsed,
+                        "args": normalized_args,
+                    }
+                )
+            else:
+                # Track failure
+                self._failed_tool_signatures.add(signature)
+
+                # Send error to model
+                error_output = {"error": error_msg or "Unknown error"}
+                if formatter:
+                    formatted_error = formatter.format_tool_output(
+                        canonical_tool_name, normalized_args, error_output
+                    )
+                else:
+                    formatted_error = f"TOOL_ERROR: {canonical_tool_name}\n{error_msg}"
+
+                if message_adder:
+                    message_adder("user", formatted_error)
+
+                results.append(
+                    {
+                        "name": canonical_tool_name,
+                        "success": False,
+                        "result": None,
+                        "error": error_msg,
+                        "elapsed": elapsed,
+                    }
+                )
+
+        return results
 
     # =====================================================================
     # Tool Call Parsing

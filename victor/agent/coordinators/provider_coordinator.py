@@ -64,12 +64,22 @@ if TYPE_CHECKING:
     from victor.config.settings import Settings
     from victor.providers.base import BaseProvider
 
+from victor.agent.coordinators.base_config import BaseCoordinatorConfig
+
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class ProviderCoordinatorConfig:
+class ProviderCoordinatorConfig(BaseCoordinatorConfig):
     """Configuration for ProviderCoordinator.
+
+    Inherits common configuration from BaseCoordinatorConfig:
+        enabled: Whether the coordinator is enabled
+        timeout: Default timeout in seconds for operations
+        max_retries: Maximum number of retry attempts for failed operations
+        retry_enabled: Whether retry logic is enabled
+        log_level: Logging level for coordinator messages
+        enable_metrics: Whether to collect metrics
 
     Attributes:
         max_rate_limit_retries: Maximum number of retries on rate limit errors

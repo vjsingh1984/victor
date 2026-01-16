@@ -127,6 +127,7 @@ For framework layer coordinators, see victor.framework.coordinators.
 For detailed architecture documentation, see docs/architecture/coordinator_separation.md
 """
 
+from victor.agent.coordinators.base_config import BaseCoordinatorConfig
 from victor.agent.coordinators.config_coordinator import (
     ConfigCoordinator,
     ValidationResult,
@@ -201,8 +202,42 @@ from victor.agent.coordinators.metrics_coordinator import (
 from victor.agent.coordinators.workflow_coordinator import (
     WorkflowCoordinator,
 )
+from victor.agent.coordinators.state_coordinator import (
+    StateCoordinator,
+    StateScope,
+    StateChange,
+    StateObserver,
+    create_state_coordinator,
+)
+from victor.agent.coordinators.response_coordinator import (
+    ResponseCoordinator,
+    IResponseCoordinator,
+    ResponseCoordinatorConfig,
+    ProcessedResponse,
+    ChunkProcessResult,
+    ToolCallValidationResult,
+)
+from victor.agent.coordinators.tool_execution_coordinator import (
+    ToolExecutionCoordinator,
+    ToolExecutionConfig,
+    ToolCallResult as ToolExecutionCallResult,
+    ToolExecutionStats,
+    ExecutionContext,
+    ToolAccessDecision,
+    create_tool_execution_coordinator,
+)
+from victor.agent.coordinators.validation_coordinator import (
+    ValidationCoordinator,
+    ValidationCoordinatorConfig,
+    ValidationResult as ValidationCoordinatorResult,
+    IntelligentValidationResult,
+    ToolCallValidationResult as ValidationToolCallResult,
+    ContextValidationResult,
+)
 
 __all__ = [
+    # Base configuration
+    "BaseCoordinatorConfig",
     # ConfigCoordinator
     "ConfigCoordinator",
     "ValidationResult",
@@ -260,4 +295,32 @@ __all__ = [
     "MetricsCoordinator",
     # WorkflowCoordinator
     "WorkflowCoordinator",
+    # StateCoordinator
+    "StateCoordinator",
+    "StateScope",
+    "StateChange",
+    "StateObserver",
+    "create_state_coordinator",
+    # ResponseCoordinator
+    "ResponseCoordinator",
+    "IResponseCoordinator",
+    "ResponseCoordinatorConfig",
+    "ProcessedResponse",
+    "ChunkProcessResult",
+    "ToolCallValidationResult",
+    # ToolExecutionCoordinator
+    "ToolExecutionCoordinator",
+    "ToolExecutionConfig",
+    "ToolExecutionCallResult",
+    "ToolExecutionStats",
+    "ExecutionContext",
+    "ToolAccessDecision",
+    "create_tool_execution_coordinator",
+    # ValidationCoordinator
+    "ValidationCoordinator",
+    "ValidationCoordinatorConfig",
+    "ValidationCoordinatorResult",
+    "IntelligentValidationResult",
+    "ValidationToolCallResult",
+    "ContextValidationResult",
 ]

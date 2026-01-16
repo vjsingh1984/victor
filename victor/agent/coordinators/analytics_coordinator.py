@@ -450,7 +450,7 @@ class AnalyticsCoordinator:
 
         return status
 
-    def flush_analytics(
+    async def flush_analytics(
         self,
         evaluation_coordinator: Optional["EvaluationCoordinator"] = None,
         tool_cache: Optional[Any] = None,
@@ -479,7 +479,7 @@ class AnalyticsCoordinator:
 
         if evaluation_coordinator:
             try:
-                flush_results = evaluation_coordinator.flush_analytics()
+                flush_results = await evaluation_coordinator.flush_analytics()
                 results.update(flush_results)
             except Exception as e:
                 import logging

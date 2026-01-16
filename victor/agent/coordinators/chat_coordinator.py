@@ -52,11 +52,12 @@ from victor.core.errors import ProviderRateLimitError
 if TYPE_CHECKING:
     # Type-only imports
     from victor.agent.streaming.context import StreamingChatContext
-    from victor.agent.orchestrator import AgentOrchestrator
     from victor.agent.streaming.intent_classification import IntentClassificationHandler
     from victor.agent.streaming.continuation import ContinuationHandler
     from victor.agent.streaming.tool_execution import ToolExecutionHandler
     from victor.agent.streaming import apply_tracking_state_updates, create_tracking_state
+    # Use protocol for type hint to avoid circular dependency (DIP compliance)
+    from victor.protocols.agent import IAgentOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -71,10 +72,10 @@ class ChatCoordinator:
     accessing shared state and delegated operations.
 
     Args:
-        orchestrator: The AgentOrchestrator instance for accessing shared state
+        orchestrator: The IAgentOrchestrator instance for accessing shared state
     """
 
-    def __init__(self, orchestrator: "AgentOrchestrator") -> None:
+    def __init__(self, orchestrator: "IAgentOrchestrator") -> None:
         """Initialize the ChatCoordinator.
 
         Args:
@@ -136,6 +137,30 @@ class ChatCoordinator:
             tools = None
             if orch.provider.supports_tools() and orch.tool_calls_used < orch.tool_budget:
                 conversation_depth = orch.conversation.message_count()
+
+                # Health check: Ensure tool selector is initialized
+                # CRITICAL: This prevents the critical bug where SemanticToolSelector was never initialized,
+                # which blocked ALL chat functionality with ValueError.
+                if hasattr(orch, "ensure_tool_selector_initialized"):
+                    try:
+                        await orch.ensure_tool_selector_initialized()
+                    except Exception as e:
+                        logger.warning(
+                            f"Health check recovery failed: {e}. "
+                            "Attempting fallback initialization..."
+                        )
+                        # Fallback: Try direct initialization
+                        if hasattr(orch.tool_selector, "initialize_tool_embeddings"):
+                            try:
+                                # Use tools from orchestrator (not tool_registry which may not exist)
+                                await orch.tool_selector.initialize_tool_embeddings(orch.tools)
+                                logger.info("Fallback initialization successful")
+                            except Exception as fallback_error:
+                                logger.error(
+                                    f"Fallback initialization also failed: {fallback_error}. "
+                                    "Tool selection may fail for this turn."
+                                )
+
                 # Use new IToolSelector API with ToolSelectionContext
                 from victor.protocols import ToolSelectionContext
 
@@ -144,11 +169,24 @@ class ChatCoordinator:
                     conversation_stage=orch.conversation_state.state.stage.value if orch.conversation_state.state.stage else None,
                     previous_tools=[],
                 )
-                tools = await orch.tool_selector.select_tools(
-                    user_message,
-                    context=context,
-                )
-                tools = orch.tool_selector.prioritize_by_stage(user_message, tools)
+
+                # Graceful fallback: If tool selection fails, log and continue without tools
+                # This prevents the bug from blocking all chat functionality
+                try:
+                    tools = await orch.tool_selector.select_tools(
+                        user_message,
+                        context=context,
+                    )
+                    tools = orch.tool_selector.prioritize_by_stage(user_message, tools)
+                except (RuntimeError, ValueError, AttributeError) as e:
+                    # Catch the bug condition: SemanticToolSelector not initialized
+                    logger.warning(
+                        f"Tool selection failed (likely uninitialized selector): {e}. "
+                        "Continuing without tools for this turn. "
+                        "The system will attempt auto-recovery on next turn."
+                    )
+                    # Set tools to None to allow chat to continue
+                    tools = None
 
             # Prepare optional thinking parameter
             provider_kwargs = {}
@@ -789,9 +827,8 @@ class ChatCoordinator:
         """Prepare streaming state and return commonly used values."""
         orch = self._orchestrator
 
-        # Initialize cancellation support
-        orch._cancel_event = asyncio.Event()
-        orch._is_streaming = True
+        # Initialize streaming state via MetricsCoordinator
+        orch._metrics_coordinator.start_streaming()
 
         # Track performance metrics using StreamMetrics
         stream_metrics = orch._metrics_collector.init_stream_metrics()
@@ -1159,6 +1196,29 @@ class ChatCoordinator:
         if not tooling_allowed:
             return None
 
+        # Health check: Ensure tool selector is initialized
+        # CRITICAL: This prevents the critical bug where SemanticToolSelector was never initialized,
+        # which blocked ALL chat functionality with ValueError.
+        if hasattr(orch, "ensure_tool_selector_initialized"):
+            try:
+                await orch.ensure_tool_selector_initialized()
+            except Exception as e:
+                logger.warning(
+                    f"Health check recovery failed: {e}. "
+                    "Attempting fallback initialization..."
+                )
+                # Fallback: Try direct initialization
+                if hasattr(orch.tool_selector, "initialize_tool_embeddings"):
+                    try:
+                        # Use tools from orchestrator (not tool_registry which may not exist)
+                        await orch.tool_selector.initialize_tool_embeddings(orch.tools)
+                        logger.info("Fallback initialization successful")
+                    except Exception as fallback_error:
+                        logger.error(
+                            f"Fallback initialization also failed: {fallback_error}. "
+                            "Tool selection may fail for this turn."
+                        )
+
         planned_tools = None
         if goals:
             available_inputs = ["query"]
@@ -1177,17 +1237,30 @@ class ChatCoordinator:
             previous_tools=[],
             planned_tools=planned_tools if planned_tools else [],
         )
-        tools = await orch.tool_selector.select_tools(
-            context_msg,
-            context=context,
-        )
-        logger.info(
-            f"context_msg={context_msg}\nconversation_stage={orch.conversation_state.state.stage.value if orch.conversation_state.state.stage else None}"
-        )
-        tools = orch.tool_selector.prioritize_by_stage(context_msg, tools)
-        current_intent = getattr(orch, "_current_intent", None)
-        tools = orch._tool_planner.filter_tools_by_intent(tools, current_intent)
-        return tools
+
+        # Graceful fallback: If tool selection fails, log and return None
+        # This prevents the bug from blocking all chat functionality
+        try:
+            tools = await orch.tool_selector.select_tools(
+                context_msg,
+                context=context,
+            )
+            logger.info(
+                f"context_msg={context_msg}\nconversation_stage={orch.conversation_state.state.stage.value if orch.conversation_state.state.stage else None}"
+            )
+            tools = orch.tool_selector.prioritize_by_stage(context_msg, tools)
+            current_intent = getattr(orch, "_current_intent", None)
+            tools = orch._tool_planner.filter_tools_by_intent(tools, current_intent)
+            return tools
+        except (RuntimeError, ValueError, AttributeError) as e:
+            # Catch the bug condition: SemanticToolSelector not initialized
+            logger.warning(
+                f"Tool selection failed (likely uninitialized selector): {e}. "
+                "Falling back to no tools for this turn. "
+                "The system will attempt auto-recovery on next turn."
+            )
+            # Return None to allow chat to continue without tools
+            return None
 
     def _extract_required_files_from_prompt(self, user_message: str) -> List[str]:
         """Extract required file paths from the user message.
@@ -1263,7 +1336,7 @@ class ChatCoordinator:
         # 1. Check for cancellation
         if orch._check_cancellation():
             logger.info("Stream cancelled by user request")
-            orch._is_streaming = False
+            orch._metrics_coordinator.stop_streaming()
             orch._record_intelligent_outcome(
                 success=False,
                 quality_score=stream_ctx.last_quality_score,
@@ -1658,6 +1731,166 @@ class ChatCoordinator:
             is_action_task=getattr(orch._task_tracker, "is_action_task", False) if hasattr(orch, "_task_tracker") else False,
         )
 
+    async def _execute_extracted_tool_call(
+        self,
+        stream_ctx: "StreamingChatContext",
+        extracted_call: Any,
+    ) -> Any:
+        """Execute an ExtractedToolCall from text parsing.
+
+        This method handles tool calls that were extracted from model text
+        (hallucinated tool calls) by converting them to proper tool calls
+        and executing them through the tool pipeline.
+
+        Args:
+            stream_ctx: The streaming context
+            extracted_call: ExtractedToolCall with tool_name and arguments
+
+        Yields:
+            StreamChunk objects from tool execution
+        """
+        from victor.agent.tool_call_extractor import ExtractedToolCall
+        from victor.providers.base import StreamChunk
+
+        orch = self._orchestrator
+
+        # Convert ExtractedToolCall to tool call format
+        tool_call = {
+            "name": extracted_call.tool_name,
+            "arguments": extracted_call.arguments,
+        }
+
+        logger.info(
+            f"Executing extracted tool call: {extracted_call.tool_name} "
+            f"(confidence: {extracted_call.confidence:.2f})"
+        )
+
+        # Generate tool start chunk
+        from victor.agent.orchestrator_utils import get_tool_status_message
+        status_msg = get_tool_status_message(
+            extracted_call.tool_name,
+            extracted_call.arguments,
+        )
+        yield StreamChunk(
+            chunk_type="tool_start",
+            content="",
+            tool_name=extracted_call.tool_name,
+            tool_args=extracted_call.arguments,
+            metadata={"status_message": status_msg},
+        )
+
+        # Execute the tool call
+        try:
+            execution_result = await orch._tool_pipeline.execute_tool_calls(
+                [tool_call],
+                context={
+                    "tool_calls_used": stream_ctx.tool_calls_used,
+                    "tool_budget": stream_ctx.tool_budget,
+                    "provider_name": orch.provider_name,
+                    "model": orch.model,
+                },
+            )
+
+            # Generate result chunks
+            if execution_result.results:
+                for result in execution_result.results:
+                    tool_name = result.get("name", extracted_call.tool_name)
+                    output = result.get("output", "")
+                    error = result.get("error")
+
+                    if error:
+                        yield StreamChunk(
+                            chunk_type="tool_error",
+                            content=str(error),
+                            tool_name=tool_name,
+                            metadata={"error": error},
+                        )
+                    else:
+                        yield StreamChunk(
+                            chunk_type="tool_result",
+                            content=output,
+                            tool_name=tool_name,
+                        )
+
+                        # Add tool result message to conversation
+                        self._message_adder.add_message("tool", output, tool_name=tool_name)
+
+        except Exception as e:
+            logger.error(f"Error executing extracted tool call: {e}")
+            yield StreamChunk(
+                chunk_type="tool_error",
+                content=f"Error executing {extracted_call.tool_name}: {str(e)}",
+                tool_name=extracted_call.tool_name,
+                metadata={"error": str(e)},
+            )
+
+    async def _handle_budget_exhausted(
+        self,
+        stream_ctx: "StreamingChatContext",
+    ) -> Any:
+        """Handle budget exhausted condition.
+
+        Generates response chunks when tool budget is exhausted.
+
+        Args:
+            stream_ctx: The streaming context
+
+        Yields:
+            StreamChunk objects for budget exhausted response
+        """
+        from victor.providers.base import StreamChunk
+
+        orch = self._orchestrator
+
+        # Log budget exhausted
+        logger.warning(
+            f"Tool budget exhausted: {stream_ctx.tool_calls_used}/{stream_ctx.tool_budget} used"
+        )
+
+        # Generate budget exhausted message
+        yield StreamChunk(
+            chunk_type="system_message",
+            content=(
+                f"\n\n[Tool Budget Exhausted: {stream_ctx.tool_calls_used}/{stream_ctx.tool_budget} used]\n"
+                f"Continuing without tool execution. Results may be limited."
+            ),
+            metadata={
+                "tool_calls_used": stream_ctx.tool_calls_used,
+                "tool_budget": stream_ctx.tool_budget,
+                "budget_exhausted": True,
+            },
+        )
+
+    async def _handle_force_final_response(
+        self,
+        stream_ctx: "StreamingChatContext",
+    ) -> Any:
+        """Handle force final response condition.
+
+        Generates response chunks when forcing final response.
+
+        Args:
+            stream_ctx: The streaming context
+
+        Yields:
+            StreamChunk objects for force final response
+        """
+        from victor.providers.base import StreamChunk
+
+        # Log force final response
+        logger.info("Forcing final response")
+
+        # Generate force final response message
+        yield StreamChunk(
+            chunk_type="system_message",
+            content=(
+                "\n\n[Force Final Response: Generating summary and concluding session]"
+            ),
+            metadata={
+                "force_final_response": True,
+            },
+        )
+
     async def _handle_recovery_with_integration(
         self,
         stream_ctx: "StreamingChatContext",
@@ -1795,3 +2028,135 @@ class ChatCoordinator:
         except Exception as e:
             logger.warning(f"Intelligent validation failed: {e}")
             return None
+
+    # =====================================================================
+    # Delegation Methods for Test Compatibility
+    # =====================================================================
+    # These methods are called by orchestrator tests and were extracted
+    # during Phase 2 refactoring. They delegate to appropriate handlers.
+
+    def _handle_cancellation(self, elapsed: float) -> Optional[StreamChunk]:
+        """Handle cancellation check during streaming.
+
+        Args:
+            elapsed: Time elapsed in seconds
+
+        Returns:
+            StreamChunk if cancellation detected, None otherwise
+        """
+        orch = self._orchestrator
+
+        # Check if cancellation was requested
+        if orch._check_cancellation():
+            # Return a final chunk to signal cancellation
+            return StreamChunk(
+                content="\n\n[Request cancelled by user]",
+                is_final=True
+            )
+        return None
+
+    def _check_time_limit_with_handler(
+        self, ctx: "StreamingChatContext"
+    ) -> Optional[StreamChunk]:
+        """Check if time limit has been exceeded.
+
+        Args:
+            ctx: The streaming context
+
+        Returns:
+            StreamChunk if limit exceeded, None otherwise
+        """
+        from victor.agent.streaming.iteration import IterationAction
+
+        orch = self._orchestrator
+
+        # Delegate to streaming handler's check_time_limit
+        if not orch._streaming_handler:
+            return None
+
+        result = orch._streaming_handler.check_time_limit(ctx)
+        if result:
+            # Check if result indicates we should stop (break or force completion)
+            should_stop = (
+                result.should_break
+                or result.action == IterationAction.FORCE_COMPLETION
+            )
+            if should_stop:
+                # Convert IterationResult to StreamChunk
+                # If result has chunks, use the first one; otherwise create from content
+                if result.chunks:
+                    return result.chunks[0]
+                return StreamChunk(content=result.content or "", is_final=True)
+        return None
+
+    def _check_progress_with_handler(self, ctx: "StreamingChatContext") -> bool:
+        """Check if session is making progress (not stuck).
+
+        Args:
+            ctx: The streaming context
+
+        Returns:
+            True if force completion should be triggered, False otherwise
+        """
+        from victor.agent.recovery_coordinator import StreamingRecoveryContext
+
+        orch = self._orchestrator
+
+        # Delegate to recovery coordinator's check_progress
+        if orch._recovery_coordinator:
+            # Create a recovery context from the streaming context
+            recovery_ctx = StreamingRecoveryContext(
+                iteration=ctx.total_iterations,
+                elapsed_time=ctx.elapsed_time(),
+                tool_calls_used=ctx.tool_calls_used,
+                tool_budget=ctx.tool_budget,
+                max_iterations=ctx.max_total_iterations,
+                session_start_time=ctx.start_time,
+                last_quality_score=getattr(ctx, 'last_quality_score', 0.5),
+                streaming_context=ctx,
+                provider_name=orch.provider_name,
+                model=orch.model,
+                temperature=orch.temperature,
+                unified_task_type=ctx.unified_task_type,
+                is_analysis_task=ctx.is_analysis_task,
+                is_action_task=ctx.is_action_task,
+            )
+
+            # Check if making progress
+            is_making_progress = orch._recovery_coordinator.check_progress(recovery_ctx)
+
+            # If not making progress, trigger force completion
+            if not is_making_progress:
+                ctx.force_completion = True
+                return True
+
+        return False
+
+    def _handle_force_completion_with_handler(
+        self, ctx: "StreamingChatContext"
+    ) -> Optional[StreamChunk]:
+        """Handle force completion conditions.
+
+        Args:
+            ctx: The streaming context
+
+        Returns:
+            StreamChunk with force completion message if forcing, None otherwise
+        """
+        # Only return a chunk if force_completion is True
+        if not ctx.force_completion:
+            return None
+
+        # Determine message based on task type
+        if ctx.is_analysis_task:
+            message = (
+                "\n\n[Research loop limit reached - providing summary based on "
+                "information gathered so far]"
+            )
+        else:
+            message = (
+                "\n\n[Exploration limit reached - providing summary based on "
+                "information gathered so far]"
+            )
+
+        return StreamChunk(content=message, is_final=True)

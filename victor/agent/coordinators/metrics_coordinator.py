@@ -15,17 +15,19 @@
 """Metrics coordinator for agent orchestration.
 
 This module provides the MetricsCoordinator which acts as a facade for
-metrics collection, cost tracking, and usage analytics in the orchestrator.
+metrics collection, cost tracking, usage analytics, and streaming state management.
 
 The coordinator wraps:
 - MetricsCollector: Stream metrics, tool selection, execution stats
 - SessionCostTracker: Per-request and session-cumulative cost tracking
 - Token usage tracking for evaluation/benchmarking
+- Streaming state: Cancellation and streaming flag management
 
 Extracted from AgentOrchestrator to improve modularity and testability
 as part of the SOLID refactoring initiative.
 """
 
+import asyncio
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
@@ -39,6 +41,28 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class StreamingState:
+    """State for a single streaming session.
+
+    Attributes:
+        is_streaming: Whether a streaming operation is in progress
+        cancel_event: Asyncio event for cancellation signaling
+        session_start_time: Optional timestamp when session started
+    """
+
+    def __init__(self) -> None:
+        """Initialize streaming state to defaults."""
+        self.is_streaming: bool = False
+        self.cancel_event: Optional[asyncio.Event] = None
+        self.session_start_time: Optional[float] = None
+
+    def reset(self) -> None:
+        """Reset streaming state to defaults."""
+        self.is_streaming = False
+        self.cancel_event = None
+        self.session_start_time = None
+
+
 class MetricsCoordinator:
     """Coordinates all metrics collection and tracking for the orchestrator.
 
@@ -47,6 +71,7 @@ class MetricsCoordinator:
     - Tool selection and execution statistics
     - Cost tracking (per-request and session-cumulative)
     - Token usage for evaluation tracking
+    - Streaming state management (cancellation, streaming flag)
 
     The coordinator delegates to specialized components:
     - MetricsCollector: Real-time metrics collection
@@ -58,6 +83,14 @@ class MetricsCoordinator:
             session_cost_tracker=cost_tracker,
             cumulative_token_usage={"prompt_tokens": 0, ...}
         )
+
+        # Start streaming
+        coordinator.start_streaming()
+
+        # Check cancellation
+        if coordinator.is_cancellation_requested():
+            coordinator.stop_streaming()
+            return
 
         # After streaming
         metrics = coordinator.finalize_stream_metrics(usage_data)
@@ -82,6 +115,7 @@ class MetricsCoordinator:
         self._metrics_collector = metrics_collector
         self._session_cost_tracker = session_cost_tracker
         self._cumulative_token_usage = cumulative_token_usage
+        self._streaming_state = StreamingState()
 
     # ========================================================================
     # Stream Metrics
@@ -337,6 +371,93 @@ class MetricsCoordinator:
     def reset_stats(self) -> None:
         """Reset all statistics (e.g., after conversation reset)."""
         self._metrics_collector.reset_stats()
+
+    # ========================================================================
+    # Streaming State Management
+    # ========================================================================
+
+    def start_streaming(self) -> None:
+        """Initialize streaming state for a new streaming session.
+
+        Creates cancellation event and sets streaming flag.
+        Should be called at the start of each streaming session.
+        """
+        self._streaming_state.is_streaming = True
+        self._streaming_state.cancel_event = asyncio.Event()
+
+        import time
+        self._streaming_state.session_start_time = time.time()
+
+        logger.debug("Streaming session started")
+
+    def stop_streaming(self) -> None:
+        """Clean up streaming state after streaming session ends.
+
+        Resets streaming flag and clears cancellation event.
+        Should be called after streaming completes (including cancellation).
+        """
+        was_streaming = self._streaming_state.is_streaming
+
+        self._streaming_state.is_streaming = False
+        self._streaming_state.cancel_event = None
+        self._streaming_state.session_start_time = None
+
+        if was_streaming:
+            logger.debug("Streaming session stopped")
+
+    def is_streaming(self) -> bool:
+        """Check if a streaming operation is currently in progress.
+
+        Returns:
+            True if streaming, False otherwise
+        """
+        return self._streaming_state.is_streaming
+
+    def request_cancellation(self) -> None:
+        """Request cancellation of the current streaming operation.
+
+        Safe to call even if not streaming. The cancellation will take
+        effect at the next check point in the stream loop.
+        """
+        if self._streaming_state.cancel_event:
+            self._streaming_state.cancel_event.set()
+            logger.info("Cancellation requested for streaming operation")
+        else:
+            logger.debug(
+                "Cancellation requested but no active streaming session "
+                "(cancellation event not initialized)"
+            )
+
+    def is_cancellation_requested(self) -> bool:
+        """Check if cancellation has been requested.
+
+        Returns:
+            True if cancellation was requested, False otherwise
+        """
+        if self._streaming_state.cancel_event and self._streaming_state.cancel_event.is_set():
+            return True
+        return False
+
+    def get_session_elapsed_time(self) -> float:
+        """Get elapsed time for the current streaming session.
+
+        Returns:
+            Elapsed seconds since session started, or 0 if no active session
+        """
+        if not self._streaming_state.session_start_time:
+            return 0.0
+
+        import time
+        return time.time() - self._streaming_state.session_start_time
+
+    @property
+    def cancel_event(self) -> Optional[asyncio.Event]:
+        """Get the cancellation event for direct access if needed.
+
+        Returns:
+            The asyncio.Event for cancellation, or None if not streaming
+        """
+        return self._streaming_state.cancel_event
 
 
 def create_metrics_coordinator(

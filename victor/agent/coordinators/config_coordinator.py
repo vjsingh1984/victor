@@ -43,10 +43,16 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from victor.agent.protocols import ToolAccessContext
 
 from victor.protocols import IConfigProvider
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -291,13 +297,15 @@ class ConfigCoordinator:
         if tool_selection is not None and not isinstance(tool_selection, dict):
             errors.append(f"Invalid tool_selection: {tool_selection} (must be dict or None)")
 
-        # Warnings for non-critical issues
-        if temperature > 1.0:
-            warnings.append(f"High temperature ({temperature}) may produce unpredictable results")
+        # Warnings for non-critical issues (need to re-check types for mypy)
+        temp_value: float = temperature if isinstance(temperature, (int, float)) else 0.7
+        if temp_value > 1.0:
+            warnings.append(f"High temperature ({temp_value}) may produce unpredictable results")
 
-        if max_tokens > 128000:
+        max_tokens_value: int = max_tokens if isinstance(max_tokens, int) else 4096
+        if max_tokens_value > 128000:
             warnings.append(
-                f"Very large max_tokens ({max_tokens}) may exceed model context limits"
+                f"Very large max_tokens ({max_tokens_value}) may exceed model context limits"
             )
 
         return ValidationResult(
@@ -631,4 +639,320 @@ __all__ = [
     "SettingsConfigProvider",
     "EnvironmentConfigProvider",
     "ProfileConfigProvider",
+    "ToolAccessConfigCoordinator",
 ]
+
+
+# =============================================================================
+# Tool Access Configuration Coordinator
+# =============================================================================
+
+
+class ToolAccessConfigCoordinator:
+    """Coordinator for tool access configuration management.
+
+    This coordinator extracts tool access configuration logic from the
+    orchestrator, providing a unified interface for:
+    - Building tool access context
+    - Querying enabled tools
+    - Checking individual tool access
+    - Setting enabled tools with propagation
+
+    Design Patterns:
+        - Facade Pattern: Simplifies access to tool access configuration
+        - Delegation Pattern: Delegates to ToolAccessController and ModeCoordinator
+        - SRP: Focused only on tool access configuration
+
+    Usage:
+        from victor.agent.coordinators.config_coordinator import (
+            ToolAccessConfigCoordinator,
+        )
+
+        coordinator = ToolAccessConfigCoordinator(
+            tool_access_controller=controller,
+            mode_coordinator=mode_coordinator,
+            tool_registry=registry,
+        )
+
+        # Check if tool is enabled
+        if coordinator.is_tool_enabled("bash"):
+            # Tool is enabled
+
+        # Get all enabled tools
+        enabled = coordinator.get_enabled_tools()
+    """
+
+    def __init__(
+        self,
+        tool_access_controller: Optional[Any] = None,
+        mode_coordinator: Optional[Any] = None,
+        tool_registry: Optional[Any] = None,
+    ) -> None:
+        """Initialize the tool access configuration coordinator.
+
+        Args:
+            tool_access_controller: ToolAccessController instance
+            mode_coordinator: ModeCoordinator instance
+            tool_registry: ToolRegistry instance
+        """
+        self._tool_access_controller = tool_access_controller
+        self._mode_coordinator = mode_coordinator
+        self._tool_registry = tool_registry
+
+    def build_tool_access_context(
+        self,
+        session_enabled_tools: Optional[Set[str]] = None,
+        current_mode: Optional[str] = None,
+    ) -> ToolAccessContext:
+        """Build ToolAccessContext for unified access control checks.
+
+        Consolidates context construction used by get_enabled_tools() and
+        is_tool_enabled() to ensure consistent access control decisions.
+
+        Args:
+            session_enabled_tools: Tools enabled for this session
+            current_mode: Current agent mode name
+
+        Returns:
+            ToolAccessContext with session tools and current mode
+        """
+        from victor.agent.protocols import ToolAccessContext
+
+        # Get current mode from coordinator if not provided
+        if current_mode is None and self._mode_coordinator:
+            current_mode = self._mode_coordinator.current_mode_name
+
+        return ToolAccessContext(
+            session_enabled_tools=session_enabled_tools,
+            current_mode=current_mode,
+        )
+
+    def get_enabled_tools(
+        self,
+        session_enabled_tools: Optional[Set[str]] = None,
+    ) -> Set[str]:
+        """Get currently enabled tool names.
+
+        Uses ToolAccessController if available for unified access control.
+        In BUILD mode (allow_all_tools=True), expands to all available tools
+        regardless of vertical restrictions.
+
+        Args:
+            session_enabled_tools: Optional override for session tools
+
+        Returns:
+            Set of enabled tool names for this session
+        """
+        # Use ToolAccessController if available (new unified approach)
+        if self._tool_access_controller:
+            context = self.build_tool_access_context(
+                session_enabled_tools=session_enabled_tools
+            )
+            result: Any = self._tool_access_controller.get_allowed_tools(context)
+            return cast(Set[str], result)
+
+        # Check mode coordinator for BUILD mode (allows all tools minus disallowed)
+        if self._mode_coordinator:
+            mode_config = self._mode_coordinator.get_mode_config()
+            if mode_config.allow_all_tools:
+                all_tools = self.get_available_tools()
+                # Remove any explicitly disallowed tools
+                disallowed: Any = mode_config.disallowed_tools
+                enabled = all_tools - cast(Set[str], disallowed)
+                return enabled
+
+        # Check for framework-set tools (vertical filtering)
+        if session_enabled_tools:
+            return session_enabled_tools
+
+        # Fall back to all available tools
+        return self.get_available_tools()
+
+    def is_tool_enabled(
+        self,
+        tool_name: str,
+        session_enabled_tools: Optional[Set[str]] = None,
+    ) -> bool:
+        """Check if a specific tool is enabled.
+
+        Uses ToolAccessController for unified layered access control:
+        Safety (L0) > Mode (L1) > Session (L2) > Vertical (L3) > Stage (L4) > Intent (L5)
+
+        Falls back to legacy logic if controller not available.
+
+        Args:
+            tool_name: Name of tool to check
+            session_enabled_tools: Optional override for session tools
+
+        Returns:
+            True if tool is enabled
+        """
+        # Use ToolAccessController if available (new unified approach)
+        if self._tool_access_controller:
+            context = self.build_tool_access_context(
+                session_enabled_tools=session_enabled_tools
+            )
+            decision: Any = self._tool_access_controller.check_access(tool_name, context)
+            return cast(bool, getattr(decision, "allowed", True))
+
+        # Check mode coordinator for mode-based restrictions
+        if self._mode_coordinator and self._mode_coordinator.is_tool_allowed(tool_name):
+            # Tool is allowed by mode, check if it exists in registry
+            if self._tool_registry and tool_name in self._tool_registry.list_tools():
+                return True
+
+        # Fall back to session/vertical restrictions
+        enabled = self.get_enabled_tools(session_enabled_tools)
+        return tool_name in enabled
+
+    def set_enabled_tools(
+        self,
+        tools: Set[str],
+        session_enabled_tools_attr: Optional[Any] = None,
+        tool_selector: Optional[Any] = None,
+        vertical_context: Optional[Any] = None,
+        tiered_config: Optional[Any] = None,
+    ) -> None:
+        """Set which tools are enabled for this session.
+
+        This is the single source of truth for enabled tools configuration.
+        It updates all relevant components: tool selector, vertical context,
+        tool access controller, and tiered configuration.
+
+        Args:
+            tools: Set of tool names to enable
+            session_enabled_tools_attr: Reference to orchestrator's _enabled_tools attr
+            tool_selector: ToolSelector instance for propagation
+            vertical_context: Vertical context for propagation
+            tiered_config: Optional TieredToolConfig to propagate for stage filtering.
+                          If None, will attempt to retrieve from active vertical.
+        """
+        # Update session enabled tools if provided
+        if session_enabled_tools_attr is not None:
+            session_enabled_tools_attr.clear()
+            session_enabled_tools_attr.update(tools)
+
+        # Apply to vertical context
+        if vertical_context and hasattr(vertical_context, "enabled_tools"):
+            vertical_context.enabled_tools = tools
+
+        # Propagate to tool_selector for selection-time filtering
+        if tool_selector:
+            tool_selector.set_enabled_tools(tools)
+            logger.info(f"Enabled tools filter propagated to selector: {sorted(tools)}")
+
+            # Also propagate TieredToolConfig for stage-aware filtering
+            if tiered_config is None:
+                # Try to get tiered config from active vertical
+                tiered_config = self._get_vertical_tiered_config()
+            if tiered_config is not None:
+                tool_selector.set_tiered_config(tiered_config)
+                logger.info(
+                    f"Tiered config propagated to selector: "
+                    f"mandatory={sorted(tiered_config.mandatory)}, "
+                    f"vertical_core={sorted(tiered_config.vertical_core)}"
+                )
+
+    def get_available_tools(self) -> Set[str]:
+        """Get all registered tool names.
+
+        Returns:
+            Set of tool names available in registry
+        """
+        if self._tool_registry:
+            return set(self._tool_registry.list_tools())
+        return set()
+
+    def _get_vertical_tiered_config(self) -> Any:
+        """Get TieredToolConfig from active vertical if available.
+
+        Returns:
+            TieredToolConfig or None
+        """
+        try:
+            from victor.core.verticals.vertical_loader import get_vertical_loader
+
+            loader = get_vertical_loader()
+            if loader.active_vertical:
+                return loader.active_vertical.get_tiered_tools()
+        except Exception as e:
+            logger.debug(f"Could not get tiered config from vertical: {e}")
+        return None
+
+    # Configuration change detection
+
+    def detect_config_changes(
+        self,
+        old_config: Dict[str, Any],
+        new_config: Dict[str, Any],
+    ) -> Dict[str, Tuple[Any, Any]]:
+        """Detect changes between two configurations.
+
+        Args:
+            old_config: Previous configuration
+            new_config: New configuration
+
+        Returns:
+            Dictionary of changed keys with (old_value, new_value) tuples
+        """
+        changes = {}
+        all_keys = set(old_config.keys()) | set(new_config.keys())
+
+        for key in all_keys:
+            old_val = old_config.get(key)
+            new_val = new_config.get(key)
+
+            if old_val != new_val:
+                changes[key] = (old_val, new_val)
+
+        return changes
+
+    def validate_mode_transition(
+        self,
+        from_mode: str,
+        to_mode: str,
+        current_tools: Set[str],
+    ) -> ValidationResult:
+        """Validate that a mode transition is safe given current tools.
+
+        Args:
+            from_mode: Current mode name
+            to_mode: Target mode name
+            current_tools: Currently enabled tools
+
+        Returns:
+            ValidationResult with validation status
+        """
+        errors: List[str] = []
+        warnings: List[str] = []
+
+        # Check if moving to more restrictive mode
+        restrictive_modes = {"plan", "explore"}
+        if to_mode.lower() in restrictive_modes and from_mode not in restrictive_modes:
+            # Check for tools that will be disabled
+            write_tools = {
+                "write_file",
+                "write",
+                "edit_files",
+                "edit",
+                "shell",
+                "bash",
+                "execute_bash",
+                "git_commit",
+                "git_push",
+                "delete_file",
+            }
+
+            write_tools_enabled = current_tools & write_tools
+            if write_tools_enabled:
+                warnings.append(
+                    f"Transitioning to {to_mode} mode will disable write tools: "
+                    f"{sorted(write_tools_enabled)}"
+                )
+
+        return ValidationResult(
+            valid=len(errors) == 0,
+            errors=errors,
+            warnings=warnings,
+            metadata={"transition": f"{from_mode} -> {to_mode}"},
+        )

@@ -60,6 +60,11 @@ if TYPE_CHECKING:
     from victor.agent.tool_output_formatter import ToolOutputFormatter
     from victor.agent.recovery import RecoveryHandler
     from victor.observability.integration import ObservabilityIntegration
+    from victor.agent.coordinators.response_coordinator import ResponseCoordinator
+    from victor.agent.coordinators.config_coordinator import ToolAccessConfigCoordinator
+    from victor.agent.coordinators.state_coordinator import StateCoordinator
+    from victor.agent.session_state_manager import SessionStateManager
+    from victor.agent.conversation_state import ConversationStateMachine
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +164,26 @@ class WorkflowOptimizationComponents:
 
 
 @dataclass
+class CoordinatorComponents:
+    """New coordinator components (Stream E4).
+
+    These coordinators extract specialized logic from the orchestrator:
+    - ResponseCoordinator: Response processing and sanitization
+    - ToolAccessConfigCoordinator: Tool access configuration management
+    - StateCoordinator: Unified state management
+
+    Design Patterns:
+        - Facade Pattern: Simplified access to complex subsystems
+        - SRP: Each coordinator has a single responsibility
+        - ISP: Focused protocols for coordinator operations
+    """
+
+    response_coordinator: Optional["ResponseCoordinator"] = None
+    tool_access_config_coordinator: Optional["ToolAccessConfigCoordinator"] = None
+    state_coordinator: Optional["StateCoordinator"] = None
+
+
+@dataclass
 class OrchestratorComponents:
     """All components needed to construct an AgentOrchestrator.
 
@@ -197,6 +222,11 @@ class OrchestratorComponents:
     # Workflow optimizations
     workflow_optimization: WorkflowOptimizationComponents = field(
         default_factory=WorkflowOptimizationComponents
+    )
+
+    # New coordinators (Stream E4)
+    coordinators: CoordinatorComponents = field(
+        default_factory=CoordinatorComponents
     )
 
 
@@ -423,6 +453,197 @@ class OrchestratorFactory(ModeAwareMixin):
             exporters.append(ConsoleAnalyticsExporter())
 
         return AnalyticsCoordinator(exporters=exporters)
+
+    # ========================================================================
+    # New Coordinator Creation Methods (Stream E4)
+    # ========================================================================
+
+    def create_response_coordinator(
+        self,
+        tool_adapter: Optional["BaseToolCallingAdapter"] = None,
+        tool_registry: Optional[Any] = None,
+    ) -> "ResponseCoordinator":
+        """Create response coordinator for response processing and sanitization.
+
+        The ResponseCoordinator consolidates response processing logic including:
+        - Content sanitization (clean malformed content from local models)
+        - Tool call parsing and validation
+        - Garbage content detection
+        - Streaming chunk aggregation
+
+        Args:
+            tool_adapter: Optional tool calling adapter for parsing
+            tool_registry: Optional tool registry for validation
+
+        Returns:
+            ResponseCoordinator instance configured with dependencies
+        """
+        from victor.agent.coordinators.response_coordinator import (
+            ResponseCoordinator,
+            ResponseCoordinatorConfig,
+        )
+
+        sanitizer = self.create_sanitizer()
+
+        config = ResponseCoordinatorConfig(
+            max_garbage_chunks=getattr(self.settings, "max_garbage_chunks", 3),
+            enable_tool_call_extraction=getattr(
+                self.settings, "enable_tool_call_extraction", True
+            ),
+            enable_content_sanitization=getattr(
+                self.settings, "enable_content_sanitization", True
+            ),
+            min_content_length=getattr(self.settings, "min_content_length", 20),
+        )
+
+        coordinator = ResponseCoordinator(
+            sanitizer=sanitizer,
+            tool_adapter=tool_adapter,
+            tool_registry=tool_registry,
+            config=config,
+        )
+
+        logger.debug(
+            f"ResponseCoordinator created with "
+            f"sanitization={'enabled' if config.enable_content_sanitization else 'disabled'}, "
+            f"max_garbage_chunks={config.max_garbage_chunks}"
+        )
+
+        return coordinator
+
+    def create_tool_access_config_coordinator(
+        self,
+        tool_access_controller: Optional[Any] = None,
+        mode_coordinator: Optional[Any] = None,
+        tool_registry: Optional[Any] = None,
+    ) -> "ToolAccessConfigCoordinator":
+        """Create tool access configuration coordinator.
+
+        The ToolAccessConfigCoordinator provides unified interface for:
+        - Building tool access context
+        - Querying enabled tools
+        - Checking individual tool access
+        - Setting enabled tools with propagation
+
+        Args:
+            tool_access_controller: Optional ToolAccessController instance
+            mode_coordinator: Optional ModeCoordinator instance
+            tool_registry: Optional ToolRegistry instance
+
+        Returns:
+            ToolAccessConfigCoordinator instance configured with dependencies
+        """
+        from victor.agent.coordinators.config_coordinator import (
+            ToolAccessConfigCoordinator,
+        )
+
+        coordinator = ToolAccessConfigCoordinator(
+            tool_access_controller=tool_access_controller,
+            mode_coordinator=mode_coordinator,
+            tool_registry=tool_registry,
+        )
+
+        logger.debug("ToolAccessConfigCoordinator created")
+
+        return coordinator
+
+    def create_state_coordinator(
+        self,
+        session_state_manager: "SessionStateManager",
+        conversation_state_machine: Optional["ConversationStateMachine"] = None,
+        enable_history: bool = True,
+        max_history_size: int = 100,
+    ) -> "StateCoordinator":
+        """Create state coordinator for unified state management.
+
+        The StateCoordinator provides centralized state management for:
+        - SessionStateManager: Execution state (tool calls, files, budget)
+        - ConversationStateMachine: Conversation stage and flow
+        - Checkpoint state: Serialization/deserialization
+        - Observer pattern: State change notifications
+
+        Args:
+            session_state_manager: Manager for session execution state
+            conversation_state_machine: Optional manager for conversation stage
+            enable_history: Whether to track state change history
+            max_history_size: Maximum number of state changes to track
+
+        Returns:
+            StateCoordinator instance configured with dependencies
+        """
+        from victor.agent.coordinators.state_coordinator import StateCoordinator
+
+        coordinator = StateCoordinator(
+            session_state_manager=session_state_manager,
+            conversation_state_machine=conversation_state_machine,
+            enable_history=enable_history,
+            max_history_size=max_history_size,
+        )
+
+        logger.debug(
+            f"StateCoordinator created with "
+            f"history={'enabled' if enable_history else 'disabled'}"
+        )
+
+        return coordinator
+
+    def create_coordinators(
+        self,
+        tool_adapter: Optional["BaseToolCallingAdapter"] = None,
+        tool_registry: Optional[Any] = None,
+        tool_access_controller: Optional[Any] = None,
+        mode_coordinator: Optional[Any] = None,
+        session_state_manager: Optional["SessionStateManager"] = None,
+        conversation_state_machine: Optional["ConversationStateMachine"] = None,
+    ) -> CoordinatorComponents:
+        """Create all new coordinator components (Stream E4).
+
+        This method creates all three new coordinators in a single call,
+        providing a complete set of coordinator components for the orchestrator.
+
+        Args:
+            tool_adapter: Optional tool calling adapter for ResponseCoordinator
+            tool_registry: Optional tool registry for coordinators
+            tool_access_controller: Optional ToolAccessController
+            mode_coordinator: Optional ModeCoordinator
+            session_state_manager: Optional SessionStateManager for StateCoordinator
+            conversation_state_machine: Optional ConversationStateMachine
+
+        Returns:
+            CoordinatorComponents with all three coordinators
+        """
+        response_coordinator = self.create_response_coordinator(
+            tool_adapter=tool_adapter,
+            tool_registry=tool_registry,
+        )
+
+        tool_access_config_coordinator = self.create_tool_access_config_coordinator(
+            tool_access_controller=tool_access_controller,
+            mode_coordinator=mode_coordinator,
+            tool_registry=tool_registry,
+        )
+
+        state_coordinator = None
+        if session_state_manager:
+            state_coordinator = self.create_state_coordinator(
+                session_state_manager=session_state_manager,
+                conversation_state_machine=conversation_state_machine,
+            )
+
+        components = CoordinatorComponents(
+            response_coordinator=response_coordinator,
+            tool_access_config_coordinator=tool_access_config_coordinator,
+            state_coordinator=state_coordinator,
+        )
+
+        logger.debug(
+            f"CoordinatorComponents created: "
+            f"response={'yes' if response_coordinator else 'no'}, "
+            f"tool_access_config={'yes' if tool_access_config_coordinator else 'no'}, "
+            f"state={'yes' if state_coordinator else 'no'}"
+        )
+
+        return components
 
     def create_core_services(
         self,
@@ -796,57 +1017,6 @@ class OrchestratorFactory(ModeAwareMixin):
             # Still create instance for manual use, just not auto-commit
             return get_auto_committer()
 
-    def create_semantic_selector(self) -> Optional[Any]:
-        """Create semantic tool selector if enabled.
-
-        DEPRECATED: This method is deprecated. Tool selection now uses the unified
-        strategy factory (create_tool_selector_strategy) which supports multiple
-        strategies (auto, keyword, semantic, hybrid). Configure via the
-        tool_selection_strategy setting instead of use_semantic_tool_selection.
-
-        Returns:
-            SemanticToolSelector instance or None
-        """
-        import warnings
-
-        # Check if deprecated setting is being used
-        if hasattr(self.settings, "use_semantic_tool_selection"):
-            use_semantic_selection = self.settings.use_semantic_tool_selection
-
-            # Only warn if explicitly set (not default)
-            field_set = getattr(self.settings, "__pydantic_fields_set__", set())
-            if "use_semantic_tool_selection" in field_set:
-                warnings.warn(
-                    "create_semantic_selector() is deprecated. "
-                    "Tool selection now uses the unified strategy factory. "
-                    "Configure via tool_selection_strategy setting instead. "
-                    "This method will be removed in v2.0.",
-                    DeprecationWarning,
-                    stacklevel=2,
-                )
-        else:
-            use_semantic_selection = False
-
-        if not use_semantic_selection:
-            return None
-
-        from victor.tools.semantic_selector import SemanticToolSelector
-
-        # Use settings-configured embedding provider and model
-        # Default: sentence-transformers with unified_embedding_model (local, fast, air-gapped)
-        # Both tool selection and codebase search use the same model for:
-        # - 40% memory reduction (120MB vs 200MB)
-        # - Better OS page cache utilization
-        # - Improved CPU L2/L3 cache hit rates
-        semantic_selector = SemanticToolSelector(
-            embedding_model=self.settings.embedding_model,
-            embedding_provider=self.settings.embedding_provider,
-            ollama_base_url=self.settings.ollama_base_url,
-            cache_embeddings=True,
-        )
-        logger.debug("SemanticToolSelector created (deprecated, use strategy factory)")
-        return semantic_selector
-
     def create_parallel_executor(self, tool_executor: Any) -> Any:
         """Create parallel tool executor for concurrent independent tool calls.
 
@@ -1210,82 +1380,6 @@ class OrchestratorFactory(ModeAwareMixin):
             " with semantic cache" if semantic_cache else "",
         )
         return pipeline
-
-    def create_streaming_tool_adapter(
-        self,
-        tool_pipeline: Any,
-        on_chunk: Optional[Callable] = None,
-    ) -> Any:
-        """⚠️ OBSOLETE - NOT IN USE - DEAD CODE ⚠️
-
-        This factory method is NO LONGER CALLED in the codebase.
-
-        Analysis (January 2025):
-        - This method is defined but never invoked
-        - streaming_tool_adapter.py module is obsolete
-        - Tool execution now uses: ToolExecutionHandler -> ToolExecutor
-
-        This method is kept for backwards compatibility only.
-
-        Create StreamingToolAdapter for unified streaming tool execution.
-
-        The StreamingToolAdapter wraps ToolPipeline to provide streaming output
-        while preserving ALL ToolPipeline features (caching, middleware, callbacks,
-        budget, deduplication, etc.).
-
-        This solves the dual execution path problem where:
-        - Batch path: Used ToolPipeline with full feature support
-        - Streaming path: Previously bypassed ToolPipeline using self.tools.execute()
-
-        Now BOTH paths route through: StreamingToolAdapter -> ToolPipeline
-
-        Args:
-            tool_pipeline: ToolPipeline instance to wrap
-            on_chunk: Optional callback for each StreamingToolChunk
-
-        Returns:
-            StreamingToolAdapter instance
-        """
-        # ============================================================================
-        # ⚠️  OBSOLETE - DEAD CODE - NOT IN USE ⚠️
-        # ============================================================================
-        # This entire method is obsolete and commented out.
-        #
-        # The streaming_tool_adapter.py module has been moved to:
-        #   archived/obsolete/streaming_tool_adapter.py
-        #
-        # Current tool execution path:
-        #   orchestrator._handle_tool_calls()
-        #     → argument_normalizer.normalize_arguments()
-        #     → tool_executor.execute(skip_normalization=True)
-        #       → tool.execute(**arguments)
-        #
-        # TODO: Remove this method entirely in next major version
-        # ============================================================================
-
-        # import warnings
-        # warnings.warn(
-        #     "create_streaming_tool_adapter() is obsolete and unused. "
-        #     "Use ToolExecutionHandler instead.",
-        #     DeprecationWarning,
-        #     stacklevel=2
-        # )
-
-        # from archived.obsolete.streaming_tool_adapter import create_streaming_tool_adapter
-
-        # adapter = create_streaming_tool_adapter(
-        #     tool_pipeline=tool_pipeline,
-        #     on_chunk=on_chunk,
-        # )
-        # logger.debug("StreamingToolAdapter created wrapping ToolPipeline")
-        # return adapter
-
-        # TEMPORARY: Return None to maintain API compatibility
-        logger.warning(
-            "create_streaming_tool_adapter() called but is obsolete. "
-            "Returning None. Tool execution uses ToolExecutionHandler instead."
-        )
-        return None
 
     def create_conversation_controller(
         self,
@@ -1771,7 +1865,6 @@ class OrchestratorFactory(ModeAwareMixin):
     def create_tool_selector(
         self,
         tools: Any,
-        semantic_selector: Any,
         conversation_state: Any,
         unified_tracker: Any,
         model: str,
@@ -1781,7 +1874,7 @@ class OrchestratorFactory(ModeAwareMixin):
     ) -> Any:
         """Create unified tool selector using the new strategy factory.
 
-        This method now uses the unified tool selection strategy factory from
+        This method uses the unified tool selection strategy factory from
         victor.agent.tool_selector_factory, which supports:
         - auto: Automatic selection based on environment (default)
         - keyword: Fast metadata-based selection (<1ms)
@@ -1790,7 +1883,6 @@ class OrchestratorFactory(ModeAwareMixin):
 
         Args:
             tools: ToolRegistry instance
-            semantic_selector: SemanticToolSelector instance (deprecated, unused)
             conversation_state: ConversationStateMachine instance
             unified_tracker: UnifiedTaskTracker instance
             model: Model identifier
@@ -2427,32 +2519,6 @@ class OrchestratorFactory(ModeAwareMixin):
     # =========================================================================
     # Orchestrator Decomposition Components (Phase 1)
     # =========================================================================
-
-    # ARCHIVED: 2024-12-31 - StreamingLoopCoordinator was never integrated
-    # Module moved to: archive/obsolete/2024_12_cleanup/streaming_loop_coordinator.py
-    # This factory method is preserved for reference but raises NotImplementedError
-    def create_streaming_loop_coordinator(
-        self,
-        termination_handler: Any,
-        tool_call_handler: Any,
-        recovery_handler: Any,
-        chunk_generator: Any,
-        intent_classifier: Any,
-        continuation_strategy: Any,
-    ) -> Any:
-        """ARCHIVED: StreamingLoopCoordinator was extracted but never integrated.
-
-        The streaming loop functionality remains in AgentOrchestrator.
-        This coordinator was moved to: archive/obsolete/2024_12_cleanup/
-
-        Raises:
-            NotImplementedError: This component was never integrated.
-        """
-        raise NotImplementedError(
-            "StreamingLoopCoordinator was archived. "
-            "Streaming loop remains in AgentOrchestrator. "
-            "See: archive/obsolete/2024_12_cleanup/streaming_loop_coordinator.py"
-        )
 
     def create_response_processor(
         self,
