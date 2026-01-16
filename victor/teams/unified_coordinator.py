@@ -20,6 +20,7 @@ This is the production-ready coordinator that combines:
 - EventBus observability via ObservabilityMixin
 - RL integration via RLMixin
 - Message bus and shared memory support
+- Recursion depth tracking for nested team/workflow execution
 
 Example:
     from victor.teams import UnifiedTeamCoordinator, TeamFormation
@@ -31,6 +32,10 @@ Example:
     coordinator.set_formation(TeamFormation.PIPELINE)
 
     result = await coordinator.execute_task("Implement authentication", {})
+
+    # Check recursion depth for nested execution
+    depth = coordinator.get_recursion_depth()
+    can_spawn = coordinator.can_spawn_nested()
 """
 
 from __future__ import annotations
@@ -50,6 +55,7 @@ from victor.teams.types import (
     TeamFormation,
     TeamResult,
 )
+from victor.workflows.recursion import RecursionContext, RecursionGuard
 
 if TYPE_CHECKING:
     from victor.coordination.formations import (
@@ -133,6 +139,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         - RL integration for team composition learning
         - Message bus for inter-agent communication
         - Shared memory for team context
+        - Recursion depth tracking for nested team/workflow execution
 
     Attributes:
         _orchestrator: Agent orchestrator (optional, for SubAgent spawning)
@@ -141,6 +148,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         _manager: Manager member for HIERARCHICAL formation
         _message_history: Log of inter-agent messages
         _shared_context: Shared context dictionary
+        _recursion_ctx: Recursion context for tracking nested execution
     """
 
     def __init__(
@@ -150,6 +158,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         enable_observability: bool = True,
         enable_rl: bool = True,
         lightweight_mode: bool = False,
+        recursion_context: Optional[RecursionContext] = None,
     ) -> None:
         """Initialize the unified coordinator.
 
@@ -158,6 +167,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             enable_observability: Enable EventBus integration
             enable_rl: Enable RL integration
             lightweight_mode: If True, disable mixins (for testing without dependencies)
+            recursion_context: Optional recursion context for tracking nested team execution
         """
         # Initialize mixins conditionally based on lightweight_mode
         if not lightweight_mode:
@@ -183,6 +193,9 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
 
         # Formation strategies (lazy loaded to avoid circular imports)
         self._formations: Optional[Dict[TeamFormation, BaseFormationStrategy]] = None
+
+        # Recursion tracking
+        self._recursion_ctx = recursion_context or RecursionContext()
 
     # =========================================================================
     # ITeamCoordinator Protocol Methods
@@ -243,6 +256,8 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 - final_output: Synthesized final output
                 - formation: Formation used
         """
+        from victor.core.errors import RecursionDepthError
+
         if not self._members:
             return {
                 "success": False,
@@ -257,65 +272,72 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         self._message_history = []
         start_time = time.time()
 
-        # Emit start event
-        self._emit_team_event(
-            "started",
-            {
-                "task": task,
-                "formation": self._formation.value,
-                "member_count": len(self._members),
-            },
-        )
+        # Track recursion depth when team executes
+        team_name = context.get("team_name", "UnifiedTeam")
+        with RecursionGuard(self._recursion_ctx, "team", team_name):
+            try:
+                # Emit start event
+                self._emit_team_event(
+                    "started",
+                    {
+                        "task": task,
+                        "formation": self._formation.value,
+                        "member_count": len(self._members),
+                        "recursion_depth": self._recursion_ctx.current_depth,
+                    },
+                )
 
-        try:
-            # Dispatch to formation executor
-            result = await self._execute_formation(task, context)
+                # Dispatch to formation executor
+                result = await self._execute_formation(task, context)
 
-            # Record RL outcome
-            duration = time.time() - start_time
-            failed_count = sum(
-                1 for r in result.get("member_results", {}).values() if not r.success
-            )
-            quality = self._compute_quality_score(
-                success=result.get("success", False),
-                member_count=len(self._members),
-                total_tool_calls=result.get("total_tool_calls", 0),
-                duration_seconds=duration,
-                failed_members=failed_count,
-            )
+                # Record RL outcome
+                duration = time.time() - start_time
+                failed_count = sum(
+                    1 for r in result.get("member_results", {}).values() if not r.success
+                )
+                quality = self._compute_quality_score(
+                    success=result.get("success", False),
+                    member_count=len(self._members),
+                    total_tool_calls=result.get("total_tool_calls", 0),
+                    duration_seconds=duration,
+                    failed_members=failed_count,
+                )
 
-            self._record_team_rl_outcome(
-                team_name=context.get("team_name", "UnifiedTeam"),
-                formation=self._formation.value,
-                success=result.get("success", False),
-                quality_score=quality,
-                metadata={
-                    "member_count": len(self._members),
-                    "duration": duration,
-                },
-            )
+                self._record_team_rl_outcome(
+                    team_name=team_name,
+                    formation=self._formation.value,
+                    success=result.get("success", False),
+                    quality_score=quality,
+                    metadata={
+                        "member_count": len(self._members),
+                        "duration": duration,
+                    },
+                )
 
-            # Emit completion event
-            self._emit_team_event(
-                "completed",
-                {
-                    "success": result.get("success", False),
-                    "duration": duration,
-                },
-            )
+                # Emit completion event
+                self._emit_team_event(
+                    "completed",
+                    {
+                        "success": result.get("success", False),
+                        "duration": duration,
+                    },
+                )
 
-            return result
+                return result
 
-        except Exception as e:
-            self._emit_team_event("error", {"error": str(e)})
-            logger.error(f"Team execution failed: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "member_results": {},
-                "final_output": "",
-                "formation": self._formation.value,
-            }
+            except RecursionDepthError:
+                # Re-raise recursion errors as-is
+                raise
+            except Exception as e:
+                self._emit_team_event("error", {"error": str(e)})
+                logger.error(f"Team execution failed: {e}")
+                return {
+                    "success": False,
+                    "error": str(e),
+                    "member_results": {},
+                    "final_output": "",
+                    "formation": self._formation.value,
+                }
 
     async def broadcast(self, message: AgentMessage) -> List[Optional[AgentMessage]]:
         """Broadcast a message to all team members.
@@ -519,3 +541,23 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 TeamFormation.CONSENSUS: ConsensusFormation(),
             }
         return self._formations
+
+    # =========================================================================
+    # Recursion Tracking Helper Methods
+    # =========================================================================
+
+    def get_recursion_depth(self) -> int:
+        """Get current recursion depth.
+
+        Returns:
+            Current recursion depth level
+        """
+        return self._recursion_ctx.current_depth
+
+    def can_spawn_nested(self) -> bool:
+        """Check if team can spawn nested workflows/teams.
+
+        Returns:
+            True if nesting is allowed, False otherwise
+        """
+        return self._recursion_ctx.can_nest(1)

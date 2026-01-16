@@ -82,7 +82,8 @@ from victor.agent.teams.communication import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    # Use protocol for type hint to avoid circular dependency (DIP compliance)
+    from victor.protocols.agent import IAgentOrchestrator
     from victor.agent.presentation import PresentationProtocol
 
 logger = logging.getLogger(__name__)
@@ -140,14 +141,14 @@ class TeamCoordinator(ITeamCoordinator):
 
     def __init__(
         self,
-        orchestrator: "AgentOrchestrator",
+        orchestrator: "IAgentOrchestrator",
         sub_agent_orchestrator: Optional[SubAgentOrchestrator] = None,
         presentation: Optional["PresentationProtocol"] = None,
     ):
         """Initialize team coordinator.
 
         Args:
-            orchestrator: Parent orchestrator
+            orchestrator: Parent orchestrator (via IAgentOrchestrator protocol)
             sub_agent_orchestrator: Optional sub-agent orchestrator (created if not provided)
             presentation: Optional presentation adapter for icons (creates default if None)
         """

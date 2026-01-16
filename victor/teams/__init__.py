@@ -143,6 +143,23 @@ from victor.teams.types import TeamConfig, TeamMember
 # Mixins
 from victor.teams.mixins import ObservabilityMixin, RLMixin
 
+# Advanced formations
+from victor.teams.advanced_formations import (
+    NegotiationFormation,
+    SwitchingCriteria,
+    SwitchingFormation,
+    VotingFormation,
+)
+
+# ML and optimization
+from victor.teams.team_analytics import TeamAnalytics
+from victor.teams.team_learning import TeamLearningSystem
+from victor.teams.team_optimizer import TeamOptimizer
+from victor.teams.team_predictor import TeamPredictor
+
+# ML models
+from victor.teams.ml import FormationPredictor, PerformancePredictor, TeamMemberSelector
+
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
 
@@ -228,4 +245,18 @@ __all__ = [
     "RLMixin",
     # Factory
     "create_coordinator",
+    # Advanced formations
+    "SwitchingFormation",
+    "SwitchingCriteria",
+    "NegotiationFormation",
+    "VotingFormation",
+    # ML and optimization
+    "TeamPredictor",
+    "TeamOptimizer",
+    "TeamAnalytics",
+    "TeamLearningSystem",
+    # ML models
+    "TeamMemberSelector",
+    "FormationPredictor",
+    "PerformancePredictor",
 ]
