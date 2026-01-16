@@ -1,0 +1,165 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+workflow:
+  name: dynamic_research_team
+  description: |
+    Research team that dynamically switches coordination strategy
+    based on execution progress, dependencies, and conflicts.
+
+  # Workflow variables
+  variables:
+    research_topic: ""
+    depth: "comprehensive"  # quick, standard, comprehensive
+    collaboration_mode: "flexible"  # independent, collaborative, flexible
+
+  nodes:
+    # Dynamic research team
+    - id: dynamic_research_team
+      type: team
+      team_formation: dynamic
+      goal: |
+        Conduct comprehensive research on: {{variables.research_topic}}
+
+        Research Depth: {{variables.depth}}
+        Collaboration Mode: {{variables.collaboration_mode}}
+
+      # Team members
+      members:
+        - id: lead_researcher
+          role: researcher
+          goal: "Lead the research effort and coordinate findings"
+          backstory: |
+            Academic researcher with 15 years of experience in
+            literature review, synthesis, and academic writing.
+          expertise: ["literature-review", "synthesis", "academic-writing"]
+          personality: "organized and synthesizing"
+          tool_budget: 30
+          tools: ["search", "web_search", "read", "write"]
+
+        - id: specialist_1
+          role: researcher
+          goal: "Research technical aspects and implementation details"
+          backstory: |
+            Technical specialist with deep knowledge of implementation
+            details and practical considerations.
+          expertise: ["technical-research", "implementation", "practicality"]
+          personality: "detail-oriented and practical"
+          tool_budget: 25
+          tools: ["search", "web_search", "read"]
+
+        - id: specialist_2
+          role: researcher
+          goal: "Research theoretical foundations and state of the art"
+          backstory: |
+            Theory-focused researcher with expertise in academic
+            foundations and cutting-edge research.
+          expertise: ["theory", "state-of-the-art", "foundations"]
+          personality: "analytical and theoretical"
+          tool_budget: 25
+          tools: ["search", "web_search", "read"]
+
+        - id: validator
+          role: reviewer
+          goal: "Validate findings, check sources, and ensure quality"
+          backstory: |
+            Detail-oriented validator focused on source quality,
+            accuracy, and comprehensive coverage.
+          expertise: ["fact-checking", "validation", "quality-assurance"]
+          personality: "critical and thorough"
+          tool_budget: 20
+          tools: ["search", "read", "analyze"]
+
+      # Dynamic formation configuration
+      dynamic_config:
+        # Start with parallel for broad exploration
+        initial_formation: parallel
+
+        # Maximum number of formation switches
+        max_switches: 5
+
+        # Enable automatic trigger detection
+        enable_auto_detection: true
+
+        # Switching rules
+        switching_rules:
+          # When dependencies emerge between researchers
+          - trigger: dependencies_emerge
+            target_formation: sequential
+            description: |
+              Switch to sequential when researchers need to build
+              on each other's work
+
+          # When conflicts or disagreements arise
+          - trigger: conflict_detected
+            target_formation: consensus
+            description: |
+              Switch to consensus when researchers disagree on
+              findings or interpretations
+
+          # When consensus is needed for final conclusions
+          - trigger: consensus_needed
+            target_formation: consensus
+            description: |
+              Switch to consensus for validating final conclusions
+
+          # When under time pressure
+          - trigger: time_pressure
+            target_formation: parallel
+            description: |
+              Switch to parallel for faster execution when time is limited
+
+          # When quality concerns are raised
+          - trigger: quality_concerns
+            target_formation: consensus
+            description: |
+              Switch to consensus for thorough validation
+
+      # Context for trigger detection
+      context:
+        time_pressure: false  # Set to true if deadline is approaching
+        quality_concerns: false  # Set to true if quality is critical
+        require_consensus: false  # Set to true for final validation
+
+      # Timeout
+      timeout_seconds: 600
+
+    # Synthesize findings
+    - id: synthesize_findings
+      type: agent
+      role: planner
+      goal: |
+        Synthesize research findings into a comprehensive report.
+
+        Include:
+        1. Formation progression and rationale
+        2. Key findings from each phase
+        3. Formation switches made and why
+        4. Final conclusions and recommendations
+        5. Sources and references
+      next: [end]
+
+  edges:
+    - from: start
+      to: dynamic_research_team
+    - from: dynamic_research_team
+      to: synthesize_findings
+    - from: synthesize_findings
+      to: end
+
+# Example usage:
+# victor workflow execute research/workflows/examples/dynamic_research.yaml \
+#   --variables "research_topic=Latest advances in large language models" \
+#   --variables "depth=comprehensive"

@@ -1,0 +1,183 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+workflow:
+  name: hybrid_deployment_pipeline
+  description: |
+    Multi-phase deployment workflow combining multiple formation patterns:
+    1. Parallel risk assessment across multiple domains
+    2. Sequential planning with dependency management
+    3. Hierarchical execution with manager coordination
+    4. Consensus validation before final deployment
+
+  # Workflow variables
+  variables:
+    service_name: ""
+    environment: "production"  # staging, production
+    deployment_type: "standard"  # standard, blue-green, canary
+
+  nodes:
+    # Multi-phase deployment team
+    - id: deployment_team
+      type: team
+      team_formation: hybrid
+      goal: |
+        Execute safe deployment of {{variables.service_name}} to {{variables.environment}}
+
+        Deployment Type: {{variables.deployment_type}}
+
+      # Team members
+      members:
+        - id: devops_engineer
+          role: coder
+          goal: "Execute deployment steps and handle infrastructure"
+          backstory: |
+            DevOps engineer with expertise in CI/CD, Kubernetes,
+            and deployment automation.
+          expertise: ["devops", "kubernetes", "ci-cd", "automation"]
+          personality: "careful and methodical"
+          tool_budget: 30
+          tools: ["bash", "read", "write", "search"]
+
+        - id: security_specialist
+          role: reviewer
+          goal: "Review security implications and validate configurations"
+          backstory: |
+            Security specialist focused on secure deployment practices,
+            secrets management, and access control.
+          expertise: ["security", "secrets-management", "access-control"]
+          personality: "security-conscious and thorough"
+          tool_budget: 20
+          tools: ["read", "search", "analyze"]
+
+        - id: qa_engineer
+          role: reviewer
+          goal: "Validate deployment success and monitor for issues"
+          backstory: |
+            QA engineer with expertise in post-deployment validation,
+            monitoring, and rollback procedures.
+          expertise: ["testing", "monitoring", "rollback"]
+          personality: "observant and responsive"
+          tool_budget: 20
+          tools: ["bash", "read", "search"]
+
+        - id: sre_lead
+          role: planner
+          goal: "Coordinate deployment and make critical decisions"
+          backstory: |
+            SRE lead with experience managing complex deployments,
+            incident response, and service reliability.
+          expertise: ["sre", "coordination", "decision-making", "incident-response"]
+          personality: "calm and decisive"
+          tool_budget: 15
+          tools: ["read", "bash", "search"]
+          is_manager: true
+          can_delegate: true
+
+      # Hybrid formation configuration
+      hybrid_config:
+        # Log phase transitions
+        enable_phase_logging: true
+
+        # Continue through all phases even if one fails
+        stop_on_first_failure: false
+
+        # Define phases
+        phases:
+          # Phase 1: Parallel Risk Assessment
+          - formation: parallel
+            goal: |
+              Conduct parallel risk assessment across multiple domains:
+              - Security risks
+              - Performance impact
+              - Dependencies and compatibility
+              - Rollback readiness
+
+            duration_budget: 120.0  # 2 minutes
+            completion_criteria: |
+              All risk domains assessed and documented
+
+          # Phase 2: Sequential Planning
+          - formation: sequential
+            goal: |
+              Create detailed deployment plan with sequential validation:
+              1. DevOps engineer creates deployment plan
+              2. Security specialist reviews security aspects
+              3. QA engineer validates testing strategy
+              4. SRE lead approves final plan
+
+            iteration_limit: 3
+            completion_criteria: |
+              Deployment plan created and approved by all members
+
+          # Phase 3: Hierarchical Execution
+          - formation: hierarchical
+            goal: |
+              Execute deployment with hierarchical coordination:
+              - SRE lead coordinates and makes decisions
+              - DevOps engineer executes deployment
+              - Security specialist monitors for issues
+              - QA engineer validates success
+
+            duration_budget: 300.0  # 5 minutes
+            completion_criteria: |
+              Deployment executed and validated
+
+          # Phase 4: Consensus Validation
+          - formation: consensus
+            goal: |
+              Validate deployment success through team consensus:
+              - All team members agree deployment was successful
+              - No issues or concerns detected
+              - Service is healthy and stable
+
+            iteration_limit: 5
+            completion_criteria: |
+              All team members consensus that deployment is successful
+
+      # Timeout for entire workflow
+      timeout_seconds: 900  # 15 minutes
+
+    # Post-deployment monitoring
+    - id: monitor_deployment
+      type: agent
+      role: coder
+      goal: |
+        Monitor deployed service for 5 minutes to ensure stability.
+
+        Check:
+        1. Service health endpoints
+        2. Error rates and latency
+        3. Resource utilization
+        4. Application logs
+
+        If issues detected, trigger rollback procedure.
+      tool_budget: 20
+      tools: ["bash", "read", "search"]
+      next: [end]
+
+  edges:
+    - from: start
+      to: deployment_team
+    - from: deployment_team
+      to: monitor_deployment
+    - from: monitor_deployment
+      to: end
+
+# Example usage:
+# victor workflow execute devops/workflows/examples/hybrid_deployment.yaml \
+#   --variables "service_name=user-service" \
+#   --variables "environment=production" \
+#   --variables "deployment_type=blue-green"

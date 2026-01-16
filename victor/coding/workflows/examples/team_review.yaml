@@ -1,0 +1,442 @@
+# Team-Based Code Review Workflow
+# ================================
+# This workflow demonstrates a comprehensive code review process using
+# a multi-agent team with parallel formation for efficient analysis.
+#
+# Workflow Steps:
+# 1. Gather code changes (git diff, PR info, etc.)
+# 2. Parallel review team analyzes different aspects
+# 3. Synthesize findings into comprehensive report
+# 4. Optional: Auto-fix issues if approved
+#
+# Team Formation: PARALLEL
+# - All reviewers work simultaneously on different aspects
+# - Results merged into single report
+#
+# Recursion Depth: 1 (single team, no nested teams)
+
+workflows:
+  comprehensive_team_review:
+    description: "Multi-agent team code review with parallel analysis"
+    version: "1.0.0"
+    vertical: "coding"
+
+    metadata:
+      author: "Victor AI"
+      tags: ["code-review", "team", "parallel"]
+      framework_version: "0.5.0"
+
+    # Workflow-level recursion depth control
+    # This workflow uses 1 level of team (no nested teams)
+    execution:
+      max_recursion_depth: 3
+      max_timeout_seconds: 1200  # 20 minutes total
+      default_node_timeout: 300   # 5 minutes per node
+      max_iterations: 100
+
+    nodes:
+      # =========================================================================
+      # Stage 1: Gather Code Changes
+      # =========================================================================
+      - id: gather_changes
+        type: agent
+        name: "Change Gatherer"
+        role: researcher
+        goal: |
+          Gather code changes for review:
+          {{changes_context}}
+
+          Collect:
+          1. Git diff or PR changes
+          2. List of modified files
+          3. Lines changed count
+          4. File types affected
+        tool_budget: 15
+        tools: [read, grep, shell]
+        output: changes_summary
+        next: [review_team]
+
+      # =========================================================================
+      # Stage 2: Parallel Review Team
+      # =========================================================================
+      # Team Formation: PARALLEL
+      # - All members work simultaneously on different review aspects
+      # - Each member specializes in a specific area
+      # - Results merged into comprehensive report
+      - id: review_team
+        type: team
+        name: "Code Review Team"
+        goal: |
+          Comprehensively review the code changes:
+          {{changes_summary}}
+
+          Each member focuses on their specialty area.
+          Work in parallel to maximize efficiency.
+        team_formation: parallel
+        timeout_seconds: 600  # 10 minutes for parallel review
+        total_tool_budget: 120  # Distributed across 4 members
+        max_iterations: 75
+        output_key: review_findings
+        merge_strategy: dict
+        merge_mode: team_wins
+        continue_on_error: true  # Continue even if one reviewer fails
+
+        members:
+          # --------------------------------------------------------------------
+          # Member 1: Security Reviewer
+          # --------------------------------------------------------------------
+          - id: security_reviewer
+            role: reviewer
+            name: "Security Reviewer"
+            goal: |
+              Review code for security vulnerabilities:
+              {{changes_summary}}
+
+              Focus on:
+              1. Injection vulnerabilities (SQL, XSS, command injection)
+              2. Authentication and authorization issues
+              3. Sensitive data exposure
+              4. Cryptographic issues
+              5. OWASP Top 10 vulnerabilities
+
+              Rate findings by severity:
+              - CRITICAL: Immediate security risk
+              - HIGH: Serious security issue
+              - MEDIUM: Potential security concern
+              - LOW: Minor security improvement
+            tool_budget: 30
+            tools: [read, grep, code_search]
+            backstory: |
+              Security specialist with 12 years of experience in application security.
+              Former penetration tester for Fortune 500 companies.
+              CISSP certified with expertise in OWASP standards.
+            expertise: ["security", "vulnerabilities", "owasp", "authentication", "cryptography"]
+            personality: "thorough and risk-averse; prioritizes security over convenience"
+            memory: true  # Remember common vulnerability patterns
+            cache: true
+            verbose: false
+
+          # --------------------------------------------------------------------
+          # Member 2: Performance Reviewer
+          # --------------------------------------------------------------------
+          - id: performance_reviewer
+            role: reviewer
+            name: "Performance Reviewer"
+            goal: |
+              Review code for performance issues:
+              {{changes_summary}}
+
+              Focus on:
+              1. Inefficient algorithms (O(n²) or worse)
+              2. Database query optimization (N+1 queries)
+              3. Memory leaks and excessive memory usage
+              4. Unnecessary API calls or network requests
+              5. Caching opportunities
+
+              Rate findings by impact:
+              - CRITICAL: Severe performance degradation
+              - HIGH: Significant performance issue
+              - MEDIUM: Moderate optimization opportunity
+              - LOW: Minor micro-optimization
+            tool_budget: 30
+            tools: [read, grep, code_search]
+            backstory: |
+              Performance optimization specialist with 10 years experience.
+              Worked on high-traffic systems processing millions of requests.
+              Expert in profiling, benchmarking, and optimization techniques.
+            expertise: ["performance", "optimization", "profiling", "databases", "caching"]
+            personality: "data-driven; focuses on measurable improvements"
+            memory: true  # Remember performance anti-patterns
+            cache: true
+            verbose: false
+
+          # --------------------------------------------------------------------
+          # Member 3: Code Quality Reviewer
+          # --------------------------------------------------------------------
+          - id: quality_reviewer
+            role: reviewer
+            name: "Code Quality Reviewer"
+            goal: |
+              Review code for quality and maintainability:
+              {{changes_summary}}
+
+              Focus on:
+              1. Code complexity (cyclomatic complexity, nesting depth)
+              2. Code duplication and DRY violations
+              3. Naming conventions and readability
+              4. Design pattern usage and adherence
+              5. SOLID principles violations
+              6. Test coverage gaps
+
+              Rate findings by severity:
+              - CRITICAL: Unmaintainable code structure
+              - HIGH: Major quality issue
+              - MEDIUM: Moderate quality concern
+              - LOW: Minor style or convention issue
+            tool_budget: 30
+            tools: [read, grep, code_search]
+            backstory: |
+              Senior software engineer with 15 years experience.
+              Led code quality initiatives at multiple companies.
+              Expert in clean code practices, refactoring, and technical debt management.
+            expertise: ["code-quality", "refactoring", "design-patterns", "solid-principles", "testing"]
+            personality: "pragmatic; balances quality with delivery speed"
+            memory: true  # Remember code quality standards
+            cache: true
+            verbose: false
+
+          # --------------------------------------------------------------------
+          # Member 4: Documentation Reviewer
+          # --------------------------------------------------------------------
+          - id: documentation_reviewer
+            role: reviewer
+            name: "Documentation Reviewer"
+            goal: |
+              Review code documentation:
+              {{changes_summary}}
+
+              Focus on:
+              1. Function/class docstrings (completeness, accuracy)
+              2. Inline comments for complex logic
+              3. README updates for new features
+              4. API documentation if applicable
+              5. Type hints and annotations
+
+              Rate findings by severity:
+              - HIGH: Missing critical documentation
+              - MEDIUM: Incomplete or unclear documentation
+              - LOW: Minor documentation improvements
+            tool_budget: 30
+            tools: [read, grep]
+            backstory: |
+              Technical writer and developer with 8 years experience.
+              Specializes in API documentation and developer guides.
+              Strong advocate for self-documenting code.
+            expertise: ["documentation", "technical-writing", "api-design", "communication"]
+            personality: "clear and concise; values user understanding"
+            memory: false  # Documentation doesn't need persistent memory
+            cache: true
+            verbose: false
+
+        next: [synthesize_review]
+
+      # =========================================================================
+      # Stage 3: Synthesize Findings
+      # =========================================================================
+      - id: synthesize_review
+        type: agent
+        name: "Review Synthesizer"
+        role: writer
+        goal: |
+          Synthesize the parallel review findings into a comprehensive report:
+          {{review_findings}}
+
+          Create a structured report with:
+
+          1. **Executive Summary**
+             - Overall assessment (PASS/FAIL/CONDITIONAL)
+             - Total issues found by severity
+             - Recommended action
+
+          2. **Critical Issues** (if any)
+             - Security issues (CRITICAL/HIGH)
+             - Performance issues (CRITICAL/HIGH)
+             - Quality issues (CRITICAL/HIGH)
+             - For each: description, file location, impact, fix recommendation
+
+          3. **Detailed Findings by Category**
+             - Security: All findings with severity ratings
+             - Performance: All findings with impact estimates
+             - Quality: All findings with complexity metrics
+             - Documentation: All findings with examples
+
+          4. **Recommendations**
+             - Priority-ranked fix list
+             - Quick wins vs. long-term improvements
+             - Suggested follow-up actions
+
+          5. **Positive Feedback**
+             - What was done well
+             - Good patterns to encourage
+
+          Use markdown formatting with tables for readability.
+        tool_budget: 25
+        tools: [read, grep]
+        llm_config:
+          temperature: 0.3  # Low temperature for consistent structure
+          max_tokens: 4096
+        output: review_report
+        next: [present_report]
+
+      # =========================================================================
+      # Stage 4: Present Report and Get Decision
+      # =========================================================================
+      - id: present_report
+        type: hitl
+        name: "Review Decision"
+        gate_type: choice_input
+        title: "Code Review Complete - Decision Required"
+        prompt: |
+          ## Code Review Report
+
+          {{review_report}}
+
+          **Files Changed:** {{changes_summary.file_count}}
+          **Lines Changed:** {{changes_summary.lines_changed}}
+
+          ---
+          What would you like to do?
+        context_keys:
+          - review_report
+          - changes_summary
+        config:
+          timeout_seconds: 900  # 15 minutes to review
+          fallback_strategy: continue_with_default
+          default_value: "Request Changes"
+          show_details: true
+          require_reason_on_reject: false
+        choices:
+          - label: "Approve and Merge"
+            value: "approve"
+            description: "Approve changes and proceed with merge"
+
+          - label: "Approve with Suggestions"
+            value: "approve_suggestions"
+            description: "Approve but incorporate suggestions later"
+
+          - label: "Request Changes"
+            value: "request_changes"
+            description: "Request changes before merge"
+
+          - label: "Request Auto-Fix"
+            value: "auto_fix"
+            description: "Attempt to auto-fix fixable issues"
+
+          - label: "Reject"
+            value: "reject"
+            description: "Reject changes (requires re-review)"
+        next: [handle_decision]
+
+      # =========================================================================
+      # Stage 5: Handle Decision
+      # =========================================================================
+      - id: handle_decision
+        type: condition
+        name: "Handle Review Decision"
+        condition: "review_decision.choice"
+        branches:
+          "approve": complete
+          "approve_suggestions": log_suggestions
+          "request_changes": request_fixes
+          "auto_fix": attempt_auto_fix
+          "reject": complete
+
+      # =========================================================================
+      # Branch: Log Suggestions (Approved with suggestions)
+      # =========================================================================
+      - id: log_suggestions
+        type: agent
+        name: "Suggestion Logger"
+        role: writer
+        goal: |
+          Log the suggestions for later incorporation:
+          {{review_report}}
+
+          Extract and format:
+          1. All non-critical suggestions
+          2. Priority order
+          3. Assign to backlog or tech debt tracker
+        tool_budget: 10
+        tools: [write]
+        output: suggestions_log
+        next: [complete]
+
+      # =========================================================================
+      # Branch: Request Manual Fixes
+      # =========================================================================
+      - id: request_fixes
+        type: agent
+        name: "Fix Request Handler"
+        role: writer
+        goal: |
+          Create detailed fix request based on review:
+          {{review_report}}
+
+          Include:
+          1. List of required fixes (CRITICAL/HIGH issues)
+          2. Code examples for fixes
+          3. Files and line numbers
+          4. Testing requirements
+        tool_budget: 15
+        tools: [write]
+        output: fix_request
+        next: [complete]
+
+      # =========================================================================
+      # Branch: Attempt Auto-Fix
+      # =========================================================================
+      - id: attempt_auto_fix
+        type: agent
+        name: "Auto-Fix Agent"
+        role: executor
+        goal: |
+          Attempt to auto-fix issues identified in review:
+          {{review_report}}
+
+          Focus on fixable issues:
+          1. Simple style violations
+          2. Missing docstrings
+          3. Type hints
+          4. Simple refactorings
+
+          For each fix:
+          1. Apply the change
+          2. Verify syntax
+          3. Document what was changed
+
+          Do NOT attempt to fix:
+          - Complex logic issues
+          - Security vulnerabilities (require human review)
+          - Performance optimizations (require benchmarks)
+        tool_budget: 40
+        tools: [read, write, edit, shell]
+        llm_config:
+          temperature: 0.1  # Very low for safe, predictable fixes
+        output: auto_fix_result
+        next: [verify_auto_fix]
+
+      - id: verify_auto_fix
+        type: compute
+        name: "Verify Auto-Fix"
+        tools: [shell]
+        inputs:
+          command: |
+            # Run syntax check
+            if [ -f "pyproject.toml" ]; then
+              python -m py_compile $(find . -name "*.py" -newer .git/index 2>/dev/null || echo "")
+            fi
+        output: verification_result
+        next: [complete]
+
+      # =========================================================================
+      # Completion Node
+      # =========================================================================
+      - id: complete
+        type: transform
+        name: "Review Complete"
+        transform: |
+          # Final summary
+          review_complete = true
+          completion_time = current_timestamp()
+
+          # Summary based on decision
+          if review_decision.choice == "approve":
+            final_status = "APPROVED"
+          elif review_decision.choice == "approve_suggestions":
+            final_status = "APPROVED_WITH_SUGGESTIONS"
+          elif review_decision.choice == "request_changes":
+            final_status = "CHANGES_REQUESTED"
+          elif review_decision.choice == "auto_fix":
+            final_status = "AUTO_FIX_ATTEMPTED"
+          else:
+            final_status = "REJECTED"

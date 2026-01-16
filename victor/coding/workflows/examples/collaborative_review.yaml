@@ -1,0 +1,195 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Collaborative Code Review Workflow Example.
+
+This workflow demonstrates advanced team collaboration features including:
+- Member-to-member communication
+- Shared context for findings and decisions
+- Negotiation for reaching consensus on code changes
+"""
+
+workflows:
+  collaborative_review:
+    name: "Collaborative Code Review"
+    description: "Multi-agent code review with negotiation and shared context"
+
+    # Team formation with collaboration enabled
+    nodes:
+      # Step 1: Security analysis
+      - id: security_review
+        type: team
+        goal: "Perform comprehensive security analysis of the code changes"
+        collaboration:
+          enabled: true
+          communication:
+            type: "request_response"
+            log_messages: true
+          shared_context:
+            keys: ["findings", "vulnerabilities", "recommendations"]
+            conflict_resolution: "merge"
+        team_formation: parallel
+        members:
+          - id: security_analyst
+            role: researcher
+            goal: "Identify security vulnerabilities and authentication issues"
+            backstory: "10+ years of security experience, specialized in finding authentication bypasses and injection vulnerabilities"
+            expertise: [security, authentication, sql-injection, xss, csrf]
+            tool_budget: 15
+            tools: [read_file, search_code]
+
+          - id: dependency_auditor
+            role: researcher
+            goal: "Review dependencies for known vulnerabilities and outdated packages"
+            expertise: [dependencies, supply-chain, versioning]
+            tool_budget: 10
+            tools: [read_file, search]
+
+      # Step 2: Code quality review
+      - id: quality_review
+        type: team
+        goal: "Analyze code quality, maintainability, and performance"
+        collaboration:
+          enabled: true
+          communication:
+            type: "broadcast"
+            log_messages: true
+          shared_context:
+            keys: ["findings", "metrics", "suggestions"]
+            conflict_resolution: "merge"
+        team_formation: parallel
+        members:
+          - id: quality_analyst
+            role: reviewer
+            goal: "Check code quality, style consistency, and best practices"
+            expertise: [code-quality, clean-code, design-patterns]
+            tool_budget: 12
+            tools: [read_file, search_code]
+
+          - id: performance_analyst
+            role: reviewer
+            goal: "Identify performance bottlenecks and optimization opportunities"
+            expertise: [performance, optimization, profiling]
+            tool_budget: 12
+            tools: [read_file, search_code]
+
+      # Step 3: Collaborative decision making
+      - id: consensus_decision
+        type: team
+        goal: "Reach consensus on which changes to recommend"
+        collaboration:
+          enabled: true
+          communication:
+            type: "pubsub"
+            log_messages: true
+          shared_context:
+            keys: ["decisions", "approvals", "concerns"]
+            conflict_resolution: "merge"
+          negotiation:
+            enabled: true
+            type: "voting"
+            voting_strategy: "weighted_by_expertise"
+            max_rounds: 3
+            expertise_weights:
+              tech_lead: 3.0
+              senior_reviewer: 2.0
+              reviewer: 1.0
+        team_formation: consensus
+        members:
+          - id: tech_lead
+            role: planner
+            goal: "Facilitate consensus and make final decisions"
+            backstory: "15 years as a software architect, expert at balancing trade-offs and building consensus"
+            expertise: [architecture, decision-making, team-leadership]
+            is_manager: true
+            can_delegate: true
+            tool_budget: 10
+
+          - id: senior_reviewer
+            role: reviewer
+            goal: "Provide expert perspective on proposed changes"
+            expertise: [security, performance, architecture]
+            tool_budget: 8
+
+          - id: reviewer
+            role: reviewer
+            goal: "Review changes from a practical implementation perspective"
+            expertise: [coding, testing, maintenance]
+            tool_budget: 8
+
+    # Workflow execution
+    edges:
+      - from: security_review
+        to: quality_review
+
+      - from: quality_review
+        to: consensus_decision
+
+    # Final output
+    output:
+      format: |
+        # Collaborative Review Report
+
+        ## Security Analysis
+        {% if security_review.findings %}
+        {% for finding in security_review.findings %}
+        - **{{ finding.severity }}**: {{ finding.description }}
+          - Location: {{ finding.location }}
+          - Recommendation: {{ finding.recommendation }}
+        {% endfor %}
+        {% else %}
+        No security issues found.
+        {% endif %}
+
+        ## Quality Analysis
+        {% if quality_review.findings %}
+        {% for finding in quality_review.findings %}
+        - **{{ finding.type }}**: {{ finding.description }}
+          - Impact: {{ finding.impact }}
+        {% endfor %}
+        {% else %}
+        Code quality looks good.
+        {% endif %}
+
+        ## Team Consensus
+        {% if consensus_decision.decisions %}
+        ### Decisions
+        {% for decision in consensus_decision.decisions %}
+        - {{ decision.description }} ({{ decision.vote }}% agreement)
+        {% endfor %}
+
+        ### Approved Changes
+        {% for change in consensus_decision.approved_changes %}
+        - ✅ {{ change.description }}
+        {% endfor %}
+
+        ### Concerns Requiring Attention
+        {% for concern in consensus_decision.concerns %}
+        - ⚠️ {{ concern.description }}
+        {% endfor %}
+        {% endif %}
+
+        ## Communication Statistics
+        - Total messages exchanged: {{ communication_stats.total_messages }}
+        - Average response time: {{ communication_stats.avg_response_time_ms }}ms
+        - Negotiation rounds: {{ consensus_decision.rounds }}
+        - Consensus achieved: {{ consensus_decision.consensus_achieved }}
+
+    # Workflow metadata
+    metadata:
+      version: "1.0.0"
+      author: "Victor AI"
+      tags: [collaboration, code-review, negotiation, consensus]
+      estimated_duration: "5-10 minutes"

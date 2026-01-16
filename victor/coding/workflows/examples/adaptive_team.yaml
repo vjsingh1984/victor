@@ -1,0 +1,165 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+workflow:
+  name: adaptive_development_team
+  description: |
+    Smart development team that adapts formation based on task characteristics.
+    Uses AI-powered analysis to select optimal coordination strategy.
+
+  # Workflow variables
+  variables:
+    task_description: ""
+    urgency: "normal"  # low, normal, high, critical
+    quality_requirement: "high"  # low, medium, high, critical
+
+  nodes:
+    # Team node with adaptive formation
+    - id: adaptive_team
+      type: team
+      team_formation: adaptive
+      goal: |
+        Complete the development task with optimal coordination strategy.
+
+        Task: {{variables.task_description}}
+
+        Context:
+        - Urgency: {{variables.urgency}}
+        - Quality Requirement: {{variables.quality_requirement}}
+
+      # Team configuration
+      members:
+        - id: developer
+          role: coder
+          goal: "Implement the feature following best practices"
+          backstory: |
+            Senior developer with 10 years of experience in
+            clean code, testing, and documentation.
+          expertise: ["python", "testing", "clean-architecture"]
+          personality: "methodical and thorough"
+          tool_budget: 25
+          tools: ["read", "write", "search", "bash"]
+
+        - id: reviewer
+          role: reviewer
+          goal: "Review code for quality, security, and best practices"
+          backstory: |
+            Security-conscious code reviewer with expertise in
+            identifying vulnerabilities and suggesting improvements.
+          expertise: ["security", "code-quality", "performance"]
+          personality: "detail-oriented and constructive"
+          tool_budget: 15
+          tools: ["read", "search", "analyze"]
+
+        - id: tester
+          role: reviewer
+          goal: "Design and execute tests to validate functionality"
+          backstory: |
+            QA specialist focused on comprehensive testing strategies
+            and edge case identification.
+          expertise: ["testing", "edge-cases", "validation"]
+          personality: "systematic and thorough"
+          tool_budget: 15
+          tools: ["read", "bash", "search"]
+
+      # Adaptive formation configuration
+      adaptive_config:
+        # Criteria for formation selection
+        criteria:
+          - complexity
+          - deadline
+          - dependency_level
+          - collaboration_needed
+          - uncertainty
+
+        # Default formation
+        default_formation: parallel
+
+        # Fallback if analysis fails
+        fallback_formation: sequential
+
+        # Use ML model for analysis (if available)
+        use_ml: false
+
+        # Custom scoring weights for formation selection
+        scoring_weights:
+          # Parallel formation scores
+          parallel:
+            complexity: 0.8
+            deadline: 0.7
+            dependency_level: -0.5  # Penalize for dependencies
+            collaboration_needed: 0.6
+            uncertainty: 0.3
+
+          # Sequential formation scores
+          sequential:
+            complexity: 0.5
+            deadline: 0.4
+            dependency_level: 0.9  # Good for dependencies
+            collaboration_needed: 0.5
+            uncertainty: 0.5
+
+          # Hierarchical formation scores
+          hierarchical:
+            complexity: 0.9  # Excellent for complexity
+            deadline: 0.6
+            dependency_level: 0.8
+            collaboration_needed: 0.7
+            uncertainty: 0.7
+
+          # Pipeline formation scores
+          pipeline:
+            complexity: 0.6
+            deadline: 0.5
+            dependency_level: 0.9  # Excellent for staged dependencies
+            collaboration_needed: 0.6
+            uncertainty: 0.4
+
+          # Consensus formation scores
+          consensus:
+            complexity: 0.4
+            deadline: 0.2  # Slowest
+            dependency_level: 0.3
+            collaboration_needed: 0.9  # Excellent for collaboration
+            uncertainty: 0.9  # Best for uncertainty
+
+      # Timeout for team execution
+      timeout_seconds: 300
+
+    # Output formatter
+    - id: format_results
+      type: agent
+      role: planner
+      goal: |
+        Format and present the team's results in a clear summary.
+
+        Include:
+        - Selected formation and rationale
+        - Task characteristics analysis
+        - Final results and recommendations
+      next: [end]
+
+  edges:
+    - from: start
+      to: adaptive_team
+    - from: adaptive_team
+      to: format_results
+    - from: format_results
+      to: end
+
+# Example usage:
+# victor workflow execute coding/workflows/examples/adaptive_team.yaml \
+#   --variables "task_description=Implement user authentication" \
+#   --variables "urgency=high"

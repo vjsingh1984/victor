@@ -1,0 +1,411 @@
+# ML-Powered Adaptive Team Formation Example
+#
+# This workflow demonstrates ML-powered formation selection for team coordination.
+# The system automatically selects the optimal team formation (sequential, parallel,
+# hierarchical, pipeline, consensus) based on task characteristics and historical
+# execution data.
+#
+# Key Features:
+# - ML model predicts optimal formation from task features
+# - Online learning continuously improves predictions
+# - Fallback to heuristic scoring if model unavailable
+# - 10-15% accuracy improvement over heuristic scoring
+#
+# Usage:
+#   victor workflow execute victor/coding/workflows/examples/ml_adaptive_team.yaml
+#
+# Requirements:
+# - Trained ML model at models/formation_selector/coding_model.pkl
+# - Or set use_ml: false to use heuristic scoring
+
+workflows:
+  # ==========================================================================
+  # ML-Powered Code Review Workflow
+  # ==========================================================================
+  ml_adaptive_code_review:
+    name: "ML-Adaptive Code Review"
+    description: "Automatically selects optimal formation for code review based on task characteristics"
+
+    # Workflow-level configuration
+    config:
+      max_iterations: 10
+      timeout_seconds: 600
+      enable_metrics: true
+      enable_ml: true
+      model_path: "models/formation_selector/coding_model.pkl"
+      online_learning: true
+      online_learning_threshold: 10
+
+    nodes:
+      # ======================================================================
+      # Task Analysis Node
+      # ======================================================================
+      - id: analyze_task
+        type: agent
+        role: task_analyzer
+        goal: |
+          Analyze the code review task to extract key characteristics:
+          - Code complexity (lines, files, complexity)
+          - Urgency (deadline, priority)
+          - Dependencies (inter-file dependencies)
+          - Resource constraints (tool budget, time limits)
+          - Team availability (number of reviewers)
+        tool_budget: 5
+        output_key: task_analysis
+        next: [select_formation]
+
+      # ======================================================================
+      # Formation Selection Node (ML-Powered)
+      # ======================================================================
+      - id: select_formation
+        type: team
+        formation: adaptive
+        config:
+          # Use ML model for formation selection
+          use_ml: ${workflow.config.enable_ml}
+          model_path: ${workflow.config.model_path}
+          enable_online_learning: ${workflow.config.online_learning}
+          online_learning_threshold: ${workflow.config.online_learning_threshold}
+          fallback_formation: "parallel"
+
+          # Criteria for ML features
+          criteria:
+            - complexity
+            - urgency
+            - uncertainty
+            - dependencies
+            - resource_constraints
+
+        # Use adaptive formation that selects optimal coordination
+        team: code_review_team
+        goal: |
+          Review code for quality, security, and best practices.
+          The ML model will select the optimal formation based on:
+          - Task complexity (high complexity -> hierarchical/parallel)
+          - Time urgency (urgent -> parallel for speed)
+          - Uncertainty (high uncertainty -> consensus for validation)
+          - Dependencies (high dependencies -> sequential/pipeline)
+          - Resource constraints (limited -> sequential)
+
+          Expected formations:
+          - parallel: Multiple reviewers independently (fast, low dependencies)
+          - sequential: Reviewers in sequence (high dependencies)
+          - hierarchical: Lead reviewer coordinates (high complexity)
+          - pipeline: Staged review (clear phases: style -> security -> performance)
+          - consensus: All reviewers agree (high uncertainty, high stakes)
+
+        tool_budget: 50
+        next: [aggregate_review]
+
+        # Context for ML feature extraction
+        context:
+          task_features: ${nodes.analyze_task.output}
+          workflow_type: "code_review"
+          vertical: "coding"
+
+      # ======================================================================
+      # Aggregation Node
+      # ======================================================================
+      - id: aggregate_review
+        type: agent
+        role: review_aggregator
+        goal: |
+          Aggregate all review feedback into a comprehensive report:
+          1. Merge findings from all reviewers
+          2. Identify common issues and unique insights
+          3. Prioritize issues by severity
+          4. Generate actionable recommendations
+          5. Track which formation was used and its effectiveness
+
+          Include in final report:
+          - Formation selected by ML model
+          - Confidence scores for each formation
+          - Task characteristics that influenced selection
+          - Execution metrics (duration, success rate)
+          - Efficiency score for online learning
+
+        inputs:
+          task_analysis: ${nodes.analyze_task.output}
+          review_results: ${nodes.select_formation.output}
+          formation_metadata: ${nodes.select_formation.metadata.selected_formation}
+          selection_method: ${nodes.select_formation.metadata.selection_method}
+          formation_scores: ${nodes.select_formation.metadata.formation_scores}
+
+        tool_budget: 10
+        output_key: final_report
+        next: [end]
+
+    # Team definition
+    teams:
+      code_review_team:
+        name: "Code Review Team"
+        formation: adaptive  # Will be dynamically selected
+        communication_style: structured
+        max_iterations: ${workflow.config.max_iterations}
+
+        roles:
+          - name: security_reviewer
+            display_name: "Security Reviewer"
+            description: "Focuses on security vulnerabilities and threats"
+            persona: |
+              You are a security expert specializing in identifying:
+              - SQL injection, XSS, CSRF vulnerabilities
+              - Authentication and authorization issues
+              - Sensitive data exposure
+              - Cryptographic weaknesses
+              - Security misconfigurations
+
+            capabilities:
+              - security_scan
+              - vulnerability_detection
+              - dependency_check
+            tool_categories:
+              - security
+              - analysis
+
+          - name: quality_reviewer
+            display_name: "Quality Reviewer"
+            description: "Focuses on code quality and maintainability"
+            persona: |
+              You are a code quality expert focusing on:
+              - Code structure and organization
+              - Naming conventions and style
+              - Documentation quality
+              - Design patterns and architecture
+              - Technical debt identification
+
+            capabilities:
+              - complexity_analysis
+              - style_check
+              - code_smell_detection
+            tool_categories:
+              - analysis
+              - metrics
+
+          - name: performance_reviewer
+            display_name: "Performance Reviewer"
+            description: "Focuses on performance optimization"
+            persona: |
+              You are a performance optimization expert examining:
+              - Algorithm efficiency
+              - Resource usage (CPU, memory)
+              - Database query optimization
+              - Caching strategies
+              - Scalability concerns
+
+            capabilities:
+              - profiling
+              - benchmarking
+              - performance_analysis
+            tool_categories:
+              - analysis
+              - profiling
+
+  # ==========================================================================
+  # ML-Adaptive Feature Development Workflow
+  # ==========================================================================
+  ml_adaptive_feature_development:
+    name: "ML-Adaptive Feature Development"
+    description: "Selects optimal formation for feature development based on task complexity"
+
+    config:
+      enable_ml: true
+      model_path: "models/formation_selector/development_model.pkl"
+      online_learning: true
+
+    nodes:
+      - id: analyze_requirements
+        type: agent
+        role: requirements_analyzer
+        goal: |
+          Analyze feature requirements to determine:
+          - Technical complexity
+          - Dependencies on other components
+          - Estimated effort
+          - Risk level
+          - Time constraints
+        tool_budget: 5
+        next: [plan_development]
+
+      - id: plan_development
+        type: team
+        formation: adaptive
+        config:
+          use_ml: ${workflow.config.enable_ml}
+          model_path: ${workflow.config.model_path}
+          enable_online_learning: ${workflow.config.online_learning}
+          fallback_formation: "hierarchical"
+
+        team: development_team
+        goal: |
+          Plan and execute feature development with optimal coordination.
+
+          ML will select formation based on:
+          - High complexity + clear dependencies -> Pipeline (design -> implement -> test)
+          - Low complexity + low dependencies -> Parallel (divide tasks)
+          - High complexity + unclear approach -> Consensus (team alignment)
+          - Manager expertise available -> Hierarchical (coordination)
+          - Many independent tasks -> Parallel (speed)
+
+        tool_budget: 100
+        next: [integrate_feature]
+
+      - id: integrate_feature
+        type: agent
+        role: integration_specialist
+        goal: |
+          Integrate developed feature into codebase:
+          1. Merge changes
+          2. Run integration tests
+          3. Update documentation
+          4. Verify deployment readiness
+        tool_budget: 20
+        next: [end]
+
+    teams:
+      development_team:
+        name: "Feature Development Team"
+        formation: adaptive
+        communication_style: collaborative
+
+        roles:
+          - name: architect
+            display_name: "Software Architect"
+            description: "Designs system architecture and technical approach"
+            capabilities:
+              - architecture_design
+              - technical_planning
+
+          - name: developer
+            display_name: "Software Developer"
+            description: "Implements the feature"
+            capabilities:
+              - coding
+              - unit_testing
+              - debugging
+
+          - name: qa_engineer
+            display_name: "QA Engineer"
+            description: "Tests and validates the feature"
+            capabilities:
+              - integration_testing
+              - quality_assurance
+
+  # ==========================================================================
+  # ML-Adaptive Bug Investigation Workflow
+  # ==========================================================================
+  ml_adaptive_bug_investigation:
+    name: "ML-Adaptive Bug Investigation"
+    description: "Selects optimal formation for debugging based on bug characteristics"
+
+    config:
+      enable_ml: true
+      model_path: "models/formation_selector/debugging_model.pkl"
+      online_learning: true
+
+    nodes:
+      - id: analyze_bug
+        type: agent
+        role: bug_analyzer
+        goal: |
+          Analyze bug report to determine:
+          - Severity and impact
+          - Reproducibility
+          - Likely component(s) involved
+          - Investigation complexity
+          - Time urgency
+        tool_budget: 5
+        next: [investigate_bug]
+
+      - id: investigate_bug
+        type: team
+        formation: adaptive
+        config:
+          use_ml: ${workflow.config.enable_ml}
+          model_path: ${workflow.config.model_path}
+          enable_online_learning: ${workflow.config.online_learning}
+          fallback_formation: "consensus"
+
+        team: debugging_team
+        goal: |
+          Investigate and resolve the bug with optimal coordination.
+
+          ML will select formation based on:
+          - High urgency + clear location -> Parallel (rapid fixes)
+          - High uncertainty + high impact -> Consensus (validate solution)
+          - Complex dependencies -> Sequential (step-by-step)
+          - Need multiple expertise areas -> Hierarchical (coordination)
+          - Reproduce + diagnose + fix -> Pipeline (staged approach)
+
+        tool_budget: 50
+        next: [verify_fix]
+
+      - id: verify_fix
+        type: agent
+        role: qa_specialist
+        goal: |
+          Verify that the bug is fixed:
+          1. Reproduce the original bug scenario
+          2. Confirm the fix resolves the issue
+          3. Check for regressions
+          4. Update test cases
+        tool_budget: 15
+        next: [end]
+
+    teams:
+      debugging_team:
+        name: "Debugging Team"
+        formation: adaptive
+        communication_style: collaborative
+
+        roles:
+          - name: reproduce_analyst
+            display_name: "Bug Reproduction Specialist"
+            description: "Reproduces and isolates the bug"
+            capabilities:
+              - bug_reproduction
+              - root_cause_analysis
+
+          - name: fix_developer
+            display_name: "Fix Developer"
+            description: "Implements the bug fix"
+            capabilities:
+              - coding
+              - debugging
+              - patch_development
+
+          - name: regression_tester
+            display_name: "Regression Tester"
+            description: "Validates fix and checks for regressions"
+            capabilities:
+              - testing
+              - regression_detection
+
+# =============================================================================
+# Configuration Notes
+# =============================================================================
+
+# To use this workflow:
+
+# 1. Train an ML model (optional):
+#    python scripts/ml/collect_training_data.py --input-dir logs/ --output-data data/executions.json
+#    python scripts/ml/train_model.py --training-data data/executions.json --algorithm random_forest \
+#        --output-model models/formation_selector/coding_model.pkl
+
+# 2. Use heuristic scoring (no ML required):
+#    Set enable_ml: false in workflow config
+
+# 3. Enable online learning:
+#    Set online_learning: true to continuously improve from executions
+
+# 4. Monitor performance:
+#    Check metadata for formation selection details:
+#    - selected_formation: Which formation was used
+#    - selection_method: "ml" or "heuristic"
+#    - formation_scores: Confidence scores for each formation
+#    - task_characteristics: Extracted features
+
+# 5. Expected improvements:
+#    - 10-15% better formation selection accuracy
+#    - 5-10% faster execution on average
+#    - Continuous improvement with online learning

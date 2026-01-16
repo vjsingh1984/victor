@@ -1,0 +1,427 @@
+# Team-Based Research Workflow
+# ============================
+# This workflow demonstrates comprehensive research using a multi-agent
+# team with pipeline formation for sequential knowledge building.
+#
+# Workflow Steps:
+# 1. Define research question and scope
+# 2. Pipeline research team builds knowledge sequentially
+# 3. Synthesize findings into comprehensive report
+# 4. Cite sources and provide references
+#
+# Team Formation: PIPELINE
+# - Initial researcher gathers broad information
+# - Each subsequent member builds on previous work
+# - Final member synthesizes into actionable insights
+#
+# Recursion Depth: 1 (single team, no nested teams)
+
+workflows:
+  comprehensive_team_research:
+    description: "Multi-agent team research with pipeline knowledge building"
+    version: "1.0.0"
+    vertical: "research"
+
+    metadata:
+      author: "Victor AI"
+      tags: ["research", "team", "pipeline", "citations"]
+      framework_version: "0.5.0"
+
+    # Workflow-level configuration
+    execution:
+      max_recursion_depth: 3
+      max_timeout_seconds: 1800  # 30 minutes total
+      default_node_timeout: 600   # 10 minutes per node
+      max_iterations: 150
+
+    # Arguments for CLI/API usage
+    arguments:
+      - name: research_topic
+        type: str
+        required: true
+        help: "Topic to research"
+
+      - name: depth
+        type: str
+        required: false
+        default: "comprehensive"
+        choices: ["quick", "standard", "comprehensive", "exhaustive"]
+        help: "Research depth level"
+
+      - name: focus_areas
+        type: list
+        required: false
+        help: "Specific areas to focus on (comma-separated)"
+
+    nodes:
+      # =========================================================================
+      # Stage 1: Define Research Scope
+      # =========================================================================
+      - id: define_scope
+        type: agent
+        name: "Research Scope Definer"
+        role: planner
+        goal: |
+          Define the scope and approach for research on: {{research_topic}}
+
+          Research depth: {{depth}}
+          {% if focus_areas %}Focus areas: {{focus_areas}}{% endif %}
+
+          Create a research plan including:
+          1. Research questions to answer
+          2. Key themes and dimensions to explore
+          3. Types of sources to prioritize (academic, industry, news, etc.)
+          4. Search strategy and keywords
+          5. Quality criteria for sources
+        tool_budget: 15
+        tools: [web_search, read]
+        llm_config:
+          temperature: 0.4
+        output: research_plan
+        next: [research_pipeline]
+
+      # =========================================================================
+      # Stage 2: Pipeline Research Team
+      # =========================================================================
+      # Team Formation: PIPELINE
+      # - Each member receives output from previous member
+      # - Knowledge builds sequentially
+      # - Final output is comprehensive, synthesized research
+      - id: research_pipeline
+        type: team
+        name: "Research Team"
+        goal: |
+          Conduct comprehensive research on: {{research_topic}}
+
+          Follow the research plan:
+          {{research_plan}}
+
+          Team will work in pipeline formation:
+          1. Broad research → 2. Deep dive → 3. Source evaluation → 4. Synthesis
+        team_formation: pipeline
+        timeout_seconds: 1200  # 20 minutes for research
+        total_tool_budget: 150  # Distributed across 4 members
+        max_iterations: 100
+        output_key: research_findings
+        merge_strategy: dict
+        merge_mode: team_wins
+        continue_on_error: true
+
+        members:
+          # --------------------------------------------------------------------
+          # Member 1: Broad Researcher
+          # --------------------------------------------------------------------
+          # First stage: Gather broad information across multiple dimensions
+          - id: broad_researcher
+            role: researcher
+            name: "Broad Researcher"
+            goal: |
+              Conduct initial broad research on: {{research_topic}}
+
+              Research plan:
+              {{research_plan}}
+
+              Gather diverse perspectives:
+              1. Academic papers and scholarly articles
+              2. Industry reports and whitepapers
+              3. News and recent developments
+              4. Expert opinions and thought leadership
+              5. Historical context and evolution
+
+              For each source:
+              - Capture key points and insights
+              - Note source type and credibility
+              - Extract quotes and statistics
+              - Identify recurring themes
+
+              Output: Structured overview with source citations
+            tool_budget: 40
+            tools: [web_search, read]
+            backstory: |
+              Information specialist with expertise in rapid research across domains.
+              Skilled at identifying diverse perspectives and synthesizing complex topics.
+              Background in journalism and academic research.
+            expertise: ["research", "information-synthesis", "source-evaluation", "web-research"]
+            personality: "curious and thorough; seeks diverse viewpoints"
+            priority: 0  # First in pipeline
+            memory: true  # Remember research patterns
+            memory_config:
+              enabled: true
+              persist_across_sessions: true
+              relevance_threshold: 0.6
+            cache: true
+            verbose: false
+
+          # --------------------------------------------------------------------
+          # Member 2: Deep Dive Specialist
+          # --------------------------------------------------------------------
+          # Second stage: Deep dive into most important areas
+          - id: deep_dive_specialist
+            role: researcher
+            name: "Deep Dive Specialist"
+            goal: |
+              Based on the broad research:
+              {{broad_researcher.output}}
+
+              Conduct deep dives into the most important areas:
+              1. Identify top 3-5 critical themes from broad research
+              2. For each theme, conduct detailed research:
+                 - Technical details and mechanisms
+                 - Case studies and examples
+                 - Metrics and data points
+                 - Leading experts and key papers
+              3. Explore connections between themes
+              4. Identify gaps or controversies in understanding
+
+              Output: Detailed analysis of key themes with evidence and examples
+            tool_budget: 40
+            tools: [web_search, read]
+            backstory: |
+              Subject matter expert with deep research capabilities.
+              PhD in interdisciplinary research with focus on synthesis.
+              Expert at diving deep into complex technical topics.
+            expertise: ["deep-research", "technical-analysis", "case-studies", "data-analysis"]
+            personality: "analytical and detail-oriented; seeks depth over breadth"
+            priority: 1  # Second in pipeline
+            memory: true
+            memory_config:
+              enabled: true
+              persist_across_sessions: true
+              relevance_threshold: 0.7
+              search_own_memories_only: false  # Can use broad_researcher's memories
+            cache: true
+            verbose: false
+
+          # --------------------------------------------------------------------
+          # Member 3: Source Evaluator
+          # --------------------------------------------------------------------
+          # Third stage: Evaluate source quality and credibility
+          - id: source_evaluator
+            role: researcher
+            name: "Source Evaluator"
+            goal: |
+              Evaluate the quality and credibility of research sources:
+              {{deep_dive_specialist.output}}
+
+              For each major finding or claim:
+              1. Assess source credibility:
+                 - Author expertise and credentials
+                 - Publication venue reputation
+                 - Publication date (currency)
+                 - Citation count and impact
+              2. Verify claims across multiple sources
+              3. Identify potential biases or conflicts
+              4. Flag controversial or disputed claims
+              5. Rank sources by reliability
+
+              Output: Annotated findings with source quality ratings
+            tool_budget: 35
+            tools: [web_search, read]
+            backstory: |
+              Research librarian and information scientist.
+              Expert in source evaluation, fact-checking, and academic integrity.
+              Experience in both academic and corporate research settings.
+            expertise: ["source-evaluation", "fact-checking", "academic-integrity", "credibility-assessment"]
+            personality: "skeptical and rigorous; questions assumptions"
+            priority: 2  # Third in pipeline
+            memory: true
+            memory_config:
+              enabled: true
+              persist_across_sessions: true
+              relevance_threshold: 0.6
+            cache: true
+            verbose: false
+
+          # --------------------------------------------------------------------
+          # Member 4: Research Synthesizer
+          # --------------------------------------------------------------------
+          # Fourth stage: Synthesize into actionable insights
+          - id: research_synthesizer
+            role: writer
+            name: "Research Synthesizer"
+            goal: |
+              Synthesize all research into comprehensive, actionable report:
+              {{source_evaluator.output}}
+
+              Create structured report:
+
+              1. **Executive Summary**
+                 - Key findings in 3-5 bullet points
+                 - Main conclusions and implications
+                 - Confidence level in findings
+
+              2. **Detailed Analysis**
+                 - Organize by major themes
+                 - Present evidence and examples
+                 - Include data points and statistics
+                 - Note confidence levels for claims
+
+              3. **Source Quality Assessment**
+                 - Overall quality rating
+                 - Most credible sources
+                 - Areas with limited evidence
+
+              4. **Key Insights**
+                 - Actionable takeaways
+                 - Recommendations
+                 - Future research directions
+
+              5. **Citations and References**
+                 - Properly formatted citations
+                 - Links to sources
+                 - Organized by theme
+
+              Use clear, professional language.
+              Attribute claims to sources.
+              Note uncertainties or controversies.
+            tool_budget: 35
+            tools: [read, write]
+            llm_config:
+              temperature: 0.3  # Low for consistency
+              max_tokens: 8192  # Allow for comprehensive report
+            backstory: |
+              Research communicator and technical writer.
+              Expert at synthesizing complex research into clear, actionable insights.
+              Experience writing for both technical and executive audiences.
+            expertise: ["synthesis", "technical-writing", "communication", "report-generation"]
+            personality: "clear and structured; prioritizes understanding"
+            priority: 3  # Last in pipeline
+            memory: false  # Doesn't need persistent memory
+            cache: true
+            verbose: false
+
+        next: [quality_check]
+
+      # =========================================================================
+      # Stage 3: Quality Check
+      # =========================================================================
+      - id: quality_check
+        type: condition
+        name: "Check Research Quality"
+        condition: "research_findings.final_output"
+        branches:
+          # Simple heuristic: if report is substantial, pass
+          "comprehensive": finalize_report
+          "default": request_more_research
+
+      - id: request_more_research
+        type: agent
+        name: "Research Gap Analyzer"
+        role: planner
+        goal: |
+          Analyze the research findings for gaps:
+          {{research_findings}}
+
+          Identify:
+          1. Insufficiently explored areas
+          2. Missing perspectives
+          3. Weak source support
+          4. Contradictory claims
+
+          Recommend whether to:
+          - Accept current findings (good enough for purpose)
+          - Conduct additional research (specify areas)
+        tool_budget: 10
+        tools: [read]
+        output: gap_analysis
+        next: [finalize_report]
+
+      # =========================================================================
+      # Stage 4: Finalize Report
+      # =========================================================================
+      - id: finalize_report
+        type: agent
+        name: "Report Finalizer"
+        role: writer
+        goal: |
+          Prepare final research report:
+          {{research_findings}}
+
+          {% if gap_analysis %}Gap analysis: {{gap_analysis}}{% endif %}
+
+          Ensure report includes:
+          1. Clear executive summary
+          2. Well-organized sections
+          3. Proper citations and references
+          4. Visual formatting (markdown)
+          5. Metadata (research date, sources, confidence level)
+
+          Save report to file.
+        tool_budget: 20
+        tools: [write]
+        llm_config:
+          temperature: 0.2
+          max_tokens: 8192
+        output: final_report
+        next: [complete]
+
+      # =========================================================================
+      # Completion
+      # =========================================================================
+      - id: complete
+        type: transform
+        name: "Research Complete"
+        transform: |
+          research_complete = true
+          completion_time = current_timestamp()
+
+          # Extract key metrics
+          total_sources = len(research_findings.citations) if hasattr(research_findings, 'citations') else 0
+          confidence_level = research_findings.confidence if hasattr(research_findings, 'confidence') else "medium"
+
+          # Final summary
+          summary = {
+            "topic": research_topic,
+            "sources_counted": total_sources,
+            "confidence": confidence_level,
+            "report_path": final_report.file_path if hasattr(final_report, 'file_path') else "generated"
+          }
+
+  # ===========================================================================
+  # VARIANT: Quick Research (Smaller Team)
+  # ===========================================================================
+  quick_team_research:
+    description: "Rapid research with smaller team for time-sensitive needs"
+    version: "1.0.0"
+    vertical: "research"
+
+    metadata:
+      author: "Victor AI"
+      tags: ["research", "team", "quick"]
+      framework_version: "0.5.0"
+
+    execution:
+      max_recursion_depth: 3
+      max_timeout_seconds: 600  # 10 minutes
+      max_iterations: 50
+
+    nodes:
+      - id: quick_research
+        type: team
+        name: "Quick Research Team"
+        goal: "Quick research on: {{research_topic}}"
+        team_formation: sequential  # Faster than pipeline
+        timeout_seconds: 300
+        total_tool_budget: 50
+        output_key: quick_findings
+        members:
+          - id: web_searcher
+            role: researcher
+            name: "Web Searcher"
+            goal: "Search web for: {{research_topic}}"
+            tool_budget: 25
+            tools: [web_search]
+            priority: 0
+
+          - id: summarizer
+            role: writer
+            name: "Summary Writer"
+            goal: "Summarize findings: {{web_searcher.output}}"
+            tool_budget: 25
+            tools: [write]
+            priority: 1
+        next: [complete]
+
+      - id: complete
+        type: transform
+        transform: "quick_research_complete = true"

@@ -1,0 +1,554 @@
+# Team-Based Data Analysis Workflow
+# =================================
+# This workflow demonstrates comprehensive data analysis using a multi-agent
+# team with hierarchical formation for coordinated analysis.
+#
+# Workflow Steps:
+# 1. Load and validate data
+# 2. Hierarchical analysis team coordinates different analysis aspects
+# 3. Manager delegates tasks and synthesizes results
+# 4. Generate comprehensive report with visualizations
+#
+# Team Formation: HIERARCHICAL
+# - Analysis manager coordinates the team
+# - Delegates specific analysis tasks to specialists
+# - Synthesizes all results into coherent report
+#
+# Recursion Depth: 1 (single team, no nested teams)
+
+workflows:
+  comprehensive_team_analysis:
+    description: "Multi-agent team data analysis with hierarchical coordination"
+    version: "1.0.0"
+    vertical: "dataanalysis"
+
+    metadata:
+      author: "Victor AI"
+      tags: ["data-analysis", "team", "hierarchical", "statistics"]
+      framework_version: "0.5.0"
+
+    # Workflow-level configuration
+    execution:
+      max_recursion_depth: 3
+      max_timeout_seconds: 2400  # 40 minutes total
+      default_node_timeout: 900   # 15 minutes per node
+      max_iterations: 200
+
+    # Arguments for CLI/API usage
+    arguments:
+      - name: data_path
+        type: str
+        required: true
+        help: "Path to data file (CSV, JSON, Excel, etc.)"
+
+      - name: analysis_type
+        type: str
+        required: false
+        default: "comprehensive"
+        choices: ["exploratory", "statistical", "comprehensive", "predictive"]
+        help: "Type of analysis to perform"
+
+      - name: target_variable
+        type: str
+        required: false
+        help: "Target variable for predictive analysis"
+
+    nodes:
+      # =========================================================================
+      # Stage 1: Load and Validate Data
+      # =========================================================================
+      - id: load_data
+        type: compute
+        name: "Data Loader"
+        tools: [pandas]
+        inputs:
+          file_path: $ctx.data_path
+          operation: load_and_validate
+        output: raw_data
+        next: [assess_data]
+
+      - id: assess_data
+        type: agent
+        name: "Data Quality Assessor"
+        role: researcher
+        goal: |
+          Assess the loaded data:
+          {{raw_data}}
+
+          Evaluate:
+          1. Data dimensions (rows, columns)
+          2. Data types and schemas
+          3. Missing values and completeness
+          4. Data quality issues (duplicates, outliers, inconsistencies)
+          5. Basic statistics preview
+
+          Recommend data cleaning steps if needed.
+        tool_budget: 15
+        tools: [pandas, python_repl]
+        output: data_assessment
+        next: [decide_cleaning]
+
+      - id: decide_cleaning
+        type: condition
+        name: "Decide on Data Cleaning"
+        condition: "data_assessment.needs_cleaning"
+        branches:
+          true: clean_data
+          false: analysis_team
+
+      - id: clean_data
+        type: agent
+        name: "Data Cleaner"
+        role: executor
+        goal: |
+          Clean the data based on assessment:
+          {{data_assessment}}
+
+          Perform:
+          1. Handle missing values (drop, impute, or flag)
+          2. Remove duplicates
+          3. Fix data types
+          4. Handle outliers
+          5. Standardize formats
+
+          Document all cleaning steps.
+        tool_budget: 25
+        tools: [pandas, python_repl]
+        output: cleaned_data
+        next: [analysis_team]
+
+      # =========================================================================
+      # Stage 2: Hierarchical Analysis Team
+      # =========================================================================
+      # Team Formation: HIERARCHICAL
+      # - Analysis manager coordinates the team
+      # - Delegates tasks to specialists
+      # - Synthesizes results into comprehensive report
+      - id: analysis_team
+        type: team
+        name: "Data Analysis Team"
+        goal: |
+          Perform comprehensive analysis on: {% if cleaned_data %}{{cleaned_data}}{% else %}{{raw_data}}{% endif %}
+
+          Analysis type: {{analysis_type}}
+          {% if target_variable %}Target variable: {{target_variable}}{% endif %}
+
+          Data assessment:
+          {{data_assessment}}
+        team_formation: hierarchical
+        timeout_seconds: 1800  # 30 minutes for analysis
+        total_tool_budget: 200  # Distributed across team
+        max_iterations: 150
+        output_key: analysis_results
+        merge_strategy: dict
+        merge_mode: team_wins
+        continue_on_error: true
+
+        members:
+          # --------------------------------------------------------------------
+          # Manager: Analysis Coordinator
+          # --------------------------------------------------------------------
+          - id: analysis_manager
+            role: planner
+            name: "Analysis Manager"
+            goal: |
+              Coordinate comprehensive data analysis:
+              {% if cleaned_data %}{{cleaned_data}}{% else %}{{raw_data}}{% endif %}
+
+              Analysis type: {{analysis_type}}
+
+              Responsibilities:
+              1. Plan analysis approach based on data and goals
+              2. Delegate specific tasks to team members:
+                 - Statistical analysis to statistician
+                 - Visualization to visualizer
+                 - Feature engineering to engineer (if predictive)
+                 - Pattern discovery to miner
+              3. Monitor progress and provide guidance
+              4. Synthesize all results into coherent report
+              5. Ensure quality and consistency
+
+              Use delegation to assign tasks.
+              Review member outputs and provide feedback.
+              Create final comprehensive report.
+            tool_budget: 40
+            tools: [pandas, python_repl]
+            is_manager: true
+            can_delegate: true
+            delegation_targets: [statistician, visualizer, engineer, miner]
+            backstory: |
+              Senior data scientist with 15 years experience leading analytics teams.
+              PhD in Statistics with expertise in experimental design and analysis.
+              Expert at coordinating complex analyses and communicating insights.
+            expertise: ["data-science", "statistics", "team-leadership", "communication", "visualization"]
+            personality: "strategic and thorough; ensures rigorous analysis"
+            memory: true  # Remember analysis patterns
+            memory_config:
+              enabled: true
+              persist_across_sessions: true
+              relevance_threshold: 0.7
+            cache: true
+            verbose: true  # Show coordination for transparency
+
+          # --------------------------------------------------------------------
+          # Member 1: Statistician
+          # --------------------------------------------------------------------
+          - id: statistician
+            role: researcher
+            name: "Statistical Analyst"
+            goal: |
+              Perform statistical analysis on the data.
+
+              Based on analysis type ({{analysis_type}}):
+              {% if analysis_type == "exploratory" or analysis_type == "comprehensive" %}
+              Exploratory Statistics:
+              1. Descriptive statistics (mean, median, mode, std, etc.)
+              2. Distribution analysis (histograms, box plots)
+              3. Correlation analysis (correlation matrix, heatmaps)
+              4. Group comparisons if applicable
+              {% endif %}
+
+              {% if analysis_type == "statistical" or analysis_type == "comprehensive" %}
+              Inferential Statistics:
+              1. Hypothesis testing (t-tests, ANOVA, chi-square)
+              2. Confidence intervals
+              3. Effect sizes
+              4. Statistical significance tests
+              {% endif %}
+
+              {% if analysis_type == "predictive" or analysis_type == "comprehensive" %}
+              Predictive Statistics:
+              1. Regression analysis
+              2. Feature importance
+              3. Model performance metrics
+              4. Validation strategies
+              {% endif %}
+
+              Report findings with:
+              - Clear explanations
+              - Statistical metrics
+              - Interpretations and implications
+              - Visualizations where helpful
+            tool_budget: 40
+            tools: [pandas, python_repl, scipy, statsmodels]
+            reports_to: analysis_manager
+            backstory: |
+              Statistician with MS in Biostatistics.
+              Expert in both frequentist and Bayesian methods.
+              Experience analyzing data across domains (healthcare, finance, tech).
+            expertise: ["statistics", "hypothesis-testing", "regression", "experimental-design"]
+            personality: "rigorous and precise; emphasizes statistical validity"
+            priority: 1
+            memory: true
+            cache: true
+            verbose: false
+
+          # --------------------------------------------------------------------
+          # Member 2: Data Visualizer
+          # --------------------------------------------------------------------
+          - id: visualizer
+            role: researcher
+            name: "Data Visualization Specialist"
+            goal: |
+              Create insightful visualizations of the data.
+
+              Generate visualizations:
+              1. Univariate analysis:
+                 - Histograms, density plots
+                 - Box plots, violin plots
+              2. Bivariate analysis:
+                 - Scatter plots with trend lines
+                 - Pair plots for key variables
+                 - Bar charts for categorical data
+              3. Multivariate analysis:
+                 - Heatmaps (correlation, confusion matrices)
+                 - Parallel coordinates plots
+                 - 3D scatter plots if applicable
+              4. Special visualizations:
+                 - Time series plots if temporal data
+                 - Geographic plots if location data
+                 - Network graphs if relational data
+
+              For each visualization:
+              - Clear title and labels
+              - Appropriate color schemes
+              - Interpretive annotations
+              - High-resolution output
+
+              Save all plots to files.
+            tool_budget: 40
+            tools: [pandas, python_repl, matplotlib, seaborn, plotly]
+            reports_to: analysis_manager
+            backstory: |
+              Data visualization specialist with background in design and analytics.
+              Expert in creating clear, impactful visualizations.
+              Experience with static, interactive, and dashboard visualizations.
+            expertise: ["visualization", "matplotlib", "seaborn", "plotly", "design"]
+            personality: "creative and clear; prioritizes insight and aesthetics"
+            priority: 2
+            memory: false  # Visualizations don't need persistent memory
+            cache: true
+            verbose: false
+
+          # --------------------------------------------------------------------
+          # Member 3: Feature Engineer (for predictive analysis)
+          # --------------------------------------------------------------------
+          - id: engineer
+            role: executor
+            name: "Feature Engineering Specialist"
+            goal: |
+              {% if analysis_type == "predictive" or analysis_type == "comprehensive" %}
+              Engineer features for analysis/modeling.
+
+              {% if target_variable %}
+              Target variable: {{target_variable}}
+              {% endif %}
+
+              Tasks:
+              1. Feature creation:
+                 - Transform existing features
+                 - Create interaction terms
+                 - Generate polynomial features
+                 - Extract date/time features
+                 - Create categorical encodings
+              2. Feature selection:
+                 - Remove low-variance features
+                 - Handle multicollinearity
+                 - Select top-k features
+              3. Feature scaling:
+                 - Standardization
+                 - Normalization
+                 - Log transforms for skewed data
+              4. Feature documentation:
+                 - Describe each feature
+                 - Note importance scores
+                 - Explain transformations
+
+              Output: Feature set ready for modeling
+              {% else %}
+              No feature engineering needed for {{analysis_type}} analysis.
+              Report current feature set.
+              {% endif %}
+            tool_budget: 40
+            tools: [pandas, python_repl, sklearn]
+            reports_to: analysis_manager
+            backstory: |
+              Machine learning engineer specializing in feature engineering.
+              Expert in creating predictive features from raw data.
+              Experience in Kaggle competitions and real-world ML projects.
+            expertise: ["feature-engineering", "machine-learning", "sklearn", "data-preprocessing"]
+            personality: "systematic and innovative; finds creative feature combinations"
+            priority: 3
+            memory: true
+            cache: true
+            verbose: false
+
+          # --------------------------------------------------------------------
+          # Member 4: Pattern Miner
+          # --------------------------------------------------------------------
+          - id: miner
+            role: researcher
+            name: "Pattern Discovery Specialist"
+            goal: |
+              Discover hidden patterns and insights in the data.
+
+              Analyze:
+              1. Clustering:
+                 - Identify natural groupings
+                 - Segment analysis
+                 - Anomaly detection
+              2. Association:
+                 - Find correlated variables
+                 - Discover rules/patterns
+                 - Identify relationships
+              3. Temporal patterns (if time data):
+                 - Trends and seasonality
+                 - Change points
+                 - Cycles
+              4. Text patterns (if text data):
+                 - Word frequencies
+                 - Topic modeling
+                 - Sentiment analysis
+              5. Outliers and anomalies:
+                 - Statistical outliers
+                 - Novel patterns
+                 - Exceptions worth investigating
+
+              Report:
+              - Patterns discovered with confidence levels
+              - Business/practical implications
+              - Recommendations for further investigation
+            tool_budget: 40
+            tools: [pandas, python_repl, sklearn, scipy]
+            reports_to: analysis_manager
+            backstory: |
+              Data mining specialist with expertise in unsupervised learning.
+              PhD in Machine Learning focused on pattern discovery.
+              Experience finding actionable insights in complex datasets.
+            expertise: ["clustering", "anomaly-detection", "pattern-mining", "unsupervised-learning"]
+            personality: "curious and intuitive; finds non-obvious patterns"
+            priority: 4
+            memory: true
+            cache: true
+            verbose: false
+
+        next: [generate_report]
+
+      # =========================================================================
+      # Stage 3: Generate Final Report
+      # =========================================================================
+      - id: generate_report
+        type: agent
+        name: "Report Generator"
+        role: writer
+        goal: |
+          Generate comprehensive analysis report from team findings:
+          {{analysis_results}}
+
+          Create structured markdown report:
+
+          1. **Executive Summary**
+             - Key insights and findings
+             - Main conclusions
+             - Top recommendations
+
+          2. **Data Overview**
+             - Data description
+             - Quality assessment
+             - Cleaning performed (if any)
+
+          3. **Statistical Analysis**
+             - Descriptive statistics
+             - Inferential statistics
+             - Key findings with interpretations
+
+          4. **Visualizations**
+             - Embed key plots
+             - Interpret each visualization
+             - Note patterns and insights
+
+          5. **Pattern Discovery**
+             - Clusters and segments
+             - Associations and correlations
+             - Anomalies and outliers
+             - Temporal patterns (if applicable)
+
+          6. **Feature Analysis** (if applicable)
+             - Engineered features
+             - Feature importance
+             - Selection rationale
+
+          7. **Conclusions and Recommendations**
+             - Answer to original question
+             - Actionable insights
+             - Limitations and caveats
+             - Suggestions for further analysis
+
+          8. **Appendix**
+             - Methodology details
+             - Code used (if applicable)
+             - Data dictionary
+
+          Use professional formatting with:
+          - Clear headings and subheadings
+          - Tables for statistics
+          - Embedded visualizations
+              - Bullet points for readability
+        tool_budget: 30
+        tools: [write, python_repl]
+        llm_config:
+          temperature: 0.3
+          max_tokens: 10240  # Allow for comprehensive report
+        output: final_report
+        next: [save_report]
+
+      - id: save_report
+        type: compute
+        name: "Save Report"
+        tools: [shell]
+        inputs:
+          command: |
+            # Create output directory
+            mkdir -p analysis_output
+
+            # Save report
+            REPORT_PATH="analysis_output/analysis_report_$(date +%Y%m%d_%H%M%S).md"
+            echo "{{final_report}}" > "$REPORT_PATH"
+
+            echo "Report saved to: $REPORT_PATH"
+        output: save_result
+        next: [complete]
+
+      # =========================================================================
+      # Completion
+      # =========================================================================
+      - id: complete
+        type: transform
+        name: "Analysis Complete"
+        transform: |
+          analysis_complete = true
+          completion_time = current_timestamp()
+
+          # Summary metrics
+          summary = {
+            "data_path": data_path,
+            "analysis_type": analysis_type,
+            "rows_analyzed": data_assessment.row_count,
+            "report_path": save_result.report_path,
+            "team_formation": "hierarchical",
+            "team_members": ["manager", "statistician", "visualizer", "engineer", "miner"]
+          }
+
+  # ===========================================================================
+  # VARIANT: Parallel Quick Analysis
+  # ===========================================================================
+  parallel_quick_analysis:
+    description: "Quick parallel analysis for rapid insights"
+    version: "1.0.0"
+    vertical: "dataanalysis"
+
+    metadata:
+      author: "Victor AI"
+      tags: ["data-analysis", "team", "parallel", "quick"]
+      framework_version: "0.5.0"
+
+    execution:
+      max_recursion_depth: 3
+      max_timeout_seconds: 900  # 15 minutes
+      max_iterations: 75
+
+    nodes:
+      - id: quick_analysis
+        type: team
+        name: "Quick Analysis Team"
+        goal: "Quick analysis of: {{data_path}}"
+        team_formation: parallel  # All analysts work simultaneously
+        timeout_seconds: 600
+        total_tool_budget: 75
+        output_key: quick_results
+        members:
+          - id: summarizer
+            role: researcher
+            name: "Data Summarizer"
+            goal: "Summarize data: {{data_path}}"
+            tool_budget: 25
+            tools: [pandas, python_repl]
+
+          - id: correlation_analyzer
+            role: researcher
+            name: "Correlation Analyzer"
+            goal: "Find correlations in: {{data_path}}"
+            tool_budget: 25
+            tools: [pandas, python_repl]
+
+          - id: outlier_detector
+            role: researcher
+            name: "Outlier Detector"
+            goal: "Detect outliers in: {{data_path}}"
+            tool_budget: 25
+            tools: [pandas, python_repl]
+        next: [complete]
+
+      - id: complete
+        type: transform
+        transform: "quick_analysis_complete = true"

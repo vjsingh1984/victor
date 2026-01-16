@@ -1,0 +1,421 @@
+# Team Template Usage Examples
+# ============================
+# Examples of using team templates in workflows.
+
+workflows:
+  # Example 1: Use code review template directly in workflow
+  pr_review_with_template:
+    description: "Pull request review using code review template"
+    version: "1.0.0"
+    vertical: "coding"
+
+    metadata:
+      template: "code_review_parallel"
+      template_source: "victor/workflows/templates/coding"
+
+    nodes:
+      # Use template to create team node
+      - id: review_team
+        type: team
+        name: "Code Review Team"
+        goal: |
+          Review pull request changes:
+          {{pr_context}}
+
+          Focus on security, performance, quality, and documentation.
+        team_formation: parallel
+        timeout_seconds: 600
+        total_tool_budget: 120
+        output_key: review_results
+
+        # Team members from template
+        members:
+          - id: security_reviewer
+            role: reviewer
+            name: "Security Reviewer"
+            goal: |
+              Review code for security vulnerabilities:
+              {{pr_context}}
+
+              Focus on injection attacks, authentication, authorization,
+              and OWASP Top 10 vulnerabilities.
+            tool_budget: 30
+            tools: [read, grep, code_search]
+            backstory: |
+              Security specialist with 12 years of experience.
+              CISSP certified with expertise in OWASP standards.
+            expertise: ["security", "vulnerabilities", "owasp", "authentication"]
+            personality: "Thorough and risk-averse; prioritizes security"
+            memory: true
+            cache: true
+
+          - id: performance_reviewer
+            role: reviewer
+            name: "Performance Reviewer"
+            goal: |
+              Review code for performance issues:
+              {{pr_context}}
+
+              Focus on algorithms, database queries, caching,
+              and optimization opportunities.
+            tool_budget: 30
+            tools: [read, grep, code_search]
+            backstory: |
+              Performance specialist with 10 years experience.
+              Expert in profiling and optimization.
+            expertise: ["performance", "optimization", "profiling", "caching"]
+            personality: "Data-driven; focuses on measurable improvements"
+            memory: true
+            cache: true
+
+          - id: quality_reviewer
+            role: reviewer
+            name: "Code Quality Reviewer"
+            goal: |
+              Review code quality and maintainability:
+              {{pr_context}}
+
+              Focus on complexity, duplication, patterns,
+              and SOLID principles.
+            tool_budget: 30
+            tools: [read, grep, code_search]
+            backstory: |
+              Senior engineer with 15 years experience.
+              Expert in clean code and refactoring.
+            expertise: ["code-quality", "refactoring", "design-patterns", "solid-principles"]
+            personality: "Pragmatic; balances quality with delivery"
+            memory: true
+            cache: true
+
+          - id: documentation_reviewer
+            role: reviewer
+            name: "Documentation Reviewer"
+            goal: |
+              Review documentation completeness:
+              {{pr_context}}
+
+              Focus on docstrings, comments, and examples.
+            tool_budget: 30
+            tools: [read, grep]
+            backstory: |
+              Technical writer with 8 years experience.
+              Advocate for self-documenting code.
+            expertise: ["documentation", "technical-writing", "communication"]
+            personality: "Clear and concise; values understanding"
+            memory: false
+            cache: true
+
+        merge_strategy: dict
+        merge_mode: team_wins
+        continue_on_error: true
+        next: [synthesize_report]
+
+      # Synthesize review results
+      - id: synthesize_report
+        type: agent
+        name: "Report Synthesizer"
+        role: writer
+        goal: |
+          Synthesize review findings into comprehensive report:
+          {{review_results}}
+
+          Create structured report with:
+          1. Executive Summary
+          2. Critical Issues
+          3. Detailed Findings by Category
+          4. Recommendations
+          5. Positive Feedback
+        tool_budget: 25
+        tools: [read, grep]
+        output: final_report
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Review Complete"
+        transform: |
+          review_complete = true
+          final_status = "REVIEW_COMPLETE"
+        next: []
+
+  # Example 2: Use multiple templates in sequence
+  comprehensive_feature_development:
+    description: "Full feature development using multiple templates"
+    version: "1.0.0"
+    vertical: "coding"
+
+    nodes:
+      # Stage 1: Quick research
+      - id: research
+        type: team
+        name: "Research Team"
+        goal: |
+          Research existing patterns and best practices for:
+          {{feature_description}}
+
+          Look for similar implementations, libraries, and examples.
+        team_formation: sequential
+        timeout_seconds: 300
+        total_tool_budget: 40
+        members:
+          - id: researcher
+            role: researcher
+            name: "Researcher"
+            goal: "Research codebase for patterns and examples"
+            tool_budget: 20
+            tools: [read, grep, code_search, web_search]
+
+          - id: planner
+            role: planner
+            name: "Planner"
+            goal: "Plan implementation based on research findings"
+            tool_budget: 20
+            tools: [read, grep]
+        output_key: research_findings
+        next: [implement]
+
+      # Stage 2: Implementation
+      - id: implement
+        type: agent
+        name: "Implementer"
+        role: executor
+        goal: |
+          Implement the feature based on research:
+          {{research_findings}}
+
+          Feature: {{feature_description}}
+          Requirements: {{requirements}}
+        tool_budget: 50
+        tools: [read, write, edit, shell]
+        output: implementation_result
+        next: [test]
+
+      # Stage 3: Testing (using template pattern)
+      - id: test
+        type: team
+        name: "Testing Team"
+        goal: |
+          Generate comprehensive tests for:
+          {{implementation_result}}
+
+          Create unit, integration, and E2E tests.
+        team_formation: parallel
+        timeout_seconds: 600
+        total_tool_budget: 100
+        members:
+          - id: unit_tester
+            role: executor
+            name: "Unit Test Generator"
+            goal: "Generate unit tests for all functions"
+            tool_budget: 30
+            tools: [read, write, shell, run_tests]
+
+          - id: integration_tester
+            role: executor
+            name: "Integration Test Generator"
+            goal: "Generate integration tests for components"
+            tool_budget: 35
+            tools: [read, write, shell, run_tests]
+
+          - id: e2e_tester
+            role: executor
+            name: "E2E Test Generator"
+            goal: "Generate end-to-end tests for user workflows"
+            tool_budget: 35
+            tools: [read, write, shell, run_tests]
+        output_key: test_results
+        next: [review]
+
+      # Stage 4: Code review (using template pattern)
+      - id: review
+        type: team
+        name: "Code Review Team"
+        goal: |
+          Review implementation and tests:
+          {{implementation_result}}
+
+          {{test_results}}
+        team_formation: parallel
+        timeout_seconds: 600
+        total_tool_budget: 100
+        members:
+          - id: security_reviewer
+            role: reviewer
+            name: "Security Reviewer"
+            goal: "Review for security vulnerabilities"
+            tool_budget: 25
+            tools: [read, grep, code_search]
+
+          - id: quality_reviewer
+            role: reviewer
+            name: "Quality Reviewer"
+            goal: "Review code quality and maintainability"
+            tool_budget: 25
+            tools: [read, grep, code_search]
+
+          - id: performance_reviewer
+            role: reviewer
+            name: "Performance Reviewer"
+            goal: "Review for performance issues"
+            tool_budget: 25
+            tools: [read, grep, code_search]
+
+          - id: test_reviewer
+            role: reviewer
+            name: "Test Reviewer"
+            goal: "Review test quality and coverage"
+            tool_budget: 25
+            tools: [read, grep, run_tests]
+        output_key: review_results
+        next: [finalize]
+
+      - id: finalize
+        type: agent
+        name: "Finalizer"
+        role: writer
+        goal: |
+          Create final summary with:
+          {{research_findings}}
+
+          {{implementation_result}}
+
+          {{test_results}}
+
+          {{review_results}}
+
+          Provide status, recommendations, and next steps.
+        tool_budget: 20
+        tools: [read, grep]
+        output: final_summary
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Complete"
+        transform: |
+          feature_complete = true
+          status = "SUCCESS"
+        next: []
+
+  # Example 3: Use hierarchical template for complex debugging
+  complex_bug_investigation:
+    description: "Complex bug investigation using hierarchical team"
+    version: "1.0.0"
+    vertical: "coding"
+
+    nodes:
+      - id: bug_investigation
+        type: team
+        name: "Bug Investigation Team"
+        goal: |
+          Investigate and fix bug:
+          {{bug_description}}
+
+          Context: {{context}}
+        team_formation: hierarchical
+        timeout_seconds: 900
+        total_tool_budget: 150
+        output_key: investigation_result
+
+        # Manager coordinates investigation
+        members:
+          - id: investigation_manager
+            role: planner
+            name: "Investigation Manager"
+            goal: |
+              Coordinate bug investigation, delegate to specialists,
+              analyze findings, and direct fix implementation.
+            backstory: |
+              Principal engineer with 20 years debugging experience.
+              Expert in systematic problem solving.
+            expertise: ["debugging-strategy", "coordination", "synthesis"]
+            tool_budget: 40
+            can_delegate: true
+            max_delegation_depth: 2
+            delegation_targets: [reproduction_specialist, log_analyzer, code_trace_expert]
+            memory: true
+            cache: true
+
+          # Specialists investigate different aspects
+          - id: reproduction_specialist
+            role: researcher
+            name: "Reproduction Specialist"
+            goal: |
+              Reproduce the bug with minimal steps.
+              Identify reproduction conditions and edge cases.
+            tool_budget: 35
+            tools: [read, shell, run_tests, grep]
+            backstory: |
+              QA engineer with 10 years experience.
+              Expert in bug reproduction.
+            expertise: ["bug-reproduction", "test-design", "edge-cases"]
+            memory: true
+            cache: true
+
+          - id: log_analyzer
+            role: researcher
+            name: "Log Analyzer"
+            goal: |
+              Analyze logs, stack traces, and error messages.
+              Identify failure patterns and error chains.
+            tool_budget: 35
+            tools: [read, grep, shell, find]
+            backstory: |
+              DevOps engineer with 12 years experience.
+              Expert in log analysis and tracing.
+            expertise: ["log-analysis", "stack-traces", "error-patterns"]
+            memory: true
+            cache: true
+
+          - id: code_trace_expert
+            role: researcher
+            name: "Code Trace Expert"
+            goal: |
+              Trace code execution to identify logic errors
+              and race conditions.
+            tool_budget: 40
+            tools: [read, grep, code_search, find]
+            backstory: |
+              Software engineer with 15 years experience.
+              Expert in code analysis and debugging.
+            expertise: ["code-tracing", "logic-analysis", "race-conditions"]
+            memory: true
+            cache: true
+
+        next: [implement_fix]
+
+      - id: implement_fix
+        type: agent
+        name: "Fix Implementer"
+        role: executor
+        goal: |
+          Implement fix based on investigation:
+          {{investigation_result}}
+
+          Test the fix and verify it resolves the issue.
+        tool_budget: 50
+        tools: [read, write, edit, shell, run_tests]
+        output: fix_result
+        next: [verify_fix]
+
+      - id: verify_fix
+        type: agent
+        name: "Fix Verifier"
+        role: reviewer
+        goal: |
+          Verify fix resolves the bug:
+          {{fix_result}}
+
+          Run tests and confirm issue is resolved.
+        tool_budget: 25
+        tools: [read, shell, run_tests]
+        output: verification_result
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Complete"
+        transform: |
+          bug_resolved = true
+          resolution_summary = {{verification_result}}
+        next: []
