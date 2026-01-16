@@ -128,6 +128,7 @@ class YAMLNodeType(str, Enum):
     PARALLEL = "parallel"
     TRANSFORM = "transform"
     HITL = "hitl"
+    TEAM = "team"
 
 
 class ConstraintType(str, Enum):
@@ -249,6 +250,7 @@ from victor.workflows.definition import (
     ConditionNode,
     ParallelNode,
     TaskConstraints,
+    TeamNodeWorkflow,
     TransformNode,
     WorkflowDefinition,
     WorkflowNode,
@@ -1045,6 +1047,60 @@ def _parse_hitl_node(node_data: Dict[str, Any]) -> WorkflowNode:
     )
 
 
+def _parse_team_node(node_data: Dict[str, Any]) -> TeamNodeWorkflow:
+    """Parse team node from YAML data.
+
+    Team nodes spawn multi-agent teams with configurable formations.
+
+    Args:
+        node_data: Parsed YAML data for a single node
+
+    Returns:
+        TeamNodeWorkflow instance
+
+    Raises:
+        YAMLWorkflowError: If required fields are missing or invalid
+    """
+    from victor.workflows.definition import TeamNodeWorkflow
+
+    # Required fields
+    node_id = node_data.get("id")
+    if not node_id:
+        raise YAMLWorkflowError("Team node missing required 'id' field")
+
+    # Parse team-specific fields
+    goal = node_data.get("goal", "")
+    team_formation = node_data.get("team_formation", "sequential")
+    members = node_data.get("members", [])
+    timeout_seconds = node_data.get("timeout_seconds")
+    total_tool_budget = node_data.get("total_tool_budget", 100)
+    max_iterations = node_data.get("max_iterations", 50)
+    merge_strategy = node_data.get("merge_strategy", "dict")
+    merge_mode = node_data.get("merge_mode", "team_wins")
+    output_key = node_data.get("output_key", "team_result")
+    continue_on_error = node_data.get("continue_on_error", True)
+
+    # Create TeamNodeWorkflow instance
+    return TeamNodeWorkflow(
+        id=node_id,
+        name=node_data.get("name", f"Team: {node_id}"),
+        goal=goal,
+        team_formation=team_formation,
+        members=members,
+        timeout_seconds=timeout_seconds,
+        total_tool_budget=total_tool_budget,
+        max_iterations=max_iterations,
+        merge_strategy=merge_strategy,
+        merge_mode=merge_mode,
+        output_key=output_key,
+        continue_on_error=continue_on_error,
+        # Common fields
+        next_nodes=node_data.get("next", []),
+        retry_policy=node_data.get("retry_policy"),
+        circuit_breaker_enabled=node_data.get("circuit_breaker_enabled", False),
+    )
+
+
 def _parse_constraints(constraints_data: Any, timeout: float = 60.0) -> TaskConstraints:
     """Parse constraints from YAML data.
 
@@ -1275,6 +1331,8 @@ def _parse_node(
         return _parse_transform_node(node_data, config)
     elif node_type_str == YAMLNodeType.HITL.value:
         return _parse_hitl_node(node_data)
+    elif node_type_str == YAMLNodeType.TEAM.value:
+        return _parse_team_node(node_data)
     else:
         valid_types = [t.value for t in YAMLNodeType]
         raise YAMLWorkflowError(f"Unknown node type: '{node_type_str}'. Valid types: {valid_types}")
@@ -1378,6 +1436,15 @@ def load_workflow_from_dict(
     )
     max_iterations = execution_settings.get("max_iterations") or data.get("max_iterations") or 25
     max_retries = execution_settings.get("max_retries") or data.get("max_retries") or 0
+
+    # Parse max_recursion_depth from execution settings, metadata, or workflow level
+    max_recursion_depth = (
+        execution_settings.get("max_recursion_depth")
+        or metadata.get("max_recursion_depth")
+        or data.get("max_recursion_depth")
+        or 3  # Default value
+    )
+    metadata["max_recursion_depth"] = max_recursion_depth
 
     # Parse schedule configuration if present
     schedule_data = data.get("schedule")

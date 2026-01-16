@@ -65,6 +65,8 @@ if TYPE_CHECKING:
     )
     from victor.framework.graph import CheckpointerProtocol
 
+from victor.workflows.recursion import RecursionContext
+
 logger = logging.getLogger(__name__)
 
 
@@ -77,6 +79,7 @@ class ExecutorConfig:
         max_iterations: Max loop iterations for cyclic workflows
         timeout: Execution timeout in seconds
         interrupt_nodes: Nodes to interrupt before (for human-in-the-loop)
+        max_recursion_depth: Maximum recursion depth for nested execution (default: 3)
     """
 
     enable_checkpointing: bool = True
@@ -84,6 +87,7 @@ class ExecutorConfig:
     timeout: Optional[float] = None
     interrupt_nodes: List[str] = field(default_factory=list)
     default_profile: Optional[str] = None  # Default profile for nodes without explicit profile
+    max_recursion_depth: int = 3
 
 
 @dataclass
@@ -238,6 +242,7 @@ class StateGraphExecutor:
         *,
         thread_id: Optional[str] = None,
         checkpointer: Optional["CheckpointerProtocol"] = None,
+        recursion_context: Optional[RecursionContext] = None,
     ) -> ExecutorResult:
         """Execute a workflow using Victor's StateGraph engine.
 
@@ -246,6 +251,7 @@ class StateGraphExecutor:
             initial_context: Initial context/state data
             thread_id: Thread ID for checkpointing
             checkpointer: Custom checkpointer
+            recursion_context: RecursionContext for tracking nesting depth
 
         Returns:
             ExecutorResult with execution outcome
@@ -273,36 +279,48 @@ class StateGraphExecutor:
             # Compile workflow to StateGraph
             compiled = compiler.compile(workflow)
 
-            # Prepare initial state
-            state: WorkflowState = {
-                "_workflow_id": thread_id or uuid.uuid4().hex,
-                "_current_node": workflow.start_node or "",
-                "_node_results": {},
-                "_error": None,
-                "_iteration": 0,
-                "_parallel_results": {},
-                "_hitl_pending": False,
-                "_hitl_response": None,
-            }
+            # Create recursion context if not provided
+            if recursion_context is None:
+                recursion_context = RecursionContext(max_depth=self.config.max_recursion_depth)
 
-            # Merge user context
-            for key, value in (initial_context or {}).items():
-                state[key] = value
+            # Track workflow entry
+            recursion_context.enter("workflow", workflow.name)
 
-            # Execute
-            result = await compiled.invoke(state, thread_id=thread_id)
+            try:
+                # Prepare initial state
+                state: WorkflowState = {
+                    "_workflow_id": thread_id or uuid.uuid4().hex,
+                    "_current_node": workflow.start_node or "",
+                    "_node_results": {},
+                    "_error": None,
+                    "_iteration": 0,
+                    "_parallel_results": {},
+                    "_hitl_pending": False,
+                    "_hitl_response": None,
+                    "_recursion_context": recursion_context,  # Add recursion context to state
+                }
 
-            # Extract user state (exclude internal fields)
-            user_state = {k: v for k, v in result.state.items() if not k.startswith("_")}
+                # Merge user context
+                if initial_context:
+                    state.update(initial_context)  # type: ignore[typeddict-item]
 
-            return ExecutorResult(
-                success=result.success,
-                state=user_state,
-                error=result.error,
-                duration_seconds=time.time() - start_time,
-                nodes_executed=result.node_history,
-                iterations=result.iterations,
-            )
+                # Execute
+                result = await compiled.invoke(state, thread_id=thread_id)
+
+                # Extract user state (exclude internal fields)
+                user_state = {k: v for k, v in result.state.items() if not k.startswith("_")}
+
+                return ExecutorResult(
+                    success=result.success,
+                    state=user_state,
+                    error=result.error,
+                    duration_seconds=time.time() - start_time,
+                    nodes_executed=result.node_history,
+                    iterations=result.iterations,
+                )
+            finally:
+                # Always exit recursion context
+                recursion_context.exit()
 
         except Exception as e:
             logger.error(f"Workflow execution failed: {e}", exc_info=True)
@@ -319,13 +337,15 @@ class StateGraphExecutor:
         initial_context: Optional[Dict[str, Any]] = None,
         *,
         thread_id: Optional[str] = None,
-    ) -> AsyncIterator[tuple]:
+        recursion_context: Optional[RecursionContext] = None,
+    ) -> AsyncIterator[tuple[str, Dict[str, Any]]]:
         """Stream workflow execution, yielding after each node.
 
         Args:
             workflow: The workflow to execute
             initial_context: Initial context data
             thread_id: Thread ID for checkpointing
+            recursion_context: RecursionContext for tracking nesting depth
 
         Yields:
             Tuple of (node_id, current_state) after each node execution
@@ -335,26 +355,38 @@ class StateGraphExecutor:
         compiler = self._get_compiler()
         compiled = compiler.compile(workflow)
 
-        # Prepare initial state
-        state: WorkflowState = {
-            "_workflow_id": thread_id or uuid.uuid4().hex,
-            "_current_node": workflow.start_node or "",
-            "_node_results": {},
-            "_error": None,
-            "_iteration": 0,
-            "_parallel_results": {},
-            "_hitl_pending": False,
-            "_hitl_response": None,
-        }
+        # Create recursion context if not provided
+        if recursion_context is None:
+            recursion_context = RecursionContext(max_depth=self.config.max_recursion_depth)
 
-        for key, value in (initial_context or {}).items():
-            state[key] = value
+        # Track workflow entry
+        recursion_context.enter("workflow", workflow.name)
 
-        # Stream execution
-        async for node_id, current_state in compiled.stream(state, thread_id=thread_id):
-            # Filter internal fields for user
-            user_state = {k: v for k, v in current_state.items() if not k.startswith("_")}
-            yield (node_id, user_state)
+        try:
+            # Prepare initial state
+            state: WorkflowState = {
+                "_workflow_id": thread_id or uuid.uuid4().hex,
+                "_current_node": workflow.start_node or "",
+                "_node_results": {},
+                "_error": None,
+                "_iteration": 0,
+                "_parallel_results": {},
+                "_hitl_pending": False,
+                "_hitl_response": None,
+                "_recursion_context": recursion_context,  # Add recursion context to state
+            }
+
+            if initial_context:
+                state.update(initial_context)  # type: ignore[typeddict-item]
+
+            # Stream execution
+            async for node_id, current_state in compiled.stream(state, thread_id=thread_id):
+                # Filter internal fields for user
+                user_state = {k: v for k, v in current_state.items() if not k.startswith("_")}
+                yield (node_id, user_state)
+        finally:
+            # Always exit recursion context
+            recursion_context.exit()
 
 
 # Global default executor instance

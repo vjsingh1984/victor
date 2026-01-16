@@ -1,0 +1,171 @@
+# Literature Review Team (Pipeline Formation)
+# ==========================================
+# Systematic literature review with search, analysis, and synthesis.
+#
+# Formation: PIPELINE
+# - Search → Analyze → Synthesize
+# - Structured approach to research
+# - Comprehensive coverage
+#
+# Use Cases:
+# - Academic literature review
+# - Technology research
+# - Competitive analysis
+# - State-of-the-art analysis
+#
+# Complexity: standard
+# Members: 3 (searcher, analyzer, synthesizer)
+# Tool Budget: 100 total
+# Timeout: 15 minutes
+
+name: literature_review_pipeline
+display_name: "Literature Review Team (Pipeline)"
+description: "Systematic literature review with search, analysis, and synthesis"
+long_description: |
+  A pipeline team for systematic literature review. The team searches for
+  relevant sources, analyzes individual papers/sources, and synthesizes
+  findings into a comprehensive review. This structured approach ensures
+  thorough coverage and high-quality synthesis.
+
+  Ideal for academic research, technology assessment, and competitive analysis.
+version: "1.0.0"
+author: "Victor AI"
+vertical: "research"
+formation: "pipeline"
+
+tags:
+  - "literature-review"
+  - "research"
+  - "synthesis"
+  - "academic-research"
+  - "pipeline"
+
+use_cases:
+  - "Academic literature review"
+  - "Technology research"
+  - "Competitive analysis"
+  - "State-of-the-art assessment"
+  - "Background research"
+
+complexity: "standard"
+max_iterations: 75
+total_tool_budget: 100
+timeout_seconds: 900
+
+members:
+  # Literature Searcher
+  - id: "literature_searcher"
+    role: "researcher"
+    name: "Literature Searcher"
+    goal: |
+      Search for and collect relevant literature, papers, articles, and
+      resources. Use multiple sources and search strategies to ensure
+      comprehensive coverage of the topic.
+    backstory: |
+      Academic librarian with 15 years of research experience.
+      Expert in academic databases, search strategies, and information retrieval.
+      Specializes in systematic literature review methodology.
+      PhD in Library and Information Science.
+    expertise:
+      - "literature-search"
+      - "academic-databases"
+      - "information-retrieval"
+      - "search-strategies"
+      - "source-evaluation"
+      - "bibliographic-management"
+    personality: |
+      Thorough and systematic; ensures comprehensive coverage.
+      Evaluates sources for quality and relevance.
+    tool_budget: 30
+    allowed_tools:
+      - "web_search"
+      - "read"
+      - "find"
+    priority: 0
+    memory: true
+    cache: true
+
+  # Paper Analyzer
+  - id: "paper_analyzer"
+    role: "researcher"
+    name: "Paper Analyzer"
+    goal: |
+      Analyze individual papers and sources in depth. Extract key findings,
+      methodologies, limitations, and contributions. Identify patterns
+      and relationships across sources.
+    backstory: |
+      Research scientist with 12 years of academic research experience.
+      Expert in critical analysis and research methodology.
+      Specializes in synthesizing information across multiple sources.
+      Published researcher with interdisciplinary background.
+    expertise:
+      - "critical-analysis"
+      - "research-methodology"
+      - "extraction"
+      - "pattern-recognition"
+      - "synthesis"
+      - "academic-writing"
+    personality: |
+      Analytical and insightful; extracts key information efficiently.
+      Identifies connections between disparate sources.
+    tool_budget: 40
+    priority: 1
+    memory: true
+    cache: true
+
+  # Review Synthesizer
+  - id: "review_synthesizer"
+    role: "writer"
+    name: "Review Synthesizer"
+    goal: |
+      Synthesize analyzed sources into a comprehensive literature review.
+      Organize findings thematically, identify gaps, and provide balanced
+      assessment of current state of knowledge.
+    backstory: |
+      Academic writer with 18 years of experience in research synthesis.
+      Expert in academic writing, literature review methodology, and publication.
+      Specializes in making complex research accessible.
+      Former journal editor with extensive reviewing experience.
+    expertise:
+      - "synthesis"
+      - "academic-writing"
+      - "literature-review-methodology"
+      - "thematic-analysis"
+      - "gap-analysis"
+      - "clear-communication"
+    personality: |
+      Clear and organized; presents complex information accessibly.
+      Maintains academic rigor while ensuring readability.
+    tool_budget: 30
+    priority: 2
+    memory: false
+    cache: true
+
+config:
+  pipeline_stages: ["search", "analysis", "synthesis"]
+  min_sources: 10
+  quality_threshold: "peer-reviewed"
+  citation_format: "APA"
+
+metadata:
+  category: "research"
+  best_for: ["literature-review", "technology-research", "competitive-analysis"]
+  alternatives:
+    - "quick_research_sequential"  # For quick research
+    - "fact_check_consensus"  # For verification
+
+examples:
+  - name: "Technology Research"
+    description: "Research current state of a technology"
+    input:
+      goal: "Research current state of large language model orchestration"
+      context:
+        years: 3
+        source_types: ["academic", "industry", "blogs"]
+  - name: "Academic Literature Review"
+    description: "Conduct academic literature review"
+    input:
+      goal: "Literature review on adversarial robustness in deep learning"
+      context:
+        min_sources: 20
+        quality: "peer-reviewed"

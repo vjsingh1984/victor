@@ -1,0 +1,234 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Recursion depth tracking for nested workflow and team execution.
+
+This module provides unified recursion depth tracking to prevent infinite nesting
+between workflows and teams. All nesting types count toward the same limit:
+- Workflow invoking workflow
+- Workflow spawning team
+- Team spawning team
+- Team spawning workflow
+
+Example:
+    from victor.workflows.recursion import RecursionContext
+
+    recursion_ctx = RecursionContext(max_depth=3)
+
+    # Enter a nested execution
+    recursion_ctx.enter("workflow", "my_workflow")
+    recursion_ctx.enter("team", "research_team")
+
+    # Check current depth
+    print(f"Current depth: {recursion_ctx.current_depth}")  # 2
+
+    # Exit in reverse order
+    recursion_ctx.exit()
+    recursion_ctx.exit()
+"""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass, field
+from typing import List, Optional
+
+from victor.core.errors import RecursionDepthError
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class RecursionContext:
+    """Tracks recursion depth for nested execution.
+
+    This class provides unified recursion depth tracking across all nested
+    execution types (workflows and teams). It maintains a stack trace
+    for debugging and clear error messages when limits are exceeded.
+
+    Attributes:
+        current_depth: Current nesting level (0 = top-level)
+        max_depth: Maximum allowed nesting level (default: 3)
+        execution_stack: Stack trace of execution entries
+
+    Example:
+        >>> ctx = RecursionContext(max_depth=3)
+        >>> ctx.enter("workflow", "main")
+        >>> ctx.enter("team", "research")
+        >>> print(ctx.current_depth)
+        2
+        >>> print(ctx.execution_stack)
+        ['workflow:main', 'team:research']
+        >>> ctx.exit()
+        >>> ctx.exit()
+        >>> print(ctx.current_depth)
+        0
+    """
+
+    current_depth: int = 0
+    max_depth: int = 3
+    execution_stack: List[str] = field(default_factory=list)
+
+    def enter(self, operation_type: str, identifier: str) -> None:
+        """Enter a nested execution level.
+
+        Args:
+            operation_type: Type of operation ("workflow" or "team")
+            identifier: Unique identifier (workflow name, team name, etc.)
+
+        Raises:
+            RecursionDepthError: If max_depth would be exceeded
+
+        Example:
+            >>> ctx = RecursionContext(max_depth=3)
+            >>> ctx.enter("workflow", "my_workflow")
+            >>> ctx.enter("team", "research_team")
+            >>> ctx.enter("workflow", "nested_workflow")
+            >>> ctx.enter("team", "inner_team")  # Raises RecursionDepthError
+        """
+        if self.current_depth >= self.max_depth:
+            stack_str = " → ".join(self.execution_stack)
+            raise RecursionDepthError(
+                message=f"Maximum recursion depth ({self.max_depth}) exceeded. "
+                f"Attempting to enter {operation_type}:{identifier}",
+                current_depth=self.current_depth,
+                max_depth=self.max_depth,
+                execution_stack=self.execution_stack.copy()
+            )
+
+        self.current_depth += 1
+        self.execution_stack.append(f"{operation_type}:{identifier}")
+
+        logger.debug(
+            f"Entered recursion level {self.current_depth}/{self.max_depth}: "
+            f"{operation_type}:{identifier}"
+        )
+
+    def exit(self) -> None:
+        """Exit a nested execution level.
+
+        Decrements the current depth and removes the last entry from the
+        execution stack. Safe to call when already at depth 0.
+
+        Example:
+            >>> ctx = RecursionContext()
+            >>> ctx.enter("workflow", "test")
+            >>> ctx.exit()
+            >>> print(ctx.current_depth)
+            0
+        """
+        if self.execution_stack:
+            exited = self.execution_stack.pop()
+            logger.debug(f"Exited recursion level: {exited}")
+
+        self.current_depth = max(0, self.current_depth - 1)
+
+    def can_nest(self, levels: int = 1) -> bool:
+        """Check if nesting is possible without exceeding max_depth.
+
+        Args:
+            levels: Number of levels to check (default: 1)
+
+        Returns:
+            True if nesting is possible, False otherwise
+
+        Example:
+            >>> ctx = RecursionContext(max_depth=3)
+            >>> ctx.enter("workflow", "test")
+            >>> ctx.can_nest(1)  # Can go to depth 2
+            True
+            >>> ctx.can_nest(2)  # Can go to depth 3
+            True
+            >>> ctx.can_nest(3)  # Would exceed max_depth
+            False
+        """
+        return (self.current_depth + levels) <= self.max_depth
+
+    def get_depth_info(self) -> dict:
+        """Get current recursion depth information.
+
+        Returns:
+            Dictionary with current_depth, max_depth, remaining_depth,
+            and execution_stack
+
+        Example:
+            >>> ctx = RecursionContext(max_depth=5)
+            >>> ctx.enter("workflow", "main")
+            >>> info = ctx.get_depth_info()
+            >>> print(info['current_depth'])
+            1
+            >>> print(info['remaining_depth'])
+            4
+        """
+        return {
+            "current_depth": self.current_depth,
+            "max_depth": self.max_depth,
+            "remaining_depth": self.max_depth - self.current_depth,
+            "execution_stack": self.execution_stack.copy(),
+        }
+
+    def __enter__(self) -> "RecursionContext":
+        """Context manager entry - for automatic cleanup.
+
+        Example:
+            >>> ctx = RecursionContext()
+            >>> with ctx:
+            ...     ctx.enter("workflow", "test")
+            ...     # Automatically exits when leaving context
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Context manager exit - reset state."""
+        self.current_depth = 0
+        self.execution_stack.clear()
+
+    def __repr__(self) -> str:
+        return (
+            f"RecursionContext(depth={self.current_depth}/{self.max_depth}, "
+            f"stack={self.execution_stack})"
+        )
+
+
+class RecursionGuard:
+    """Context manager for automatic recursion tracking.
+
+    Ensures that enter() and exit() are properly paired, even when
+    exceptions occur.
+
+    Example:
+        >>> ctx = RecursionContext(max_depth=3)
+        >>> with RecursionGuard(ctx, "workflow", "my_workflow"):
+        ...     # Nested execution here
+        ...     pass
+        # Automatically exits when leaving context
+    """
+
+    def __init__(
+        self,
+        recursion_context: RecursionContext,
+        operation_type: str,
+        identifier: str,
+    ):
+        self._ctx = recursion_context
+        self._operation_type = operation_type
+        self._identifier = identifier
+
+    def __enter__(self) -> "RecursionGuard":
+        self._ctx.enter(self._operation_type, self._identifier)
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self._ctx.exit()
+        return False  # Don't suppress exceptions

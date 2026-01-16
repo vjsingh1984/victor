@@ -132,6 +132,7 @@ class WorkflowState(TypedDict, total=False):
         _parallel_results: Results from parallel node execution
         _hitl_pending: Whether waiting for human input
         _hitl_response: Human response data
+        _recursion_context: RecursionContext for tracking nesting depth
 
     All other keys are dynamic workflow context data.
     """
@@ -145,6 +146,7 @@ class WorkflowState(TypedDict, total=False):
     _parallel_results: Dict[str, Any]
     _hitl_pending: bool
     _hitl_response: Optional[Dict[str, Any]]
+    _recursion_context: Optional[Any]  # RecursionContext (avoid circular import)
 
 
 # =============================================================================

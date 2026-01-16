@@ -133,6 +133,7 @@ class UnifiedCompilerConfig:
         max_iterations: Maximum workflow iterations (default: 25)
         execution_timeout: Overall execution timeout in seconds
         enable_checkpointing: Whether to enable state checkpointing
+        max_recursion_depth: Maximum recursion depth for nested execution (default: 3)
     """
 
     enable_caching: bool = True
@@ -145,6 +146,7 @@ class UnifiedCompilerConfig:
     max_iterations: int = 25
     execution_timeout: Optional[float] = None
     enable_checkpointing: bool = True
+    max_recursion_depth: int = 3
 
 
 # =============================================================================
@@ -434,7 +436,7 @@ class NodeExecutorFactory:
             except (ToolExecutionError, ToolTimeoutError, ValidationError, ConfigurationError) as e:
                 # Known workflow errors - handle with specific logging
                 duration = time.time() - start_time
-                correlation_id = getattr(e, 'correlation_id', str(uuid.uuid4())[:8])
+                correlation_id = getattr(e, "correlation_id", str(uuid.uuid4())[:8])
                 workflow_id = state.get("_workflow_name", "unknown")
                 checkpoint_id = state.get("_checkpoint_id") or state.get("thread_id")
 
@@ -667,7 +669,9 @@ class NodeExecutorFactory:
                                     break
                             except Exception as e:
                                 # Catch-all for unexpected errors
-                                logger.warning(f"Unexpected error executing tool '{tool_name}': {e}")
+                                logger.warning(
+                                    f"Unexpected error executing tool '{tool_name}': {e}"
+                                )
                                 outputs[tool_name] = {"error": str(e)}
                                 if node.fail_fast:
                                     break
@@ -1048,9 +1052,12 @@ class NodeExecutorFactory:
         from victor.framework.state_merging import MergeMode
         from victor.agent.subagents import SubAgentRole
         from victor.teams.types import TeamMember, TeamFormation
+        from victor.workflows.team_node_runner import TeamNodeRunner
+        from victor.workflows.recursion import RecursionContext
 
         orchestrator = self.orchestrator
         emitter = self._emitter
+        tool_registry = self.tool_registry
 
         async def execute_team(state: Dict[str, Any]) -> Dict[str, Any]:
             start_time = time.time()
@@ -1062,95 +1069,50 @@ class NodeExecutorFactory:
                 emitter.emit_node_start(node.id, node_name)
 
             try:
-                # Convert team members from dict to TeamMember objects
-                role_map = {
-                    "researcher": SubAgentRole.RESEARCHER,
-                    "planner": SubAgentRole.PLANNER,
-                    "executor": SubAgentRole.EXECUTOR,
-                    "reviewer": SubAgentRole.REVIEWER,
-                    "writer": SubAgentRole.WRITER,
-                    "analyst": SubAgentRole.RESEARCHER,
-                }
-
-                members = []
-                for member_dict in node.members:
-                    role = role_map.get(
-                        member_dict.get("role", "executor").lower(), SubAgentRole.EXECUTOR
+                # Extract recursion context from state
+                recursion_ctx: Optional[RecursionContext] = state.get("_recursion_context")
+                if recursion_ctx is None:
+                    # Create new recursion context if not present
+                    recursion_ctx = RecursionContext(max_depth=3)
+                    logger.warning(
+                        f"Team node '{node.id}' executing without parent recursion context, "
+                        "created new context"
                     )
-                    member = TeamMember(
-                        id=member_dict.get("id", f"{role.value}_{len(members)}"),
-                        role=role,
-                        name=member_dict.get("name", member_dict.get("id", "Member")),
-                        goal=member_dict.get("goal", ""),
-                        tool_budget=member_dict.get("tool_budget", 15),
-                        allowed_tools=member_dict.get("allowed_tools"),
-                        can_delegate=member_dict.get("can_delegate", False),
-                        delegation_targets=member_dict.get("delegation_targets"),
-                        is_manager=member_dict.get("is_manager", False),
-                        backstory=member_dict.get("backstory", ""),
-                        expertise=member_dict.get("expertise", []),
-                        personality=member_dict.get("personality", ""),
-                    )
-                    members.append(member)
 
-                # Map formation string to enum
-                formation_map = {
-                    "sequential": TeamFormation.SEQUENTIAL,
-                    "parallel": TeamFormation.PARALLEL,
-                    "hierarchical": TeamFormation.HIERARCHICAL,
-                    "pipeline": TeamFormation.PIPELINE,
-                    "consensus": TeamFormation.CONSENSUS,
-                }
-                formation = formation_map.get(node.team_formation.lower(), TeamFormation.SEQUENTIAL)
-
-                # Map merge mode string to enum
-                merge_mode_map = {
-                    "team_wins": MergeMode.TEAM_WINS,
-                    "graph_wins": MergeMode.GRAPH_WINS,
-                    "merge": MergeMode.MERGE,
-                    "error": MergeMode.ERROR,
-                }
-                merge_mode = merge_mode_map.get(node.merge_mode.lower(), MergeMode.TEAM_WINS)
-
-                # Create TeamNode config
-                from victor.framework.workflows.nodes import TeamNodeConfig
-
-                config = TeamNodeConfig(
-                    timeout_seconds=node.timeout_seconds,
-                    merge_strategy=node.merge_strategy,
-                    merge_mode=merge_mode,
-                    output_key=node.output_key,
-                    continue_on_error=node.continue_on_error,
+                # Use TeamNodeRunner for proper recursion tracking
+                runner = TeamNodeRunner(
+                    orchestrator=orchestrator,
+                    tool_registry=tool_registry,
+                    enable_observability=bool(emitter),
                 )
 
-                # Create TeamNode and execute
-                team_node = TeamNode(
-                    id=node.id,
-                    name=node.name,
-                    goal=node.goal,
-                    team_formation=formation,
-                    members=members,
-                    config=config,
-                    shared_context=node.shared_context,
-                    max_iterations=node.max_iterations,
-                    total_tool_budget=node.total_tool_budget,
+                # Execute team node with recursion context
+                result = await runner.execute(
+                    node=node,
+                    context=state,
+                    recursion_ctx=recursion_ctx,
                 )
 
-                # Execute team (async)
-                merged_state = await team_node.execute_async(orchestrator, state)
-
-                # Update node results
+                # Update state with result
                 duration = time.time() - start_time
-                if "_node_results" not in merged_state:
-                    merged_state["_node_results"] = {}
+                if "_node_results" not in state:
+                    state["_node_results"] = {}
 
-                team_result = merged_state.get(node.output_key, {})
-                merged_state["_node_results"][node.id] = NodeExecutionResult(
+                state["_node_results"][node.id] = NodeExecutionResult(
                     node_id=node.id,
-                    success=team_result.get("success", True),
-                    output=team_result,
+                    success=result.success,
+                    output=result.output,
+                    error=result.error,
                     duration_seconds=duration,
+                    tool_calls_used=getattr(result, "tool_calls_used", 0),
                 )
+
+                # Merge output into state using output_key
+                if result.success and result.output is not None:
+                    if isinstance(result.output, dict):
+                        state.update(result.output)
+                    else:
+                        state[node.output_key] = result.output
 
                 # Emit NODE_COMPLETE if emitter is configured
                 if emitter and hasattr(emitter, "emit_node_complete"):
@@ -1158,10 +1120,10 @@ class NodeExecutorFactory:
                         node.id,
                         node_name,
                         duration=duration,
-                        output=team_result,
+                        output=result.output,
                     )
 
-                return merged_state
+                return state
 
             except Exception as e:
                 duration = time.time() - start_time
@@ -1206,7 +1168,9 @@ class NodeExecutorFactory:
                         checkpoint_id=checkpoint_id,
                         execution_context={
                             "duration": duration,
-                            "team_formation": node.formation if hasattr(node, "formation") else "unknown",
+                            "team_formation": (
+                                node.formation if hasattr(node, "formation") else "unknown"
+                            ),
                         },
                         correlation_id=correlation_id,
                     ) from e
@@ -1259,6 +1223,7 @@ class CachedCompiledGraph:
         default_node_timeout_seconds: Default timeout for nodes
         max_iterations: Maximum workflow iterations
         max_retries: Maximum retries for workflow
+        max_recursion_depth: Maximum recursion depth for nested execution (default: 3)
     """
 
     compiled_graph: "CompiledGraph"
@@ -1271,6 +1236,7 @@ class CachedCompiledGraph:
     default_node_timeout_seconds: Optional[float] = None
     max_iterations: int = 25
     max_retries: int = 0
+    max_recursion_depth: int = 3
 
     async def invoke(
         self,
@@ -1279,6 +1245,7 @@ class CachedCompiledGraph:
         config: Optional["GraphConfig"] = None,
         thread_id: Optional[str] = None,
         use_cache: bool = True,
+        max_recursion_depth: Optional[int] = None,
     ) -> "GraphExecutionResult":
         """Execute the compiled workflow.
 
@@ -1287,47 +1254,81 @@ class CachedCompiledGraph:
             config: Optional execution configuration override
             thread_id: Thread ID for checkpointing
             use_cache: Whether to use execution cache (for future use)
+            max_recursion_depth: Override max recursion depth (optional)
 
         Returns:
             GraphExecutionResult with final state
         """
         from victor.framework.graph import GraphExecutionResult
+        from victor.workflows.recursion import RecursionContext
 
         # Prepare state with metadata
         exec_state = self._prepare_state(input_state)
         exec_state["_max_iterations"] = self.max_iterations
 
-        # Execute with optional workflow-level timeout
-        if self.max_execution_timeout_seconds:
-            try:
-                result = await asyncio.wait_for(
-                    self.compiled_graph.invoke(
-                        exec_state,
-                        config=config,
-                        thread_id=thread_id,
-                    ),
-                    timeout=self.max_execution_timeout_seconds,
+        # Create recursion context with override or default depth
+        depth = max_recursion_depth if max_recursion_depth is not None else self.max_recursion_depth
+        recursion_ctx = RecursionContext(max_depth=depth)
+
+        # Track workflow entry
+        recursion_ctx.enter("workflow", self.workflow_name)
+
+        try:
+            # Execute with optional workflow-level timeout
+            if self.max_execution_timeout_seconds:
+                try:
+                    result = await asyncio.wait_for(
+                        self._execute_with_recursion(exec_state, config, thread_id, recursion_ctx),
+                        timeout=self.max_execution_timeout_seconds,
+                    )
+                    return result
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        f"Workflow '{self.workflow_name}' timed out after "
+                        f"{self.max_execution_timeout_seconds}s"
+                    )
+                    return GraphExecutionResult(
+                        state=exec_state,
+                        success=False,
+                        error=f"Workflow execution timed out after {self.max_execution_timeout_seconds}s",
+                        iterations=0,
+                        duration=self.max_execution_timeout_seconds,
+                        node_history=[],
+                    )
+            else:
+                return await self._execute_with_recursion(
+                    exec_state, config, thread_id, recursion_ctx
                 )
-                return result
-            except asyncio.TimeoutError:
-                logger.warning(
-                    f"Workflow '{self.workflow_name}' timed out after "
-                    f"{self.max_execution_timeout_seconds}s"
-                )
-                return GraphExecutionResult(
-                    state=exec_state,
-                    success=False,
-                    error=f"Workflow execution timed out after {self.max_execution_timeout_seconds}s",
-                    iterations=0,
-                    duration=self.max_execution_timeout_seconds,
-                    node_history=[],
-                )
-        else:
-            return await self.compiled_graph.invoke(
-                exec_state,
-                config=config,
-                thread_id=thread_id,
-            )
+        finally:
+            recursion_ctx.exit()
+
+    async def _execute_with_recursion(
+        self,
+        exec_state: Dict[str, Any],
+        config: Optional["GraphConfig"],
+        thread_id: Optional[str],
+        recursion_ctx: Any,
+    ) -> "GraphExecutionResult":
+        """Execute compiled graph with recursion context.
+
+        Args:
+            exec_state: Prepared execution state
+            config: Optional execution configuration override
+            thread_id: Thread ID for checkpointing
+            recursion_ctx: RecursionContext for tracking nesting depth
+
+        Returns:
+            GraphExecutionResult with final state
+        """
+        # Add recursion context to state for downstream access
+        exec_state["_recursion_context"] = recursion_ctx
+
+        # Execute the compiled graph
+        return await self.compiled_graph.invoke(
+            exec_state,
+            config=config,
+            thread_id=thread_id,
+        )
 
     async def stream(
         self,
@@ -1642,6 +1643,7 @@ class UnifiedWorkflowCompiler:
                     default_node_timeout_seconds=cached_def.default_node_timeout_seconds,
                     max_iterations=cached_def.max_iterations,
                     max_retries=cached_def.max_retries,
+                    max_recursion_depth=cached_def.metadata.get("max_recursion_depth", 3),
                 )
 
         # Load and parse YAML
@@ -1661,9 +1663,9 @@ class UnifiedWorkflowCompiler:
         if isinstance(result, dict):
             if not result:
                 raise ConfigurationValidationError(
-                    message=f"No workflows found in YAML file",
+                    message="No workflows found in YAML file",
                     config_key=str(yaml_path),
-                    recovery_hint=f"Check that the YAML file contains at least one workflow definition. Ensure the 'workflows:' key exists."
+                    recovery_hint="Check that the YAML file contains at least one workflow definition. Ensure the 'workflows:' key exists.",
                 )
             workflow_def = next(iter(result.values()))
         else:
@@ -1689,6 +1691,7 @@ class UnifiedWorkflowCompiler:
             default_node_timeout_seconds=workflow_def.default_node_timeout_seconds,
             max_iterations=workflow_def.max_iterations,
             max_retries=workflow_def.max_retries,
+            max_recursion_depth=workflow_def.metadata.get("max_recursion_depth", 3),
         )
 
     def compile_yaml_content(
@@ -1743,6 +1746,7 @@ class UnifiedWorkflowCompiler:
             default_node_timeout_seconds=workflow_def.default_node_timeout_seconds,
             max_iterations=workflow_def.max_iterations,
             max_retries=workflow_def.max_retries,
+            max_recursion_depth=workflow_def.metadata.get("max_recursion_depth", 3),
         )
 
     # =========================================================================
@@ -1779,6 +1783,7 @@ class UnifiedWorkflowCompiler:
                     # Try to extract field name from error message
                     # Format: "Node 'node_id' has error" or "Field 'field_name' error"
                     import re
+
                     match = re.search(r"'([^']+)'", error)
                     if match:
                         field_name = match.group(1)
@@ -1791,7 +1796,7 @@ class UnifiedWorkflowCompiler:
                     invalid_fields=invalid_fields,
                     field_errors=field_errors,
                     validation_errors=errors,
-                    recovery_hint=f"Fix validation errors in workflow '{definition.name}'. Use 'victor workflow validate <path>' to check."
+                    recovery_hint=f"Fix validation errors in workflow '{definition.name}'. Use 'victor workflow validate <path>' to check.",
                 )
 
         # Generate cache key if not provided
@@ -1810,6 +1815,7 @@ class UnifiedWorkflowCompiler:
             default_node_timeout_seconds=definition.default_node_timeout_seconds,
             max_iterations=definition.max_iterations,
             max_retries=definition.max_retries,
+            max_recursion_depth=definition.metadata.get("max_recursion_depth", 3),
         )
 
     # =========================================================================
@@ -2034,7 +2040,7 @@ def compile_workflow(
                 raise ConfigurationValidationError(
                     message="workflow_name required for YAML content",
                     config_key="<yaml_content>",
-                    recovery_hint="Provide workflow_name parameter when compiling YAML content string."
+                    recovery_hint="Provide workflow_name parameter when compiling YAML content string.",
                 )
             return compiler.compile_yaml_content(source, workflow_name, **kwargs)
     else:

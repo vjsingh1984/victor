@@ -315,12 +315,15 @@ from victor.workflows.node_runners import (
     ParallelNodeRunner,
     NodeRunnerRegistry,
 )
+from victor.workflows.team_node_runner import (
+    TeamNodeRunner,
+)
 from victor.workflows.protocols import (
     NodeRunner,
     NodeRunnerResult,
 )
 from victor.workflows.graph_compiler import (
-    CompilerConfig,
+    CompilerConfig as GraphCompilerConfig,
     NodeRunnerWrapper,
     WorkflowGraphCompiler,
     WorkflowDefinitionCompiler,
@@ -354,6 +357,29 @@ from victor.workflows.compiler_registry import (
     get_compiler,
     is_registered,
     list_compilers,
+)
+from victor.workflows.team_metrics import (
+    TeamMetricsCollector,
+    MemberExecutionMetrics,
+    TeamExecutionMetrics,
+    MetricPriority,
+    get_team_metrics_collector,
+    record_team_execution,
+)
+from victor.workflows.team_tracing import (
+    TeamTracer,
+    TraceSpan,
+    SpanAttributes,
+    SpanEvents,
+    SpanKind,
+    get_team_tracer,
+    trace_team_execution,
+    trace_member_execution,
+    trace_workflow_execution,
+    get_current_trace_id,
+    set_trace_id,
+    export_trace_to_dict,
+    get_all_traces,
 )
 
 # Register framework handlers on module load
@@ -592,9 +618,10 @@ __all__ = [
     "HITLNodeRunner",
     "ConditionNodeRunner",
     "ParallelNodeRunner",
+    "TeamNodeRunner",
     "NodeRunnerRegistry",
     # Graph Compilers (Single Execution Engine - Phase 4)
-    "CompilerConfig",
+    "GraphCompilerConfig",
     "NodeRunnerWrapper",
     "WorkflowGraphCompiler",
     "WorkflowDefinitionCompiler",
@@ -624,4 +651,25 @@ __all__ = [
     "get_compiler",
     "is_registered",
     "list_compilers",
+    # Team Metrics
+    "TeamMetricsCollector",
+    "MemberExecutionMetrics",
+    "TeamExecutionMetrics",
+    "MetricPriority",
+    "get_team_metrics_collector",
+    "record_team_execution",
+    # Team Tracing
+    "TeamTracer",
+    "TraceSpan",
+    "SpanAttributes",
+    "SpanEvents",
+    "SpanKind",
+    "get_team_tracer",
+    "trace_team_execution",
+    "trace_member_execution",
+    "trace_workflow_execution",
+    "get_current_trace_id",
+    "set_trace_id",
+    "export_trace_to_dict",
+    "get_all_traces",
 ]

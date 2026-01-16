@@ -1,0 +1,138 @@
+# Quick Task Team (Sequential Formation)
+# ======================================
+# Fast sequential task execution for simple tasks.
+#
+# Formation: SEQUENTIAL
+# - Simple chain of agents
+# - Quick handoffs between stages
+# - Optimized for speed
+#
+# Use Cases:
+# - Quick code fixes
+# - Simple documentation updates
+# - Fast research tasks
+# - Routine maintenance
+#
+# Complexity: quick
+# Members: 2 (analyzer, implementer)
+# Tool Budget: 40 total
+# Timeout: 5 minutes
+
+name: quick_task_sequential
+display_name: "Quick Task Team (Sequential)"
+description: "Fast sequential task execution for simple tasks"
+long_description: |
+  A lightweight team for quick tasks. Two agents work sequentially: analyzer
+  identifies what needs to be done, implementer makes the changes. Optimized
+  for speed and simplicity.
+
+  Ideal for quick fixes, simple updates, and routine maintenance.
+version: "1.0.0"
+author: "Victor AI"
+vertical: "general"
+formation: "sequential"
+
+tags:
+  - "quick"
+  - "simple"
+  - "fast"
+  - "sequential"
+  - "maintenance"
+
+use_cases:
+  - "Quick code fixes"
+  - "Simple documentation updates"
+  - "Fast research tasks"
+  - "Routine maintenance"
+  - "Minor improvements"
+
+complexity: "quick"
+max_iterations: 25
+total_tool_budget: 40
+timeout_seconds: 300
+
+members:
+  # Quick Analyzer
+  - id: "quick_analyzer"
+    role: "researcher"
+    name: "Quick Analyzer"
+    goal: |
+      Quickly analyze the task and identify what needs to be done.
+      Determine scope, locate relevant code, and provide clear
+      implementation guidance.
+    backstory: |
+      Developer with 8 years of experience in rapid analysis.
+      Expert in quickly understanding codebases and identifying changes.
+      Specializes in efficient, focused analysis.
+    expertise:
+      - "quick-analysis"
+      - "code-navigation"
+      - "scope-identification"
+      - "efficient-research"
+    personality: |
+      Fast and focused; gets to the point quickly.
+      Provides clear, actionable guidance.
+    tool_budget: 15
+    allowed_tools:
+      - "read"
+      - "grep"
+      - "find"
+    priority: 0
+    memory: false
+    cache: true
+
+  # Quick Implementer
+  - id: "quick_implementer"
+    role: "executor"
+    name: "Quick Implementer"
+    goal: |
+      Implement the identified changes quickly and correctly.
+      Make minimal, focused changes to complete the task.
+      Verify basic functionality.
+    backstory: |
+      Developer with 10 years of experience in rapid implementation.
+      Expert in making focused, minimal changes.
+      Specializes in quick fixes and simple updates.
+    expertise:
+      - "quick-implementation"
+      - "minimal-changes"
+      - "focused-editing"
+      - "basic-testing"
+    personality: |
+      Efficient and direct; makes changes quickly and correctly.
+      Tests basic functionality before completion.
+    tool_budget: 25
+    allowed_tools:
+      - "read"
+      - "write"
+      - "edit"
+      - "shell"
+    priority: 1
+    memory: false
+    cache: true
+
+config:
+  handoff_strategy: "minimal"
+  verification_level: "basic"
+  optimization: "speed"
+
+metadata:
+  category: "quick-tasks"
+  best_for: ["quick-fixes", "simple-updates", "routine-maintenance"]
+  alternatives:
+    - "standard_task_sequential"  # For more complex tasks
+    - "code_review_parallel"  # For review needs
+
+examples:
+  - name: "Quick Fix"
+    description: "Fix a simple bug"
+    input:
+      goal: "Fix typo in README.md"
+      context:
+        file: "README.md"
+  - name: "Update Documentation"
+    description: "Update documentation"
+    input:
+      goal: "Update installation instructions with new requirements"
+      context:
+        file: "INSTALL.md"
