@@ -175,7 +175,7 @@ class LifecycleManager:
 
         # Flush analytics data
         try:
-            flush_results = self._flush_analytics()
+            flush_results = await self._flush_analytics()
             results["analytics_flushed"] = all(flush_results.values()) if flush_results else True
         except Exception as e:
             logger.warning(f"Failed to flush analytics during shutdown: {e}")
@@ -498,7 +498,7 @@ class LifecycleManager:
     # INTERNAL METHODS (for orchestrator integration)
     # =========================================================================
 
-    def _flush_analytics(self) -> Dict[str, bool]:
+    async def _flush_analytics(self) -> Dict[str, bool]:
         """Flush analytics data.
 
         Calls the orchestrator callback if set.
@@ -507,7 +507,11 @@ class LifecycleManager:
             Dictionary with flush status for each analytics type
         """
         if self._flush_analytics_callback:
-            return self._flush_analytics_callback()
+            result = self._flush_analytics_callback()
+            # Handle both async and sync callbacks
+            if asyncio.iscoroutine(result):
+                return await result
+            return result
         return {}
 
     async def _stop_health_monitoring(self) -> bool:

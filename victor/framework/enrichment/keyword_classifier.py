@@ -138,7 +138,7 @@ class KeywordClassifier:
         scores = self.classify_with_scores(text)
         if not scores:
             return None
-        return max(scores, key=scores.get)
+        return max(scores, key=lambda k: scores[k])
 
     def has_category(self, text: str, category: str) -> bool:
         """Check if text matches a specific category.

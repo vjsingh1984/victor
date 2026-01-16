@@ -131,7 +131,7 @@ class ClassificationPattern:
     priority: int = 50
 
     @property
-    def compiled_pattern(self) -> Pattern:
+    def compiled_pattern(self) -> Pattern[str]:
         """Get compiled regex pattern (cached)."""
         return re.compile(self.regex, re.IGNORECASE)
 
@@ -197,7 +197,7 @@ TASK_TYPE_TO_COMPLEXITY: Dict[TaskType, TaskComplexity] = {
 PATTERNS: Dict[str, ClassificationPattern] = {}
 
 
-def _register_patterns():
+def _register_patterns() -> None:
     """Register all patterns. Called on module load."""
     global PATTERNS
 

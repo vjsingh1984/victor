@@ -299,7 +299,8 @@ class Pipeline(Ensemble):
             prompt_parts
         )  # noqa: F841 - Built for future orchestrator integration
 
-        # TODO: Integrate with actual orchestrator
+        # NOTE: Ensemble requires orchestrator integration for parallel agent execution
+        # Deferred: Ensemble feature pending multi-agent coordination refactor
         # For now, return mock output
         return f"[{agent.name}] Output for: {task}"
 

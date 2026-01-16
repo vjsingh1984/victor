@@ -291,7 +291,7 @@ class StateInspector:
             else:
                 return default
 
-        return value
+        return value or default
 
     def get_state_summary(self, state: Dict[str, Any]) -> Dict[str, str]:
         """Get summary of state keys and types.

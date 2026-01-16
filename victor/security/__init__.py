@@ -70,6 +70,8 @@ Example usage:
     asyncio.run(scan_project())
 """
 
+from typing import Any
+
 # CVE/Vulnerability scanning (existing functionality)
 from victor.security.protocol import (
     CVE,
@@ -148,7 +150,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """Lazy import for submodules to avoid circular imports."""
     if name == "auth":
         from victor.security import auth

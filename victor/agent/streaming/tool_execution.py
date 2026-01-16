@@ -71,7 +71,8 @@ from victor.agent.streaming.context import StreamingChatContext
 from victor.providers.base import StreamChunk
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    # Use protocol for type hint to avoid circular dependency (DIP compliance)
+    from victor.protocols.agent import IAgentOrchestrator
     from victor.config.settings import Settings
 
 logger = logging.getLogger(__name__)

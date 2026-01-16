@@ -578,6 +578,8 @@ async def run_oneshot(
             tool_calls_made = metrics.get("tool_calls", 0) if metrics else 0
     except Exception as e:
         formatter.error(str(e))
+        import traceback
+        traceback.print_exc()  # DEBUG: Print full traceback
         raise typer.Exit(1)
     finally:
         # Emit session end event

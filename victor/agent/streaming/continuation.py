@@ -52,6 +52,7 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
@@ -70,7 +71,8 @@ from victor.agent.streaming.context import StreamingChatContext
 from victor.providers.base import StreamChunk
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    # Use protocol for type hint to avoid circular dependency (DIP compliance)
+    from victor.protocols.agent import IAgentOrchestrator
     from victor.agent.streaming.handler import StreamingChatHandler
     from victor.config.settings import Settings
 
@@ -1016,12 +1018,14 @@ class ContinuationHandler:
 
         # Record outcome for Q-learning
         if self._record_outcome:
-            self._record_outcome(
+            outcome = self._record_outcome(
                 success=True,
                 quality_score=stream_ctx.last_quality_score,
                 user_satisfied=True,
                 completed=True,
             )
+            if asyncio.iscoroutine(outcome):
+                await outcome
 
         result.add_chunk(self._chunk_generator.generate_final_marker_chunk())
         return result

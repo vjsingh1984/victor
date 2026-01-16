@@ -2513,7 +2513,8 @@ class SemanticToolSelector:
 
         # For now, return the tools directly (ToolDefinition objects)
         # This maintains backward compatibility with chat_coordinator which expects List[ToolDefinition]
-        # TODO: Transition to ToolSelectionResult return type across all callers
+        # NOTE: Refactor to return ToolSelectionResult for better error handling and metadata
+        # Deferred: Requires updating all callers in chat_coordinator, agent_loop, and tool_pipeline
         return tools
 
     async def get_tool_score(

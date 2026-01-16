@@ -102,7 +102,7 @@ class FileType:
     category: FileCategory = FileCategory.UNKNOWN
     aliases: List[str] = field(default_factory=list)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not self.display_name:
             self.display_name = self.name.title()
 
@@ -170,7 +170,7 @@ class FileTypeRegistry:
 
     _instance: Optional["FileTypeRegistry"] = None
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the registry with built-in types."""
         self._types: Dict[str, FileType] = {}
         self._extension_map: Dict[str, str] = {}  # ext -> type name

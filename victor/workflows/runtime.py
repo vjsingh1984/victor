@@ -490,7 +490,7 @@ class WorkflowRuntime:
 
             # Create the HITL FastAPI app
             app = create_hitl_app(
-                store=self._hitl_store,
+                store=self._hitl_store,  # type: ignore[arg-type]
                 require_auth=self.config.hitl.require_auth,
                 auth_token=self.config.hitl.auth_token,
             )

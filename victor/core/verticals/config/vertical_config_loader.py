@@ -304,7 +304,8 @@ class VerticalConfigLoader:
             # Template with variable substitution (future feature)
             template = prompt_config.get("template", "")
             # For now, just return template as-is
-            # TODO: Implement variable substitution
+            # NOTE: Variable substitution (e.g., {{project_name}}, {{version}}) needs Jinja2-like template engine
+            # Deferred: Low priority - static prompts work for current use cases
             return template
 
         else:

@@ -245,7 +245,7 @@ class ContextReminderManager:
 
         # Special case: task hint only injected once
         if reminder_type == ReminderType.TASK_HINT:
-            return (
+            return bool(
                 self.state.task_hint and ReminderType.TASK_HINT not in self.state.reminder_history
             )
 

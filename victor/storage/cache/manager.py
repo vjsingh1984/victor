@@ -49,7 +49,7 @@ from __future__ import annotations
 import logging
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Callable, Dict, List, Optional, Protocol, runtime_checkable
 
 from victor.storage.cache.config import CacheConfig
 from victor.storage.cache.tiered_cache import TieredCache
@@ -181,7 +181,7 @@ class CacheNamespace:
     def get_or_set(
         self,
         key: str,
-        factory: callable,
+        factory: Callable[[], Any],
         ttl: Optional[int] = None,
     ) -> Any:
         """Get cached value or compute and cache it.

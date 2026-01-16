@@ -111,15 +111,15 @@ class RetryConfig:
     exponential_base: float = 2.0
     jitter_factor: float = 0.1
 
-    retryable_exceptions: tuple = (
+    retryable_exceptions: tuple[type[Exception], ...] = (
         ConnectionError,
         TimeoutError,
         asyncio.TimeoutError,
     )
 
-    non_retryable_exceptions: tuple = ()
+    non_retryable_exceptions: tuple[type[BaseException], ...] = ()
 
-    retryable_patterns: tuple = (
+    retryable_patterns: tuple[str, ...] = (
         r"rate.?limit",
         r"overloaded",
         r"capacity",
@@ -586,7 +586,7 @@ def with_exponential_backoff(
     max_delay: float = 60.0,
     exponential_base: float = 2.0,
     jitter: float = 0.1,
-):
+) -> Callable[[Callable[..., Awaitable[T]]], Callable[..., Awaitable[T]]]:
     """Decorator for async functions with exponential backoff retry.
 
     Args:
@@ -624,7 +624,7 @@ def with_exponential_backoff_sync(
     max_delay: float = 60.0,
     exponential_base: float = 2.0,
     jitter: float = 0.1,
-):
+) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """Decorator for sync functions with exponential backoff retry.
 
     Args:

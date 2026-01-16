@@ -47,7 +47,8 @@ from victor.agent.delegation.protocol import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    # Use protocol for type hint to avoid circular dependency (DIP compliance)
+    from victor.protocols.agent import IAgentOrchestrator
 
 logger = logging.getLogger(__name__)
 

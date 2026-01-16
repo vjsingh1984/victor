@@ -15,7 +15,7 @@
 """DevOps Tool Dependencies - Tool relationships for infrastructure workflows.
 
 This module provides tool dependency configuration for DevOps workflows.
-The core configuration is now loaded from YAML (tool_dependencies.yaml),
+The core configuration is loaded from YAML (tool_dependencies.yaml),
 while composed patterns remain in Python for complex logic.
 
 Uses canonical tool names from ToolNames to ensure consistent naming
@@ -23,13 +23,11 @@ across RL Q-values, workflow patterns, and vertical configurations.
 
 Migration Notes:
     - Transitions, clusters, sequences, dependencies are now in YAML
-    - DevOpsToolDependencyProvider uses YAMLToolDependencyProvider
+    - Use create_vertical_tool_dependency_provider('devops') for the provider
     - Composed patterns and graph functions remain in Python for flexibility
-    - All exports preserved for backward compatibility
 
 Example:
     from victor.devops.tool_dependencies import (
-        DevOpsToolDependencyProvider,
         get_devops_tool_graph,
         DEVOPS_COMPOSED_PATTERNS,
     )
@@ -45,10 +43,10 @@ Example:
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 
 from victor.core.tool_dependency_loader import (
-    YAMLToolDependencyProvider,
+    create_vertical_tool_dependency_provider,
     load_tool_dependency_yaml,
 )
 from victor.framework.tool_naming import ToolNames
@@ -62,25 +60,8 @@ _YAML_CONFIG_PATH = Path(__file__).parent / "tool_dependencies.yaml"
 
 
 # =============================================================================
-# Backward Compatibility Exports
+# Internal Config Loading
 # =============================================================================
-# These are derived from the YAML config at module load time for backward
-# compatibility with code that imports these constants directly.
-
-
-def _load_yaml_config():
-    """Load YAML config and extract data structures for backward compatibility.
-
-    Note: Canonicalization is disabled to preserve tool names as-is.
-    This is important because the YAML uses distinct tool names like 'grep'
-    (keyword search) and 'code_search' (semantic/AI search) that would
-    otherwise be collapsed by the alias mapping.
-    """
-    config = load_tool_dependency_yaml(_YAML_CONFIG_PATH, canonicalize=False)
-    return config
-
-
-# Load config lazily to support deprecation warnings
 _config = None
 
 
@@ -88,49 +69,15 @@ def _get_config():
     """Get or load the YAML config lazily."""
     global _config
     if _config is None:
-        _config = _load_yaml_config()
+        _config = load_tool_dependency_yaml(_YAML_CONFIG_PATH, canonicalize=False)
     return _config
 
 
-def _warn_deprecated(name: str) -> None:
-    """Emit deprecation warning for legacy constant access."""
-    import warnings
-
-    warnings.warn(
-        f"{name} is deprecated. Use DevOpsToolDependencyProvider() or "
-        f"create_vertical_tool_dependency_provider('devops') instead.",
-        DeprecationWarning,
-        stacklevel=3,
-    )
-
-
-# Backward compatibility: module-level exports accessed via __getattr__
-# These are deprecated and will emit warnings when accessed
-_DEPRECATED_CONSTANTS = {
-    "DEVOPS_TOOL_TRANSITIONS": lambda: _get_config().transitions,
-    "DEVOPS_TOOL_CLUSTERS": lambda: _get_config().clusters,
-    "DEVOPS_TOOL_SEQUENCES": lambda: _get_config().sequences,
-    "DEVOPS_TOOL_DEPENDENCIES": lambda: _get_config().dependencies,
-    "DEVOPS_REQUIRED_TOOLS": lambda: _get_config().required_tools,
-    "DEVOPS_OPTIONAL_TOOLS": lambda: _get_config().optional_tools,
-}
-
-
-def __getattr__(name: str) -> Any:
-    """Lazy loading of module-level exports for backward compatibility.
-
-    This allows existing code to import the module-level constants
-    while actually loading them from the YAML file.
-
-    .. deprecated::
-        These constants are deprecated. Use DevOpsToolDependencyProvider() or
-        create_vertical_tool_dependency_provider('devops') instead.
-    """
-    if name in _DEPRECATED_CONSTANTS:
-        _warn_deprecated(name)
-        return _DEPRECATED_CONSTANTS[name]()
-
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+# =============================================================================
+# DevOpsToolDependencyProvider (canonical provider)
+# =============================================================================
+# Create canonical provider for DevOps vertical
+DevOpsToolDependencyProvider = create_vertical_tool_dependency_provider("devops")
 
 
 # =============================================================================
@@ -211,59 +158,6 @@ DEVOPS_COMPOSED_PATTERNS: Dict[str, Dict[str, any]] = {
         "weight": 0.7,
     },
 }
-
-
-class DevOpsToolDependencyProvider(YAMLToolDependencyProvider):
-    """Tool dependency provider for DevOps vertical.
-
-    .. deprecated::
-        Use ``create_vertical_tool_dependency_provider('devops')`` instead.
-        This class is maintained for backward compatibility.
-
-    Loads configuration from tool_dependencies.yaml for infrastructure
-    and CI/CD workflows. Extends YAMLToolDependencyProvider with
-    DevOps-specific features.
-
-    Uses canonical ToolNames constants for consistency.
-
-    Example:
-        # Preferred (new code):
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
-        provider = create_vertical_tool_dependency_provider("devops")
-
-        # Deprecated (backward compatible):
-        provider = DevOpsToolDependencyProvider()
-
-    Migration Notes:
-        - Configuration now loaded from YAML instead of hand-coded Python
-        - All functionality preserved via YAMLToolDependencyProvider
-        - Composed patterns remain in DEVOPS_COMPOSED_PATTERNS constant
-        - For new code, use create_vertical_tool_dependency_provider('devops')
-    """
-
-    def __init__(self):
-        """Initialize the provider from YAML config.
-
-        Note: Canonicalization is disabled to preserve tool names as-is.
-        This is important because the YAML uses distinct tool names like 'grep'
-        (keyword search) and 'code_search' (semantic/AI search) that would
-        otherwise be collapsed by the alias mapping.
-
-        .. deprecated::
-            Use ``create_vertical_tool_dependency_provider('devops')`` instead.
-        """
-        import warnings
-
-        warnings.warn(
-            "DevOpsToolDependencyProvider is deprecated. "
-            "Use create_vertical_tool_dependency_provider('devops') instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        super().__init__(
-            yaml_path=_YAML_CONFIG_PATH,
-            canonicalize=False,
-        )
 
 
 # =============================================================================
@@ -369,16 +263,10 @@ def list_composed_patterns() -> List[str]:
     return list(DEVOPS_COMPOSED_PATTERNS.keys())
 
 
-__all__ = [  # noqa: F822 - constants defined via __getattr__ for lazy loading
-    # Provider class
+__all__ = [
+    # Provider class (canonical)
     "DevOpsToolDependencyProvider",
-    # Data exports (lazy-loaded with deprecation warnings)
-    "DEVOPS_TOOL_DEPENDENCIES",
-    "DEVOPS_TOOL_TRANSITIONS",
-    "DEVOPS_TOOL_CLUSTERS",
-    "DEVOPS_TOOL_SEQUENCES",
-    "DEVOPS_REQUIRED_TOOLS",
-    "DEVOPS_OPTIONAL_TOOLS",
+    # Composed patterns
     "DEVOPS_COMPOSED_PATTERNS",
     # Graph functions
     "get_devops_tool_graph",

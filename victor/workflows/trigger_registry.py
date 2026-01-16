@@ -80,9 +80,9 @@ class WorkflowTrigger:
     priority: int = 0
     description: str = ""
 
-    _compiled_pattern: Optional[re.Pattern] = field(default=None, repr=False)
+    _compiled_pattern: Optional[re.Pattern[str]] = field(default=None, repr=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Compile the regex pattern."""
         if self.pattern:
             try:

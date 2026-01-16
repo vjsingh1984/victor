@@ -14,7 +14,7 @@
 
 """Generic file operations capability provider (Phase 3)."""
 
-from typing import List, Set
+from typing import List, Optional, Set
 from dataclasses import dataclass
 from enum import Enum
 
@@ -58,8 +58,8 @@ class FileOperationsCapability:
 
     def __init__(
         self,
-        operations: List[FileOperation] = None,
-    ):
+        operations: Optional[List[FileOperation]] = None,
+    ) -> None:
         """Initialize file operations capability.
 
         Args:

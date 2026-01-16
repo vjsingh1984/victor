@@ -268,7 +268,8 @@ class MFAVerifier:
         """Check if biometric auth is available."""
         if platform.system() == "Darwin" and BIOMETRIC_AVAILABLE:
             return True
-        # TODO: Add Windows Hello support
+        # NOTE: Windows Hello support blocked on python integration (Windows Credential UI)
+        # Tracking: https://github.com/microsoft/windows-python-src
         return False
 
     def verify_biometric(self, reason: str = "Authenticate to Victor") -> bool:
@@ -283,7 +284,8 @@ class MFAVerifier:
         if platform.system() == "Darwin" and BIOMETRIC_AVAILABLE:
             return self._verify_touch_id(reason)
 
-        # TODO: Add Windows Hello support
+        # NOTE: Windows Hello support blocked on python integration (Windows Credential UI)
+        # Tracking: https://github.com/microsoft/windows-python-src
         logger.warning("Biometric auth not available on this platform")
         return False
 
@@ -330,12 +332,14 @@ class MFAVerifier:
     # Passkeys (FIDO2/WebAuthn)
     def is_passkey_available(self) -> bool:
         """Check if passkey/FIDO2 is available."""
-        # TODO: Implement FIDO2 support using python-fido2
+        # NOTE: FIDO2 support deferred - requires python-fido2 library integration
+        # and CTAP2 protocol handling for authenticator communication
         return False
 
     def verify_passkey(self, credential_id: str) -> bool:
         """Verify using passkey/FIDO2 hardware key."""
-        # TODO: Implement FIDO2 verification
+        # NOTE: FIDO2 verification deferred - requires python-fido2 library integration
+        # and CTAP2 protocol handling for authenticator communication
         logger.warning("Passkey auth not yet implemented")
         return False
 
@@ -451,6 +455,7 @@ class SmartCardType(Enum):
     PIV = "piv"  # Personal Identity Verification (FIPS 201)
     CAC = "cac"  # Common Access Card (DoD)
     X509 = "x509"  # Generic X.509 certificate
+    YUBIKEY = "yubikey"  # Yubiko hardware token
 
 
 @dataclass
@@ -700,6 +705,8 @@ class SSOProvider(Enum):
     OKTA = "okta"
     AZURE_AD = "azure_ad"
     GOOGLE = "google"
+    AUTH0 = "auth0"  # Auth0 OIDC provider
+    GOOGLE_WORKSPACE = "google_workspace"  # Google Workspace SAML
     ONELOGIN = "onelogin"
     PING = "ping"
     KEYCLOAK = "keycloak"

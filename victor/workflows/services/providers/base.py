@@ -433,5 +433,6 @@ class BaseServiceProvider(ABC):
     ) -> bool:
         """Check gRPC health endpoint."""
         # For now, just TCP check
-        # TODO: Implement proper gRPC health check
+        # NOTE: gRPC health check requires grpc.health.v1.Health/Check protocol
+        # Deferred: Low priority - TCP connectivity sufficient for basic health checks
         return await self._check_tcp(handle, config)

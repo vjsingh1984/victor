@@ -43,7 +43,6 @@ from victor.agent.tool_calling.capabilities import (
     # Model name normalization utilities
     normalize_model_name,
     get_model_name_variants,
-    # MODEL_NAME_ALIASES,  # TODO: Not yet defined in capabilities.py
 )
 from victor.agent.tool_calling.base import HALLUCINATED_ARGUMENTS
 

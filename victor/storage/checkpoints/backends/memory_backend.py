@@ -33,7 +33,7 @@ class MemoryCheckpointBackend(CheckpointManagerProtocol):
     the process exits.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize empty storage."""
         self._checkpoints: Dict[str, CheckpointData] = {}
         self._by_session: Dict[str, List[str]] = {}

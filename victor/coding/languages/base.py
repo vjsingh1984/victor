@@ -373,7 +373,7 @@ class LanguagePlugin(Protocol):
 class BaseLanguagePlugin(ABC):
     """Base class for language plugins with common functionality."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize plugin."""
         self._config: Optional[LanguageConfig] = None
         self._capabilities: Optional[LanguageCapabilities] = None

@@ -219,22 +219,14 @@ class ToolBuilder(FactoryAwareBuilder):
         response_completer = self._factory.create_response_completer()
         tool_components["response_completer"] = response_completer
 
-        # Build semantic selector (optional)
-        use_semantic_selection, embedding_preload_task = self._factory.setup_semantic_selection()
-        semantic_selector = self._factory.create_semantic_selector()
-        tool_components["semantic_selector"] = semantic_selector
-        tool_components["use_semantic_selection"] = use_semantic_selection
-        tool_components["embedding_preload_task"] = embedding_preload_task
-
         # Build unified tracker
         if unified_tracker is None:
             unified_tracker = self._factory.create_unified_tracker(tool_calling_caps)
         tool_components["unified_tracker"] = unified_tracker
 
-        # Build tool selector
+        # Build tool selector (uses unified strategy factory with auto/keyword/semantic/hybrid strategies)
         tool_selector = self._factory.create_tool_selector(
             tools=tools,
-            semantic_selector=semantic_selector,
             conversation_state=conversation_state,
             unified_tracker=unified_tracker,
             model=model or "unknown",

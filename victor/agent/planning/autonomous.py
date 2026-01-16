@@ -59,7 +59,8 @@ from victor.agent.planning.base import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    # Use protocol for type hint to avoid circular dependency (DIP compliance)
+    from victor.protocols.agent import IAgentOrchestrator
     from victor.agent.subagents import SubAgentOrchestrator, SubAgentRole
 
 logger = logging.getLogger(__name__)
@@ -115,14 +116,14 @@ class AutonomousPlanner:
 
     def __init__(
         self,
-        orchestrator: "AgentOrchestrator",
+        orchestrator: "IAgentOrchestrator",
         sub_agent_orchestrator: Optional["SubAgentOrchestrator"] = None,
         approval_callback: Optional[Callable[[str], bool]] = None,
     ):
         """Initialize the autonomous planner.
 
         Args:
-            orchestrator: Parent orchestrator for LLM calls and tool execution
+            orchestrator: Parent orchestrator (via IAgentOrchestrator protocol) for LLM calls and tool execution
             sub_agent_orchestrator: Optional orchestrator for delegating to sub-agents
             approval_callback: Optional callback for user approval prompts
         """

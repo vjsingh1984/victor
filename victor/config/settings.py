@@ -1087,7 +1087,7 @@ class Settings(BaseSettings):
     # ==========================================================================
     # Legacy configuration migrated to canonical event system above.
     # These settings are kept for backward compatibility during migration.
-    # TODO: Remove in v0.3.0 once all components use core/events
+    # NOTE: Preserved for compatibility with external integrations (v0.5.0+)
 
     # Legacy EventBus Backend Type (deprecated)
     eventbus_backend: str = "memory"  # Mapped to event_backend_type

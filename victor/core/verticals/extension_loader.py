@@ -244,6 +244,11 @@ class VerticalExtensionLoader(ABC):
                         """Auto-generated getter method."""
                         # Build import path from vertical name
                         vertical_name = subcls.name.lower()
+
+                        # Skip if vertical name is empty (abstract base class)
+                        if not vertical_name:
+                            return None
+
                         import_path = f"victor.{vertical_name}.{mod_suffix}"
 
                         # Auto-generate class name
@@ -268,12 +273,17 @@ class VerticalExtensionLoader(ABC):
                     """Factory to create cached getter methods with proper closure."""
                     def _getter(subcls):
                         """Auto-generated cached getter method."""
+                        # Skip if vertical name is empty (abstract base class)
+                        vertical_name = subcls.name.lower()
+                        if not vertical_name:
+                            # Return default value for abstract base class
+                            return [] if ext_type == "middleware" else None
+
                         # Special handling for middleware
                         if ext_type == "middleware":
                             def _create_middleware():
                                 # Try to import from vertical.middleware
                                 try:
-                                    vertical_name = subcls.name.lower()
                                     module = __import__(
                                         f"victor.{vertical_name}.middleware", fromlist=[""]
                                     )
@@ -299,7 +309,6 @@ class VerticalExtensionLoader(ABC):
                         # Special handling for composed_chains and personas
                         if ext_type in ("composed_chains", "personas"):
                             def _create_extension():
-                                vertical_name = subcls.name.lower()
                                 try:
                                     if ext_type == "composed_chains":
                                         module = __import__(
@@ -445,6 +454,13 @@ class VerticalExtensionLoader(ABC):
         """
 
         def _create():
+            # Skip loading if import_path is invalid (empty vertical name)
+            # This handles the case where VerticalBase has name="" (abstract base class)
+            # which would create invalid paths like "victor..safety" (double dots)
+            if not import_path or ".." in import_path:
+                # Invalid import path - return None to indicate no extension available
+                return None
+
             # Determine the class name to import
             if attribute_name is None:
                 # Auto-generate class name
@@ -457,10 +473,14 @@ class VerticalExtensionLoader(ABC):
                 class_name = attribute_name
 
             # Lazy import: only loads module when first called
-            module = __import__(import_path, fromlist=[class_name])
-
-            # Import and instantiate
-            return getattr(module, class_name)()
+            # Return None if module doesn't exist (graceful degradation)
+            try:
+                module = __import__(import_path, fromlist=[class_name])
+                # Import and instantiate
+                return getattr(module, class_name)()
+            except (ModuleNotFoundError, AttributeError):
+                # Module or class doesn't exist - return None
+                return None
 
         # Use existing caching infrastructure
         return cls._get_cached_extension(extension_key, _create)

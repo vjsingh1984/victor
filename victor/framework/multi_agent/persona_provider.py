@@ -120,7 +120,7 @@ class FrameworkPersonaProvider(BaseCapabilityProvider["PersonaTraits"]):
                     cls._instance._initialized = False
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the persona provider."""
         if self._initialized:
             return
@@ -138,7 +138,7 @@ class FrameworkPersonaProvider(BaseCapabilityProvider["PersonaTraits"]):
         # Initialize BaseCapabilityProvider attributes
         self._capabilities: Dict[str, "PersonaTraits"] = {}
         self._metadata_full: Dict[str, CapabilityMetadata] = {}
-        self._initialized = True
+        object.__setattr__(self, "_initialized", True)
 
     @classmethod
     def reset_instance(cls) -> None:
@@ -325,9 +325,11 @@ class FrameworkPersonaProvider(BaseCapabilityProvider["PersonaTraits"]):
         """
         with self._lock:
             # Return latest version of each persona
-            result = {}
+            result: Dict[str, PersonaTraits] = {}
             for name in self._personas:
-                result[name] = self.get_persona(name)
+                persona = self.get_persona(name)
+                if persona:
+                    result[name] = persona
             return result
 
     def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
@@ -385,7 +387,7 @@ class FrameworkPersonaProvider(BaseCapabilityProvider["PersonaTraits"]):
         return re.match(pattern, version) is not None
 
     @staticmethod
-    def _semver_key(version: str) -> tuple:
+    def _semver_key(version: str) -> tuple[int, ...]:
         """Convert SemVer to tuple for sorting.
 
         Args:

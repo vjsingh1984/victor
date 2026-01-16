@@ -150,7 +150,8 @@ from typing import TYPE_CHECKING, Any, List, Optional
 from victor.agent.capability_registry import CAPABILITY_METHOD_MAPPINGS, get_method_for_capability
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    # Use protocol for type hint to avoid circular dependency (DIP compliance)
+    from victor.protocols.agent import IAgentOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -172,11 +173,11 @@ class VerticalIntegrationAdapter:
         _orchestrator: Reference to the parent orchestrator
     """
 
-    def __init__(self, orchestrator: "AgentOrchestrator"):
+    def __init__(self, orchestrator: "IAgentOrchestrator"):
         """Initialize the adapter with orchestrator reference.
 
         Args:
-            orchestrator: Parent orchestrator instance
+            orchestrator: Parent orchestrator instance (via IAgentOrchestrator protocol)
         """
         self._orchestrator = orchestrator
 

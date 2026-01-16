@@ -72,7 +72,8 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    # Use protocol for type hint to avoid circular dependency (DIP compliance)
+    from victor.protocols.agent import IAgentOrchestrator
     from victor.agent.intelligent_pipeline import (
         IntelligentAgentPipeline,
         RequestContext,
@@ -134,14 +135,14 @@ class OrchestratorIntegration:
 
     def __init__(
         self,
-        orchestrator: "AgentOrchestrator",
+        orchestrator: "IAgentOrchestrator",
         pipeline: "IntelligentAgentPipeline",
         config: Optional[IntegrationConfig] = None,
     ):
         """Initialize the integration bridge.
 
         Args:
-            orchestrator: The AgentOrchestrator to enhance
+            orchestrator: The orchestrator (via IAgentOrchestrator protocol) to enhance
             pipeline: The IntelligentAgentPipeline to use
             config: Optional configuration settings
         """

@@ -102,7 +102,7 @@ class SafetyRegistry:
         scanner = registry.get_scanner("secrets")
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the registry with an empty scanner dictionary."""
         self._scanners: Dict[str, ISafetyScanner] = {}
 

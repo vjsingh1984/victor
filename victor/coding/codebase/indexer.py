@@ -2904,19 +2904,6 @@ class SymbolVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
 
-# TODO: Future enhancements
-# [DONE] 1. Add semantic search with embeddings (ChromaDB, LanceDB)
-# 2. Add support for more languages (JavaScript, TypeScript, Go, etc.)
-# [DONE] 3. Add incremental indexing (only reindex changed files)
-# [DONE] 4. Add file watching for automatic staleness detection
-# [DONE] 5. Add background indexer service for periodic updates
-# 6. Add symbol reference tracking (who calls what)
-# 7. Add type information extraction
-# 8. Add test coverage mapping
-# 9. Add documentation extraction
-# 10. Add complexity metrics
-
-
 # =============================================================================
 # Background Indexer Service
 # =============================================================================

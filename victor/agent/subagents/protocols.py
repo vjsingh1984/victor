@@ -62,7 +62,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    # Use protocol for type hint to avoid circular dependency (DIP compliance)
+    from victor.protocols.agent import IAgentOrchestrator
 
 
 @runtime_checkable

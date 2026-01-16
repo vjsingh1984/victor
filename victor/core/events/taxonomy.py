@@ -248,6 +248,38 @@ class UnifiedEventType(str, Enum):
     """State was inspected for debugging."""
 
     # =========================================================================
+    # Team Events
+    # Events related to multi-agent team execution
+    # =========================================================================
+
+    TEAM_EXECUTION_STARTED = "team.execution.started"
+    """Team execution has started."""
+
+    TEAM_EXECUTION_COMPLETED = "team.execution.completed"
+    """Team execution has completed."""
+
+    TEAM_MEMBER_STARTED = "team.member.started"
+    """Team member execution has started."""
+
+    TEAM_MEMBER_COMPLETED = "team.member.completed"
+    """Team member execution has completed."""
+
+    TEAM_MEMBER_FAILED = "team.member.failed"
+    """Team member execution has failed."""
+
+    TEAM_RECURSION_DEPTH_EXCEEDED = "team.recursion.depth_exceeded"
+    """Team recursion depth limit was exceeded."""
+
+    TEAM_CONSENSUS_ACHIEVED = "team.consensus.achieved"
+    """Team reached consensus (for consensus formation)."""
+
+    TEAM_CONSENSUS_FAILED = "team.consensus.failed"
+    """Team failed to reach consensus."""
+
+    TEAM_PROGRESS_UPDATE = "team.progress.update"
+    """Team execution progress update."""
+
+    # =========================================================================
     # Custom/Extension Events
     # =========================================================================
 
@@ -513,6 +545,33 @@ def map_system_event(event_name: str) -> UnifiedEventType:
     return system_mapping.get(event_name.lower(), UnifiedEventType.UNKNOWN)
 
 
+def map_team_event(event_name: str) -> UnifiedEventType:
+    """Map a team event name to the unified taxonomy.
+
+    Args:
+        event_name: Team event name (e.g., "execution.started", "member.completed").
+
+    Returns:
+        Corresponding UnifiedEventType, or UNKNOWN if no mapping exists.
+
+    Example:
+        unified = map_team_event("execution.started")
+        assert unified == UnifiedEventType.TEAM_EXECUTION_STARTED
+    """
+    team_mapping: Dict[str, UnifiedEventType] = {
+        "execution.started": UnifiedEventType.TEAM_EXECUTION_STARTED,
+        "execution.completed": UnifiedEventType.TEAM_EXECUTION_COMPLETED,
+        "member.started": UnifiedEventType.TEAM_MEMBER_STARTED,
+        "member.completed": UnifiedEventType.TEAM_MEMBER_COMPLETED,
+        "member.failed": UnifiedEventType.TEAM_MEMBER_FAILED,
+        "recursion.depth_exceeded": UnifiedEventType.TEAM_RECURSION_DEPTH_EXCEEDED,
+        "consensus.achieved": UnifiedEventType.TEAM_CONSENSUS_ACHIEVED,
+        "consensus.failed": UnifiedEventType.TEAM_CONSENSUS_FAILED,
+        "progress.update": UnifiedEventType.TEAM_PROGRESS_UPDATE,
+    }
+    return team_mapping.get(event_name.lower(), UnifiedEventType.UNKNOWN)
+
+
 # =============================================================================
 # Utility Functions
 # =============================================================================
@@ -617,6 +676,7 @@ __all__ = [
     "map_tool_event",
     "map_agent_event",
     "map_system_event",
+    "map_team_event",
     # Utility functions
     "get_all_categories",
     "get_events_by_category",

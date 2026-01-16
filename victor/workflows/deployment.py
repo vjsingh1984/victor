@@ -1369,7 +1369,8 @@ class RemoteDeploymentHandler(DeploymentHandler):
     ) -> Dict[str, Any]:
         """Execute node on remote server."""
         logger.debug(f"Executing node {node.id} remotely")
-        # TODO: HTTP/gRPC to remote
+        # NOTE: Remote execution via HTTP/gRPC requires API server with workflow endpoint
+        # Deferred: Needs victor.api server to expose workflow execution API
         return state
 
     async def cleanup(self) -> None:

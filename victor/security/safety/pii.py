@@ -107,7 +107,7 @@ class PIIMatch:
     severity: PIISeverity
     suggestion: str = ""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # Redact matched text for safety in logs
         if len(self.matched_text) > 8:
             visible = min(4, len(self.matched_text) // 4)
@@ -286,10 +286,10 @@ class PIIScanner:
         matches = scanner.scan_content(text)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the scanner."""
-        self._column_patterns: Dict[PIIType, Pattern] = {}
-        self._content_patterns: Dict[PIIType, Pattern] = {}
+        self._column_patterns: Dict[PIIType, Pattern[str]] = {}
+        self._content_patterns: Dict[PIIType, Pattern[str]] = {}
         self._compile_patterns()
 
     def _compile_patterns(self) -> None:

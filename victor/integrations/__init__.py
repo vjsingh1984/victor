@@ -52,7 +52,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """Lazy load integration submodules on first access.
 
     This function is called by Python when an attribute is not found in the module.
