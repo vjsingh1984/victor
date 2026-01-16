@@ -55,6 +55,7 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.error_handler import HTTPErrorHandlerMixin
 from victor.providers.openai_compat import (
     convert_messages_to_openai_format,
     convert_tools_to_openai_format,
@@ -188,7 +189,7 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
     return tool_calls, remaining.strip()
 
 
-class LlamaCppProvider(BaseProvider):
+class LlamaCppProvider(BaseProvider, HTTPErrorHandlerMixin):
     """Provider for llama.cpp server (CPU-optimized inference).
 
     Features:
@@ -426,32 +427,12 @@ class LlamaCppProvider(BaseProvider):
             result = response.json()
             return self._parse_response(result, model)
 
-        except httpx.TimeoutException as e:
-            raise ProviderError(
-                message=f"llama.cpp request timed out after {self.timeout}s",
-                provider="llamacpp",
-                details={
-                    "model": model,
-                    "timeout": self.timeout,
-                    "suggestion": (
-                        "CPU inference can be slow. Try:\n"
-                        "  1. Use a smaller/more quantized model (Q4_K_M)\n"
-                        "  2. Reduce max_tokens\n"
-                        "  3. Increase timeout with --timeout flag"
-                    ),
-                },
-            ) from e
-
         except httpx.ConnectError as e:
-            raise ProviderConnectionError(
-                message=f"Cannot connect to llama.cpp server at {self.base_url}",
-                provider="llamacpp",
-                details={
-                    "suggestion": (
-                        "Start llama.cpp server:\n" "  llama-server -m model.gguf --port 8080"
-                    )
-                },
-            ) from e
+            raise self._handle_error(e, self.name)
+        except httpx.TimeoutException as e:
+            raise self._handle_error(e, self.name)
+        except Exception as e:
+            raise self._handle_error(e, self.name)
 
     async def stream(
         self,
@@ -614,10 +595,9 @@ class LlamaCppProvider(BaseProvider):
                             continue
 
         except httpx.TimeoutException as e:
-            raise ProviderError(
-                message=f"llama.cpp streaming timed out after {self.timeout}s",
-                provider="llamacpp",
-            ) from e
+            raise self._handle_error(e, self.name)
+        except Exception as e:
+            raise self._handle_error(e, self.name)
 
     def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
         """Parse llama.cpp API response.

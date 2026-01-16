@@ -58,6 +58,7 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.error_handler import HTTPErrorHandlerMixin
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +82,7 @@ HARM_CATEGORIES = [
 ]
 
 
-class GoogleProvider(BaseProvider):
+class GoogleProvider(BaseProvider, HTTPErrorHandlerMixin):
     """Provider for Google Gemini models.
 
     Safety Settings:
@@ -244,11 +245,7 @@ class GoogleProvider(BaseProvider):
         except ProviderError:
             raise
         except Exception as e:
-            raise ProviderError(
-                message=f"Google API error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            )
+            raise self._handle_error(e, self.name)
 
     async def stream(
         self,
@@ -333,11 +330,7 @@ class GoogleProvider(BaseProvider):
         except ProviderError:
             raise
         except Exception as e:
-            raise ProviderError(
-                message=f"Google streaming error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            )
+            raise self._handle_error(e, self.name)
 
     def _convert_tools(self, tools: List[ToolDefinition]) -> List[Any]:
         """Convert tools to Gemini format using proper SDK types.

@@ -42,6 +42,7 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.error_handler import HTTPErrorHandlerMixin
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,7 @@ DEEPSEEK_MODELS = {
 }
 
 
-class DeepSeekProvider(BaseProvider):
+class DeepSeekProvider(BaseProvider, HTTPErrorHandlerMixin):
     """Provider for DeepSeek API (OpenAI-compatible).
 
     Features:
@@ -195,23 +196,9 @@ class DeepSeekProvider(BaseProvider):
                 provider=self.name,
             ) from e
         except httpx.HTTPStatusError as e:
-            error_body = ""
-            try:
-                error_body = e.response.text[:500]
-            except Exception:
-                pass
-            raise ProviderError(
-                message=f"DeepSeek HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-                raw_error=e,
-            ) from e
+            raise self._handle_http_error(e, self.name)
         except Exception as e:
-            raise ProviderError(
-                message=f"DeepSeek unexpected error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
+            raise self._handle_error(e, self.name)
 
     async def stream(
         self,
@@ -311,23 +298,9 @@ class DeepSeekProvider(BaseProvider):
                 provider=self.name,
             ) from e
         except httpx.HTTPStatusError as e:
-            error_body = ""
-            try:
-                error_body = e.response.text[:500]
-            except Exception:
-                pass
-            raise ProviderError(
-                message=f"DeepSeek streaming HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-                raw_error=e,
-            ) from e
+            raise self._handle_http_error(e, self.name)
         except Exception as e:
-            raise ProviderError(
-                message=f"DeepSeek stream error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
+            raise self._handle_error(e, self.name)
 
     def _build_request_payload(
         self,

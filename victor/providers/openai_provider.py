@@ -35,6 +35,7 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.error_handler import HTTPErrorHandlerMixin
 from victor.providers.openai_compat import (
     convert_tools_to_openai_format,
 )
@@ -42,7 +43,7 @@ from victor.providers.openai_compat import (
 logger = logging.getLogger(__name__)
 
 
-class OpenAIProvider(BaseProvider):
+class OpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
     """Provider for OpenAI GPT models."""
 
     # O-series reasoning models have different parameter requirements
@@ -188,7 +189,7 @@ class OpenAIProvider(BaseProvider):
             ) from e
         except Exception as e:
             # Catch-all for truly unexpected errors
-            return self._handle_error(e)
+            raise self._handle_error(e, self.name)
 
     async def stream(
         self,
@@ -272,7 +273,7 @@ class OpenAIProvider(BaseProvider):
             ) from e
         except Exception as e:
             # Catch-all for truly unexpected errors
-            raise self._handle_error(e)
+            raise self._handle_error(e, self.name)
 
     def _convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
         """Convert standard tools to OpenAI format."""
@@ -412,40 +413,6 @@ class OpenAIProvider(BaseProvider):
             is_final=is_final,
             usage=usage,
         )
-
-    def _handle_error(self, error: Exception) -> ProviderError:
-        """Handle and convert API errors.
-
-        Args:
-            error: Original exception
-
-        Returns:
-            ProviderError with details
-
-        Raises:
-            ProviderError: Always raises after converting
-        """
-        error_msg = str(error)
-
-        if "authentication" in error_msg.lower() or "api_key" in error_msg.lower():
-            raise ProviderAuthError(
-                message=f"Authentication failed: {error_msg}",
-                provider=self.name,
-                raw_error=error,
-            )
-        elif "rate_limit" in error_msg.lower() or "429" in error_msg:
-            raise ProviderRateLimitError(
-                message=f"Rate limit exceeded: {error_msg}",
-                provider=self.name,
-                status_code=429,
-                raw_error=error,
-            )
-        else:
-            raise ProviderError(
-                message=f"OpenAI API error: {error_msg}",
-                provider=self.name,
-                raw_error=error,
-            )
 
     async def list_models(self) -> List[Dict[str, Any]]:
         """List available OpenAI models.

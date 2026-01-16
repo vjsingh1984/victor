@@ -49,6 +49,7 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.error_handler import HTTPErrorHandlerMixin
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +112,7 @@ OPENROUTER_MODELS = {
 }
 
 
-class OpenRouterProvider(BaseProvider):
+class OpenRouterProvider(BaseProvider, HTTPErrorHandlerMixin):
     """Provider for OpenRouter API - unified gateway to multiple LLMs.
 
     Features:
@@ -196,18 +197,12 @@ class OpenRouterProvider(BaseProvider):
 
             return self._parse_response(response.json(), model)
 
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"OpenRouter request timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
         except httpx.HTTPStatusError as e:
-            error_body = e.response.text[:500] if e.response.text else ""
-            raise ProviderError(
-                message=f"OpenRouter HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-            ) from e
+            raise self._handle_http_error(e, self.name)
+        except httpx.TimeoutException as e:
+            raise self._handle_error(e, self.name)
+        except Exception as e:
+            raise self._handle_error(e, self.name)
 
     async def stream(
         self,
@@ -249,17 +244,12 @@ class OpenRouterProvider(BaseProvider):
                     except json.JSONDecodeError:
                         pass
 
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message="OpenRouter stream timed out",
-                provider=self.name,
-            ) from e
         except httpx.HTTPStatusError as e:
-            raise ProviderError(
-                message=f"OpenRouter streaming error {e.response.status_code}",
-                provider=self.name,
-                status_code=e.response.status_code,
-            ) from e
+            raise self._handle_http_error(e, self.name)
+        except httpx.TimeoutException as e:
+            raise self._handle_error(e, self.name)
+        except Exception as e:
+            raise self._handle_error(e, self.name)
 
     def _build_request_payload(
         self, messages, model, temperature, max_tokens, tools, stream, **kwargs

@@ -30,13 +30,14 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.error_handler import HTTPErrorHandlerMixin
 from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
 from victor.providers.ollama_capability_detector import TOOL_SUPPORT_PATTERNS
 
 logger = logging.getLogger(__name__)
 
 
-class OllamaProvider(BaseProvider):
+class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
     """Provider for Ollama local model server."""
 
     def __init__(
@@ -369,11 +370,6 @@ class OllamaProvider(BaseProvider):
             result = response.json()
             return self._parse_response(result, model)
 
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"Request timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
         except httpx.HTTPStatusError as e:
             # Check for "does not support tools" error (HTTP 400)
             # Retry without tools if model doesn't support them
@@ -406,25 +402,12 @@ class OllamaProvider(BaseProvider):
                 except Exception:
                     pass  # Fall through to original error
 
-            # Include error body for better debugging
-            error_body = ""
-            try:
-                error_body = e.response.text[:500]
-            except Exception:
-                pass
-            logger.error(f"Ollama HTTP error {e.response.status_code}: {error_body}")
-            raise ProviderError(
-                message=f"HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-                raw_error=e,
-            ) from e
+            # Use mixin for other HTTP errors
+            raise self._handle_http_error(e, self.name)
+        except httpx.TimeoutException as e:
+            raise self._handle_error(e, self.name)
         except Exception as e:
-            raise ProviderError(
-                message=f"Unexpected error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
+            raise self._handle_error(e, self.name)
 
     async def stream(
         self,
@@ -554,31 +537,13 @@ class OllamaProvider(BaseProvider):
                     except json.JSONDecodeError:
                         logger.warning(f"JSON decode error on line: {line[:100]}")
 
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"Stream timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
         except httpx.HTTPStatusError as e:
-            # Include error body for better debugging
-            error_body = ""
-            try:
-                error_body = e.response.text[:500]
-            except Exception:
-                pass
-            logger.error(f"Ollama streaming HTTP error {e.response.status_code}: {error_body}")
-            raise ProviderError(
-                message=f"HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-                raw_error=e,
-            ) from e
+            # Use mixin for HTTP errors
+            raise self._handle_http_error(e, self.name)
+        except httpx.TimeoutException as e:
+            raise self._handle_error(e, self.name)
         except Exception as e:
-            raise ProviderError(
-                message=f"Unexpected error in stream: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
+            raise self._handle_error(e, self.name)
 
     def _build_request_payload(
         self,
@@ -799,11 +764,7 @@ class OllamaProvider(BaseProvider):
             result = response.json()
             return result.get("models", [])
         except Exception as e:
-            raise ProviderError(
-                message=f"Failed to list models: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
+            raise self._handle_error(e, self.name)
 
     async def pull_model(self, model: str) -> AsyncIterator[Dict[str, Any]]:
         """Pull a model from Ollama library.
@@ -831,11 +792,7 @@ class OllamaProvider(BaseProvider):
                             continue
 
         except Exception as e:
-            raise ProviderError(
-                message=f"Failed to pull model: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
+            raise self._handle_error(e, self.name)
 
     async def close(self) -> None:
         """Close HTTP client."""

@@ -43,6 +43,7 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.error_handler import HTTPErrorHandlerMixin
 from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
 
 logger = logging.getLogger(__name__)
@@ -102,7 +103,7 @@ def _extract_thinking_content(response: str) -> Tuple[str, str]:
     return (thinking, content)
 
 
-class LMStudioProvider(BaseProvider):
+class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
     """Provider for LMStudio local model server (OpenAI-compatible API).
 
     Features:
@@ -587,63 +588,47 @@ class LMStudioProvider(BaseProvider):
             result = response.json()
             return self._parse_response(result, model)
 
-        except httpx.TimeoutException as e:
-            # Enhanced timeout error with helpful suggestions
-            raise ProviderTimeoutError(
-                message=(
-                    f"LMStudio request timed out after {self.timeout}s. "
-                    f"Possible causes:\n"
-                    f"  1. Model '{model}' is still loading (first request takes longer)\n"
-                    f"  2. Model is too large for available VRAM\n"
-                    f"  3. Server is overloaded\n"
-                    f"Try: Increase timeout or wait for model to finish loading."
-                ),
-                provider=self.name,
-            ) from e
         except httpx.HTTPStatusError as e:
+            # Enhanced error classification for specific cases
+            status_code = e.response.status_code
             error_body = ""
             try:
                 error_body = e.response.text[:500]
             except Exception:
                 pass
 
-            # Enhanced error classification
-            status_code = e.response.status_code
             if status_code == 503:
-                message = (
-                    f"LMStudio server unavailable (503). "
-                    f"The model may still be loading. "
-                    f"Server: {self.base_url}"
-                )
-            elif status_code == 500 and "out of memory" in error_body.lower():
-                message = (
-                    f"LMStudio out of memory loading model '{model}'. "
-                    f"Try a smaller model or free up VRAM."
-                )
-            else:
-                message = f"LMStudio HTTP error {status_code}: {error_body}"
-
-            raise ProviderError(
-                message=message,
-                provider=self.name,
-                status_code=status_code,
-                raw_error=e,
-            ) from e
+                # Special message for model loading
+                raise ProviderError(
+                    message=(
+                        f"LMStudio server unavailable (503). "
+                        f"The model may still be loading. "
+                        f"Server: {self.base_url}"
+                    ),
+                    provider=self.name,
+                    status_code=status_code,
+                    raw_error=e,
+                ) from e
+            if status_code == 500 and "out of memory" in error_body.lower():
+                # Special message for OOM
+                raise ProviderError(
+                    message=(
+                        f"LMStudio out of memory loading model '{model}'. "
+                        f"Try a smaller model or free up VRAM."
+                    ),
+                    provider=self.name,
+                    status_code=status_code,
+                    raw_error=e,
+                ) from e
+            # Use mixin for other HTTP errors
+            raise self._handle_http_error(e, self.name)
+        except httpx.TimeoutException as e:
+            # Enhanced timeout error with helpful suggestions
+            raise self._handle_error(e, self.name)
         except httpx.ConnectError as e:
-            raise ProviderError(
-                message=(
-                    f"Cannot connect to LMStudio server at {self.base_url}. "
-                    f"Ensure LMStudio is running and the server is enabled."
-                ),
-                provider=self.name,
-                raw_error=e,
-            ) from e
+            raise self._handle_error(e, self.name)
         except Exception as e:
-            raise ProviderError(
-                message=f"LMStudio unexpected error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
+            raise self._handle_error(e, self.name)
 
     async def stream(
         self,
@@ -763,52 +748,28 @@ class LMStudioProvider(BaseProvider):
                         except json.JSONDecodeError:
                             logger.warning(f"LMStudio JSON decode error on line: {line[:100]}")
 
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=(
-                    f"LMStudio stream timed out after {self.timeout}s. "
-                    f"Model '{model}' may still be loading."
-                ),
-                provider=self.name,
-            ) from e
         except httpx.HTTPStatusError as e:
-            error_body = ""
-            try:
-                error_body = e.response.text[:500]
-            except Exception:
-                pass
-
-            # Enhanced error classification
+            # Enhanced error classification for specific cases
             status_code = e.response.status_code
             if status_code == 503:
-                message = (
-                    "LMStudio server unavailable (503) during streaming. "
-                    "The model may still be loading."
-                )
-            else:
-                message = f"LMStudio streaming HTTP error {status_code}: {error_body}"
-
-            raise ProviderError(
-                message=message,
-                provider=self.name,
-                status_code=status_code,
-                raw_error=e,
-            ) from e
+                # Special message for model loading during streaming
+                raise ProviderError(
+                    message=(
+                        "LMStudio server unavailable (503) during streaming. "
+                        "The model may still be loading."
+                    ),
+                    provider=self.name,
+                    status_code=status_code,
+                    raw_error=e,
+                ) from e
+            # Use mixin for other HTTP errors
+            raise self._handle_http_error(e, self.name)
+        except httpx.TimeoutException as e:
+            raise self._handle_error(e, self.name)
         except httpx.ConnectError as e:
-            raise ProviderError(
-                message=(
-                    f"Cannot connect to LMStudio server at {self.base_url}. "
-                    f"Ensure LMStudio is running and the server is enabled."
-                ),
-                provider=self.name,
-                raw_error=e,
-            ) from e
+            raise self._handle_error(e, self.name)
         except Exception as e:
-            raise ProviderError(
-                message=f"LMStudio stream error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
+            raise self._handle_error(e, self.name)
 
     def _build_request_payload(
         self,
@@ -1115,11 +1076,7 @@ class LMStudioProvider(BaseProvider):
             result = response.json()
             return result.get("data", [])
         except Exception as e:
-            raise ProviderError(
-                message=f"LMStudio failed to list models: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
+            raise self._handle_error(e, self.name)
 
     async def close(self) -> None:
         """Close HTTP client."""

@@ -46,11 +46,11 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
-    ProviderError,
     ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.error_handler import HTTPErrorHandlerMixin
 
 logger = logging.getLogger(__name__)
 
@@ -402,7 +402,7 @@ def _extract_qwen3_thinking(content: str) -> Tuple[str, str]:
     return thinking, main
 
 
-class CerebrasProvider(BaseProvider):
+class CerebrasProvider(BaseProvider, HTTPErrorHandlerMixin):
     """Provider for Cerebras Inference API (OpenAI-compatible).
 
     Features:
@@ -482,12 +482,9 @@ class CerebrasProvider(BaseProvider):
                 provider=self.name,
             ) from e
         except httpx.HTTPStatusError as e:
-            error_body = e.response.text[:500] if e.response.text else ""
-            raise ProviderError(
-                message=f"Cerebras HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-            ) from e
+            raise self._handle_http_error(e, self.name)
+        except Exception as e:
+            raise self._handle_error(e, self.name)
 
     async def stream(
         self,
@@ -572,11 +569,9 @@ class CerebrasProvider(BaseProvider):
                 provider=self.name,
             ) from e
         except httpx.HTTPStatusError as e:
-            raise ProviderError(
-                message=f"Cerebras streaming error {e.response.status_code}",
-                provider=self.name,
-                status_code=e.response.status_code,
-            ) from e
+            raise self._handle_http_error(e, self.name)
+        except Exception as e:
+            raise self._handle_error(e, self.name)
 
     def _build_request_payload(
         self, messages, model, temperature, max_tokens, tools, stream, **kwargs

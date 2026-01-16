@@ -47,11 +47,11 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
-    ProviderError,
     ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.error_handler import HTTPErrorHandlerMixin
 from victor.providers.payload_limiter import (
     ProviderPayloadLimiter,
     TruncationStrategy,
@@ -121,7 +121,7 @@ GROQ_MODELS = {
 }
 
 
-class GroqProvider(BaseProvider):
+class GroqProvider(BaseProvider, HTTPErrorHandlerMixin):
     """Provider for Groq Cloud API (OpenAI-compatible).
 
     Features:
@@ -255,23 +255,9 @@ class GroqProvider(BaseProvider):
                 provider=self.name,
             ) from e
         except httpx.HTTPStatusError as e:
-            error_body = ""
-            try:
-                error_body = e.response.text[:500]
-            except Exception:
-                pass
-            raise ProviderError(
-                message=f"Groq HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-                raw_error=e,
-            ) from e
+            raise self._handle_http_error(e, self.name)
         except Exception as e:
-            raise ProviderError(
-                message=f"Groq unexpected error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
+            raise self._handle_error(e, self.name)
 
     async def stream(
         self,
@@ -374,23 +360,9 @@ class GroqProvider(BaseProvider):
                 provider=self.name,
             ) from e
         except httpx.HTTPStatusError as e:
-            error_body = ""
-            try:
-                error_body = e.response.text[:500]
-            except Exception:
-                pass
-            raise ProviderError(
-                message=f"Groq streaming HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-                raw_error=e,
-            ) from e
+            raise self._handle_http_error(e, self.name)
         except Exception as e:
-            raise ProviderError(
-                message=f"Groq stream error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
+            raise self._handle_error(e, self.name)
 
     def _build_request_payload(
         self,

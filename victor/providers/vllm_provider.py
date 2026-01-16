@@ -53,6 +53,7 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.error_handler import HTTPErrorHandlerMixin
 from victor.providers.openai_compat import (
     convert_messages_to_openai_format,
     convert_tools_to_openai_format,
@@ -208,7 +209,7 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
     return tool_calls, remaining.strip()
 
 
-class VLLMProvider(BaseProvider):
+class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
     """Provider for vLLM high-throughput inference server.
 
     Features:
@@ -413,34 +414,13 @@ class VLLMProvider(BaseProvider):
             result = response.json()
             return self._parse_response(result, model)
 
-        except httpx.TimeoutException as e:
-            raise ProviderError(
-                message=f"vLLM request timed out after {self.timeout}s",
-                provider="vllm",
-                details={
-                    "model": model,
-                    "timeout": self.timeout,
-                    "suggestion": (
-                        "Try:\n"
-                        "  1. Increase timeout with --timeout flag\n"
-                        "  2. Use a smaller model\n"
-                        "  3. Reduce max_tokens"
-                    ),
-                },
-            ) from e
-
         except httpx.ConnectError as e:
-            raise ProviderConnectionError(
-                message=f"Cannot connect to vLLM server at {self.base_url}",
-                provider="vllm",
-                details={
-                    "suggestion": (
-                        "Ensure vLLM server is running:\n"
-                        "  python -m vllm.entrypoints.openai.api_server \\\n"
-                        "    --model YOUR_MODEL --port 8000"
-                    )
-                },
-            ) from e
+            # Use mixin for connection errors
+            raise self._handle_error(e, self.name)
+        except httpx.TimeoutException as e:
+            raise self._handle_error(e, self.name)
+        except Exception as e:
+            raise self._handle_error(e, self.name)
 
     async def stream(
         self,
@@ -602,10 +582,9 @@ class VLLMProvider(BaseProvider):
                             continue
 
         except httpx.TimeoutException as e:
-            raise ProviderError(
-                message=f"vLLM streaming timed out after {self.timeout}s",
-                provider="vllm",
-            ) from e
+            raise self._handle_error(e, self.name)
+        except Exception as e:
+            raise self._handle_error(e, self.name)
 
     def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
         """Parse vLLM API response.

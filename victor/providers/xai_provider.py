@@ -35,13 +35,12 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
-    ProviderAuthError,
     ProviderError,
-    ProviderRateLimitError,
     ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.error_handler import HTTPErrorHandlerMixin
 from victor.providers.openai_compat import convert_tools_to_openai_format
 
 logger = logging.getLogger(__name__)
@@ -85,7 +84,7 @@ XAI_MODELS = {
 }
 
 
-class XAIProvider(BaseProvider):
+class XAIProvider(BaseProvider, HTTPErrorHandlerMixin):
     """Provider for xAI Grok models (OpenAI-compatible API).
 
     Features:
@@ -224,7 +223,7 @@ class XAIProvider(BaseProvider):
                 provider=self.name,
             ) from e
         except httpx.HTTPStatusError as e:
-            self._handle_http_error(e)
+            raise self._handle_http_error(e, self.name)
         except Exception as e:
             raise ProviderError(
                 message=f"xAI API error: {str(e)}",
@@ -318,7 +317,7 @@ class XAIProvider(BaseProvider):
                 provider=self.name,
             ) from e
         except httpx.HTTPStatusError as e:
-            raise self._handle_http_error(e)
+            raise self._handle_http_error(e, self.name)
         except Exception as e:
             raise ProviderError(
                 message=f"xAI streaming error: {str(e)}",
@@ -546,44 +545,6 @@ class XAIProvider(BaseProvider):
             stop_reason=finish_reason,
             is_final=finish_reason is not None,
         )
-
-    def _handle_http_error(self, error: httpx.HTTPStatusError) -> ProviderError:
-        """Handle HTTP errors from xAI API.
-
-        Args:
-            error: HTTP error
-
-        Raises:
-            ProviderError: Converted error
-        """
-        status_code = error.response.status_code
-        # Safely get error message - streaming responses may not have .text available
-        try:
-            error_msg = error.response.text
-        except httpx.ResponseNotRead:
-            error_msg = f"HTTP {status_code} error (response body not available)"
-
-        if status_code == 401:
-            raise ProviderAuthError(
-                message=f"Authentication failed: {error_msg}",
-                provider=self.name,
-                status_code=status_code,
-                raw_error=error,
-            )
-        elif status_code == 429:
-            raise ProviderRateLimitError(
-                message=f"Rate limit exceeded: {error_msg}",
-                provider=self.name,
-                status_code=status_code,
-                raw_error=error,
-            )
-        else:
-            raise ProviderError(
-                message=f"xAI API error ({status_code}): {error_msg}",
-                provider=self.name,
-                status_code=status_code,
-                raw_error=error,
-            )
 
     async def list_models(self) -> List[Dict[str, Any]]:
         """List available xAI models.

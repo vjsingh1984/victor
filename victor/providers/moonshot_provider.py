@@ -41,6 +41,7 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.error_handler import HTTPErrorHandlerMixin
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,7 @@ KIMI_K2_MODELS = {
 }
 
 
-class MoonshotProvider(BaseProvider):
+class MoonshotProvider(BaseProvider, HTTPErrorHandlerMixin):
     """Provider for Moonshot AI's Kimi K2 models (OpenAI-compatible API).
 
     Features:
@@ -168,29 +169,12 @@ class MoonshotProvider(BaseProvider):
             result = response.json()
             return self._parse_response(result, model)
 
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"Moonshot request timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
         except httpx.HTTPStatusError as e:
-            error_body = ""
-            try:
-                error_body = e.response.text[:500]
-            except Exception:
-                pass
-            raise ProviderError(
-                message=f"Moonshot HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-                raw_error=e,
-            ) from e
+            raise self._handle_http_error(e, self.name)
+        except httpx.TimeoutException as e:
+            raise self._handle_error(e, self.name)
         except Exception as e:
-            raise ProviderError(
-                message=f"Moonshot unexpected error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
+            raise self._handle_error(e, self.name)
 
     async def stream(
         self,
@@ -281,29 +265,12 @@ class MoonshotProvider(BaseProvider):
                         except json.JSONDecodeError:
                             logger.warning(f"Moonshot JSON decode error on line: {line[:100]}")
 
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"Moonshot stream timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
         except httpx.HTTPStatusError as e:
-            error_body = ""
-            try:
-                error_body = e.response.text[:500]
-            except Exception:
-                pass
-            raise ProviderError(
-                message=f"Moonshot streaming HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-                raw_error=e,
-            ) from e
+            raise self._handle_http_error(e, self.name)
+        except httpx.TimeoutException as e:
+            raise self._handle_error(e, self.name)
         except Exception as e:
-            raise ProviderError(
-                message=f"Moonshot stream error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
+            raise self._handle_error(e, self.name)
 
     def _build_request_payload(
         self,

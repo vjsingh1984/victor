@@ -51,6 +51,7 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.error_handler import HTTPErrorHandlerMixin
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +108,7 @@ REPLICATE_MODELS = {
 }
 
 
-class ReplicateProvider(BaseProvider):
+class ReplicateProvider(BaseProvider, HTTPErrorHandlerMixin):
     """Provider for Replicate API.
 
     Features:
@@ -198,18 +199,12 @@ class ReplicateProvider(BaseProvider):
                 raw_response=prediction,
             )
 
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"Replicate request timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
         except httpx.HTTPStatusError as e:
-            error_body = e.response.text[:500] if e.response.text else ""
-            raise ProviderError(
-                message=f"Replicate HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-            ) from e
+            raise self._handle_http_error(e, self.name)
+        except httpx.TimeoutException as e:
+            raise self._handle_error(e, self.name)
+        except Exception as e:
+            raise self._handle_error(e, self.name)
 
     async def stream(
         self,
@@ -277,17 +272,12 @@ class ReplicateProvider(BaseProvider):
                             is_final=False,
                         )
 
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message="Replicate stream timed out",
-                provider=self.name,
-            ) from e
         except httpx.HTTPStatusError as e:
-            raise ProviderError(
-                message=f"Replicate streaming error {e.response.status_code}",
-                provider=self.name,
-                status_code=e.response.status_code,
-            ) from e
+            raise self._handle_http_error(e, self.name)
+        except httpx.TimeoutException as e:
+            raise self._handle_error(e, self.name)
+        except Exception as e:
+            raise self._handle_error(e, self.name)
 
     def _messages_to_prompt(self, messages: List[Message]) -> str:
         """Convert messages to a prompt string for Replicate models."""
