@@ -28,6 +28,12 @@ from victor.workflows.definition import (
     WorkflowDefinition,
     WorkflowNode,
     WorkflowNodeType,
+    AgentNode,
+    ComputeNode,
+    ConditionNode,
+    ParallelNode,
+    TransformNode,
+    TeamNodeWorkflow,
 )
 
 
@@ -128,25 +134,27 @@ class TestWorkflowToGraphAdapter:
     def test_adapt_simple_workflow(self):
         """Test adapting a simple workflow."""
         # Create a simple workflow
+        node1 = AgentNode(
+            id="node1",
+            name="node1",
+            role="researcher",
+            goal="Do research",
+            next_nodes=["node2"],
+        )
+        node2 = AgentNode(
+            id="node2",
+            name="node2",
+            role="writer",
+            goal="Write output",
+            next_nodes=[],
+        )
         workflow = WorkflowDefinition(
             name="test_workflow",
             description="Test workflow",
-            nodes=[
-                WorkflowNode(
-                    name="node1",
-                    node_type=WorkflowNodeType.AGENT,
-                    role="researcher",
-                    goal="Do research",
-                    next_nodes=["node2"],
-                ),
-                WorkflowNode(
-                    name="node2",
-                    node_type=WorkflowNodeType.AGENT,
-                    role="writer",
-                    goal="Write output",
-                    next_nodes=[],
-                ),
-            ],
+            nodes={
+                "node1": node1,
+                "node2": node2,
+            },
         )
 
         adapter = WorkflowToGraphAdapter()
@@ -160,18 +168,19 @@ class TestWorkflowToGraphAdapter:
 
     def test_adapt_with_single_node(self):
         """Test adapting a workflow with a single node."""
+        only_node = AgentNode(
+            id="only_node",
+            name="only_node",
+            role="agent",
+            goal="Do something",
+            next_nodes=[],
+        )
         workflow = WorkflowDefinition(
             name="single_node_workflow",
             description="Single node workflow",
-            nodes=[
-                WorkflowNode(
-                    name="only_node",
-                    node_type=WorkflowNodeType.AGENT,
-                    role="agent",
-                    goal="Do something",
-                    next_nodes=[],
-                ),
-            ],
+            nodes={
+                "only_node": only_node,
+            },
         )
 
         adapter = WorkflowToGraphAdapter()
@@ -181,32 +190,35 @@ class TestWorkflowToGraphAdapter:
 
     def test_adapt_with_branching(self):
         """Test adapting a workflow with branching paths."""
+        start = AgentNode(
+            id="start",
+            name="start",
+            role="coordinator",
+            goal="Coordinate",
+            next_nodes=["branch_a", "branch_b"],
+        )
+        branch_a = AgentNode(
+            id="branch_a",
+            name="branch_a",
+            role="agent_a",
+            goal="Handle branch A",
+            next_nodes=[],
+        )
+        branch_b = AgentNode(
+            id="branch_b",
+            name="branch_b",
+            role="agent_b",
+            goal="Handle branch B",
+            next_nodes=[],
+        )
         workflow = WorkflowDefinition(
             name="branching_workflow",
             description="Branching workflow",
-            nodes=[
-                WorkflowNode(
-                    name="start",
-                    node_type=WorkflowNodeType.AGENT,
-                    role="coordinator",
-                    goal="Coordinate",
-                    next_nodes=["branch_a", "branch_b"],
-                ),
-                WorkflowNode(
-                    name="branch_a",
-                    node_type=WorkflowNodeType.AGENT,
-                    role="agent_a",
-                    goal="Handle branch A",
-                    next_nodes=[],
-                ),
-                WorkflowNode(
-                    name="branch_b",
-                    node_type=WorkflowNodeType.AGENT,
-                    role="agent_b",
-                    goal="Handle branch B",
-                    next_nodes=[],
-                ),
-            ],
+            nodes={
+                "start": start,
+                "branch_a": branch_a,
+                "branch_b": branch_b,
+            },
         )
 
         adapter = WorkflowToGraphAdapter()
@@ -219,7 +231,7 @@ class TestWorkflowToGraphAdapter:
         workflow = WorkflowDefinition(
             name="empty_workflow",
             description="Empty workflow",
-            nodes=[],
+            nodes={},
         )
 
         adapter = WorkflowToGraphAdapter()
@@ -229,22 +241,23 @@ class TestWorkflowToGraphAdapter:
 
     def test_adapt_node_creates_handler(self):
         """Test that _adapt_node creates a proper handler."""
+        node1 = AgentNode(
+            id="node1",
+            name="node1",
+            role="agent",
+            goal="Test",
+            next_nodes=[],
+        )
         workflow = WorkflowDefinition(
             name="test_workflow",
             description="Test",
-            nodes=[
-                WorkflowNode(
-                    name="node1",
-                    node_type=WorkflowNodeType.AGENT,
-                    role="agent",
-                    goal="Test",
-                    next_nodes=[],
-                ),
-            ],
+            nodes={
+                "node1": node1,
+            },
         )
 
         adapter = WorkflowToGraphAdapter()
-        adapted = adapter._adapt_node(workflow.nodes[0], workflow)
+        adapted = adapter._adapt_node(list(workflow.nodes.values())[0], workflow)
 
         assert adapted.name == "node1"
         assert adapted.node_type == WorkflowNodeType.AGENT
@@ -268,9 +281,9 @@ class TestWorkflowToGraphAdapter:
 
     def test_adapt_node_preserves_properties(self):
         """Test that _adapt_node preserves node properties."""
-        node = WorkflowNode(
+        node = AgentNode(
+            id="test_node",
             name="test_node",
-            node_type=WorkflowNodeType.AGENT,
             role="researcher",
             goal="Research task",
             next_nodes=["next"],
@@ -281,7 +294,9 @@ class TestWorkflowToGraphAdapter:
         workflow = WorkflowDefinition(
             name="test_workflow",
             description="Test",
-            nodes=[node],
+            nodes={
+                "test_node": node,
+            },
         )
 
         adapter = WorkflowToGraphAdapter()
@@ -291,31 +306,33 @@ class TestWorkflowToGraphAdapter:
         assert adapted.allowed_tools == ["tool1", "tool2"]
         assert adapted.next_nodes == ["next"]
 
-    @patch("victor.workflows.adapters.StateGraph")
+    @patch("victor.framework.graph.StateGraph")
     def test_adapt_adds_edges_correctly(self, mock_graph_class):
         """Test that adapt adds edges between nodes."""
         mock_graph = MagicMock()
         mock_graph_class.return_value = mock_graph
 
+        node1 = AgentNode(
+            id="node1",
+            name="node1",
+            role="agent1",
+            goal="Task 1",
+            next_nodes=["node2"],
+        )
+        node2 = AgentNode(
+            id="node2",
+            name="node2",
+            role="agent2",
+            goal="Task 2",
+            next_nodes=[],
+        )
         workflow = WorkflowDefinition(
             name="test_workflow",
             description="Test",
-            nodes=[
-                WorkflowNode(
-                    name="node1",
-                    node_type=WorkflowNodeType.AGENT,
-                    role="agent1",
-                    goal="Task 1",
-                    next_nodes=["node2"],
-                ),
-                WorkflowNode(
-                    name="node2",
-                    node_type=WorkflowNodeType.AGENT,
-                    role="agent2",
-                    goal="Task 2",
-                    next_nodes=[],
-                ),
-            ],
+            nodes={
+                "node1": node1,
+                "node2": node2,
+            },
         )
 
         adapter = WorkflowToGraphAdapter()
@@ -328,22 +345,23 @@ class TestWorkflowToGraphAdapter:
 
     def test_handler_updates_visited_nodes(self):
         """Test that handler tracks visited nodes."""
+        node1 = AgentNode(
+            id="node1",
+            name="node1",
+            role="agent",
+            goal="Test",
+            next_nodes=[],
+        )
         workflow = WorkflowDefinition(
             name="test_workflow",
             description="Test",
-            nodes=[
-                WorkflowNode(
-                    name="node1",
-                    node_type=WorkflowNodeType.AGENT,
-                    role="agent",
-                    goal="Test",
-                    next_nodes=[],
-                ),
-            ],
+            nodes={
+                "node1": node1,
+            },
         )
 
         adapter = WorkflowToGraphAdapter()
-        adapted = adapter._adapt_node(workflow.nodes[0], workflow)
+        adapted = adapter._adapt_node(list(workflow.nodes.values())[0], workflow)
 
         state: WorkflowState = {
             "context": {},
@@ -362,22 +380,23 @@ class TestWorkflowToGraphAdapter:
 
     def test_handler_preserves_context(self):
         """Test that handler preserves workflow context."""
+        node1 = AgentNode(
+            id="node1",
+            name="node1",
+            role="agent",
+            goal="Test",
+            next_nodes=[],
+        )
         workflow = WorkflowDefinition(
             name="test_workflow",
             description="Test",
-            nodes=[
-                WorkflowNode(
-                    name="node1",
-                    node_type=WorkflowNodeType.AGENT,
-                    role="agent",
-                    goal="Test",
-                    next_nodes=[],
-                ),
-            ],
+            nodes={
+                "node1": node1,
+            },
         )
 
         adapter = WorkflowToGraphAdapter()
-        adapted = adapter._adapt_node(workflow.nodes[0], workflow)
+        adapted = adapter._adapt_node(list(workflow.nodes.values())[0], workflow)
 
         state: WorkflowState = {
             "context": {"task": "important task", "data": {"key": "value"}},
@@ -399,18 +418,19 @@ class TestWorkflowToGraphAdapterExecution:
 
     def test_adapt_with_execution(self):
         """Test adapting workflow with real execution handlers."""
+        node1 = AgentNode(
+            id="node1",
+            name="node1",
+            role="agent",
+            goal="Test",
+            next_nodes=[],
+        )
         workflow = WorkflowDefinition(
             name="test_workflow",
             description="Test",
-            nodes=[
-                WorkflowNode(
-                    name="node1",
-                    node_type=WorkflowNodeType.AGENT,
-                    role="agent",
-                    goal="Test",
-                    next_nodes=[],
-                ),
-            ],
+            nodes={
+                "node1": node1,
+            },
         )
 
         mock_executor = MagicMock()
@@ -423,9 +443,9 @@ class TestWorkflowToGraphAdapterExecution:
 
     def test_execution_handler_calls_executor(self):
         """Test that execution handler calls executor."""
-        node = WorkflowNode(
+        node = AgentNode(
+            id="node1",
             name="node1",
-            node_type=WorkflowNodeType.AGENT,
             role="agent",
             goal="Test",
             next_nodes=[],
@@ -434,7 +454,9 @@ class TestWorkflowToGraphAdapterExecution:
         workflow = WorkflowDefinition(
             name="test_workflow",
             description="Test",
-            nodes=[node],
+            nodes={
+                "node1": node,
+            },
         )
 
         mock_executor = MagicMock()
@@ -461,9 +483,9 @@ class TestWorkflowToGraphAdapterExecution:
 
     def test_execution_handler_handles_errors(self):
         """Test that execution handler handles errors gracefully."""
-        node = WorkflowNode(
+        node = AgentNode(
+            id="node1",
             name="node1",
-            node_type=WorkflowNodeType.AGENT,
             role="agent",
             goal="Test",
             next_nodes=[],
@@ -472,7 +494,9 @@ class TestWorkflowToGraphAdapterExecution:
         workflow = WorkflowDefinition(
             name="test_workflow",
             description="Test",
-            nodes=[node],
+            nodes={
+                "node1": node,
+            },
         )
 
         mock_executor = MagicMock()
@@ -540,7 +564,8 @@ class TestGraphToWorkflowAdapter:
         workflow = adapter.adapt(mock_graph, "test_workflow")
 
         # Entry point should be first
-        assert workflow.nodes[0].name == "node1"
+        nodes_list = list(workflow.nodes.values())
+        assert nodes_list[0].name == "node1"
 
     def test_adapt_without_entry_point(self):
         """Test adapting graph without entry point."""

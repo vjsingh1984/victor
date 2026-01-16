@@ -163,13 +163,14 @@ class WorkflowToGraphAdapter:
         # Create StateGraph with workflow state
         graph: StateGraph[WorkflowState] = StateGraph(WorkflowState)
 
-        # Convert each node
-        for node in workflow.nodes:
+        # Convert each node - workflow.nodes is a Dict[str, WorkflowNode]
+        nodes_list = list(workflow.nodes.values())
+        for node in nodes_list:
             adapted = self._adapt_node(node, workflow)
             graph.add_node(adapted.name, adapted.handler)
 
         # Add edges based on node connections
-        for node in workflow.nodes:
+        for node in nodes_list:
             if node.next_nodes:
                 for next_node in node.next_nodes:
                     if next_node:
@@ -179,11 +180,11 @@ class WorkflowToGraphAdapter:
                 graph.add_edge(node.name, END)
 
         # Set entry point
-        if workflow.nodes:
-            graph.set_entry_point(workflow.nodes[0].name)
+        if nodes_list:
+            graph.set_entry_point(nodes_list[0].name)
 
         logger.debug(
-            f"Adapted workflow '{workflow.name}' to StateGraph " f"({len(workflow.nodes)} nodes)"
+            f"Adapted workflow '{workflow.name}' to StateGraph " f"({len(nodes_list)} nodes)"
         )
 
         return graph
@@ -264,13 +265,14 @@ class WorkflowToGraphAdapter:
 
         graph: StateGraph[WorkflowState] = StateGraph(WorkflowState)
 
-        # Convert each node with real execution
-        for node in workflow.nodes:
+        # Convert each node with real execution - workflow.nodes is a Dict[str, WorkflowNode]
+        nodes_list = list(workflow.nodes.values())
+        for node in nodes_list:
             handler = self._create_execution_handler(node, executor)
             graph.add_node(node.name, handler)
 
         # Add edges
-        for node in workflow.nodes:
+        for node in nodes_list:
             if node.next_nodes:
                 for next_node in node.next_nodes:
                     if next_node:
@@ -278,8 +280,8 @@ class WorkflowToGraphAdapter:
             else:
                 graph.add_edge(node.name, END)
 
-        if workflow.nodes:
-            graph.set_entry_point(workflow.nodes[0].name)
+        if nodes_list:
+            graph.set_entry_point(nodes_list[0].name)
 
         return graph
 
@@ -365,9 +367,8 @@ class GraphToWorkflowAdapter:
         Returns:
             WorkflowDefinition compatible with existing infrastructure
         """
-        from victor.workflows.builder import WorkflowBuilder
-
-        builder = WorkflowBuilder(name)
+        # Import concrete node types
+        from victor.workflows.definition import AgentNode
 
         # Get nodes from graph
         # Note: This is a simplified adaptation - StateGraph
@@ -382,20 +383,32 @@ class GraphToWorkflowAdapter:
             ordered_nodes.remove(entry_point)
             ordered_nodes.insert(0, entry_point)
 
+        # Create workflow nodes
+        workflow_nodes = {}
+        node_to_next = {}  # Map node name to list of next node IDs
+
+        # Build mapping of edges
+        for from_node, to_nodes in edges.items():
+            node_to_next[from_node] = to_nodes
+
         for node_name in ordered_nodes:
-            builder.add_agent(
+            # Get next nodes from edge mapping
+            next_nodes = node_to_next.get(node_name, [])
+
+            # Create an AgentNode as a placeholder
+            workflow_nodes[node_name] = AgentNode(
+                id=node_name,
                 name=node_name,
                 role="adapted_node",
                 goal=f"Execute {node_name}",
+                next_nodes=next_nodes,
             )
 
-        # Set up edges
-        for from_node, to_nodes in edges.items():
-            for to_node in to_nodes:
-                # Note: WorkflowBuilder uses next_nodes on nodes
-                pass  # Edge setup handled by builder
-
-        return builder.build()
+        return WorkflowDefinition(
+            name=name,
+            description=f"Adapted from StateGraph",
+            nodes=workflow_nodes,
+        )
 
 
 __all__ = [

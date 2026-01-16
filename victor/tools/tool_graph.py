@@ -68,7 +68,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, FrozenSet, List, Optional, Set, Tuple
+from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple
 
 
 @dataclass
@@ -111,7 +111,7 @@ class ToolNode:
     inputs: Set[str] = field(default_factory=set)
     outputs: Set[str] = field(default_factory=set)
     weight: float = 1.0
-    metadata: Dict[str, any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_dependency(cls, dep: ToolDependency) -> "ToolNode":

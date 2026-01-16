@@ -242,7 +242,7 @@ class ContentPatternScanner:
     Uses native Rust pattern matching when available for 10-100x speedup.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the scanner with optional native acceleration."""
         self._warning_patterns = CONTENT_WARNING_PATTERNS
         self._misinfo_patterns = MISINFORMATION_RISK_PATTERNS
@@ -260,7 +260,7 @@ class ContentPatternScanner:
         """
         return scan_content_warnings(content)
 
-    def get_all_risks(self, content: str) -> Dict:
+    def get_all_risks(self, content: str) -> Dict[str, List[ContentWarningMatch]]:
         """Get comprehensive risk assessment.
 
         Args:

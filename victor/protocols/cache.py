@@ -91,14 +91,14 @@ class FileChangeEvent:
     Attributes:
         file_path: Absolute path to the file that changed
         change_type: Type of change that occurred
-        timestamp: ISO timestamp of when the change was detected
+        timestamp: ISO timestamp of when the change was detected (can be datetime or str)
         source_path: Original path if file was moved (None otherwise)
         metadata: Additional metadata about the change
     """
 
     file_path: str
     change_type: FileChangeType
-    timestamp: str
+    timestamp: str | datetime  # Accept both, normalize to str in __post_init__
     source_path: Optional[str] = None
     metadata: Dict[str, Any] | None = None
 

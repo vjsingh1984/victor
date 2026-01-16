@@ -803,7 +803,7 @@ class WorkflowCacheManager:
         """
         self._default_config = default_config or WorkflowCacheConfig()
         self._caches: Dict[str, WorkflowCache] = {}
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     def get_cache(
         self,

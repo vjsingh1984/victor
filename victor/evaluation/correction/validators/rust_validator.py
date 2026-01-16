@@ -395,7 +395,7 @@ class RustCodeValidator(BaseCodeValidator):
 
     def _check_lifetimes(self, code: str) -> list[str]:
         """Check lifetime annotations for common issues."""
-        warnings = []
+        warnings: list[str] = []
 
         # Check for potentially missing lifetime annotations
         # This is a very basic heuristic

@@ -45,6 +45,11 @@ from victor.framework.middleware.framework import (
     CacheResult,
     RateLimitResult,
 )
+from victor.framework.middleware.builder import (
+    MiddlewareBuilder,
+    MiddlewareChain,
+    MiddlewareProtocol,
+)
 
 __all__ = [
     # Middleware implementations (all from framework.py)
@@ -67,4 +72,8 @@ __all__ = [
     # Result types
     "CacheResult",
     "RateLimitResult",
+    # Builder
+    "MiddlewareBuilder",
+    "MiddlewareChain",
+    "MiddlewareProtocol",
 ]

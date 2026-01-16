@@ -7,7 +7,7 @@
 #   make build        # Build distribution packages
 #   make release      # Create a release (requires version)
 
-.PHONY: help install install-dev test lint format clean build build-binary docker release
+.PHONY: help install install-dev test lint format clean build build-binary docker release security security-full
 
 # Default target
 help:
@@ -32,6 +32,8 @@ help:
 	@echo "  make docs          Generate documentation"
 	@echo "  make serve         Start API server"
 	@echo "  make tui           Start TUI"
+	@echo "  make security     Run quick security scans"
+	@echo "  make security-full Run comprehensive security scans"
 
 # =============================================================================
 # Development
@@ -128,6 +130,54 @@ serve:
 
 tui:
 	victor
+
+# =============================================================================
+# Security
+# =============================================================================
+
+security:
+	@echo "Running quick security scans..."
+	@echo "================================"
+	@echo ""
+	@echo "Bandit (High/Critical severity only)..."
+	bandit -r victor/ --exclude victor/test/,victor/tests/,tests/,archive/ -lll || true
+	@echo ""
+	@echo "Safety check..."
+	safety check || true
+	@echo ""
+	@echo "Semgrep (ERROR severity only)..."
+	semgrep --config=auto --exclude=tests/ --exclude=archive/ --severity ERROR || true
+	@echo ""
+	@echo "Pip Audit..."
+	pip-audit || true
+	@echo ""
+	@echo "Quick security scans complete!"
+
+security-full:
+	@echo "Running comprehensive security scans..."
+	@echo "======================================="
+	@echo ""
+	@echo "Creating reports directory..."
+	mkdir -p security-reports
+	@echo ""
+	@echo "Bandit (all findings)..."
+	bandit -r victor/ --exclude victor/test/,victor/tests/,tests/,archive/ -f json -o security-reports/bandit-report.json || true
+	bandit -r victor/ --exclude victor/test/,victor/tests/,tests/,archive/ -f txt -o security-reports/bandit-report.txt || true
+	@echo ""
+	@echo "Safety check..."
+	safety check --save-json security-reports/safety-report.json || true
+	safety check --output text > security-reports/safety-report.txt || true
+	@echo ""
+	@echo "Semgrep..."
+	semgrep --config=auto --exclude=tests/ --exclude=archive/ --json --output=security-reports/semgrep-report.json || true
+	semgrep --config=auto --exclude=tests/ --exclude=archive/ > security-reports/semgrep-report.txt || true
+	@echo ""
+	@echo "Pip Audit..."
+	pip-audit --format json --output security-reports/pip-audit-report.json || true
+	pip-audit > security-reports/pip-audit-report.txt || true
+	@echo ""
+	@echo "Comprehensive security scans complete!"
+	@echo "Reports saved to security-reports/"
 
 # Check if all distribution files are ready
 check-dist:

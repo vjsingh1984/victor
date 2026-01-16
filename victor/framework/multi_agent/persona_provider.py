@@ -110,6 +110,7 @@ class FrameworkPersonaProvider(BaseCapabilityProvider["PersonaTraits"]):
 
     _instance: Optional["FrameworkPersonaProvider"] = None
     _lock: threading.RLock = threading.RLock()  # RLock allows reentrant acquisition
+    _initialized: bool = False  # Track initialization state for singleton
 
     def __new__(cls) -> "FrameworkPersonaProvider":
         """Create or return singleton instance."""

@@ -143,9 +143,9 @@ class EmbeddingRegistry:
         # Warn if trying to use ProximaDB when not available
         if config.vector_store == "proximadb" and not PROXIMADB_AVAILABLE:
             logger.warning(
-                f"ProximaDB is configured but not installed. "
-                f"Install with: pip install victor-ai[vector-experimental]. "
-                f"Using LanceDB as fallback."
+                "ProximaDB is configured but not installed. "
+                "Install with: pip install victor-ai[vector-experimental]. "
+                "Using LanceDB as fallback."
             )
             # Fallback to LanceDB
             config = EmbeddingConfig(

@@ -460,7 +460,10 @@ class GoCodeValidator(BaseCodeValidator):
         single_import = re.search(r'import\s+"[^"]+"\n', code)
         if single_import:
             # Convert to import block
-            existing = re.search(r'import\s+"([^"]+)"', code).group(1)
+            existing_match = re.search(r'import\s+"([^"]+)"', code)
+            if existing_match is None:
+                return code
+            existing = existing_match.group(1)
             all_imports = [existing] + missing
             import_block = "import (\n" + "\n".join(f'\t"{pkg}"' for pkg in all_imports) + "\n)\n"
             return code[: single_import.start()] + import_block + code[single_import.end() :]

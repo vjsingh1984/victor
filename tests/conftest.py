@@ -86,12 +86,14 @@ def mock_docker_client():
 
 
 @pytest.fixture(autouse=True)
-def reset_singletons():
+def reset_singletons(request):
     """Reset singleton classifiers before each test for isolation.
 
     This prevents test pollution from cached singleton state, especially
     embedding services and classifiers that cache model instances.
     """
+    # Skip reset for cache tests to avoid hanging during cleanup
+    is_cache_test = "test_cache" in str(request.node.fspath)
 
     def _reset_all():
         # Reset TaskTypeClassifier singleton
@@ -176,13 +178,35 @@ def reset_singletons():
         except ImportError:
             pass
 
+        # Reset UniversalRegistry singletons (clear all cached registries)
+        # Prevents cross-test pollution from cached registry instances
+        try:
+            from victor.core.registries import UniversalRegistry
+
+            UniversalRegistry._instances.clear()
+        except ImportError:
+            pass
+
+        # Reset all registry type caches
+        try:
+            from victor.core.registries.universal_registry import CacheStrategy
+
+            # Clear any thread-local or instance caches
+            # Note: We don't clear individual registries here as they may be
+            # legitimately used across tests
+            pass
+        except ImportError:
+            pass
+
     # Reset before test
-    _reset_all()
+    if not is_cache_test:
+        _reset_all()
 
     yield
 
     # Reset after test
-    _reset_all()
+    if not is_cache_test:
+        _reset_all()
 
 
 @pytest.fixture(autouse=True)

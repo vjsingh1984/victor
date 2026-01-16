@@ -281,7 +281,7 @@ class StateInspector:
             Value at key path or default
         """
         keys = key_path.split(".")
-        value = state
+        value: Any = state
 
         for key in keys:
             if isinstance(value, dict):
@@ -291,7 +291,7 @@ class StateInspector:
             else:
                 return default
 
-        return value or default
+        return value if value is not None else default
 
     def get_state_summary(self, state: Dict[str, Any]) -> Dict[str, str]:
         """Get summary of state keys and types.

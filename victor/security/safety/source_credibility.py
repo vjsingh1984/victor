@@ -27,7 +27,7 @@ Performance:
 import logging
 import re
 from enum import Enum
-from typing import Dict, List, NamedTuple, Optional
+from typing import Any, Dict, List, NamedTuple, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -196,10 +196,10 @@ class SourceCredibilityScanner:
     Uses native Rust pattern matching when available for 10-100x speedup.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the scanner with optional native acceleration."""
         self._patterns = SOURCE_CREDIBILITY_PATTERNS
-        self._native_matchers: Dict[CredibilityLevel, any] = {}
+        self._native_matchers: Dict[CredibilityLevel, Any] = {}
         self._use_native = _NATIVE_AVAILABLE
 
         if self._use_native:

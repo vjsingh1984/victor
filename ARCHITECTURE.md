@@ -49,3 +49,72 @@ User
 - Clear separation of orchestration, provider I/O, and tooling.
 - Provider-independent context management.
 - Opt-in complexity: workflows and teams when needed.
+- **Two-layer coordinator architecture**: Application-specific vs framework-agnostic
+
+## Coordinator Architecture
+
+Victor employs a **two-layer coordinator architecture** that separates application-specific orchestration from framework-agnostic workflow infrastructure. This design follows SOLID principles and enables clear separation of concerns.
+
+### Two-Layer Design
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     APPLICATION LAYER                            │
+│                  victor/agent/coordinators/                     │
+│                                                                   │
+│  Manages AI agent conversation lifecycle and orchestration      │
+│                                                                   │
+│  • ChatCoordinator: LLM chat & streaming                       │
+│  • ToolCoordinator: Tool validation & execution                 │
+│  • ContextCoordinator: Context management                       │
+│  • AnalyticsCoordinator: Session metrics                        │
+│  • PromptCoordinator: System prompt building                    │
+│  • SessionCoordinator: Session lifecycle                        │
+│  • ProviderCoordinator: Provider switching                      │
+│  • ModeCoordinator: Agent modes (build/plan/explore)            │
+│  • ConfigCoordinator: Configuration loading                     │
+│  • ToolSelectionCoordinator: Semantic tool selection            │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             │ uses
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      FRAMEWORK LAYER                             │
+│                 victor/framework/coordinators/                  │
+│                                                                   │
+│  Provides domain-agnostic workflow infrastructure                │
+│                                                                   │
+│  • YAMLWorkflowCoordinator: YAML workflow execution             │
+│  • GraphExecutionCoordinator: StateGraph execution              │
+│  • HITLCoordinator: Human-in-the-loop integration               │
+│  • CacheCoordinator: Workflow caching                           │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Why This Separation?
+
+**Application Layer** (`victor/agent/coordinators/`):
+- Manages Victor-specific business logic (conversation lifecycle, tool orchestration)
+- Handles user interactions and session management
+- Coordinates between multiple concerns (chat, tools, context, analytics)
+- Changes when Victor's application requirements change
+
+**Framework Layer** (`victor/framework/coordinators/`):
+- Provides reusable workflow infrastructure (YAML execution, StateGraph runtime)
+- Domain-agnostic (no Victor-specific logic)
+- Used across all verticals (Coding, DevOps, RAG, DataAnalysis, Research)
+- Can be used by external verticals and third-party packages
+
+### Key Benefits
+
+1. **Single Responsibility**: Each coordinator has one clear purpose
+2. **Layered Architecture**: Application logic builds on framework foundation
+3. **Reusability**: Framework coordinators work across all verticals
+4. **Testability**: Coordinators can be tested independently
+5. **Maintainability**: Clear boundaries reduce coupling
+
+### Further Reading
+
+- [Coordinator Architecture (Detailed)](docs/architecture/coordinator_separation.md) - Complete explanation with examples
+- [Architecture Diagrams](docs/architecture/diagrams/coordinators.mmd) - Visual representations
+- [Coordinator Quick Reference](docs/architecture/COORDINATOR_QUICK_REFERENCE.md) - Quick lookup guide

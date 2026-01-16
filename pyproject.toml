@@ -140,6 +140,9 @@ dev = [
 
     # Monitoring and Metrics
     "psutil>=5.9",  # For system metrics in coordinator dashboard
+
+    # Scientific computing (for experiments/ab_testing)
+    "scipy>=1.11.0",  # Statistical analysis for experiments
 ]
 
 docs = [

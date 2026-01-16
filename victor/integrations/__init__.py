@@ -44,6 +44,8 @@ Submodules are only imported when actually accessed (e.g., when MCP features are
 
 from __future__ import annotations
 
+from typing import Any
+
 __all__ = [
     "api",
     "mcp",

@@ -234,6 +234,26 @@ from victor.agent.coordinators.validation_coordinator import (
     ToolCallValidationResult as ValidationToolCallResult,
     ContextValidationResult,
 )
+from victor.agent.coordinators.tool_budget_coordinator import (
+    ToolBudgetCoordinator,
+    ToolBudgetConfig,
+    BudgetStatus,
+    BudgetStats,
+    create_tool_budget_coordinator,
+)
+from victor.agent.coordinators.tool_access_coordinator import (
+    ToolAccessCoordinator,
+    ToolAccessConfig,
+    AccessDecision,
+    ToolAccessContext,
+    create_tool_access_coordinator,
+)
+from victor.agent.coordinators.tool_alias_resolver import (
+    ToolAliasResolver,
+    ToolAliasConfig,
+    ResolutionResult,
+    create_tool_alias_resolver,
+)
 
 __all__ = [
     # Base configuration
@@ -323,4 +343,21 @@ __all__ = [
     "IntelligentValidationResult",
     "ValidationToolCallResult",
     "ContextValidationResult",
+    # ToolBudgetCoordinator
+    "ToolBudgetCoordinator",
+    "ToolBudgetConfig",
+    "BudgetStatus",
+    "BudgetStats",
+    "create_tool_budget_coordinator",
+    # ToolAccessCoordinator
+    "ToolAccessCoordinator",
+    "ToolAccessConfig",
+    "AccessDecision",
+    "ToolAccessContext",
+    "create_tool_access_coordinator",
+    # ToolAliasResolver
+    "ToolAliasResolver",
+    "ToolAliasConfig",
+    "ResolutionResult",
+    "create_tool_alias_resolver",
 ]
