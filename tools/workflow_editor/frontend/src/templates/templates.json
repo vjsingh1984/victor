@@ -1,0 +1,383 @@
+{
+  "templates": [
+    {
+      "id": "bugfix_workflow",
+      "name": "Bug Fix Workflow",
+      "description": "Standard workflow for fixing bugs with code review and testing",
+      "category": "coding",
+      "icon": "🐛",
+      "nodes": [
+        {
+          "id": "analyze_bug",
+          "type": "agent",
+          "position": { "x": 100, "y": 0 },
+          "data": {
+            "label": "Analyze Bug",
+            "role": "senior_developer",
+            "goal": "Analyze the bug report and understand the issue",
+            "tool_budget": 10
+          }
+        },
+        {
+          "id": "fix_implementation",
+          "type": "agent",
+          "position": { "x": 400, "y": 0 },
+          "data": {
+            "label": "Implement Fix",
+            "role": "developer",
+            "goal": "Implement the fix for the identified bug",
+            "tool_budget": 20
+          }
+        },
+        {
+          "id": "code_review",
+          "type": "team",
+          "position": { "x": 700, "y": 0 },
+          "data": {
+            "label": "Code Review Team",
+            "formation": "sequential",
+            "goal": "Review the fix for correctness and best practices",
+            "max_iterations": 3
+          }
+        },
+        {
+          "id": "test_fix",
+          "type": "agent",
+          "position": { "x": 1000, "y": 0 },
+          "data": {
+            "label": "Test Fix",
+            "role": "qa_engineer",
+            "goal": "Test the fix and verify it resolves the issue",
+            "tool_budget": 15
+          }
+        }
+      ],
+      "edges": [
+        { "id": "e1", "source": "analyze_bug", "target": "fix_implementation" },
+        { "id": "e2", "source": "fix_implementation", "target": "code_review" },
+        { "id": "e3", "source": "code_review", "target": "test_fix" }
+      ]
+    },
+    {
+      "id": "feature_development",
+      "name": "Feature Development",
+      "description": "Complete workflow for developing new features with design and implementation",
+      "category": "coding",
+      "icon": "✨",
+      "nodes": [
+        {
+          "id": "requirement_analysis",
+          "type": "agent",
+          "position": { "x": 100, "y": 0 },
+          "data": {
+            "label": "Requirement Analysis",
+            "role": "product_manager",
+            "goal": "Analyze and clarify feature requirements",
+            "tool_budget": 10
+          }
+        },
+        {
+          "id": "design_phase",
+          "type": "team",
+          "position": { "x": 400, "y": 0 },
+          "data": {
+            "label": "Design Team",
+            "formation": "parallel",
+            "goal": "Create technical design and architecture for the feature",
+            "max_iterations": 5
+          }
+        },
+        {
+          "id": "implementation",
+          "type": "team",
+          "position": { "x": 700, "y": 0 },
+          "data": {
+            "label": "Implementation Team",
+            "formation": "pipeline",
+            "goal": "Implement the feature according to design",
+            "max_iterations": 10
+          }
+        },
+        {
+          "id": "quality_check",
+          "type": "condition",
+          "position": { "x": 1000, "y": 0 },
+          "data": {
+            "label": "Quality Check",
+            "condition": "check_quality_standards"
+          }
+        },
+        {
+          "id": "deploy",
+          "type": "agent",
+          "position": { "x": 1300, "y": 0 },
+          "data": {
+            "label": "Deploy",
+            "role": "devops_engineer",
+            "goal": "Deploy the feature to production",
+            "tool_budget": 10
+          }
+        }
+      ],
+      "edges": [
+        { "id": "e1", "source": "requirement_analysis", "target": "design_phase" },
+        { "id": "e2", "source": "design_phase", "target": "implementation" },
+        { "id": "e3", "source": "implementation", "target": "quality_check" },
+        { "id": "e4", "source": "quality_check", "target": "deploy", "label": "approved" }
+      ]
+    },
+    {
+      "id": "research_workflow",
+      "name": "Research Workflow",
+      "description": "Comprehensive research workflow with multi-perspective analysis",
+      "category": "research",
+      "icon": "🔬",
+      "nodes": [
+        {
+          "id": "research_planning",
+          "type": "agent",
+          "position": { "x": 100, "y": 0 },
+          "data": {
+            "label": "Research Planning",
+            "role": "research_lead",
+            "goal": "Define research objectives and methodology",
+            "tool_budget": 10
+          }
+        },
+        {
+          "id": "data_collection",
+          "type": "agent",
+          "position": { "x": 400, "y": 0 },
+          "data": {
+            "label": "Data Collection",
+            "role": "researcher",
+            "goal": "Collect relevant data and sources",
+            "tool_budget": 20
+          }
+        },
+        {
+          "id": "analysis_team",
+          "type": "team",
+          "position": { "x": 700, "y": 0 },
+          "data": {
+            "label": "Analysis Team",
+            "formation": "consensus",
+            "goal": "Analyze data from multiple perspectives and reach consensus",
+            "max_iterations": 5
+          }
+        },
+        {
+          "id": "synthesis",
+          "type": "agent",
+          "position": { "x": 1000, "y": 0 },
+          "data": {
+            "label": "Synthesize Findings",
+            "role": "senior_researcher",
+            "goal": "Synthesize findings into comprehensive report",
+            "tool_budget": 15
+          }
+        }
+      ],
+      "edges": [
+        { "id": "e1", "source": "research_planning", "target": "data_collection" },
+        { "id": "e2", "source": "data_collection", "target": "analysis_team" },
+        { "id": "e3", "source": "analysis_team", "target": "synthesis" }
+      ]
+    },
+    {
+      "id": "code_review",
+      "name": "Code Review Workflow",
+      "description": "Thorough code review with multiple specialized reviewers",
+      "category": "coding",
+      "icon": "👁️",
+      "nodes": [
+        {
+          "id": "receive_pr",
+          "type": "agent",
+          "position": { "x": 100, "y": 0 },
+          "data": {
+            "label": "Receive PR",
+            "role": "triage",
+            "goal": "Review the pull request description and context",
+            "tool_budget": 5
+          }
+        },
+        {
+          "id": "review_team",
+          "type": "team",
+          "position": { "x": 400, "y": 0 },
+          "data": {
+            "label": "Review Team",
+            "formation": "parallel",
+            "goal": "Conduct parallel reviews from different perspectives",
+            "max_iterations": 3
+          }
+        },
+        {
+          "id": "security_check",
+          "type": "agent",
+          "position": { "x": 400, "y": 200 },
+          "data": {
+            "label": "Security Review",
+            "role": "security_engineer",
+            "goal": "Review for security vulnerabilities",
+            "tool_budget": 15
+          }
+        },
+        {
+          "id": "performance_check",
+          "type": "agent",
+          "position": { "x": 400, "y": 400 },
+          "data": {
+            "label": "Performance Review",
+            "role": "performance_engineer",
+            "goal": "Review for performance issues",
+            "tool_budget": 15
+          }
+        },
+        {
+          "id": "synthesize_feedback",
+          "type": "agent",
+          "position": { "x": 700, "y": 0 },
+          "data": {
+            "label": "Synthesize Feedback",
+            "role": "tech_lead",
+            "goal": "Combine all reviews into actionable feedback",
+            "tool_budget": 10
+          }
+        }
+      ],
+      "edges": [
+        { "id": "e1", "source": "receive_pr", "target": "review_team" },
+        { "id": "e2", "source": "receive_pr", "target": "security_check" },
+        { "id": "e3", "source": "receive_pr", "target": "performance_check" },
+        { "id": "e4", "source": "review_team", "target": "synthesize_feedback" },
+        { "id": "e5", "source": "security_check", "target": "synthesize_feedback" },
+        { "id": "e6", "source": "performance_check", "target": "synthesize_feedback" }
+      ]
+    },
+    {
+      "id": "data_pipeline",
+      "name": "Data Pipeline Workflow",
+      "description": "ETL pipeline with data validation and processing",
+      "category": "data",
+      "icon": "📊",
+      "nodes": [
+        {
+          "id": "extract",
+          "type": "compute",
+          "position": { "x": 100, "y": 0 },
+          "data": {
+            "label": "Extract Data",
+            "handler": "extract_data"
+          }
+        },
+        {
+          "id": "validate",
+          "type": "condition",
+          "position": { "x": 400, "y": 0 },
+          "data": {
+            "label": "Validate Data",
+            "condition": "validate_data_quality"
+          }
+        },
+        {
+          "id": "transform",
+          "type": "compute",
+          "position": { "x": 700, "y": 0 },
+          "data": {
+            "label": "Transform Data",
+            "handler": "transform_data"
+          }
+        },
+        {
+          "id": "load",
+          "type": "compute",
+          "position": { "x": 1000, "y": 0 },
+          "data": {
+            "label": "Load Data",
+            "handler": "load_to_warehouse"
+          }
+        }
+      ],
+      "edges": [
+        { "id": "e1", "source": "extract", "target": "validate" },
+        { "id": "e2", "source": "validate", "target": "transform", "label": "valid" },
+        { "id": "e3", "source": "transform", "target": "load" }
+      ]
+    },
+    {
+      "id": "ci_cd_pipeline",
+      "name": "CI/CD Pipeline",
+      "description": "Continuous integration and deployment workflow",
+      "category": "devops",
+      "icon": "🚀",
+      "nodes": [
+        {
+          "id": "trigger",
+          "type": "agent",
+          "position": { "x": 100, "y": 0 },
+          "data": {
+            "label": "Trigger Build",
+            "role": "build_system",
+            "goal": "Trigger the build process on commit",
+            "tool_budget": 5
+          }
+        },
+        {
+          "id": "run_tests",
+          "type": "compute",
+          "position": { "x": 400, "y": 0 },
+          "data": {
+            "label": "Run Tests",
+            "handler": "run_test_suite"
+          }
+        },
+        {
+          "id": "test_results",
+          "type": "condition",
+          "position": { "x": 700, "y": 0 },
+          "data": {
+            "label": "Check Results",
+            "condition": "all_tests_passed"
+          }
+        },
+        {
+          "id": "deploy_staging",
+          "type": "compute",
+          "position": { "x": 1000, "y": 0 },
+          "data": {
+            "label": "Deploy to Staging",
+            "handler": "deploy_staging"
+          }
+        },
+        {
+          "id": "approval",
+          "type": "hitl",
+          "position": { "x": 1300, "y": 0 },
+          "data": {
+            "label": "Approval",
+            "hitl_type": "approval",
+            "prompt": "Approve deployment to production?"
+          }
+        },
+        {
+          "id": "deploy_production",
+          "type": "compute",
+          "position": { "x": 1600, "y": 0 },
+          "data": {
+            "label": "Deploy to Production",
+            "handler": "deploy_production"
+          }
+        }
+      ],
+      "edges": [
+        { "id": "e1", "source": "trigger", "target": "run_tests" },
+        { "id": "e2", "source": "run_tests", "target": "test_results" },
+        { "id": "e3", "source": "test_results", "target": "deploy_staging", "label": "passed" },
+        { "id": "e4", "source": "deploy_staging", "target": "approval" },
+        { "id": "e5", "source": "approval", "target": "deploy_production", "label": "approved" }
+      ]
+    }
+  ]
+}

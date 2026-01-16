@@ -1,0 +1,12 @@
+.workflow-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.workflow-canvas .react-flow__node {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.workflow-canvas .react-flow__attribution {
+  display: none;
+}

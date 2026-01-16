@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Victor Workflow Editor - Team Node Support</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            margin: 0;
+        }
+
+        .header .controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: white;
+            color: #667eea;
+        }
+
+        .btn-primary:hover {
+            background: #f0f0ff;
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #45a049;
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #da190b;
+        }
+
+        .container {
+            display: flex;
+            height: calc(100vh - 60px);
+        }
+
+        .sidebar {
+            width: 280px;
+            background: white;
+            border-right: 1px solid #ddd;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .sidebar h3 {
+            font-size: 14px;
+            margin-bottom: 12px;
+            color: #667eea;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .node-palette {
+            display: grid;
+            gap: 8px;
+        }
+
+        .node-type {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 12px;
+            cursor: grab;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .node-type:hover {
+            border-color: #667eea;
+            background: #f0f0ff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .node-type .icon {
+            font-size: 24px;
+            margin-bottom: 6px;
+        }
+
+        .node-type .name {
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 3px;
+        }
+
+        .node-type .desc {
+            font-size: 11px;
+            color: #666;
+        }
+
+        .canvas-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #fafafa;
+        }
+
+        .canvas-toolbar {
+            background: white;
+            padding: 10px 15px;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .canvas-info {
+            font-size: 13px;
+            color: #666;
+        }
+
+        .canvas-toolbar .controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .canvas {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background-image:
+                radial-gradient(circle, #ddd 1px, transparent 1px);
+            background-size: 20px 20px;
+            background-color: #fafafa;
+        }
+
+        .canvas svg.connections {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .connection-line {
+            stroke: #667eea;
+            stroke-width: 2;
+            fill: none;
+            marker-end: url(#arrowhead);
+        }
+
+        .connection-line:hover {
+            stroke: #764ba2;
+            stroke-width: 3;
+        }
+
+        .canvas-node {
+            position: absolute;
+            width: 150px;
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 12px;
+            cursor: move;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+            z-index: 2;
+            user-select: none;
+        }
+
+        .canvas-node:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+
+        .canvas-node.selected {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        .canvas-node .node-icon {
+            font-size: 28px;
+            margin-bottom: 6px;
+        }
+
+        .canvas-node .node-name {
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 3px;
+        }
+
+        .canvas-node .node-type-label {
+            font-size: 11px;
+            color: #666;
+        }
+
+        .properties-panel {
+            width: 320px;
+            background: white;
+            border-left: 1px solid #ddd;
+            overflow-y: auto;
+            display: none;
+        }
+
+        .properties-panel.visible {
+            display: block;
+        }
+
+        .properties-header {
+            padding: 15px;
+            border-bottom: 1px solid #ddd;
+            background: #f8f9fa;
+        }
+
+        .properties-header h3 {
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .properties-header .node-id {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .properties-content {
+            padding: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #555;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .form-section {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .form-section:last-child {
+            border-bottom: none;
+        }
+
+        .form-section h4 {
+            font-size: 13px;
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+
+        .yaml-preview-container {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+
+        .yaml-preview {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 12px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 11px;
+            line-height: 1.5;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre;
+        }
+
+        .connection-controls {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+        }
+
+        .connection-controls h4 {
+            font-size: 13px;
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+
+        .connection-list {
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .connection-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+
+        .connection-item button {
+            background: none;
+            border: none;
+            color: #f44336;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 0 5px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 15px;
+            opacity: 0.3;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 15px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .tab.active {
+            border-bottom-color: #667eea;
+            color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎨 Victor Workflow Editor</h1>
+        <div class="controls">
+            <input type="file" id="yaml-import" accept=".yaml,.yml" style="display: none;" onchange="importWorkflow(event)">
+            <button class="btn btn-primary" onclick="document.getElementById('yaml-import').click()">📤 Import YAML</button>
+            <button class="btn btn-success" onclick="exportWorkflow()">📥 Export YAML</button>
+            <button class="btn btn-primary" onclick="copyWorkflowYAML()">📋 Copy to Clipboard</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Node Palette Sidebar -->
+        <div class="sidebar">
+            <h3>📦 Node Types</h3>
+            <div class="node-palette">
+                <div class="node-type" draggable="true" data-type="agent">
+                    <div class="icon">🤖</div>
+                    <div class="name">Agent</div>
+                    <div class="desc">LLM-powered agent</div>
+                </div>
+                <div class="node-type" draggable="true" data-type="team">
+                    <div class="icon">👥</div>
+                    <div class="name">Team</div>
+                    <div class="desc">Multi-agent team</div>
+                </div>
+                <div class="node-type" draggable="true" data-type="compute">
+                    <div class="icon">⚙️</div>
+                    <div class="name">Compute</div>
+                    <div class="desc">Execute handler</div>
+                </div>
+                <div class="node-type" draggable="true" data-type="condition">
+                    <div class="icon">🔀</div>
+                    <div class="name">Condition</div>
+                    <div class="desc">Conditional branch</div>
+                </div>
+                <div class="node-type" draggable="true" data-type="parallel">
+                    <div class="icon">🔀</div>
+                    <div class="name">Parallel</div>
+                    <div class="desc">Parallel execution</div>
+                </div>
+                <div class="node-type" draggable="true" data-type="transform">
+                    <div class="icon">🔄</div>
+                    <div class="name">Transform</div>
+                    <div class="desc">State transform</div>
+                </div>
+                <div class="node-type" draggable="true" data-type="hitl">
+                    <div class="icon">👤</div>
+                    <div class="name">Human-in-Loop</div>
+                    <div class="desc">Human approval</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Canvas Area -->
+        <div class="canvas-container">
+            <div class="canvas-toolbar">
+                <div class="canvas-info">
+                    <span id="node-count">0 nodes</span> •
+                    <span id="connection-count">0 connections</span>
+                </div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="connectMode()">🔗 Connect Mode</button>
+                    <button class="btn btn-danger" onclick="clearCanvas()">🗑️ Clear</button>
+                </div>
+            </div>
+            <div class="canvas" id="canvas">
+                <svg class="connections" id="connections">
+                    <defs>
+                        <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                            <polygon points="0 0, 10 3, 0 6" fill="#667eea" />
+                        </marker>
+                    </defs>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Properties Panel -->
+        <div class="properties-panel" id="properties-panel">
+            <div class="properties-header">
+                <h3 id="properties-title">Node Properties</h3>
+                <div class="node-id" id="properties-node-id"></div>
+            </div>
+            <div class="properties-content">
+                <div class="tabs">
+                    <div class="tab active" onclick="switchTab('config')">Configuration</div>
+                    <div class="tab" onclick="switchTab('connections')">Connections</div>
+                    <div class="tab" onclick="switchTab('preview')">YAML</div>
+                </div>
+
+                <!-- Configuration Tab -->
+                <div class="tab-content active" id="tab-config">
+                    <form id="config-form">
+                        <div class="form-group">
+                            <label>Node ID</label>
+                            <input type="text" id="node-id-input" placeholder="Enter node ID">
+                        </div>
+                        <div class="form-group">
+                            <label>Node Name</label>
+                            <input type="text" id="node-name-input" placeholder="Enter display name">
+                        </div>
+
+                        <!-- Team Node Configuration -->
+                        <div id="team-config" style="display: none;">
+                            <div class="form-section">
+                                <h4>🎯 Team Configuration</h4>
+                                <div class="form-group">
+                                    <label>Team Formation</label>
+                                    <select id="formation-type">
+                                        <option value="sequential">Sequential</option>
+                                        <option value="parallel" selected>Parallel</option>
+                                        <option value="pipeline">Pipeline</option>
+                                        <option value="hierarchical">Hierarchical</option>
+                                        <option value="consensus">Consensus</option>
+                                        <option value="dynamic">Dynamic</option>
+                                        <option value="adaptive">Adaptive (ML)</option>
+                                        <option value="hybrid">Hybrid</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Goal</label>
+                                    <textarea id="team-goal" placeholder="Describe the team's goal"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>Member Count</label>
+                                    <input type="number" id="member-count" value="3" min="1" max="10">
+                                </div>
+                                <div class="form-group">
+                                    <label>Tool Budget</label>
+                                    <input type="number" id="tool-budget" value="50" min="1">
+                                </div>
+                                <div class="form-group">
+                                    <label>Max Recursion Depth</label>
+                                    <input type="number" id="recursion-depth" value="3" min="1" max="10">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Agent Node Configuration -->
+                        <div id="agent-config" style="display: none;">
+                            <div class="form-section">
+                                <h4>🤖 Agent Configuration</h4>
+                                <div class="form-group">
+                                    <label>Role</label>
+                                    <input type="text" id="agent-role" placeholder="e.g., researcher, analyst">
+                                </div>
+                                <div class="form-group">
+                                    <label>Goal</label>
+                                    <textarea id="agent-goal" placeholder="Describe the agent's goal"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn btn-success" style="width: 100%" onclick="saveNodeConfig()">💾 Save Configuration</button>
+                    </form>
+                </div>
+
+                <!-- Connections Tab -->
+                <div class="tab-content" id="tab-connections">
+                    <div class="connection-controls">
+                        <h4>Outgoing Connections</h4>
+                        <div class="form-group">
+                            <label>Connect to Node:</label>
+                            <select id="connect-to-node">
+                                <option value="">Select a node...</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" style="width: 100%; margin-bottom: 15px;" onclick="addConnection()">➕ Add Connection</button>
+
+                        <h4>Current Connections</h4>
+                        <div class="connection-list" id="connection-list">
+                            <div class="empty-state">No connections yet</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- YAML Preview Tab -->
+                <div class="tab-content" id="tab-preview">
+                    <div class="yaml-preview-container">
+                        <h4 style="margin-bottom: 10px; color: #667eea;">📄 Node YAML Preview</h4>
+                        <div class="yaml-preview" id="yaml-preview">
+# Select a node to see its YAML configuration
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" style="width: 100%; margin-top: 10px;" onclick="copyNodeYAML()">📋 Copy Node YAML</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State management
+        let canvasNodes = [];
+        let connections = [];
+        let selectedNodeId = null;
+        let nodeIdCounter = 0;
+        let connectModeEnabled = false;
+        let connectSourceNode = null;
+
+        const canvas = document.getElementById('canvas');
+        const connectionsSvg = document.getElementById('connections');
+
+        // Node icons
+        const nodeIcons = {
+            agent: '🤖',
+            team: '👥',
+            compute: '⚙️',
+            condition: '🔀',
+            parallel: '🔀',
+            transform: '🔄',
+            hitl: '👤'
+        };
+
+        // Initialize drag and drop for palette
+        document.querySelectorAll('.node-type').forEach(nodeType => {
+            nodeType.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('type', nodeType.dataset.type);
+            });
+        });
+
+        // Handle drag over canvas
+        canvas.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        // Handle drop on canvas
+        canvas.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const type = e.dataTransfer.getData('type');
+            if (!type) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left - 75;
+            const y = e.clientY - rect.top - 40;
+
+            const newNode = {
+                id: `node_${++nodeIdCounter}`,
+                type: type,
+                name: `${type.charAt(0).toUpperCase() + type.slice(1)} ${nodeIdCounter}`,
+                x: Math.max(0, x),
+                y: Math.max(0, y),
+                config: getDefaultConfig(type)
+            };
+
+            canvasNodes.push(newNode);
+            renderCanvas();
+            selectNode(newNode.id);
+        });
+
+        // Get default configuration for node type
+        function getDefaultConfig(type) {
+            if (type === 'team') {
+                return {
+                    formation: 'parallel',
+                    goal: '',
+                    members: 3,
+                    budget: 50,
+                    recursion: 3
+                };
+            } else if (type === 'agent') {
+                return {
+                    role: '',
+                    goal: ''
+                };
+            }
+            return {};
+        }
+
+        // Render all nodes and connections
+        function renderCanvas() {
+            // Clear existing nodes
+            canvas.querySelectorAll('.canvas-node').forEach(el => el.remove());
+
+            // Render nodes
+            canvasNodes.forEach(node => {
+                const nodeEl = document.createElement('div');
+                nodeEl.className = 'canvas-node' + (node.id === selectedNodeId ? ' selected' : '');
+                nodeEl.dataset.nodeId = node.id;
+                nodeEl.style.left = node.x + 'px';
+                nodeEl.style.top = node.y + 'px';
+
+                nodeEl.innerHTML = `
+                    <div class="node-icon">${nodeIcons[node.type]}</div>
+                    <div class="node-name">${node.name}</div>
+                    <div class="node-type-label">${node.type}</div>
+                `;
+
+                // Add drag functionality
+                nodeEl.addEventListener('mousedown', (e) => startDrag(e, node));
+                nodeEl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (connectModeEnabled) {
+                        handleConnectClick(node.id);
+                    } else {
+                        selectNode(node.id);
+                    }
+                });
+
+                canvas.appendChild(nodeEl);
+            });
+
+            // Render connections
+            renderConnections();
+            updateNodeCount();
+        }
+
+        // Render connection lines
+        function renderConnections() {
+            // Clear existing lines
+            connectionsSvg.querySelectorAll('.connection-line').forEach(el => el.remove());
+
+            connections.forEach(conn => {
+                const fromNode = canvasNodes.find(n => n.id === conn.from);
+                const toNode = canvasNodes.find(n => n.id === conn.to);
+                if (!fromNode || !toNode) return;
+
+                const fromX = fromNode.x + 75;
+                const fromY = fromNode.y + 40;
+                const toX = toNode.x + 75;
+                const toY = toNode.y + 40;
+
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', fromX);
+                line.setAttribute('y1', fromY);
+                line.setAttribute('x2', toX);
+                line.setAttribute('y2', toY);
+                line.setAttribute('class', 'connection-line');
+                connectionsSvg.appendChild(line);
+            });
+
+            document.getElementById('connection-count').textContent = connections.length + ' connections';
+        }
+
+        // Drag functionality
+        let isDragging = false;
+        let dragNode = null;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+
+        function startDrag(e, node) {
+            if (connectModeEnabled) return;
+            isDragging = true;
+            dragNode = node;
+            dragOffsetX = e.clientX - node.x;
+            dragOffsetY = e.clientY - node.y;
+
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', stopDrag);
+        }
+
+        function drag(e) {
+            if (!isDragging || !dragNode) return;
+
+            const rect = canvas.getBoundingClientRect();
+            dragNode.x = Math.max(0, Math.min(e.clientX - dragOffsetX, rect.width - 150));
+            dragNode.y = Math.max(0, Math.min(e.clientY - dragOffsetY, rect.height - 100));
+
+            renderCanvas();
+        }
+
+        function stopDrag() {
+            isDragging = false;
+            dragNode = null;
+            document.removeEventListener('mousemove', drag);
+            document.removeEventListener('mouseup', stopDrag);
+        }
+
+        // Select node
+        function selectNode(nodeId) {
+            selectedNodeId = nodeId;
+            renderCanvas();
+
+            const node = canvasNodes.find(n => n.id === nodeId);
+            if (node) {
+                showPropertiesPanel(node);
+            }
+        }
+
+        // Show properties panel
+        function showPropertiesPanel(node) {
+            const panel = document.getElementById('properties-panel');
+            panel.classList.add('visible');
+
+            document.getElementById('properties-title').textContent = `${node.name} (${node.type})`;
+            document.getElementById('properties-node-id').textContent = node.id;
+
+            // Load configuration
+            document.getElementById('node-id-input').value = node.id;
+            document.getElementById('node-name-input').value = node.name;
+
+            // Show/hide type-specific config
+            document.getElementById('team-config').style.display = node.type === 'team' ? 'block' : 'none';
+            document.getElementById('agent-config').style.display = node.type === 'agent' ? 'block' : 'none';
+
+            if (node.type === 'team' && node.config) {
+                document.getElementById('formation-type').value = node.config.formation || 'parallel';
+                document.getElementById('team-goal').value = node.config.goal || '';
+                document.getElementById('member-count').value = node.config.members || 3;
+                document.getElementById('tool-budget').value = node.config.budget || 50;
+                document.getElementById('recursion-depth').value = node.config.recursion || 3;
+            } else if (node.type === 'agent' && node.config) {
+                document.getElementById('agent-role').value = node.config.role || '';
+                document.getElementById('agent-goal').value = node.config.goal || '';
+            }
+
+            updateConnectionOptions(node);
+            updateConnectionList(node);
+            updateYAMLPreview(node);
+        }
+
+        // Update connection dropdown
+        function updateConnectionOptions(currentNode) {
+            const select = document.getElementById('connect-to-node');
+            select.innerHTML = '<option value="">Select a node...</option>';
+
+            canvasNodes.forEach(node => {
+                if (node.id !== currentNode.id) {
+                    const option = document.createElement('option');
+                    option.value = node.id;
+                    option.textContent = node.name;
+                    select.appendChild(option);
+                }
+            });
+        }
+
+        // Update connection list
+        function updateConnectionList(node) {
+            const list = document.getElementById('connection-list');
+            const nodeConnections = connections.filter(c => c.from === node.id);
+
+            if (nodeConnections.length === 0) {
+                list.innerHTML = '<div class="empty-state">No connections yet</div>';
+                return;
+            }
+
+            list.innerHTML = nodeConnections.map(conn => {
+                const toNode = canvasNodes.find(n => n.id === conn.to);
+                return `
+                    <div class="connection-item">
+                        <span>→ ${toNode ? toNode.name : conn.to}</span>
+                        <button onclick="removeConnection('${conn.from}', '${conn.to}')">×</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Add connection
+        function addConnection() {
+            if (!selectedNodeId) return;
+
+            const toNodeId = document.getElementById('connect-to-node').value;
+            if (!toNodeId) {
+                alert('Please select a node to connect to');
+                return;
+            }
+
+            // Check if connection already exists
+            const exists = connections.some(c => c.from === selectedNodeId && c.to === toNodeId);
+            if (exists) {
+                alert('Connection already exists');
+                return;
+            }
+
+            connections.push({ from: selectedNodeId, to: toNodeId });
+            renderCanvas();
+            updateConnectionList(canvasNodes.find(n => n.id === selectedNodeId));
+        }
+
+        // Remove connection
+        function removeConnection(fromId, toId) {
+            connections = connections.filter(c => !(c.from === fromId && c.to === toId));
+            renderCanvas();
+            updateConnectionList(canvasNodes.find(n => n.id === selectedNodeId));
+        }
+
+        // Connect mode
+        function connectMode() {
+            connectModeEnabled = !connectModeEnabled;
+            connectSourceNode = null;
+
+            const btn = event.target;
+            if (connectModeEnabled) {
+                btn.textContent = '🔗 Connecting... (Click 2 nodes)';
+                btn.classList.add('btn-success');
+            } else {
+                btn.textContent = '🔗 Connect Mode';
+                btn.classList.remove('btn-success');
+            }
+        }
+
+        function handleConnectClick(nodeId) {
+            if (!connectSourceNode) {
+                connectSourceNode = nodeId;
+                alert(`Source node: ${nodeId}\nNow click the destination node`);
+            } else {
+                if (connectSourceNode !== nodeId) {
+                    connections.push({ from: connectSourceNode, to: nodeId });
+                    renderCanvas();
+                    updateConnectionList(canvasNodes.find(n => n.id === selectedNodeId));
+                }
+                connectSourceNode = null;
+                connectMode(); // Exit connect mode
+            }
+        }
+
+        // Save node configuration
+        function saveNodeConfig() {
+            if (!selectedNodeId) return;
+
+            const node = canvasNodes.find(n => n.id === selectedNodeId);
+            if (!node) return;
+
+            node.name = document.getElementById('node-name-input').value;
+
+            if (node.type === 'team') {
+                node.config = {
+                    formation: document.getElementById('formation-type').value,
+                    goal: document.getElementById('team-goal').value,
+                    members: parseInt(document.getElementById('member-count').value),
+                    budget: parseInt(document.getElementById('tool-budget').value),
+                    recursion: parseInt(document.getElementById('recursion-depth').value)
+                };
+            } else if (node.type === 'agent') {
+                node.config = {
+                    role: document.getElementById('agent-role').value,
+                    goal: document.getElementById('agent-goal').value
+                };
+            }
+
+            renderCanvas();
+            updateYAMLPreview(node);
+
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = '✓ Saved!';
+            setTimeout(() => btn.textContent = originalText, 1000);
+        }
+
+        // Update YAML preview
+        function updateYAMLPreview(node) {
+            if (!node) return;
+
+            let yaml = '';
+
+            if (node.type === 'team') {
+                const config = node.config || {};
+                yaml = `- id: ${node.id}
+  type: team
+  name: "${node.name}"
+  goal: "${config.goal || 'Team goal'}"
+  team_formation: ${config.formation || 'parallel'}
+  members:
+    - id: member_1
+      role: researcher
+      goal: "Conduct research"
+    - id: member_2
+      role: analyst
+      goal: "Analyze findings"
+    - id: member_3
+      role: synthesizer
+      goal: "Synthesize results"
+  total_tool_budget: ${config.budget || 50}
+  max_recursion_depth: ${config.recursion || 3}
+  next: [complete]`;
+            } else if (node.type === 'agent') {
+                const config = node.config || {};
+                yaml = `- id: ${node.id}
+  type: agent
+  name: "${node.name}"
+  role: ${config.role || 'agent'}
+  goal: "${config.goal || 'Agent goal'}"
+  next: [complete]`;
+            } else {
+                yaml = `- id: ${node.id}
+  type: ${node.type}
+  name: "${node.name}"
+  next: [complete]`;
+            }
+
+            document.getElementById('yaml-preview').textContent = yaml;
+        }
+
+        // Generate complete workflow YAML
+        function generateWorkflowYAML() {
+            let yaml = `workflows:
+  my_workflow:
+    description: "Workflow created with Victor Workflow Editor"
+    metadata:
+      version: "1.0"
+      vertical: "general"
+    nodes:
+`;
+
+            // Add all nodes
+            canvasNodes.forEach(node => {
+                yaml += '\n';
+
+                if (node.type === 'team') {
+                    const config = node.config || {};
+                    const nodeConnections = connections
+                        .filter(c => c.from === node.id)
+                        .map(c => c.to);
+
+                    yaml += `      - id: ${node.id}
+        type: team
+        name: "${node.name}"
+        goal: "${config.goal || 'Team goal'}"
+        team_formation: ${config.formation || 'parallel'}
+        members:
+          - id: member_1
+            role: researcher
+            goal: "Conduct research"
+          - id: member_2
+            role: analyst
+            goal: "Analyze findings"
+          - id: member_3
+            role: synthesizer
+            goal: "Synthesize results"
+        total_tool_budget: ${config.budget || 50}
+        max_recursion_depth: ${config.recursion || 3}`;
+
+                    if (nodeConnections.length > 0) {
+                        yaml += `\n        next: [${nodeConnections.join(', ')}]`;
+                    }
+                } else if (node.type === 'agent') {
+                    const config = node.config || {};
+                    const nodeConnections = connections
+                        .filter(c => c.from === node.id)
+                        .map(c => c.to);
+
+                    yaml += `      - id: ${node.id}
+        type: agent
+        name: "${node.name}"
+        role: ${config.role || 'agent'}
+        goal: "${config.goal || 'Agent goal'}"`;
+
+                    if (nodeConnections.length > 0) {
+                        yaml += `\n        next: [${nodeConnections.join(', ')}]`;
+                    }
+                } else {
+                    const nodeConnections = connections
+                        .filter(c => c.from === node.id)
+                        .map(c => c.to);
+
+                    yaml += `      - id: ${node.id}
+        type: ${node.type}
+        name: "${node.name}"`;
+
+                    if (nodeConnections.length > 0) {
+                        yaml += `\n        next: [${nodeConnections.join(', ')}]`;
+                    }
+                }
+            });
+
+            yaml += '\n';
+
+            return yaml;
+        }
+
+        // Export workflow
+        function exportWorkflow() {
+            const yaml = generateWorkflowYAML();
+
+            const blob = new Blob([yaml], { type: 'text/yaml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'workflow.yaml';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            alert('✅ Workflow exported to workflow.yaml');
+        }
+
+        // Copy workflow YAML to clipboard
+        function copyWorkflowYAML() {
+            const yaml = generateWorkflowYAML();
+            navigator.clipboard.writeText(yaml).then(() => {
+                alert('📋 Complete workflow YAML copied to clipboard!');
+            });
+        }
+
+        // Copy node YAML
+        function copyNodeYAML() {
+            const yaml = document.getElementById('yaml-preview').textContent;
+            navigator.clipboard.writeText(yaml).then(() => {
+                alert('📋 Node YAML copied to clipboard!');
+            });
+        }
+
+        // Import workflow from YAML
+        function importWorkflow(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const yaml = e.target.result;
+                    const workflow = parseWorkflowYAML(yaml);
+
+                    if (workflow && workflow.nodes && workflow.nodes.length > 0) {
+                        // Clear existing canvas
+                        canvasNodes = [];
+                        connections = [];
+                        nodeIdCounter = 0;
+
+                        // Calculate positions using hierarchical layout
+                        const positions = calculateNodePositions(workflow.nodes, workflow.connections || []);
+
+                        // Import nodes
+                        workflow.nodes.forEach((nodeData, index) => {
+                            const node = {
+                                id: nodeData.id || `node_${++nodeIdCounter}`,
+                                type: nodeData.type || 'agent',
+                                name: nodeData.name || `${nodeData.type}_${index}`,
+                                x: positions[nodeData.id]?.x || 100 + (index % 5) * 200,
+                                y: positions[nodeData.id]?.y || 100 + Math.floor(index / 5) * 150,
+                                config: parseNodeConfig(nodeData)
+                            };
+
+                            // Update counter
+                            const num = parseInt(node.id.split('_')[1]) || nodeIdCounter;
+                            if (num > nodeIdCounter) nodeIdCounter = num;
+
+                            canvasNodes.push(node);
+                        });
+
+                        // Import connections
+                        if (workflow.connections) {
+                            workflow.connections.forEach(conn => {
+                                connections.push({ from: conn.from, to: conn.to });
+                            });
+                        } else {
+                            // Extract connections from node 'next' fields
+                            workflow.nodes.forEach(nodeData => {
+                                if (nodeData.next && Array.isArray(nodeData.next)) {
+                                    nodeData.next.forEach(nextId => {
+                                        // Avoid duplicate connections
+                                        if (!connections.some(c => c.from === nodeData.id && c.to === nextId)) {
+                                            connections.push({ from: nodeData.id, to: nextId });
+                                        }
+                                    });
+                                }
+                            });
+                        }
+
+                        renderCanvas();
+                        alert(`✅ Imported ${canvasNodes.length} nodes and ${connections.length} connections!`);
+                    } else {
+                        alert('⚠️ No valid workflow found in YAML file');
+                    }
+                } catch (error) {
+                    console.error('Import error:', error);
+                    alert('❌ Error importing YAML: ' + error.message);
+                }
+
+                // Reset file input
+                event.target.value = '';
+            };
+
+            reader.readAsText(file);
+        }
+
+        // Parse workflow YAML (simple parser)
+        function parseWorkflowYAML(yaml) {
+            const nodes = [];
+            const connections = [];
+            const lines = yaml.split('\n');
+            let currentNode = null;
+            let inNodesSection = false;
+            let indentLevel = 0;
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const trimmed = line.trim();
+                const indent = line.search(/\S|$/);
+
+                // Check for nodes section
+                if (trimmed.startsWith('nodes:')) {
+                    inNodesSection = true;
+                    continue;
+                }
+
+                // Check for workflow section start
+                if (trimmed.match(/^workflow:/) || trimmed.match(/^\w+:/)) {
+                    inNodesSection = false;
+                }
+
+                // Parse nodes
+                if (inNodesSection && trimmed.startsWith('- id:')) {
+                    if (currentNode) {
+                        nodes.push(currentNode);
+                    }
+                    currentNode = {
+                        id: trimmed.replace('- id:', '').trim(),
+                        type: 'agent',
+                        config: {}
+                    };
+                } else if (currentNode) {
+                    if (trimmed.startsWith('type:')) {
+                        currentNode.type = trimmed.replace('type:', '').trim();
+                    } else if (trimmed.startsWith('name:')) {
+                        currentNode.name = trimmed.replace('name:', '').trim().replace(/"/g, '');
+                    } else if (trimmed.startsWith('role:')) {
+                        currentNode.role = trimmed.replace('role:', '').trim();
+                        currentNode.config.role = currentNode.role;
+                    } else if (trimmed.startsWith('goal:')) {
+                        currentNode.goal = trimmed.replace('goal:', '').trim().replace(/"/g, '');
+                        currentNode.config.goal = currentNode.goal;
+                    } else if (trimmed.startsWith('team_formation:')) {
+                        currentNode.config.formation = trimmed.replace('team_formation:', '').trim();
+                    } else if (trimmed.startsWith('total_tool_budget:')) {
+                        currentNode.config.budget = parseInt(trimmed.replace('total_tool_budget:', '').trim());
+                    } else if (trimmed.startsWith('tool_budget:')) {
+                        currentNode.config.budget = parseInt(trimmed.replace('tool_budget:', '').trim());
+                    } else if (trimmed.startsWith('max_recursion_depth:')) {
+                        currentNode.config.recursion = parseInt(trimmed.replace('max_recursion_depth:', '').trim());
+                    } else if (trimmed.startsWith('next:')) {
+                        const nextValue = trimmed.replace('next:', '').trim().replace(/[\[\]]/g, '');
+                        if (nextValue) {
+                            currentNode.next = nextValue.split(',').map(s => s.trim());
+                        }
+                    }
+                }
+            }
+
+            if (currentNode) {
+                nodes.push(currentNode);
+            }
+
+            // Build connections from next fields
+            nodes.forEach(node => {
+                if (node.next && Array.isArray(node.next)) {
+                    node.next.forEach(nextId => {
+                        connections.push({ from: node.id, to: nextId });
+                    });
+                }
+            });
+
+            return { nodes, connections };
+        }
+
+        // Parse node configuration
+        function parseNodeConfig(nodeData) {
+            const config = {};
+
+            if (nodeData.type === 'team') {
+                config.formation = nodeData.team_formation || 'parallel';
+                config.goal = nodeData.goal || '';
+                config.members = nodeData.members?.length || 3;
+                config.budget = nodeData.total_tool_budget || 50;
+                config.recursion = nodeData.max_recursion_depth || 3;
+            } else if (nodeData.type === 'agent') {
+                config.role = nodeData.role || '';
+                config.goal = nodeData.goal || '';
+            }
+
+            return config;
+        }
+
+        // Calculate hierarchical layout positions
+        function calculateNodePositions(nodes, connections) {
+            const positions = {};
+            const levels = {};
+            const visited = new Set();
+
+            // Build adjacency list
+            const adj = {};
+            const reverseAdj = {};
+            nodes.forEach(node => {
+                adj[node.id] = [];
+                reverseAdj[node.id] = [];
+            });
+            connections.forEach(conn => {
+                if (adj[conn.from]) adj[conn.from].push(conn.to);
+                if (reverseAdj[conn.to]) reverseAdj[conn.to].push(conn.from);
+            });
+
+            // Calculate levels using BFS
+            function getLevel(nodeId, level = 0) {
+                if (visited.has(nodeId)) return;
+                visited.add(nodeId);
+                levels[nodeId] = Math.max(levels[nodeId] || 0, level);
+
+                (adj[nodeId] || []).forEach(nextId => {
+                    getLevel(nextId, level + 1);
+                });
+            }
+
+            // Find root nodes (no incoming edges)
+            const roots = nodes.filter(node =>
+                !reverseAdj[node.id] || reverseAdj[node.id].length === 0
+            );
+
+            if (roots.length === 0 && nodes.length > 0) {
+                // No clear roots, use first node
+                roots.push(nodes[0]);
+            }
+
+            roots.forEach(root => getLevel(root.id));
+
+            // Handle disconnected nodes
+            nodes.forEach(node => {
+                if (!visited.has(node.id)) {
+                    levels[node.id] = 0;
+                }
+            });
+
+            // Group nodes by level
+            const levelGroups = {};
+            Object.keys(levels).forEach(nodeId => {
+                const level = levels[nodeId];
+                if (!levelGroups[level]) levelGroups[level] = [];
+                levelGroups[level].push(nodeId);
+            });
+
+            // Calculate positions
+            const levelHeight = 180;
+            const nodeWidth = 180;
+
+            Object.keys(levelGroups).sort((a, b) => a - b).forEach(level => {
+                const nodesInLevel = levelGroups[level];
+                const totalWidth = nodesInLevel.length * nodeWidth;
+                const startX = (Math.max(800, totalWidth) - totalWidth) / 2;
+
+                nodesInLevel.forEach((nodeId, index) => {
+                    positions[nodeId] = {
+                        x: startX + index * nodeWidth + 50,
+                        y: 100 + parseInt(level) * levelHeight
+                    };
+                });
+            });
+
+            return positions;
+        }
+
+        // Clear canvas
+        function clearCanvas() {
+            if (confirm('Clear all nodes and connections?')) {
+                canvasNodes = [];
+                connections = [];
+                selectedNodeId = null;
+                renderCanvas();
+                document.getElementById('properties-panel').classList.remove('visible');
+            }
+        }
+
+        // Update node count
+        function updateNodeCount() {
+            document.getElementById('node-count').textContent = canvasNodes.length + ' nodes';
+        }
+
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+            event.target.classList.add('active');
+            document.getElementById('tab-' + tabName).classList.add('active');
+        }
+
+        // Click on canvas to deselect
+        canvas.addEventListener('click', (e) => {
+            if (e.target === canvas || e.target === connectionsSvg) {
+                selectedNodeId = null;
+                renderCanvas();
+                document.getElementById('properties-panel').classList.remove('visible');
+            }
+        });
+
+        // Initialize
+        renderCanvas();
+    </script>
+</body>
+</html>

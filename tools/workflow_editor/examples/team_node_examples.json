@@ -1,0 +1,184 @@
+{
+  "examples": [
+    {
+      "name": "Parallel Research Team",
+      "description": "Three researchers working in parallel on different aspects",
+      "nodes": [
+        {
+          "id": "research_team",
+          "type": "team",
+          "name": "Research Team",
+          "config": {
+            "formation": "parallel",
+            "goal": "Research the given topic from multiple angles",
+            "max_iterations": 2,
+            "members": [
+              {
+                "id": "technical_researcher",
+                "role": "researcher",
+                "goal": "Research technical aspects and implementation details",
+                "tool_budget": 20,
+                "expertise": ["technical", "implementation"]
+              },
+              {
+                "id": "business_researcher",
+                "role": "researcher",
+                "goal": "Research business use cases and market fit",
+                "tool_budget": 20,
+                "expertise": ["business", "market-analysis"]
+              },
+              {
+                "id": "competitive_researcher",
+                "role": "researcher",
+                "goal": "Research competitive landscape and alternatives",
+                "tool_budget": 20,
+                "expertise": ["competition", "analysis"]
+              }
+            ]
+          },
+          "position": { "x": 100, "y": 100 }
+        }
+      ],
+      "edges": []
+    },
+    {
+      "name": "Sequential Content Pipeline",
+      "description": "Content creation through sequential refinement",
+      "nodes": [
+        {
+          "id": "content_team",
+          "type": "team",
+          "name": "Content Team",
+          "config": {
+            "formation": "sequential",
+            "goal": "Create high-quality content through iterative refinement",
+            "max_iterations": 4,
+            "members": [
+              {
+                "id": "draft_writer",
+                "role": "writer",
+                "goal": "Create initial draft of the content",
+                "tool_budget": 25
+              },
+              {
+                "id": "content_editor",
+                "role": "reviewer",
+                "goal": "Review and improve clarity, flow, and structure",
+                "tool_budget": 20
+              },
+              {
+                "id": "fact_checker",
+                "role": "researcher",
+                "goal": "Verify facts and add supporting evidence",
+                "tool_budget": 15
+              },
+              {
+                "id": "final_editor",
+                "role": "writer",
+                "goal": "Final polish and formatting",
+                "tool_budget": 15
+              }
+            ]
+          },
+          "position": { "x": 100, "y": 100 }
+        }
+      ],
+      "edges": []
+    },
+    {
+      "name": "Consensus Decision Team",
+      "description": "Team members vote on important decisions",
+      "nodes": [
+        {
+          "id": "decision_team",
+          "type": "team",
+          "name": "Decision Team",
+          "config": {
+            "formation": "consensus",
+            "goal": "Make group decision on technical approach",
+            "max_iterations": 3,
+            "members": [
+              {
+                "id": "senior_engineer",
+                "role": "reviewer",
+                "goal": "Evaluate technical feasibility and risks",
+                "tool_budget": 15,
+                "backstory": "Senior engineer with 10+ years experience"
+              },
+              {
+                "id": "security_expert",
+                "role": "reviewer",
+                "goal": "Assess security implications",
+                "tool_budget": 15,
+                "expertise": ["security", "cryptography"]
+              },
+              {
+                "id": "product_manager",
+                "role": "planner",
+                "goal": "Consider product requirements and timeline",
+                "tool_budget": 15
+              },
+              {
+                "id": "devops_engineer",
+                "role": "executor",
+                "goal": "Evaluate deployment and operational concerns",
+                "tool_budget": 15,
+                "expertise": ["devops", "infrastructure"]
+              }
+            ]
+          },
+          "position": { "x": 100, "y": 100 }
+        }
+      ],
+      "edges": []
+    },
+    {
+      "name": "Hierarchical QA Team",
+      "description": "Manager coordinates multiple specialized testers",
+      "nodes": [
+        {
+          "id": "qa_team",
+          "type": "team",
+          "name": "QA Team",
+          "config": {
+            "formation": "hierarchical",
+            "goal": "Comprehensive testing of the application",
+            "max_iterations": 5,
+            "members": [
+              {
+                "id": "qa_lead",
+                "role": "planner",
+                "goal": "Coordinate testing efforts and prioritize test cases",
+                "tool_budget": 20,
+                "backstory": "QA lead with experience in test strategy"
+              },
+              {
+                "id": "unit_tester",
+                "role": "executor",
+                "goal": "Write and execute unit tests",
+                "tool_budget": 15,
+                "expertise": ["testing", "unit-tests"]
+              },
+              {
+                "id": "integration_tester",
+                "role": "executor",
+                "goal": "Test integration points and APIs",
+                "tool_budget": 15,
+                "expertise": ["testing", "api", "integration"]
+              },
+              {
+                "id": "ui_tester",
+                "role": "executor",
+                "goal": "Test user interface and user experience",
+                "tool_budget": 15,
+                "expertise": ["testing", "ui", "ux"]
+              }
+            ]
+          },
+          "position": { "x": 100, "y": 100 }
+        }
+      ],
+      "edges": []
+    }
+  ]
+}

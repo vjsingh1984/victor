@@ -27,14 +27,14 @@ import asyncio
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class EmbeddingModelConfig(BaseModel):
     """Configuration for embedding model."""
 
     model_type: str = Field(description="Model type (sentence-transformers, openai, cohere, etc.)")
-    model_name: str = Field(default="all-MiniLM-L6-v2", description="Specific model name")
+    embedding_model: str = Field(default="all-MiniLM-L6-v2", description="Specific model name")
     dimension: int = Field(
         default=384, description="Embedding dimension (auto-detected if possible)"
     )

@@ -1,0 +1,91 @@
+{
+  "nodes": [
+    {
+      "id": "gather_changes",
+      "type": "compute",
+      "name": "Gather Changes",
+      "config": {
+        "handler": "git_diff_fetcher",
+        "timeout": 60
+      },
+      "position": { "x": 100, "y": 100 }
+    },
+    {
+      "id": "parallel_analysis",
+      "type": "parallel",
+      "name": "Parallel Analysis",
+      "config": {
+        "join_strategy": "all"
+      },
+      "position": { "x": 100, "y": 250 }
+    },
+    {
+      "id": "code_review_team",
+      "type": "team",
+      "name": "Code Review Team",
+      "config": {
+        "formation": "parallel",
+        "goal": "Perform comprehensive code review focusing on security, quality, and performance",
+        "max_iterations": 3,
+        "timeout_seconds": 300,
+        "members": [
+          {
+            "id": "security_reviewer",
+            "role": "reviewer",
+            "goal": "Check for security vulnerabilities, authentication issues, and authorization flaws",
+            "tool_budget": 15,
+            "expertise": ["security", "python", "authentication"]
+          },
+          {
+            "id": "quality_reviewer",
+            "role": "reviewer",
+            "goal": "Review code quality, maintainability, and adherence to best practices",
+            "tool_budget": 15,
+            "expertise": ["python", "code-quality", "documentation"]
+          },
+          {
+            "id": "performance_reviewer",
+            "role": "reviewer",
+            "goal": "Analyze performance bottlenecks, database queries, and optimization opportunities",
+            "tool_budget": 15,
+            "expertise": ["performance", "database", "optimization"]
+          }
+        ]
+      },
+      "position": { "x": 100, "y": 400 }
+    },
+    {
+      "id": "generate_report",
+      "type": "agent",
+      "name": "Generate Report",
+      "config": {
+        "role": "writer",
+        "goal": "Compile review findings into a comprehensive report with recommendations",
+        "tool_budget": 20
+      },
+      "position": { "x": 100, "y": 600 }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "gather_changes",
+      "target": "parallel_analysis"
+    },
+    {
+      "id": "e2",
+      "source": "parallel_analysis",
+      "target": "code_review_team"
+    },
+    {
+      "id": "e3",
+      "source": "code_review_team",
+      "target": "generate_report"
+    }
+  ],
+  "metadata": {
+    "name": "Code Review Workflow",
+    "description": "Automated code review with parallel team analysis",
+    "version": "1.0"
+  }
+}

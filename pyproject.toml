@@ -602,6 +602,11 @@ disallow_untyped_defs = false  # Allow gradual improvement
 warn_return_any = true
 warn_unused_ignores = true
 
+[tool.pydantic]
+# Allow model_ prefixed field names (used in embedding models)
+# This suppresses warnings about model_name conflicting with protected namespace
+protected_namespaces = ()
+
 [tool.black]
 line-length = 100
 target-version = ['py310']
