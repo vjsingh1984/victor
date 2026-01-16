@@ -35,6 +35,7 @@ from victor.agent.orchestrator_factory import (
     AnalyticsComponents,
     RecoveryComponents,
     WorkflowOptimizationComponents,
+    CoordinatorComponents,
 )
 
 
@@ -847,3 +848,253 @@ class TestCreateAnalyticsCoordinator:
         # Should have at least console exporter
         assert len(coordinator._exporters) >= 1
         assert any(isinstance(e, ConsoleAnalyticsExporter) for e in coordinator._exporters)
+
+
+# =============================================================================
+# New Coordinator Components Tests (Stream E4)
+# =============================================================================
+
+
+class TestCreateResponseCoordinator:
+    """Tests for create_response_coordinator method."""
+
+    def test_create_response_coordinator_returns_coordinator(self, factory):
+        """create_response_coordinator returns ResponseCoordinator instance."""
+        from victor.agent.coordinators.response_coordinator import ResponseCoordinator
+
+        coordinator = factory.create_response_coordinator()
+
+        assert isinstance(coordinator, ResponseCoordinator)
+
+    def test_create_response_coordinator_with_dependencies(self, factory):
+        """create_response_coordinator accepts tool_adapter and tool_registry."""
+        from victor.agent.coordinators.response_coordinator import ResponseCoordinator
+
+        mock_adapter = MagicMock()
+        mock_registry = MagicMock()
+
+        coordinator = factory.create_response_coordinator(
+            tool_adapter=mock_adapter,
+            tool_registry=mock_registry,
+        )
+
+        assert isinstance(coordinator, ResponseCoordinator)
+        assert coordinator._tool_adapter == mock_adapter
+        assert coordinator._tool_registry == mock_registry
+
+    def test_create_response_coordinator_uses_settings(self, factory, mock_settings):
+        """create_response_coordinator reads config from settings."""
+        from victor.agent.coordinators.response_coordinator import ResponseCoordinator
+
+        mock_settings.max_garbage_chunks = 5
+        mock_settings.enable_tool_call_extraction = False
+        mock_settings.enable_content_sanitization = False
+        mock_settings.min_content_length = 50
+
+        coordinator = factory.create_response_coordinator()
+
+        assert isinstance(coordinator, ResponseCoordinator)
+        assert coordinator._config.max_garbage_chunks == 5
+        assert coordinator._config.enable_tool_call_extraction is False
+        assert coordinator._config.enable_content_sanitization is False
+        assert coordinator._config.min_content_length == 50
+
+
+class TestCreateToolAccessConfigCoordinator:
+    """Tests for create_tool_access_config_coordinator method."""
+
+    def test_create_tool_access_config_coordinator_returns_coordinator(self, factory):
+        """create_tool_access_config_coordinator returns ToolAccessConfigCoordinator instance."""
+        from victor.agent.coordinators.config_coordinator import (
+            ToolAccessConfigCoordinator,
+        )
+
+        coordinator = factory.create_tool_access_config_coordinator()
+
+        assert isinstance(coordinator, ToolAccessConfigCoordinator)
+
+    def test_create_tool_access_config_coordinator_with_dependencies(self, factory):
+        """create_tool_access_config_coordinator accepts dependencies."""
+        from victor.agent.coordinators.config_coordinator import (
+            ToolAccessConfigCoordinator,
+        )
+
+        mock_controller = MagicMock()
+        mock_mode_coordinator = MagicMock()
+        mock_registry = MagicMock()
+
+        coordinator = factory.create_tool_access_config_coordinator(
+            tool_access_controller=mock_controller,
+            mode_coordinator=mock_mode_coordinator,
+            tool_registry=mock_registry,
+        )
+
+        assert isinstance(coordinator, ToolAccessConfigCoordinator)
+        assert coordinator._tool_access_controller == mock_controller
+        assert coordinator._mode_coordinator == mock_mode_coordinator
+        assert coordinator._tool_registry == mock_registry
+
+
+class TestCreateStateCoordinator:
+    """Tests for create_state_coordinator method."""
+
+    def test_create_state_coordinator_returns_coordinator(self, factory):
+        """create_state_coordinator returns StateCoordinator instance."""
+        from victor.agent.coordinators.state_coordinator import StateCoordinator
+        from victor.agent.session_state_manager import SessionStateManager
+
+        mock_session_state = MagicMock(spec=SessionStateManager)
+
+        coordinator = factory.create_state_coordinator(
+            session_state_manager=mock_session_state
+        )
+
+        assert isinstance(coordinator, StateCoordinator)
+
+    def test_create_state_coordinator_with_conversation_state(self, factory):
+        """create_state_coordinator accepts conversation_state_machine."""
+        from victor.agent.coordinators.state_coordinator import StateCoordinator
+        from victor.agent.session_state_manager import SessionStateManager
+
+        mock_session_state = MagicMock(spec=SessionStateManager)
+        mock_conversation_state = MagicMock()
+
+        coordinator = factory.create_state_coordinator(
+            session_state_manager=mock_session_state,
+            conversation_state_machine=mock_conversation_state,
+        )
+
+        assert isinstance(coordinator, StateCoordinator)
+
+    def test_create_state_coordinator_with_history_settings(self, factory):
+        """create_state_coordinator respects history settings."""
+        from victor.agent.coordinators.state_coordinator import StateCoordinator
+        from victor.agent.session_state_manager import SessionStateManager
+
+        mock_session_state = MagicMock(spec=SessionStateManager)
+
+        coordinator = factory.create_state_coordinator(
+            session_state_manager=mock_session_state,
+            enable_history=False,
+            max_history_size=50,
+        )
+
+        assert isinstance(coordinator, StateCoordinator)
+        assert coordinator._enable_history is False
+        assert coordinator._max_history_size == 50
+
+
+class TestCreateCoordinators:
+    """Tests for create_coordinators method."""
+
+    def test_create_coordinators_returns_components(self, factory):
+        """create_coordinators returns CoordinatorComponents instance."""
+        from victor.agent.coordinators.response_coordinator import ResponseCoordinator
+        from victor.agent.coordinators.config_coordinator import (
+            ToolAccessConfigCoordinator,
+        )
+
+        components = factory.create_coordinators()
+
+        assert isinstance(components, CoordinatorComponents)
+        assert isinstance(components.response_coordinator, ResponseCoordinator)
+        assert isinstance(
+            components.tool_access_config_coordinator, ToolAccessConfigCoordinator
+        )
+        # state_coordinator is None without session_state_manager
+        assert components.state_coordinator is None
+
+    def test_create_coordinators_with_all_dependencies(self, factory):
+        """create_coordinators creates all coordinators with full dependencies."""
+        from victor.agent.coordinators.response_coordinator import ResponseCoordinator
+        from victor.agent.coordinators.config_coordinator import (
+            ToolAccessConfigCoordinator,
+        )
+        from victor.agent.coordinators.state_coordinator import StateCoordinator
+        from victor.agent.session_state_manager import SessionStateManager
+
+        mock_adapter = MagicMock()
+        mock_registry = MagicMock()
+        mock_controller = MagicMock()
+        mock_mode_coordinator = MagicMock()
+        mock_session_state = MagicMock(spec=SessionStateManager)
+        mock_conversation_state = MagicMock()
+
+        components = factory.create_coordinators(
+            tool_adapter=mock_adapter,
+            tool_registry=mock_registry,
+            tool_access_controller=mock_controller,
+            mode_coordinator=mock_mode_coordinator,
+            session_state_manager=mock_session_state,
+            conversation_state_machine=mock_conversation_state,
+        )
+
+        assert isinstance(components, CoordinatorComponents)
+        assert isinstance(components.response_coordinator, ResponseCoordinator)
+        assert isinstance(
+            components.tool_access_config_coordinator, ToolAccessConfigCoordinator
+        )
+        assert isinstance(components.state_coordinator, StateCoordinator)
+
+
+class TestCoordinatorComponentsDataClass:
+    """Tests for CoordinatorComponents dataclass."""
+
+    def test_coordinator_components_fields(self):
+        """CoordinatorComponents has expected fields."""
+        components = CoordinatorComponents()
+
+        assert components.response_coordinator is None
+        assert components.tool_access_config_coordinator is None
+        assert components.state_coordinator is None
+
+    def test_coordinator_components_with_values(self):
+        """CoordinatorComponents stores values correctly."""
+        mock_response = MagicMock()
+        mock_tool_access = MagicMock()
+        mock_state = MagicMock()
+
+        components = CoordinatorComponents(
+            response_coordinator=mock_response,
+            tool_access_config_coordinator=mock_tool_access,
+            state_coordinator=mock_state,
+        )
+
+        assert components.response_coordinator == mock_response
+        assert components.tool_access_config_coordinator == mock_tool_access
+        assert components.state_coordinator == mock_state
+
+
+class TestOrchestratorComponentsWithCoordinators:
+    """Tests for OrchestratorComponents with coordinators field."""
+
+    def test_orchestrator_components_has_coordinators_field(self):
+        """OrchestratorComponents includes coordinators field."""
+        components = OrchestratorComponents()
+
+        assert hasattr(components, "coordinators")
+        assert isinstance(components.coordinators, CoordinatorComponents)
+
+    def test_orchestrator_components_coordinators_defaults(self):
+        """OrchestratorComponents coordinators field has correct defaults."""
+        components = OrchestratorComponents()
+
+        assert components.coordinators.response_coordinator is None
+        assert components.coordinators.tool_access_config_coordinator is None
+        assert components.coordinators.state_coordinator is None
+
+    def test_orchestrator_components_with_custom_coordinators(self):
+        """OrchestratorComponents accepts custom coordinators."""
+        mock_coordinators = CoordinatorComponents(
+            response_coordinator=MagicMock(),
+            tool_access_config_coordinator=MagicMock(),
+            state_coordinator=MagicMock(),
+        )
+
+        components = OrchestratorComponents(coordinators=mock_coordinators)
+
+        assert components.coordinators == mock_coordinators
+        assert components.coordinators.response_coordinator is not None
+        assert components.coordinators.tool_access_config_coordinator is not None
+        assert components.coordinators.state_coordinator is not None
+

@@ -45,7 +45,6 @@ class TestExecutorNodeStatus:
         assert ExecutorNodeStatus.COMPLETED.value == "completed"
         assert ExecutorNodeStatus.FAILED.value == "failed"
         assert ExecutorNodeStatus.SKIPPED.value == "skipped"
-        assert ExecutorNodeStatus.CANCELLED.value == "cancelled"
 
 
 # =============================================================================
@@ -68,20 +67,18 @@ class TestNodeResult:
         assert result.status == ExecutorNodeStatus.COMPLETED
         assert result.output == {"result": "success"}
         assert result.error is None
-        assert result.metadata == {}
 
-    def test_initialization_with_metadata(self):
-        """Test NodeResult with metadata."""
-        metadata = {
-            "execution_time": 1.5,
-            "tool_calls": 5,
-        }
+    def test_initialization_with_duration(self):
+        """Test NodeResult with duration and tool calls."""
         result = NodeResult(
             node_id="test_node",
             status=ExecutorNodeStatus.COMPLETED,
-            metadata=metadata,
+            output="done",
+            duration_seconds=1.5,
+            tool_calls_used=5,
         )
-        assert result.metadata == metadata
+        assert result.duration_seconds == 1.5
+        assert result.tool_calls_used == 5
 
     def test_initialization_with_error(self):
         """Test NodeResult with error."""
@@ -93,37 +90,45 @@ class TestNodeResult:
         assert result.status == ExecutorNodeStatus.FAILED
         assert result.error == "Execution failed"
 
-    def test_is_complete_true(self):
-        """Test is_complete property when True."""
+    def test_success_true(self):
+        """Test success property when True."""
         result = NodeResult(
             node_id="test_node",
             status=ExecutorNodeStatus.COMPLETED,
         )
-        assert result.is_complete is True
+        assert result.success is True
 
-    def test_is_complete_false(self):
-        """Test is_complete property when False."""
+    def test_success_false(self):
+        """Test success property when False."""
         result = NodeResult(
             node_id="test_node",
             status=ExecutorNodeStatus.RUNNING,
         )
-        assert result.is_complete is False
+        assert result.success is False
 
-    def test_is_failed_true(self):
-        """Test is_failed property when True."""
+    def test_success_false_for_failed(self):
+        """Test success property when failed."""
         result = NodeResult(
             node_id="test_node",
             status=ExecutorNodeStatus.FAILED,
         )
-        assert result.is_failed is True
+        assert result.success is False
 
-    def test_is_failed_false(self):
-        """Test is_failed property when False."""
+    def test_to_dict(self):
+        """Test serialization to dictionary."""
         result = NodeResult(
             node_id="test_node",
             status=ExecutorNodeStatus.COMPLETED,
+            output={"result": "success"},
+            duration_seconds=2.5,
+            tool_calls_used=3,
         )
-        assert result.is_failed is False
+        data = result.to_dict()
+        assert data["node_id"] == "test_node"
+        assert data["status"] == "completed"
+        assert data["output"] == {"result": "success"}
+        assert data["duration_seconds"] == 2.5
+        assert data["tool_calls_used"] == 3
 
 
 # =============================================================================
@@ -136,38 +141,117 @@ class TestTemporalContext:
 
     def test_initialization(self):
         """Test TemporalContext initialization."""
-        now = datetime.now(timezone.utc)
         temporal = TemporalContext(
-            workflow_id="workflow_1",
-            started_at=now,
-            node_timeouts={"node1": 60},
+            as_of_date="2025-01-15",
+            lookback_periods=4,
         )
-        assert temporal.workflow_id == "workflow_1"
-        assert temporal.started_at == now
-        assert temporal.node_timeouts == {"node1": 60}
+        assert temporal.as_of_date == "2025-01-15"
+        assert temporal.lookback_periods == 4
+        assert temporal.period_type == "quarters"
+        assert temporal.include_end_date is True
 
-    def test_default_timeouts(self):
-        """Test default node timeouts."""
-        temporal = TemporalContext(workflow_id="workflow_1")
-        assert temporal.node_timeouts == {}
+    def test_default_values(self):
+        """Test default values."""
+        temporal = TemporalContext()
+        assert temporal.as_of_date is None
+        assert temporal.lookback_periods == 0
+        assert temporal.period_type == "quarters"
+        assert temporal.include_end_date is True
 
-    def test_get_timeout_for_node(self):
-        """Test getting timeout for a specific node."""
+    def test_custom_period_type(self):
+        """Test custom period type."""
         temporal = TemporalContext(
-            workflow_id="workflow_1",
-            node_timeouts={"node1": 120, "node2": 60},
+            as_of_date="2025-01-15",
+            lookback_periods=30,
+            period_type="days",
         )
-        timeout = temporal.get_node_timeout("node1")
-        assert timeout == 120
+        assert temporal.period_type == "days"
 
-    def test_get_timeout_default(self):
-        """Test getting timeout for node without specific timeout."""
+    def test_get_date_range_quarters(self):
+        """Test date range calculation for quarters."""
         temporal = TemporalContext(
-            workflow_id="workflow_1",
-            node_timeouts={"node1": 120},
+            as_of_date="2025-01-15",
+            lookback_periods=2,
+            period_type="quarters",
         )
-        timeout = temporal.get_node_timeout("node2", default=30)
-        assert timeout == 30
+        start, end = temporal.get_date_range()
+        assert end == "2025-01-15"
+        # Approximately 6 months back (2 quarters)
+        assert start < "2025-01-15"
+
+    def test_get_date_range_days(self):
+        """Test date range calculation for days."""
+        temporal = TemporalContext(
+            as_of_date="2025-01-15",
+            lookback_periods=7,
+            period_type="days",
+        )
+        start, end = temporal.get_date_range()
+        assert end == "2025-01-15"
+        assert start < "2025-01-15"
+
+    def test_is_valid_for_date_with_include(self):
+        """Test date validation with include_end_date=True."""
+        temporal = TemporalContext(
+            as_of_date="2025-01-15",
+            include_end_date=True,
+        )
+        assert temporal.is_valid_for_date("2025-01-15") is True
+        assert temporal.is_valid_for_date("2025-01-10") is True
+        assert temporal.is_valid_for_date("2025-01-20") is False
+
+    def test_is_valid_for_date_without_include(self):
+        """Test date validation with include_end_date=False."""
+        temporal = TemporalContext(
+            as_of_date="2025-01-15",
+            include_end_date=False,
+        )
+        assert temporal.is_valid_for_date("2025-01-15") is False
+        assert temporal.is_valid_for_date("2025-01-10") is True
+        assert temporal.is_valid_for_date("2025-01-20") is False
+
+    def test_is_valid_for_date_no_constraint(self):
+        """Test date validation when no as_of_date is set."""
+        temporal = TemporalContext()
+        assert temporal.is_valid_for_date("2025-01-15") is True
+        assert temporal.is_valid_for_date("2020-01-01") is True
+
+    def test_to_dict(self):
+        """Test serialization to dictionary."""
+        temporal = TemporalContext(
+            as_of_date="2025-01-15",
+            lookback_periods=2,
+            period_type="months",
+            include_end_date=False,
+        )
+        data = temporal.to_dict()
+        assert data["as_of_date"] == "2025-01-15"
+        assert data["lookback_periods"] == 2
+        assert data["period_type"] == "months"
+        assert data["include_end_date"] is False
+
+    def test_from_dict(self):
+        """Test deserialization from dictionary."""
+        data = {
+            "as_of_date": "2025-01-15",
+            "lookback_periods": 3,
+            "period_type": "weeks",
+            "include_end_date": True,
+        }
+        temporal = TemporalContext.from_dict(data)
+        assert temporal.as_of_date == "2025-01-15"
+        assert temporal.lookback_periods == 3
+        assert temporal.period_type == "weeks"
+        assert temporal.include_end_date is True
+
+    def test_from_dict_defaults(self):
+        """Test from_dict with missing fields."""
+        data = {"as_of_date": "2025-01-15"}
+        temporal = TemporalContext.from_dict(data)
+        assert temporal.as_of_date == "2025-01-15"
+        assert temporal.lookback_periods == 0
+        assert temporal.period_type == "quarters"
+        assert temporal.include_end_date is True
 
 
 # =============================================================================
@@ -181,20 +265,18 @@ class TestWorkflowContext:
     def test_initialization(self):
         """Test WorkflowContext initialization."""
         context = WorkflowContext(
-            workflow_id="workflow_1",
-            execution_id="exec_1",
-            state={"key": "value"},
+            data={"key": "value"},
+            metadata={"workflow_id": "workflow_1"},
         )
-        assert context.workflow_id == "workflow_1"
-        assert context.execution_id == "exec_1"
-        assert context.state == {"key": "value"}
+        assert context.data == {"key": "value"}
+        assert context.metadata == {"workflow_id": "workflow_1"}
+        assert context.node_results == {}
+        assert context.temporal is None
 
     def test_get_state_value(self):
         """Test getting state value."""
         context = WorkflowContext(
-            workflow_id="workflow_1",
-            execution_id="exec_1",
-            state={"user": "alice", "task": "test"},
+            data={"user": "alice", "task": "test"},
         )
         assert context.get("user") == "alice"
         assert context.get("task") == "test"
@@ -202,88 +284,121 @@ class TestWorkflowContext:
     def test_get_state_default(self):
         """Test getting state value with default."""
         context = WorkflowContext(
-            workflow_id="workflow_1",
-            execution_id="exec_1",
-            state={"user": "alice"},
+            data={"user": "alice"},
         )
         assert context.get("nonexistent", default="default") == "default"
 
     def test_set_state_value(self):
         """Test setting state value."""
-        context = WorkflowContext(
-            workflow_id="workflow_1",
-            execution_id="exec_1",
-            state={},
-        )
+        context = WorkflowContext(data={})
         context.set("user", "bob")
         assert context.get("user") == "bob"
 
     def test_update_state(self):
         """Test updating state with dict."""
         context = WorkflowContext(
-            workflow_id="workflow_1",
-            execution_id="exec_1",
-            state={"user": "alice"},
+            data={"user": "alice"},
         )
         context.update({"task": "test", "priority": "high"})
         assert context.get("user") == "alice"
         assert context.get("task") == "test"
         assert context.get("priority") == "high"
 
-    def test_delete_state_value(self):
-        """Test deleting state value."""
-        context = WorkflowContext(
-            workflow_id="workflow_1",
-            execution_id="exec_1",
-            state={"user": "alice", "task": "test"},
+    def test_add_node_result(self):
+        """Test adding node result."""
+        context = WorkflowContext()
+        result = NodeResult(
+            node_id="node1",
+            status=ExecutorNodeStatus.COMPLETED,
+            output="done",
         )
-        context.delete("task")
-        assert context.get("task") is None
-        assert context.get("user") == "alice"
+        context.add_result(result)
+        assert context.get_result("node1") is not None
+        assert context.get_result("node1").output == "done"
 
-    def test_has_state_value(self):
-        """Test checking if state has value."""
-        context = WorkflowContext(
-            workflow_id="workflow_1",
-            execution_id="exec_1",
-            state={"user": "alice"},
+    def test_get_result(self):
+        """Test getting result for specific node."""
+        context = WorkflowContext()
+        result = NodeResult(
+            node_id="node1",
+            status=ExecutorNodeStatus.COMPLETED,
+            output={"data": "test"},
         )
-        assert context.has("user") is True
-        assert context.has("nonexistent") is False
+        context.add_result(result)
+        retrieved = context.get_result("node1")
+        assert retrieved is not None
+        assert retrieved.output == {"data": "test"}
 
-    def test_keys(self):
-        """Test getting state keys."""
-        context = WorkflowContext(
-            workflow_id="workflow_1",
-            execution_id="exec_1",
-            state={"user": "alice", "task": "test"},
+    def test_get_result_not_found(self):
+        """Test getting result for non-existent node."""
+        context = WorkflowContext()
+        result = context.get_result("nonexistent")
+        assert result is None
+
+    def test_has_failures_true(self):
+        """Test has_failures when there are failures."""
+        context = WorkflowContext()
+        failed_result = NodeResult(
+            node_id="node1",
+            status=ExecutorNodeStatus.FAILED,
+            error="Failed",
         )
-        keys = context.keys()
-        assert "user" in keys
-        assert "task" in keys
+        context.add_result(failed_result)
+        assert context.has_failures() is True
 
-    def test_to_dict(self):
-        """Test converting context to dict."""
-        context = WorkflowContext(
-            workflow_id="workflow_1",
-            execution_id="exec_1",
-            state={"user": "alice"},
+    def test_has_failures_false(self):
+        """Test has_failures when there are no failures."""
+        context = WorkflowContext()
+        success_result = NodeResult(
+            node_id="node1",
+            status=ExecutorNodeStatus.COMPLETED,
+            output="done",
         )
-        data = context.to_dict()
-        assert data["workflow_id"] == "workflow_1"
-        assert data["execution_id"] == "exec_1"
-        assert data["state"]["user"] == "alice"
+        context.add_result(success_result)
+        assert context.has_failures() is False
 
-    def test_from_dict(self):
-        """Test creating context from dict."""
-        data = {
-            "workflow_id": "workflow_1",
-            "execution_id": "exec_1",
-            "state": {"user": "alice"},
-        }
-        context = WorkflowContext.from_dict(data)
-        assert context.workflow_id == "workflow_1"
-        assert context.state["user"] == "alice"
+    def test_get_outputs(self):
+        """Test getting all successful node outputs."""
+        context = WorkflowContext()
+        result1 = NodeResult(
+            node_id="node1",
+            status=ExecutorNodeStatus.COMPLETED,
+            output={"result": "success"},
+        )
+        result2 = NodeResult(
+            node_id="node2",
+            status=ExecutorNodeStatus.COMPLETED,
+            output="done",
+        )
+        result3 = NodeResult(
+            node_id="node3",
+            status=ExecutorNodeStatus.FAILED,
+            error="failed",
+        )
+        context.add_result(result1)
+        context.add_result(result2)
+        context.add_result(result3)
+
+        outputs = context.get_outputs()
+        assert "node1" in outputs
+        assert "node2" in outputs
+        assert "node3" not in outputs
+        assert outputs["node1"] == {"result": "success"}
+        assert outputs["node2"] == "done"
+
+    def test_with_temporal_context(self):
+        """Test WorkflowContext with temporal context."""
+        temporal = TemporalContext(
+            as_of_date="2025-01-15",
+            lookback_periods=2,
+        )
+        context = WorkflowContext(
+            data={"analysis": "test"},
+            temporal=temporal,
+        )
+        assert context.temporal is not None
+        assert context.temporal.as_of_date == "2025-01-15"
+        assert context.get("analysis") == "test"
 
 
 # =============================================================================
@@ -296,235 +411,91 @@ class TestWorkflowResult:
 
     def test_initialization_success(self):
         """Test WorkflowResult initialization for success."""
-        now = datetime.now(timezone.utc)
-        result = WorkflowResult(
-            workflow_id="workflow_1",
-            execution_id="exec_1",
-            status=ExecutorNodeStatus.COMPLETED,
-            started_at=now,
-            completed_at=now,
-            final_state={"result": "success"},
-            node_results={},
+        context = WorkflowContext(
+            data={"result": "success"},
         )
-        assert result.workflow_id == "workflow_1"
-        assert result.execution_id == "exec_1"
-        assert result.status == ExecutorNodeStatus.COMPLETED
-        assert result.final_state == {"result": "success"}
+        result = WorkflowResult(
+            workflow_name="test_workflow",
+            success=True,
+            context=context,
+            total_duration=10.5,
+            total_tool_calls=5,
+        )
+        assert result.workflow_name == "test_workflow"
+        assert result.success is True
+        assert result.context == context
+        assert result.total_duration == 10.5
+        assert result.total_tool_calls == 5
         assert result.error is None
 
     def test_initialization_failure(self):
         """Test WorkflowResult initialization for failure."""
-        now = datetime.now(timezone.utc)
+        context = WorkflowContext(data={})
         result = WorkflowResult(
-            workflow_id="workflow_1",
-            execution_id="exec_1",
-            status=ExecutorNodeStatus.FAILED,
-            started_at=now,
-            completed_at=now,
+            workflow_name="test_workflow",
+            success=False,
+            context=context,
             error="Workflow execution failed",
-            node_results={},
         )
-        assert result.status == ExecutorNodeStatus.FAILED
-        assert result.error == "Workflow failed"
-
-    def test_is_successful_true(self):
-        """Test is_successful property when True."""
-        now = datetime.now(timezone.utc)
-        result = WorkflowResult(
-            workflow_id="workflow_1",
-            execution_id="exec_1",
-            status=ExecutorNodeStatus.COMPLETED,
-            started_at=now,
-            completed_at=now,
-            node_results={},
-        )
-        assert result.is_successful is True
-
-    def test_is_successful_false(self):
-        """Test is_successful property when False."""
-        now = datetime.now(timezone.utc)
-        result = WorkflowResult(
-            workflow_id="workflow_1",
-            execution_id="exec_1",
-            status=ExecutorNodeStatus.FAILED,
-            started_at=now,
-            completed_at=now,
-            error="Failed",
-            node_results={},
-        )
-        assert result.is_successful is False
-
-    def test_execution_duration(self):
-        """Test execution duration calculation."""
-        started = datetime.now(timezone.utc)
-        completed = datetime.fromtimestamp(
-            started.timestamp() + 10, tz=timezone.utc
-        )
-
-        result = WorkflowResult(
-            workflow_id="workflow_1",
-            execution_id="exec_1",
-            status=ExecutorNodeStatus.COMPLETED,
-            started_at=started,
-            completed_at=completed,
-            node_results={},
-        )
-        duration = result.execution_duration
-        assert duration >= 9.9 and duration <= 10.1  # Account for timing
-
-    def test_execution_duration_none(self):
-        """Test execution duration when completed_at is None."""
-        now = datetime.now(timezone.utc)
-        result = WorkflowResult(
-            workflow_id="workflow_1",
-            execution_id="exec_1",
-            status=ExecutorNodeStatus.RUNNING,
-            started_at=now,
-            completed_at=None,
-            node_results={},
-        )
-        assert result.execution_duration is None
-
-    def test_get_node_result(self):
-        """Test getting result for specific node."""
-        now = datetime.now(timezone.utc)
-        node_result = NodeResult(
-            node_id="node1",
-            status=ExecutorNodeStatus.COMPLETED,
-            output={"data": "test"},
-        )
-        result = WorkflowResult(
-            workflow_id="workflow_1",
-            execution_id="exec_1",
-            status=ExecutorNodeStatus.COMPLETED,
-            started_at=now,
-            completed_at=now,
-            node_results={"node1": node_result},
-        )
-        retrieved = result.get_node_result("node1")
-        assert retrieved is not None
-        assert retrieved.output == {"data": "test"}
-
-    def test_get_node_result_not_found(self):
-        """Test getting result for non-existent node."""
-        now = datetime.now(timezone.utc)
-        result = WorkflowResult(
-            workflow_id="workflow_1",
-            execution_id="exec_1",
-            status=ExecutorNodeStatus.COMPLETED,
-            started_at=now,
-            completed_at=now,
-            node_results={},
-        )
-        retrieved = result.get_node_result("nonexistent")
-        assert retrieved is None
-
-    def test_get_failed_nodes(self):
-        """Test getting list of failed nodes."""
-        now = datetime.now(timezone.utc)
-        node1 = NodeResult(
-            node_id="node1",
-            status=ExecutorNodeStatus.COMPLETED,
-        )
-        node2 = NodeResult(
-            node_id="node2",
-            status=ExecutorNodeStatus.FAILED,
-        )
-        node3 = NodeResult(
-            node_id="node3",
-            status=ExecutorNodeStatus.FAILED,
-        )
-
-        result = WorkflowResult(
-            workflow_id="workflow_1",
-            execution_id="exec_1",
-            status=ExecutorNodeStatus.FAILED,
-            started_at=now,
-            completed_at=now,
-            node_results={"node1": node1, "node2": node2, "node3": node3},
-        )
-
-        failed = result.get_failed_nodes()
-        assert "node2" in failed
-        assert "node3" in failed
-        assert "node1" not in failed
-        assert len(failed) == 2
+        assert result.success is False
+        assert result.error == "Workflow execution failed"
 
     def test_to_dict(self):
-        """Test converting result to dict."""
-        now = datetime.now(timezone.utc)
-        result = WorkflowResult(
-            workflow_id="workflow_1",
-            execution_id="exec_1",
+        """Test serialization to dictionary."""
+        context = WorkflowContext(
+            data={"result": "success"},
+        )
+        node_result = NodeResult(
+            node_id="node1",
             status=ExecutorNodeStatus.COMPLETED,
-            started_at=now,
-            completed_at=now,
-            final_state={"result": "success"},
-            node_results={},
+            output="done",
+        )
+        context.add_result(node_result)
+
+        result = WorkflowResult(
+            workflow_name="test_workflow",
+            success=True,
+            context=context,
+            total_duration=5.0,
+            total_tool_calls=3,
         )
         data = result.to_dict()
-        assert data["workflow_id"] == "workflow_1"
-        assert data["status"] == "completed"
-        assert data["final_state"]["result"] == "success"
+        assert data["workflow_name"] == "test_workflow"
+        assert data["success"] is True
+        assert data["total_duration"] == 5.0
+        assert data["total_tool_calls"] == 3
+        assert data["error"] is None
+        assert "outputs" in data
+        assert "node_results" in data
 
-    def test_from_dict(self):
-        """Test creating result from dict."""
-        now = datetime.now(timezone.utc)
-        data = {
-            "workflow_id": "workflow_1",
-            "execution_id": "exec_1",
-            "status": "completed",
-            "started_at": now.isoformat(),
-            "completed_at": now.isoformat(),
-            "final_state": {"result": "success"},
-            "node_results": {},
-        }
-        result = WorkflowResult.from_dict(data)
-        assert result.workflow_id == "workflow_1"
-        assert result.status == ExecutorNodeStatus.COMPLETED
-
-    def test_summary(self):
-        """Test getting result summary."""
-        now = datetime.now(timezone.utc)
-        node1 = NodeResult(node_id="node1", status=ExecutorNodeStatus.COMPLETED)
-        node2 = NodeResult(node_id="node2", status=ExecutorNodeStatus.FAILED)
-
-        result = WorkflowResult(
-            workflow_id="workflow_1",
-            execution_id="exec_1",
-            status=ExecutorNodeStatus.FAILED,
-            started_at=now,
-            completed_at=now,
-            node_results={"node1": node1, "node2": node2},
-        )
-
-        summary = result.summary()
-        assert "workflow_id" in summary
-        assert "status" in summary
-        assert "total_nodes" in summary
-        assert summary["total_nodes"] == 2
-
-    def test_merge_node_results(self):
-        """Test merging node results."""
-        now = datetime.now(timezone.utc)
-        result = WorkflowResult(
-            workflow_id="workflow_1",
-            execution_id="exec_1",
-            status=ExecutorNodeStatus.RUNNING,
-            started_at=now,
-            completed_at=None,
-            node_results={},
-        )
-
+    def test_get_output(self):
+        """Test getting output from specific node."""
+        context = WorkflowContext()
         node_result = NodeResult(
             node_id="node1",
             status=ExecutorNodeStatus.COMPLETED,
             output={"data": "test"},
         )
+        context.add_result(node_result)
 
-        result.merge_node_result(node_result)
-        assert "node1" in result.node_results
-        assert result.node_results["node1"].output == {"data": "test"}
+        result = WorkflowResult(
+            workflow_name="test_workflow",
+            success=True,
+            context=context,
+        )
+        output = result.get_output("node1")
+        assert output == {"data": "test"}
+
+    def test_get_output_not_found(self):
+        """Test getting output from non-existent node."""
+        context = WorkflowContext()
+        result = WorkflowResult(
+            workflow_name="test_workflow",
+            success=True,
+            context=context,
+        )
+        output = result.get_output("nonexistent")
+        assert output is None
 
 
 # =============================================================================
@@ -568,7 +539,7 @@ class TestWorkflowExecutor:
     async def test_execute_simple_workflow(self):
         """Test executing a simple workflow."""
         from victor.workflows.executor import WorkflowExecutor
-        from victor.workflows.definition import WorkflowDefinition, WorkflowNode, WorkflowNodeType
+        from victor.workflows.definition import WorkflowDefinition, AgentNode
 
         mock_orchestrator = MagicMock()
         mock_tool_registry = MagicMock()
@@ -578,18 +549,19 @@ class TestWorkflowExecutor:
             tool_registry=mock_tool_registry,
         )
 
+        # Create workflow with proper structure
+        node1 = AgentNode(
+            id="node1",
+            name="Node 1",
+            role="agent",
+            goal="Test goal",
+        )
+
         workflow = WorkflowDefinition(
             name="test_workflow",
             description="Test workflow",
-            nodes=[
-                WorkflowNode(
-                    name="node1",
-                    node_type=WorkflowNodeType.AGENT,
-                    role="agent",
-                    goal="Test goal",
-                    next_nodes=[],
-                ),
-            ],
+            nodes={"node1": node1},
+            start_node="node1",
         )
 
         # Mock the sub-agent execution
@@ -600,20 +572,14 @@ class TestWorkflowExecutor:
                 output={"result": "success"},
             )
 
-            context = WorkflowContext(
-                workflow_id="test_workflow",
-                execution_id="exec_1",
-                state={},
-            )
-
-            result = await executor.execute(workflow, context)
-            assert result.status == ExecutorNodeStatus.COMPLETED
+            result = await executor.execute(workflow)
+            assert result.success is True
 
     @pytest.mark.asyncio
     async def test_execute_workflow_with_failure(self):
         """Test executing a workflow that fails."""
         from victor.workflows.executor import WorkflowExecutor
-        from victor.workflows.definition import WorkflowDefinition, WorkflowNode, WorkflowNodeType
+        from victor.workflows.definition import WorkflowDefinition, AgentNode
 
         mock_orchestrator = MagicMock()
         mock_tool_registry = MagicMock()
@@ -623,18 +589,19 @@ class TestWorkflowExecutor:
             tool_registry=mock_tool_registry,
         )
 
+        # Create workflow with proper structure
+        node1 = AgentNode(
+            id="node1",
+            name="Node 1",
+            role="agent",
+            goal="Test goal",
+        )
+
         workflow = WorkflowDefinition(
             name="test_workflow",
             description="Test workflow",
-            nodes=[
-                WorkflowNode(
-                    name="node1",
-                    node_type=WorkflowNodeType.AGENT,
-                    role="agent",
-                    goal="Test goal",
-                    next_nodes=[],
-                ),
-            ],
+            nodes={"node1": node1},
+            start_node="node1",
         )
 
         # Mock the sub-agent execution to fail
@@ -645,14 +612,8 @@ class TestWorkflowExecutor:
                 error="Execution failed",
             )
 
-            context = WorkflowContext(
-                workflow_id="test_workflow",
-                execution_id="exec_1",
-                state={},
-            )
-
-            result = await executor.execute(workflow, context)
-            assert result.status == ExecutorNodeStatus.FAILED
+            result = await executor.execute(workflow)
+            assert result.success is False
 
     def test_get_compute_handler(self):
         """Test getting compute handler."""

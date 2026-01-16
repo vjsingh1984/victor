@@ -416,46 +416,49 @@ class TestCancellationSupport:
 
     def test_request_cancellation(self, orchestrator):
         """Test request_cancellation sets event (covers lines 1955-1957)."""
-        import asyncio
-
-        orchestrator._cancel_event = asyncio.Event()
+        # Start streaming to initialize cancellation event
+        orchestrator._metrics_coordinator.start_streaming()
         orchestrator.request_cancellation()
-        assert orchestrator._cancel_event.is_set()
+        assert orchestrator._check_cancellation() is True
+        # Clean up
+        orchestrator._metrics_coordinator.stop_streaming()
 
     def test_request_cancellation_no_event(self, orchestrator):
         """Test request_cancellation with no event (safe no-op)."""
-        orchestrator._cancel_event = None
+        # Don't start streaming - no cancel event
         # Should not raise
         orchestrator.request_cancellation()
 
     def test_is_streaming_true(self, orchestrator):
         """Test is_streaming returns True when streaming (covers line 1965)."""
-        orchestrator._is_streaming = True
+        orchestrator._metrics_coordinator.start_streaming()
         assert orchestrator.is_streaming() is True
+        # Clean up
+        orchestrator._metrics_coordinator.stop_streaming()
 
     def test_is_streaming_false(self, orchestrator):
         """Test is_streaming returns False when not streaming."""
-        orchestrator._is_streaming = False
+        # By default, streaming is False
         assert orchestrator.is_streaming() is False
 
     def test_check_cancellation_true(self, orchestrator):
         """Test _check_cancellation when cancelled (covers lines 1973-1974)."""
-        import asyncio
-
-        orchestrator._cancel_event = asyncio.Event()
-        orchestrator._cancel_event.set()
+        orchestrator._metrics_coordinator.start_streaming()
+        orchestrator.request_cancellation()
         assert orchestrator._check_cancellation() is True
+        # Clean up
+        orchestrator._metrics_coordinator.stop_streaming()
 
     def test_check_cancellation_false(self, orchestrator):
         """Test _check_cancellation when not cancelled (covers line 1975)."""
-        import asyncio
-
-        orchestrator._cancel_event = asyncio.Event()
+        orchestrator._metrics_coordinator.start_streaming()
         assert orchestrator._check_cancellation() is False
+        # Clean up
+        orchestrator._metrics_coordinator.stop_streaming()
 
     def test_check_cancellation_no_event(self, orchestrator):
         """Test _check_cancellation with no event."""
-        orchestrator._cancel_event = None
+        # Don't start streaming - no cancel event
         assert orchestrator._check_cancellation() is False
 
 
@@ -1862,24 +1865,28 @@ class TestGetOptimizationStatus:
 class TestFlushAnalytics:
     """Tests for flush_analytics method."""
 
-    def test_returns_dict(self, orchestrator):
+    @pytest.mark.asyncio
+    async def test_returns_dict(self, orchestrator):
         """flush_analytics returns a dictionary."""
-        results = orchestrator.flush_analytics()
+        results = await orchestrator.flush_analytics()
         assert isinstance(results, dict)
 
-    def test_usage_analytics_key(self, orchestrator):
+    @pytest.mark.asyncio
+    async def test_usage_analytics_key(self, orchestrator):
         """Results include usage_analytics key."""
-        results = orchestrator.flush_analytics()
+        results = await orchestrator.flush_analytics()
         assert "usage_analytics" in results
 
-    def test_sequence_tracker_key(self, orchestrator):
+    @pytest.mark.asyncio
+    async def test_sequence_tracker_key(self, orchestrator):
         """Results include sequence_tracker key."""
-        results = orchestrator.flush_analytics()
+        results = await orchestrator.flush_analytics()
         assert "sequence_tracker" in results
 
-    def test_tool_cache_key(self, orchestrator):
+    @pytest.mark.asyncio
+    async def test_tool_cache_key(self, orchestrator):
         """Results include tool_cache key."""
-        results = orchestrator.flush_analytics()
+        results = await orchestrator.flush_analytics()
         assert "tool_cache" in results
 
 
@@ -2694,37 +2701,40 @@ class TestCancellation:
     """Tests for cancellation functionality."""
 
     def test_request_cancellation(self, orchestrator):
-        """Test request_cancellation sets cancel event."""
-        import asyncio
-
-        # Set up cancel event (normally done during streaming)
-        orchestrator._cancel_event = asyncio.Event()
-        # Initially not cancelled
-        assert orchestrator._check_cancellation() is False
-        # Request cancellation
-        orchestrator.request_cancellation()
-        # Now should be cancelled
-        assert orchestrator._check_cancellation() is True
+        """Test request_cancellation sets cancel state via metrics coordinator."""
+        # Start streaming to initialize cancellation tracking
+        orchestrator._metrics_coordinator.start_streaming()
+        try:
+            # Initially not cancelled
+            assert orchestrator._check_cancellation() is False
+            # Request cancellation
+            orchestrator.request_cancellation()
+            # Now should be cancelled
+            assert orchestrator._check_cancellation() is True
+        finally:
+            orchestrator._metrics_coordinator.stop_streaming()
 
     def test_check_cancellation(self, orchestrator):
-        """Test _check_cancellation returns event state."""
-        import asyncio
+        """Test _check_cancellation returns metrics coordinator state."""
+        # Start streaming
+        orchestrator._metrics_coordinator.start_streaming()
+        try:
+            # Initially not cancelled
+            assert orchestrator._check_cancellation() is False
+            # Request cancellation
+            orchestrator.request_cancellation()
+            assert orchestrator._check_cancellation() is True
+        finally:
+            orchestrator._metrics_coordinator.stop_streaming()
 
-        # Set up cancel event
-        orchestrator._cancel_event = asyncio.Event()
+    def test_check_cancellation_no_streaming(self, orchestrator):
+        """Test _check_cancellation returns False when not streaming."""
+        # By default, not streaming and not cancelled
         assert orchestrator._check_cancellation() is False
-        orchestrator.request_cancellation()
-        assert orchestrator._check_cancellation() is True
 
-    def test_check_cancellation_no_event(self, orchestrator):
-        """Test _check_cancellation returns False when no event."""
-        orchestrator._cancel_event = None
-        assert orchestrator._check_cancellation() is False
-
-    def test_request_cancellation_no_event(self, orchestrator):
-        """Test request_cancellation is safe when no event."""
-        orchestrator._cancel_event = None
-        # Should not raise
+    def test_request_cancellation_safe_no_streaming(self, orchestrator):
+        """Test request_cancellation is safe when not streaming."""
+        # Should not raise even if not streaming
         orchestrator.request_cancellation()
 
     def test_is_streaming(self, orchestrator):
@@ -3837,7 +3847,9 @@ class TestSetEnabledTools:
         """Test set_enabled_tools sets the tool set."""
         tools = {"read_file", "write_file"}
         orchestrator.set_enabled_tools(tools)
-        assert orchestrator._enabled_tools == tools
+        # Verify that the tool selector's enabled tools filter was updated
+        # Note: KeywordToolSelector stores this in _enabled_tools attribute
+        assert orchestrator.tool_selector._enabled_tools == tools
 
 
 class TestClassifyTaskKeywords:
@@ -4003,8 +4015,8 @@ class TestStageMethods:
         assert stage is not None
 
 
-class TestFlushAnalytics:
-    """Tests for flush_analytics method."""
+class TestFlushAnalyticsAsync:
+    """Tests for flush_analytics method (async version)."""
 
     @pytest.mark.asyncio
     async def test_returns_dict(self, orchestrator):

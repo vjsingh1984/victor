@@ -182,8 +182,8 @@ class TestLifecycleManager:
     @pytest.mark.asyncio
     async def test_graceful_shutdown_success(self, lifecycle_manager, usage_analytics):
         """Test successful graceful shutdown."""
-        # Mock flush_analytics
-        lifecycle_manager._flush_analytics = MagicMock(return_value={"analytics": True})
+        # Mock flush_analytics as async function
+        lifecycle_manager._flush_analytics = AsyncMock(return_value={"analytics": True})
 
         # Mock stop_health_monitoring
         lifecycle_manager._stop_health_monitoring = AsyncMock(return_value=True)
@@ -205,7 +205,7 @@ class TestLifecycleManager:
     ):
         """Test graceful shutdown when analytics flush fails."""
         # Mock flush_analytics that fails
-        lifecycle_manager._flush_analytics = MagicMock(return_value={"analytics": False})
+        lifecycle_manager._flush_analytics = AsyncMock(return_value={"analytics": False})
 
         # Mock stop_health_monitoring
         lifecycle_manager._stop_health_monitoring = AsyncMock(return_value=True)
@@ -224,7 +224,7 @@ class TestLifecycleManager:
         lifecycle_manager._usage_analytics = None
 
         # Mock dependencies
-        lifecycle_manager._flush_analytics = MagicMock(return_value={})
+        lifecycle_manager._flush_analytics = AsyncMock(return_value={})
         lifecycle_manager._stop_health_monitoring = AsyncMock(return_value=True)
 
         # Shutdown - should not fail
@@ -658,7 +658,7 @@ class TestLifecycleManagerIntegration:
         lifecycle_manager._semantic_selector = None
         lifecycle_manager._background_tasks = []
         lifecycle_manager._usage_logger = MagicMock()
-        lifecycle_manager._flush_analytics = MagicMock(return_value={})
+        lifecycle_manager._flush_analytics = AsyncMock(return_value={})
         lifecycle_manager._stop_health_monitoring = AsyncMock(return_value=True)
 
         # Shutdown
@@ -695,7 +695,7 @@ class TestLifecycleManagerIntegration:
         lifecycle_manager._semantic_selector = None
         lifecycle_manager._background_tasks = []
         lifecycle_manager._usage_logger = MagicMock()
-        lifecycle_manager._flush_analytics = MagicMock(return_value={})
+        lifecycle_manager._flush_analytics = AsyncMock(return_value={})
         lifecycle_manager._stop_health_monitoring = AsyncMock(return_value=True)
 
         # Shutdown
@@ -723,7 +723,7 @@ class TestLifecycleManagerErrorHandling:
     async def test_graceful_shutdown_handles_exception(self, lifecycle_manager):
         """Test that graceful shutdown exceptions are handled gracefully."""
         # Mock flush that raises exception
-        lifecycle_manager._flush_analytics = MagicMock(side_effect=RuntimeError("Flush failed"))
+        lifecycle_manager._flush_analytics = AsyncMock(side_effect=RuntimeError("Flush failed"))
         lifecycle_manager._stop_health_monitoring = AsyncMock(return_value=True)
 
         # Shutdown should handle exception
