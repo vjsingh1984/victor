@@ -942,6 +942,83 @@ class WorkflowExecutionError(VictorError):
             self.details["execution_context"] = execution_context
 
 
+class RecursionDepthError(WorkflowExecutionError):
+    """Raised when maximum recursion depth is exceeded.
+
+    This exception is raised when nested workflow or team execution
+    exceeds the maximum allowed recursion depth, preventing infinite
+    nesting and stack overflow.
+
+    Attributes:
+        current_depth: Current recursion level when limit was exceeded
+        max_depth: Maximum allowed recursion depth
+        execution_stack: Stack trace of execution entries leading to the error
+
+    Example:
+        >>> raise RecursionDepthError(
+        ...     message="Maximum recursion depth exceeded",
+        ...     current_depth=4,
+        ...     max_depth=3,
+        ...     execution_stack=["workflow:main", "team:outer", "team:middle", "team:inner"]
+        ... )
+    """
+
+    def __init__(
+        self,
+        message: str,
+        current_depth: int,
+        max_depth: int,
+        execution_stack: List[str],
+        **kwargs: Any,
+    ):
+        # Generate stack trace for error message
+        stack_str = " → ".join(execution_stack) if execution_stack else "empty"
+
+        # Generate recovery hint if not provided
+        # Note: Don't set recovery_hint here as parent class will generate one
+        # We'll override it after parent construction if needed
+
+        # Call parent constructor
+        # Note: parent class sets category=INTERNAL_ERROR, so we pass severity separately
+        # and will override category after construction
+        super().__init__(
+            message,
+            severity=ErrorSeverity.ERROR,
+            **kwargs,
+        )
+
+        # Override category to RESOURCE_EXHAUSTED (more specific than parent's INTERNAL_ERROR)
+        self.category = ErrorCategory.RESOURCE_EXHAUSTED
+
+        # Override recovery hint if not provided by parent
+        if kwargs.get("recovery_hint") is None:
+            self.recovery_hint = (
+                f"Reduce nesting depth in your workflow or team configuration. "
+                f"Current depth: {current_depth}/{max_depth}. "
+                f"Execution path: {stack_str}. "
+                f"Consider restructuring to reduce nesting or increase max_recursion_depth."
+            )
+
+        self.current_depth = current_depth
+        self.max_depth = max_depth
+        self.execution_stack = execution_stack
+
+        # Add to details
+        self.details["current_depth"] = current_depth
+        self.details["max_depth"] = max_depth
+        self.details["execution_stack"] = execution_stack
+        self.details["stack_trace"] = stack_str
+
+    def __str__(self) -> str:
+        stack_str = " → ".join(self.execution_stack) if self.execution_stack else "empty"
+        return (
+            f"[{self.correlation_id}] Recursion depth limit exceeded: "
+            f"{self.current_depth}/{self.max_depth}\n"
+            f"Execution stack: {stack_str}\n"
+            f"{self.message}"
+        )
+
+
 # =============================================================================
 # Error Information
 # =============================================================================
