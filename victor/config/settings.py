@@ -313,10 +313,10 @@ class ProviderConfig(BaseSettings):
 class ProfileConfig(BaseSettings):
     """Configuration for a model profile."""
 
-    model_config = SettingsConfigDict(extra="allow")
+    model_config = SettingsConfigDict(extra="allow", protected_namespaces=())
 
     provider: str = Field(..., description="Provider name (ollama, anthropic, openai, google)")
-    model: str = Field(..., description="Model identifier")
+    model_name: str = Field(..., description="Model identifier")
     temperature: float = Field(0.7, ge=0.0, le=2.0)
     max_tokens: int = Field(4096, gt=0)
     description: Optional[str] = Field(None, description="Optional profile description")

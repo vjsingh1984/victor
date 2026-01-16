@@ -244,7 +244,7 @@ async def _get_or_build_index(
         "embedding_model_type": getattr(
             settings, "codebase_embedding_provider", "sentence-transformers"
         ),
-        "embedding_model_name": getattr(
+        "embedding_model": getattr(
             settings,
             "codebase_embedding_model",
             getattr(settings, "unified_embedding_model", "all-MiniLM-L12-v2"),

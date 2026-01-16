@@ -40,6 +40,16 @@ For coding-specific features:
     from victor.coding.codebase import CodebaseIndex
 """
 
+import warnings
+
+# Suppress pydantic warnings from third-party libraries (lancedb, etc.)
+# These warnings are not under our control and don't affect functionality
+warnings.filterwarnings(
+    "ignore",
+    message='Field "model_" has conflict with protected namespace "model_"',
+    category=UserWarning,
+)
+
 __version__ = "0.5.0"
 __author__ = "Vijaykumar Singh"
 __email__ = "singhvjd@gmail.com"

@@ -33,8 +33,10 @@ from pydantic import BaseModel, ConfigDict, Field
 class EmbeddingModelConfig(BaseModel):
     """Configuration for embedding model."""
 
-    model_type: str = Field(description="Model type (sentence-transformers, openai, cohere, etc.)")
-    embedding_model: str = Field(default="all-MiniLM-L6-v2", description="Specific model name")
+    model_config = ConfigDict(protected_namespaces=())
+
+    embedding_type: str = Field(default="sentence-transformers", description="Embedding provider type (sentence-transformers, openai, cohere, ollama, etc.)")
+    embedding_model: str = Field(default="BAAI/bge-small-en-v1.5", description="Specific model name")
     dimension: int = Field(
         default=384, description="Embedding dimension (auto-detected if possible)"
     )
@@ -518,11 +520,11 @@ def create_embedding_model(config: EmbeddingModelConfig) -> BaseEmbeddingModel:
     Raises:
         ValueError: If model type not recognized
     """
-    model_class = _embedding_models.get(config.model_type)
+    model_class = _embedding_models.get(config.embedding_type)
     if not model_class:
         available = ", ".join(_embedding_models.keys())
         raise ValueError(
-            f"Unknown embedding model type: {config.model_type}. " f"Available: {available}"
+            f"Unknown embedding model type: {config.embedding_type}. " f"Available: {available}"
         )
 
     return model_class(config)

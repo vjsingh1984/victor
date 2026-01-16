@@ -106,6 +106,7 @@ dependencies = [
     "sentence-transformers>=2.2.0",
 
     # Vector Storage (conversation embeddings, codebase search)
+    # LanceDB is the default vector store and always available
     "lancedb>=0.6.0",
     "pyarrow>=14.0",
 ]
@@ -135,6 +136,7 @@ dev = [
     "bandit[toml]>=1.7",
     "safety>=3.0",
     "semgrep>=1.0",
+    "pip-audit>=2.0",
 
     # Monitoring and Metrics
     "psutil>=5.9",  # For system metrics in coordinator dashboard
@@ -328,15 +330,38 @@ native = [
     "maturin>=1.4",
 ]
 
+# Alternative vector stores (optional)
+# Usage: pip install victor-ai[vector-alt]
+# Note: LanceDB is the default vector store and always available.
+# ChromaDB is an alternative vector store for development/testing.
+vector-alt = [
+    "chromadb>=0.4.0",  # Alternative vector store for development/testing
+]
+
 # Experimental vector stores (optional)
-# Usage: pip install victor[vector-experimental]
-# Note: LanceDB is the default vector store and always available
+# Usage: pip install victor-ai[vector-experimental]
+# Note: LanceDB is the default vector store and always available.
+# ProximaDB is an experimental vector store under active development.
+# It is not required for core functionality and may have stability issues.
 vector-experimental = [
     "proximadb @ git+ssh://git@github.com/vjsingh1984/proximaDB.git@f2df18818ae808524920c99d6bd617990786acef#egg=proximadb",
 ]
 
+# Database support (optional)
+# Usage: pip install victor-ai[database]
+database = [
+    "psycopg2-binary>=2.9.0",  # PostgreSQL support for database_tool.py
+    "duckdb>=0.9.0",  # DuckDB support for graph store
+]
+
+# Experiments and A/B testing (optional)
+# Usage: pip install victor-ai[experiments]
+experiments = [
+    "scipy>=1.11.0",  # Statistical analysis for A/B testing
+]
+
 all = [
-    "victor[dev,docs,build,lang-all]",
+    "victor[dev,docs,build,lang-all,vector-alt,database,experiments]",
 ]
 
 [project.urls]
@@ -601,11 +626,6 @@ check_untyped_defs = true
 disallow_untyped_defs = false  # Allow gradual improvement
 warn_return_any = true
 warn_unused_ignores = true
-
-[tool.pydantic]
-# Allow model_ prefixed field names (used in embedding models)
-# This suppresses warnings about model_name conflicting with protected namespace
-protected_namespaces = ()
 
 [tool.black]
 line-length = 100

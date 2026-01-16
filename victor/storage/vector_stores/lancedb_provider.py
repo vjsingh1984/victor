@@ -93,7 +93,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
         # Get embedding model configuration from EmbeddingConfig
         model_type = self.config.embedding_model_type
-        model_name = self.config.embedding_model_name
+        model_name = self.config.embedding_model
         api_key = self.config.embedding_api_key
         dimension = self.config.extra_config.get("dimension", 4096)
         batch_size = self.config.extra_config.get("batch_size", 16)
@@ -394,7 +394,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
             "provider": "lancedb",
             "total_documents": count,
             "embedding_model_type": self.config.embedding_model_type,
-            "embedding_model_name": self.config.embedding_model_name,
+            "embedding_model": self.config.embedding_model,
             "dimension": self.embedding_model.get_dimension() if self.embedding_model else 4096,
             "distance_metric": self.config.distance_metric,
             "table_name": self.config.extra_config.get("table_name", "embeddings"),

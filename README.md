@@ -132,6 +132,8 @@ pip install victor-ai[vector-experimental]  # Experimental vector stores (Proxim
 
 **Note**: Victor includes LanceDB as the default vector store for semantic code search and conversation embeddings. The `vector-experimental` optional dependency group provides ProximaDB, an experimental vector store under active development. ProximaDB is not required for core functionality, and Victor will automatically fall back to LanceDB if ProximaDB is configured but not installed.
 
+**ProximaDB Status**: Experimental - Under active development, may have stability issues. Use LanceDB (default) for production workloads.
+
 ## Supported Providers
 
 Victor supports **21 LLM providers** for maximum flexibility:

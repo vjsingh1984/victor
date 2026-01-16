@@ -22,7 +22,7 @@ This module separates concerns:
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 if TYPE_CHECKING:
     from victor.coding.codebase.embeddings.models import BaseEmbeddingModel
@@ -33,6 +33,8 @@ class EmbeddingConfig(BaseModel):
 
     This configures BOTH the embedding model (text -> vector) and vector store (storage/search).
     """
+
+    model_config = ConfigDict(protected_namespaces=())
 
     # Vector Store Configuration
     vector_store: str = Field(
@@ -52,9 +54,9 @@ class EmbeddingConfig(BaseModel):
         default="sentence-transformers",
         description="Embedding model type (sentence-transformers=local/offline, ollama, openai, cohere)",
     )
-    embedding_model_name: str = Field(
-        default="all-MiniLM-L12-v2",
-        description="Embedding model name (all-MiniLM-L12-v2 = 384-dim, 120MB, ~8ms, optimal balance)",
+    embedding_model: str = Field(
+        default="BAAI/bge-small-en-v1.5",
+        description="Embedding model name (BAAI/bge-small-en-v1.5 = 384-dim, 130MB, better quality than all-MiniLM)",
     )
     embedding_api_key: Optional[str] = Field(
         default=None, description="API key for cloud embedding providers (or Ollama base URL)"

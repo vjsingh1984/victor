@@ -72,7 +72,7 @@ from typing import (
     Union,
 )
 
-from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 
 # =============================================================================
@@ -466,14 +466,16 @@ class ProviderConfigSchema(BaseModel):
 class ModelConfigSchema(BaseModel):
     """Schema for model configuration."""
 
-    model: str = Field(..., min_length=1, description="Model identifier")
+    model_config = ConfigDict(protected_namespaces=())
+
+    model_name: str = Field(..., min_length=1, description="Model identifier")
     temperature: float = Field(0.7, ge=0.0, le=2.0, description="Sampling temperature")
     max_tokens: int = Field(4096, ge=1, le=200000, description="Maximum tokens")
     top_p: float = Field(1.0, ge=0.0, le=1.0, description="Nucleus sampling")
     presence_penalty: float = Field(0.0, ge=-2.0, le=2.0, description="Presence penalty")
     frequency_penalty: float = Field(0.0, ge=-2.0, le=2.0, description="Frequency penalty")
 
-    @field_validator("model")
+    @field_validator("model_name")
     @classmethod
     def validate_model_name(cls, v: str) -> str:
         """Validate model name format."""

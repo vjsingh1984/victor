@@ -454,7 +454,7 @@ class LanceDBService(ServiceLifecycle):
         embedding_config = EmbeddingConfig(
             vector_store="lancedb",
             persist_directory=persist_dir,
-            embedding_model_name=config.config.get("embedding_model", "BAAI/bge-small-en-v1.5"),
+            embedding_model=config.config.get("embedding_model", "BAAI/bge-small-en-v1.5"),
             extra_config={
                 "table_name": config.config.get("table_name", "embeddings"),
                 "readonly": config.config.get("readonly", False),

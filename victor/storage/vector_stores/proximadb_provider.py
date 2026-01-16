@@ -99,7 +99,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
 
         # Get embedding model configuration from EmbeddingConfig
         model_type = self.config.embedding_model_type
-        model_name = self.config.embedding_model_name
+        model_name = self.config.embedding_model
         api_key = self.config.embedding_api_key
         dimension = self.config.extra_config.get("dimension", 384)
         batch_size = self.config.extra_config.get("batch_size", 16)
@@ -542,7 +542,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             "graph_engine": "ORION",
             "total_documents": count,
             "embedding_model_type": self.config.embedding_model_type,
-            "embedding_model_name": self.config.embedding_model_name,
+            "embedding_model": self.config.embedding_model,
             "dimension": self.embedding_model.get_dimension() if self.embedding_model else 384,
             "distance_metric": self.config.distance_metric,
             "collection_name": self._collection_name,
@@ -604,7 +604,7 @@ def create_proximadb_provider(
         persist_directory=persist_directory,
         distance_metric="cosine",
         embedding_model_type="sentence-transformers",
-        embedding_model_name=embedding_model,
+        embedding_model=embedding_model,
         extra_config={
             "collection_name": collection_name,
             "dimension": 384,  # all-MiniLM-L12-v2 dimension

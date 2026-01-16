@@ -2649,8 +2649,8 @@ class CodebaseIndex:
                     "embedding_model_type",
                     getattr(settings, "codebase_embedding_provider", "sentence-transformers"),
                 ),
-                embedding_model_name=config.get(
-                    "embedding_model_name",
+                embedding_model=config.get(
+                    "embedding_model",
                     getattr(settings, "codebase_embedding_model", "BAAI/bge-small-en-v1.5"),
                 ),
                 persist_directory=config.get("persist_directory", str(default_persist_dir)),
@@ -2660,7 +2660,7 @@ class CodebaseIndex:
             # Create embedding provider
             self.embedding_provider = EmbeddingRegistry.create(embedding_config)
             print(
-                f"✓ Embeddings enabled: {embedding_config.embedding_model_name} + "
+                f"✓ Embeddings enabled: {embedding_config.embedding_model} + "
                 f"{embedding_config.vector_store}"
             )
             print(f"  Storage: {embedding_config.persist_directory}")

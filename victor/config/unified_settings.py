@@ -79,6 +79,7 @@ class VictorSettings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="allow",
+        protected_namespaces=(),
     )
 
     # ==========================================================================
@@ -90,7 +91,7 @@ class VictorSettings(BaseSettings):
         description="Default LLM provider (ollama, anthropic, openai, google, groq, lmstudio, vllm)",
     )
     default_model: str = Field(default="qwen3-coder:30b", description="Default model identifier")
-    model: Optional[str] = Field(
+    model_name: Optional[str] = Field(
         default=None, description="Runtime model override (alias for default_model)"
     )
     default_temperature: float = Field(

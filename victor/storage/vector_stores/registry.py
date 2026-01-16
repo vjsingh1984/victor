@@ -100,7 +100,7 @@ class EmbeddingRegistry:
         - vector_store: The provider type (lancedb, chromadb, etc.)
         - persist_directory: The database path (critical for singleton)
         - embedding_model_type: Model type (sentence-transformers, ollama, etc.)
-        - embedding_model_name: Model name (affects embedding dimension)
+        - embedding_model: Model name (affects embedding dimension)
 
         Args:
             config: Embedding configuration
@@ -116,7 +116,7 @@ class EmbeddingRegistry:
             config.vector_store,
             persist_dir,
             config.embedding_model_type,
-            config.embedding_model_name,
+            config.embedding_model,
             config.distance_metric,
         ]
 
@@ -152,7 +152,7 @@ class EmbeddingRegistry:
                 vector_store="lancedb",
                 persist_directory=config.persist_directory,
                 embedding_model_type=config.embedding_model_type,
-                embedding_model_name=config.embedding_model_name,
+                embedding_model=config.embedding_model,
                 distance_metric=config.distance_metric,
             )
 
@@ -264,6 +264,8 @@ def _auto_register_providers() -> None:
         )
 
     # ProximaDB (experimental, optional)
+    # Note: ProximaDB is an experimental vector store under active development.
+    # It is not required for core functionality. LanceDB is the default.
     try:
         # First check if the actual proximaDB package is importable
         import proximadb
@@ -275,8 +277,9 @@ def _auto_register_providers() -> None:
         logger.info("Registered ProximaDB provider (experimental)")
     except ImportError:
         logger.debug(
-            "ProximaDB not installed (optional). "
-            "Install with: pip install victor-ai[vector-experimental]"
+            "ProximaDB not installed (optional experimental feature). "
+            "Install with: pip install victor-ai[vector-experimental]. "
+            "Using LanceDB as default vector store."
         )
         PROXIMADB_AVAILABLE = False
 

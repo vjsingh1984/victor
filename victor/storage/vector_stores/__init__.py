@@ -25,7 +25,7 @@ Example:
     config = EmbeddingConfig(
         vector_store="lancedb",
         embedding_model_type="sentence-transformers",
-        embedding_model_name="all-MiniLM-L12-v2",
+        embedding_model="all-MiniLM-L12-v2",
         persist_directory="~/.victor/embeddings"
     )
 

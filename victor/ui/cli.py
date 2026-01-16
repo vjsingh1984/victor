@@ -14,6 +14,16 @@
 
 """Command-line interface for Victor - Open-source AI coding assistant."""
 
+import warnings
+
+# Suppress pydantic warnings from third-party libraries (lancedb, etc.)
+# These warnings are not under our control and don't affect functionality
+warnings.filterwarnings(
+    "ignore",
+    message='Field "model_" has conflict with protected namespace "model_"',
+    category=UserWarning,
+)
+
 import typer
 from rich.console import Console
 from typing import Optional, Any, Callable

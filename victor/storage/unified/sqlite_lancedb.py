@@ -68,7 +68,7 @@ class SqliteLanceDBStore:
         repo_root: Path,
         persist_directory: Optional[Path] = None,
         embedding_model_type: str = "sentence-transformers",
-        embedding_model_name: str = "all-MiniLM-L12-v2",
+        embedding_model: str = "all-MiniLM-L12-v2",
         **kwargs: Any,
     ):
         """Initialize store.
@@ -77,12 +77,12 @@ class SqliteLanceDBStore:
             repo_root: Root directory of the repository
             persist_directory: Override storage location (default: {repo_root}/.victor)
             embedding_model_type: Embedding model type (sentence-transformers, ollama, openai)
-            embedding_model_name: Model name (default: all-MiniLM-L12-v2)
+            embedding_model: Model name (default: all-MiniLM-L12-v2)
         """
         self.repo_root = repo_root.resolve()
         self.persist_directory = persist_directory or (self.repo_root / ".victor")
         self.embedding_model_type = embedding_model_type
-        self.embedding_model_name = embedding_model_name
+        self.embedding_model = embedding_model
         self._extra_config = kwargs
 
         self._graph_store = None
@@ -121,7 +121,7 @@ class SqliteLanceDBStore:
 
         model_config = EmbeddingModelConfig(
             model_type=self.embedding_model_type,
-            model_name=self.embedding_model_name,
+            model_name=self.embedding_model,
         )
         self._embedding_model = create_embedding_model(model_config)
         await self._embedding_model.initialize()
@@ -132,7 +132,7 @@ class SqliteLanceDBStore:
         self._initialized = True
         logger.info(
             f"Initialized SqliteLanceDBStore for {self.repo_root} "
-            f"(graph: SQLite, vectors: LanceDB, model: {self.embedding_model_name})"
+            f"(graph: SQLite, vectors: LanceDB, model: {self.embedding_model})"
         )
 
     async def _init_vector_store(self) -> None:
@@ -773,7 +773,7 @@ class SqliteLanceDBStore:
             "graph": graph_stats,
             "vectors": {
                 "count": vector_count,
-                "model": self.embedding_model_name,
+                "model": self.embedding_model,
             },
         }
 

@@ -17,7 +17,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Protocol, runtime_checkable
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from victor.providers.circuit_breaker import (
     CircuitBreaker,
@@ -188,12 +188,14 @@ class ToolDefinition(BaseModel):
 class CompletionResponse(BaseModel):
     """Standard completion response format."""
 
+    model_config = ConfigDict(protected_namespaces=())
+
     content: str = Field(..., description="Generated content")
     role: str = Field(default="assistant", description="Response role")
     tool_calls: Optional[List[Dict[str, Any]]] = Field(None, description="Tool calls requested")
     stop_reason: Optional[str] = Field(None, description="Why generation stopped")
     usage: Optional[Dict[str, int]] = Field(None, description="Token usage stats")
-    model: Optional[str] = Field(None, description="Model used")
+    model_name: Optional[str] = Field(None, description="Model used")
     raw_response: Optional[Dict[str, Any]] = Field(None, description="Raw provider response")
     metadata: Optional[Dict[str, Any]] = Field(
         None, description="Additional metadata (e.g., reasoning_content)"
@@ -202,6 +204,8 @@ class CompletionResponse(BaseModel):
 
 class StreamChunk(BaseModel):
     """Streaming response chunk."""
+
+    model_config = ConfigDict(protected_namespaces=())
 
     content: str = Field(default="", description="Incremental content")
     tool_calls: Optional[List[Dict[str, Any]]] = None
@@ -214,6 +218,7 @@ class StreamChunk(BaseModel):
         default=None,
         description="Token usage stats (typically on final chunk). Keys: prompt_tokens, completion_tokens, total_tokens, cache_creation_input_tokens, cache_read_input_tokens",
     )
+    model_name: Optional[str] = Field(None, description="Model used")
 
 
 # Provider error classes - re-exported from victor/core/errors for backward compatibility

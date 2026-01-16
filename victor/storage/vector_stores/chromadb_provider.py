@@ -89,7 +89,7 @@ class ChromaDBProvider(BaseEmbeddingProvider):
 
         # Get embedding model configuration from EmbeddingConfig
         model_type = self.config.embedding_model_type
-        model_name = self.config.embedding_model_name
+        model_name = self.config.embedding_model
 
         print("🔧 Initializing ChromaDB provider")
         print("📦 Vector Store: ChromaDB")
@@ -355,7 +355,7 @@ class ChromaDBProvider(BaseEmbeddingProvider):
             "provider": "chromadb",
             "total_documents": count,
             "embedding_model_type": self.config.embedding_model_type,
-            "embedding_model_name": self.config.embedding_model_name,
+            "embedding_model": self.config.embedding_model,
             "dimension": self.embedding_model.get_dimension() if self.embedding_model else 4096,
             "distance_metric": self.config.distance_metric,
             "collection_name": self.collection.name,
