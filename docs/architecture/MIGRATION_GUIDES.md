@@ -9,6 +9,7 @@ This guide provides practical examples for migrating from old patterns to new ar
 3. [Migrating from Direct Calls to Event-Driven Communication](#3-event-driven)
 4. [Migrating from Monolithic Handlers to Coordinators](#4-coordinators)
 5. [Migrating from Concrete Classes to Protocols](#5-concrete-to-protocols)
+6. [Migrating to New Coordinator Architecture](#6-migrating-to-new-coordinator-architecture)
 
 ---
 
@@ -504,6 +505,236 @@ keyword_component = MyComponent(
 - Easy to extend with new implementations
 - Testable with mocks
 - Flexible configuration
+
+---
+
+## 6. Migrating to New Coordinator Architecture
+
+### Problem
+
+Code directly uses orchestrator methods for response processing, state management, and tool access control, making it hard to test and reuse.
+
+### Before: Direct Orchestrator Method Calls
+
+```python
+# Old approach: Direct orchestrator calls
+from victor.agent.orchestrator import AgentOrchestrator
+
+class MyComponent:
+    def __init__(self, orchestrator: AgentOrchestrator):
+        self._orchestrator = orchestrator
+
+    async def process_response(self, content: str):
+        # Direct call to orchestrator's response sanitization
+        cleaned = self._orchestrator._sanitize_response(content)
+
+        # Direct call for tool call parsing
+        tool_calls = self._orchestrator._parse_tool_calls(content)
+
+        # Direct call for state access
+        state = self._orchestrator.get_state()
+
+        return cleaned, tool_calls
+```
+
+**Problems**:
+- Tightly coupled to orchestrator internals
+- Hard to test in isolation
+- Cannot reuse logic outside orchestrator
+- Breaking changes when orchestrator changes
+
+### After: Using Coordinators
+
+```python
+# New approach: Use specialized coordinators
+from victor.agent.coordinators import (
+    ResponseCoordinator,
+    StateCoordinator,
+    ToolAccessConfigCoordinator,
+)
+
+class MyComponent:
+    def __init__(
+        self,
+        response_coordinator: ResponseCoordinator,
+        state_coordinator: StateCoordinator,
+        tool_access_coordinator: ToolAccessConfigCoordinator,
+    ):
+        self._response_coord = response_coordinator
+        self._state_coord = state_coordinator
+        self._tool_access_coord = tool_access_coordinator
+
+    async def process_response(self, content: str):
+        # Use ResponseCoordinator for response processing
+        cleaned = self._response_coord.sanitize_response(content)
+
+        # Parse and validate tool calls
+        validation = self._response_coord.parse_and_validate_tool_calls(
+            tool_calls=None,
+            content=content,
+            enabled_tools=self._tool_access_coord.get_enabled_tools(),
+        )
+
+        # Get state from StateCoordinator
+        state = self._state_coord.get_state()
+
+        return cleaned, validation.tool_calls, state
+```
+
+**Benefits**:
+- Loose coupling via coordinator protocols
+- Easy to test with mock coordinators
+- Reusable across different contexts
+- Stable interface
+
+### Coordinator Usage Examples
+
+#### ResponseCoordinator - Response Processing
+
+```python
+from victor.agent.coordinators import ResponseCoordinator
+from victor.agent.response_sanitizer import ResponseSanitizer
+
+# Create coordinator
+response_coord = ResponseCoordinator(
+    sanitizer=ResponseSanitizer(),
+    tool_adapter=tool_calling_adapter,
+)
+
+# Sanitize LLM response
+cleaned = response_coord.sanitize_response(raw_model_output)
+
+# Parse and validate tool calls
+validation = response_coord.parse_and_validate_tool_calls(
+    tool_calls=native_tool_calls,
+    content=response_content,
+    enabled_tools={"read_file", "write_file", "bash"},
+)
+
+if validation.tool_calls:
+    # Execute validated tool calls
+    for call in validation.tool_calls:
+        await execute_tool(call["name"], call["arguments"])
+
+# Process streaming with garbage detection
+result = response_coord.process_stream_chunk(
+    chunk=stream_chunk,
+    consecutive_garbage_count=current_count,
+    max_garbage_chunks=3,
+)
+if result.should_stop:
+    # Stop streaming due to garbage
+    break
+```
+
+#### StateCoordinator - Unified State Management
+
+```python
+from victor.agent.coordinators import StateCoordinator, StateScope
+
+# Create coordinator
+state_coord = StateCoordinator(
+    session_state_manager=session_state,
+    conversation_state_machine=conversation_state,
+)
+
+# Get comprehensive state
+state = state_coord.get_state(scope=StateScope.ALL)
+# Returns: {"session": {...}, "conversation": {...}, "checkpoint": {...}}
+
+# Subscribe to state changes (Observer pattern)
+@state_coord.on_state_change
+def handle_state_change(change: StateChange):
+    print(f"State changed: {change.scope}")
+    print(f"Old state: {change.old_state}")
+    print(f"New state: {change.new_state}")
+
+# Get state history
+history = state_coord.get_state_history(limit=10)
+for change in history:
+    print(f"{change.scope}: {change.changes}")
+
+# Budget management
+if state_coord.is_budget_exhausted():
+    print("Tool budget exhausted!")
+    remaining = state_coord.get_remaining_budget()
+
+# Record tool execution
+state_coord.record_tool_call("read_file", {"path": "/path/to/file"})
+```
+
+#### ToolAccessConfigCoordinator - Tool Access Control
+
+```python
+from victor.agent.coordinators import ToolAccessConfigCoordinator
+
+# Create coordinator
+tool_access_coord = ToolAccessConfigCoordinator(
+    tool_access_controller=controller,
+    mode_coordinator=mode_coordinator,
+    tool_registry=registry,
+)
+
+# Check if tool is enabled (with mode-based filtering)
+if tool_access_coord.is_tool_enabled("bash"):
+    # Tool is enabled in current mode
+    await execute_bash_command(command)
+
+# Get all enabled tools for current mode/session
+enabled_tools = tool_access_coord.get_enabled_tools()
+print(f"Available tools: {sorted(enabled_tools)}")
+
+# Validate mode transition before switching
+result = tool_access_coord.validate_mode_transition(
+    from_mode="build",
+    to_mode="plan",
+    current_tools=enabled_tools,
+)
+if result.warnings:
+    print(f"Warnings: {result.warnings}")
+    # "Transitioning to plan mode will disable write tools: ..."
+
+# Detect configuration changes
+changes = tool_access_coord.detect_config_changes(
+    old_config={"temperature": 0.7},
+    new_config={"temperature": 0.5},
+)
+print(f"Config changes: {changes}")
+```
+
+### Testing with Coordinators
+
+```python
+import pytest
+from unittest.mock import MagicMock
+
+def test_my_component_with_coordinators():
+    # Create mock coordinators
+    mock_response = MagicMock(spec=ResponseCoordinator)
+    mock_response.sanitize_response.return_value = "cleaned: content"
+    mock_response.parse_and_validate_tool_calls.return_value = MagicMock(
+        tool_calls=[{"name": "read_file"}]
+    )
+
+    mock_state = MagicMock(spec=StateCoordinator)
+    mock_state.get_state.return_value = {"session": {}, "conversation": {}}
+
+    mock_tool_access = MagicMock(spec=ToolAccessConfigCoordinator)
+    mock_tool_access.get_enabled_tools.return_value = {"read_file"}
+
+    # Create component with mocks
+    component = MyComponent(
+        response_coordinator=mock_response,
+        state_coordinator=mock_state,
+        tool_access_coordinator=mock_tool_access,
+    )
+
+    # Test in isolation - no orchestrator needed
+    cleaned, tool_calls, state = await component.process_response("content")
+
+    assert cleaned == "cleaned: content"
+    mock_response.sanitize_response.assert_called_once_with("content")
+```
 
 ---
 

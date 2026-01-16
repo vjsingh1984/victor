@@ -17,7 +17,7 @@
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Application Layer Coordinators (14)
+## Application Layer Coordinators (17)
 
 | Coordinator | Purpose | Key Methods |
 |-------------|---------|-------------|
@@ -35,6 +35,9 @@
 | **MetricsCoordinator** | System metrics | `track_metric()`, `get_metrics()` |
 | **ConfigCoordinator** | Configuration loading | `load_config()`, `validate()` |
 | **WorkflowCoordinator** | Workflow orchestration | `execute_workflow()` |
+| **ResponseCoordinator** | Response processing | `sanitize_response()`, `parse_tool_calls()` |
+| **StateCoordinator** | Unified state management | `get_state()`, `transition_to()` |
+| **ToolAccessConfigCoordinator** | Tool access configuration | `get_enabled_tools()`, `is_tool_enabled()` |
 
 ## Framework Layer Coordinators (4)
 
@@ -142,6 +145,96 @@ analytics_coord = AnalyticsCoordinator()
 await analytics_coord.export(CustomExporter())
 ```
 
+### Using ResponseCoordinator
+
+```python
+from victor.agent.coordinators import ResponseCoordinator
+
+coordinator = ResponseCoordinator(
+    sanitizer=ResponseSanitizer(),
+    tool_adapter=tool_calling_adapter,
+)
+
+# Sanitize response from LLM
+cleaned = coordinator.sanitize_response(raw_content)
+
+# Parse and validate tool calls
+validation = coordinator.parse_and_validate_tool_calls(
+    tool_calls=native_calls,
+    content=response_content,
+    enabled_tools={"read_file", "write_file"},
+)
+
+# Process streaming chunks with garbage detection
+result = coordinator.process_stream_chunk(
+    chunk=stream_chunk,
+    consecutive_garbage_count=0,
+    max_garbage_chunks=3,
+)
+if result.should_stop:
+    # Stop streaming due to garbage
+    pass
+```
+
+### Using StateCoordinator
+
+```python
+from victor.agent.coordinators import StateCoordinator, StateScope
+
+coordinator = StateCoordinator(
+    session_state_manager=session_state,
+    conversation_state_machine=conversation_state,
+)
+
+# Get comprehensive state
+state = coordinator.get_state(scope=StateScope.ALL)
+
+# Subscribe to state changes
+@coordinator.on_state_change
+def handle_change(change: StateChange):
+    print(f"State changed: {change.scope}")
+
+# Transition to new stage
+coordinator.transition_to(ConversationStage.EXECUTION)
+
+# Check budget
+if coordinator.is_budget_exhausted():
+    # Handle budget exhaustion
+    pass
+
+# Record tool call
+coordinator.record_tool_call("read_file", {"path": "/path/to/file"})
+```
+
+### Using ToolAccessConfigCoordinator
+
+```python
+from victor.agent.coordinators import ToolAccessConfigCoordinator
+
+coordinator = ToolAccessConfigCoordinator(
+    tool_access_controller=controller,
+    mode_coordinator=mode_coordinator,
+    tool_registry=registry,
+)
+
+# Check if tool is enabled
+if coordinator.is_tool_enabled("bash"):
+    # Tool is enabled for current mode/session
+
+# Get all enabled tools
+enabled = coordinator.get_enabled_tools()
+
+# Validate mode transition
+result = coordinator.validate_mode_transition(
+    from_mode="build",
+    to_mode="plan",
+    current_tools=enabled,
+)
+if result.warnings:
+    # Warn user about tools that will be disabled
+    pass
+```
+
 ## Key Benefits
 
 1. **Single Responsibility**: Each coordinator has one clear purpose
@@ -229,7 +322,19 @@ victor/
 │   ├── chat_coordinator.py
 │   ├── tool_coordinator.py
 │   ├── context_coordinator.py
-│   └── ... (11 more)
+│   ├── analytics_coordinator.py
+│   ├── prompt_coordinator.py
+│   ├── tool_selection_coordinator.py
+│   ├── session_coordinator.py
+│   ├── provider_coordinator.py
+│   ├── mode_coordinator.py
+│   ├── checkpoint_coordinator.py
+│   ├── evaluation_coordinator.py
+│   ├── metrics_coordinator.py
+│   ├── config_coordinator.py     # ConfigCoordinator + ToolAccessConfigCoordinator
+│   ├── workflow_coordinator.py
+│   ├── response_coordinator.py  # NEW: Response processing
+│   └── state_coordinator.py     # NEW: Unified state management
 └── framework/coordinators/
     ├── __init__.py              # Framework layer docstring
     ├── yaml_coordinator.py
@@ -247,7 +352,7 @@ victor/
 ## Key Takeaways
 
 1. **Two Layers**: Application (Victor-specific) + Framework (domain-agnostic)
-2. **18 Coordinators**: 14 application + 4 framework
+2. **21 Coordinators**: 17 application + 4 framework
 3. **SOLID Principles**: All 5 principles implemented
 4. **Reusable**: Framework coordinators used across all verticals
 5. **Testable**: Each coordinator can be tested independently
