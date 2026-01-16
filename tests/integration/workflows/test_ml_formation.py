@@ -596,7 +596,7 @@ class TestAdaptiveFormationML:
             assert "urgency" in importance
             assert all(isinstance(v, float) for v in importance.values())
 
-    def test_save_online_learning_data(self, sample_task, team_context, mock_agents, tmp_path):
+    async def test_save_online_learning_data(self, sample_task, team_context, mock_agents, tmp_path):
         """Test saving online learning data."""
         selector = AdaptiveFormationML(
             model_path=None, enable_online_learning=True, online_learning_threshold=100

@@ -136,11 +136,11 @@ class SentenceTransformerModel(BaseEmbeddingModel):
         # Import here to avoid circular imports
         from victor.storage.embeddings.service import EmbeddingService
 
-        print(f"🤖 Loading sentence-transformer model: {self.config.model_name}")
+        print(f"🤖 Loading sentence-transformer model: {self.config.embedding_model}")
 
         # Use shared EmbeddingService singleton for memory efficiency
         # This shares the model with IntentClassifier and SemanticToolSelector
-        self._embedding_service = EmbeddingService.get_instance(model_name=self.config.model_name)
+        self._embedding_service = EmbeddingService.get_instance(model_name=self.config.embedding_model)
 
         # Ensure model is loaded (lazy loading)
         self._embedding_service._ensure_model_loaded()
@@ -221,14 +221,14 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         self.client = AsyncOpenAI(api_key=self.config.api_key)
         self._initialized = True
 
-        print(f"✅ OpenAI embedding model initialized: {self.config.model_name}")
+        print(f"✅ OpenAI embedding model initialized: {self.config.embedding_model}")
 
     async def embed_text(self, text: str) -> List[float]:
         """Generate embedding using OpenAI API."""
         if not self._initialized:
             await self.initialize()
 
-        response = await self.client.embeddings.create(model=self.config.model_name, input=text)
+        response = await self.client.embeddings.create(model=self.config.embedding_model, input=text)
         return response.data[0].embedding
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
@@ -237,7 +237,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
             await self.initialize()
 
         # OpenAI API handles batching internally (up to 2048 texts per request)
-        response = await self.client.embeddings.create(model=self.config.model_name, input=texts)
+        response = await self.client.embeddings.create(model=self.config.embedding_model, input=texts)
         return [item.embedding for item in response.data]
 
     def get_dimension(self) -> int:
@@ -248,7 +248,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
             "text-embedding-3-large": 3072,
             "text-embedding-ada-002": 1536,
         }
-        return dimensions.get(self.config.model_name, self.config.dimension)
+        return dimensions.get(self.config.embedding_model, self.config.dimension)
 
     async def close(self) -> None:
         """Clean up resources."""
@@ -293,14 +293,14 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
         self.client = cohere.AsyncClient(api_key=self.config.api_key)
         self._initialized = True
 
-        print(f"✅ Cohere embedding model initialized: {self.config.model_name}")
+        print(f"✅ Cohere embedding model initialized: {self.config.embedding_model}")
 
     async def embed_text(self, text: str) -> List[float]:
         """Generate embedding using Cohere API."""
         if not self._initialized:
             await self.initialize()
 
-        response = await self.client.embed(texts=[text], model=self.config.model_name)
+        response = await self.client.embed(texts=[text], model=self.config.embedding_model)
         return response.embeddings[0]
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
@@ -308,7 +308,7 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
         if not self._initialized:
             await self.initialize()
 
-        response = await self.client.embed(texts=texts, model=self.config.model_name)
+        response = await self.client.embed(texts=texts, model=self.config.embedding_model)
         return response.embeddings
 
     def get_dimension(self) -> int:
@@ -320,7 +320,7 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
             "embed-english-light-v3.0": 384,
             "embed-multilingual-light-v3.0": 384,
         }
-        return dimensions.get(self.config.model_name, self.config.dimension)
+        return dimensions.get(self.config.embedding_model, self.config.dimension)
 
     async def close(self) -> None:
         """Clean up resources."""
@@ -379,20 +379,20 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
             base_url=self.base_url, timeout=120.0  # Longer timeout for large models
         )
 
-        print(f"🤖 Initializing Ollama embedding model: {self.config.model_name}")
+        print(f"🤖 Initializing Ollama embedding model: {self.config.embedding_model}")
         print(f"🔗 Ollama server: {self.base_url}")
 
         # Verify model is available by testing with a small prompt
         try:
             response = await self.client.post(
-                "/api/embeddings", json={"model": self.config.model_name, "prompt": "test"}
+                "/api/embeddings", json={"model": self.config.embedding_model, "prompt": "test"}
             )
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 raise RuntimeError(
-                    f"❌ Ollama model '{self.config.model_name}' not found.\n"
-                    f"   Pull it with: ollama pull {self.config.model_name}\n"
+                    f"❌ Ollama model '{self.config.embedding_model}' not found.\n"
+                    f"   Pull it with: ollama pull {self.config.embedding_model}\n"
                     f"   Available models: ollama list"
                 )
             else:
@@ -405,7 +405,7 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
             )
 
         self._initialized = True
-        print(f"✅ Ollama embedding model ready: {self.config.model_name}")
+        print(f"✅ Ollama embedding model ready: {self.config.embedding_model}")
         print(f"📊 Embedding dimension: {self.get_dimension()}")
 
     async def embed_text(self, text: str) -> List[float]:
@@ -422,7 +422,7 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
 
         try:
             response = await self.client.post(
-                "/api/embeddings", json={"model": self.config.model_name, "prompt": text}
+                "/api/embeddings", json={"model": self.config.embedding_model, "prompt": text}
             )
             response.raise_for_status()
             result = response.json()
@@ -478,12 +478,12 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
         }
 
         # Check for exact match first
-        if self.config.model_name in dimensions:
-            return dimensions[self.config.model_name]
+        if self.config.embedding_model in dimensions:
+            return dimensions[self.config.embedding_model]
 
         # Check for partial match (e.g., "qwen3-embedding" matches "qwen3-embedding:8b")
         for model_key, dim in dimensions.items():
-            if self.config.model_name in model_key or model_key in self.config.model_name:
+            if self.config.embedding_model in model_key or model_key in self.config.embedding_model:
                 return dim
 
         # Fall back to config dimension
