@@ -1,0 +1,125 @@
+# Human-in-the-Loop Workflow
+# ===========================
+#
+# Purpose: Test HITL node rendering and interaction
+# Features:
+#   - Approval gate
+#   - Text input
+#   - Review gate
+#   - Timeout handling
+#   - Fallback behavior
+
+workflows:
+  hitl_test:
+    description: "Workflow with human-in-the-loop interactions"
+
+    metadata:
+      version: "1.0"
+      vertical: "test"
+
+    nodes:
+      - id: prepare
+        type: agent
+        name: "Prepare Document"
+        role: writer
+        goal: |
+          Prepare a document for review:
+          1. Gather information
+          2. Structure the content
+          3. Format for readability
+        tool_budget: 15
+        tools: [read, write]
+        output: draft_document
+        next: [approval_gate]
+
+      - id: approval_gate
+        type: hitl
+        name: "Approval Required"
+        hitl_type: approval
+        prompt: |
+          ## Document Review
+
+          Please review the prepared document:
+
+          {draft_document}
+
+          Do you approve this document for publication?
+        context_keys:
+          - draft_document
+        timeout: 300
+        fallback: reject
+        next: [handle_approval]
+
+      - id: handle_approval
+        type: condition
+        name: "Check Approval Decision"
+        condition: "approval_decision"
+        branches:
+          "approved": publish
+          "rejected": request_revision
+          "timeout": request_revision
+
+      - id: request_revision
+        type: hitl
+        name: "Revision Feedback"
+        hitl_type: input
+        prompt: |
+          ## Revision Requested
+
+          Please provide feedback on what needs to be revised:
+        timeout: 600
+        fallback: continue
+        next: [revise]
+
+      - id: revise
+        type: agent
+        name: "Revise Document"
+        role: writer
+        goal: |
+          Revise the document based on feedback:
+          {revision_feedback}
+
+          Original draft:
+          {draft_document}
+        tool_budget: 20
+        tools: [read, write]
+        input_mapping:
+          revision_feedback: request_revision.output
+        output: revised_document
+        next: [review_gate]
+
+      - id: review_gate
+        type: hitl
+        name: "Final Review"
+        hitl_type: review
+        prompt: |
+          ## Final Review
+
+          Review the revised document and provide comments:
+        context_keys:
+          - revised_document
+        timeout: 900
+        fallback: approve
+        next: [publish]
+
+      - id: publish
+        type: agent
+        name: "Publish Document"
+        role: executor
+        goal: |
+          Publish the approved document:
+          1. Finalize formatting
+          2. Save to output location
+          3. Generate summary
+        tool_budget: 10
+        tools: [write]
+        output: published_document
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Workflow Complete"
+        transform: |
+          status = "completed"
+          document_published = true
+          result = published_document

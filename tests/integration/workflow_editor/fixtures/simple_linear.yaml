@@ -1,0 +1,49 @@
+# Simple Linear Workflow
+# ======================
+#
+# Purpose: Test basic linear workflow with sequential agent nodes
+# Features:
+#   - Linear A -> B -> C flow
+#   - Simple agent nodes
+#   - Transform node for completion
+#   - No branching or complex logic
+
+workflows:
+  simple_linear:
+    description: "Simple linear workflow for basic testing"
+
+    metadata:
+      version: "1.0"
+      author: "test"
+      vertical: "test"
+
+    nodes:
+      - id: start
+        type: agent
+        name: "Start Node"
+        role: assistant
+        goal: "Begin the workflow"
+        tool_budget: 5
+        tools: [read]
+        output: start_result
+        next: [process]
+
+      - id: process
+        type: agent
+        name: "Process Node"
+        role: assistant
+        goal: "Process the data"
+        tool_budget: 10
+        tools: [read, write]
+        input_mapping:
+          data: start_result
+        output: process_result
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Complete"
+        transform: |
+          status = "completed"
+          final_result = process_result
+          timestamp = current_timestamp()

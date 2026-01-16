@@ -1,0 +1,94 @@
+# Docker ignore patterns for Victor AI
+# Similar to .gitignore but for Docker build context
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+azure-pipelines.yml
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# Testing
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+htmlcov/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Project specific
+archive/
+.vscode-victor/
+demo_workspace/
+models/
+var/
+*.egg-info/
+
+# Development files
+Makefile
+.mypy_cache/
+.ruff_cache/
+.bandit
+.pytest_cache/
+
+# CI/CD artifacts
+artifacts/
+validation-*.txt
+validation-*.json
