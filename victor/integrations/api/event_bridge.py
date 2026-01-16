@@ -337,8 +337,8 @@ class EventBusAdapter:
         """Connect to an EventBus and subscribe to events."""
         self._event_bus = event_bus
 
-        # TODO: Update to use async subscribe with new event system
-        # The new ObservabilityBus uses async subscribe(pattern, handler)
+        # NOTE: New ObservabilityBus uses async subscribe(pattern, handler)
+        # Deferred: API event bridge needs asyncio integration for async subscriptions
         # For now, we'll skip subscription to avoid blocking issues
         try:
             # Try old sync API first (won't work but won't break if method exists)

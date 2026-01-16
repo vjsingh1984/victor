@@ -1,0 +1,332 @@
+# Prometheus Alerting Rules for Victor Team Workflows
+#
+# This file defines alerting rules for monitoring team execution health,
+# performance, and resource usage. Rules are organized by severity level
+# and include appropriate notification channels.
+#
+# Installation:
+#   prometheus --config.file=/path/to/prometheus.yml
+#
+# Testing:
+#   promtool check rules /path/to/team_alerts.yml
+#
+# Documentation: See docs/observability/dashboards.md
+
+groups:
+  - name: victor_teams_critical
+    interval: 30s
+    rules:
+      # High recursion depth - approaching or exceeded limit
+      - alert: VictorTeamRecursionDepthCritical
+        expr: |
+          (victor_teams_recursion_depth / 10) >= 0.9
+        for: 1m
+        labels:
+          severity: critical
+          component: teams
+          alert_type: recursion
+        annotations:
+          summary: "Team recursion depth critical: {{ $labels.team_id }}"
+          description: |
+            Team '{{ $labels.team_id }}' ({{ $labels.formation }} formation) has reached
+            {{ $value | humanizePercentage }} of recursion limit ({{ $labels.vertical }} vertical).
+
+            Current depth: {{ $value }} of 10
+            Action: Review workflow for infinite loops or deeply nested team calls.
+          runbook_url: "https://docs.victor.ai/observability/troubleshooting#recursion-depth"
+          dashboard_url: "https://grafana.victor.ai/d/victor-team-recursion"
+
+      # Team execution timeout - exceeding 90th percentile
+      - alert: VictorTeamExecutionTimeout
+        expr: |
+          histogram_quantile(0.90,
+            sum by (formation, le) (
+              rate(victor_teams_duration_seconds_bucket[5m])
+            )
+          ) > 300
+        for: 5m
+        labels:
+          severity: critical
+          component: teams
+          alert_type: performance
+        annotations:
+          summary: "Team execution timeout: {{ $labels.formation }} formation"
+          description: |
+            {{ $labels.formation }} formation teams are taking longer than 5 minutes (90th percentile).
+
+            Current 90th percentile: {{ $value | humanizeDuration }}
+            Threshold: 5 minutes
+            Action: Investigate slow-performing teams and optimize tool usage.
+          runbook_url: "https://docs.victor.ai/observability/troubleshooting#timeouts"
+          dashboard_url: "https://grafana.victor.ai/d/victor-team-performance"
+
+      # Catastrophic failure rate - complete breakdown
+      - alert: VictorTeamCatastrophicFailureRate
+        expr: |
+          (
+            sum(rate(victor_teams_failed_total[5m])) /
+            sum(rate(victor_teams_executed_total[5m]))
+          ) > 0.5
+        for: 2m
+        labels:
+          severity: critical
+          component: teams
+          alert_type: availability
+        annotations:
+          summary: "Catastrophic team failure rate: {{ $value | humanizePercentage }}"
+          description: |
+            More than 50% of team executions are failing ({{ $labels.vertical }} vertical).
+
+            Current failure rate: {{ $value | humanizePercentage }}
+            Action: Immediate investigation required. Check provider status,
+            tool availability, and workflow configuration.
+          runbook_url: "https://docs.victor.ai/observability/troubleshooting#failures"
+          dashboard_url: "https://grafana.victor.ai/d/victor-team-overview"
+
+  - name: victor_teams_warning
+    interval: 1m
+    rules:
+      # High failure rate - degradation detected
+      - alert: VictorTeamHighFailureRate
+        expr: |
+          (
+            sum(rate(victor_teams_failed_total[5m])) /
+            sum(rate(victor_teams_executed_total[5m]))
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: teams
+          alert_type: availability
+        annotations:
+          summary: "High team failure rate: {{ $value | humanizePercentage }}"
+          description: |
+            Team failure rate is above 10% ({{ $labels.vertical }} vertical).
+
+            Current failure rate: {{ $value | humanizePercentage }}
+            Threshold: 10%
+            Action: Review failed team executions and identify common failure patterns.
+          runbook_url: "https://docs.victor.ai/observability/troubleshooting#failures"
+          dashboard_url: "https://grafana.victor.ai/d/victor-team-overview"
+
+      # Performance regression - significant slowdown
+      - alert: VictorTeamPerformanceRegression
+        expr: |
+          (
+            rate(victor_teams_duration_seconds_sum[5m]) /
+            rate(victor_teams_duration_seconds_count[5m])
+          ) >
+          (
+            rate(victor_teams_duration_seconds_sum[1h] offset 1h) /
+            rate(victor_teams_duration_seconds_count[1h] offset 1h)
+          ) * 1.2
+        for: 10m
+        labels:
+          severity: warning
+          component: teams
+          alert_type: performance
+        annotations:
+          summary: "Team performance regression detected: +{{ $value | humanizePercentage }}"
+          description: |
+            Average team execution time has increased by more than 20% compared to 1 hour ago.
+
+            Current avg: {{ $value }}s
+            Previous avg (1h ago): {{ $value }}s
+            Regression: +20%
+            Action: Investigate recent changes that may have impacted performance.
+          runbook_url: "https://docs.victor.ai/observability/troubleshooting#performance-regression"
+          dashboard_url: "https://grafana.victor.ai/d/victor-team-performance"
+
+      # Recursion depth warning - approaching limit
+      - alert: VictorTeamRecursionDepthWarning
+        expr: |
+          (victor_teams_recursion_depth / 10) >= 0.7
+        for: 3m
+        labels:
+          severity: warning
+          component: teams
+          alert_type: recursion
+        annotations:
+          summary: "Team recursion depth warning: {{ $labels.team_id }}"
+          description: |
+            Team '{{ $labels.team_id }}' has reached 70% of recursion limit.
+
+            Current depth: {{ $value }} of 10 ({{ $value | humanizePercentage }})
+            Threshold: 70%
+            Action: Review workflow for potential optimization opportunities.
+          runbook_url: "https://docs.victor.ai/observability/troubleshooting#recursion-depth"
+          dashboard_url: "https://grafana.victor.ai/d/victor-team-recursion"
+
+      # Member failure rate spike
+      - alert: VictorTeamMemberHighFailureRate
+        expr: |
+          (
+            sum by (role) (rate(victor_team_members_completed_total{success="false"}[5m])) /
+            sum by (role) (rate(victor_team_members_completed_total[5m]))
+          ) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          component: teams
+          alert_type: member_health
+        annotations:
+          summary: "High member failure rate: {{ $labels.role }} role"
+          description: |
+            Members with role '{{ $labels.role }}' have a failure rate above 20%.
+
+            Current failure rate: {{ $value | humanizePercentage }}
+            Action: Investigate role-specific issues and tool availability.
+          runbook_url: "https://docs.victor.ai/observability/troubleshooting#member-failures"
+          dashboard_url: "https://grafana.victor.ai/d/victor-team-members"
+
+  - name: victor_teams_info
+    interval: 2m
+    rules:
+      # Formation-specific performance outliers
+      - alert: VictorTeamFormationSlowExecution
+        expr: |
+          (
+            rate(victor_teams_duration_seconds_sum{formation=~".*"}[5m]) /
+            rate(victor_teams_duration_seconds_count{formation=~".*"}[5m])
+          ) > 60
+        for: 10m
+        labels:
+          severity: info
+          component: teams
+          alert_type: performance
+        annotations:
+          summary: "Slow formation execution: {{ $labels.formation }}"
+          description: |
+            {{ $labels.formation }} formation teams are averaging more than 60 seconds per execution.
+
+            Current average: {{ $value | humanizeDuration }}
+            Action: Consider optimizing formation configuration or tool usage.
+          runbook_url: "https://docs.victor.ai/observability/optimization#formations"
+          dashboard_url: "https://grafana.victor.ai/d/victor-team-performance"
+
+      # Low tool usage - potential inefficiency
+      - alert: VictorTeamLowToolUsage
+        expr: |
+          (
+            sum(rate(victor_teams_tool_calls_total[5m])) /
+            sum(rate(victor_teams_executed_total[5m]))
+          ) < 1
+        for: 15m
+        labels:
+          severity: info
+          component: teams
+          alert_type: efficiency
+        annotations:
+          summary: "Low team tool usage: {{ $value | humanize }} tools/team"
+          description: |
+            Teams are averaging less than 1 tool call per execution.
+
+            Current: {{ $value | humanize }} tools/team
+            Action: Review if teams are effectively utilizing available tools.
+          runbook_url: "https://docs.victor.ai/observability/optimization#tool-usage"
+          dashboard_url: "https://grafana.victor.ai/d/victor-team-overview"
+
+      # Large team size - potential coordination overhead
+      - alert: VictorTeamLargeSize
+        expr: |
+          (
+            rate(victor_teams_member_count_sum[5m]) /
+            rate(victor_teams_member_count_count[5m])
+          ) > 10
+        for: 10m
+        labels:
+          severity: info
+          component: teams
+          alert_type: efficiency
+        annotations:
+          summary: "Large team size detected: {{ $value | humanize }} members"
+          description: |
+            Teams are averaging more than 10 members per execution.
+
+            Current average: {{ $value | humanize }} members
+            Action: Consider team size optimization to reduce coordination overhead.
+          runbook_url: "https://docs.victor.ai/observability/optimization#team-size"
+          dashboard_url: "https://grafana.victor.ai/d/victor-team-overview"
+
+      # No team executions - potential health issue
+      - alert: VictorTeamNoExecutions
+        expr: |
+          sum(rate(victor_teams_executed_total[5m])) == 0
+        for: 15m
+        labels:
+          severity: info
+          component: teams
+          alert_type: availability
+        annotations:
+          summary: "No team executions detected"
+          description: |
+            No team executions have been recorded in the last 15 minutes.
+
+            Expected: Regular team executions for active workflows
+            Action: Verify workflow configuration and team node availability.
+          runbook_url: "https://docs.victor.ai/observability/troubleshooting#no-executions"
+          dashboard_url: "https://grafana.victor.ai/d/victor-team-overview"
+
+  - name: victor_teams_memory
+    interval: 1m
+    rules:
+      # Memory usage spike
+      - alert: VictorTeamMemoryUsageSpike
+        expr: |
+          (
+            sum(victor_teams_active) *
+            sum(rate(victor_teams_member_count_sum[5m])) /
+            sum(rate(victor_teams_member_count_count[5m]))
+          ) > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: teams
+          alert_type: resource
+        annotations:
+          summary: "Team memory usage spike detected"
+          description: |
+            Estimated active team members exceed 100, indicating potential memory pressure.
+
+            Estimated active members: {{ $value | humanize }}
+            Action: Monitor memory usage and consider team execution throttling.
+          runbook_url: "https://docs.victor.ai/observability/troubleshooting#memory"
+          dashboard_url: "https://grafana.victor.ai/d/victor-team-overview"
+
+  - name: victor_teams_summary
+    interval: 5m
+    rules:
+      # Aggregate team health score
+      - record: victor_teams_health_score
+        expr: |
+          (
+            (1 - (
+              sum(rate(victor_teams_failed_total[5m])) /
+              sum(rate(victor_teams_executed_total[5m]))
+            )) * 0.5
+            +
+            (1 - (
+              histogram_quantile(0.90,
+                sum by (le) (rate(victor_teams_duration_seconds_bucket[5m]))
+              ) / 300
+            )) * 0.3
+            +
+            (1 - (
+              max(victor_teams_recursion_depth) / 10
+            )) * 0.2
+          ) * 100
+
+      # Formation success rate
+      - record: victor_teams_formation_success_rate
+        expr: |
+          (
+            sum by (formation) (rate(victor_teams_executed_total[5m])) -
+            sum by (formation) (rate(victor_teams_failed_total[5m]))
+          ) /
+          sum by (formation) (rate(victor_teams_executed_total[5m])) * 100
+
+      # Average team execution time
+      - record: victor_teams_avg_duration
+        expr: |
+          sum(rate(victor_teams_duration_seconds_sum[5m])) /
+          sum(rate(victor_teams_duration_seconds_count[5m]))

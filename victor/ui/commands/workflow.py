@@ -484,6 +484,161 @@ def validate_workflow(
         raise typer.Exit(1)
 
 
+@workflow_app.command("lint")
+def lint_workflow(
+    path: str = typer.Argument(
+        ...,
+        help="Path to workflow file or directory to lint",
+    ),
+    format: str = typer.Option(
+        "text",
+        "--format",
+        "-f",
+        help="Output format: text, json, markdown",
+    ),
+    output_file: Optional[str] = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Save report to file",
+    ),
+    strict: bool = typer.Option(
+        False,
+        "--strict",
+        help="Enable strict validation (all rules)",
+    ),
+    disable_rules: Optional[List[str]] = typer.Option(
+        None,
+        "--disable-rule",
+        help="Disable specific rules by ID",
+    ),
+    enable_rules: Optional[List[str]] = typer.Option(
+        None,
+        "--enable-rule",
+        help="Enable specific rules by ID",
+    ),
+    include_suggestions: bool = typer.Option(
+        True,
+        "--include-suggestions/--no-suggestions",
+        help="Include suggestions in report",
+    ),
+    include_context: bool = typer.Option(
+        False,
+        "--include-context",
+        help="Include context data in report",
+    ),
+    recursive: bool = typer.Option(
+        False,
+        "--recursive",
+        "-r",
+        help="Recursively lint directory",
+    ),
+) -> None:
+    """Lint workflow files for best practices and issues.
+
+    Performs comprehensive validation including:
+    - YAML syntax and structure
+    - Node schema validation (required fields, types)
+    - Connection reference checking
+    - Circular dependency detection
+    - Team node configuration
+    - Best practices (goal quality, tool budgets)
+    - Complexity analysis
+
+    Rules can be enabled/disabled individually. Use --strict to enable all rules.
+
+    Examples:
+        victor workflow lint workflow.yaml
+        victor workflow lint workflows/ --recursive
+        victor workflow lint workflow.yaml --format json -o report.json
+        victor workflow lint workflow.yaml --strict --disable-rule complexity_analysis
+        victor workflow lint . --format markdown -o lint_report.md
+    """
+    from victor.workflows.linter import WorkflowLinter
+
+    path_obj = Path(path)
+
+    if not path_obj.exists():
+        console.print(f"[bold red]Error:[/] Path not found: {path}")
+        raise typer.Exit(1)
+
+    console.print(f"\n[bold blue]Linting:[/] {path_obj.name}")
+    console.print("[dim]" + "─" * 50 + "[/]")
+
+    # Create linter
+    linter = WorkflowLinter()
+
+    # Apply strict mode
+    if strict:
+        from victor.workflows.validation_rules import Severity
+
+        console.print("[dim]Strict mode enabled[/]")
+        for rule in linter.get_rules():
+            if rule.severity in {Severity.INFO, Severity.SUGGESTION}:
+                rule.enabled = True
+
+    # Disable specific rules
+    if disable_rules:
+        for rule_id in disable_rules:
+            linter.disable_rule(rule_id)
+            console.print(f"[dim]Disabled rule: {rule_id}[/]")
+
+    # Enable specific rules
+    if enable_rules:
+        for rule_id in enable_rules:
+            linter.enable_rule(rule_id)
+            console.print(f"[dim]Enabled rule: {rule_id}[/]")
+
+    console.print()
+
+    # Run linter
+    if path_obj.is_file():
+        result = linter.lint_file(path_obj)
+    elif path_obj.is_dir():
+        result = linter.lint_directory(path_obj, recursive=recursive)
+    else:
+        console.print(f"[bold red]Error:[/] Not a file or directory: {path}")
+        raise typer.Exit(1)
+
+    # Display results
+    report = result.generate_report(
+        format=format,
+        include_suggestions=include_suggestions,
+        include_context=include_context,
+    )
+
+    # Save to file if requested
+    if output_file:
+        output_path = Path(output_file)
+        output_path.write_text(report)
+        console.print(f"[bold green]✓[/] Report saved to {output_file}")
+    else:
+        console.print()
+
+        # Colorize text output
+        if format == "text":
+            # Add color indicators
+            for line in report.split("\n"):
+                if line.startswith("✗"):
+                    console.print(f"[bold red]{line}[/]")
+                elif line.startswith("⚠"):
+                    console.print(f"[bold yellow]{line}[/]")
+                elif line.startswith("ℹ"):
+                    console.print(f"[bold cyan]{line}[/]")
+                elif line.startswith("💡"):
+                    console.print(f"[bold dim]{line}[/]")
+                elif line.startswith("✓"):
+                    console.print(f"[bold green]{line}[/]")
+                else:
+                    console.print(line)
+        else:
+            console.print(report)
+
+    # Exit with error if validation failed
+    if result.has_errors:
+        raise typer.Exit(1)
+
+
 @workflow_app.command("render")
 def render_workflow(
     workflow_path: str = typer.Argument(
@@ -1577,3 +1732,535 @@ def generate_workflow(
         return yaml_nodes
 
     asyncio.run(_generate())
+
+
+@workflow_app.command("debug")
+def debug_workflow(
+    workflow_path: str = typer.Argument(
+        ...,
+        help="Path to YAML workflow file to debug",
+    ),
+    context: Optional[str] = typer.Option(
+        None,
+        "--context",
+        "-c",
+        help='Initial context as JSON string (e.g., \'{"symbol": "AAPL"}\')',
+    ),
+    breakpoints: Optional[str] = typer.Option(
+        None,
+        "--breakpoints",
+        "-b",
+        help="Comma-separated list of node IDs to set breakpoints on",
+    ),
+    workflow_name: Optional[str] = typer.Option(
+        None,
+        "--name",
+        "-n",
+        help="Workflow name to debug (if file contains multiple workflows)",
+    ),
+    stop_on_entry: bool = typer.Option(
+        False,
+        "--stop-on-entry",
+        help="Stop before executing first node",
+    ),
+    log_level: Optional[str] = typer.Option(
+        "DEBUG",
+        "--log-level",
+        help="Set logging level (default: DEBUG for debugging)",
+    ),
+) -> None:
+    """Debug a workflow with breakpoints and step execution.
+
+    Provides interactive debugging capabilities including:
+    - Set breakpoints on specific nodes
+    - Step through execution (step over, into, out)
+    - Inspect state at any point
+    - View variable values
+    - Continue to next breakpoint
+
+    Example:
+        victor workflow debug ./workflows/analysis.yaml -c '{"symbol": "AAPL"}'
+        victor workflow debug ./workflows/analysis.yaml -b node_1,node_3
+        victor workflow debug ./workflows/analysis.yaml --stop-on-entry
+    """
+    from victor.workflows.execution_engine import WorkflowExecutor
+    from victor.workflows.debugger import WorkflowDebugger
+
+    # Set debug logging
+    import logging
+    level = getattr(logging, log_level.upper(), logging.DEBUG)
+    logging.basicConfig(level=level, format="%(levelname)s: %(message)s")
+
+    path = Path(workflow_path)
+    if not path.exists():
+        console.print(f"[bold red]Error:[/] Workflow file not found: {path}")
+        raise typer.Exit(1)
+
+    console.print(f"\n[bold blue]Debugging:[/] {path.name}")
+    console.print("[dim]" + "─" * 50 + "[/]")
+
+    # Parse context
+    initial_context = {}
+    if context:
+        try:
+            initial_context = json.loads(context)
+        except json.JSONDecodeError as e:
+            console.print(f"[bold red]Error:[/] Invalid JSON in --context: {e}")
+            raise typer.Exit(1)
+
+    # Parse breakpoints
+    breakpoint_list = []
+    if breakpoints:
+        breakpoint_list = [b.strip() for b in breakpoints.split(",")]
+        console.print(f"[dim]Breakpoints: {', '.join(breakpoint_list)}[/]")
+
+    console.print("\n[bold yellow]Debug mode:[/] Starting debugger...")
+    console.print("[dim](Note: Interactive debugging is under development)[/]\n")
+
+    # Execute with debug mode
+    async def _debug():
+        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
+
+        compiler = UnifiedWorkflowCompiler()
+        compiled = compiler.compile_yaml(path, workflow_name)
+
+        # Create executor with debug mode
+        executor = WorkflowExecutor(debug_mode=True, trace_mode=True)
+
+        try:
+            result = await executor.execute(
+                compiled,
+                initial_context,
+                breakpoints=breakpoint_list,
+            )
+
+            console.print("\n[dim]" + "─" * 50 + "[/]")
+            console.print("[bold green]✓[/] Debugging completed")
+
+            # Show trace summary
+            trace = executor.get_trace()
+            if trace:
+                summary = trace.get_summary()
+                console.print(f"\n[bold]Execution Summary:[/]")
+                console.print(f"  Duration: {summary['duration_seconds']:.3f}s")
+                console.print(f"  Total events: {summary['total_events']}")
+                console.print(f"  Error count: {summary['error_count']}")
+
+        except Exception as e:
+            console.print(f"\n[bold red]✗[/] Debugging failed: {e}")
+            raise typer.Exit(1)
+
+    asyncio.run(_debug())
+
+
+@workflow_app.command("trace")
+def trace_workflow(
+    workflow_path: str = typer.Argument(
+        ...,
+        help="Path to YAML workflow file to trace",
+    ),
+    context: Optional[str] = typer.Option(
+        None,
+        "--context",
+        "-c",
+        help='Initial context as JSON string',
+    ),
+    trace_file: Optional[str] = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Output trace file path (JSON format)",
+    ),
+    workflow_name: Optional[str] = typer.Option(
+        None,
+        "--name",
+        "-n",
+        help="Workflow name to trace (if file contains multiple workflows)",
+    ),
+    format: str = typer.Option(
+        "json",
+        "--format",
+        "-f",
+        help="Trace output format: json, csv, html",
+    ),
+) -> None:
+    """Execute workflow with execution tracing.
+
+    Captures detailed trace logs including:
+    - All node executions with inputs/outputs
+    - Execution time for each node
+    - Tool calls and their results
+    - Errors and failures
+    - Performance metrics
+
+    Example:
+        victor workflow trace ./workflows/analysis.yaml -c '{"symbol": "AAPL"}'
+        victor workflow trace ./workflows/analysis.yaml -o trace.json
+        victor workflow trace ./workflows/analysis.yaml --format html -o report.html
+    """
+    from victor.workflows.execution_engine import WorkflowExecutor
+
+    path = Path(workflow_path)
+    if not path.exists():
+        console.print(f"[bold red]Error:[/] Workflow file not found: {path}")
+        raise typer.Exit(1)
+
+    console.print(f"\n[bold blue]Tracing:[/] {path.name}")
+    console.print("[dim]" + "─" * 50 + "[/]")
+
+    # Parse context
+    initial_context = {}
+    if context:
+        try:
+            initial_context = json.loads(context)
+        except json.JSONDecodeError as e:
+            console.print(f"[bold red]Error:[/] Invalid JSON in --context: {e}")
+            raise typer.Exit(1)
+
+    console.print("\n[bold]Starting workflow with tracing...[/]\n")
+
+    # Execute with trace mode
+    async def _trace():
+        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
+
+        compiler = UnifiedWorkflowCompiler()
+        compiled = compiler.compile_yaml(path, workflow_name)
+
+        # Create executor with trace mode
+        executor = WorkflowExecutor(trace_mode=True)
+
+        try:
+            result = await executor.execute(compiled, initial_context)
+
+            console.print("\n[dim]" + "─" * 50 + "[/]")
+            console.print("[bold green]✓[/] Workflow execution completed")
+
+            # Export trace
+            trace = executor.get_trace()
+            if trace:
+                if trace_file:
+                    output_path = Path(trace_file)
+                    executor.export_trace(output_path)
+                    console.print(f"[bold]Trace saved to:[/] {output_path}")
+                else:
+                    # Show trace summary
+                    summary = trace.get_summary()
+                    console.print(f"\n[bold]Trace Summary:[/]")
+                    console.print(f"  Duration: {summary['duration_seconds']:.3f}s")
+                    console.print(f"  Total events: {summary['total_events']}")
+                    console.print(f"  Nodes executed: {len(summary['node_counts'])}")
+                    console.print(f"  Error count: {summary['error_count']}")
+
+        except Exception as e:
+            console.print(f"\n[bold red]✗[/] Tracing failed: {e}")
+            raise typer.Exit(1)
+
+    asyncio.run(_trace())
+
+
+@workflow_app.command("history")
+def show_history(
+    workflow_name: Optional[str] = typer.Option(
+        None,
+        "--workflow",
+        "-w",
+        help="Filter by workflow name",
+    ),
+    limit: int = typer.Option(
+        10,
+        "--limit",
+        "-l",
+        help="Maximum number of executions to show",
+    ),
+    export_file: Optional[str] = typer.Option(
+        None,
+        "--export",
+        "-e",
+        help="Export history to file",
+    ),
+    format: str = typer.Option(
+        "json",
+        "--format",
+        "-f",
+        help="Export format: json, csv",
+    ),
+) -> None:
+    """Show workflow execution history.
+
+    Displays past workflow executions from history, including:
+    - Execution ID and timestamp
+    - Workflow name
+    - Success/failure status
+    - Execution duration
+    - Node execution counts
+
+    Example:
+        victor workflow history
+        victor workflow history --workflow my_workflow --limit 20
+        victor workflow history --export history.json
+        victor workflow history --format csv --export report.csv
+    """
+    from victor.workflows.execution_engine import WorkflowExecutor
+
+    executor = WorkflowExecutor()
+    history = executor.get_history(limit=limit)
+
+    if workflow_name:
+        history = [h for h in history if h.get("workflow_name") == workflow_name]
+
+    if not history:
+        console.print("[dim]No execution history found[/]")
+        return
+
+    # Display history
+    table = Table(title="Workflow Execution History")
+    table.add_column("Execution ID", style="cyan")
+    table.add_column("Workflow", style="green")
+    table.add_column("Timestamp")
+    table.add_column("Duration", justify="right")
+    table.add_column("Success")
+    table.add_column("Nodes", justify="right")
+
+    for record in history:
+        timestamp = datetime.fromtimestamp(record.get("start_time", 0)).strftime("%Y-%m-%d %H:%M:%S")
+        success_str = "[green]✓[/]" if record.get("success", True) else "[red]✗[/]"
+
+        table.add_row(
+            record.get("execution_id", "unknown")[:8],
+            record.get("workflow_name", "unknown"),
+            timestamp,
+            f"{record.get('duration', 0):.2f}s",
+            success_str,
+            str(record.get("nodes_executed", 0)),
+        )
+
+    console.print(table)
+
+    # Export if requested
+    if export_file:
+        import json
+
+        output_path = Path(export_file)
+
+        if format == "json":
+            output_path.write_text(json.dumps(history, indent=2, default=str))
+        elif format == "csv":
+            import csv
+
+            with open(output_path, "w", newline="") as f:
+                if history:
+                    writer = csv.DictWriter(f, fieldnames=history[0].keys())
+                    writer.writeheader()
+                    writer.writerows(history)
+
+        console.print(f"\n[bold green]✓[/] History exported to {output_path}")
+
+
+@workflow_app.command("replay")
+def replay_execution(
+    execution_id: str = typer.Argument(
+        ...,
+        help="Execution ID to replay",
+    ),
+    export_trace: bool = typer.Option(
+        False,
+        "--export-trace",
+        "-e",
+        help="Export trace from replayed execution",
+    ),
+) -> None:
+    """Replay a previous workflow execution.
+
+    Re-runs a workflow with the same inputs as a previous execution,
+    allowing you to compare results or debug issues.
+
+    Example:
+        victor workflow replay exec_abc123
+        victor workflow replay exec_abc123 --export-trace
+    """
+    from victor.workflows.execution_engine import WorkflowExecutor
+
+    console.print(f"\n[bold blue]Replaying:[/] {execution_id}")
+    console.print("[dim]" + "─" * 50 + "[/]")
+
+    executor = WorkflowExecutor()
+    history = executor.get_history()
+
+    # Find execution
+    execution = None
+    for record in history:
+        if record.get("execution_id", "").startswith(execution_id):
+            execution = record
+            break
+
+    if not execution:
+        console.print(f"[bold red]Error:[/] Execution '{execution_id}' not found in history")
+        console.print("[dim]Use 'victor workflow history' to list executions[/]")
+        raise typer.Exit(1)
+
+    console.print(f"Workflow: {execution.get('workflow_name')}")
+    console.print(f"Original duration: {execution.get('duration', 0):.2f}s\n")
+
+    console.print("[bold yellow]Replay is under development[/]")
+    console.print("[dim](Use 'victor workflow run' with same inputs for now)[/]")
+    console.print(f"\n[dim]Original inputs:[/]")
+    console.print(json.dumps(execution.get("inputs", {}), indent=2)[:500])
+
+
+@workflow_app.command("inspect")
+def inspect_state(
+    execution_id: str = typer.Argument(
+        ...,
+        help="Execution ID to inspect",
+    ),
+    query: Optional[str] = typer.Option(
+        None,
+        "--query",
+        "-q",
+        help="Query specific state variable (e.g., 'user.name')",
+    ),
+    snapshot: Optional[str] = typer.Option(
+        None,
+        "--snapshot",
+        "-s",
+        help="Snapshot ID to inspect (default: latest)",
+    ),
+) -> None:
+    """Inspect workflow execution state.
+
+    View the state of a workflow execution at a specific point,
+    including variables, node results, and metadata.
+
+    Example:
+        victor workflow inspect exec_abc123
+        victor workflow inspect exec_abc123 --query user.name
+        victor workflow inspect exec_abc123 --snapshot snap_xyz
+    """
+    from victor.workflows.execution_engine import WorkflowExecutor
+
+    console.print(f"\n[bold blue]Inspecting:[/] {execution_id}")
+    console.print("[dim]" + "─" * 50 + "[/]")
+
+    console.print("[bold yellow]State inspection is under development[/]")
+    console.print("[dim](Use 'victor workflow trace --output trace.json' for detailed state)[/]")
+
+
+@workflow_app.command("metrics")
+def show_metrics(
+    execution_id: Optional[str] = typer.Option(
+        None,
+        "--execution",
+        "-e",
+        help="Execution ID to show metrics for",
+    ),
+    workflow_name: Optional[str] = typer.Option(
+        None,
+        "--workflow",
+        "-w",
+        help="Show metrics for workflow (all executions)",
+    ),
+    export_file: Optional[str] = typer.Option(
+        None,
+        "--export",
+        "-o",
+        help="Export metrics to file",
+    ),
+) -> None:
+    """Show workflow execution metrics.
+
+    Displays performance metrics and analytics:
+    - Total executions
+    - Success/failure rates
+    - Average duration
+    - Node execution counts
+    - Tool usage statistics
+
+    Example:
+        victor workflow metrics --workflow my_workflow
+        victor workflow metrics --execution exec_abc123
+        victor workflow metrics --export metrics.json
+    """
+    from victor.workflows.execution_engine import WorkflowExecutor
+
+    if not execution_id and not workflow_name:
+        console.print("[bold red]Error:[/] Specify --execution or --workflow")
+        raise typer.Exit(1)
+
+    console.print(f"\n[bold blue]Metrics:[/]")
+    console.print("[dim]" + "─" * 50 + "[/]")
+
+    if workflow_name:
+        executor = WorkflowExecutor()
+        history = executor.get_history(limit=1000)
+
+        # Filter by workflow
+        workflow_executions = [
+            h for h in history
+            if h.get("workflow_name") == workflow_name
+        ]
+
+        if not workflow_executions:
+            console.print(f"[dim]No executions found for workflow '{workflow_name}'[/]")
+            return
+
+        # Calculate metrics
+        total = len(workflow_executions)
+        successful = sum(1 for h in workflow_executions if h.get("success", True))
+        failed = total - successful
+        durations = [h.get("duration", 0) for h in workflow_executions]
+
+        console.print(f"[bold]Workflow:[/] {workflow_name}")
+        console.print(f"  Total executions: {total}")
+        console.print(f"  Successful: [green]{successful}[/] ({successful/total*100:.1f}%)")
+        console.print(f"  Failed: [red]{failed}[/] ({failed/total*100:.1f}%)")
+        console.print(f"  Avg duration: {sum(durations)/total:.2f}s")
+        console.print(f"  Min duration: {min(durations):.2f}s")
+        console.print(f"  Max duration: {max(durations):.2f}s")
+
+    elif execution_id:
+        # Show specific execution metrics
+        executor = WorkflowExecutor()
+        history = executor.get_history()
+
+        execution = None
+        for h in history:
+            if h.get("execution_id", "").startswith(execution_id):
+                execution = h
+                break
+
+        if not execution:
+            console.print(f"[bold red]Error:[/] Execution '{execution_id}' not found")
+            raise typer.Exit(1)
+
+        console.print(f"[bold]Execution:[/] {execution_id}")
+        console.print(f"  Workflow: {execution.get('workflow_name')}")
+        console.print(f"  Duration: {execution.get('duration', 0):.2f}s")
+        console.print(f"  Success: [green]Yes[/]" if execution.get('success', True) else "  Success: [red]No[/]")
+        console.print(f"  Nodes executed: {execution.get('nodes_executed', 0)}")
+
+        metrics = execution.get("metrics", {})
+        if metrics:
+            console.print(f"\n[bold]Detailed Metrics:[/]")
+            for key, value in metrics.items():
+                console.print(f"  {key}: {value}")
+
+    console.print("\n[dim](Detailed metrics export coming soon)[/]")
+
+    # Export if requested
+    if export_file:
+        import json
+
+        output_path = Path(export_file)
+        metrics_data = {
+            "workflow_name": workflow_name,
+            "timestamp": time.time(),
+            "summary": {
+                "total_executions": len(workflow_executions) if workflow_name else 1,
+                "successful": successful if workflow_name else None,
+                "failed": failed if workflow_name else None,
+                "average_duration": sum(durations)/total if workflow_name else None,
+            },
+        }
+
+        output_path.write_text(json.dumps(metrics_data, indent=2, default=str))
+        console.print(f"\n[bold green]✓[/] Metrics exported to {output_path}")
