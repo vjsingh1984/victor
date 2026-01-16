@@ -39,24 +39,59 @@ jobs:
 
       - name: Type check with MyPy
         run: |
-          # Phase 1: Enhanced type checking for coordinator modules
-          # See TYPE_SAFETY_PLAN.md for roadmap
-          echo "=== Type checking coordinator modules (Phase 1) ===" >> $GITHUB_STEP_SUMMARY
+          # Phase 2.3: Enhanced type checking with strict mode enforcement
+          # See TYPE_SAFETY_PLAN.md for complete roadmap
+          echo "# Type Safety Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # 1. Strict-typed modules (must pass)
+          echo "## 1. Strict Mode Modules (90+ modules)" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          mypy victor/agent/coordinators victor/agent/factory_adapter --config-file pyproject.toml | tee -a $GITHUB_STEP_SUMMARY
+          if mypy victor/protocols victor/framework/coordinators victor/core/registries victor/core/verticals --config-file pyproject.toml; then
+            echo "✅ All strict-typed modules passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Strict-typed modules have errors" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
           echo '```' >> $GITHUB_STEP_SUMMARY
-          echo ""
-          echo "=== Type checking all modules (non-blocking) ===" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # 2. Framework core modules (must pass)
+          echo "## 2. Framework Core Modules (10+ modules)" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          mypy victor --config-file pyproject.toml | tee -a $GITHUB_STEP_SUMMARY || echo "Note: Some modules have type errors - see TYPE_SAFETY_PLAN.md"
+          if mypy victor/framework/validation victor/framework/health victor/framework/metrics victor/framework/resilience --config-file pyproject.toml; then
+            echo "✅ All framework core modules passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Framework core modules have errors" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
           echo '```' >> $GITHUB_STEP_SUMMARY
-          echo ""
-          echo "### Type Safety Progress" >> $GITHUB_STEP_SUMMARY
-          echo "- **Strict mode modules:** 80+ modules (protocols, coordinators, workflows, providers)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Enhanced typing:** Coordinator modules with improved type coverage" >> $GITHUB_STEP_SUMMARY
-          echo "- **Permissive modules:** Legacy code with `ignore_errors = true`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Full details:** See TYPE_SAFETY_PLAN.md" >> $GITHUB_STEP_SUMMARY
-        continue-on-error: true
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # 3. Coordinator modules (enhanced typing, non-blocking)
+          echo "## 3. Coordinator Modules (Enhanced Typing)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          mypy victor/agent/coordinators victor/agent/factory_adapter --config-file pyproject.toml | tee -a $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # 4. Full codebase scan (informational)
+          echo "## 4. Full Codebase Scan (Informational)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          FULL_OUTPUT=$(mypy victor --config-file pyproject.toml 2>&1 || true)
+          echo "$FULL_OUTPUT" | tail -5 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Summary statistics
+          ERROR_COUNT=$(echo "$FULL_OUTPUT" | grep -o "Found [0-9]* errors" | grep -o "[0-9]*" || echo "0")
+          echo "### Type Safety Metrics" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total Errors:** $ERROR_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "- **Strict Mode Modules:** 90+ (protocols, framework, coordinators)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Enhanced Typing:** Coordinator modules (184 errors to fix)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Permissive Modules:** Legacy code with \`ignore_errors = true\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Progress Documentation:** See [TYPE_SAFETY_PLAN.md](docs/TYPE_SAFETY_PLAN.md)" >> $GITHUB_STEP_SUMMARY
+        continue-on-error: false
 
   test:
     name: Test (Python ${{ matrix.python-version }})

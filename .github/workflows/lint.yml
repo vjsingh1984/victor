@@ -1,0 +1,319 @@
+name: Lint
+
+on:
+  push:
+    branches: [main, develop, 'release/**']
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-python:
+    name: Python Linting
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install linting tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install "pip>=25.2"
+          pip install black ruff mypy types-pyyaml types-aiofiles bandit[toml]
+
+      - name: Check formatting with Black
+        run: |
+          echo "# Black Formatting Check" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          black --check victor tests 2>&1 || {
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## Formatting Issues Found" >> $GITHUB_STEP_SUMMARY
+            echo "Run \`make format\` to fix formatting issues automatically." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          }
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "✓ All code is properly formatted" >> $GITHUB_STEP_SUMMARY
+
+      - name: Lint with Ruff
+        run: |
+          echo "# Ruff Linting Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          ruff check victor tests --output-format=github 2>&1 | tee ruff-output.txt || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          # Count errors
+          ERROR_COUNT=$(grep -c "^victor" ruff-output.txt 2>/dev/null || echo "0")
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Errors Found:** $ERROR_COUNT" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$ERROR_COUNT" -gt "0" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## Linting Issues Found" >> $GITHUB_STEP_SUMMARY
+            echo "Run \`ruff check --fix victor tests\` to auto-fix issues." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+      - name: Type check with MyPy
+        run: |
+          echo "# MyPy Type Checking" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Phase 1: Strict-typed modules (must pass)
+          echo "## 1. Strict Mode Modules" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          if mypy victor/protocols victor/framework/coordinators victor/core/registries victor/core/verticals --config-file pyproject.toml 2>&1 | tee mypy-strict.txt; then
+            echo "✅ All strict-typed modules passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Strict-typed modules have errors" >> $GITHUB_STEP_SUMMARY
+            cat mypy-strict.txt >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Phase 2: Framework core modules (must pass)
+          echo "## 2. Framework Core Modules" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          if mypy victor/framework/validation victor/framework/health victor/framework/metrics victor/framework/resilience --config-file pyproject.toml 2>&1 | tee mypy-framework.txt; then
+            echo "✅ All framework core modules passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Framework core modules have errors" >> $GITHUB_STEP_SUMMARY
+            cat mypy-framework.txt >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Phase 3: Coordinator modules (informational)
+          echo "## 3. Coordinator Modules (Enhanced Typing)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          mypy victor/agent/coordinators victor/agent/factory_adapter --config-file pyproject.toml 2>&1 | tee -a $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Summary statistics
+          FULL_OUTPUT=$(mypy victor --config-file pyproject.toml 2>&1 || true)
+          ERROR_COUNT=$(echo "$FULL_OUTPUT" | grep -o "Found [0-9]* errors" | grep -o "[0-9]*" || echo "0")
+
+          echo "### Type Safety Metrics" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total Errors:** $ERROR_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "- **Strict Mode Modules:** 90+ (protocols, framework, coordinators)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Enhanced Typing:** Coordinator modules" >> $GITHUB_STEP_SUMMARY
+          echo "- **Progress Documentation:** See [TYPE_SAFETY_PLAN.md](TYPE_SAFETY_PLAN.md)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Security check with Bandit
+        run: |
+          echo "# Bandit Security Scan" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          bandit -r victor/ -ll -ii \
+            --exclude victor/test/,victor/tests/,tests/,victor/ui/,victor/api/ \
+            --format txt 2>&1 | tee bandit-output.txt || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          # Check for high severity issues
+          if grep -q "High Severity" bandit-output.txt; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## High Severity Issues Found" >> $GITHUB_STEP_SUMMARY
+            echo "Please review and fix security issues above." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✓ No high severity security issues found" >> $GITHUB_STEP_SUMMARY
+
+  lint-imports:
+    name: Import Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Check import dependencies
+        run: |
+          if [ -f scripts/check_imports.py ]; then
+            python scripts/check_imports.py || echo "Import check completed with warnings"
+          else
+            echo "Import check script not found, skipping"
+          fi
+
+  lint-yaml:
+    name: YAML Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: pip
+
+      - name: Install validation tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install yamllint pyyaml
+
+      - name: Lint YAML files
+        run: |
+          echo "# YAML Linting Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Create yamllint config
+          cat > .yamllint.yml << 'EOF'
+          extends: default
+          rules:
+            line-length:
+              max: 120
+              level: warning
+            indentation:
+              spaces: 2
+            comments:
+              min-spaces-from-content: 1
+          EOF
+
+          # Check YAML files
+          yamllint -c .yamllint.yml victor/**/*.yaml victor/**/*.yml .github/**/*.yml 2>&1 | tee yamllint-output.txt || true
+
+          # Count errors
+          ERROR_COUNT=$(grep -c "error" yamllint-output.txt 2>/dev/null || echo "0")
+          echo "**Errors Found:** $ERROR_COUNT" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$ERROR_COUNT" -gt "0" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## YAML Issues Found" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat yamllint-output.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          echo "✓ All YAML files are valid" >> $GITHUB_STEP_SUMMARY
+
+  lint-workflows:
+    name: Workflow Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install Victor
+        run: |
+          python -m pip install --upgrade pip
+          pip install "pip>=25.2"
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]"
+
+      - name: Validate YAML workflows
+        run: |
+          echo "# Workflow Validation Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f scripts/hooks/validate_workflows.sh ]; then
+            bash scripts/hooks/validate_workflows.sh --ci victor/*/workflows/*.yaml victor/workflows/*.yaml 2>&1 | tee workflow-validation.txt
+
+            # Count errors
+            ERROR_COUNT=$(grep -c "ERROR" workflow-validation.txt 2>/dev/null || echo "0")
+            echo "**Errors Found:** $ERROR_COUNT" >> $GITHUB_STEP_SUMMARY
+
+            if [ "$ERROR_COUNT" -gt "0" ]; then
+              exit 1
+            fi
+          else
+            echo "Workflow validation script not found, skipping"
+          fi
+
+  lint-summary:
+    name: Lint Summary Report
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [lint-python, lint-imports, lint-yaml, lint-workflows]
+
+    steps:
+      - name: Generate lint summary
+        run: |
+          cat > lint-summary.md << 'EOF'
+          # Lint Summary Report
+
+          **Workflow**: ${{ github.workflow }}
+          **Run ID**: ${{ github.run_id }}
+          **Branch**: ${{ github.ref_name }}
+          **Commit**: ${{ github.sha }}
+
+          ## Lint Results
+
+          - Python Linting: ${{ needs.lint-python.result }}
+          - Import Validation: ${{ needs.lint-imports.result }}
+          - YAML Validation: ${{ needs.lint-yaml.result }}
+          - Workflow Validation: ${{ needs.lint-workflows.result }}
+
+          ## Quick Fixes
+
+          ### Formatting Issues
+          Run \`make format\` to fix Black and Ruff formatting issues automatically.
+
+          ### Type Checking Issues
+          See [TYPE_SAFETY_PLAN.md](TYPE_SAFETY_PLAN.md) for the type safety improvement roadmap.
+
+          ### YAML Issues
+          Fix indentation and line length issues in YAML files.
+
+          ### Workflow Issues
+          Run \`victor workflow validate <path>\` to validate individual workflows.
+
+          ## Next Steps
+
+          If all checks pass, your code is ready for review.
+          If any checks fail, review the error messages above and fix the issues.
+          EOF
+
+          cat lint-summary.md
+
+      - name: Upload lint summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-summary
+          path: lint-summary.md
+
+      - name: Add to job summary
+        run: cat lint-summary.md >> $GITHUB_STEP_SUMMARY

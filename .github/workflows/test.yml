@@ -1,0 +1,283 @@
+name: Test
+
+on:
+  push:
+    branches: [main, develop, 'release/**']
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+        os: [ubuntu-latest]
+        include:
+          - python-version: '3.11'
+            os: macos-latest
+          - python-version: '3.11'
+            os: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install system dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl
+
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install libgit2
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install "pip>=25.2"
+          # Use CPU-only torch for faster CI (saves ~800MB download)
+          pip install torch --index-url https://download.pytorch.org/whl/cpu || pip install torch
+          pip install -e ".[dev]"
+
+      - name: Run unit tests
+        shell: bash
+        run: |
+          pytest tests/unit -v \
+            --cov=victor \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-report=term-missing \
+            --cov-context=test \
+            --cov-fail-under=65 \
+            --tb=short \
+            --maxfail=5
+
+      - name: Run integration tests (sample)
+        shell: bash
+        if: matrix.python-version == '3.11' && matrix.os == 'ubuntu-latest'
+        run: |
+          # Run a subset of integration tests
+          pytest tests/integration/agent/test_orchestrator_integration.py -v \
+            --cov=victor \
+            --cov-append \
+            --cov-report=xml \
+            --tb=short \
+            -m "not slow" || true
+
+      - name: Run smoke tests
+        shell: bash
+        if: matrix.python-version == '3.11' && matrix.os == 'ubuntu-latest'
+        run: |
+          pytest tests/smoke -v \
+            --tb=short \
+            --maxfail=3 || true
+
+      - name: Generate coverage summary
+        if: matrix.python-version == '3.11' && matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          echo "# Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          coverage report --sort=cover >> $GITHUB_STEP_SUMMARY || true
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Module Coverage Breakdown" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          coverage report --include='victor/agent/*' --sort=cover >> $GITHUB_STEP_SUMMARY || true
+          coverage report --include='victor/framework/*' --sort=cover >> $GITHUB_STEP_SUMMARY || true
+          coverage report --include='victor/workflows/*' --sort=cover >> $GITHUB_STEP_SUMMARY || true
+
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.11' && matrix.os == 'ubuntu-latest'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+          flags: unittests
+          name: codecov-umbrella
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload coverage HTML
+        if: matrix.python-version == '3.11' && matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-${{ matrix.os }}
+          path: htmlcov/
+          retention-days: 7
+
+      - name: CLI smoke test
+        shell: bash
+        run: |
+          victor --help
+          victor version || echo "Version command not available"
+
+  test-workflows:
+    name: Test Workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "pip>=25.2"
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]"
+
+      - name: Run workflow validation tests
+        run: |
+          pytest tests/integration/workflows/test_workflow_yaml_validation.py -v \
+            --tb=short \
+            --cov=victor.workflows \
+            --cov-report=xml \
+            --cov-report=term-missing
+
+      - name: Run team node tests
+        run: |
+          pytest tests/integration/workflows/test_team_nodes.py -v \
+            --tb=short
+
+      - name: Run workflow execution tests
+        run: |
+          pytest tests/integration/workflows/test_workflow_execution.py -v \
+            --tb=short \
+            -m "not slow"
+
+  test-providers:
+    name: Test Providers
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run provider tests
+        run: |
+          pytest tests/unit/providers/ -v \
+            --tb=short \
+            -m "not slow" || true
+
+  test-coordinators:
+    name: Test Coordinators
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "pip>=25.2"
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]"
+
+      - name: Run coordinator tests
+        run: |
+          pytest tests/unit/agent/test_coordinators.py -v \
+            --cov=victor.agent.coordinators \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --tb=short
+
+      - name: Upload coordinator coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+          flags: coordinators
+          name: coordinator-tests
+
+  test-report:
+    name: Test Summary Report
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [test, test-workflows, test-providers, test-coordinators]
+
+    steps:
+      - name: Generate test summary
+        run: |
+          cat > test-summary.md << 'EOF'
+          # Test Suite Summary
+
+          **Workflow**: ${{ github.workflow }}
+          **Run ID**: ${{ github.run_id }}
+          **Branch**: ${{ github.ref_name }}
+          **Commit**: ${{ github.sha }}
+
+          ## Test Results
+
+          - Unit Tests: ${{ needs.test.result }}
+          - Workflow Tests: ${{ needs.test-workflows.result }}
+          - Provider Tests: ${{ needs.test-providers.result }}
+          - Coordinator Tests: ${{ needs.test-coordinators.result }}
+
+          ## Coverage Reports
+
+          Coverage reports have been uploaded to Codecov.
+          Click on the "Details" link in the Codecov step to view the full report.
+
+          ## Quick Links
+
+          - [Codecov Dashboard](https://codecov.io/gh/${{ github.repository }})
+          - [Workflow Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          EOF
+
+          cat test-summary.md
+
+      - name: Upload test summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-summary
+          path: test-summary.md
+
+      - name: Add to job summary
+        run: cat test-summary.md >> $GITHUB_STEP_SUMMARY

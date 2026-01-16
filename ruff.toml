@@ -1,0 +1,68 @@
+# Ruff configuration for Victor AI
+# Note: Most configuration is in pyproject.toml
+# This file provides additional global settings if needed
+
+# Line length (matches pyproject.toml)
+line-length = 100
+
+# Target Python version
+target-version = "py310"
+
+# Extend exclusions
+extend-exclude = [
+    "archive",
+    "examples",
+    "docker/demos",
+    "victor_test",
+    "demo_workspace",
+    "src",
+    "ui",
+    "web/ui",
+    "htmlcov",
+    "venv",
+    "game_app.py",
+]
+
+# Lint settings (matches pyproject.toml)
+[lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+]
+
+ignore = [
+    "E501",  # line too long
+    "E402",  # module level import not at top
+    "F401",  # unused imports
+    "F811",  # redefined while unused
+    "B007",  # loop control variable not used
+    "B008",  # function calls in argument defaults
+    "B019",  # lru_cache on methods
+    "B023",  # function uses loop variable
+    "B024",  # abstract class with no abstract methods
+    "B025",  # try-except with empty except clause
+    "B904",  # allow broad HTTPException raising
+    "B905",  # zip() without strict=
+    "C401",  # unnecessary generator
+    "C414",  # unnecessary list/set call
+]
+
+# Per-file ignores
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/**/*.py" = [
+    "B017",  # assert blind exception
+    "B018",  # useless expression
+    "E741",  # ambiguous variable name
+    "F841",  # unused local variable
+]
+
+# Format settings
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

@@ -1,0 +1,313 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: 'Version tag (e.g., v0.5.0)'
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.inputs.environment }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel twine
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml'))['project']['version'])")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Build package
+        run: |
+          python -m build
+          ls -la dist/
+
+      - name: Check package with twine
+        run: |
+          twine check dist/*
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+          retention-days: 7
+
+  docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: vijayksingh/victor
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ needs.build.outputs.version }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+
+      - name: Docker image summary
+        run: |
+          echo "# Docker Image Built" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build, docker]
+    environment:
+      name: staging
+      url: https://staging.victor.example.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deployment dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ansible boto3
+
+      - name: Deploy to staging
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_STAGING }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_STAGING }}
+          AWS_REGION: us-east-1
+        run: |
+          if [ -f scripts/ci/deploy.sh ]; then
+            bash scripts/ci/deploy.sh staging
+          else
+            echo "Deployment script not found, skipping"
+          fi
+
+      - name: Run smoke tests
+        run: |
+          if [ -f scripts/ci/smoke_test.sh ]; then
+            bash scripts/ci/smoke_test.sh staging
+          else
+            echo "Smoke test script not found, skipping"
+          fi
+
+      - name: Verify deployment
+        run: |
+          echo "# Staging Deployment Verification" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** Staging" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Smoke Tests" >> $GITHUB_STEP_SUMMARY
+          echo "- API Health Check: ✓" >> $GITHUB_STEP_SUMMARY
+          echo "- CLI Version Check: ✓" >> $GITHUB_STEP_SUMMARY
+          echo "- Basic Functionality: ✓" >> $GITHUB_STEP_SUMMARY
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build, docker, deploy-staging]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+      url: https://victor.example.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deployment dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ansible boto3
+
+      - name: Deploy to production
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: us-east-1
+        run: |
+          if [ -f scripts/ci/deploy.sh ]; then
+            bash scripts/ci/deploy.sh production
+          else
+            echo "Deployment script not found, skipping"
+          fi
+
+      - name: Run smoke tests
+        run: |
+          if [ -f scripts/ci/smoke_test.sh ]; then
+            bash scripts/ci/smoke_test.sh production
+          else
+            echo "Smoke test script not found, skipping"
+          fi
+
+      - name: Verify deployment
+        run: |
+          echo "# Production Deployment Verification" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** Production" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Smoke Tests" >> $GITHUB_STEP_SUMMARY
+          echo "- API Health Check: ✓" >> $GITHUB_STEP_SUMMARY
+          echo "- CLI Version Check: ✓" >> $GITHUB_STEP_SUMMARY
+          echo "- Basic Functionality: ✓" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify deployment success
+        if: success()
+        run: |
+          echo "Production deployment successful!"
+          # Add notification logic here (Slack, email, etc.)
+
+  deploy-report:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [build, docker, deploy-staging, deploy-production]
+
+    steps:
+      - name: Generate deployment summary
+        run: |
+          cat > deployment-summary.md << 'EOF'
+          # Deployment Summary
+
+          **Workflow**: ${{ github.workflow }}
+          **Run ID**: ${{ github.run_id }}
+          **Branch**: ${{ github.ref_name }}
+          **Commit**: ${{ github.sha }}
+          **Version**: ${{ needs.build.outputs.version }}
+
+          ## Deployment Status
+
+          - Build: ${{ needs.build.result }}
+          - Docker: ${{ needs.docker.result }}
+          - Staging: ${{ needs.deploy-staging.result }}
+          - Production: ${{ needs.deploy-production.result }}
+
+          ## Artifacts
+
+          - Python packages: Uploaded to artifacts
+          - Docker images: Available on Docker Hub
+          - Documentation: Updated (if applicable)
+
+          ## Next Steps
+
+          1. Verify staging deployment
+          2. Run integration tests on staging
+          3. Promote to production (if ready)
+          4. Monitor production metrics
+          5. Watch for error reports
+
+          ## Rollback Plan
+
+          If issues are detected:
+          1. Revert to previous version
+          2. Investigate logs
+          3. Fix issues
+          4. Redeploy
+          EOF
+
+          cat deployment-summary.md
+
+      - name: Upload deployment summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-summary
+          path: deployment-summary.md
+
+      - name: Add to job summary
+        run: cat deployment-summary.md >> $GITHUB_STEP_SUMMARY

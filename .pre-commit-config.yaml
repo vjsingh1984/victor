@@ -1,0 +1,197 @@
+# Pre-commit configuration for Victor AI
+# See docs/PRE_COMMIT_HOOKS.md for details
+
+# Minimum pre-commit version
+minimum_pre_commit_version: 2.20.0
+
+# Default language version
+default_language_version:
+  python: python3.10
+
+# Repositories and hooks
+repos:
+  # Standard hooks for general code quality
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+        exclude: ^(tests/|examples/)
+
+      - id: end-of-file-fixer
+        name: Fix end of files
+        exclude: ^(tests/|examples/)
+
+      - id: check-yaml
+        name: Check YAML syntax
+        args: [--unsafe]
+
+      - id: check-toml
+        name: Check TOML syntax
+
+      - id: check-json
+        name: Check JSON syntax
+
+      - id: check-added-large-files
+        name: Check for large files
+        args: ['--maxkb=1000']
+
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+
+      - id: check-case-conflict
+        name: Check for case conflicts
+
+      - id: detect-private-key
+        name: Detect private keys
+
+      - id: mixed-line-ending
+        name: Fix mixed line endings
+        args: ['--fix=lf']
+
+  # Python-specific hooks
+  - repo: https://github.com/psf/black
+    rev: 24.3.0
+    hooks:
+      - id: black
+        name: Format code with Black
+        language_version: python3.10
+        args: [--line-length=100]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.0
+    hooks:
+      - id: ruff
+        name: Lint with Ruff
+        args: [--fix, --exit-non-zero-on-fix]
+
+  # Type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.9.0
+    hooks:
+      - id: mypy
+        name: Type check with MyPy (strict modules)
+        entry: mypy victor/protocols victor/framework/coordinators victor/core/registries victor/core/verticals
+        pass_filenames: false
+        additional_dependencies:
+          - types-pyyaml
+          - types-aiofiles
+        language_version: python3.10
+
+  # Security checks
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.8
+    hooks:
+      - id: bandit
+        name: Security check with Bandit
+        args: [-ll, -ii]
+        exclude: ^tests/
+        additional_dependencies: ['bandit[toml]']
+
+  # YAML linting
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        name: Lint YAML files
+        args: [-c=.yamllint.yml]
+
+  # Local hooks for Victor-specific validation
+  - repo: local
+    hooks:
+      # Validate YAML workflows before commit
+      - id: validate-workflows
+        name: Validate YAML Workflows
+        entry: scripts/hooks/validate_workflows.sh
+        language: script
+        files: ^victor/[^/]+/workflows/.*\.ya?ml$
+        pass_filenames: true
+        description: >
+          Validate YAML workflow files before commit.
+          Checks YAML syntax, workflow compilation, and common errors.
+          Run with VICTOR_VERBOSE_VALIDATION=1 for detailed output.
+
+      # Check Python imports
+      - id: check-imports
+        name: Check Python imports
+        entry: python scripts/check_imports.py
+        language: python
+        pass_filenames: false
+        files: ^victor/.*\.py$
+
+      # Validate mode configs
+      - id: validate-modes
+        name: Validate mode configurations
+        entry: python -m victor.core.mode_config
+        language: python
+        pass_filenames: false
+        files: ^victor/config/modes/.*\.ya?ml$
+
+      # Validate capability configs
+      - id: validate-capabilities
+        name: Validate capability configurations
+        entry: python -m victor.core.capabilities
+        language: python
+        pass_filenames: false
+        files: ^victor/config/capabilities/.*\.ya?ml$
+
+      # Validate team configs
+      - id: validate-teams
+        name: Validate team configurations
+        entry: python -m victor.core.teams
+        language: python
+        pass_filenames: false
+        files: ^victor/config/teams/.*\.ya?ml$
+
+      # Check for TODO/FIXME comments
+      - id: check-todos
+        name: Check for TODO/FIXME comments
+        entry: scripts/hooks/check_todos.sh
+        language: script
+        files: ^victor/.*\.py$
+        description: >
+          Check for TODO/FIXME/HACK comments in code.
+          Use this to track technical debt.
+
+      # Validate docstrings
+      - id: check-docstrings
+        name: Validate docstrings
+        entry: scripts/hooks/check_docstrings.py
+        language: python
+        files: ^victor/.*\.py$
+        description: >
+          Check that public functions and classes have docstrings.
+          Google-style docstrings preferred.
+
+      # Check file size
+      - id: check-file-size
+        name: Check file size
+        entry: scripts/hooks/check_file_size.sh
+        language: script
+        files: .*\.py$
+        description: >
+          Check that Python files are not too large (>500 lines).
+          Large files should be refactored into smaller modules.
+
+      # Check complexity
+      - id: check-complexity
+        name: Check code complexity
+        entry: scripts/hooks/check_complexity.py
+        language: python
+        files: ^victor/.*\.py$
+        description: >
+          Check cyclomatic complexity of functions.
+          Functions with complexity > 10 should be refactored.
+
+# CI configuration
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: []
+  submodules: false

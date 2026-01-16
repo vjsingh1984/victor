@@ -1,0 +1,27 @@
+# Pre-commit hooks for Victor AI Coding Assistant
+#
+# Install:
+#   pip install pre-commit
+#   pre-commit install
+#
+# Usage:
+#   # Run all hooks manually
+#   pre-commit run --all-files
+#
+#   # Run specific hook
+#   pre-commit run validate-workflows --all-files
+#
+#   # Skip hooks for a single commit
+#   git commit --no-verify -m "WIP: skip hooks"
+#
+# See docs/development/pre_commit_hooks.md for details
+
+- repo: local
+  hooks:
+    - id: validate-workflows
+      name: Validate YAML Workflows
+      entry: scripts/hooks/validate_workflows.sh
+      language: script
+      files: '^victor/[^/]+/workflows/.*\.ya?ml$'
+      pass_filenames: true
+      description: Validate YAML workflow files before commit. Checks YAML syntax, workflow compilation, and common errors.

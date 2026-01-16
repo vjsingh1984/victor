@@ -1,0 +1,409 @@
+name: Workflow Performance Regression
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'victor/**/workflows/**/*.yaml'
+      - 'victor/**/workflows/**/*.yml'
+      - 'victor/workflows/*.yaml'
+      - 'victor/workflows/*.yml'
+      - 'victor/framework/**/*.py'
+      - 'victor/workflows/**/*.py'
+      - 'tests/integration/workflows/**/*.py'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  performance-benchmark:
+    name: Workflow Performance Benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "pip>=25.2"
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]"
+
+      - name: Create baseline measurements
+        if: github.event_name == 'pull_request'
+        run: |
+          # Checkout base branch for baseline comparison
+          git fetch origin ${{ github.base_ref }}
+          git checkout origin/${{ github.base_ref }}
+
+          # Run baseline benchmarks
+          python - <<'EOF'
+          import sys
+          import json
+          import time
+          from pathlib import Path
+
+          sys.path.insert(0, str(Path.cwd()))
+
+          from victor.workflows import load_workflow_from_file
+          from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
+
+          # Test workflows
+          test_workflows = [
+              "victor/coding/workflows/feature.yaml",
+              "victor/coding/workflows/team_node_example.yaml",
+              "victor/research/workflows/deep_research.yaml",
+              "victor/benchmark/workflows/swe_bench.yaml",
+          ]
+
+          baseline_results = {}
+
+          for workflow_path in test_workflows:
+              try:
+                  # Measure load time
+                  start_load = time.perf_counter()
+                  loaded = load_workflow_from_file(workflow_path)
+                  load_time = time.perf_counter() - start_load
+
+                  # Measure compile time
+                  if isinstance(loaded, dict):
+                      workflow_defs = loaded
+                  else:
+                      workflow_defs = {loaded.name: loaded}
+
+                  compiler = UnifiedWorkflowCompiler()
+
+                  start_compile = time.perf_counter()
+                  for name, definition in workflow_defs.items():
+                      compiled = compiler.compile_definition(definition)
+                  compile_time = time.perf_counter() - start_compile
+
+                  baseline_results[workflow_path] = {
+                      "load_time": load_time,
+                      "compile_time": compile_time,
+                      "total_time": load_time + compile_time,
+                  }
+
+                  print(f"✓ {workflow_path}")
+                  print(f"  Load: {load_time:.4f}s, Compile: {compile_time:.4f}s")
+              except Exception as e:
+                  print(f"✗ {workflow_path}: {e}")
+                  baseline_results[workflow_path] = {
+                      "error": str(e)
+                  }
+
+          # Save baseline results
+          with open("baseline-performance.json", "w") as f:
+              json.dump(baseline_results, f, indent=2)
+
+          print("\nBaseline performance saved to baseline-performance.json")
+          EOF
+
+          # Save baseline artifact
+          mkdir -p artifacts
+          mv baseline-performance.json artifacts/
+
+      - name: Checkout PR changes
+        if: github.event_name == 'pull_request'
+        run: |
+          git checkout -
+          git checkout ${{ github.sha }}
+
+      - name: Run current benchmarks
+        run: |
+          python - <<'EOF'
+          import sys
+          import json
+          import time
+          from pathlib import Path
+
+          sys.path.insert(0, str(Path.cwd()))
+
+          from victor.workflows import load_workflow_from_file
+          from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
+
+          # Test workflows
+          test_workflows = [
+              "victor/coding/workflows/feature.yaml",
+              "victor/coding/workflows/team_node_example.yaml",
+              "victor/research/workflows/deep_research.yaml",
+              "victor/benchmark/workflows/swe_bench.yaml",
+          ]
+
+          current_results = {}
+
+          for workflow_path in test_workflows:
+              try:
+                  # Measure load time
+                  start_load = time.perf_counter()
+                  loaded = load_workflow_from_file(workflow_path)
+                  load_time = time.perf_counter() - start_load
+
+                  # Measure compile time
+                  if isinstance(loaded, dict):
+                      workflow_defs = loaded
+                  else:
+                      workflow_defs = {loaded.name: loaded}
+
+                  compiler = UnifiedWorkflowCompiler()
+
+                  start_compile = time.perf_counter()
+                  for name, definition in workflow_defs.items():
+                      compiled = compiler.compile_definition(definition)
+                  compile_time = time.perf_counter() - start_compile
+
+                  current_results[workflow_path] = {
+                      "load_time": load_time,
+                      "compile_time": compile_time,
+                      "total_time": load_time + compile_time,
+                  }
+
+                  print(f"✓ {workflow_path}")
+                  print(f"  Load: {load_time:.4f}s, Compile: {compile_time:.4f}s")
+              except Exception as e:
+                  print(f"✗ {workflow_path}: {e}")
+                  current_results[workflow_path] = {
+                      "error": str(e)
+                  }
+
+          # Save current results
+          with open("current-performance.json", "w") as f:
+              json.dump(current_results, f, indent=2)
+
+          print("\nCurrent performance saved to current-performance.json")
+          EOF
+
+      - name: Compare performance
+        if: github.event_name == 'pull_request'
+        run: |
+          python - <<'EOF'
+          import json
+          import sys
+
+          # Load baseline and current results
+          try:
+              with open("artifacts/baseline-performance.json", "r") as f:
+                  baseline = json.load(f)
+          except FileNotFoundError:
+              print("Baseline results not found (first run or fetch issue)")
+              baseline = {}
+
+          with open("current-performance.json", "r") as f:
+              current = json.load(f)
+
+          # Compare results
+          regressions = []
+          improvements = []
+
+          for workflow_path in current.keys():
+              if workflow_path not in baseline:
+                  continue
+
+              baseline_total = baseline[workflow_path].get("total_time", 0)
+              current_total = current[workflow_path].get("total_time", 0)
+
+              if baseline_total == 0:
+                  continue
+
+              # Calculate percentage change
+              change_pct = ((current_total - baseline_total) / baseline_total) * 100
+
+              result = {
+                  "workflow": workflow_path,
+                  "baseline_time": baseline_total,
+                  "current_time": current_total,
+                  "change_pct": change_pct,
+                  "change_abs": current_total - baseline_total,
+              }
+
+              if change_pct > 10:  # More than 10% slower
+                  regressions.append(result)
+              elif change_pct < -10:  # More than 10% faster
+                  improvements.append(result)
+
+          # Generate report
+          print("=" * 60)
+          print("Performance Comparison Report")
+          print("=" * 60)
+          print()
+
+          if regressions:
+              print("⚠ PERFORMANCE REGRESSIONS DETECTED:")
+              print()
+              for reg in regressions:
+                  print(f"  {reg['workflow']}")
+                  print(f"    Baseline: {reg['baseline_time']:.4f}s")
+                  print(f"    Current:  {reg['current_time']:.4f}s")
+                  print(f"    Change:   +{reg['change_pct']:.1f}% (+{reg['change_abs']:.4f}s)")
+                  print()
+
+              print(f"Total regressions: {len(regressions)}")
+              print()
+
+              # Fail if regressions detected
+              sys.exit(1)
+
+          if improvements:
+              print("✓ Performance Improvements:")
+              print()
+              for imp in improvements:
+                  print(f"  {imp['workflow']}")
+                  print(f"    Baseline: {imp['baseline_time']:.4f}s")
+                  print(f"    Current:  {imp['current_time']:.4f}s")
+                  print(f"    Change:   {imp['change_pct']:.1f}% ({imp['change_abs']:.4f}s)")
+                  print()
+
+              print(f"Total improvements: {len(improvements)}")
+              print()
+
+          if not regressions and not improvements:
+              print("No significant performance changes detected.")
+              print("All workflows within ±10% of baseline performance.")
+              print()
+
+          print("=" * 60)
+          EOF
+
+      - name: Generate performance report
+        if: always()
+        run: |
+          cat > performance-report.md << 'EOF'
+          # Workflow Performance Report
+
+          **Workflow**: ${{ github.workflow }}
+          **Run ID**: ${{ github.run_id }}
+          **Branch**: ${{ github.ref_name }}
+          **PR**: ${{ github.event.pull_request.number }}
+          **Commit**: ${{ github.sha }}
+
+          ## What Was Tested
+
+          The following workflows were benchmarked for performance:
+          - `victor/coding/workflows/feature.yaml` - Feature development workflow
+          - `victor/coding/workflows/team_node_example.yaml` - Team node demonstration
+          - `victor/research/workflows/deep_research.yaml` - Deep research workflow
+          - `victor/benchmark/workflows/swe_bench.yaml` - SWE-bench workflow
+
+          ## Performance Metrics
+
+          For each workflow, we measured:
+          - **Load Time**: Time to parse and load YAML file
+          - **Compile Time**: Time to compile workflow to executable graph
+          - **Total Time**: Sum of load and compile time
+
+          ## Regression Threshold
+
+          - **Failure Criteria**: >10% slowdown compared to baseline
+          - **Improvement Threshold**: >10% speedup compared to baseline
+          - **Acceptable Range**: ±10% of baseline performance
+
+          ## Performance Regression Analysis
+
+          This job compares workflow compilation performance against the baseline
+          from the target branch (`${{ github.base_ref }}`).
+
+          ### Why Performance Matters
+
+          Workflow compilation performance affects:
+          - Cold start time for workflow execution
+          - Workflow validation speed in CI/CD
+          - Developer experience when iterating on workflows
+          - Overall system responsiveness
+
+          ### Investigating Regressions
+
+          If performance regressions are detected:
+          1. Check the diff for changes to workflow YAML files
+          2. Look for changes in `victor/workflows/` compiler code
+          3. Review changes to workflow definition classes
+          4. Check for added complexity in node parsing
+          5. Verify no unnecessary loops or expensive operations
+
+          ### Next Steps
+
+          - Review the performance comparison output above
+          - If regressions are acceptable, update the baseline
+          - If not, investigate and optimize the changes
+          - Re-run this job to verify fixes
+
+          For more information, see [docs/ci_cd/workflow_validation.md](https://github.com/${{ github.repository }}/blob/main/docs/ci_cd/workflow_validation.md#performance-regression).
+          EOF
+
+          cat performance-report.md
+
+      - name: Upload performance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-performance-report
+          path: |
+            performance-report.md
+            current-performance.json
+            artifacts/baseline-performance.json
+          retention-days: 30
+
+      - name: Post PR comment with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = 'performance-report.md';
+
+            try {
+              const report = fs.readFileSync(reportPath, 'utf8');
+              const issue_number = context.issue.number;
+              const owner = context.repo.owner;
+              const repo = context.repo.repo;
+
+              // Find existing comment
+              const { data: comments } = await github.rest.issues.listComments({
+                owner,
+                repo,
+                issue_number,
+              });
+
+              const botComment = comments.find(comment =>
+                comment.user.type === 'Bot' &&
+                comment.body.includes('Workflow Performance Report')
+              );
+
+              if (botComment) {
+                // Update existing comment
+                await github.rest.issues.updateComment({
+                  owner,
+                  repo,
+                  comment_id: botComment.id,
+                  body: report,
+                });
+              } else {
+                // Create new comment
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number,
+                  body: report,
+                });
+              }
+            } catch (error) {
+              console.log('Error posting comment:', error);
+            }
+
+      - name: Add to job summary
+        run: |
+          cat performance-report.md >> $GITHUB_STEP_SUMMARY
