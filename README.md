@@ -130,7 +130,7 @@ pip install victor-ai[lang-web]  # HTML, CSS, JavaScript
 pip install victor-ai[vector-experimental]  # Experimental vector stores (ProximaDB)
 ```
 
-**Note**: Victor includes LanceDB as the default vector store for semantic code search and conversation embeddings. The `vector-experimental` group provides additional vector stores like ProximaDB, which are optional and not required for core functionality.
+**Note**: Victor includes LanceDB as the default vector store for semantic code search and conversation embeddings. The `vector-experimental` optional dependency group provides ProximaDB, an experimental vector store under active development. ProximaDB is not required for core functionality, and Victor will automatically fall back to LanceDB if ProximaDB is configured but not installed.
 
 ## Supported Providers
 
@@ -289,6 +289,49 @@ result = await compiled.invoke({"query": "AI trends 2025"})
 - [Development](docs/development/)
 - [Architecture](ARCHITECTURE.md)
 - [Roadmap](ROADMAP.md)
+
+## CI/CD
+
+Victor uses comprehensive CI/CD workflows to ensure code quality and workflow validity:
+
+[![Workflow Validation](https://github.com/vjsingh1984/victor/actions/workflows/workflow-validation.yml/badge.svg)](https://github.com/vjsingh1984/victor/actions/workflows/workflow-validation.yml)
+[![Performance Tests](https://github.com/vjsingh1984/victor/actions/workflows/workflow-performance.yml/badge.svg)](https://github.com/vjsingh1984/victor/actions/workflows/workflow-performance.yml)
+
+### Workflows Validated in CI
+
+- **YAML Syntax**: All workflow files are checked for valid YAML syntax
+- **Compilation**: Workflows are compiled to ensure they can be executed
+- **Integration Tests**: Full workflow execution tests across all verticals
+- **Performance Regression**: Detects >10% slowdowns in workflow compilation
+- **Security Scanning**: Checks for hardcoded secrets and suspicious patterns
+- **Multi-Platform**: Validates on Ubuntu, macOS, and Windows
+
+### For Contributors
+
+1. **Pre-commit Hooks**: Install to catch issues before pushing
+   ```bash
+   pre-commit install
+   ```
+
+2. **Local Validation**: Test workflows before committing
+   ```bash
+   bash scripts/hooks/validate_workflows.sh victor/coding/workflows/feature.yaml
+   ```
+
+3. **Run All Tests**: Validate locally before pushing
+   ```bash
+   bash scripts/ci/run_workflow_tests.sh
+   ```
+
+4. **CI Will**: Run automatically on all pull requests
+
+### Performance Thresholds
+
+- **Fails if**: >10% slower than baseline
+- **Improvements**: >10% faster than baseline (reported but not blocked)
+- **Acceptable**: ±10% of baseline performance
+
+For detailed information, see [docs/ci_cd/workflow_validation.md](docs/ci_cd/workflow_validation.md).
 
 ## Contributing
 

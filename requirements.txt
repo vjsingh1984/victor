@@ -162,7 +162,6 @@ Pygments==2.19.2
 pyinstaller==6.17.0
 pyinstaller-hooks-contrib==2025.10
 pylance==0.39.0
-pymilvus==2.6.5
 pyparsing==3.2.5
 PyPika==0.48.9
 pyproject_hooks==1.2.0
@@ -190,7 +189,6 @@ rpds-py==0.29.0
 rsa==4.9.1
 ruff==0.14.6
 safetensors==0.7.0
-scipy==1.16.3
 scikit-learn==1.7.2
 seaborn==0.13.2
 sentence-transformers==5.1.2

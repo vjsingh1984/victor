@@ -282,3 +282,6 @@ fep-XXXX-test.md
 # Oddly named files from shell script errors
 =1.0
 =3.0
+
+# Workflow validation cache
+.cache/workflow-validation/

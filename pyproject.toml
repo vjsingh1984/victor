@@ -413,6 +413,7 @@ markers = [
     "benchmark: marks performance benchmarks",
     "summary: marks summary/report generation tests",
     "regression: marks regression tests",
+    "smoke: marks smoke tests (quick sanity checks)",
 ]
 filterwarnings = [
     # Ignore PytestCollectionWarning for non-test classes in victor module
@@ -506,19 +507,18 @@ disallow_untyped_defs = true
 warn_return_any = true
 strict = true
 
-# Phase 1: Enhanced typing for coordinator modules (Jan 14, 2026)
-# Note: Coordinators pass standard mypy but have ~50 errors with --strict
-# See TYPE_SAFETY_PLAN.md Phase 1 for details and roadmap to strict mode
+# Phase 1: Enhanced typing for coordinator modules (Jan 14, 2026) ✅ COMPLETE
+# Coordinators now pass strict mypy checks
+# See TYPE_SAFETY_PLAN.md Phase 1 for details
 [[tool.mypy.overrides]]
 module = [
     "victor.agent.coordinators.*",
     "victor.agent.factory_adapter",
 ]
-disallow_untyped_defs = false  # Allow gradual improvement
+strict = true
+disallow_untyped_defs = true
 warn_return_any = true
 warn_unused_ignores = true
-check_untyped_defs = true
-# strict = true  # TODO: Enable strict mode after fixing ~50 type errors (see TYPE_SAFETY_PLAN.md)
 
 # Phase 2: Protocol and interface modules (Jan 14, 2026)
 # These modules now pass strict mypy checks
@@ -534,6 +534,40 @@ disallow_untyped_defs = true
 warn_return_any = true
 warn_unused_ignores = true
 
+# Phase 2.3: Framework core modules with 0 errors (Jan 15, 2026)
+# These modules have been verified to have 0 mypy errors
+# See TYPE_SAFETY_PLAN.md Phase 2.3 for details
+[[tool.mypy.overrides]]
+module = [
+    "victor.framework.capabilities",
+    "victor.framework.services",
+    "victor.framework.parallel",
+    "victor.framework.middleware",
+    "victor.framework.tool_config",
+    "victor.framework.validation",
+    "victor.framework.health",
+    "victor.framework.metrics",
+    "victor.framework.resilience",
+]
+strict = true
+disallow_untyped_defs = true
+warn_return_any = true
+warn_unused_ignores = true
+
+# Phase 2.3: Core configuration and capabilities (Jan 15, 2026)
+# These modules have minimal errors (6 type: ignore comments to fix)
+[[tool.mypy.overrides]]
+module = [
+    "victor.core.config",
+    "victor.core.capabilities",
+    "victor.core.teams",
+]
+disallow_untyped_defs = true
+warn_return_any = true
+warn_unused_ignores = true
+check_untyped_defs = true
+# strict = true  # TODO: Enable after fixing 6 type: ignore comments
+
 # Modules with known issues - ignore for now
 [[tool.mypy.overrides]]
 module = [
@@ -547,7 +581,6 @@ module = [
     "victor.verticals.*",
     "victor.evaluation.*",
     "victor.protocol.*",
-    "victor.framework.*",
     "victor.embeddings.*",
     "victor.state.*",
     "victor.observability.*",
@@ -556,15 +589,18 @@ module = [
 ]
 ignore_errors = true
 
-# Orchestrator has complex type issues - gradual improvement
+# Phase 7: Orchestrator gradual improvement (Jan 15, 2026)
+# Main orchestrator has complex type issues - gradual improvement enabled
+# See TYPE_SAFETY_PLAN.md Phase 7 for details and roadmap
 [[tool.mypy.overrides]]
 module = [
     "victor.agent.orchestrator",
 ]
-# Don't ignore errors entirely, just be permissive
-# This allows us to gradually improve typing
-check_untyped_defs = false
-disallow_untyped_defs = false
+# Don't ignore errors entirely, use enhanced checking
+check_untyped_defs = true
+disallow_untyped_defs = false  # Allow gradual improvement
+warn_return_any = true
+warn_unused_ignores = true
 
 [tool.black]
 line-length = 100
