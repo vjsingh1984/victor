@@ -326,9 +326,7 @@ class TestErrorBodyExtraction:
     def test_extract_json_error_message(self, handler):
         """Test extracting error message from JSON response."""
         error = MockHTTPError("Bad request", status_code=400)
-        error.response.json.return_value = {
-            "error": {"message": "Invalid API key format"}
-        }
+        error.response.json.return_value = {"error": {"message": "Invalid API key format"}}
 
         result = handler._handle_http_error(error, "testprovider")
 

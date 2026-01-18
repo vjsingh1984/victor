@@ -167,9 +167,7 @@ class TeamExecutionMetrics:
             "recursion_depth": self.recursion_depth,
             "success": self.success,
             "duration_seconds": self.duration_seconds,
-            "member_metrics": {
-                k: v.to_dict() for k, v in self.member_metrics.items()
-            },
+            "member_metrics": {k: v.to_dict() for k, v in self.member_metrics.items()},
             "total_tool_calls": self.total_tool_calls,
             "unique_tools_used": list(self.unique_tools_used),
             "start_time": self.start_time.isoformat() if self.start_time else None,
@@ -477,8 +475,7 @@ class TeamMetricsCollector:
                     self._registry.counter("victor_teams_failed_total").increment()
 
         logger.debug(
-            f"Team '{team_id}' completed: success={success}, "
-            f"duration={duration_seconds:.2f}s"
+            f"Team '{team_id}' completed: success={success}, " f"duration={duration_seconds:.2f}s"
         )
 
     def get_team_metrics(self, team_id: str) -> Optional[TeamExecutionMetrics]:
@@ -557,9 +554,7 @@ class TeamMetricsCollector:
             Dictionary with formation-specific statistics
         """
         with self._lock:
-            formation_teams = [
-                m for m in self._team_metrics.values() if m.formation == formation
-            ]
+            formation_teams = [m for m in self._team_metrics.values() if m.formation == formation]
 
             if not formation_teams:
                 return {

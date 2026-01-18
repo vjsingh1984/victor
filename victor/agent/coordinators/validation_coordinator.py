@@ -423,10 +423,7 @@ class ValidationCoordinator:
             return None
 
         # Return None if intelligent validation disabled or not available
-        if (
-            not self._config.enable_intelligent_validation
-            or not self._intelligent_integration
-        ):
+        if not self._config.enable_intelligent_validation or not self._intelligent_integration:
             return None
 
         result = IntelligentValidationResult(is_valid=True)
@@ -562,7 +559,9 @@ class ValidationCoordinator:
                 if name_result.is_valid:
                     validated_calls.append(tc)
                 else:
-                    result.add_error(name_result.errors[0] if name_result.errors else "Invalid tool name")
+                    result.add_error(
+                        name_result.errors[0] if name_result.errors else "Invalid tool name"
+                    )
                     result.filtered_count += 1
             else:
                 result.errors.extend(structure_result.errors)
@@ -589,9 +588,7 @@ class ValidationCoordinator:
     # Context Validation
     # ========================================================================
 
-    def check_context_overflow(
-        self, max_context_chars: int = 200000
-    ) -> ContextValidationResult:
+    def check_context_overflow(self, max_context_chars: int = 200000) -> ContextValidationResult:
         """Check if context is at risk of overflow.
 
         Args:

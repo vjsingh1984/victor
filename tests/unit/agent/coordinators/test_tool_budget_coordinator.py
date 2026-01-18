@@ -547,8 +547,7 @@ class TestToolBudgetCoordinatorConsume:
 
         coordinator = ToolBudgetCoordinator(
             config=ToolBudgetConfig(
-                default_budget=25,
-                warning_threshold=0.2  # 20% = 5 calls threshold
+                default_budget=25, warning_threshold=0.2  # 20% = 5 calls threshold
             ),
             budget_manager=None,
             on_warning=warning_handler,
@@ -569,18 +568,15 @@ class TestToolBudgetCoordinatorConsume:
             warnings.append((remaining, total))
 
         coordinator = ToolBudgetCoordinator(
-            config=ToolBudgetConfig(
-                default_budget=25,
-                warning_threshold=0.2
-            ),
+            config=ToolBudgetConfig(default_budget=25, warning_threshold=0.2),
             budget_manager=None,
             on_warning=warning_handler,
         )
 
         # Consume past threshold multiple times
         coordinator.consume(21)  # 4 remaining - triggers warning
-        coordinator.consume(1)   # 3 remaining - triggers warning
-        coordinator.consume(1)   # 2 remaining - triggers warning
+        coordinator.consume(1)  # 3 remaining - triggers warning
+        coordinator.consume(1)  # 2 remaining - triggers warning
 
         # Should trigger 3 warnings
         assert len(warnings) == 3
@@ -588,10 +584,7 @@ class TestToolBudgetCoordinatorConsume:
     def test_consume_warning_without_callback(self):
         """Test consume handles missing warning callback gracefully."""
         coordinator = ToolBudgetCoordinator(
-            config=ToolBudgetConfig(
-                default_budget=25,
-                warning_threshold=0.2
-            ),
+            config=ToolBudgetConfig(default_budget=25, warning_threshold=0.2),
             budget_manager=None,
             on_warning=None,
         )
@@ -782,17 +775,14 @@ class TestToolBudgetCoordinatorStats:
             warnings.append((remaining, total))
 
         coordinator = ToolBudgetCoordinator(
-            config=ToolBudgetConfig(
-                default_budget=25,
-                warning_threshold=0.2
-            ),
+            config=ToolBudgetConfig(default_budget=25, warning_threshold=0.2),
             budget_manager=None,
             on_warning=warning_handler,
         )
 
         # Trigger warnings (need to go below threshold: 25 * 0.2 = 5)
         coordinator.consume(21)  # First warning (4 remaining)
-        coordinator.consume(1)   # Second warning (3 remaining)
+        coordinator.consume(1)  # Second warning (3 remaining)
 
         stats = coordinator.get_stats()
         assert stats.warning_count == 2

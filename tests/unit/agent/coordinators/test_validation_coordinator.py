@@ -486,7 +486,9 @@ class TestValidationCoordinator:
         assert "below threshold" in result.errors[0].lower()
 
     @pytest.mark.asyncio
-    async def test_validate_intelligent_response_short_response(self, coordinator: ValidationCoordinator):
+    async def test_validate_intelligent_response_short_response(
+        self, coordinator: ValidationCoordinator
+    ):
         """Test that short responses skip validation."""
         # Execute
         result = await coordinator.validate_intelligent_response(
@@ -500,7 +502,9 @@ class TestValidationCoordinator:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_validate_intelligent_response_empty_response(self, coordinator: ValidationCoordinator):
+    async def test_validate_intelligent_response_empty_response(
+        self, coordinator: ValidationCoordinator
+    ):
         """Test that empty responses skip validation."""
         # Execute
         result = await coordinator.validate_intelligent_response(
@@ -514,7 +518,9 @@ class TestValidationCoordinator:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_validate_intelligent_response_whitespace_only(self, coordinator: ValidationCoordinator):
+    async def test_validate_intelligent_response_whitespace_only(
+        self, coordinator: ValidationCoordinator
+    ):
         """Test that whitespace-only responses skip validation."""
         # Execute
         result = await coordinator.validate_intelligent_response(
@@ -596,7 +602,9 @@ class TestValidationCoordinator:
     ):
         """Test that exceptions are handled gracefully."""
         # Setup
-        mock_intelligent_integration.validate_intelligent_response.side_effect = Exception("Validation failed")
+        mock_intelligent_integration.validate_intelligent_response.side_effect = Exception(
+            "Validation failed"
+        )
 
         # Execute
         result = await coordinator.validate_intelligent_response(
@@ -873,7 +881,9 @@ class TestValidationCoordinator:
         self, coordinator: ValidationCoordinator, mock_response_coordinator: Mock
     ):
         """Test tool call validation handles response coordinator exceptions."""
-        mock_response_coordinator.parse_and_validate_tool_calls.side_effect = Exception("Parse failed")
+        mock_response_coordinator.parse_and_validate_tool_calls.side_effect = Exception(
+            "Parse failed"
+        )
 
         tool_calls = [{"name": "test", "arguments": {}}]
 
@@ -1409,9 +1419,7 @@ class TestValidationCoordinatorEdgeCases:
         result = coordinator.validate_tool_call_structure(tool_call)
         assert result.is_valid is True
 
-    def test_validate_and_filter_tool_calls_all_filtered(
-        self, mock_response_coordinator: Mock
-    ):
+    def test_validate_and_filter_tool_calls_all_filtered(self, mock_response_coordinator: Mock):
         """Test tool call validation when all calls are filtered."""
         coordinator = ValidationCoordinator(
             intelligent_integration=None,

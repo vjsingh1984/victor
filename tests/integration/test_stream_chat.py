@@ -180,9 +180,7 @@ class TestMultiTurnConversations:
                 usage={"input_tokens": 50, "output_tokens": 30, "total_tokens": 80},
             )
 
-        with patch.object(
-            coordinator, "_stream_chat_impl", side_effect=mock_stream_impl
-        ):
+        with patch.object(coordinator, "_stream_chat_impl", side_effect=mock_stream_impl):
             # Turn 1
             chunks = []
             async for chunk in coordinator.stream_chat("Hello"):
@@ -226,9 +224,7 @@ class TestMultiTurnConversations:
                 usage={"input_tokens": 50, "output_tokens": 20, "total_tokens": 70},
             )
 
-        with patch.object(
-            coordinator, "_stream_chat_impl", side_effect=mock_stream_impl
-        ):
+        with patch.object(coordinator, "_stream_chat_impl", side_effect=mock_stream_impl):
             # Turn with tool call
             chunks = []
             async for chunk in coordinator.stream_chat("First message"):
@@ -260,9 +256,7 @@ class TestMultiTurnConversations:
                 usage={"input_tokens": 30, "output_tokens": 10, "total_tokens": 40},
             )
 
-        with patch.object(
-            coordinator, "_stream_chat_impl", side_effect=mock_stream_impl
-        ):
+        with patch.object(coordinator, "_stream_chat_impl", side_effect=mock_stream_impl):
             # First message
             async for chunk in coordinator.stream_chat("Message 1"):
                 pass
@@ -310,9 +304,7 @@ class TestToolCallScenarios:
                 usage={"input_tokens": 50, "output_tokens": 20, "total_tokens": 70},
             )
 
-        with patch.object(
-            coordinator, "_stream_chat_impl", side_effect=mock_stream_impl
-        ):
+        with patch.object(coordinator, "_stream_chat_impl", side_effect=mock_stream_impl):
             chunks = []
             async for chunk in coordinator.stream_chat("Read the file"):
                 chunks.append(chunk)
@@ -348,9 +340,7 @@ class TestToolCallScenarios:
                 usage={"input_tokens": 100, "output_tokens": 30, "total_tokens": 130},
             )
 
-        with patch.object(
-            coordinator, "_stream_chat_impl", side_effect=mock_stream_impl
-        ):
+        with patch.object(coordinator, "_stream_chat_impl", side_effect=mock_stream_impl):
             chunks = []
             async for chunk in coordinator.stream_chat("Explore the codebase"):
                 chunks.append(chunk)
@@ -386,9 +376,7 @@ class TestToolCallScenarios:
                 usage={"input_tokens": 50, "output_tokens": 20, "total_tokens": 70},
             )
 
-        with patch.object(
-            coordinator, "_stream_chat_impl", side_effect=mock_stream_impl
-        ):
+        with patch.object(coordinator, "_stream_chat_impl", side_effect=mock_stream_impl):
             chunks = []
             async for chunk in coordinator.stream_chat("Run slow tool"):
                 chunks.append(chunk)
@@ -415,17 +403,13 @@ class TestToolCallScenarios:
                 yield StreamChunk(content="Success", usage=None)
             except ToolNotFoundError as e:
                 error_handled[0] = True
-                yield StreamChunk(
-                    content=f"Error: Tool not found - {e.tool_name}", usage=None
-                )
+                yield StreamChunk(content=f"Error: Tool not found - {e.tool_name}", usage=None)
             yield StreamChunk(
                 content="",
                 usage={"input_tokens": 50, "output_tokens": 20, "total_tokens": 70},
             )
 
-        with patch.object(
-            coordinator, "_stream_chat_impl", side_effect=mock_stream_impl
-        ):
+        with patch.object(coordinator, "_stream_chat_impl", side_effect=mock_stream_impl):
             chunks = []
             async for chunk in coordinator.stream_chat("Use invalid_tool"):
                 chunks.append(chunk)
@@ -464,9 +448,7 @@ class TestToolCallScenarios:
             for i in range(3):
                 result = await mock_orchestrator.tools.execute("test_tool")
                 if result.success:
-                    yield StreamChunk(
-                        content=f"Success after {i+1} attempts", usage=None
-                    )
+                    yield StreamChunk(content=f"Success after {i+1} attempts", usage=None)
                     break
                 yield StreamChunk(content="", usage=None)
             yield StreamChunk(
@@ -474,9 +456,7 @@ class TestToolCallScenarios:
                 usage={"input_tokens": 50, "output_tokens": 20, "total_tokens": 70},
             )
 
-        with patch.object(
-            coordinator, "_stream_chat_impl", side_effect=mock_stream_impl
-        ):
+        with patch.object(coordinator, "_stream_chat_impl", side_effect=mock_stream_impl):
             chunks = []
             async for chunk in coordinator.stream_chat("Retry this tool"):
                 chunks.append(chunk)
@@ -505,9 +485,7 @@ class TestErrorConditions:
         async def mock_stream_impl(user_message):
             if "rate_limit" in user_message.lower():
                 rate_limited[0] = True
-                yield StreamChunk(
-                    content="Rate limit exceeded. Please wait...", usage=None
-                )
+                yield StreamChunk(content="Rate limit exceeded. Please wait...", usage=None)
             else:
                 yield StreamChunk(content="Normal response", usage=None)
             yield StreamChunk(
@@ -515,9 +493,7 @@ class TestErrorConditions:
                 usage={"input_tokens": 50, "output_tokens": 20, "total_tokens": 70},
             )
 
-        with patch.object(
-            coordinator, "_stream_chat_impl", side_effect=mock_stream_impl
-        ):
+        with patch.object(coordinator, "_stream_chat_impl", side_effect=mock_stream_impl):
             chunks = []
             async for chunk in coordinator.stream_chat("This will hit rate_limit"):
                 chunks.append(chunk)
@@ -546,9 +522,7 @@ class TestErrorConditions:
                 usage={"input_tokens": 0, "output_tokens": 0, "total_tokens": 0},
             )
 
-        with patch.object(
-            coordinator, "_stream_chat_impl", side_effect=mock_stream_impl
-        ):
+        with patch.object(coordinator, "_stream_chat_impl", side_effect=mock_stream_impl):
             chunks = []
             async for chunk in coordinator.stream_chat("Test connection"):
                 chunks.append(chunk)
@@ -563,9 +537,7 @@ class TestErrorConditions:
         async def mock_stream_impl(user_message):
             # Check for empty/invalid input
             if not user_message or not user_message.strip():
-                yield StreamChunk(
-                    content="Please provide a valid message.", usage=None
-                )
+                yield StreamChunk(content="Please provide a valid message.", usage=None)
             else:
                 yield StreamChunk(content="Processing your message...", usage=None)
             yield StreamChunk(
@@ -573,9 +545,7 @@ class TestErrorConditions:
                 usage={"input_tokens": 50, "output_tokens": 20, "total_tokens": 70},
             )
 
-        with patch.object(
-            coordinator, "_stream_chat_impl", side_effect=mock_stream_impl
-        ):
+        with patch.object(coordinator, "_stream_chat_impl", side_effect=mock_stream_impl):
             # Test empty input
             chunks = []
             async for chunk in coordinator.stream_chat(""):
@@ -616,9 +586,7 @@ class TestErrorConditions:
                 usage={"input_tokens": 50, "output_tokens": 20, "total_tokens": 70},
             )
 
-        with patch.object(
-            coordinator, "_stream_chat_impl", side_effect=mock_stream_impl
-        ):
+        with patch.object(coordinator, "_stream_chat_impl", side_effect=mock_stream_impl):
             chunks = []
             async for chunk in coordinator.stream_chat("Write file"):
                 chunks.append(chunk)
@@ -637,9 +605,7 @@ class TestErrorConditions:
             # Check if context is too large
             if mock_orchestrator.conversation.message_count() > 1000:
                 context_compacted[0] = True
-                yield StreamChunk(
-                    content="Context compacted to continue...", usage=None
-                )
+                yield StreamChunk(content="Context compacted to continue...", usage=None)
             else:
                 yield StreamChunk(content="Normal response", usage=None)
             yield StreamChunk(
@@ -650,9 +616,7 @@ class TestErrorConditions:
         # Simulate large conversation
         mock_orchestrator.conversation.message_count = MagicMock(return_value=1500)
 
-        with patch.object(
-            coordinator, "_stream_chat_impl", side_effect=mock_stream_impl
-        ):
+        with patch.object(coordinator, "_stream_chat_impl", side_effect=mock_stream_impl):
             chunks = []
             async for chunk in coordinator.stream_chat("Long message"):
                 chunks.append(chunk)
@@ -683,9 +647,7 @@ class TestStreamingBehavior:
                 usage={"input_tokens": 50, "output_tokens": 30, "total_tokens": 80},
             )
 
-        with patch.object(
-            coordinator, "_stream_chat_impl", side_effect=mock_stream_impl
-        ):
+        with patch.object(coordinator, "_stream_chat_impl", side_effect=mock_stream_impl):
             chunks = []
             async for chunk in coordinator.stream_chat("Test"):
                 chunks.append(chunk)
@@ -711,9 +673,7 @@ class TestStreamingBehavior:
                 # Simulate delay
                 await asyncio.sleep(0.01)
 
-        with patch.object(
-            coordinator, "_stream_chat_impl", side_effect=mock_stream_impl
-        ):
+        with patch.object(coordinator, "_stream_chat_impl", side_effect=mock_stream_impl):
             chunks = []
             async for chunk in coordinator.stream_chat("Test"):
                 chunks.append(chunk)
@@ -743,9 +703,7 @@ class TestStreamingBehavior:
                 usage={"input_tokens": 100, "output_tokens": 50, "total_tokens": 150},
             )
 
-        with patch.object(
-            coordinator, "_stream_chat_impl", side_effect=mock_stream_impl
-        ):
+        with patch.object(coordinator, "_stream_chat_impl", side_effect=mock_stream_impl):
             # Mock the stream context
             mock_orchestrator._current_stream_context = stream_ctx
 
@@ -781,9 +739,7 @@ class TestEdgeCases:
                 usage={"input_tokens": 10000, "output_tokens": 20, "total_tokens": 10020},
             )
 
-        with patch.object(
-            coordinator, "_stream_chat_impl", side_effect=mock_stream_impl
-        ):
+        with patch.object(coordinator, "_stream_chat_impl", side_effect=mock_stream_impl):
             chunks = []
             async for chunk in coordinator.stream_chat(long_message):
                 chunks.append(chunk)
@@ -804,9 +760,7 @@ class TestEdgeCases:
                 usage={"input_tokens": 50, "output_tokens": 20, "total_tokens": 70},
             )
 
-        with patch.object(
-            coordinator, "_stream_chat_impl", side_effect=mock_stream_impl
-        ):
+        with patch.object(coordinator, "_stream_chat_impl", side_effect=mock_stream_impl):
             chunks = []
             async for chunk in coordinator.stream_chat(special_message):
                 chunks.append(chunk)
@@ -827,9 +781,7 @@ class TestEdgeCases:
                 usage={"input_tokens": 50, "output_tokens": 20, "total_tokens": 70},
             )
 
-        with patch.object(
-            coordinator, "_stream_chat_impl", side_effect=mock_stream_impl
-        ):
+        with patch.object(coordinator, "_stream_chat_impl", side_effect=mock_stream_impl):
             # Make concurrent requests
             tasks = [coordinator.stream_chat(f"Message {i}") for i in range(3)]
 
@@ -858,9 +810,7 @@ class TestEdgeCases:
                 usage={"input_tokens": 50, "output_tokens": 0, "total_tokens": 50},
             )
 
-        with patch.object(
-            coordinator, "_stream_chat_impl", side_effect=mock_stream_impl
-        ):
+        with patch.object(coordinator, "_stream_chat_impl", side_effect=mock_stream_impl):
             chunks = []
             async for chunk in coordinator.stream_chat("Test"):
                 chunks.append(chunk)
@@ -927,9 +877,7 @@ class TestRealOrchestratorIntegration:
         orch.tool_selector.select_tools = AsyncMock(return_value=[])
         orch.tool_selector.prioritize_by_stage = MagicMock(return_value=[])
         orch.task_classifier = MagicMock()
-        orch.task_classifier.classify = MagicMock(
-            return_value=MagicMock(tool_budget=20)
-        )
+        orch.task_classifier.classify = MagicMock(return_value=MagicMock(tool_budget=20))
         orch.tool_budget = 20
         orch.tool_calls_used = 0
         orch._system_added = False
@@ -968,9 +916,7 @@ class TestRealOrchestratorIntegration:
                 usage={"input_tokens": 50, "output_tokens": 20, "total_tokens": 70},
             )
 
-        with patch.object(
-            coordinator, "_stream_chat_impl", side_effect=mock_stream_impl
-        ):
+        with patch.object(coordinator, "_stream_chat_impl", side_effect=mock_stream_impl):
             chunks = []
             async for chunk in coordinator.stream_chat("Test message"):
                 chunks.append(chunk)

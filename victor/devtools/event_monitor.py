@@ -102,17 +102,13 @@ class EventStatistics:
     def record_event(self, record: EventRecord) -> None:
         """Record an event."""
         self.total_events += 1
-        self.events_by_type[record.event_type] = (
-            self.events_by_type.get(record.event_type, 0) + 1
-        )
+        self.events_by_type[record.event_type] = self.events_by_type.get(record.event_type, 0) + 1
         self.events_by_category[record.category] = (
             self.events_by_category.get(record.category, 0) + 1
         )
 
         if record.source:
-            self.events_by_source[record.source] = (
-                self.events_by_source.get(record.source, 0) + 1
-            )
+            self.events_by_source[record.source] = self.events_by_source.get(record.source, 0) + 1
 
         if self.first_event_time is None:
             self.first_event_time = record.timestamp
@@ -126,29 +122,27 @@ class EventStatistics:
 
         lines = [
             f"\n{'=' * 60}",
-            f"Event Statistics",
+            "Event Statistics",
             f"{'=' * 60}",
             f"Total Events: {self.total_events}",
             f"Duration: {duration:.2f} seconds",
             f"Event Rate: {self.total_events / duration:.2f} events/sec" if duration > 0 else "",
-            f"\nTop Event Types:",
+            "\nTop Event Types:",
         ]
 
         # Top 10 event types
-        sorted_types = sorted(
-            self.events_by_type.items(), key=lambda x: x[1], reverse=True
-        )[:10]
+        sorted_types = sorted(self.events_by_type.items(), key=lambda x: x[1], reverse=True)[:10]
         for event_type, count in sorted_types:
             lines.append(f"  {event_type}: {count}")
 
-        lines.append(f"\nBy Category:")
+        lines.append("\nBy Category:")
         for category, count in sorted(
             self.events_by_category.items(), key=lambda x: x[1], reverse=True
         ):
             lines.append(f"  {category}: {count}")
 
         if self.events_by_source:
-            lines.append(f"\nBy Source:")
+            lines.append("\nBy Source:")
             for source, count in sorted(
                 self.events_by_source.items(), key=lambda x: x[1], reverse=True
             )[:10]:
@@ -291,7 +285,7 @@ class EventMonitor:
                 print(f"  Source: {record.source}")
 
             if record.data:
-                print(f"  Data:")
+                print("  Data:")
                 for key, value in record.data.items():
                     value_str = str(value)
                     if len(value_str) > 100:

@@ -57,6 +57,7 @@ class TestGraphAlgorithmsIntegration:
         else:
             # NetworkX fallback
             import networkx as nx
+
             assert isinstance(graph, (nx.DiGraph, nx.Graph))
 
     def test_pagerank_computation(self):
@@ -165,10 +166,7 @@ class TestBatchProcessorIntegration:
         # Create tasks
         from victor.native.accelerators.batch_processor import BatchTask
 
-        tasks = [
-            BatchTask(task_id=f"task-{i}", task_data=i)
-            for i in range(5)
-        ]
+        tasks = [BatchTask(task_id=f"task-{i}", task_data=i) for i in range(5)]
 
         # Simple executor that returns task_data * 2
         def executor(task):
@@ -306,11 +304,7 @@ class TestSerializationIntegration:
         """Test JSON serialization."""
         accelerator = get_serialization_accelerator()
 
-        data = {
-            "key": "value",
-            "number": 42,
-            "nested": {"a": 1}
-        }
+        data = {"key": "value", "number": 42, "nested": {"a": 1}}
 
         # Compact serialization
         json_str = accelerator.serialize_json(data, pretty=False)
@@ -345,11 +339,7 @@ nested:
         """Test YAML serialization."""
         accelerator = get_serialization_accelerator()
 
-        data = {
-            "key": "value",
-            "number": 42,
-            "nested": {"a": 1}
-        }
+        data = {"key": "value", "number": 42, "nested": {"a": 1}}
 
         yaml_str = accelerator.serialize_yaml(data)
         assert "key: value" in yaml_str
@@ -399,13 +389,13 @@ nested:
 
         # Valid JSON
         assert accelerator.validate_json('{"key": "value"}')
-        assert accelerator.validate_json('[]')
-        assert accelerator.validate_json('null')
+        assert accelerator.validate_json("[]")
+        assert accelerator.validate_json("null")
 
         # Invalid JSON
-        assert not accelerator.validate_json('{key: value}')  # Missing quotes
-        assert not accelerator.validate_json('{')  # Incomplete
-        assert not accelerator.validate_json('')  # Empty
+        assert not accelerator.validate_json("{key: value}")  # Missing quotes
+        assert not accelerator.validate_json("{")  # Incomplete
+        assert not accelerator.validate_json("")  # Empty
 
 
 class TestAcceleratorIntegration:
@@ -467,10 +457,7 @@ class TestAcceleratorIntegration:
         # Load configs in batch
         from victor.native.accelerators.batch_processor import BatchTask
 
-        tasks = [
-            BatchTask(task_id=f"load-{i}", task_data=configs[i])
-            for i in range(5)
-        ]
+        tasks = [BatchTask(task_id=f"load-{i}", task_data=configs[i]) for i in range(5)]
 
         def load_config(task):
             return serial_accel.load_config_file(task.task_data)

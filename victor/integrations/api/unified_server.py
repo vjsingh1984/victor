@@ -533,12 +533,14 @@ def _include_workflow_editor_api(app: FastAPI) -> None:
             async def get_node_types_proxy():
                 """Get available workflow node types."""
                 from tools.workflow_editor.backend.api import get_node_types
+
                 return await get_node_types()
 
             @app.get("/api/v1/workflows/formations", tags=["Workflows"])
             async def get_formations_proxy():
                 """Get available team formation types."""
                 from tools.workflow_editor.backend.api import get_formations
+
                 return await get_formations()
 
             logger.info("Workflow editor routes mounted at /workflow-editor and /api/v1/workflows")
@@ -613,6 +615,7 @@ def _include_workflow_editor_api(app: FastAPI) -> None:
 
 def _setup_frontend_routes(app: FastAPI) -> None:
     """Setup frontend UI routes."""
+
     # Redirect root to landing page
     @app.get("/", response_class=RedirectResponse, include_in_schema=False)
     async def root():
@@ -628,6 +631,7 @@ def _setup_frontend_routes(app: FastAPI) -> None:
     async def hitl_ui():
         try:
             from victor.workflows.hitl_api import get_hitl_ui_html
+
             return HTMLResponse(content=get_hitl_ui_html())
         except ImportError:
             return HTMLResponse(
@@ -639,7 +643,11 @@ def _setup_frontend_routes(app: FastAPI) -> None:
     @app.get("/ui/workflow-editor", response_class=HTMLResponse, include_in_schema=False)
     async def workflow_editor_ui():
         workflow_editor_dist = (
-            Path(__file__).parent.parent.parent.parent / "tools" / "workflow_editor" / "frontend" / "dist"
+            Path(__file__).parent.parent.parent.parent
+            / "tools"
+            / "workflow_editor"
+            / "frontend"
+            / "dist"
         )
 
         if workflow_editor_dist.exists():
@@ -649,7 +657,7 @@ def _setup_frontend_routes(app: FastAPI) -> None:
                     content = f.read()
 
                 # Update API paths
-                content = content.replace('/api/workflows/', '/workflow-editor/api/workflows/')
+                content = content.replace("/api/workflows/", "/workflow-editor/api/workflows/")
 
                 return HTMLResponse(content=content)
             else:
@@ -658,7 +666,8 @@ def _setup_frontend_routes(app: FastAPI) -> None:
                     status_code=404,
                 )
         else:
-            return HTMLResponse(content="""
+            return HTMLResponse(
+                content="""
 <!DOCTYPE html>
 <html>
 <head>
@@ -683,11 +692,13 @@ def _setup_frontend_routes(app: FastAPI) -> None:
     <p>The editor will be available at <a href="http://localhost:5173">http://localhost:5173</a></p>
 </body>
 </html>
-""")
+"""
+            )
 
 
 def _setup_health_check(app: FastAPI) -> None:
     """Setup unified health check."""
+
     @app.get("/health", tags=["System"])
     async def unified_health_check():
         """Health check for all services."""
@@ -701,7 +712,7 @@ def _setup_health_check(app: FastAPI) -> None:
         }
 
         # Check HITL
-        if hasattr(app.state, 'hitl_store') and app.state.hitl_store:
+        if hasattr(app.state, "hitl_store") and app.state.hitl_store:
             try:
                 pending = await app.state.hitl_store.list_pending()
                 status["services"]["hitl"] = {
@@ -714,7 +725,11 @@ def _setup_health_check(app: FastAPI) -> None:
 
         # Check workflow editor
         workflow_editor_dist = (
-            Path(__file__).parent.parent.parent.parent / "tools" / "workflow_editor" / "frontend" / "dist"
+            Path(__file__).parent.parent.parent.parent
+            / "tools"
+            / "workflow_editor"
+            / "frontend"
+            / "dist"
         )
         if not workflow_editor_dist.exists():
             status["services"]["workflow_editor"] = "not_built"

@@ -62,8 +62,7 @@ async def test_core_tools_always_selected():
     try:
         # Use new IToolSelector API with ToolSelectionContext
         context = ToolSelectionContext(
-            task_description="do something",
-            conversation_stage="initial"
+            task_description="do something", conversation_stage="initial"
         )
         tools = await orch.tool_selector.select_tools("do something", context)
         names = [t.name for t in tools]
@@ -85,7 +84,7 @@ async def test_planned_tools_prepended_to_selection():
         context = ToolSelectionContext(
             task_description="summarize",
             conversation_stage="initial",
-            planned_tools=["grep", "read", "ls"]  # Use real tool names
+            planned_tools=["grep", "read", "ls"],  # Use real tool names
         )
 
         tools = await orch.tool_selector.select_tools("summarize", context)
@@ -131,8 +130,7 @@ async def test_docs_keyword_matching_with_mock_registry():
         try:
             # Use new IToolSelector API
             context = ToolSelectionContext(
-                task_description="document the codebase",
-                conversation_stage="initial"
+                task_description="document the codebase", conversation_stage="initial"
             )
             tools = await orch.tool_selector.select_tools("document the codebase", context)
             names = [t.name for t in tools]

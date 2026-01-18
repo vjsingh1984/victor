@@ -103,9 +103,7 @@ class TestCacheKeyGenerator:
         gen = CacheKeyGenerator()
 
         short_history = [{"role": "user", "content": "last message"}]
-        long_history = [
-            {"role": "user", "content": f"message {i}"} for i in range(100)
-        ]
+        long_history = [{"role": "user", "content": f"message {i}"} for i in range(100)]
 
         key1 = gen.generate_context_key("read the file", "abc123", long_history, None)
         key2 = gen.generate_context_key("read the file", "abc123", short_history, None)

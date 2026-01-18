@@ -74,6 +74,7 @@ class ToolCallRecord:
         error: Error if failed
         timestamp: Call timestamp
     """
+
     tool_name: str
     inputs: Dict[str, Any]
     outputs: Optional[Dict[str, Any]]
@@ -99,6 +100,7 @@ class NodeTraceRecord:
         timestamp: Execution timestamp
         metadata: Additional metadata
     """
+
     node_id: str
     node_type: str
     inputs: Dict[str, Any]
@@ -125,6 +127,7 @@ class WorkflowTrace:
         nodes: Node trace records
         metadata: Trace metadata
     """
+
     trace_id: str
     workflow_name: str
     start_time: float
@@ -381,8 +384,7 @@ class WorkflowTracer:
             self._current_node.tool_calls.append(record)
 
         logger.debug(
-            f"Traced tool call: {tool_name} "
-            f"success={success} duration={duration_seconds:.3f}s"
+            f"Traced tool call: {tool_name} " f"success={success} duration={duration_seconds:.3f}s"
         )
 
     def get_trace(self) -> Optional[WorkflowTrace]:
@@ -477,14 +479,8 @@ class WorkflowTracer:
             "successful_nodes": sum(1 for n in trace.nodes if n.success),
             "failed_nodes": sum(1 for n in trace.nodes if not n.success),
             "total_tool_calls": sum(len(n.tool_calls) for n in trace.nodes),
-            "slowest_nodes": [
-                {"node_id": nid, "duration": dur}
-                for nid, dur in slowest_nodes
-            ],
-            "most_used_tools": [
-                {"tool": tool, "calls": count}
-                for tool, count in most_used_tools
-            ],
+            "slowest_nodes": [{"node_id": nid, "duration": dur} for nid, dur in slowest_nodes],
+            "most_used_tools": [{"tool": tool, "calls": count} for tool, count in most_used_tools],
             "error_count": error_count,
         }
 
@@ -575,27 +571,31 @@ class WorkflowTracer:
             writer = csv.writer(f)
 
             # Header
-            writer.writerow([
-                "node_id",
-                "node_type",
-                "timestamp",
-                "duration_seconds",
-                "success",
-                "error",
-                "tool_calls_count",
-            ])
+            writer.writerow(
+                [
+                    "node_id",
+                    "node_type",
+                    "timestamp",
+                    "duration_seconds",
+                    "success",
+                    "error",
+                    "tool_calls_count",
+                ]
+            )
 
             # Rows
             for node in trace.nodes:
-                writer.writerow([
-                    node.node_id,
-                    node.node_type,
-                    datetime.fromtimestamp(node.timestamp).isoformat(),
-                    f"{node.duration_seconds:.3f}",
-                    node.success,
-                    node.error or "",
-                    len(node.tool_calls),
-                ])
+                writer.writerow(
+                    [
+                        node.node_id,
+                        node.node_type,
+                        datetime.fromtimestamp(node.timestamp).isoformat(),
+                        f"{node.duration_seconds:.3f}",
+                        node.success,
+                        node.error or "",
+                        len(node.tool_calls),
+                    ]
+                )
 
     def _export_html(self, trace: WorkflowTrace, output_path: Path) -> None:
         """Export trace as HTML report.

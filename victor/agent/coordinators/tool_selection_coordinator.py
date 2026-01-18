@@ -57,23 +57,82 @@ class ToolSelectionCoordinator(IToolSelectionCoordinator):
 
     # Keywords for task classification
     ANALYSIS_KEYWORDS = {
-        "explain", "understand", "analyze", "review", "what", "how", "why",
-        "describe", "summarize", "compare", "find", "search", "locate",
-        "identify", "check", "verify", "validate", "document", "read",
-        "show", "display", "list", "get", "examine", "inspect",
+        "explain",
+        "understand",
+        "analyze",
+        "review",
+        "what",
+        "how",
+        "why",
+        "describe",
+        "summarize",
+        "compare",
+        "find",
+        "search",
+        "locate",
+        "identify",
+        "check",
+        "verify",
+        "validate",
+        "document",
+        "read",
+        "show",
+        "display",
+        "list",
+        "get",
+        "examine",
+        "inspect",
     }
 
     ACTION_KEYWORDS = {
-        "fix", "repair", "resolve", "debug", "correct", "patch", "solve",
-        "implement", "apply", "execute", "run", "perform", "do", "make",
-        "change", "update", "modify", "edit", "refactor", "optimize",
-        "improve", "enhance", "adjust", "configure", "setup", "deploy",
+        "fix",
+        "repair",
+        "resolve",
+        "debug",
+        "correct",
+        "patch",
+        "solve",
+        "implement",
+        "apply",
+        "execute",
+        "run",
+        "perform",
+        "do",
+        "make",
+        "change",
+        "update",
+        "modify",
+        "edit",
+        "refactor",
+        "optimize",
+        "improve",
+        "enhance",
+        "adjust",
+        "configure",
+        "setup",
+        "deploy",
     }
 
     CREATION_KEYWORDS = {
-        "create", "generate", "build", "write", "add", "new", "make",
-        "develop", "implement", "design", "construct", "produce", "author",
-        "draft", "compose", "formulate", "establish", "initiate", "start",
+        "create",
+        "generate",
+        "build",
+        "write",
+        "add",
+        "new",
+        "make",
+        "develop",
+        "implement",
+        "design",
+        "construct",
+        "produce",
+        "author",
+        "draft",
+        "compose",
+        "formulate",
+        "establish",
+        "initiate",
+        "start",
     }
 
     # Tool name patterns for detection
@@ -125,14 +184,29 @@ class ToolSelectionCoordinator(IToolSelectionCoordinator):
             return "semantic_search"
 
         # Check for file pattern indicators
-        file_pattern_indicators = ["files ending", "files starting", "pattern",
-                                   "extension", "glob", "wildcard"]
+        file_pattern_indicators = [
+            "files ending",
+            "files starting",
+            "pattern",
+            "extension",
+            "glob",
+            "wildcard",
+        ]
         if any(indicator in query_lower for indicator in file_pattern_indicators):
             return "ls"
 
         # Check for web search indicators
-        web_indicators = ["latest", "current", "recent", "news", "external",
-                         "internet", "online", "documentation", "docs"]
+        web_indicators = [
+            "latest",
+            "current",
+            "recent",
+            "news",
+            "external",
+            "internet",
+            "online",
+            "documentation",
+            "docs",
+        ]
         if any(indicator in query_lower for indicator in web_indicators):
             return "web_search"
 
@@ -273,15 +347,15 @@ class ToolSelectionCoordinator(IToolSelectionCoordinator):
         if context:
             # EXECUTING stage suggests action
             if context.stage and "EXECUTING" in str(context.stage).upper():
-                if action_count := sum(1 for kw in self.ACTION_KEYWORDS
-                                     if kw in task.lower()):
+                if action_count := sum(1 for kw in self.ACTION_KEYWORDS if kw in task.lower()):
                     if action_count > 0:
                         return "action"
 
             # Recent tools can indicate continuing work
             if context.recent_tools:
-                recent_write = any(tool in ["write", "edit", "bash"]
-                                 for tool in context.recent_tools)
+                recent_write = any(
+                    tool in ["write", "edit", "bash"] for tool in context.recent_tools
+                )
                 if recent_write and task_type != "analysis":
                     return "action"
 
@@ -312,8 +386,19 @@ class ToolSelectionCoordinator(IToolSelectionCoordinator):
             return True
 
         # Check for tool-related keywords
-        tool_keywords = ["use", "run", "execute", "call", "invoke", "search",
-                        "find", "read", "write", "list", "check"]
+        tool_keywords = [
+            "use",
+            "run",
+            "execute",
+            "call",
+            "invoke",
+            "search",
+            "find",
+            "read",
+            "write",
+            "list",
+            "check",
+        ]
         message_lower = message.lower()
         if any(keyword in message_lower for keyword in tool_keywords):
             return True

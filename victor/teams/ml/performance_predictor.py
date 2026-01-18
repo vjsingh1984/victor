@@ -167,9 +167,7 @@ class PerformancePredictor:
             Success rate prediction
         """
         if "success_rate" in self._models:
-            return self._predict_with_model(
-                "success_rate", task_features, team_features, formation
-            )
+            return self._predict_with_model("success_rate", task_features, team_features, formation)
         elif self.use_heuristic:
             return self._predict_success_heuristic(task_features, team_features, formation)
         else:
@@ -229,9 +227,7 @@ class PerformancePredictor:
             Tool usage prediction
         """
         if "tool_usage" in self._models:
-            return self._predict_with_model(
-                "tool_usage", task_features, team_features, formation
-            )
+            return self._predict_with_model("tool_usage", task_features, team_features, formation)
         elif self.use_heuristic:
             return self._predict_tool_usage_heuristic(task_features, team_features, formation)
         else:
@@ -268,9 +264,7 @@ class PerformancePredictor:
             raise ValueError(f"No model available for metric: {metric_name}")
 
         # Create feature vector
-        feature_vector = self._create_feature_vector(
-            task_features, team_features, formation
-        )
+        feature_vector = self._create_feature_vector(task_features, team_features, formation)
 
         # Scale features
         if scaler:
@@ -284,10 +278,7 @@ class PerformancePredictor:
 
         # Estimate confidence interval (simplified)
         std_dev = abs(prediction) * 0.2  # 20% variance
-        confidence_interval = (
-            max(0, prediction - 1.96 * std_dev),
-            prediction + 1.96 * std_dev
-        )
+        confidence_interval = (max(0, prediction - 1.96 * std_dev), prediction + 1.96 * std_dev)
 
         return PerformancePrediction(
             metric_name=metric_name,
@@ -370,19 +361,19 @@ class PerformancePredictor:
         formation_factor = formation_multipliers.get(formation.value, 1.0)
 
         predicted_time = (
-            base_time *
-            complexity_factor *
-            loc_factor *
-            file_factor *
-            team_factor *
-            formation_factor
+            base_time
+            * complexity_factor
+            * loc_factor
+            * file_factor
+            * team_factor
+            * formation_factor
         )
 
         # Confidence interval
         std_dev = predicted_time * 0.25
         confidence_interval = (
             max(0, predicted_time - 1.96 * std_dev),
-            predicted_time + 1.96 * std_dev
+            predicted_time + 1.96 * std_dev,
         )
 
         factors = {
@@ -439,11 +430,7 @@ class PerformancePredictor:
         formation_bonus = formation_bonuses.get(formation.value, 0.0)
 
         predicted_rate = (
-            base_rate +
-            expertise_bonus +
-            diversity_bonus +
-            formation_bonus -
-            complexity_penalty
+            base_rate + expertise_bonus + diversity_bonus + formation_bonus - complexity_penalty
         )
         predicted_rate = max(0.0, min(1.0, predicted_rate))
 
@@ -451,7 +438,7 @@ class PerformancePredictor:
         std_dev = 0.15
         confidence_interval = (
             max(0, predicted_rate - 1.96 * std_dev),
-            min(1, predicted_rate + 1.96 * std_dev)
+            min(1, predicted_rate + 1.96 * std_dev),
         )
 
         factors = {
@@ -507,11 +494,7 @@ class PerformancePredictor:
         complexity_penalty = task_features.complexity * 0.05
 
         predicted_score = (
-            base_score +
-            expertise_bonus +
-            diversity_bonus +
-            formation_bonus -
-            complexity_penalty
+            base_score + expertise_bonus + diversity_bonus + formation_bonus - complexity_penalty
         )
         predicted_score = max(0.0, min(1.0, predicted_score))
 
@@ -519,7 +502,7 @@ class PerformancePredictor:
         std_dev = 0.12
         confidence_interval = (
             max(0, predicted_score - 1.96 * std_dev),
-            min(1, predicted_score + 1.96 * std_dev)
+            min(1, predicted_score + 1.96 * std_dev),
         )
 
         factors = {
@@ -568,18 +551,14 @@ class PerformancePredictor:
         team_factor = 1.0 + (team_features.member_count - 1) * 0.2
 
         predicted_calls = int(
-            base_calls *
-            complexity_factor *
-            file_factor *
-            loc_factor *
-            team_factor
+            base_calls * complexity_factor * file_factor * loc_factor * team_factor
         )
 
         # Confidence interval
         std_dev = predicted_calls * 0.3
         confidence_interval = (
             max(0, int(predicted_calls - 1.96 * std_dev)),
-            int(predicted_calls + 1.96 * std_dev)
+            int(predicted_calls + 1.96 * std_dev),
         )
 
         factors = {
@@ -666,9 +645,7 @@ class PerformancePredictor:
             formation = example["formation"]
             value = example["value"]
 
-            feature_vector = self._create_feature_vector(
-                task_features, team_features, formation
-            )
+            feature_vector = self._create_feature_vector(task_features, team_features, formation)
 
             X.append(feature_vector)
             y.append(value)

@@ -73,8 +73,7 @@ class TestBatchProcessor:
             return f"Result for {task_dict['task_id']}"
 
         tasks = [
-            BatchTask(task_id=f"task{i}", task_data=simple_executor, priority=1.0)
-            for i in range(5)
+            BatchTask(task_id=f"task{i}", task_data=simple_executor, priority=1.0) for i in range(5)
         ]
 
         summary = processor.process_batch(tasks, simple_executor)
@@ -142,9 +141,7 @@ class TestBatchProcessor:
 
     def test_task_retry_logic(self):
         """Test task retry with failures."""
-        processor = BatchProcessor(
-            max_concurrent=5, retry_policy="fixed"
-        )
+        processor = BatchProcessor(max_concurrent=5, retry_policy="fixed")
 
         call_count = {"count": 0}
 
@@ -154,9 +151,7 @@ class TestBatchProcessor:
                 raise ValueError("Simulated failure")
             return "Success"
 
-        tasks = [
-            BatchTask(task_id="failing_task", task_data=failing_executor, priority=1.0)
-        ]
+        tasks = [BatchTask(task_id="failing_task", task_data=failing_executor, priority=1.0)]
 
         summary = processor.process_batch(tasks, failing_executor)
 
@@ -167,9 +162,7 @@ class TestBatchProcessor:
 
     def test_priority_execution(self):
         """Test that task priorities are respected."""
-        processor = BatchProcessor(
-            max_concurrent=5, aggregation_strategy="priority"
-        )
+        processor = BatchProcessor(max_concurrent=5, aggregation_strategy="priority")
 
         execution_order = []
 
@@ -208,10 +201,7 @@ class TestBatchProcessor:
         processor = BatchProcessor(max_concurrent=10)
         processor.set_load_balancer("round_robin")
 
-        tasks = [
-            BatchTask(task_id=f"task{i}", task_data=None, priority=1.0)
-            for i in range(10)
-        ]
+        tasks = [BatchTask(task_id=f"task{i}", task_data=None, priority=1.0) for i in range(10)]
 
         assignments = processor.assign_tasks(tasks, workers=3)
 
@@ -222,10 +212,7 @@ class TestBatchProcessor:
         """Test splitting tasks into batches."""
         from victor.native.rust.batch_processor import create_task_batches_py
 
-        tasks = [
-            BatchTask(task_id=f"task{i}", task_data=None, priority=1.0)
-            for i in range(10)
-        ]
+        tasks = [BatchTask(task_id=f"task{i}", task_data=None, priority=1.0) for i in range(10)]
 
         batches = create_task_batches_py(tasks, batch_size=3)
 
@@ -311,9 +298,7 @@ class TestBatchProcessor:
             for i in range(5)
         ]
 
-        summary = processor.process_batch_streaming(
-            tasks, streaming_executor, result_callback
-        )
+        summary = processor.process_batch_streaming(tasks, streaming_executor, result_callback)
 
         assert len(results_received) == 5
         assert summary.successful_count == 5
@@ -339,9 +324,7 @@ class TestBatchProcessorIntegration:
 
     def test_multi_stage_pipeline(self):
         """Test a multi-stage processing pipeline."""
-        processor = BatchProcessor(
-            max_concurrent=10, aggregation_strategy="ordered"
-        )
+        processor = BatchProcessor(max_concurrent=10, aggregation_strategy="ordered")
 
         results = {}
 
@@ -397,10 +380,7 @@ class TestBatchProcessorIntegration:
             return f"Processed {file_path}"
 
         files = [f"file{i}.py" for i in range(10)]
-        tasks = [
-            BatchTask(task_id=file, task_data=file_processor, priority=1.0)
-            for file in files
-        ]
+        tasks = [BatchTask(task_id=file, task_data=file_processor, priority=1.0) for file in files]
 
         summary = processor.process_batch(tasks, file_processor)
 

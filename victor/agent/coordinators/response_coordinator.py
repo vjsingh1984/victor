@@ -494,9 +494,7 @@ class ResponseCoordinator:
         # Fallback: return empty result
         from victor.agent.tool_calling.base import ToolCallParseResult
 
-        return ToolCallParseResult(
-            tool_calls=[], remaining_content=content, parse_method="none"
-        )
+        return ToolCallParseResult(tool_calls=[], remaining_content=content, parse_method="none")
 
     def normalize_tool_call_arguments(
         self, tool_calls: List[Dict[str, Any]]
@@ -617,8 +615,7 @@ class ResponseCoordinator:
 
             if extraction_result.success and extraction_result.tool_calls:
                 logger.info(
-                    f"Extracted {len(extraction_result.tool_calls)} "
-                    f"tool calls from text output"
+                    f"Extracted {len(extraction_result.tool_calls)} " f"tool calls from text output"
                 )
                 tool_calls = [
                     {
@@ -654,9 +651,7 @@ class ResponseCoordinator:
         filtered = [c for c in chunks if c]
         return "".join(filtered)
 
-    def aggregate_stream_chunks(
-        self, chunks: List[Any], content_attr: str = "content"
-    ) -> str:
+    def aggregate_stream_chunks(self, chunks: List[Any], content_attr: str = "content") -> str:
         """Aggregate stream chunk objects into complete content.
 
         Args:

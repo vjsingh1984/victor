@@ -204,15 +204,10 @@ class UniversalRegistry(Generic[T]):
         """
         with cls._lock:
             if registry_type not in cls._instances:
-                cls._instances[registry_type] = cls(
-                    registry_type, cache_strategy, max_size
-                )
+                cls._instances[registry_type] = cls(registry_type, cache_strategy, max_size)
                 logger.info(f"UniversalRegistry: Created new registry '{registry_type}'")
             registry = cls._instances[registry_type]
-            if (
-                registry._cache_strategy != cache_strategy
-                or registry._max_size != max_size
-            ):
+            if registry._cache_strategy != cache_strategy or registry._max_size != max_size:
                 registry._cache_strategy = cache_strategy
                 registry._max_size = max_size
                 registry.invalidate()
@@ -344,9 +339,7 @@ class UniversalRegistry(Generic[T]):
         with self._lock:
             return list(self._namespaces.keys())
 
-    def invalidate(
-        self, key: Optional[str] = None, namespace: Optional[str] = None
-    ) -> int:
+    def invalidate(self, key: Optional[str] = None, namespace: Optional[str] = None) -> int:
         """Invalidate cache entries by key or namespace.
 
         Args:
@@ -379,9 +372,7 @@ class UniversalRegistry(Generic[T]):
                     logger.debug(f"UniversalRegistry: Invalidated key '{cache_key}'")
             elif namespace:
                 # Invalidate all in namespace
-                keys_to_remove = [
-                    k for k, v in self._entities.items() if v.namespace == namespace
-                ]
+                keys_to_remove = [k for k, v in self._entities.items() if v.namespace == namespace]
                 for k in keys_to_remove:
                     entry_key = self._entities.pop(k)
                     if entry_key.namespace == namespace:
@@ -392,8 +383,7 @@ class UniversalRegistry(Generic[T]):
                 if namespace in self._namespaces:
                     del self._namespaces[namespace]
                 logger.debug(
-                    f"UniversalRegistry: Invalidated namespace '{namespace}' "
-                    f"({count} entries)"
+                    f"UniversalRegistry: Invalidated namespace '{namespace}' " f"({count} entries)"
                 )
             else:
                 # Clear all
@@ -426,9 +416,7 @@ class UniversalRegistry(Generic[T]):
                 "expired_entries": expired_count,
                 "total_accesses": total_accesses,
                 "max_size": self._max_size,
-                "utilization": len(self._entities) / self._max_size
-                if self._max_size > 0
-                else 0,
+                "utilization": len(self._entities) / self._max_size if self._max_size > 0 else 0,
             }
 
     def _generate_cache_key(self, key: str, namespace: str) -> str:

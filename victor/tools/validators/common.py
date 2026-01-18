@@ -165,8 +165,7 @@ class ValidationResult:
             return msg
 
         return (
-            f"Validation failed: {len(self.errors)} error(s), "
-            f"{len(self.warnings)} warning(s)"
+            f"Validation failed: {len(self.errors)} error(s), " f"{len(self.warnings)} warning(s)"
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -355,21 +354,15 @@ class ToolBudgetValidator:
 
         # Type check
         if not isinstance(budget, int):
-            result.add_error(
-                f"Budget must be an integer, got {type(budget).__name__}"
-            )
+            result.add_error(f"Budget must be an integer, got {type(budget).__name__}")
             return result
 
         # Range check
         if budget < self._min_budget:
-            result.add_error(
-                f"Budget ({budget}) is below minimum ({self._min_budget})"
-            )
+            result.add_error(f"Budget ({budget}) is below minimum ({self._min_budget})")
 
         if budget > self._max_budget:
-            result.add_error(
-                f"Budget ({budget}) exceeds maximum ({self._max_budget})"
-            )
+            result.add_error(f"Budget ({budget}) exceeds maximum ({self._max_budget})")
 
         # Recommendation check (warning only)
         if budget < self._recommended_min:
@@ -508,9 +501,7 @@ class CombinedToolValidator:
 
         # Validate tool availability
         if tool_names:
-            availability_result = self._availability_validator.validate_tools_available(
-                tool_names
-            )
+            availability_result = self._availability_validator.validate_tools_available(tool_names)
             result.merge(availability_result)
 
         # Validate tool budget
@@ -520,9 +511,7 @@ class CombinedToolValidator:
 
         # Validate task budgets
         if task_budgets:
-            task_budgets_result = self._budget_validator.validate_task_budgets(
-                task_budgets
-            )
+            task_budgets_result = self._budget_validator.validate_task_budgets(task_budgets)
             result.merge(task_budgets_result)
 
         return result

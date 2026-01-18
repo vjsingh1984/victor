@@ -377,7 +377,9 @@ class SharedToolRegistry:
 
             # Cache the result
             self._tool_instances_cache[cache_key] = result
-            logger.debug(f"Built and cached {len(result)} tools for registration (mode={cache_key})")
+            logger.debug(
+                f"Built and cached {len(result)} tools for registration (mode={cache_key})"
+            )
         else:
             logger.debug(f"Using cached tool instances (mode={cache_key})")
 

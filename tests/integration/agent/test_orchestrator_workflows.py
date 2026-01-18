@@ -92,9 +92,7 @@ class TestSimpleChatFlow:
         test_provider.chat = AsyncMock(side_effect=mock_chat)
 
         # Call chat through provider
-        response = await test_provider.chat(
-            messages=[{"role": "user", "content": user_message}]
-        )
+        response = await test_provider.chat(messages=[{"role": "user", "content": user_message}])
 
         # Verify response
         assert response.content == "I'm doing well, thank you!"
@@ -188,6 +186,7 @@ class TestToolExecutionFlow:
         2. Execute tool
         3. Verify error handled gracefully
         """
+
         # Make tool fail
         async def failing_execute(**kwargs):
             raise ValueError("Tool execution failed")
@@ -243,7 +242,7 @@ class TestStreamingResponses:
         # Verify final chunk has usage
         assert chunks[-1].usage is not None
         # Note: usage is a MagicMock in fixture, so we just check it exists
-        assert hasattr(chunks[-1].usage, '__getitem__')
+        assert hasattr(chunks[-1].usage, "__getitem__")
 
     @pytest.mark.asyncio
     async def test_streaming_with_tool_calls(self, test_provider):
@@ -254,6 +253,7 @@ class TestStreamingResponses:
         2. Verify tool calls in stream
         3. Verify final response complete
         """
+
         # Mock stream with tool calls
         async def mock_stream_with_tools(messages, **kwargs):
             from victor.providers.base import StreamChunk
@@ -360,9 +360,7 @@ class TestContextManagement:
         4. Verify tokens saved
         """
         # Create large context
-        large_messages = [
-            {"role": "user", "content": f"Message {i}" * 100} for i in range(50)
-        ]
+        large_messages = [{"role": "user", "content": f"Message {i}" * 100} for i in range(50)]
 
         context = {
             "messages": large_messages,
@@ -595,9 +593,7 @@ class TestPromptBuilding:
             "constraints": {"max_iterations": 10},
         }
 
-        system_prompt = await mock_prompt_coordinator.build_system_prompt(
-            prompt_context
-        )
+        system_prompt = await mock_prompt_coordinator.build_system_prompt(prompt_context)
 
         # Verify prompt content
         assert isinstance(system_prompt, str)
@@ -605,9 +601,7 @@ class TestPromptBuilding:
         assert "helpful" in system_prompt.lower() and "assistant" in system_prompt.lower()
 
         # Verify coordinator called
-        mock_prompt_coordinator.build_system_prompt.assert_called_once_with(
-            prompt_context
-        )
+        mock_prompt_coordinator.build_system_prompt.assert_called_once_with(prompt_context)
 
     @pytest.mark.asyncio
     async def test_task_hint_building(self, mock_prompt_coordinator):
@@ -652,6 +646,7 @@ class TestErrorHandling:
         1. Provider raises error
         2. Verify error propagated or handled
         """
+
         # Make provider fail
         async def failing_chat(messages, **kwargs):
             raise RuntimeError("Provider unavailable")
@@ -712,6 +707,7 @@ class TestErrorHandling:
         2. Verify fallback behavior
         3. System continues with reduced context
         """
+
         # Make compaction fail
         async def failing_compact(context, budget):
             raise RuntimeError("Compaction service unavailable")

@@ -81,11 +81,11 @@ class EntityExtractor:
 
         # Compile regex patterns for code entity detection
         self._file_pattern = re.compile(
-            r'\b(?:[\w-]+/)*[\w-]+\.(?:py|js|ts|java|cpp|c|h|go|rs|rb|php|swift|kt|scala|rs|yaml|yml|json|xml|html|css|md|txt|sh|bash|zsh)\b'
+            r"\b(?:[\w-]+/)*[\w-]+\.(?:py|js|ts|java|cpp|c|h|go|rs|rb|php|swift|kt|scala|rs|yaml|yml|json|xml|html|css|md|txt|sh|bash|zsh)\b"
         )
-        self._function_pattern = re.compile(r'\b[a-z_][a-z0-9_]*(?:\s*\(|\s*\()')
-        self._class_pattern = re.compile(r'\b[A-Z][a-zA-Z0-9]*\b')
-        self._module_pattern = re.compile(r'\b(?:from|import)\s+([a-z_][a-z0-9_.]*)')
+        self._function_pattern = re.compile(r"\b[a-z_][a-z0-9_]*(?:\s*\(|\s*\()")
+        self._class_pattern = re.compile(r"\b[A-Z][a-zA-Z0-9]*\b")
+        self._module_pattern = re.compile(r"\b(?:from|import)\s+([a-z_][a-z0-9_.]*)")
 
     async def extract_from_message(
         self,
@@ -316,9 +316,7 @@ class EntityExtractor:
         """
         entities = self._memory.search(query, limit=limit)
 
-        return [
-            f"{e.name} ({e.entity_type.value})" for e in entities
-        ]
+        return [f"{e.name} ({e.entity_type.value})" for e in entities]
 
     async def get_context_summary(self, limit: int = 20) -> str:
         """Generate a summary of key entities in context.

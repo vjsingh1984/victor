@@ -575,7 +575,9 @@ class TestVerticalProtocolMethods:
             # Test that each mode can be retrieved
             for mode_name in modes:
                 mode_config = vertical.get_mode_config(mode_name)
-                assert mode_config is not None, f"{vertical.name} get_mode_config('{mode_name}') failed"
+                assert (
+                    mode_config is not None
+                ), f"{vertical.name} get_mode_config('{mode_name}') failed"
                 assert hasattr(mode_config, "name")
 
     def test_all_verticals_have_task_type_hints(self):

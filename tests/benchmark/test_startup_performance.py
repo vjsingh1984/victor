@@ -91,7 +91,7 @@ print(f"{end - start:.3f}")
     min_time = min(times)
     max_time = max(times)
 
-    print(f"\nBasic Victor Import Performance:")
+    print("\nBasic Victor Import Performance:")
     print(f"  Times: {[f'{t:.3f}s' for t in times]}")
     print(f"  Average: {avg_time:.3f}s")
     print(f"  Min: {min_time:.3f}s")
@@ -111,7 +111,9 @@ print(f"{end - start:.3f}")
     # Assertions - Phase 2 target is stricter
     assert avg_time < 0.5, f"Average startup time {avg_time:.3f}s exceeds Phase 2 target of 0.5s"
     assert improvement >= 69, f"Overall improvement {improvement:.1f}% is less than target of 69%"
-    assert phase2_improvement >= 10, f"Phase 2 improvement {phase2_improvement:.1f}% is less than target of 10%"
+    assert (
+        phase2_improvement >= 10
+    ), f"Phase 2 improvement {phase2_improvement:.1f}% is less than target of 10%"
 
     return avg_time
 
@@ -152,14 +154,16 @@ print(f"{baseline:.3f},{framework_incremental:.3f},{total:.3f}")
     framework_incremental = float(result[1])
     total = float(result[2])
 
-    print(f"\nFramework Core Import Performance:")
+    print("\nFramework Core Import Performance:")
     print(f"  Baseline (import victor): {baseline:.3f}s")
     print(f"  Framework incremental: {framework_incremental:.3f}s")
     print(f"  Total: {total:.3f}s")
 
     # The incremental cost of framework imports should be minimal
     # since most work happens during the base victor import
-    assert framework_incremental < 0.1, f"Framework incremental import {framework_incremental:.3f}s exceeds target of 0.1s"
+    assert (
+        framework_incremental < 0.1
+    ), f"Framework incremental import {framework_incremental:.3f}s exceeds target of 0.1s"
 
     return total
 
@@ -188,9 +192,9 @@ print(f"{elapsed:.3f}")
 
     elapsed = float(run_in_isolated_python(code))
 
-    print(f"\nIntegrations Import Performance:")
+    print("\nIntegrations Import Performance:")
     print(f"  Time: {elapsed:.3f}s")
-    print(f"  Note: This includes victor base import")
+    print("  Note: This includes victor base import")
 
     # Should be comparable to baseline since submodules are lazy loaded
     assert elapsed < 0.5, f"Integrations import {elapsed:.3f}s exceeds target of 0.5s"
@@ -220,7 +224,7 @@ print(f"{elapsed:.3f}")
 
     elapsed = float(run_in_isolated_python(code))
 
-    print(f"\nCode Executor Tool Import Performance:")
+    print("\nCode Executor Tool Import Performance:")
     print(f"  Time: {elapsed:.3f}s")
 
     # Should be comparable to baseline import since Docker is lazy loaded
@@ -256,7 +260,7 @@ print(f"{first_time:.3f},{second_time:.3f}")
     first_time = float(result[0])
     second_time = float(result[1])
 
-    print(f"\nLazy Subsystem Loading:")
+    print("\nLazy Subsystem Loading:")
     print(f"  First access: {first_time:.3f}s")
     print(f"  Second access (cached): {second_time:.3f}s")
 
@@ -282,7 +286,7 @@ print(f"{docker_loaded}")
 
     result = run_in_isolated_python(code)
 
-    print(f"\nDocker Lazy Import Verification:")
+    print("\nDocker Lazy Import Verification:")
     print(f"  Docker loaded at import: {result}")
 
     # Docker should NOT be loaded at import time
@@ -311,7 +315,7 @@ print(f"{mcp_loaded},{api_loaded}")
     mcp_loaded = result[0]
     api_loaded = result[1]
 
-    print(f"\nMCP Lazy Import Verification:")
+    print("\nMCP Lazy Import Verification:")
     print(f"  MCP loaded at import: {mcp_loaded}")
     print(f"  API loaded at import: {api_loaded}")
 
@@ -342,7 +346,7 @@ print(f"{mcp.__name__}")
     parts = lines[0].split(",")
     mcp_name = lines[1]
 
-    print(f"\nBackward Compatibility Verification:")
+    print("\nBackward Compatibility Verification:")
     print(f"  Agent: {parts[0]}")
     print(f"  CircuitBreaker: {parts[1]}")
     print(f"  mcp: {mcp_name}")
@@ -413,7 +417,7 @@ print(f"{len(all_providers)}")
     # Fourth line: total providers
     total_providers = int(result[3])
 
-    print(f"\nProvider Lazy Loading Verification:")
+    print("\nProvider Lazy Loading Verification:")
     print(f"  Import time: {import_time:.3f}s")
     print(f"  Provider implementations loaded at import: {num_loaded}")
     print(f"  Lazy import time: {lazy_import_time:.3f}s")
@@ -422,7 +426,9 @@ print(f"{len(all_providers)}")
     print(f"  Total providers available: {total_providers}")
 
     # No provider implementations should be loaded at import time
-    assert num_loaded == 0, f"Expected 0 provider implementations loaded at import, got {num_loaded}"
+    assert (
+        num_loaded == 0
+    ), f"Expected 0 provider implementations loaded at import, got {num_loaded}"
     # Lazy import should work
     assert provider_name == "AnthropicProvider", f"Expected AnthropicProvider, got {provider_name}"
     # Should have all providers available

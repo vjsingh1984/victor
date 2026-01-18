@@ -55,6 +55,7 @@ import pytest
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
 
+
 @pytest.fixture
 def run_async():
     loop = asyncio.new_event_loop()
@@ -171,7 +172,9 @@ def medium_team():
 def large_team():
     """Create large team (10 members)."""
     return [
-        MockTeamMember(f"member_{i}", ["researcher", "executor", "reviewer"][i % 3], execution_delay=0.01)
+        MockTeamMember(
+            f"member_{i}", ["researcher", "executor", "reviewer"][i % 3], execution_delay=0.01
+        )
         for i in range(10)
     ]
 
@@ -190,7 +193,9 @@ def recursion_context():
 
 
 @pytest.mark.benchmark(group="team_formations")
-@pytest.mark.parametrize("formation", ["sequential", "parallel", "pipeline", "hierarchical", "consensus"])
+@pytest.mark.parametrize(
+    "formation", ["sequential", "parallel", "pipeline", "hierarchical", "consensus"]
+)
 def test_formation_performance(benchmark, team_coordinator, small_team, formation, run_async):
     """Benchmark performance of different team formations.
 
@@ -239,7 +244,9 @@ def test_team_size_scaling(benchmark, team_coordinator, team_size, run_async):
     from victor.teams.types import TeamFormation
 
     # Create team of specified size
-    team = [MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01) for i in range(team_size)]
+    team = [
+        MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01) for i in range(team_size)
+    ]
 
     team_coordinator.clear()
     for member in team:
@@ -407,7 +414,9 @@ def test_memory_per_member(benchmark, team_coordinator, team_size, run_async):
 
     tracemalloc.start()
 
-    team = [MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01) for i in range(team_size)]
+    team = [
+        MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01) for i in range(team_size)
+    ]
 
     team_coordinator.clear()
     for member in team:
@@ -542,9 +551,7 @@ def test_large_context_scenario(benchmark, team_coordinator, run_async):
 
 @pytest.mark.benchmark(group="consensus")
 @pytest.mark.parametrize("members,rounds", [(3, 2), (5, 3), (7, 4)])
-def test_consensus_formation_performance(
-    benchmark, team_coordinator, members, rounds, run_async
-):
+def test_consensus_formation_performance(benchmark, team_coordinator, members, rounds, run_async):
     """Benchmark consensus formation with varying team sizes and rounds.
 
     Consensus formation requires multiple rounds until all members agree.
@@ -611,9 +618,7 @@ def test_team_node_performance_summary():
     for formation in formations:
         start = time.time()
         coordinator = UnifiedTeamCoordinator(lightweight_mode=True)
-        team = [
-            MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01) for i in range(3)
-        ]
+        team = [MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01) for i in range(3)]
         for member in team:
             coordinator.add_member(member)
         coordinator.set_formation(TeamFormation(formation))

@@ -167,7 +167,7 @@ class WorkflowRegistry:
                 try:
                     # Type narrowing: check if node has allowed_tools attribute
                     if hasattr(node, "allowed_tools"):
-                        setattr(node, "allowed_tools", canonical_tools)
+                        node.allowed_tools = canonical_tools
                 except AttributeError:
                     if legacy:
                         logger.warning(

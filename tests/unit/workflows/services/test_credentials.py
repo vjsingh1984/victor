@@ -212,7 +212,9 @@ class TestMFAVerifier:
     def test_get_totp_uri_success(self, mock_pyotp):
         """Test successful TOTP URI generation."""
         mock_totp = MagicMock()
-        mock_totp.provisioning_uri.return_value = "otpauth://totp/Victor:user@example.com?secret=SECRET"
+        mock_totp.provisioning_uri.return_value = (
+            "otpauth://totp/Victor:user@example.com?secret=SECRET"
+        )
         mock_pyotp.TOTP.return_value = mock_totp
 
         verifier = MFAVerifier()
@@ -973,7 +975,13 @@ class TestCredentialManager:
         assert manager._backends is not None
         # Should only have EnvironmentBackend and FileBackend
 
-    @patch.dict(os.environ, {"VICTOR_AWS_DEFAULT_ACCESS_KEY_ID": "test-key", "VICTOR_AWS_DEFAULT_SECRET_ACCESS_KEY": "test-secret"})
+    @patch.dict(
+        os.environ,
+        {
+            "VICTOR_AWS_DEFAULT_ACCESS_KEY_ID": "test-key",
+            "VICTOR_AWS_DEFAULT_SECRET_ACCESS_KEY": "test-secret",
+        },
+    )
     def test_get_aws_from_environment(self):
         """Test getting AWS credentials from environment."""
         manager = CredentialManager()

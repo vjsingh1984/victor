@@ -85,6 +85,7 @@ class ExecutionRecord:
         nodes_executed: List of node IDs executed
         metadata: Additional metadata
     """
+
     execution_id: str
     workflow_name: str
     timestamp: float
@@ -108,6 +109,7 @@ class ExecutionComparison:
         performance_diff: Performance comparison
         node_diff: Differences in node execution
     """
+
     execution_1_id: str
     execution_2_id: str
     output_diff: Dict[str, Any]
@@ -367,21 +369,15 @@ class WorkflowExecutionHistory:
             "duration_ratio": (
                 record_2.duration_seconds / record_1.duration_seconds
                 if record_1.duration_seconds > 0
-                else float('inf')
+                else float("inf")
             ),
         }
 
         # Compare node execution
         node_diff = {
-            "nodes_only_in_1": list(
-                set(record_1.nodes_executed) - set(record_2.nodes_executed)
-            ),
-            "nodes_only_in_2": list(
-                set(record_2.nodes_executed) - set(record_1.nodes_executed)
-            ),
-            "common_nodes": list(
-                set(record_1.nodes_executed) & set(record_2.nodes_executed)
-            ),
+            "nodes_only_in_1": list(set(record_1.nodes_executed) - set(record_2.nodes_executed)),
+            "nodes_only_in_2": list(set(record_2.nodes_executed) - set(record_1.nodes_executed)),
+            "common_nodes": list(set(record_1.nodes_executed) & set(record_2.nodes_executed)),
         }
 
         return ExecutionComparison(
@@ -412,11 +408,13 @@ class WorkflowExecutionHistory:
             "added_keys": list(all_keys - set(outputs_1.keys())),
             "removed_keys": list(all_keys - set(outputs_2.keys())),
             "changed_keys": [
-                k for k in all_keys
+                k
+                for k in all_keys
                 if k in outputs_1 and k in outputs_2 and outputs_1[k] != outputs_2[k]
             ],
             "unchanged_keys": [
-                k for k in all_keys
+                k
+                for k in all_keys
                 if k in outputs_1 and k in outputs_2 and outputs_1[k] == outputs_2[k]
             ],
         }
@@ -495,14 +493,10 @@ class WorkflowExecutionHistory:
         # Duration trend
         if durations[-1] > durations[0]:
             duration_trend = "increasing"
-            duration_change = (
-                (durations[-1] - durations[0]) / durations[0] * 100
-            )
+            duration_change = (durations[-1] - durations[0]) / durations[0] * 100
         else:
             duration_trend = "decreasing"
-            duration_change = (
-                (durations[0] - durations[-1]) / durations[0] * 100
-            )
+            duration_change = (durations[0] - durations[-1]) / durations[0] * 100
 
         return {
             "workflow_name": workflow_name,
@@ -674,7 +668,8 @@ class WorkflowExecutionHistory:
         """
         if workflow_name:
             to_remove = [
-                exec_id for exec_id in self._record_order
+                exec_id
+                for exec_id in self._record_order
                 if self._records[exec_id].workflow_name == workflow_name
             ]
         else:

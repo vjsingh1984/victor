@@ -197,9 +197,7 @@ def get_file_metadata(paths: List[Union[str, Path]]) -> List[FileMetadata]:
         raise FileOpsError(f"Error collecting metadata: {e}") from e
 
 
-def filter_files_by_extension(
-    files: List[FileInfo], extensions: List[str]
-) -> List[FileInfo]:
+def filter_files_by_extension(files: List[FileInfo], extensions: List[str]) -> List[FileInfo]:
     """
     Filter files by extension using efficient set-based lookup.
 

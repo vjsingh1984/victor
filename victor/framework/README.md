@@ -954,6 +954,63 @@ class MyVertical(VerticalBase):
         return "You are a specialized assistant..."
 ```
 
+### Custom Step Handlers
+
+**Step Handlers** are the primary extension mechanism for vertical development. They provide a clean, SOLID-compliant way to customize how verticals are integrated with orchestrators.
+
+```python
+from victor.framework.step_handlers import BaseStepHandler, StepHandlerRegistry
+
+class CustomToolsHandler(BaseStepHandler):
+    """Handle custom tool registration with validation."""
+
+    @property
+    def name(self) -> str:
+        return "custom_tools"
+
+    @property
+    def order(self) -> int:
+        return 12  # After default tools (10), before tiered config (15)
+
+    def _do_apply(self, orchestrator, vertical, context, result):
+        tools = vertical.get_tools()
+        validated = self._validate_tools(tools)
+        context.apply_enabled_tools(validated)
+        result.add_info(f"Applied {len(validated)} tools")
+
+# Register and use
+registry = StepHandlerRegistry.default()
+registry.add_handler(CustomToolsHandler())
+
+# Use with pipeline
+from victor.framework.vertical_integration import VerticalIntegrationPipeline
+
+pipeline = VerticalIntegrationPipeline(step_registry=registry)
+result = pipeline.apply(orchestrator, MyVertical)
+```
+
+**Benefits:**
+- **Testable**: Each handler can be unit tested independently
+- **Reusable**: Share handlers across verticals
+- **Maintainable**: Clear separation of concerns
+- **Observable**: Per-step status tracking and metrics
+
+**Built-in Handlers:**
+- `CapabilityConfigStepHandler` (order=5) - Capability config storage
+- `ToolStepHandler` (order=10) - Tool filter application
+- `TieredConfigStepHandler` (order=15) - Tiered tool config
+- `PromptStepHandler` (order=20) - System prompt and contributors
+- `ConfigStepHandler` (order=40) - Stages, modes, tool dependencies
+- `ExtensionsStepHandler` (order=45) - Coordinated extension application
+- `MiddlewareStepHandler` (order=50) - Middleware chain application
+- `FrameworkStepHandler` (order=60) - Workflows, RL, teams, chains, personas
+- `ContextStepHandler` (order=100) - Attach context to orchestrator
+
+**See Also:**
+- [Step Handler Guide](../../docs/extensions/step_handler_guide.md) - Complete guide to step handlers
+- [Step Handler Examples](../../docs/extensions/step_handler_examples.md) - Practical examples
+- [Migration Guide](../../docs/extensions/step_handler_migration.md) - Migrating from direct extension
+
 ### Custom Personas
 
 ```python

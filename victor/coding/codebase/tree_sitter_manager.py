@@ -327,12 +327,18 @@ def extract_symbols_parallel(
 
             for node in all_nodes:
                 if hasattr(node, "text"):
-                    symbols.append({
-                        "name": node.text.decode("utf-8") if isinstance(node.text, bytes) else node.text,
-                        "type": node.parent.type if node.parent else "unknown",
-                        "line": node.start_point[0] + 1,
-                        "column": node.start_point[1],
-                    })
+                    symbols.append(
+                        {
+                            "name": (
+                                node.text.decode("utf-8")
+                                if isinstance(node.text, bytes)
+                                else node.text
+                            ),
+                            "type": node.parent.type if node.parent else "unknown",
+                            "line": node.start_point[0] + 1,
+                            "column": node.start_point[1],
+                        }
+                    )
 
             results[file_path] = symbols
 

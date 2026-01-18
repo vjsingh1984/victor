@@ -111,6 +111,7 @@ class TestExecutionContext:
 
     def test_with_complex_services(self):
         """Test with complex services object."""
+
         class Service1:
             def method1(self):
                 return "service1"
@@ -134,6 +135,7 @@ class TestExecutionContext:
 # Helper function to create a mock orchestrator
 def mock_orchestrator():
     """Create a mock orchestrator for testing."""
+
     class MockOrchestrator:
         def __init__(self):
             self.name = "mock_orchestrator"

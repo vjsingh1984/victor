@@ -138,9 +138,7 @@ class LinterResult:
         else:
             return self._generate_text_report(include_suggestions, include_context)
 
-    def _generate_text_report(
-        self, include_suggestions: bool, include_context: bool
-    ) -> str:
+    def _generate_text_report(self, include_suggestions: bool, include_context: bool) -> str:
         """Generate text report."""
         lines = []
         lines.append("=" * 60)
@@ -172,9 +170,12 @@ class LinterResult:
             if not issues:
                 continue
 
-            icon = {Severity.ERROR: "✗", Severity.WARNING: "⚠", Severity.INFO: "ℹ", Severity.SUGGESTION: "💡"}[
-                severity
-            ]
+            icon = {
+                Severity.ERROR: "✗",
+                Severity.WARNING: "⚠",
+                Severity.INFO: "ℹ",
+                Severity.SUGGESTION: "💡",
+            }[severity]
             lines.append(f"{icon} {severity.value.upper()} ({len(issues)}):")
             lines.append("")
 
@@ -192,9 +193,7 @@ class LinterResult:
 
         return "\n".join(lines)
 
-    def _generate_markdown_report(
-        self, include_suggestions: bool, include_context: bool
-    ) -> str:
+    def _generate_markdown_report(self, include_suggestions: bool, include_context: bool) -> str:
         """Generate Markdown report."""
         lines = []
         lines.append("# Workflow Linting Report")
@@ -226,9 +225,12 @@ class LinterResult:
             if not issues:
                 continue
 
-            icon = {Severity.ERROR: "❌", Severity.WARNING: "⚠️", Severity.INFO: "ℹ️", Severity.SUGGESTION: "💡"}[
-                severity
-            ]
+            icon = {
+                Severity.ERROR: "❌",
+                Severity.WARNING: "⚠️",
+                Severity.INFO: "ℹ️",
+                Severity.SUGGESTION: "💡",
+            }[severity]
             lines.append(f"### {icon} {severity.value.upper()} ({len(issues)})")
             lines.append("")
 
@@ -242,15 +244,15 @@ class LinterResult:
                     lines.append(f"- **Suggestion:** {issue.suggestion}")
 
                 if include_context and issue.context:
-                    lines.append(f"- **Context:** ```json\n{json.dumps(issue.context, indent=2)}\n```")
+                    lines.append(
+                        f"- **Context:** ```json\n{json.dumps(issue.context, indent=2)}\n```"
+                    )
 
                 lines.append("")
 
         return "\n".join(lines)
 
-    def _generate_json_report(
-        self, include_suggestions: bool, include_context: bool
-    ) -> str:
+    def _generate_json_report(self, include_suggestions: bool, include_context: bool) -> str:
         """Generate JSON report."""
         report = {
             "summary": {
@@ -263,7 +265,9 @@ class LinterResult:
                 "suggestion_count": self.suggestion_count,
             },
             "issues": [
-                issue.to_dict() for issue in self.issues if include_suggestions or not issue.suggestion
+                issue.to_dict()
+                for issue in self.issues
+                if include_suggestions or not issue.suggestion
             ],
         }
 
@@ -516,7 +520,12 @@ class WorkflowLinter:
                 )
 
         # Sort issues: by severity, then category, then location
-        severity_order = {Severity.ERROR: 0, Severity.WARNING: 1, Severity.INFO: 2, Severity.SUGGESTION: 3}
+        severity_order = {
+            Severity.ERROR: 0,
+            Severity.WARNING: 1,
+            Severity.INFO: 2,
+            Severity.SUGGESTION: 3,
+        }
         all_issues.sort(
             key=lambda i: (severity_order.get(i.severity, 99), i.category.value, i.location)
         )

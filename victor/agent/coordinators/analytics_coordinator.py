@@ -148,9 +148,7 @@ class AnalyticsCoordinator:
         self._session_analytics[session_id].events.append(event)
         self._session_analytics[session_id].updated_at = datetime.utcnow().isoformat()
 
-        logger.debug(
-            f"Tracked analytics event {event.event_type} for session {session_id}"
-        )
+        logger.debug(f"Tracked analytics event {event.event_type} for session {session_id}")
 
     async def export_analytics(
         self,
@@ -409,18 +407,14 @@ class AnalyticsCoordinator:
                 # New vertical middleware - use get_config() if available or default values
                 status["components"]["code_correction"]["config"] = {
                     "auto_fix": getattr(code_correction_middleware, "auto_fix", True),
-                    "max_iterations": getattr(
-                        code_correction_middleware, "max_iterations", 1
-                    ),
+                    "max_iterations": getattr(code_correction_middleware, "max_iterations", 1),
                 }
 
         # Safety Checker
         status["components"]["safety_checker"] = {
             "enabled": safety_checker is not None,
             "has_confirmation_callback": (
-                safety_checker.confirmation_callback is not None
-                if safety_checker
-                else False
+                safety_checker.confirmation_callback is not None if safety_checker else False
             ),
         }
 

@@ -145,7 +145,9 @@ class TestToolAccessCoordinatorCheckAccess:
         assert decision.tool_name == "unknown_tool"
         assert decision.layer == "default"
 
-    def test_check_access_unregistered_tool_strict_mode(self, coordinator_strict: ToolAccessCoordinator):
+    def test_check_access_unregistered_tool_strict_mode(
+        self, coordinator_strict: ToolAccessCoordinator
+    ):
         """Test access check for unregistered tool with strict_mode=True."""
         # Execute
         decision = coordinator_strict.check_access("unknown_tool")
@@ -570,7 +572,7 @@ class TestToolAccessCoordinatorSetEnabledTools:
     def test_set_enabled_tools_with_duplicate_names(self, coordinator: ToolAccessCoordinator):
         """Test set_enabled_tools handles duplicate tool names."""
         # Execute - set with duplicates (shouldn't happen but testing robustness)
-        coordinator.set_enabled_tools({"read_file", "read_file"})
+        coordinator.set_enabled_tools({"read_file"})
 
         # Assert - should deduplicate
         assert coordinator._session_enabled_tools == {"read_file"}
@@ -612,7 +614,9 @@ class TestToolAccessCoordinatorClearSessionRestrictions:
         # Assert
         assert coordinator._session_enabled_tools is None
 
-    def test_clear_session_restrictions_after_multiple_sets(self, coordinator: ToolAccessCoordinator):
+    def test_clear_session_restrictions_after_multiple_sets(
+        self, coordinator: ToolAccessCoordinator
+    ):
         """Test clear_session_restrictions after multiple set operations."""
         # Setup
         coordinator.set_enabled_tools({"read_file"})

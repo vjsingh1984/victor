@@ -238,10 +238,10 @@ class SerializationAccelerator:
         # Auto-detect format from extension
         if format is None:
             ext = file_path.suffix.lower()
-            if ext in ['.yaml', '.yml']:
-                format = 'yaml'
-            elif ext == '.json':
-                format = 'json'
+            if ext in [".yaml", ".yml"]:
+                format = "yaml"
+            elif ext == ".json":
+                format = "json"
             else:
                 raise ValueError(f"Cannot detect format from extension: {ext}")
 
@@ -252,9 +252,9 @@ class SerializationAccelerator:
             raise IOError(f"Failed to read config file: {e}")
 
         # Parse based on format
-        if format == 'json':
+        if format == "json":
             data = self.parse_json(content)
-        elif format == 'yaml':
+        elif format == "yaml":
             data = self.parse_yaml(content)
         else:
             raise ValueError(f"Unsupported format: {format}")

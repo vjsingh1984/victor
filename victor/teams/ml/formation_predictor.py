@@ -150,7 +150,7 @@ class FormationPredictor:
             return FormationPrediction(
                 formation=TeamFormation.SEQUENTIAL,
                 confidence=0.0,
-                probabilities={f: 0.2 for f in self._formations},
+                probabilities=dict.fromkeys(self._formations, 0.2),
                 reasoning="No prediction method available, using default",
             )
 
@@ -169,10 +169,12 @@ class FormationPredictor:
             Formation prediction
         """
         # Create feature vector
-        feature_vector = np.concatenate([
-            task_features.to_feature_vector(),
-            team_features.to_feature_vector(),
-        ])
+        feature_vector = np.concatenate(
+            [
+                task_features.to_feature_vector(),
+                team_features.to_feature_vector(),
+            ]
+        )
 
         # Scale features
         if self._scaler:
@@ -219,41 +221,41 @@ class FormationPredictor:
 
         # SEQUENTIAL: Good for simple, single-file, low-complexity tasks
         sequential_score = (
-            (1.0 - task_features.complexity) * 0.5 +
-            (1.0 / max(1, task_features.file_count)) * 0.3 +
-            (1.0 - task_features.urgency) * 0.2
+            (1.0 - task_features.complexity) * 0.5
+            + (1.0 / max(1, task_features.file_count)) * 0.3
+            + (1.0 - task_features.urgency) * 0.2
         )
         scores["sequential"] = sequential_score
 
         # PARALLEL: Good for complex, multi-file, high-urgency tasks
         parallel_score = (
-            task_features.complexity * 0.4 +
-            min(1.0, task_features.file_count / 5) * 0.4 +
-            task_features.urgency * 0.2
+            task_features.complexity * 0.4
+            + min(1.0, task_features.file_count / 5) * 0.4
+            + task_features.urgency * 0.2
         )
         scores["parallel"] = parallel_score
 
         # HIERARCHICAL: Good for complex tasks with manager
         hierarchical_score = (
-            task_features.complexity * 0.5 +
-            float(team_features.has_manager) * 0.3 +
-            (team_features.member_count / 10) * 0.2
+            task_features.complexity * 0.5
+            + float(team_features.has_manager) * 0.3
+            + (team_features.member_count / 10) * 0.2
         )
         scores["hierarchical"] = hierarchical_score
 
         # PIPELINE: Good for sequential dependencies, multi-stage tasks
         pipeline_score = (
-            (min(1.0, task_features.file_count / 3)) * 0.5 +
-            (1.0 - task_features.urgency) * 0.3 +
-            task_features.novelty * 0.2
+            (min(1.0, task_features.file_count / 3)) * 0.5
+            + (1.0 - task_features.urgency) * 0.3
+            + task_features.novelty * 0.2
         )
         scores["pipeline"] = pipeline_score
 
         # CONSENSUS: Good for high-quality, low-urgency requirements
         consensus_score = (
-            (1.0 - task_features.urgency) * 0.4 +
-            team_features.diversity * 0.4 +
-            (1.0 - task_features.complexity) * 0.2
+            (1.0 - task_features.urgency) * 0.4
+            + team_features.diversity * 0.4
+            + (1.0 - task_features.complexity) * 0.2
         )
         scores["consensus"] = consensus_score
 
@@ -267,9 +269,7 @@ class FormationPredictor:
         confidence = probabilities[best_formation_str]
 
         # Generate reasoning
-        reasoning = self._generate_heuristic_reasoning(
-            best_formation, task_features, team_features
-        )
+        reasoning = self._generate_heuristic_reasoning(best_formation, task_features, team_features)
 
         return FormationPrediction(
             formation=best_formation,
@@ -388,10 +388,12 @@ class FormationPredictor:
             success = example.get("success", True)
 
             # Extract features
-            feature_vector = np.concatenate([
-                task_features.to_feature_vector(),
-                team_features.to_feature_vector(),
-            ])
+            feature_vector = np.concatenate(
+                [
+                    task_features.to_feature_vector(),
+                    team_features.to_feature_vector(),
+                ]
+            )
 
             X.append(feature_vector)
             y.append(self._formations.index(formation.value))

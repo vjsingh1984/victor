@@ -33,6 +33,7 @@ from victor.framework.tools import ToolSet
 # Test Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def temp_yaml_vertical(tmp_path):
     """Create a temporary vertical with YAML configuration."""
@@ -91,6 +92,7 @@ tiered_tools:
 
     # Create Python vertical class
     import sys
+
     # Add temp_path to sys.path so we can import the module
     sys.path.insert(0, str(tmp_path))
 
@@ -134,6 +136,7 @@ def temp_no_yaml_vertical(tmp_path):
 
     # Create Python vertical class
     import sys
+
     sys.path.insert(0, str(tmp_path))
 
     init_file = vertical_dir / "__init__.py"
@@ -167,6 +170,7 @@ class TestNoYAMLVertical(VerticalBase):
 # ============================================================================
 # Tests
 # ============================================================================
+
 
 class TestYAMLConfigLoading:
     """Tests for YAML configuration loading."""
@@ -325,6 +329,7 @@ class TestBackwardCompatibility:
 # Tests for CodingAssistant YAML Config
 # ============================================================================
 
+
 class TestCodingAssistantYAML:
     """Tests for CodingAssistant's YAML configuration."""
 
@@ -348,7 +353,10 @@ class TestCodingAssistantYAML:
         yaml_path = CodingAssistant._get_yaml_config_path()
         if yaml_path and yaml_path.exists():
             # Loaded from YAML
-            assert "Victor" in config.system_prompt or "software development" in config.system_prompt.lower()
+            assert (
+                "Victor" in config.system_prompt
+                or "software development" in config.system_prompt.lower()
+            )
         else:
             # Loaded from programmatic methods
             assert len(config.tools.tools) > 0
@@ -364,4 +372,6 @@ class TestCodingAssistantYAML:
 
         # Check for common stages
         stage_names = list(config.stages.keys())
-        assert any(stage in stage_names for stage in ["INITIAL", "PLANNING", "EXECUTING", "VERIFICATION"])
+        assert any(
+            stage in stage_names for stage in ["INITIAL", "PLANNING", "EXECUTING", "VERIFICATION"]
+        )

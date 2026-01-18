@@ -115,9 +115,7 @@ class TestConfigCoordinator:
     def coordinator_with_providers(self):
         """Create coordinator with mock providers."""
         provider1 = MockConfigProvider({"temperature": 0.3}, priority=10)
-        provider2 = MockConfigProvider(
-            {"max_tokens": 1024, "temperature": 0.7}, priority=100
-        )
+        provider2 = MockConfigProvider({"max_tokens": 1024, "temperature": 0.7}, priority=100)
         return ConfigCoordinator(providers=[provider1, provider2])
 
     def test_init_empty(self):
@@ -129,9 +127,7 @@ class TestConfigCoordinator:
     def test_init_with_providers(self):
         """Test initialization with providers."""
         provider = MockConfigProvider({}, priority=50)
-        coordinator = ConfigCoordinator(
-            providers=[provider], enable_cache=False
-        )
+        coordinator = ConfigCoordinator(providers=[provider], enable_cache=False)
 
         assert len(coordinator._providers) == 1
         assert coordinator._enable_cache is False
@@ -215,9 +211,7 @@ class TestConfigCoordinator:
     async def test_load_orchestrator_config(self, coordinator_with_providers):
         """Test loading OrchestratorConfig."""
         config = await coordinator_with_providers.load_orchestrator_config(
-            session_id="session123",
-            provider="anthropic",
-            model="claude-sonnet-4-5"
+            session_id="session123", provider="anthropic", model="claude-sonnet-4-5"
         )
 
         assert isinstance(config, OrchestratorConfig)
@@ -379,18 +373,14 @@ class TestValidationResult:
 
     def test_validation_result_with_errors(self):
         """Test validation result with errors."""
-        result = ValidationResult(
-            valid=False, errors=["Missing field", "Invalid value"]
-        )
+        result = ValidationResult(valid=False, errors=["Missing field", "Invalid value"])
 
         assert result.valid is False
         assert len(result.errors) == 2
 
     def test_validation_result_with_warnings(self):
         """Test validation result with warnings."""
-        result = ValidationResult(
-            valid=True, errors=[], warnings=["High temperature"]
-        )
+        result = ValidationResult(valid=True, errors=[], warnings=["High temperature"])
 
         assert result.valid is True
         assert len(result.warnings) == 1
@@ -410,9 +400,7 @@ class TestOrchestratorConfig:
     def test_orchestrator_config_defaults(self):
         """Test default values."""
         config = OrchestratorConfig(
-            session_id="session123",
-            provider="anthropic",
-            model="claude-sonnet-4-5"
+            session_id="session123", provider="anthropic", model="claude-sonnet-4-5"
         )
 
         assert config.temperature == 0.7
@@ -433,7 +421,7 @@ class TestOrchestratorConfig:
             thinking=True,
             profile_name="fast",
             tool_selection={"base_threshold": 0.3},
-            metadata={"custom": "value"}
+            metadata={"custom": "value"},
         )
 
         assert config.temperature == 0.5
@@ -450,8 +438,11 @@ class TestProfileConfigProvider:
     @pytest.fixture
     def mock_settings_with_profiles(self):
         """Create mock settings with profiles."""
+
         class MockProfile:
-            def __init__(self, provider, model, temperature=0.7, max_tokens=4096, tool_selection=None):
+            def __init__(
+                self, provider, model, temperature=0.7, max_tokens=4096, tool_selection=None
+            ):
                 self.provider = provider
                 self.model = model
                 self.temperature = temperature
@@ -497,9 +488,7 @@ class TestProfileConfigProvider:
             await provider.get_config("session123")
 
     @pytest.mark.asyncio
-    async def test_get_config_profile_not_found_with_suggestions(
-        self, mock_settings_with_profiles
-    ):
+    async def test_get_config_profile_not_found_with_suggestions(self, mock_settings_with_profiles):
         """Test error message includes profile suggestions."""
         from victor.agent.coordinators.config_coordinator import ProfileConfigProvider
 
@@ -569,9 +558,7 @@ class TestConfigCoordinatorErrorHandling:
             def priority(self):
                 return 50
 
-        coordinator = ConfigCoordinator(
-            providers=[FailingProvider(), WorkingProvider()]
-        )
+        coordinator = ConfigCoordinator(providers=[FailingProvider(), WorkingProvider()])
 
         config = await coordinator.load_config("session123")
         assert config["temperature"] == 0.5
@@ -589,9 +576,7 @@ class TestConfigCoordinatorCreateProvider:
         coordinator = ConfigCoordinator(providers=[])
 
         with pytest.raises(ValueError, match="Configuration missing 'provider' field"):
-            await coordinator.create_provider_from_config(
-                config={}, settings=MockSettings()
-            )
+            await coordinator.create_provider_from_config(config={}, settings=MockSettings())
 
     @pytest.mark.asyncio
     async def test_create_provider_with_mock_registry(self):
@@ -861,9 +846,7 @@ class TestToolAccessConfigCoordinator:
         assert result.valid is True
         assert len(result.errors) == 0
 
-    def test_validate_mode_transition_restrictive_with_warnings(
-        self, tool_access_coordinator
-    ):
+    def test_validate_mode_transition_restrictive_with_warnings(self, tool_access_coordinator):
         """Test validating transition to restrictive mode with write tools."""
         result = tool_access_coordinator.validate_mode_transition(
             from_mode="build",
@@ -875,9 +858,7 @@ class TestToolAccessConfigCoordinator:
         assert len(result.warnings) > 0
         assert "write" in str(result.warnings).lower()
 
-    def test_validate_mode_transition_restrictive_no_write_tools(
-        self, tool_access_coordinator
-    ):
+    def test_validate_mode_transition_restrictive_no_write_tools(self, tool_access_coordinator):
         """Test validating transition to restrictive mode without write tools."""
         result = tool_access_coordinator.validate_mode_transition(
             from_mode="build", to_mode="explore", current_tools={"read_file", "search"}

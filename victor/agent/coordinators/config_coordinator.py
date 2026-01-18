@@ -416,18 +416,14 @@ class ConfigCoordinator:
         profile_overrides = config.get("profile_overrides")
         if profile_overrides:
             provider_settings.update(profile_overrides)
-            logger.debug(
-                f"Applied profile overrides: {list(profile_overrides.keys())}"
-            )
+            logger.debug(f"Applied profile overrides: {list(profile_overrides.keys())}")
 
         # Apply timeout multiplier from model capabilities
         # Slow local models (Ollama, LMStudio) get longer timeouts
         from victor.agent.tool_calling.capabilities import ModelCapabilityLoader
 
         cap_loader = ModelCapabilityLoader()
-        caps = cap_loader.get_capabilities(
-            provider_name, config.get("model", "")
-        )
+        caps = cap_loader.get_capabilities(provider_name, config.get("model", ""))
         if caps and caps.timeout_multiplier > 1.0:
             base_timeout = provider_settings.get("timeout", 300)
             adjusted_timeout = int(base_timeout * caps.timeout_multiplier)
@@ -443,6 +439,7 @@ class ConfigCoordinator:
 
 
 # Built-in config providers
+
 
 class SettingsConfigProvider(IConfigProvider):
     """Configuration provider that reads from Settings object.
@@ -598,9 +595,7 @@ class ProfileConfigProvider(IConfigProvider):
             # Use difflib for similar name suggestions
             import difflib
 
-            suggestions = difflib.get_close_matches(
-                self._profile_name, available, n=3, cutoff=0.4
-            )
+            suggestions = difflib.get_close_matches(self._profile_name, available, n=3, cutoff=0.4)
 
             error_msg = f"Profile not found: '{self._profile_name}'"
             if suggestions:
@@ -745,9 +740,7 @@ class ToolAccessConfigCoordinator:
         """
         # Use ToolAccessController if available (new unified approach)
         if self._tool_access_controller:
-            context = self.build_tool_access_context(
-                session_enabled_tools=session_enabled_tools
-            )
+            context = self.build_tool_access_context(session_enabled_tools=session_enabled_tools)
             result: Any = self._tool_access_controller.get_allowed_tools(context)
             return cast(Set[str], result)
 
@@ -789,9 +782,7 @@ class ToolAccessConfigCoordinator:
         """
         # Use ToolAccessController if available (new unified approach)
         if self._tool_access_controller:
-            context = self.build_tool_access_context(
-                session_enabled_tools=session_enabled_tools
-            )
+            context = self.build_tool_access_context(session_enabled_tools=session_enabled_tools)
             decision: Any = self._tool_access_controller.check_access(tool_name, context)
             return cast(bool, getattr(decision, "allowed", True))
 

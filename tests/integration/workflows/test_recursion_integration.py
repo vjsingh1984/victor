@@ -34,10 +34,12 @@ from victor.workflows.recursion import RecursionContext, RecursionDepthError
 def mock_orchestrator():
     """Create a mock orchestrator."""
     orchestrator = MagicMock()
-    orchestrator.execute_task = AsyncMock(return_value={
-        "output": "Test result",
-        "tool_calls": 0,
-    })
+    orchestrator.execute_task = AsyncMock(
+        return_value={
+            "output": "Test result",
+            "tool_calls": 0,
+        }
+    )
     return orchestrator
 
 

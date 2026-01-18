@@ -123,7 +123,9 @@ class BaseMiddleware(ABC, IMiddleware):
         self._applicable_tools = applicable_tools
         self._priority = priority
         self._phase = phase
-        self._logger = logging.getLogger(logger_name) if logger_name else logging.getLogger(__name__)
+        self._logger = (
+            logging.getLogger(logger_name) if logger_name else logging.getLogger(__name__)
+        )
 
     @property
     def enabled(self) -> bool:
@@ -145,9 +147,7 @@ class BaseMiddleware(ABC, IMiddleware):
         self._logger.debug(f"{self.__class__.__name__} disabled")
 
     @abstractmethod
-    async def before_tool_call(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
         """Process tool call before execution.
 
         Subclasses must implement this method to define their

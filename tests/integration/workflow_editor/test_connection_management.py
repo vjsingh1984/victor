@@ -66,7 +66,9 @@ workflows:
 """
 
         config = YAMLWorkflowConfig()
-        workflow_def = load_workflow_from_yaml(yaml_content, "linear", config)  # Returns WorkflowDefinition directly when name is provided
+        workflow_def = load_workflow_from_yaml(
+            yaml_content, "linear", config
+        )  # Returns WorkflowDefinition directly when name is provided
 
         # Build connection map
         connections = self._build_connection_map(workflow_def)
@@ -133,7 +135,9 @@ workflows:
 """
 
         config = YAMLWorkflowConfig()
-        workflow_def = load_workflow_from_yaml(yaml_content, "parallel", config)  # Returns WorkflowDefinition directly
+        workflow_def = load_workflow_from_yaml(
+            yaml_content, "parallel", config
+        )  # Returns WorkflowDefinition directly
 
         # Build connection map
         connections = self._build_connection_map(workflow_def)
@@ -190,11 +194,15 @@ class TestConnectionValidation:
         for node in workflow_def.nodes.values():  # Fixed: iterate over values
             if hasattr(node, "next_nodes") and node.next_nodes:
                 for target_id in node.next_nodes:
-                    assert target_id in all_node_ids, f"Dangling connection: {node.id} -> {target_id}"
+                    assert (
+                        target_id in all_node_ids
+                    ), f"Dangling connection: {node.id} -> {target_id}"
 
             if hasattr(node, "branches") and node.branches:
                 for branch_name, target_id in node.branches.items():
-                    assert target_id in all_node_ids, f"Dangling branch: {node.id}.{branch_name} -> {target_id}"
+                    assert (
+                        target_id in all_node_ids
+                    ), f"Dangling branch: {node.id}.{branch_name} -> {target_id}"
 
     def test_validate_no_self_loops(self):
         """Test that nodes don't connect to themselves."""
@@ -304,16 +312,8 @@ class TestConnectionTransformation:
         graph_edges = [
             {"source": "node_a", "target": "node_b", "label": None},
             {"source": "node_b", "target": "node_c", "label": None},
-            {
-                "source": "decision",
-                "target": "option_a",
-                "label": "yes"
-            },
-            {
-                "source": "decision",
-                "target": "option_b",
-                "label": "no"
-            },
+            {"source": "decision", "target": "option_a", "label": "yes"},
+            {"source": "decision", "target": "option_b", "label": "no"},
         ]
 
         # Group edges by source
@@ -450,15 +450,17 @@ class TestConnectionPaths:
         connections = self._build_connection_map_with_branches(workflow_def)
 
         # Find all paths from start to end
-        start_nodes = [n for n in workflow_def.nodes.values() if not self._has_incoming(n, workflow_def)]
-        end_nodes = [n for n in workflow_def.nodes.values() if not hasattr(n, "next_nodes") or not n.next_nodes]
+        start_nodes = [
+            n for n in workflow_def.nodes.values() if not self._has_incoming(n, workflow_def)
+        ]
+        end_nodes = [
+            n
+            for n in workflow_def.nodes.values()
+            if not hasattr(n, "next_nodes") or not n.next_nodes
+        ]
 
         if start_nodes and end_nodes:
-            paths = self._find_all_paths(
-                connections,
-                start_nodes[0].id,
-                end_nodes[0].id
-            )
+            paths = self._find_all_paths(connections, start_nodes[0].id, end_nodes[0].id)
             # Should find multiple paths due to branching
             assert len(paths) >= 1
 
@@ -479,7 +481,9 @@ class TestConnectionPaths:
 
         assert len(critical_path) == 4  # start -> a -> c -> end (or start -> b -> c -> end)
 
-    def _build_connection_map_with_branches(self, workflow_def: WorkflowDefinition) -> Dict[str, List[str]]:
+    def _build_connection_map_with_branches(
+        self, workflow_def: WorkflowDefinition
+    ) -> Dict[str, List[str]]:
         """Build connection map including conditional branches."""
         connections = {}
         for node in workflow_def.nodes.values():  # Fixed: iterate over values
@@ -508,11 +512,7 @@ class TestConnectionPaths:
         return False
 
     def _find_all_paths(
-        self,
-        connections: Dict[str, List[str]],
-        start: str,
-        end: str,
-        path: List[str] = None
+        self, connections: Dict[str, List[str]], start: str, end: str, path: List[str] = None
     ) -> List[List[str]]:
         """Find all paths from start to end using DFS."""
         if path is None:
@@ -550,12 +550,14 @@ class TestConnectionVisualization:
             if isinstance(node, ConditionNode):
                 # Create labeled edges for branches
                 for branch_name, target_id in node.branches.items():
-                    edge_labels.append({
-                        "source": node.id,
-                        "target": target_id,
-                        "label": branch_name,
-                        "type": "conditional",
-                    })
+                    edge_labels.append(
+                        {
+                            "source": node.id,
+                            "target": target_id,
+                            "label": branch_name,
+                            "type": "conditional",
+                        }
+                    )
 
         # Verify labels
         assert len(edge_labels) > 0
@@ -584,11 +586,13 @@ class TestConnectionVisualization:
                     edge_type = "team_output"
 
                 for target_id in node.next_nodes:
-                    edge_types.append({
-                        "source": node.id,
-                        "target": target_id,
-                        "type": edge_type,
-                    })
+                    edge_types.append(
+                        {
+                            "source": node.id,
+                            "target": target_id,
+                            "type": edge_type,
+                        }
+                    )
 
         # Verify classification
         assert len(edge_types) > 0
@@ -629,7 +633,9 @@ workflows:
 """
 
         config = YAMLWorkflowConfig()
-        workflow_def = load_workflow_from_yaml(yaml_content, "layout_test", config)  # Returns WorkflowDefinition directly
+        workflow_def = load_workflow_from_yaml(
+            yaml_content, "layout_test", config
+        )  # Returns WorkflowDefinition directly
 
         # Generate layout hints
         layout_hints = {}
@@ -659,28 +665,29 @@ class TestConnectionSerialization:
         workflow_def = workflows["team_node_demo"]
 
         # Build connection data
-        connection_data = {
-            "workflow_id": workflow_def.name,
-            "connections": []
-        }
+        connection_data = {"workflow_id": workflow_def.name, "connections": []}
 
         for node in workflow_def.nodes.values():  # Fixed: iterate over values
             if hasattr(node, "next_nodes") and node.next_nodes:
                 for target_id in node.next_nodes:
-                    connection_data["connections"].append({
-                        "source": node.id,
-                        "target": target_id,
-                        "type": "standard",
-                    })
+                    connection_data["connections"].append(
+                        {
+                            "source": node.id,
+                            "target": target_id,
+                            "type": "standard",
+                        }
+                    )
 
             if hasattr(node, "branches") and node.branches:
                 for branch_name, target_id in node.branches.items():
-                    connection_data["connections"].append({
-                        "source": node.id,
-                        "target": target_id,
-                        "type": "conditional",
-                        "label": branch_name,
-                    })
+                    connection_data["connections"].append(
+                        {
+                            "source": node.id,
+                            "target": target_id,
+                            "type": "conditional",
+                            "label": branch_name,
+                        }
+                    )
 
         # Serialize to JSON
         json_str = json.dumps(connection_data)

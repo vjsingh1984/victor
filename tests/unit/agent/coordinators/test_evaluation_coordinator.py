@@ -907,9 +907,7 @@ class TestEvaluationCoordinatorFlushAnalytics:
         mock_usage_analytics.flush = Mock()
 
         mock_sequence_tracker = Mock()
-        mock_sequence_tracker.get_statistics = Mock(
-            return_value={"unique_transitions": 42}
-        )
+        mock_sequence_tracker.get_statistics = Mock(return_value={"unique_transitions": 42})
 
         coordinator = EvaluationCoordinator(
             usage_analytics=mock_usage_analytics,
@@ -984,9 +982,7 @@ class TestEvaluationCoordinatorFlushAnalytics:
     async def test_flush_analytics_with_sequence_tracker_failure(self):
         """Test flushing when sequence tracker raises exception."""
         mock_sequence_tracker = Mock()
-        mock_sequence_tracker.get_statistics = Mock(
-            side_effect=RuntimeError("Tracker error")
-        )
+        mock_sequence_tracker.get_statistics = Mock(side_effect=RuntimeError("Tracker error"))
 
         coordinator = EvaluationCoordinator(
             usage_analytics=None,
@@ -1017,9 +1013,7 @@ class TestEvaluationCoordinatorFlushAnalytics:
         mock_usage_analytics.flush = Mock()
 
         mock_sequence_tracker = Mock()
-        mock_sequence_tracker.get_statistics = Mock(
-            return_value={"unique_transitions": 10}
-        )
+        mock_sequence_tracker.get_statistics = Mock(return_value={"unique_transitions": 10})
 
         coordinator = EvaluationCoordinator(
             usage_analytics=mock_usage_analytics,
@@ -1127,9 +1121,7 @@ class TestEvaluationCoordinatorIntegrationScenarios:
         mock_usage_analytics.flush = Mock()
 
         mock_sequence_tracker = Mock()
-        mock_sequence_tracker.get_statistics = Mock(
-            return_value={"unique_transitions": 5}
-        )
+        mock_sequence_tracker.get_statistics = Mock(return_value={"unique_transitions": 5})
 
         mock_provider = Mock()
         mock_provider.name = "anthropic"

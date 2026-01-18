@@ -52,6 +52,7 @@ if TYPE_CHECKING:
     # This avoids circular imports
     class ConversationContext:
         """Placeholder for type checking."""
+
         token_count: int
 
 

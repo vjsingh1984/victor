@@ -64,7 +64,11 @@ from victor.agent.provider import (
     ProviderSwitcherState,
 )
 from victor.agent.strategies import DefaultProviderClassificationStrategy
-from victor.core.errors import ProviderNotFoundError, ProviderInitializationError, ConfigurationError
+from victor.core.errors import (
+    ProviderNotFoundError,
+    ProviderInitializationError,
+    ConfigurationError,
+)
 from victor.protocols.provider_manager import SwitchResult, HealthStatus
 from victor.providers.base import BaseProvider
 from victor.providers.registry import ProviderRegistry
@@ -290,19 +294,19 @@ class ProviderManager:
 
         # Check if provider exists in registry BEFORE attempting initialization
         # Only do this check if we're not in a test environment (mocked registry)
-        providers_dict = getattr(ProviderRegistry, '_providers', None)
+        providers_dict = getattr(ProviderRegistry, "_providers", None)
         if providers_dict is not None and isinstance(providers_dict, dict):
             if provider_name not in providers_dict:
                 # Provider not in registry - show available providers
                 available_list = ProviderRegistry.list_providers()
-                available = ', '.join(available_list[:10])
+                available = ", ".join(available_list[:10])
 
                 raise ProviderNotFoundError(
                     f"Provider '{provider_name}' is not registered. "
                     f"Available providers: {available}\n"
                     f"Use 'victor providers list' to see all providers.",
                     provider=provider_name,
-                    available_providers=available_list
+                    available_providers=available_list,
                 )
 
         # Try to initialize the provider
@@ -315,7 +319,7 @@ class ProviderManager:
             raise
         except ConfigurationError as e:
             # Configuration error - specific hint about config key
-            config_key = getattr(e, 'config_key', None) or f"{provider_name.upper()}_API_KEY"
+            config_key = getattr(e, "config_key", None) or f"{provider_name.upper()}_API_KEY"
             raise ProviderInitializationError(
                 f"Provider '{provider_name}' failed to initialize: {e}. "
                 f"Check your API credentials and configuration.",
@@ -499,7 +503,9 @@ class ProviderManager:
                     )
                     fallback_result = await self._attempt_fallback(reason)
                     if not fallback_result:
-                        error_message = f"Failed to switch to {provider_name} and all fallbacks exhausted"
+                        error_message = (
+                            f"Failed to switch to {provider_name} and all fallbacks exhausted"
+                        )
                         # Return appropriate type based on return_result_object flag
                         if return_result_object:
                             return SwitchResult(
@@ -516,7 +522,9 @@ class ProviderManager:
                         # Sync legacy state with switcher state
                         switcher_state = self._provider_switcher.get_current_state()
                         if switcher_state:
-                            _old_switch_count = self._current_state.switch_count if self._current_state else 0
+                            _old_switch_count = (
+                                self._current_state.switch_count if self._current_state else 0
+                            )
                             self._current_state = ProviderState(
                                 provider=switcher_state.provider,
                                 provider_name=switcher_state.provider_name,
@@ -541,8 +549,14 @@ class ProviderManager:
                             metadata = {
                                 "switch_count": self._current_state.switch_count,
                                 "context_window": self.get_context_window(),
-                                "supports_tools": self.provider.supports_tools() if self.provider else False,
-                                "native_tool_calls": self.capabilities.native_tool_calls if self.capabilities else False,
+                                "supports_tools": (
+                                    self.provider.supports_tools() if self.provider else False
+                                ),
+                                "native_tool_calls": (
+                                    self.capabilities.native_tool_calls
+                                    if self.capabilities
+                                    else False
+                                ),
                             }
 
                             if self._current_state.runtime_capabilities:
@@ -606,7 +620,9 @@ class ProviderManager:
                     "switch_count": self._current_state.switch_count,
                     "context_window": self.get_context_window(),
                     "supports_tools": self.provider.supports_tools() if self.provider else False,
-                    "native_tool_calls": self.capabilities.native_tool_calls if self.capabilities else False,
+                    "native_tool_calls": (
+                        self.capabilities.native_tool_calls if self.capabilities else False
+                    ),
                 }
 
                 if self._current_state.runtime_capabilities:

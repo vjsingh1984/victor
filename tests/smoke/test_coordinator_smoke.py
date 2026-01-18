@@ -136,6 +136,7 @@ class TestCoordinatorSmokeTests:
         @dataclass
         class MockUsageLogger:
             """Mock usage logger for testing."""
+
             tool_selections: dict = field(default_factory=dict)
             tool_executions: dict = field(default_factory=dict)
 
@@ -168,6 +169,7 @@ class TestCoordinatorSmokeTests:
         @dataclass
         class MockUsageLogger:
             """Mock usage logger for testing."""
+
             tool_selections: dict = field(default_factory=dict)
             tool_executions: dict = field(default_factory=dict)
 
@@ -703,7 +705,9 @@ class TestErrorRecoverySmokeTests:
         handler = HTTPErrorHandlerMixin()
 
         # Test pattern matching
-        assert handler._matches_any_pattern("authentication failed", ["authentication", "unauthorized"])
+        assert handler._matches_any_pattern(
+            "authentication failed", ["authentication", "unauthorized"]
+        )
         assert handler._matches_any_pattern("rate limit exceeded", ["rate limit", "ratelimit"])
         assert handler._matches_any_pattern("connection timeout", ["timeout", "timed out"])
 

@@ -190,9 +190,7 @@ def show_entity(
             if len(results) == 1:
                 entity = results[0]
             elif len(results) > 1:
-                console.print(
-                    f"[yellow]Multiple entities found with name '{entity_name}':[/]"
-                )
+                console.print(f"[yellow]Multiple entities found with name '{entity_name}':[/]")
                 for e in results:
                     console.print(f"  - {e.name} ({e.entity_type.value})")
                 console.print("\n[dim]Use --type to specify the entity type.[/]")
@@ -246,9 +244,7 @@ def show_entity(
             for rel_entity in related[:20]:  # Limit to 20
                 # Get relation type if available
                 relation_str = "RELATED"
-                rel_table.add_row(
-                    rel_entity.name[:50], relation_str, str(rel_entity.mention_count)
-                )
+                rel_table.add_row(rel_entity.name[:50], relation_str, str(rel_entity.mention_count))
 
             console.print(rel_table)
 
@@ -392,12 +388,8 @@ def show_graph(
             stats_table.add_column("Metric", style="cyan")
             stats_table.add_column("Value")
 
-            stats_table.add_row(
-                "Total Entities", str(stats_dict.get("total_entities", 0))
-            )
-            stats_table.add_row(
-                "Total Relations", str(stats_dict.get("total_relations", 0))
-            )
+            stats_table.add_row("Total Entities", str(stats_dict.get("total_entities", 0)))
+            stats_table.add_row("Total Relations", str(stats_dict.get("total_relations", 0)))
 
             # Most connected entities
             most_connected = stats_dict.get("most_connected", [])
@@ -490,13 +482,9 @@ def clear_memory(
         if entity_type:
             entity_type_enum = EntityType[entity_type.upper()]
             # Clear specific type (would need to implement this in EntityMemory)
-            console.print(
-                f"[yellow]Clearing all entities of type '{entity_type}'...[/]"
-            )
+            console.print(f"[yellow]Clearing all entities of type '{entity_type}'...[/]")
             # memory.clear_by_type(entity_type_enum)
-            console.print(
-                f"[bold green]✓[/] Cleared entities of type '{entity_type}'"
-            )
+            console.print(f"[bold green]✓[/] Cleared entities of type '{entity_type}'")
         else:
             # Clear all entities
             console.print("[yellow]Clearing all entities from memory...[/]")

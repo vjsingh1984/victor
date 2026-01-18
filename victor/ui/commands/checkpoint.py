@@ -197,6 +197,7 @@ def list_checkpoints(
                 if timestamp:
                     try:
                         from datetime import datetime
+
                         dt = datetime.fromisoformat(timestamp)
                         timestamp = dt.strftime("%Y-%m-%d %H:%M")
                     except:
@@ -397,7 +398,9 @@ def fork_session(
         console.print(f"[bold green]✓[/] Session forked successfully")
         console.print(f"  New session ID: {new_session_id}")
         console.print(f"  Forked from: {checkpoint_id}")
-        console.print("\n[dim]Use --session {new_session_id} with other commands to use this session[/]")
+        console.print(
+            "\n[dim]Use --session {new_session_id} with other commands to use this session[/]"
+        )
 
     except ValueError as e:
         console.print(f"[bold red]Error:[/] {e}")
@@ -483,10 +486,14 @@ def configure_auto_checkpoint(
     console.print(f"  Interval: Every {interval} tool calls\n")
 
     if enable:
-        console.print("[dim]Auto-checkpointing will create checkpoints automatically during tool execution.[/]")
+        console.print(
+            "[dim]Auto-checkpointing will create checkpoints automatically during tool execution.[/]"
+        )
         console.print("[dim]Use 'victor checkpoint list' to view all checkpoints.[/]")
     else:
-        console.print("[dim]Auto-checkpointing disabled. Use 'victor checkpoint save' for manual checkpoints.[/]")
+        console.print(
+            "[dim]Auto-checkpointing disabled. Use 'victor checkpoint save' for manual checkpoints.[/]"
+        )
 
 
 __all__ = ["checkpoint_app"]

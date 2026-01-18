@@ -36,6 +36,7 @@ class LoadTrigger(str, Enum):
     ON_DEMAND: Load when first accessed
     LAZY: Load asynchronously when needed
     """
+
     EAGER = "eager"
     ON_DEMAND = "on_demand"
     LAZY = "lazy"
@@ -54,6 +55,7 @@ class LazyVerticalProxy:
         _loaded: Whether the vertical has been loaded
         _instance: Cached loaded vertical instance
     """
+
     vertical_name: str
     loader: Callable[[], Type]
     _loaded: bool = False
@@ -121,10 +123,7 @@ class LazyVerticalLoader:
         self._loaded_verticals: Set[str] = set()
 
     def register_vertical(
-        self,
-        vertical_name: str,
-        loader: Callable[[], Type],
-        load_immediately: bool = False
+        self, vertical_name: str, loader: Callable[[], Type], load_immediately: bool = False
     ) -> None:
         """Register vertical for lazy loading.
 

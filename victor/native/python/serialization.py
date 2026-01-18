@@ -53,6 +53,7 @@ try:
         IncrementalJsonParser,
         JsonPatch,
     )
+
     NATIVE_AVAILABLE = True
 except ImportError:
     NATIVE_AVAILABLE = False
@@ -727,7 +728,11 @@ def merge_json(base: str, merge_data: str) -> str:
                 if isinstance(base_val, dict) and isinstance(merge_val, dict):
                     result = base_val.copy()
                     for key, val in merge_val.items():
-                        if key in result and isinstance(result[key], dict) and isinstance(val, dict):
+                        if (
+                            key in result
+                            and isinstance(result[key], dict)
+                            and isinstance(val, dict)
+                        ):
                             result[key] = deep_merge(result[key], val)
                         else:
                             result[key] = val
@@ -774,7 +779,7 @@ def deep_get_json(json_str: str, path: List[str]) -> Any:
                 elif isinstance(current, list):
                     current = current[int(component)]
                 else:
-                    raise SerializationError(f"Cannot traverse into scalar value")
+                    raise SerializationError("Cannot traverse into scalar value")
             return current
         except (json.JSONDecodeError, KeyError, IndexError, TypeError) as e:
             raise SerializationError(f"Failed to get nested value: {e}")

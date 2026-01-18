@@ -580,9 +580,8 @@ class TextInputGate(BaseHITLGate):
             title=title,
             prompt=prompt,
             timeout_seconds=timeout_seconds,
-            fallback_strategy=fallback_strategy or FallbackStrategy.continue_with_default(
-                default_value
-            ),
+            fallback_strategy=fallback_strategy
+            or FallbackStrategy.continue_with_default(default_value),
             required=required,
             context=context or {},
         )

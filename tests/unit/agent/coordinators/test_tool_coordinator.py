@@ -558,9 +558,7 @@ class TestToolCoordinatorExecution:
         mock_result.error = "Invalid argument: path is required"
         coordinator._pipeline._execute_single_tool = AsyncMock(return_value=mock_result)
 
-        result, success, error = await coordinator.execute_tool_with_retry(
-            "read_file", {}, {}
-        )
+        result, success, error = await coordinator.execute_tool_with_retry("read_file", {}, {})
 
         assert success is False
         assert "Invalid argument" in error
@@ -697,9 +695,7 @@ class TestToolCoordinatorHandleToolCalls:
         mock_result.result = "Success"
         coordinator.execute_tool_with_retry = AsyncMock(return_value=(mock_result, True, None))
 
-        tool_calls = [
-            {"name": "read_file", "arguments": '{"path": "/test.py"}'}
-        ]
+        tool_calls = [{"name": "read_file", "arguments": '{"path": "/test.py"}'}]
 
         # Need to mock tool adapter sanitizer
         mock_adapter = Mock()
@@ -735,9 +731,7 @@ class TestToolCoordinatorHandleToolCalls:
 
         tool_calls = [{"name": "read_file", "arguments": {}}]
 
-        results = await coordinator.handle_tool_calls(
-            tool_calls, formatter=mock_formatter
-        )
+        results = await coordinator.handle_tool_calls(tool_calls, formatter=mock_formatter)
 
         mock_formatter.format_tool_output.assert_called_once()
 
@@ -765,14 +759,11 @@ class TestToolCoordinatorParsing:
         assert result.parse_method == "none"
         assert len(result.warnings) > 0
 
-    @pytest.mark.skip(reason="NormalizationStrategy not imported at runtime - implementation bug")
     def test_normalize_tool_arguments_without_normalizer(self, coordinator: ToolCoordinator):
         """Test normalize_tool_arguments without normalizer.
 
-        NOTE: This test is skipped because NormalizationStrategy is only imported
-        in TYPE_CHECKING block, causing a NameError at runtime. This is an
-        implementation bug that should be fixed by moving the import outside
-        TYPE_CHECKING.
+        Tests that when no argument normalizer is set, the method returns
+        the original arguments and NormalizationStrategy.DIRECT.
         """
         coordinator._argument_normalizer = None
 

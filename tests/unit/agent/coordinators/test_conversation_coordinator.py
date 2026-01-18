@@ -191,9 +191,7 @@ class TestConversationCoordinator:
         coordinator.add_message("assistant", "My response")
 
         # Assert
-        mock_conversation.add_message.assert_called_once_with(
-            "assistant", "My response"
-        )
+        mock_conversation.add_message.assert_called_once_with("assistant", "My response")
 
     def test_add_message_with_system_role(
         self, coordinator: ConversationCoordinator, mock_conversation: Mock
@@ -203,9 +201,7 @@ class TestConversationCoordinator:
         coordinator.add_message("system", "System instruction")
 
         # Assert
-        mock_conversation.add_message.assert_called_once_with(
-            "system", "System instruction"
-        )
+        mock_conversation.add_message.assert_called_once_with("system", "System instruction")
 
     def test_add_message_with_empty_content(
         self, coordinator: ConversationCoordinator, mock_conversation: Mock
@@ -319,9 +315,7 @@ class TestConversationCoordinator:
     ):
         """Test that assistant messages are logged to usage analytics."""
         # Execute
-        coordinator_with_logging.add_message(
-            "assistant", "Here is your answer"
-        )
+        coordinator_with_logging.add_message("assistant", "Here is your answer")
 
         # Assert
         mock_usage_logger.log_event.assert_called_once_with(
@@ -545,9 +539,7 @@ class TestConversationCoordinatorEdgeCases:
         # Setup - use PropertyMock to make the property raise
         from unittest.mock import PropertyMock
 
-        type(mock_conversation).messages = PropertyMock(
-            side_effect=RuntimeError("Database error")
-        )
+        type(mock_conversation).messages = PropertyMock(side_effect=RuntimeError("Database error"))
         coordinator = ConversationCoordinator(
             conversation=mock_conversation,
             lifecycle_manager=mock_lifecycle_manager,
@@ -573,9 +565,7 @@ class TestConversationCoordinatorEdgeCases:
     ):
         """Test reset_conversation when lifecycle manager raises an exception."""
         # Setup
-        mock_lifecycle_manager.reset_conversation.side_effect = RuntimeError(
-            "Reset failed"
-        )
+        mock_lifecycle_manager.reset_conversation.side_effect = RuntimeError("Reset failed")
 
         # Execute & Assert - should propagate the error
         with pytest.raises(RuntimeError, match="Reset failed"):

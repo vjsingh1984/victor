@@ -253,7 +253,9 @@ class TestPerformanceLogging:
                 tree, elapsed = parse_file_with_timing(temp_file)
 
             # Check that performance was logged
-            assert any("Parsed" in record.message and "ms" in record.message for record in caplog.records)
+            assert any(
+                "Parsed" in record.message and "ms" in record.message for record in caplog.records
+            )
         finally:
             Path(temp_file).unlink()
 

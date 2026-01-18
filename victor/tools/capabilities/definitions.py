@@ -50,7 +50,6 @@ BUILTIN_CAPABILITIES = [
         dependencies=[ToolCapability.FILE_READ],
         conflicts=[],
     ),
-
     # =============================================================================
     # CODE ANALYSIS
     # =============================================================================
@@ -86,10 +85,13 @@ BUILTIN_CAPABILITIES = [
         name=ToolCapability.CODE_REFACTORING,
         description="Automated code refactoring operations",
         tools=["refactor_tool"],
-        dependencies=[ToolCapability.FILE_READ, ToolCapability.FILE_WRITE, ToolCapability.CODE_ANALYSIS],
+        dependencies=[
+            ToolCapability.FILE_READ,
+            ToolCapability.FILE_WRITE,
+            ToolCapability.CODE_ANALYSIS,
+        ],
         conflicts=[],
     ),
-
     # =============================================================================
     # SEARCH & DISCOVERY
     # =============================================================================
@@ -114,7 +116,6 @@ BUILTIN_CAPABILITIES = [
         dependencies=[ToolCapability.FILE_READ],
         conflicts=[],
     ),
-
     # =============================================================================
     # VERSION CONTROL
     # =============================================================================
@@ -132,7 +133,6 @@ BUILTIN_CAPABILITIES = [
         dependencies=[ToolCapability.VERSION_CONTROL],
         conflicts=[],
     ),
-
     # =============================================================================
     # INFRASTRUCTURE
     # =============================================================================
@@ -178,7 +178,6 @@ BUILTIN_CAPABILITIES = [
         dependencies=[],
         conflicts=[],
     ),
-
     # =============================================================================
     # DEVELOPMENT
     # =============================================================================
@@ -217,7 +216,6 @@ BUILTIN_CAPABILITIES = [
         dependencies=[ToolCapability.FILE_WRITE],
         conflicts=[],
     ),
-
     # =============================================================================
     # EXECUTION
     # =============================================================================
@@ -249,7 +247,6 @@ BUILTIN_CAPABILITIES = [
         dependencies=[],
         conflicts=[],
     ),
-
     # =============================================================================
     # COMMUNICATION
     # =============================================================================
@@ -274,7 +271,6 @@ BUILTIN_CAPABILITIES = [
         dependencies=[],
         conflicts=[],
     ),
-
     # =============================================================================
     # WORKFLOW & AUTOMATION
     # =============================================================================
@@ -292,7 +288,6 @@ BUILTIN_CAPABILITIES = [
         dependencies=[],
         conflicts=[],
     ),
-
     # =============================================================================
     # INTELLIGENCE
     # =============================================================================
@@ -310,7 +305,6 @@ BUILTIN_CAPABILITIES = [
         dependencies=[],
         conflicts=[],
     ),
-
     # =============================================================================
     # SECURITY & COMPLIANCE
     # =============================================================================
@@ -335,7 +329,6 @@ BUILTIN_CAPABILITIES = [
         dependencies=[ToolCapability.FILE_READ],
         conflicts=[],
     ),
-
     # =============================================================================
     # INTEGRATION
     # =============================================================================
@@ -346,7 +339,6 @@ BUILTIN_CAPABILITIES = [
         dependencies=[],
         conflicts=[],
     ),
-
     # =============================================================================
     # UTILITIES
     # =============================================================================

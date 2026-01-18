@@ -96,15 +96,10 @@ class SessionRestoreProgress(ModalScreen[None]):
     def compose(self) -> ComposeResult:
         with Vertical(id="restore-progress-container"):
             yield Label(
-                f"Restoring: {self.session_name}",
-                classes="progress-title",
-                id="progress-title"
+                f"Restoring: {self.session_name}", classes="progress-title", id="progress-title"
             )
             yield ProgressBar(
-                total=100,
-                show_eta=False,
-                classes="session-progress",
-                id="progress-bar"
+                total=100, show_eta=False, classes="session-progress", id="progress-bar"
             )
             yield Label("0/0 messages (0%)", id="progress-label")
 
@@ -719,8 +714,7 @@ class VictorTUI(App):
 
         # Keybinding support
         self._keybindings = keybindings or KeybindingConfig(
-            bindings=DEFAULT_KEYBINDINGS.copy(),
-            preset_name="default"
+            bindings=DEFAULT_KEYBINDINGS.copy(), preset_name="default"
         )
 
     def compose(self) -> ComposeResult:
@@ -1134,16 +1128,11 @@ class VictorTUI(App):
 
             # Use timer for polling (100ms intervals, up to 5 seconds)
             self._poll_timer = self.set_timer(
-                0.1,
-                self._poll_cancellation_sync,
-                repeat=50  # Poll for 5 seconds (50 * 0.1)
+                0.1, self._poll_cancellation_sync, repeat=50  # Poll for 5 seconds (50 * 0.1)
             )
 
             # Set timeout for cancellation
-            self._cancellation_timer = self.set_timer(
-                5.0,
-                self._on_cancellation_timeout
-            )
+            self._cancellation_timer = self.set_timer(5.0, self._on_cancellation_timeout)
         else:
             self._add_system_message("Streaming cancellation not supported")
 
@@ -1155,9 +1144,9 @@ class VictorTUI(App):
             self._add_system_message("✓ Stream canceled successfully")
 
             # Stop timers
-            if hasattr(self, '_poll_timer') and self._poll_timer:
+            if hasattr(self, "_poll_timer") and self._poll_timer:
                 self._poll_timer.stop()
-            if hasattr(self, '_cancellation_timer') and self._cancellation_timer:
+            if hasattr(self, "_cancellation_timer") and self._cancellation_timer:
                 self._cancellation_timer.stop()
 
     def _on_cancellation_timeout(self) -> None:
@@ -1167,7 +1156,7 @@ class VictorTUI(App):
             self._add_system_message("⚠ Cancellation timed out - stream may still be active")
 
         # Stop poll timer
-        if hasattr(self, '_poll_timer') and self._poll_timer:
+        if hasattr(self, "_poll_timer") and self._poll_timer:
             self._poll_timer.stop()
 
     def action_resume_session(self) -> None:
@@ -1392,7 +1381,9 @@ class VictorTUI(App):
         else:
             # Fast path for small sessions
             if message_count > 50:
-                self._add_system_message(f"Loading {message_count} messages from project session...")
+                self._add_system_message(
+                    f"Loading {message_count} messages from project session..."
+                )
 
             if self._conversation_log:
                 self._conversation_log.clear()
@@ -1429,7 +1420,9 @@ class VictorTUI(App):
                 except Exception as exc:
                     self._add_error_message(f"Failed to restore conversation state: {exc}")
 
-        self._add_system_message(f"Project session loaded: {session_name} ({message_count} messages)")
+        self._add_system_message(
+            f"Project session loaded: {session_name} ({message_count} messages)"
+        )
 
     def _render_message(self, role: str, content: str) -> None:
         if not self._conversation_log:
@@ -1775,8 +1768,7 @@ Available Themes:
     def reset_keybindings(self) -> None:
         """Reset keybindings to default preset."""
         self._keybindings = KeybindingConfig(
-            bindings=DEFAULT_KEYBINDINGS.copy(),
-            preset_name="default"
+            bindings=DEFAULT_KEYBINDINGS.copy(), preset_name="default"
         )
         self._add_system_message("Keybindings reset to default")
 

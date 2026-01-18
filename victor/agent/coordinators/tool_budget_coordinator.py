@@ -254,8 +254,7 @@ class ToolBudgetCoordinator:
             if self._on_warning:
                 self._on_warning(remaining, total)
             logger.debug(
-                f"Budget warning: {remaining}/{total} remaining "
-                f"({remaining/total*100:.1f}%)"
+                f"Budget warning: {remaining}/{total} remaining " f"({remaining/total*100:.1f}%)"
             )
 
     def reset(

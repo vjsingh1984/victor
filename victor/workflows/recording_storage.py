@@ -585,7 +585,9 @@ class FileRecordingStorage(RecordingStorage):
             "success_count": success_count,
             "failed_count": failed_count,
             "workflow_counts": workflow_counts,
-            "oldest_recording": min((r.get("started_at", float("inf")) for r in recordings), default=None),
+            "oldest_recording": min(
+                (r.get("started_at", float("inf")) for r in recordings), default=None
+            ),
             "newest_recording": max((r.get("started_at", 0) for r in recordings), default=None),
         }
 

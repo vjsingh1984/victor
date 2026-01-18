@@ -107,7 +107,9 @@ class ContextIntelligenceBuilder(FactoryAwareBuilder):
             get_provider_fn=lambda: getattr(orchestrator, "provider", None),
             get_model_fn=lambda: getattr(orchestrator, "model", ""),
             get_tool_calls_used_fn=lambda: getattr(orchestrator, "tool_calls_used", 0),
-            get_intelligent_integration_fn=lambda: getattr(orchestrator, "intelligent_integration", None),
+            get_intelligent_integration_fn=lambda: getattr(
+                orchestrator, "intelligent_integration", None
+            ),
         )
         components["evaluation_coordinator"] = orchestrator._evaluation_coordinator
 

@@ -37,11 +37,12 @@ def test_metrics_logging_builder_wires_components():
     orchestrator._cumulative_token_usage = {"total_tokens": 0}
     orchestrator.tools = MagicMock()
 
-    with patch(
-        "victor.agent.session_cost_tracker.SessionCostTracker"
-    ) as tracker_cls, patch(
-        "victor.agent.coordinators.metrics_coordinator.MetricsCoordinator"
-    ) as metrics_coord_cls:
+    with (
+        patch("victor.agent.session_cost_tracker.SessionCostTracker") as tracker_cls,
+        patch(
+            "victor.agent.coordinators.metrics_coordinator.MetricsCoordinator"
+        ) as metrics_coord_cls,
+    ):
         tracker_instance = MagicMock()
         tracker_cls.return_value = tracker_instance
         metrics_coord_instance = MagicMock()

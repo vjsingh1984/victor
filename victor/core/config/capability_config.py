@@ -99,7 +99,9 @@ class CapabilityConfig:
             module = importlib.import_module(self.handler_module)
             return getattr(module, self.handler_function, None)
         except Exception as e:
-            logger.warning(f"Failed to import handler {self.handler_module}.{self.handler_function}: {e}")
+            logger.warning(
+                f"Failed to import handler {self.handler_module}.{self.handler_function}: {e}"
+            )
             return None
 
     def import_getter(self) -> Optional[Callable]:
@@ -115,7 +117,9 @@ class CapabilityConfig:
             module = importlib.import_module(self.handler_module)
             return getattr(module, self.getter_function, None)
         except Exception as e:
-            logger.warning(f"Failed to import getter {self.handler_module}.{self.getter_function}: {e}")
+            logger.warning(
+                f"Failed to import getter {self.handler_module}.{self.getter_function}: {e}"
+            )
             return None
 
     def get_default_config(self) -> Dict[str, Any]:
@@ -214,10 +218,14 @@ class CapabilityConfigRegistry:
         if not self._initialized:
             with self._lock:
                 if not self._initialized:
-                    self._config_dir = Path(__file__).parent.parent.parent / "config" / "capabilities"
+                    self._config_dir = (
+                        Path(__file__).parent.parent.parent / "config" / "capabilities"
+                    )
                     self._cache: Dict[str, VerticalCapabilities] = {}
                     self._initialized = True
-                    logger.debug(f"CapabilityConfigRegistry initialized with config dir: {self._config_dir}")
+                    logger.debug(
+                        f"CapabilityConfigRegistry initialized with config dir: {self._config_dir}"
+                    )
 
     @classmethod
     def get_instance(cls) -> "CapabilityConfigRegistry":

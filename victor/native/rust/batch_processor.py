@@ -310,6 +310,7 @@ class BatchProcessor:
         else:
             # Fallback implementation
             import time
+
             start = time.time()
 
             # Validate dependencies
@@ -404,9 +405,7 @@ class BatchProcessor:
             self._validate_dependencies(tasks)
             return True
 
-    def assign_tasks(
-        self, tasks: List[BatchTask], workers: int
-    ) -> List[List[BatchTask]]:
+    def assign_tasks(self, tasks: List[BatchTask], workers: int) -> List[List[BatchTask]]:
         """
         Assign tasks to workers using load balancing strategy.
 
@@ -420,9 +419,7 @@ class BatchProcessor:
         if RUST_AVAILABLE:
             rust_tasks = [task.to_rust() for task in tasks]
             rust_assignments = self._rust_processor.assign_tasks(rust_tasks, workers)
-            return [
-                [BatchTask.from_rust(t) for t in assignment] for assignment in rust_assignments
-            ]
+            return [[BatchTask.from_rust(t) for t in assignment] for assignment in rust_assignments]
         else:
             raise NotImplementedError("Load balancing requires Rust implementation")
 
@@ -535,31 +532,37 @@ class BatchProcessor:
         for task in tasks:
             start = time.time()
             try:
-                result = executor({
-                    "task_id": task.task_id,
-                    "task_data": task.task_data,
-                    "priority": task.priority,
-                    "timeout_ms": task.timeout_ms,
-                    "retry_count": task.retry_count,
-                    "dependencies": task.dependencies,
-                })
+                result = executor(
+                    {
+                        "task_id": task.task_id,
+                        "task_data": task.task_data,
+                        "priority": task.priority,
+                        "timeout_ms": task.timeout_ms,
+                        "retry_count": task.retry_count,
+                        "dependencies": task.dependencies,
+                    }
+                )
                 duration = (time.time() - start) * 1000.0
-                results.append(BatchResult(
-                    task_id=task.task_id,
-                    success=True,
-                    result=result,
-                    duration_ms=duration,
-                    retry_count=task.retry_count,
-                ))
+                results.append(
+                    BatchResult(
+                        task_id=task.task_id,
+                        success=True,
+                        result=result,
+                        duration_ms=duration,
+                        retry_count=task.retry_count,
+                    )
+                )
             except Exception as e:
                 duration = (time.time() - start) * 1000.0
-                results.append(BatchResult(
-                    task_id=task.task_id,
-                    success=False,
-                    error=str(e),
-                    duration_ms=duration,
-                    retry_count=task.retry_count,
-                ))
+                results.append(
+                    BatchResult(
+                        task_id=task.task_id,
+                        success=False,
+                        error=str(e),
+                        duration_ms=duration,
+                        retry_count=task.retry_count,
+                    )
+                )
         return results
 
 
@@ -578,13 +581,11 @@ def create_task_batches_py(tasks: List[BatchTask], batch_size: int) -> List[List
     if RUST_AVAILABLE:
         rust_tasks = [task.to_rust() for task in tasks]
         rust_batches = create_task_batches(rust_tasks, batch_size)
-        return [
-            [BatchTask.from_rust(t) for t in batch] for batch in rust_batches
-        ]
+        return [[BatchTask.from_rust(t) for t in batch] for batch in rust_batches]
     else:
         batches = []
         for i in range(0, len(tasks), batch_size):
-            batches.append(tasks[i:i + batch_size])
+            batches.append(tasks[i : i + batch_size])
         return batches
 
 

@@ -222,6 +222,7 @@ class VerticalConfigLoader:
 
             # Build stages from YAML
             from victor.core.vertical_types import StageDefinition
+
             stages = {}
             for stage_name, stage_data in yaml_config.stages.items():
                 stages[stage_name] = StageDefinition(
@@ -288,9 +289,7 @@ class VerticalConfigLoader:
         else:
             raise ValueError(f"Unknown prompt source: {source}")
 
-    def _validate_required_fields(
-        self, yaml_data: Dict[str, Any], config_path: Path
-    ) -> None:
+    def _validate_required_fields(self, yaml_data: Dict[str, Any], config_path: Path) -> None:
         """Validate that required fields are present in YAML data.
 
         Supports both legacy and structured YAML formats.

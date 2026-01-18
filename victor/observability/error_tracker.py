@@ -137,9 +137,7 @@ class ErrorTracker:
         # Get errors from last hour
         cutoff = timestamp - timedelta(hours=1)
         recent_errors = [
-            e
-            for e in self._errors
-            if e.error_type == error_type and e.timestamp > cutoff
+            e for e in self._errors if e.error_type == error_type and e.timestamp > cutoff
         ]
 
         error_rate = len(recent_errors)  # Errors per hour
@@ -165,9 +163,7 @@ class ErrorTracker:
                 "total_errors": len(self._errors),
                 "error_counts": dict(self._error_counts),
                 "error_types": list(self._error_counts.keys()),
-                "most_common": sorted(
-                    self._error_counts.items(), key=lambda x: x[1], reverse=True
-                ),
+                "most_common": sorted(self._error_counts.items(), key=lambda x: x[1], reverse=True),
                 "recent_errors": [e.to_dict() for e in self._errors[-100:]],
             }
 
@@ -197,9 +193,7 @@ class ErrorTracker:
         with self._lock:
             return [e for e in self._errors if e.error_type == error_type]
 
-    def get_errors_by_timeframe(
-        self, hours: int = 24
-    ) -> List[ErrorRecord]:
+    def get_errors_by_timeframe(self, hours: int = 24) -> List[ErrorRecord]:
         """Get errors from the last N hours.
 
         Args:
@@ -222,8 +216,7 @@ class ErrorTracker:
 
         # Add error rates
         error_rates = {
-            error_type: self.get_error_rate(error_type)
-            for error_type in summary["error_types"]
+            error_type: self.get_error_rate(error_type) for error_type in summary["error_types"]
         }
 
         metrics = {

@@ -463,7 +463,9 @@ class SWEBenchWorkspaceManager:
         """
         # Create unique workspace directory
         # MD5 used for workspace ID generation, not security
-        workspace_id = hashlib.md5(f"{task.task_id}_{task.base_commit}".encode(), usedforsecurity=False).hexdigest()[:12]
+        workspace_id = hashlib.md5(
+            f"{task.task_id}_{task.base_commit}".encode(), usedforsecurity=False
+        ).hexdigest()[:12]
         workspace_dir = self.workspace_base / f"task_{workspace_id}"
 
         if workspace_dir.exists():

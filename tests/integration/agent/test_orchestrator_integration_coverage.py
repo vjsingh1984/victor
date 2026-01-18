@@ -67,9 +67,7 @@ class TestSimpleChatFlow:
     """
 
     @pytest.mark.asyncio
-    async def test_simple_chat_message_flow(
-        self, legacy_orchestrator, test_provider
-    ):
+    async def test_simple_chat_message_flow(self, legacy_orchestrator, test_provider):
         """Test simple chat message flow through orchestrator.
 
         Scenario:
@@ -104,9 +102,7 @@ class TestSimpleChatFlow:
         test_provider.chat = AsyncMock(side_effect=mock_chat)
 
         # Call chat
-        response = await test_provider.chat(
-            messages=[Message(role="user", content=user_message)]
-        )
+        response = await test_provider.chat(messages=[Message(role="user", content=user_message)])
 
         # Verify response
         assert response is not None
@@ -114,9 +110,7 @@ class TestSimpleChatFlow:
         assert response.role == "assistant"
 
     @pytest.mark.asyncio
-    async def test_chat_with_conversation_history(
-        self, test_provider, sample_messages
-    ):
+    async def test_chat_with_conversation_history(self, test_provider, sample_messages):
         """Test chat with conversation history.
 
         Scenario:
@@ -128,6 +122,7 @@ class TestSimpleChatFlow:
         - All messages passed to provider
         - History maintained correctly
         """
+
         # Mock chat that verifies messages
         async def mock_chat(messages, **kwargs):
             assert len(messages) == len(sample_messages)
@@ -144,9 +139,7 @@ class TestSimpleChatFlow:
         message_objs = []
         for msg in sample_messages:
             if isinstance(msg, dict):
-                message_objs.append(
-                    Message(role=msg["role"], content=msg["content"])
-                )
+                message_objs.append(Message(role=msg["role"], content=msg["content"]))
             else:
                 message_objs.append(msg)
 
@@ -234,6 +227,7 @@ class TestToolExecutionFlow:
         - Error caught and handled gracefully
         - Error information returned
         """
+
         # Mock tool that raises error
         async def failing_execute(**kwargs):
             raise ValueError("Tool execution failed")
@@ -280,9 +274,7 @@ class TestContextManagement:
         budget = {"max_tokens": 4096, "reserve_tokens": 500}
 
         # Check budget
-        is_within = await mock_context_coordinator.is_within_budget(
-            context, budget
-        )
+        is_within = await mock_context_coordinator.is_within_budget(context, budget)
 
         # Should be within budget
         assert is_within is True
@@ -303,10 +295,7 @@ class TestContextManagement:
         - Messages removed
         """
         # Create large context
-        large_messages = [
-            {"role": "user", "content": f"Message {i}" * 100}
-            for i in range(50)
-        ]
+        large_messages = [{"role": "user", "content": f"Message {i}" * 100} for i in range(50)]
 
         context = {
             "messages": large_messages,
@@ -325,9 +314,7 @@ class TestContextManagement:
         assert result.strategy_used == "truncation"
 
     @pytest.mark.asyncio
-    async def test_context_compaction_preserves_recent(
-        self, mock_context_coordinator
-    ):
+    async def test_context_compaction_preserves_recent(self, mock_context_coordinator):
         """Test that compaction preserves recent messages.
 
         Scenario:
@@ -370,9 +357,7 @@ class TestAnalyticsTracking:
     """
 
     @pytest.mark.asyncio
-    async def test_tool_execution_tracking(
-        self, mock_analytics_coordinator, test_session_id
-    ):
+    async def test_tool_execution_tracking(self, mock_analytics_coordinator, test_session_id):
         """Test tracking of tool execution events.
 
         Scenario:
@@ -409,9 +394,7 @@ class TestAnalyticsTracking:
         assert tracked_event.data["tool"] == "read_file"
 
     @pytest.mark.asyncio
-    async def test_llm_call_tracking(
-        self, mock_analytics_coordinator, test_session_id
-    ):
+    async def test_llm_call_tracking(self, mock_analytics_coordinator, test_session_id):
         """Test tracking of LLM call events.
 
         Scenario:
@@ -487,9 +470,7 @@ class TestPromptBuilding:
     """
 
     @pytest.mark.asyncio
-    async def test_system_prompt_building(
-        self, mock_prompt_coordinator, test_session_id
-    ):
+    async def test_system_prompt_building(self, mock_prompt_coordinator, test_session_id):
         """Test system prompt building.
 
         Scenario:
@@ -512,16 +493,12 @@ class TestPromptBuilding:
         }
 
         # Build prompt
-        system_prompt = await mock_prompt_coordinator.build_system_prompt(
-            prompt_context
-        )
+        system_prompt = await mock_prompt_coordinator.build_system_prompt(prompt_context)
 
         # Verify
         assert isinstance(system_prompt, str)
         assert len(system_prompt) > 0
-        mock_prompt_coordinator.build_system_prompt.assert_called_once_with(
-            prompt_context
-        )
+        mock_prompt_coordinator.build_system_prompt.assert_called_once_with(prompt_context)
 
     @pytest.mark.asyncio
     async def test_task_hint_building(self, mock_prompt_coordinator):
@@ -682,9 +659,7 @@ class TestMetricsCollection:
             def record_tool_selection(self, method: str, num_tools: int):
                 self.tool_selections[method] = num_tools
 
-            def record_tool_execution(
-                self, tool_name: str, success: bool, elapsed_ms: float
-            ):
+            def record_tool_execution(self, tool_name: str, success: bool, elapsed_ms: float):
                 self.tool_executions[tool_name] = {
                     "success": success,
                     "elapsed_ms": elapsed_ms,
@@ -747,9 +722,7 @@ class TestMetricsCollection:
             def record_tool_selection(self, method: str, num_tools: int):
                 pass
 
-            def record_tool_execution(
-                self, tool_name: str, success: bool, elapsed_ms: float
-            ):
+            def record_tool_execution(self, tool_name: str, success: bool, elapsed_ms: float):
                 pass
 
             def log_event(self, event_type: str, data: dict):
@@ -791,9 +764,7 @@ class TestCoordinatorInteractions:
     """
 
     @pytest.mark.asyncio
-    async def test_chat_and_analytics_interaction(
-        self, test_provider, mock_analytics_coordinator
-    ):
+    async def test_chat_and_analytics_interaction(self, test_provider, mock_analytics_coordinator):
         """Test ChatCoordinator and AnalyticsCoordinator interaction.
 
         Scenario:
@@ -805,6 +776,7 @@ class TestCoordinatorInteractions:
         - Chat executes successfully
         - Analytics events tracked
         """
+
         # Execute chat
         async def mock_chat(messages, **kwargs):
             return MagicMock(
@@ -816,9 +788,7 @@ class TestCoordinatorInteractions:
 
         test_provider.chat = AsyncMock(side_effect=mock_chat)
 
-        response = await test_provider.chat(
-            messages=[Message(role="user", content="Hello")]
-        )
+        response = await test_provider.chat(messages=[Message(role="user", content="Hello")])
 
         # Track analytics
         event = AnalyticsEvent(
@@ -835,9 +805,7 @@ class TestCoordinatorInteractions:
         assert len(mock_analytics_coordinator._events) == 1
 
     @pytest.mark.asyncio
-    async def test_context_and_compaction_interaction(
-        self, mock_context_coordinator
-    ):
+    async def test_context_and_compaction_interaction(self, mock_context_coordinator):
         """Test ContextCoordinator compaction flow.
 
         Scenario:
@@ -858,9 +826,7 @@ class TestCoordinatorInteractions:
         budget = {"max_tokens": 4096, "reserve_tokens": 500}
 
         # Check budget
-        is_within = await mock_context_coordinator.is_within_budget(
-            context, budget
-        )
+        is_within = await mock_context_coordinator.is_within_budget(context, budget)
 
         # Compact if needed
         if not is_within:
@@ -890,9 +856,7 @@ class TestCoordinatorInteractions:
             "tools": ["read"],
         }
 
-        system_prompt = await mock_prompt_coordinator.build_system_prompt(
-            prompt_context
-        )
+        system_prompt = await mock_prompt_coordinator.build_system_prompt(prompt_context)
 
         # Check context with prompt (CompactionContext is a dict type alias)
         context = {
@@ -937,6 +901,7 @@ class TestErrorHandling:
         - Chat succeeds despite analytics failure
         - Error handled gracefully
         """
+
         # Make analytics fail
         async def failing_track(event):
             raise RuntimeError("Analytics service unavailable")
@@ -945,23 +910,17 @@ class TestErrorHandling:
 
         # Chat should still work
         async def mock_chat(messages, **kwargs):
-            return MagicMock(
-                content="Response", role="assistant", tool_calls=None, usage={}
-            )
+            return MagicMock(content="Response", role="assistant", tool_calls=None, usage={})
 
         test_provider.chat = AsyncMock(side_effect=mock_chat)
 
-        response = await test_provider.chat(
-            messages=[Message(role="user", content="Hello")]
-        )
+        response = await test_provider.chat(messages=[Message(role="user", content="Hello")])
 
         # Verify response despite analytics failure
         assert response.content == "Response"
 
     @pytest.mark.asyncio
-    async def test_context_compaction_error_handling(
-        self, mock_context_coordinator
-    ):
+    async def test_context_compaction_error_handling(self, mock_context_coordinator):
         """Test error handling when compaction fails.
 
         Scenario:
@@ -972,13 +931,12 @@ class TestErrorHandling:
         - Error caught
         - Fallback behavior
         """
+
         # Make compaction fail
         async def failing_compact(context, budget):
             raise RuntimeError("Compaction failed")
 
-        mock_context_coordinator.compact_context = AsyncMock(
-            side_effect=failing_compact
-        )
+        mock_context_coordinator.compact_context = AsyncMock(side_effect=failing_compact)
 
         # Try to compact (using dict type aliases)
         with pytest.raises(RuntimeError, match="Compaction failed"):
@@ -1000,6 +958,7 @@ class TestErrorHandling:
         - Error caught
         - Error information returned
         """
+
         # Make tool fail
         async def failing_execute(**kwargs):
             raise RuntimeError("Tool execution failed")

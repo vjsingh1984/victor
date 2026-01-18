@@ -272,9 +272,9 @@ class ContinuationSignals:
         signal_scores = {}
         weights = {
             "progress_velocity": 0.30,  # 30% - Most important, measures actual progress
-            "stuck_loop_penalty": 0.25,   # 25% - Strong penalty for being stuck
-            "token_budget": 0.20,          # 20% - Context window pressure
-            "intervention_ratio": 0.15,    # 15% - Intervention count relative to max
+            "stuck_loop_penalty": 0.25,  # 25% - Strong penalty for being stuck
+            "token_budget": 0.20,  # 20% - Context window pressure
+            "intervention_ratio": 0.15,  # 15% - Intervention count relative to max
             "complexity_adjustment": 0.10,  # 10% - Task complexity factor
         }
 

@@ -285,13 +285,17 @@ class SwitchingFormation:
                 self.switch_count += 1
 
                 if self.track_switches:
-                    self.switch_history.append({
-                        "from": old_formation.value,
-                        "to": new_formation.value,
-                        "timestamp": time.time(),
-                        "context": dict(execution_context),
-                        "criteria_index": self.switching_criteria.index(criteria) if criteria else -1,
-                    })
+                    self.switch_history.append(
+                        {
+                            "from": old_formation.value,
+                            "to": new_formation.value,
+                            "timestamp": time.time(),
+                            "context": dict(execution_context),
+                            "criteria_index": (
+                                self.switching_criteria.index(criteria) if criteria else -1
+                            ),
+                        }
+                    )
 
                 logger.info(
                     f"Switched formation: {old_formation.value} -> {new_formation.value} "
@@ -323,7 +327,9 @@ class SwitchingFormation:
                 break
 
             # Determine remaining agents (for formations that support partial completion)
-            current_agents = [a for i, a in enumerate(agents) if i >= execution_context["completed_members"]]
+            current_agents = [
+                a for i, a in enumerate(agents) if i >= execution_context["completed_members"]
+            ]
 
         return results
 
@@ -1077,14 +1083,18 @@ Rationale: [your reasoning]
             rationale = " ".join(rationale_lines).strip() if rationale_lines else ""
 
             if choice:
-                return Vote(member_id=member_id, choice=choice, confidence=confidence, rationale=rationale)
+                return Vote(
+                    member_id=member_id, choice=choice, confidence=confidence, rationale=rationale
+                )
 
         except Exception as e:
             logger.warning(f"Failed to parse vote from {member_id}: {e}")
 
         return None
 
-    def _tally_votes(self, votes: List[Vote], choices: List[str]) -> tuple[Optional[str], Dict[str, int], float]:
+    def _tally_votes(
+        self, votes: List[Vote], choices: List[str]
+    ) -> tuple[Optional[str], Dict[str, int], float]:
         """Tally votes and determine winner.
 
         Args:
@@ -1098,7 +1108,7 @@ Rationale: [your reasoning]
             return None, {}, 0.0
 
         # Count votes
-        distribution = {choice: 0 for choice in choices}
+        distribution = dict.fromkeys(choices, 0)
         for vote in votes:
             if vote.choice in distribution:
                 if self.voting_method == VotingMethod.WEIGHTED:

@@ -344,9 +344,7 @@ class TeamAnalytics:
             metrics["min_member_time"] = min(member_times) if member_times else 0
 
             member_success = [m.get("success", False) for m in member_results.values()]
-            metrics["member_success_rate"] = (
-                np.mean(member_success) if member_success else 0
-            )
+            metrics["member_success_rate"] = np.mean(member_success) if member_success else 0
 
             member_tool_calls = [m.get("tool_calls_used", 0) for m in member_results.values()]
             metrics["avg_tool_calls"] = np.mean(member_tool_calls) if member_tool_calls else 0
@@ -412,9 +410,7 @@ class TeamAnalytics:
                 stats["total_time"] / stats["executions"] if stats["executions"] > 0 else 0
             )
             stats["avg_tool_calls"] = (
-                stats["total_tool_calls"] / stats["executions"]
-                if stats["executions"] > 0
-                else 0
+                stats["total_tool_calls"] / stats["executions"] if stats["executions"] > 0 else 0
             )
 
         return {
@@ -493,7 +489,10 @@ class TeamAnalytics:
 
         # Check for tool budget issues
         for record in records:
-            if record.metrics.get("total_tool_calls", 0) >= record.team_config.total_tool_budget * 0.95:
+            if (
+                record.metrics.get("total_tool_calls", 0)
+                >= record.team_config.total_tool_budget * 0.95
+            ):
                 bottlenecks.append(
                     BottleneckInfo(
                         bottleneck_type="tool_budget_exhaustion",
@@ -511,9 +510,7 @@ class TeamAnalytics:
 
         return sorted(bottlenecks, key=lambda b: b.severity, reverse=True)
 
-    def compare_teams(
-        self, team1_id: str, team2_id: str
-    ) -> Optional[ComparisonResult]:
+    def compare_teams(self, team1_id: str, team2_id: str) -> Optional[ComparisonResult]:
         """Compare two teams.
 
         Args:
@@ -545,16 +542,16 @@ class TeamAnalytics:
             "team1": stats1["avg_execution_time"],
             "team2": stats2["avg_execution_time"],
             "difference": stats1["avg_execution_time"] - stats2["avg_execution_time"],
-            "winner": team1_id if stats1["avg_execution_time"] < stats2["avg_execution_time"] else team2_id,
+            "winner": (
+                team1_id
+                if stats1["avg_execution_time"] < stats2["avg_execution_time"]
+                else team2_id
+            ),
         }
 
         # Determine overall winner
-        team1_wins = sum(
-            1 for m in metric_comparisons.values() if m["winner"] == team1_id
-        )
-        team2_wins = sum(
-            1 for m in metric_comparisons.values() if m["winner"] == team2_id
-        )
+        team1_wins = sum(1 for m in metric_comparisons.values() if m["winner"] == team1_id)
+        team2_wins = sum(1 for m in metric_comparisons.values() if m["winner"] == team2_id)
 
         overall_winner = team1_id if team1_wins > team2_wins else team2_id
         confidence = min(1.0, (team1_wins + team2_wins) / (2 * len(metric_comparisons)))
@@ -568,9 +565,7 @@ class TeamAnalytics:
                 else 0
             )
             if diff_pct > 20:
-                insights.append(
-                    f"{metric_name}: {comparison['winner']} is {diff_pct:.1f}% better"
-                )
+                insights.append(f"{metric_name}: {comparison['winner']} is {diff_pct:.1f}% better")
 
         return ComparisonResult(
             team1_id=team1_id,
@@ -640,7 +635,11 @@ class TeamAnalytics:
             avg_tool_calls = np.mean(stats["tool_calls"])
 
             # Composite score: prioritize success, then speed, then efficiency
-            score = success_rate * 0.6 + (1 / max(1, avg_time)) * 0.25 + (1 / max(1, avg_tool_calls)) * 0.15
+            score = (
+                success_rate * 0.6
+                + (1 / max(1, avg_time)) * 0.25
+                + (1 / max(1, avg_tool_calls)) * 0.15
+            )
 
             rankings.append((member_id, score))
 
@@ -654,9 +653,7 @@ class TeamAnalytics:
         """
         try:
             data = {
-                "executions": {
-                    eid: record.to_dict() for eid, record in self._executions.items()
-                },
+                "executions": {eid: record.to_dict() for eid, record in self._executions.items()},
                 "team_executions": dict(self._team_executions),
                 "member_stats": dict(self._member_stats),
                 "formation_stats": dict(self._formation_stats),

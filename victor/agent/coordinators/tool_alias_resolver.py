@@ -251,9 +251,7 @@ class ToolAliasResolver:
 
         # Method 3: Fall back to canonical (will fail validation)
         canonical = self._get_canonical_name(tool_name)
-        logger.debug(
-            f"No shell variant enabled for '{tool_name}', using canonical '{canonical}'"
-        )
+        logger.debug(f"No shell variant enabled for '{tool_name}', using canonical '{canonical}'")
 
         return ResolutionResult(
             original=tool_name,

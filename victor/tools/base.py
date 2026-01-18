@@ -107,7 +107,9 @@ class ToolResult(BaseModel):
         return cls(success=True, output=output, error=None, metadata=metadata)
 
     @classmethod
-    def create_failure(cls, error: str, output: Any = None, metadata: Optional[Dict[str, Any]] = None) -> "ToolResult":
+    def create_failure(
+        cls, error: str, output: Any = None, metadata: Optional[Dict[str, Any]] = None
+    ) -> "ToolResult":
         """Create a failed tool result."""
         return cls(success=False, output=output, error=error, metadata=metadata)
 

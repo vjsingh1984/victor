@@ -43,8 +43,7 @@ class MockCompiledGraph:
         self.thread_id_received = thread_id
         self.checkpoint_received = checkpoint
         return ExecutionResult(
-            final_state=initial_state,
-            metrics={"nodes_executed": 5, "duration_seconds": 1.5}
+            final_state=initial_state, metrics={"nodes_executed": 5, "duration_seconds": 1.5}
         )
 
     async def stream(self, initial_state: Dict[str, Any], thread_id=None):

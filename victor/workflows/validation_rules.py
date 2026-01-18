@@ -473,7 +473,7 @@ class TeamFormationRule(ValidationRule):
                         if not member.get("role"):
                             issues.append(
                                 self.create_issue(
-                                    message=f"Team member missing 'role' field",
+                                    message="Team member missing 'role' field",
                                     location=f"{wf_name}:{node_id}.members[{i}]",
                                     context={"member": member_id},
                                 )
@@ -482,7 +482,7 @@ class TeamFormationRule(ValidationRule):
                         if not member.get("goal"):
                             issues.append(
                                 self.create_issue(
-                                    message=f"Team member missing 'goal' field",
+                                    message="Team member missing 'goal' field",
                                     location=f"{wf_name}:{node_id}.members[{i}]",
                                     context={"member": member_id},
                                 )
@@ -491,7 +491,11 @@ class TeamFormationRule(ValidationRule):
                 # Check recursion depth
                 max_iterations = node.get("max_iterations")
                 if max_iterations is not None:
-                    if not isinstance(max_iterations, int) or max_iterations < 1 or max_iterations > 10:
+                    if (
+                        not isinstance(max_iterations, int)
+                        or max_iterations < 1
+                        or max_iterations > 10
+                    ):
                         issues.append(
                             self.create_issue(
                                 message=f"Invalid max_iterations: {max_iterations}. Must be between 1 and 10",

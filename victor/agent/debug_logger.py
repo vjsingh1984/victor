@@ -307,10 +307,12 @@ class DebugLogger:
         # Convert context window from tokens to chars (assume 4 chars/token)
         context_window_chars = self.context_window * 4
         warning_threshold = int(context_window_chars * 0.80)  # 80% for warning
-        info_threshold = int(context_window_chars * 0.50)     # 50% for info
+        info_threshold = int(context_window_chars * 0.50)  # 50% for info
 
         # Calculate percentage of context used
-        context_pct = (estimated_tokens / self.context_window * 100) if self.context_window > 0 else 0
+        context_pct = (
+            (estimated_tokens / self.context_window * 100) if self.context_window > 0 else 0
+        )
 
         if char_count > warning_threshold:
             warning_icon = self._presentation.icon("warning", with_color=False)

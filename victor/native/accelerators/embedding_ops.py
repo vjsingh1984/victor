@@ -79,9 +79,7 @@ class EmbeddingCacheStats:
     total_topk_calls: int = 0
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
-    def record_similarity_call(
-        self, duration_ms: float, rust_used: bool, cache_hit: bool
-    ) -> None:
+    def record_similarity_call(self, duration_ms: float, rust_used: bool, cache_hit: bool) -> None:
         """Record a similarity computation."""
         with self._lock:
             self.total_similarity_calls += 1

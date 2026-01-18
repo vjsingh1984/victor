@@ -227,13 +227,16 @@ class TestParallelExecutor:
     @pytest.mark.asyncio
     async def test_execute_with_tuple_tasks(self):
         """Test tasks specified as tuples with kwargs."""
+
         async def kwargs_task(**kwargs):
             return kwargs.get("value", "default")
 
         executor = ParallelExecutor()
-        result = await executor.execute([
-            (kwargs_task, {"value": "custom"}),
-        ])
+        result = await executor.execute(
+            [
+                (kwargs_task, {"value": "custom"}),
+            ]
+        )
 
         assert result.success is True
         assert result.results == ["custom"]
@@ -495,6 +498,7 @@ class TestTimeout:
     @pytest.mark.asyncio
     async def test_task_timeout(self):
         """Test that tasks timeout as configured."""
+
         async def slow_task(**kwargs):
             await asyncio.sleep(2)  # Sleep longer than timeout
             return "should not happen"

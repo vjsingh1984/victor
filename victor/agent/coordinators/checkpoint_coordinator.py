@@ -134,7 +134,9 @@ class CheckpointCoordinator:
                 description=description,
                 tags=tags or [],
             )
-            logger.info(f"Checkpoint saved: {checkpoint_id[:20]}... ({description or 'no description'})")
+            logger.info(
+                f"Checkpoint saved: {checkpoint_id[:20]}... ({description or 'no description'})"
+            )
             return checkpoint_id
         except (TypeError, ValueError) as e:
             # Serialization error - state contains non-serializable objects

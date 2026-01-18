@@ -724,8 +724,7 @@ class VerticalBase(
         # Validate extension implements protocol
         if not isinstance(extension, IExtension):
             raise TypeError(
-                f"Extension must implement IExtension protocol, "
-                f"got {type(extension).__name__}"
+                f"Extension must implement IExtension protocol, " f"got {type(extension).__name__}"
             )
 
         # Register with shared registry
@@ -772,9 +771,7 @@ class VerticalBase(
     # =========================================================================
 
     @classmethod
-    def get_mode_config(  # type: ignore[override]
-        cls, mode_name: str
-    ) -> Any:  # AgentMode
+    def get_mode_config(cls, mode_name: str) -> Any:  # type: ignore[override]  # AgentMode
         """Get mode configuration from centralized registry.
 
         This replaces the legacy get_mode_config() method with a canonical

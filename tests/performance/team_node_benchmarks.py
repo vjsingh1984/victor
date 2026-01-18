@@ -518,16 +518,19 @@ def large_team():
 
 
 @pytest.mark.benchmark
-@pytest.mark.parametrize("formation", [
-    TeamFormationType.SEQUENTIAL,
-    TeamFormationType.PARALLEL,
-    TeamFormationType.PIPELINE,
-    TeamFormationType.HIERARCHICAL,
-    TeamFormationType.CONSENSUS,
-    TeamFormationType.DYNAMIC,
-    TeamFormationType.ADAPTIVE,
-    TeamFormationType.HYBRID,
-])
+@pytest.mark.parametrize(
+    "formation",
+    [
+        TeamFormationType.SEQUENTIAL,
+        TeamFormationType.PARALLEL,
+        TeamFormationType.PIPELINE,
+        TeamFormationType.HIERARCHICAL,
+        TeamFormationType.CONSENSUS,
+        TeamFormationType.DYNAMIC,
+        TeamFormationType.ADAPTIVE,
+        TeamFormationType.HYBRID,
+    ],
+)
 def test_formation_performance(benchmark, formation):
     """Benchmark performance of different team formations.
 
@@ -547,15 +550,15 @@ def test_formation_performance(benchmark, formation):
 
     # Create team of 3 members
     for i in range(3):
-        coordinator.add_member(
-            MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01)
-        )
+        coordinator.add_member(MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01))
 
     def run_team():
-        return asyncio.run(coordinator.execute_team(
-            task="Analyze codebase for performance bottlenecks",
-            context={"team_name": f"benchmark_{formation.value}"},
-        ))
+        return asyncio.run(
+            coordinator.execute_team(
+                task="Analyze codebase for performance bottlenecks",
+                context={"team_name": f"benchmark_{formation.value}"},
+            )
+        )
 
     result = benchmark(run_team)
 
@@ -564,26 +567,29 @@ def test_formation_performance(benchmark, formation):
     assert result["member_count"] == 3
 
     # Print performance metrics
-    print(f"\n{formation.value:15} | Time: {result['total_time']*1000:7.2f}ms | "
-          f"Messages: {result['message_count']:3} | Members: {result['member_count']}")
+    print(
+        f"\n{formation.value:15} | Time: {result['total_time']*1000:7.2f}ms | "
+        f"Messages: {result['message_count']:3} | Members: {result['member_count']}"
+    )
 
 
 @pytest.mark.benchmark
-@pytest.mark.parametrize("formation,expected_max_ms", [
-    (TeamFormationType.SEQUENTIAL, 60),
-    (TeamFormationType.PARALLEL, 30),
-    (TeamFormationType.PIPELINE, 60),
-    (TeamFormationType.HIERARCHICAL, 40),
-    (TeamFormationType.CONSENSUS, 200),
-])
+@pytest.mark.parametrize(
+    "formation,expected_max_ms",
+    [
+        (TeamFormationType.SEQUENTIAL, 60),
+        (TeamFormationType.PARALLEL, 30),
+        (TeamFormationType.PIPELINE, 60),
+        (TeamFormationType.HIERARCHICAL, 40),
+        (TeamFormationType.CONSENSUS, 200),
+    ],
+)
 def test_formation_performance_targets(benchmark, formation, expected_max_ms):
     """Verify that formations meet performance targets."""
     coordinator = MockTeamCoordinator(formation=formation)
 
     for i in range(3):
-        coordinator.add_member(
-            MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01)
-        )
+        coordinator.add_member(MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01))
 
     def run_team():
         return asyncio.run(coordinator.execute_team(task="Quick task", context={}))
@@ -592,9 +598,9 @@ def test_formation_performance_targets(benchmark, formation, expected_max_ms):
 
     # Check performance target
     exec_time_ms = result["total_time"] * 1000
-    assert exec_time_ms < expected_max_ms, (
-        f"{formation.value} exceeded target: {exec_time_ms:.2f}ms > {expected_max_ms}ms"
-    )
+    assert (
+        exec_time_ms < expected_max_ms
+    ), f"{formation.value} exceeded target: {exec_time_ms:.2f}ms > {expected_max_ms}ms"
 
 
 # =============================================================================
@@ -612,9 +618,7 @@ def test_scalability_sequential(benchmark, member_count):
     coordinator = MockTeamCoordinator(formation=TeamFormationType.SEQUENTIAL)
 
     for i in range(member_count):
-        coordinator.add_member(
-            MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01)
-        )
+        coordinator.add_member(MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01))
 
     def run_team():
         return asyncio.run(coordinator.execute_team(task="Scale test", context={}))
@@ -627,8 +631,10 @@ def test_scalability_sequential(benchmark, member_count):
     actual_time = result["total_time"]
     ratio = actual_time / expected_time if expected_time > 0 else 0
 
-    print(f"\nSequential | Members: {member_count:2} | "
-          f"Time: {actual_time*1000:7.2f}ms | Ratio: {ratio:.2f}x")
+    print(
+        f"\nSequential | Members: {member_count:2} | "
+        f"Time: {actual_time*1000:7.2f}ms | Ratio: {ratio:.2f}x"
+    )
 
 
 @pytest.mark.benchmark
@@ -641,9 +647,7 @@ def test_scalability_parallel(benchmark, member_count):
     coordinator = MockTeamCoordinator(formation=TeamFormationType.PARALLEL)
 
     for i in range(member_count):
-        coordinator.add_member(
-            MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01)
-        )
+        coordinator.add_member(MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01))
 
     def run_team():
         return asyncio.run(coordinator.execute_team(task="Scale test", context={}))
@@ -656,8 +660,10 @@ def test_scalability_parallel(benchmark, member_count):
     actual_time = result["total_time"]
     ratio = actual_time / expected_time if expected_time > 0 else 0
 
-    print(f"\nParallel   | Members: {member_count:2} | "
-          f"Time: {actual_time*1000:7.2f}ms | Ratio: {ratio:.2f}x")
+    print(
+        f"\nParallel   | Members: {member_count:2} | "
+        f"Time: {actual_time*1000:7.2f}ms | Ratio: {ratio:.2f}x"
+    )
 
 
 @pytest.mark.benchmark
@@ -670,9 +676,7 @@ def test_scalability_consensus(benchmark, member_count):
     coordinator = MockTeamCoordinator(formation=TeamFormationType.CONSENSUS)
 
     for i in range(member_count):
-        coordinator.add_member(
-            MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01)
-        )
+        coordinator.add_member(MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01))
 
     def run_team():
         return asyncio.run(coordinator.execute_team(task="Consensus test", context={}))
@@ -681,9 +685,11 @@ def test_scalability_consensus(benchmark, member_count):
     assert result["success"]
 
     # Consensus should take longer with more members
-    print(f"\nConsensus  | Members: {member_count:2} | "
-          f"Time: {result['total_time']*1000:7.2f}ms | "
-          f"Messages: {result['message_count']:3}")
+    print(
+        f"\nConsensus  | Members: {member_count:2} | "
+        f"Time: {result['total_time']*1000:7.2f}ms | "
+        f"Messages: {result['message_count']:3}"
+    )
 
 
 # =============================================================================
@@ -737,9 +743,11 @@ def test_recursion_depth_overhead(benchmark, depth):
     # Calculate per-level overhead
     overhead_per_level = total_time / depth
 
-    print(f"\nRecursion Depth: {depth:2} | "
-          f"Total Time: {total_time*1000:7.2f}ms | "
-          f"Overhead/Level: {overhead_per_level*1000:6.3f}ms")
+    print(
+        f"\nRecursion Depth: {depth:2} | "
+        f"Total Time: {total_time*1000:7.2f}ms | "
+        f"Overhead/Level: {overhead_per_level*1000:6.3f}ms"
+    )
 
     # Verify overhead is acceptable (<5ms per level)
     assert overhead_per_level < 0.005, (
@@ -786,15 +794,15 @@ def test_recursion_tracking_overhead_vs_no_tracking():
     overhead = time_with - time_without
     overhead_pct = (overhead / time_without * 100) if time_without > 0 else 0
 
-    print(f"\nRecursion Tracking Overhead:")
+    print("\nRecursion Tracking Overhead:")
     print(f"  With tracking:    {time_with*1000:.2f}ms")
     print(f"  Without tracking: {time_without*1000:.2f}ms")
     print(f"  Overhead:         {overhead*1000:.2f}ms ({overhead_pct:.1f}%)")
 
     # Verify overhead is minimal (<10%)
-    assert overhead_pct < 10.0, (
-        f"Recursion tracking overhead {overhead_pct:.1f}% exceeds 10% target"
-    )
+    assert (
+        overhead_pct < 10.0
+    ), f"Recursion tracking overhead {overhead_pct:.1f}% exceeds 10% target"
 
 
 # =============================================================================
@@ -840,6 +848,7 @@ def test_memory_per_member(benchmark, member_count):
             current, peak = tracemalloc.get_traced_memory()
             tracemalloc.stop()
             return {"result": result, "memory": peak}
+
         return asyncio.run(_run_team())
 
     output = benchmark(run_team)
@@ -849,14 +858,16 @@ def test_memory_per_member(benchmark, member_count):
     peak_memory_kb = output["memory"] / 1024
     memory_per_member = peak_memory_kb / member_count
 
-    print(f"\nMemory Usage | Members: {member_count:2} | "
-          f"Total: {peak_memory_kb:6.1f}KB | "
-          f"Per-Member: {memory_per_member:5.1f}KB")
+    print(
+        f"\nMemory Usage | Members: {member_count:2} | "
+        f"Total: {peak_memory_kb:6.1f}KB | "
+        f"Per-Member: {memory_per_member:5.1f}KB"
+    )
 
     # Target: < 1MB (1024KB) for 10 members
-    assert output["memory"] < 1_000_000, (
-        f"Memory usage {peak_memory_kb:.1f}KB exceeds 1MB target for {member_count} members"
-    )
+    assert (
+        output["memory"] < 1_000_000
+    ), f"Memory usage {peak_memory_kb:.1f}KB exceeds 1MB target for {member_count} members"
 
 
 def test_memory_leak_detection():
@@ -868,9 +879,7 @@ def test_memory_leak_detection():
 
     # Add members once
     for i in range(3):
-        coordinator.add_member(
-            MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01)
-        )
+        coordinator.add_member(MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01))
 
     memory_snapshots = []
 
@@ -898,7 +907,7 @@ def test_memory_leak_detection():
         late_avg = sum(memory_snapshots[-2:]) / 2
         growth = (late_avg - early_avg) / early_avg * 100 if early_avg > 0 else 0
 
-        print(f"\nMemory Leak Check:")
+        print("\nMemory Leak Check:")
         print(f"  Early avg:  {early_avg / 1024:.1f}KB")
         print(f"  Late avg:   {late_avg / 1024:.1f}KB")
         print(f"  Growth:     {growth:.1f}%")
@@ -932,19 +941,23 @@ def test_communication_overhead(benchmark, message_size):
         )
 
     def run_team():
-        return asyncio.run(coordinator.execute_team(
-            task="Communication test",
-            context={"data": "x" * message_size},
-        ))
+        return asyncio.run(
+            coordinator.execute_team(
+                task="Communication test",
+                context={"data": "x" * message_size},
+            )
+        )
 
     result = benchmark(run_team)
 
     assert result["success"]
     messages_per_member = result["message_count"] / result["member_count"]
 
-    print(f"\nCommunication | Msg Size: {message_size:5}B | "
-          f"Time: {result['total_time']*1000:7.2f}ms | "
-          f"Messages/Member: {messages_per_member:.1f}")
+    print(
+        f"\nCommunication | Msg Size: {message_size:5}B | "
+        f"Time: {result['total_time']*1000:7.2f}ms | "
+        f"Messages/Member: {messages_per_member:.1f}"
+    )
 
 
 # =============================================================================
@@ -977,10 +990,12 @@ def test_tool_budget_impact(benchmark, tool_budget):
         )
 
     def run_team():
-        return asyncio.run(coordinator.execute_team(
-            task="Tool budget test",
-            context={"tool_budget": tool_budget},
-        ))
+        return asyncio.run(
+            coordinator.execute_team(
+                task="Tool budget test",
+                context={"tool_budget": tool_budget},
+            )
+        )
 
     result = benchmark(run_team)
 
@@ -990,9 +1005,11 @@ def test_tool_budget_impact(benchmark, tool_budget):
     total_tool_calls = sum(m.tool_calls_used for m in coordinator.members)
     time_per_call = result["total_time"] / total_tool_calls if total_tool_calls > 0 else 0
 
-    print(f"\nTool Budget | Budget: {tool_budget:3} | "
-          f"Time: {result['total_time']*1000:7.2f}ms | "
-          f"Per-Call: {time_per_call*1000:6.3f}ms")
+    print(
+        f"\nTool Budget | Budget: {tool_budget:3} | "
+        f"Time: {result['total_time']*1000:7.2f}ms | "
+        f"Per-Call: {time_per_call*1000:6.3f}ms"
+    )
 
 
 # =============================================================================
@@ -1021,20 +1038,24 @@ def test_real_world_code_review_team(benchmark):
         coordinator.add_member(reviewer)
 
     def run_team():
-        return asyncio.run(coordinator.execute_team(
-            task="Review authentication module implementation",
-            context={
-                "file": "auth.py",
-                "lines_of_code": 500,
-                "complexity": "high",
-            },
-        ))
+        return asyncio.run(
+            coordinator.execute_team(
+                task="Review authentication module implementation",
+                context={
+                    "file": "auth.py",
+                    "lines_of_code": 500,
+                    "complexity": "high",
+                },
+            )
+        )
 
     result = benchmark(run_team)
 
     assert result["success"]
-    print(f"\nCode Review Team | Time: {result['total_time']*1000:.2f}ms | "
-          f"Members: {result['member_count']} | Messages: {result['message_count']}")
+    print(
+        f"\nCode Review Team | Time: {result['total_time']*1000:.2f}ms | "
+        f"Members: {result['member_count']} | Messages: {result['message_count']}"
+    )
 
 
 @pytest.mark.benchmark
@@ -1057,19 +1078,23 @@ def test_feature_implementation_pipeline(benchmark):
         coordinator.add_member(stage)
 
     def run_team():
-        return asyncio.run(coordinator.execute_team(
-            task="Implement user authentication with JWT",
-            context={
-                "requirements": ["JWT tokens", "password hashing", "session management"],
-                "testing": "unit + integration",
-            },
-        ))
+        return asyncio.run(
+            coordinator.execute_team(
+                task="Implement user authentication with JWT",
+                context={
+                    "requirements": ["JWT tokens", "password hashing", "session management"],
+                    "testing": "unit + integration",
+                },
+            )
+        )
 
     result = benchmark(run_team)
 
     assert result["success"]
-    print(f"\nFeature Pipeline | Time: {result['total_time']*1000:.2f}ms | "
-          f"Stages: {result['member_count']} | Messages: {result['message_count']}")
+    print(
+        f"\nFeature Pipeline | Time: {result['total_time']*1000:.2f}ms | "
+        f"Stages: {result['member_count']} | Messages: {result['message_count']}"
+    )
 
 
 # =============================================================================
@@ -1108,9 +1133,7 @@ def test_team_node_performance_summary():
     for formation in formations:
         coordinator = MockTeamCoordinator(formation=formation)
         for i in range(3):
-            coordinator.add_member(
-                MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01)
-            )
+            coordinator.add_member(MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01))
 
         async def run_formation():
             return await coordinator.execute_team(task="Test", context={})
@@ -1126,8 +1149,10 @@ def test_team_node_performance_summary():
         }
 
         status = "✓" if result["success"] else "✗"
-        print(f"  {formation.value:15} {status}  {elapsed*1000:6.2f}ms  "
-              f"{result['message_count']:3} messages")
+        print(
+            f"  {formation.value:15} {status}  {elapsed*1000:6.2f}ms  "
+            f"{result['message_count']:3} messages"
+        )
 
     # Test scaling
     print("\n2. Scaling Performance (Parallel formation)")
@@ -1137,9 +1162,7 @@ def test_team_node_performance_summary():
     for size in team_sizes:
         coordinator = MockTeamCoordinator(formation=TeamFormationType.PARALLEL)
         for i in range(size):
-            coordinator.add_member(
-                MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01)
-            )
+            coordinator.add_member(MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01))
 
         async def run_scaling():
             return await coordinator.execute_team(task="Test", context={})
@@ -1183,8 +1206,10 @@ def test_team_node_performance_summary():
             "overhead_per_level_ms": overhead_per_level,
         }
 
-        print(f"  Depth {depth:2}          ✓  {elapsed*1000:6.2f}ms  "
-              f"({overhead_per_level:5.3f}ms per level)")
+        print(
+            f"  Depth {depth:2}          ✓  {elapsed*1000:6.2f}ms  "
+            f"({overhead_per_level:5.3f}ms per level)"
+        )
 
     # Test memory
     print("\n4. Memory Usage (Parallel formation)")

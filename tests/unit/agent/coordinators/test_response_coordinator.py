@@ -80,9 +80,7 @@ class TestProcessedResponse:
         assert response.has_tool_calls() is False
 
         # With tool calls
-        response = ProcessedResponse(
-            content="test", tool_calls=[{"name": "read_file"}]
-        )
+        response = ProcessedResponse(content="test", tool_calls=[{"name": "read_file"}])
         assert response.has_tool_calls() is True
 
     def test_is_empty(self):
@@ -96,9 +94,7 @@ class TestProcessedResponse:
         assert response.is_empty() is False
 
         # Has tool calls
-        response = ProcessedResponse(
-            content="", tool_calls=[{"name": "read_file"}]
-        )
+        response = ProcessedResponse(content="", tool_calls=[{"name": "read_file"}])
         assert response.is_empty() is False
 
 
@@ -171,9 +167,7 @@ def mock_tool_adapter():
     """Create mock tool adapter."""
     adapter = MagicMock()
     adapter.parse_tool_calls.return_value = MagicMock(
-        tool_calls=[],
-        remaining_content="content",
-        parse_method="mock"
+        tool_calls=[], remaining_content="content", parse_method="mock"
     )
     return adapter
 
@@ -259,9 +253,7 @@ class TestResponseCoordinator:
         assert result.tool_calls is None
         assert result.filtered_count == 0
 
-    def test_parse_and_validate_tool_calls_with_filtering(
-        self, coordinator, mock_tool_adapter
-    ):
+    def test_parse_and_validate_tool_calls_with_filtering(self, coordinator, mock_tool_adapter):
         """Test tool call filtering by enabled tools."""
         mock_calls = [
             {"name": "read_file", "arguments": {}},
@@ -443,13 +435,11 @@ class TestResponseCoordinatorIntegration:
         mock_tool_call = MagicMock()
         mock_tool_call.to_dict.return_value = {
             "name": "read_file",
-            "arguments": {"path": "/test/file"}
+            "arguments": {"path": "/test/file"},
         }
 
         adapter.parse_tool_calls.return_value = MagicMock(
-            tool_calls=[mock_tool_call],
-            remaining_content="remaining content",
-            parse_method="mock"
+            tool_calls=[mock_tool_call], remaining_content="remaining content", parse_method="mock"
         )
 
         coordinator = ResponseCoordinator(
@@ -493,6 +483,7 @@ class TestResponseCoordinatorExtendedMethods:
 
     def test_aggregate_stream_chunks_custom_attr(self, coordinator):
         """Test aggregating stream chunks with custom attribute."""
+
         class CustomChunk:
             def __init__(self, text):
                 self.text = text
@@ -509,6 +500,7 @@ class TestResponseCoordinatorExtendedMethods:
 
     def test_aggregate_stream_chunks_no_content_attr(self, coordinator):
         """Test aggregating chunks without content attribute."""
+
         class BadChunk:
             pass
 
@@ -603,6 +595,7 @@ class TestResponseCoordinatorExtendedMethods:
 
     def test_process_stream_chunk_no_content_attr(self, coordinator):
         """Test processing chunk without content attribute."""
+
         class BadChunk:
             pass
 
@@ -641,8 +634,7 @@ class TestResponseCoordinatorExtendedMethods:
         )
 
         result = coordinator.try_extract_tool_calls_from_text(
-            "Some content with tool calls",
-            valid_tool_names={"read_file"}
+            "Some content with tool calls", valid_tool_names={"read_file"}
         )
 
         # Should return None when disabled
@@ -662,9 +654,7 @@ class TestResponseCoordinatorExtendedMethods:
         content = "Just content"
 
         result = coordinator.format_response_for_display(
-            content,
-            tool_calls=None,
-            show_tool_calls=True
+            content, tool_calls=None, show_tool_calls=True
         )
 
         # Should just return content
@@ -676,9 +666,7 @@ class TestResponseCoordinatorExtendedMethods:
         tool_calls = [{"arguments": {}}, {"name": "read_file"}]
 
         result = coordinator.format_response_for_display(
-            content,
-            tool_calls=tool_calls,
-            show_tool_calls=True
+            content, tool_calls=tool_calls, show_tool_calls=True
         )
 
         assert "Content" in result
@@ -719,7 +707,9 @@ class TestResponseCoordinatorWithResolution:
         # Should call resolver for shell aliases
         result = coordinator_with_resolvers._resolve_shell_variant_internal("run")
         assert result == "shell_readonly"
-        coordinator_with_resolvers._shell_variant_resolver.resolve_shell_variant.assert_called_once_with("run")
+        coordinator_with_resolvers._shell_variant_resolver.resolve_shell_variant.assert_called_once_with(
+            "run"
+        )
 
     def test_resolve_shell_variant_internal_not_shell_alias(self, coordinator_with_resolvers):
         """Test that non-shell tools are not resolved."""
@@ -740,8 +730,7 @@ class TestResponseCoordinatorWithResolution:
         enabled_tools = {"read_file", "write_file"}
 
         result = coordinator_with_resolvers._is_tool_enabled_internal(
-            "read_file",
-            enabled_tools=enabled_tools
+            "read_file", enabled_tools=enabled_tools
         )
 
         assert result is True
@@ -752,7 +741,9 @@ class TestResponseCoordinatorWithResolution:
         result = coordinator_with_resolvers._is_tool_enabled_internal("read_file")
 
         assert result is True
-        coordinator_with_resolvers._tool_enabled_checker.is_tool_enabled.assert_called_once_with("read_file")
+        coordinator_with_resolvers._tool_enabled_checker.is_tool_enabled.assert_called_once_with(
+            "read_file"
+        )
 
     def test_is_tool_enabled_internal_with_registry(self, mock_sanitizer, mock_tool_registry):
         """Test tool enabled check with registry."""
@@ -791,14 +782,12 @@ class TestResponseCoordinatorWithResolution:
 
     def test_parse_and_validate_with_resolution_shell_alias(self, coordinator_with_resolvers):
         """Test parsing with shell alias resolution."""
-        tool_calls = [
-            {"name": "run", "arguments": {"command": "ls"}}
-        ]
+        tool_calls = [{"name": "run", "arguments": {"command": "ls"}}]
 
-        result_tool_calls, result_content = coordinator_with_resolvers.parse_and_validate_tool_calls_with_resolution(
-            tool_calls=tool_calls,
-            full_content="Content",
-            enabled_tools={"shell_readonly"}
+        result_tool_calls, result_content = (
+            coordinator_with_resolvers.parse_and_validate_tool_calls_with_resolution(
+                tool_calls=tool_calls, full_content="Content", enabled_tools={"shell_readonly"}
+            )
         )
 
         # Should resolve "run" to "shell_readonly"
@@ -812,11 +801,15 @@ class TestResponseCoordinatorWithResolution:
             {"name": "disabled_tool", "arguments": {}},
         ]
 
-        coordinator_with_resolvers._tool_enabled_checker.is_tool_enabled.side_effect = lambda name: name == "read_file"
+        coordinator_with_resolvers._tool_enabled_checker.is_tool_enabled.side_effect = (
+            lambda name: name == "read_file"
+        )
 
-        result_tool_calls, result_content = coordinator_with_resolvers.parse_and_validate_tool_calls_with_resolution(
-            tool_calls=tool_calls,
-            full_content="Content",
+        result_tool_calls, result_content = (
+            coordinator_with_resolvers.parse_and_validate_tool_calls_with_resolution(
+                tool_calls=tool_calls,
+                full_content="Content",
+            )
         )
 
         # Should filter out disabled tool
@@ -825,23 +818,27 @@ class TestResponseCoordinatorWithResolution:
 
     def test_parse_and_validate_with_resolution_no_tool_calls(self, coordinator_with_resolvers):
         """Test parsing when no tool calls provided."""
-        result_tool_calls, result_content = coordinator_with_resolvers.parse_and_validate_tool_calls_with_resolution(
-            tool_calls=None,
-            full_content="Just content",
+        result_tool_calls, result_content = (
+            coordinator_with_resolvers.parse_and_validate_tool_calls_with_resolution(
+                tool_calls=None,
+                full_content="Just content",
+            )
         )
 
         assert result_tool_calls is None
         assert result_content == "Just content"
 
-    def test_parse_and_validate_with_resolution_normalizes_arguments(self, coordinator_with_resolvers):
+    def test_parse_and_validate_with_resolution_normalizes_arguments(
+        self, coordinator_with_resolvers
+    ):
         """Test that arguments are normalized."""
-        tool_calls = [
-            {"name": "read_file", "arguments": '{"path": "/test"}'}
-        ]
+        tool_calls = [{"name": "read_file", "arguments": '{"path": "/test"}'}]
 
-        result_tool_calls, result_content = coordinator_with_resolvers.parse_and_validate_tool_calls_with_resolution(
-            tool_calls=tool_calls,
-            full_content="Content",
+        result_tool_calls, result_content = (
+            coordinator_with_resolvers.parse_and_validate_tool_calls_with_resolution(
+                tool_calls=tool_calls,
+                full_content="Content",
+            )
         )
 
         # Arguments should be converted from JSON string to dict

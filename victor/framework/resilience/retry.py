@@ -281,8 +281,7 @@ class RetryHandler:
                 try:
                     if self._config.log_attempts and attempt > 0:
                         logger.info(
-                            f"Retry attempt {attempt}/{max_attempts - 1} "
-                            f"for tool '{tool_name}'"
+                            f"Retry attempt {attempt}/{max_attempts - 1} " f"for tool '{tool_name}'"
                         )
 
                     result = await asyncio.wait_for(
@@ -351,7 +350,9 @@ class RetryHandler:
 
         return NodeResult(
             node_id=node.id,
-            status=ExecutorNodeStatus.COMPLETED if outputs or not errors else ExecutorNodeStatus.FAILED,
+            status=(
+                ExecutorNodeStatus.COMPLETED if outputs or not errors else ExecutorNodeStatus.FAILED
+            ),
             output=outputs,
             error="; ".join(errors) if errors else None,
             duration_seconds=time.time() - start_time,
@@ -404,6 +405,7 @@ class RetryHandler:
             return True
 
         import re
+
         error_lower = error.lower()
         for pattern in self._config.retry_config.retryable_patterns:
             if isinstance(pattern, str):
@@ -414,13 +416,17 @@ class RetryHandler:
                     # Remove r prefix if present and escape the pattern for literal matching
                     # or use as regex if it looks like a regex pattern
                     clean_pattern = pattern.lower()
-                    if "?)" in clean_pattern or "?." in clean_pattern or clean_pattern.startswith("^"):
+                    if (
+                        "?)" in clean_pattern
+                        or "?." in clean_pattern
+                        or clean_pattern.startswith("^")
+                    ):
                         # Use regex matching
                         if re.search(clean_pattern, error_lower):
                             return True
                     else:
                         # Simple substring match (remove common regex markers)
-                        simple_pattern = clean_pattern.replace("r\"", "").replace(".?", "")
+                        simple_pattern = clean_pattern.replace('r"', "").replace(".?", "")
                         if simple_pattern in error_lower:
                             return True
                 except (re.error, ValueError):
@@ -601,6 +607,7 @@ def with_exponential_backoff(
         async def fetch_data(url: str) -> dict:
             return await http_client.get(url)
     """
+
     def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> T:
@@ -614,7 +621,9 @@ def with_exponential_backoff(
                 jitter=jitter,
                 **kwargs,
             )
+
         return wrapper
+
     return decorator
 
 
@@ -639,6 +648,7 @@ def with_exponential_backoff_sync(
         def read_file(path: str) -> str:
             return Path(path).read_text()
     """
+
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> T:
@@ -652,7 +662,9 @@ def with_exponential_backoff_sync(
                 jitter=jitter,
                 **kwargs,
             )
+
         return wrapper
+
     return decorator
 
 

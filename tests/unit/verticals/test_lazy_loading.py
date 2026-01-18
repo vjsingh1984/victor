@@ -184,7 +184,10 @@ class TestLazyLoading:
 
         # Test eager loading by running in a subprocess
         eager_result = subprocess.run(
-            [sys.executable, "-c", """
+            [
+                sys.executable,
+                "-c",
+                """
 import os
 os.environ['VICTOR_LAZY_LOADING'] = 'false'
 import time
@@ -192,15 +195,19 @@ start = time.perf_counter()
 from victor.core.verticals import VerticalRegistry
 eager_time = time.perf_counter() - start
 print(f"{eager_time:.6f}")
-"""],
+""",
+            ],
             capture_output=True,
-            text=True
+            text=True,
         )
         eager_time = float(eager_result.stdout.strip())
 
         # Test lazy loading by running in a subprocess
         lazy_result = subprocess.run(
-            [sys.executable, "-c", """
+            [
+                sys.executable,
+                "-c",
+                """
 import os
 os.environ['VICTOR_LAZY_LOADING'] = 'true'
 import time
@@ -208,15 +215,18 @@ start = time.perf_counter()
 from victor.core.verticals import VerticalRegistry
 lazy_time = time.perf_counter() - start
 print(f"{lazy_time:.6f}")
-"""],
+""",
+            ],
             capture_output=True,
-            text=True
+            text=True,
         )
         lazy_time = float(lazy_result.stdout.strip())
 
         # Lazy loading should be faster
         # (allowing some tolerance for variance)
-        assert lazy_time < eager_time, f"Lazy loading ({lazy_time*1000:.1f}ms) should be faster than eager loading ({eager_time*1000:.1f}ms)"
+        assert (
+            lazy_time < eager_time
+        ), f"Lazy loading ({lazy_time*1000:.1f}ms) should be faster than eager loading ({eager_time*1000:.1f}ms)"
 
     def test_lazy_import_thread_safety(self):
         """Test that lazy loading is thread-safe."""

@@ -97,9 +97,7 @@ class TestProductionWorkflowImport:
 
     def test_import_team_research_workflow(self):
         """Test importing the comprehensive team research workflow."""
-        workflows = load_workflow_from_file(
-            "victor/research/workflows/examples/team_research.yaml"
-        )
+        workflows = load_workflow_from_file("victor/research/workflows/examples/team_research.yaml")
 
         assert isinstance(workflows, dict)
         assert "comprehensive_team_research" in workflows
@@ -175,7 +173,11 @@ class TestEditorGraphConversion:
         # Each branch should create an edge
         branch_count = len(condition_node.branches)
         # next_nodes can be empty for condition nodes since they use branches
-        assert condition_node.next_nodes is None or len(condition_node.next_nodes) == 0 or len(condition_node.next_nodes) == branch_count
+        assert (
+            condition_node.next_nodes is None
+            or len(condition_node.next_nodes) == 0
+            or len(condition_node.next_nodes) == branch_count
+        )
 
     def _get_node_type(self, node) -> str:
         """Get node type string for editor."""
@@ -319,9 +321,7 @@ class TestCompilationWithEditor:
         """Test compiling comprehensive team research workflow."""
         compiler = UnifiedWorkflowCompiler(enable_caching=True)
 
-        workflows = load_workflow_from_file(
-            "victor/research/workflows/examples/team_research.yaml"
-        )
+        workflows = load_workflow_from_file("victor/research/workflows/examples/team_research.yaml")
         workflow_def = workflows["comprehensive_team_research"]
 
         # Compile
@@ -425,7 +425,8 @@ class TestEdgeCases:
         from victor.workflows.yaml_loader import YAMLWorkflowError
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            f.write("""
+            f.write(
+                """
 workflows:
   test_workflow:
     description: "Test"
@@ -433,12 +434,15 @@ workflows:
       - id: node1
         type: invalid_type
         # Invalid node type
-""")
+"""
+            )
             f.flush()
             temp_path = f.name
 
         try:
-            with pytest.raises((ConfigurationValidationError, ValueError, KeyError, YAMLWorkflowError)):
+            with pytest.raises(
+                (ConfigurationValidationError, ValueError, KeyError, YAMLWorkflowError)
+            ):
                 load_workflow_from_file(temp_path)
         finally:
             Path(temp_path).unlink()
@@ -546,4 +550,6 @@ class TestWorkflowNodeConnections:
         # Verify branches point to valid nodes
         all_node_ids = set(workflow_def.nodes.keys())  # Fixed: use keys() for IDs
         for branch_name, target in condition.branches.items():
-            assert target in all_node_ids, f"Branch '{branch_name}' points to invalid node: {target}"
+            assert (
+                target in all_node_ids
+            ), f"Branch '{branch_name}' points to invalid node: {target}"

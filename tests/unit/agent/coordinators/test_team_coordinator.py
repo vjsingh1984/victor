@@ -163,9 +163,8 @@ class TestTeamCoordinator:
             coordinator.get_team_suggestions("feature", complexity)
 
         # Assert - called for each complexity level
-        assert (
-            mock_mw_coordinator.coordination.suggest_for_task.call_count
-            == len(complexity_levels)
+        assert mock_mw_coordinator.coordination.suggest_for_task.call_count == len(
+            complexity_levels
         )
 
     def test_get_team_suggestions_with_different_modes(
@@ -209,9 +208,7 @@ class TestTeamCoordinator:
         assert hasattr(result, "action")
         assert hasattr(result, "team_recommendations")
 
-    def test_get_team_suggestions_includes_team_recommendations(
-        self, coordinator: TeamCoordinator
-    ):
+    def test_get_team_suggestions_includes_team_recommendations(self, coordinator: TeamCoordinator):
         """Test that suggestions include team recommendations."""
         # Execute
         result = coordinator.get_team_suggestions("feature", "high")
@@ -239,9 +236,7 @@ class TestTeamCoordinator:
             system_prompt_additions="",
             tool_priorities={},
         )
-        mock_mw_coordinator.coordination.suggest_for_task = Mock(
-            return_value=empty_suggestion
-        )
+        mock_mw_coordinator.coordination.suggest_for_task = Mock(return_value=empty_suggestion)
 
         # Execute
         coordinator = TeamCoordinator(
@@ -418,9 +413,7 @@ class TestTeamCoordinator:
         # Assert - same reference
         assert result is specs
 
-    def test_get_team_specs_after_set_team_specs(
-        self, coordinator: TeamCoordinator
-    ):
+    def test_get_team_specs_after_set_team_specs(self, coordinator: TeamCoordinator):
         """Test get_team_specs after set_team_specs."""
         # Setup and execute
         original_specs = {"team1": Mock(name="team1")}
@@ -468,9 +461,7 @@ class TestTeamCoordinator:
         # Assert delegation occurred
         mock_mw_coordinator.coordination.suggest_for_task.assert_called_once()
 
-    def test_multiple_set_and_get_cycles(
-        self, coordinator: TeamCoordinator
-    ):
+    def test_multiple_set_and_get_cycles(self, coordinator: TeamCoordinator):
         """Test multiple set/get cycles."""
         # First cycle
         specs1 = {"team1": Mock(name="team1")}
@@ -615,9 +606,7 @@ class TestTeamCoordinatorEdgeCases:
         with pytest.raises(RuntimeError, match="Coordinator error"):
             coordinator.get_team_suggestions("feature", "high")
 
-    def test_set_team_specs_with_none(
-        self, coordinator: TeamCoordinator, mock_orchestrator: Mock
-    ):
+    def test_set_team_specs_with_none(self, coordinator: TeamCoordinator, mock_orchestrator: Mock):
         """Test set_team_specs with None - should handle gracefully."""
         # Execute & Assert - should raise or handle None appropriately
         # The implementation tries to log len(specs), so None will raise

@@ -23,9 +23,11 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 # Try to import Rust native Graph class
 try:
     from victor_native import Graph as _NativeGraph
+
     _RUST_AVAILABLE = True
 except ImportError:
     import warnings
+
     _NativeGraph = None
     warnings.warn(
         "Tier 3 Rust graph algorithms unavailable, using Python fallback. "
@@ -196,11 +198,14 @@ class GraphAlgorithmsAccelerator:
         if not edge_list:
             logger.warning("Creating empty graph")
             if self._use_rust:
-                return Graph(directed=directed, node_count=node_count, edge_count=0, edges=[], adjacency={})
+                return Graph(
+                    directed=directed, node_count=node_count, edge_count=0, edges=[], adjacency={}
+                )
             else:
                 # Return empty NetworkX graph for Python fallback
                 try:
                     import networkx as nx
+
                     return nx.DiGraph() if directed else nx.Graph()
                 except ImportError:
                     raise ImportError(
@@ -210,9 +215,7 @@ class GraphAlgorithmsAccelerator:
 
         max_node = max(max(src, tgt) for src, tgt, _ in edge_list)
         if max_node >= node_count:
-            raise ValueError(
-                f"Edge list contains node ID {max_node} >= node_count {node_count}"
-            )
+            raise ValueError(f"Edge list contains node ID {max_node} >= node_count {node_count}")
 
         # Return NetworkX graph for Python fallback
         if not self._use_rust:
@@ -375,8 +378,7 @@ class GraphAlgorithmsAccelerator:
 
         except ImportError:
             raise ImportError(
-                "NetworkX is required for Python fallback. "
-                "Install with: pip install networkx"
+                "NetworkX is required for Python fallback. " "Install with: pip install networkx"
             )
 
     @_time_function
@@ -478,8 +480,7 @@ class GraphAlgorithmsAccelerator:
 
         except ImportError:
             raise ImportError(
-                "NetworkX is required for Python fallback. "
-                "Install with: pip install networkx"
+                "NetworkX is required for Python fallback. " "Install with: pip install networkx"
             )
 
     @_time_function
@@ -583,8 +584,7 @@ class GraphAlgorithmsAccelerator:
 
         except ImportError:
             raise ImportError(
-                "NetworkX is required for Python fallback. "
-                "Install with: pip install networkx"
+                "NetworkX is required for Python fallback. " "Install with: pip install networkx"
             )
 
     @_time_function
@@ -678,8 +678,7 @@ class GraphAlgorithmsAccelerator:
 
         except ImportError:
             raise ImportError(
-                "NetworkX is required for Python fallback. "
-                "Install with: pip install networkx"
+                "NetworkX is required for Python fallback. " "Install with: pip install networkx"
             )
 
     @_time_function
@@ -737,8 +736,7 @@ class GraphAlgorithmsAccelerator:
 
         except ImportError:
             raise ImportError(
-                "NetworkX is required for Python fallback. "
-                "Install with: pip install networkx"
+                "NetworkX is required for Python fallback. " "Install with: pip install networkx"
             )
 
     def _compute_degree_centrality(self, graph: Graph) -> List[float]:
@@ -760,8 +758,7 @@ class GraphAlgorithmsAccelerator:
 
         except ImportError:
             raise ImportError(
-                "NetworkX is required for Python fallback. "
-                "Install with: pip install networkx"
+                "NetworkX is required for Python fallback. " "Install with: pip install networkx"
             )
 
     def clear_cache(self):
@@ -804,8 +801,6 @@ def get_graph_algorithms_accelerator(
     if _graph_accelerator_singleton is None:
         with _singleton_lock:
             if _graph_accelerator_singleton is None:
-                _graph_accelerator_singleton = GraphAlgorithmsAccelerator(
-                    force_python=force_python
-                )
+                _graph_accelerator_singleton = GraphAlgorithmsAccelerator(force_python=force_python)
 
     return _graph_accelerator_singleton

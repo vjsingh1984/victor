@@ -34,12 +34,15 @@ def test_session_services_builder_wires_components():
     orchestrator._tool_calling_caps_internal = "caps"
     orchestrator.provider_name = "provider"
 
-    with patch(
-        "victor.agent.builders.session_services_builder.create_session_state_manager",
-        return_value="session-state",
-    ) as create_session_state, patch(
-        "victor.agent.builders.session_services_builder.TaskCompletionDetector"
-    ) as completion_cls:
+    with (
+        patch(
+            "victor.agent.builders.session_services_builder.create_session_state_manager",
+            return_value="session-state",
+        ) as create_session_state,
+        patch(
+            "victor.agent.builders.session_services_builder.TaskCompletionDetector"
+        ) as completion_cls,
+    ):
         completion_instance = MagicMock()
         completion_cls.return_value = completion_instance
 

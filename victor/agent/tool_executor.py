@@ -1162,10 +1162,7 @@ class ToolExecutor:
 
         for group in independent_groups:
             # Execute all tools in this group in parallel
-            group_tasks = [
-                execute_with_semaphore(tool_name, args)
-                for tool_name, args in group
-            ]
+            group_tasks = [execute_with_semaphore(tool_name, args) for tool_name, args in group]
             group_results = await asyncio.gather(*group_tasks, return_exceptions=True)
 
             # Handle exceptions and build results list

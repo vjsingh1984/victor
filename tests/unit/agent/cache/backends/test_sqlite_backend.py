@@ -82,9 +82,7 @@ class TestConnectionLifecycle:
         cursor = conn.cursor()
 
         # Check that table exists
-        cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='cache_entries'"
-        )
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='cache_entries'")
         result = cursor.fetchone()
 
         assert result is not None
@@ -428,9 +426,7 @@ class TestThreadSafety:
     async def test_concurrent_set_operations(self, connected_backend):
         """Test that concurrent set operations work correctly."""
         # Run concurrent sets
-        tasks = [
-            connected_backend.set(f"key{i}", f"value{i}", "test_namespace") for i in range(10)
-        ]
+        tasks = [connected_backend.set(f"key{i}", f"value{i}", "test_namespace") for i in range(10)]
         await asyncio.gather(*tasks)
 
         # All values should be stored
@@ -488,6 +484,7 @@ class TestDistributedInvalidation:
     @pytest.mark.asyncio
     async def test_listen_for_invalidation_raises_not_implemented(self, connected_backend):
         """Test that listen_for_invalidation() raises NotImplementedError."""
+
         async def callback(key: str, namespace: str) -> None:
             pass
 

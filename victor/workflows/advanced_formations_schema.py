@@ -147,7 +147,9 @@ class AdaptiveFormationConfig:
         use_ml: Use ML model if available
     """
 
-    criteria: List[str] = field(default_factory=lambda: ["complexity", "deadline", "resource_availability"])
+    criteria: List[str] = field(
+        default_factory=lambda: ["complexity", "deadline", "resource_availability"]
+    )
     default_formation: str = "parallel"
     fallback_formation: str = "sequential"
     scoring_weights: Optional[Dict[str, Dict[str, float]]] = None
@@ -377,9 +379,7 @@ def validate_adaptive_config(config: AdaptiveFormationConfig) -> List[str]:
 
     for criterion in config.criteria:
         if criterion not in valid_criteria:
-            errors.append(
-                f"Invalid criterion '{criterion}'. Must be one of: {valid_criteria}"
-            )
+            errors.append(f"Invalid criterion '{criterion}'. Must be one of: {valid_criteria}")
 
     # Validate formations
     valid_formations = ["sequential", "parallel", "hierarchical", "pipeline", "consensus"]
@@ -412,8 +412,7 @@ def validate_adaptive_config(config: AdaptiveFormationConfig) -> List[str]:
             for criterion, weight in weights.items():
                 if not isinstance(weight, (int, float)):
                     errors.append(
-                        f"scoring_weights['{formation}']['{criterion}'] "
-                        f"must be a number"
+                        f"scoring_weights['{formation}']['{criterion}'] " f"must be a number"
                     )
 
     return errors
@@ -517,7 +516,8 @@ def parse_advanced_formation_from_yaml(yaml_data: Dict[str, Any]) -> AdvancedFor
         errors = validate_advanced_formation_config(config)
         if errors:
             raise ValidationError(
-                f"Invalid advanced formation configuration:\n" + "\n".join(f"  - {e}" for e in errors)
+                "Invalid advanced formation configuration:\n"
+                + "\n".join(f"  - {e}" for e in errors)
             )
 
         return config

@@ -279,7 +279,6 @@ def is_local_provider(provider_name: str) -> bool:
         "lmstudio",
         "vllm",
         "llamacpp",
-        "vllm",
     }
 
 

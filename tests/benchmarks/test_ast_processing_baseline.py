@@ -194,34 +194,34 @@ def generate_python_source(
                 source_lines.append(f"        return param + self.value{i}\n")
             elif complexity == "medium":
                 source_lines.append(f"        result = param + self.value{i}\n")
-                source_lines.append(f"        if result > 50:\n")
-                source_lines.append(f"            result *= 2\n")
-                source_lines.append(f"        return result\n")
+                source_lines.append("        if result > 50:\n")
+                source_lines.append("            result *= 2\n")
+                source_lines.append("        return result\n")
             else:  # complex
-                source_lines.append(f"        result = 0\n")
-                source_lines.append(f"        for k in range(param):\n")
+                source_lines.append("        result = 0\n")
+                source_lines.append("        for k in range(param):\n")
                 source_lines.append(f"            result += self.value{i} * k\n")
-                source_lines.append(f"            if result > 1000:\n")
-                source_lines.append(f"                break\n")
-                source_lines.append(f"        return result\n")
+                source_lines.append("            if result > 1000:\n")
+                source_lines.append("                break\n")
+                source_lines.append("        return result\n")
             source_lines.append("\n")
 
     # Generate functions
     for i in range(functions):
         source_lines.append(f"def generated_function{i}(param: List[int]) -> Dict[str, Any]:\n")
         if complexity == "simple":
-            source_lines.append(f'    return {{"result": sum(param)}}\n')
+            source_lines.append('    return {"result": sum(param)}\n')
         elif complexity == "medium":
-            source_lines.append(f"    total = sum(param)\n")
-            source_lines.append(f"    average = total / len(param) if param else 0\n")
-            source_lines.append(f'    return {{"total": total, "average": average}}\n')
+            source_lines.append("    total = sum(param)\n")
+            source_lines.append("    average = total / len(param) if param else 0\n")
+            source_lines.append('    return {"total": total, "average": average}\n')
         else:  # complex
-            source_lines.append(f"    result = {{}}\n")
-            source_lines.append(f"    result['sum'] = sum(param)\n")
-            source_lines.append(f"    result['min'] = min(param) if param else 0\n")
-            source_lines.append(f"    result['max'] = max(param) if param else 0\n")
-            source_lines.append(f"    result['unique'] = list(set(param))\n")
-            source_lines.append(f"    return result\n")
+            source_lines.append("    result = {}\n")
+            source_lines.append("    result['sum'] = sum(param)\n")
+            source_lines.append("    result['min'] = min(param) if param else 0\n")
+            source_lines.append("    result['max'] = max(param) if param else 0\n")
+            source_lines.append("    result['unique'] = list(set(param))\n")
+            source_lines.append("    return result\n")
         source_lines.append("\n")
 
     # Add more lines to reach target
@@ -454,18 +454,20 @@ def reset_registries():
     # Import and clear caches if possible
     try:
         from victor.coding.codebase import tree_sitter_manager
-        if hasattr(tree_sitter_manager, '_language_cache'):
+
+        if hasattr(tree_sitter_manager, "_language_cache"):
             tree_sitter_manager._language_cache.clear()
-        if hasattr(tree_sitter_manager, '_parser_cache'):
+        if hasattr(tree_sitter_manager, "_parser_cache"):
             tree_sitter_manager._parser_cache.clear()
     except Exception:
         pass  # If import fails, continue anyway
     yield
     try:
         from victor.coding.codebase import tree_sitter_manager
-        if hasattr(tree_sitter_manager, '_language_cache'):
+
+        if hasattr(tree_sitter_manager, "_language_cache"):
             tree_sitter_manager._language_cache.clear()
-        if hasattr(tree_sitter_manager, '_parser_cache'):
+        if hasattr(tree_sitter_manager, "_parser_cache"):
             tree_sitter_manager._parser_cache.clear()
     except Exception:
         pass
@@ -747,6 +749,7 @@ class TestSymbolExtractionPerformance:
             temp_path = Path(f.name)
 
         try:
+
             def extract():
                 symbols = extractor.extract_symbols(temp_path, language="python")
                 assert len(symbols) > 0
@@ -779,6 +782,7 @@ class TestSymbolExtractionPerformance:
             temp_path = Path(f.name)
 
         try:
+
             def extract():
                 symbols = extractor.extract_symbols(temp_path, language="python")
                 assert len(symbols) > 0
@@ -811,6 +815,7 @@ class TestSymbolExtractionPerformance:
             temp_path = Path(f.name)
 
         try:
+
             def extract():
                 symbols, edges = extractor.extract_all(temp_path, language="python")
                 assert len(symbols) > 0
@@ -989,7 +994,9 @@ class TestParallelProcessingPerformance:
         )
 
         print(f"\n{result}")
-        assert result.avg_latency < 100.0, f"Sequential parsing too slow: {result.avg_latency:.3f}ms"
+        assert (
+            result.avg_latency < 100.0
+        ), f"Sequential parsing too slow: {result.avg_latency:.3f}ms"
 
     def test_parallel_parsing_thread_pool(self, python_parser):
         """Benchmark parallel parsing using ThreadPoolExecutor."""
@@ -1068,6 +1075,7 @@ class TestParallelProcessingPerformance:
                 temp_files.append(Path(f.name))
 
         try:
+
             def extract_sequential():
                 all_symbols = []
                 for temp_path in temp_files:
@@ -1223,6 +1231,7 @@ class TestEdgeExtractionPerformance:
             temp_path = Path(f.name)
 
         try:
+
             def extract():
                 edges = extractor.extract_call_edges(temp_path, language="python")
                 return edges
@@ -1272,6 +1281,7 @@ class TestEdgeExtractionPerformance:
             temp_path = Path(f.name)
 
         try:
+
             def extract():
                 edges = extractor.extract_inheritance_edges(temp_path, language="python")
                 return edges

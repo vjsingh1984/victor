@@ -324,7 +324,9 @@ class TestFrameworkShimVertical:
             await shim.create_orchestrator()
 
             # New capability-based approach calls orchestrator.set_custom_prompt directly
-            mock_orchestrator.set_custom_prompt.assert_called_once_with("You are a framework shim test assistant.")
+            mock_orchestrator.set_custom_prompt.assert_called_once_with(
+                "You are a framework shim test assistant."
+            )
 
     @pytest.mark.asyncio
     async def test_vertical_stages_applied(self, mock_settings, mock_orchestrator):

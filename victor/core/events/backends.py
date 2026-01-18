@@ -343,7 +343,9 @@ class InMemoryEventBackend:
                 try:
                     # Use lambda to properly pass arguments to queue.get
                     event = await asyncio.wait_for(
-                        loop.run_in_executor(None, lambda: self._event_queue.get(block=True, timeout=0.1)),
+                        loop.run_in_executor(
+                            None, lambda: self._event_queue.get(block=True, timeout=0.1)
+                        ),
                         timeout=0.2,
                     )
                 except (asyncio.TimeoutError, concurrent.futures.TimeoutError):
@@ -366,9 +368,7 @@ class InMemoryEventBackend:
                 with self._lock:
                     subscriptions = list(self._subscriptions.values())
                     matching = [
-                        s
-                        for s in subscriptions
-                        if s.is_active and event.matches_pattern(s.pattern)
+                        s for s in subscriptions if s.is_active and event.matches_pattern(s.pattern)
                     ]
 
                 # Dispatch to handlers and wait for completion
@@ -458,6 +458,7 @@ class InMemoryEventBackend:
         try:
             # Check if handler is a coroutine function
             import inspect
+
             if asyncio.iscoroutinefunction(handler):
                 await handler(event)
             else:

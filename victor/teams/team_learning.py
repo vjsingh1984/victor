@@ -335,9 +335,7 @@ class TeamLearningSystem:
 
         # Q-learning update
         current_q = self._q_table[key]
-        self._q_table[key] = current_q + self.learning_rate * (
-            experience.reward - current_q
-        )
+        self._q_table[key] = current_q + self.learning_rate * (experience.reward - current_q)
 
         # Update formation performance
         formation = experience.team_config.formation.value
@@ -470,7 +468,9 @@ class TeamLearningSystem:
 
         return recommendations[:top_k]
 
-    def _recommend_formation(self, experiences: List[TeamExperience]) -> Optional[AdaptationRecommendation]:
+    def _recommend_formation(
+        self, experiences: List[TeamExperience]
+    ) -> Optional[AdaptationRecommendation]:
         """Recommend formation changes.
 
         Args:
@@ -513,7 +513,9 @@ class TeamLearningSystem:
             f"{avg_rewards[current_formation]:.3f} for {current_formation}",
         )
 
-    def _recommend_member_changes(self, experiences: List[TeamExperience]) -> Optional[AdaptationRecommendation]:
+    def _recommend_member_changes(
+        self, experiences: List[TeamExperience]
+    ) -> Optional[AdaptationRecommendation]:
         """Recommend member changes.
 
         Args:
@@ -534,9 +536,7 @@ class TeamLearningSystem:
         if not member_rewards:
             return None
 
-        avg_rewards = {
-            member_id: np.mean(rewards) for member_id, rewards in member_rewards.items()
-        }
+        avg_rewards = {member_id: np.mean(rewards) for member_id, rewards in member_rewards.items()}
 
         # Find worst performing member
         worst_member = min(avg_rewards, key=avg_rewards.get)
@@ -554,7 +554,9 @@ class TeamLearningSystem:
             rationale=f"{worst_member} has average reward of {worst_reward:.3f}, below threshold",
         )
 
-    def _recommend_budget_changes(self, experiences: List[TeamExperience]) -> Optional[AdaptationRecommendation]:
+    def _recommend_budget_changes(
+        self, experiences: List[TeamExperience]
+    ) -> Optional[AdaptationRecommendation]:
         """Recommend budget changes.
 
         Args:
@@ -645,9 +647,7 @@ class TeamLearningSystem:
         """
         try:
             data = {
-                "experiences": {
-                    eid: exp.to_dict() for eid, exp in self._experiences.items()
-                },
+                "experiences": {eid: exp.to_dict() for eid, exp in self._experiences.items()},
                 "team_experiences": dict(self._team_experiences),
                 "q_table": {f"{k[0]}_{k[1]}": v for k, v in self._q_table.items()},
                 "formation_performance": dict(self._formation_performance),

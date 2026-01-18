@@ -38,12 +38,15 @@ def test_finalization_builder_wires_dependencies():
     orchestrator.__init_capability_registry__ = MagicMock()
     orchestrator._lifecycle_manager = MagicMock()
 
-    with patch(
-        "victor.agent.builders.finalization_builder.create_vertical_context",
-        return_value="vertical-context",
-    ), patch(
-        "victor.agent.builders.finalization_builder.VerticalIntegrationAdapter",
-        return_value="vertical-adapter",
+    with (
+        patch(
+            "victor.agent.builders.finalization_builder.create_vertical_context",
+            return_value="vertical-context",
+        ),
+        patch(
+            "victor.agent.builders.finalization_builder.VerticalIntegrationAdapter",
+            return_value="vertical-adapter",
+        ),
     ):
         builder = FinalizationBuilder(settings=settings, factory=factory)
         components = builder.build(orchestrator)

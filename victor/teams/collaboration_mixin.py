@@ -214,7 +214,10 @@ class CollaborationMixin:
         Args:
             config: Shared context configuration
         """
-        from victor.workflows.team_collaboration import ConflictResolutionStrategy, SharedTeamContext
+        from victor.workflows.team_collaboration import (
+            ConflictResolutionStrategy,
+            SharedTeamContext,
+        )
 
         # Get conflict resolution strategy
         resolution_str = config.get("conflict_resolution", "last_write_wins")
@@ -237,7 +240,11 @@ class CollaborationMixin:
         Args:
             config: Negotiation configuration
         """
-        from victor.workflows.team_collaboration import NegotiationFramework, NegotiationType, VotingStrategy
+        from victor.workflows.team_collaboration import (
+            NegotiationFramework,
+            NegotiationType,
+            VotingStrategy,
+        )
 
         # Get voting strategy
         voting_str = config.get("voting_strategy", "majority")

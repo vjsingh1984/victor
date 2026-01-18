@@ -579,6 +579,7 @@ async def run_oneshot(
     except Exception as e:
         formatter.error(str(e))
         import traceback
+
         traceback.print_exc()  # DEBUG: Print full traceback
         raise typer.Exit(1)
     finally:

@@ -247,7 +247,9 @@ class TeamNodeRunner:
                                 duration_seconds=member_result.duration_seconds,
                                 tool_calls_used=member_result.tool_calls_used,
                                 tools_used=set(getattr(member_result, "tools_used", set())),
-                                error_message=member_result.error if not member_result.success else None,
+                                error_message=(
+                                    member_result.error if not member_result.success else None
+                                ),
                                 role=getattr(member_result, "role", "assistant"),
                             )
 
@@ -260,8 +262,12 @@ class TeamNodeRunner:
                         team_id=node.id,
                         success=success,
                         duration_seconds=duration_seconds,
-                        consensus_achieved=result.get("consensus_achieved") if isinstance(result, dict) else None,
-                        consensus_rounds=result.get("consensus_rounds") if isinstance(result, dict) else None,
+                        consensus_achieved=(
+                            result.get("consensus_achieved") if isinstance(result, dict) else None
+                        ),
+                        consensus_rounds=(
+                            result.get("consensus_rounds") if isinstance(result, dict) else None
+                        ),
                     )
 
                 # Return node result (metadata stored in output for now)

@@ -396,17 +396,20 @@ class ProviderIntegrationTest(ABC):
             mock_server: Mock HTTP server fixture
         """
         # First turn
-        _, response1 = await mock_server.request("/chat/completions", messages=[
-            {"role": "user", "content": "Hello"}
-        ])
+        _, response1 = await mock_server.request(
+            "/chat/completions", messages=[{"role": "user", "content": "Hello"}]
+        )
         assert response1["choices"][0]["message"]["content"] == "Test response"
 
         # Second turn (with history)
-        _, response2 = await mock_server.request("/chat/completions", messages=[
-            {"role": "user", "content": "Hello"},
-            {"role": "assistant", "content": "Test response"},
-            {"role": "user", "content": "How are you?"}
-        ])
+        _, response2 = await mock_server.request(
+            "/chat/completions",
+            messages=[
+                {"role": "user", "content": "Hello"},
+                {"role": "assistant", "content": "Test response"},
+                {"role": "user", "content": "How are you?"},
+            ],
+        )
         assert response2["choices"][0]["message"]["content"] == "Test response"
 
     def test_provider_properties(self, mock_server: MockHTTPServer):
@@ -443,22 +446,24 @@ class ProviderIntegrationTest(ABC):
             "/chat/completions",
             response_data={
                 "id": "chatcmpl-tools",
-                "choices": [{
-                    "message": {
-                        "role": "assistant",
-                        "content": None,
-                        "tool_calls": [
-                            {
-                                "id": "call_1",
-                                "type": "function",
-                                "function": {
-                                    "name": "test_tool",
-                                    "arguments": '{"param": "value"}',
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "id": "call_1",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "test_tool",
+                                        "arguments": '{"param": "value"}',
+                                    },
                                 }
-                            }
-                        ]
+                            ],
+                        }
                     }
-                }],
+                ],
             },
         )
 
@@ -472,14 +477,12 @@ class ProviderIntegrationTest(ABC):
                         "description": "A test tool",
                         "parameters": {
                             "type": "object",
-                            "properties": {
-                                "param": {"type": "string"}
-                            },
+                            "properties": {"param": {"type": "string"}},
                             "required": ["param"],
-                        }
-                    }
+                        },
+                    },
                 }
-            ]
+            ],
         )
 
         assert status_code == 200
@@ -595,17 +598,21 @@ def create_mock_stream_chunks(
     """
     chunks = []
     for i in range(0, len(content), chunk_size):
-        chunk_content = content[i:i + chunk_size]
+        chunk_content = content[i : i + chunk_size]
         is_final = (i + chunk_size) >= len(content)
 
         chunk = MagicMock(spec=StreamChunk)
         chunk.content = chunk_content
         chunk.delta = chunk_content
         chunk.is_final = is_final
-        chunk.usage = None if not is_final else MagicMock(
-            prompt_tokens=10,
-            completion_tokens=len(content) // 4,
-            total_tokens=10 + len(content) // 4,
+        chunk.usage = (
+            None
+            if not is_final
+            else MagicMock(
+                prompt_tokens=10,
+                completion_tokens=len(content) // 4,
+                total_tokens=10 + len(content) // 4,
+            )
         )
         chunks.append(chunk)
 
@@ -630,5 +637,6 @@ def assert_provider_error(
     assert isinstance(error, expected_type), f"Expected {expected_type}, got {type(error)}"
 
     if expected_message_contains:
-        assert expected_message_contains in str(error), \
-            f"Expected '{expected_message_contains}' in error message: {str(error)}"
+        assert expected_message_contains in str(
+            error
+        ), f"Expected '{expected_message_contains}' in error message: {str(error)}"

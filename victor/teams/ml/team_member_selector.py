@@ -140,9 +140,7 @@ class TeamMemberSelector:
         scored_members = []
 
         for member in available_members:
-            score, confidence, reasons = self._score_member(
-                member, task, task_features
-            )
+            score, confidence, reasons = self._score_member(member, task, task_features)
             scored_members.append(
                 MemberScore(
                     member=member,
@@ -198,10 +196,12 @@ class TeamMemberSelector:
         member_features = self._extract_member_features(member, task_features)
 
         # Create feature vector
-        feature_vector = np.concatenate([
-            task_features.to_feature_vector(),
-            member_features,
-        ])
+        feature_vector = np.concatenate(
+            [
+                task_features.to_feature_vector(),
+                member_features,
+            ]
+        )
 
         # Scale features
         if self._scaler:
@@ -277,7 +277,9 @@ class TeamMemberSelector:
 
         return min(1.0, score), 0.6, reasons
 
-    def _extract_member_features(self, member: "TeamMember", task_features: "TaskFeatures") -> np.ndarray:
+    def _extract_member_features(
+        self, member: "TeamMember", task_features: "TaskFeatures"
+    ) -> np.ndarray:
         """Extract numerical features from member.
 
         Args:
@@ -338,10 +340,12 @@ class TeamMemberSelector:
 
             # Extract features
             member_features = self._extract_member_features(member, task_features)
-            feature_vector = np.concatenate([
-                task_features.to_feature_vector(),
-                member_features,
-            ])
+            feature_vector = np.concatenate(
+                [
+                    task_features.to_feature_vector(),
+                    member_features,
+                ]
+            )
 
             X.append(feature_vector)
             y.append(int(success))

@@ -650,7 +650,7 @@ class TestSearchError:
             failed_backends=["SemanticSearchBackend", "VectorSearchBackend"],
             failure_details={
                 "SemanticSearchBackend": "Connection timeout",
-                "VectorSearchBackend": "Index not found"
+                "VectorSearchBackend": "Index not found",
             },
             query="authentication logic",
         )

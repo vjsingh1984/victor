@@ -50,9 +50,7 @@ class IntelligentIntegrationBuilder(FactoryAwareBuilder):
             self.settings, "intelligent_pipeline_enabled", True
         )
         components["intelligent_integration_config"] = orchestrator._intelligent_integration_config
-        components["intelligent_pipeline_enabled"] = (
-            orchestrator._intelligent_pipeline_enabled
-        )
+        components["intelligent_pipeline_enabled"] = orchestrator._intelligent_pipeline_enabled
 
         # Sub-agent orchestration (via factory) - lazy initialization for parallel task delegation
         (
@@ -60,9 +58,7 @@ class IntelligentIntegrationBuilder(FactoryAwareBuilder):
             orchestrator._subagent_orchestration_enabled,
         ) = factory.setup_subagent_orchestration()
         components["subagent_orchestrator"] = orchestrator._subagent_orchestrator
-        components["subagent_orchestration_enabled"] = (
-            orchestrator._subagent_orchestration_enabled
-        )
+        components["subagent_orchestration_enabled"] = orchestrator._subagent_orchestration_enabled
 
         self._register_components(components)
         return components

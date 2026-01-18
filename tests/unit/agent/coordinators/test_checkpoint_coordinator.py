@@ -129,9 +129,7 @@ class TestCheckpointCoordinator:
         # Assert
         assert manager is None
 
-    def test_is_enabled_when_manager_exists(
-        self, coordinator: CheckpointCoordinator
-    ):
+    def test_is_enabled_when_manager_exists(self, coordinator: CheckpointCoordinator):
         """Test that is_enabled returns True when manager is set."""
         # Execute
         is_enabled = coordinator.is_enabled
@@ -139,9 +137,7 @@ class TestCheckpointCoordinator:
         # Assert
         assert is_enabled is True
 
-    def test_is_enabled_when_manager_is_none(
-        self, coordinator_no_manager: CheckpointCoordinator
-    ):
+    def test_is_enabled_when_manager_is_none(self, coordinator_no_manager: CheckpointCoordinator):
         """Test that is_enabled returns False when manager is None."""
         # Execute
         is_enabled = coordinator_no_manager.is_enabled
@@ -213,9 +209,7 @@ class TestCheckpointCoordinator:
     ):
         """Test that save_checkpoint returns None when checkpointing is disabled."""
         # Execute
-        checkpoint_id = await coordinator_no_manager.save_checkpoint(
-            description="Should not save"
-        )
+        checkpoint_id = await coordinator_no_manager.save_checkpoint(description="Should not save")
 
         # Assert
         assert checkpoint_id is None
@@ -364,9 +358,7 @@ class TestCheckpointCoordinator:
     ):
         """Test that restore_checkpoint handles ValueError gracefully."""
         # Setup
-        mock_checkpoint_manager.restore_checkpoint.side_effect = ValueError(
-            "Invalid data format"
-        )
+        mock_checkpoint_manager.restore_checkpoint.side_effect = ValueError("Invalid data format")
 
         # Execute
         success = await coordinator.restore_checkpoint("cp_bad_format")
@@ -448,9 +440,7 @@ class TestCheckpointCoordinator:
     ):
         """Test that maybe_auto_checkpoint handles TypeError gracefully."""
         # Setup
-        mock_checkpoint_manager.maybe_auto_checkpoint.side_effect = TypeError(
-            "Cannot serialize"
-        )
+        mock_checkpoint_manager.maybe_auto_checkpoint.side_effect = TypeError("Cannot serialize")
 
         # Execute
         checkpoint_id = await coordinator.maybe_auto_checkpoint()
@@ -464,9 +454,7 @@ class TestCheckpointCoordinator:
     ):
         """Test that maybe_auto_checkpoint handles ValueError gracefully."""
         # Setup
-        mock_checkpoint_manager.maybe_auto_checkpoint.side_effect = ValueError(
-            "Invalid value"
-        )
+        mock_checkpoint_manager.maybe_auto_checkpoint.side_effect = ValueError("Invalid value")
 
         # Execute
         checkpoint_id = await coordinator.maybe_auto_checkpoint()
@@ -702,9 +690,7 @@ class TestCheckpointCoordinatorEdgeCases:
             await coordinator_with_broken_apply_state.restore_checkpoint("cp_test")
 
     @pytest.mark.asyncio
-    async def test_save_checkpoint_with_complex_state(
-        self, mock_checkpoint_manager: Mock
-    ):
+    async def test_save_checkpoint_with_complex_state(self, mock_checkpoint_manager: Mock):
         """Test saving checkpoint with complex nested state."""
         # Setup
         complex_state = {

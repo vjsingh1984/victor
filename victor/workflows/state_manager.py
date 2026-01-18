@@ -74,6 +74,7 @@ class StateSnapshot:
         metadata: Additional metadata
         parent_id: Parent snapshot ID (for rollback chains)
     """
+
     snapshot_id: str
     timestamp: float
     state: Dict[str, Any]
@@ -95,6 +96,7 @@ class StateDiff:
         changed_keys: Keys changed
         unchanged_keys: Keys unchanged
     """
+
     snapshot_id: str
     from_snapshot_id: str
     to_snapshot_id: str
@@ -117,6 +119,7 @@ class StateMutation:
         new_value: New value
         mutation_type: Type of mutation (add, remove, change)
     """
+
     mutation_id: str
     timestamp: float
     node_id: Optional[str]
@@ -298,10 +301,7 @@ class WorkflowStateManager:
         Returns:
             Formatted state string
         """
-        snapshot = (
-            self.get_snapshot(snapshot_id) if snapshot_id
-            else self.get_latest_snapshot()
-        )
+        snapshot = self.get_snapshot(snapshot_id) if snapshot_id else self.get_latest_snapshot()
 
         if not snapshot:
             raise ValueError("No snapshot to visualize")
@@ -315,6 +315,7 @@ class WorkflowStateManager:
         elif format == "yaml":
             try:
                 import yaml
+
                 return yaml.dump(state, default_flow_style=False)
             except ImportError:
                 raise ValueError("PyYAML not installed for YAML format")
@@ -336,9 +337,7 @@ class WorkflowStateManager:
         lines.append("=" * 60)
 
         # Filter internal keys
-        display_state = {
-            k: v for k, v in state.items() if not k.startswith("_")
-        }
+        display_state = {k: v for k, v in state.items() if not k.startswith("_")}
 
         # Sort keys for consistent output
         for key in sorted(display_state.keys()):
@@ -386,8 +385,7 @@ class WorkflowStateManager:
         """
         from_snapshot = self.get_snapshot(from_snapshot_id)
         to_snapshot = (
-            self.get_snapshot(to_snapshot_id) if to_snapshot_id
-            else self.get_latest_snapshot()
+            self.get_snapshot(to_snapshot_id) if to_snapshot_id else self.get_latest_snapshot()
         )
 
         if not from_snapshot or not to_snapshot:
@@ -446,10 +444,7 @@ class WorkflowStateManager:
         Returns:
             Query result or None
         """
-        snapshot = (
-            self.get_snapshot(snapshot_id) if snapshot_id
-            else self.get_latest_snapshot()
-        )
+        snapshot = self.get_snapshot(snapshot_id) if snapshot_id else self.get_latest_snapshot()
 
         if not snapshot:
             raise ValueError("No snapshot to query")
@@ -603,7 +598,9 @@ class WorkflowStateManager:
             Rolled back state or None
         """
         if len(self._snapshot_order) <= n:
-            raise ValueError(f"Cannot rollback {n} snapshots, only {len(self._snapshot_order)} available")
+            raise ValueError(
+                f"Cannot rollback {n} snapshots, only {len(self._snapshot_order)} available"
+            )
 
         target_index = len(self._snapshot_order) - n - 1
         if target_index < 0:
@@ -695,10 +692,7 @@ class WorkflowStateManager:
         if snapshot_id:
             snapshot = self.get_snapshot(snapshot_id)
             if snapshot:
-                mutations = [
-                    m for m in mutations
-                    if m.timestamp <= snapshot.timestamp
-                ]
+                mutations = [m for m in mutations if m.timestamp <= snapshot.timestamp]
 
         if key:
             mutations = [m for m in mutations if m.key == key]
@@ -751,10 +745,7 @@ class WorkflowStateManager:
         Returns:
             JSON string
         """
-        snapshot = (
-            self.get_snapshot(snapshot_id) if snapshot_id
-            else self.get_latest_snapshot()
-        )
+        snapshot = self.get_snapshot(snapshot_id) if snapshot_id else self.get_latest_snapshot()
 
         if not snapshot:
             raise ValueError("No snapshot to export")

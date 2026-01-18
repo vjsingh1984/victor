@@ -1191,7 +1191,7 @@ class GroundingVerifier:
                     is_valid_nested = False
                     if len(given_parts) <= len(actual_parts):
                         # Check if the given path is a suffix of the actual path
-                        if actual_parts[-len(given_parts):] == given_parts:
+                        if actual_parts[-len(given_parts) :] == given_parts:
                             is_valid_nested = True
 
                     if is_valid_nested:

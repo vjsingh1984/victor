@@ -387,7 +387,9 @@ class HITLSession:
                 except Exception:
                     pass  # Don't let callback errors break the session
 
-    def _add_event(self, event_type: str, gate_id: Optional[str] = None, data: Optional[Dict[str, Any]] = None) -> None:
+    def _add_event(
+        self, event_type: str, gate_id: Optional[str] = None, data: Optional[Dict[str, Any]] = None
+    ) -> None:
         """Add an event to the session history.
 
         Args:

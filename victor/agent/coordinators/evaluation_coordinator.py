@@ -126,6 +126,7 @@ class EvaluationCoordinator:
         if self._event_bus is None:
             try:
                 from victor.core.events.backends import get_observability_bus
+
                 self._event_bus = get_observability_bus()
             except ImportError:
                 logger.debug("Event bus not available, event publishing disabled")
@@ -193,9 +194,15 @@ class EvaluationCoordinator:
         rl_coordinator = self._get_rl_coordinator_fn()
 
         # Get additional state attributes (if available)
-        continuation_prompts = getattr(stream_context, "_continuation_prompts", 0) if stream_context else 0
-        max_continuation_prompts_used = getattr(stream_context, "_max_continuation_prompts_used", 6) if stream_context else 6
-        stuck_loop_detected = getattr(stream_context, "_stuck_loop_detected", False) if stream_context else False
+        continuation_prompts = (
+            getattr(stream_context, "_continuation_prompts", 0) if stream_context else 0
+        )
+        max_continuation_prompts_used = (
+            getattr(stream_context, "_max_continuation_prompts_used", 6) if stream_context else 6
+        )
+        stuck_loop_detected = (
+            getattr(stream_context, "_stuck_loop_detected", False) if stream_context else False
+        )
 
         try:
             integration.record_intelligent_outcome(
@@ -281,7 +288,9 @@ class EvaluationCoordinator:
             provider = getattr(session, "provider", "unknown")
             model = getattr(session, "model", "unknown")
             vertical_context = self._get_vertical_context_fn()
-            vertical_name = getattr(vertical_context, "vertical_name", None) if vertical_context else None
+            vertical_name = (
+                getattr(vertical_context, "vertical_name", None) if vertical_context else None
+            )
 
             outcome = RLOutcome(
                 provider=provider,

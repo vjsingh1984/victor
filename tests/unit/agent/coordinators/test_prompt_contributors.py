@@ -161,12 +161,11 @@ class TestContextPromptContributor:
     @pytest.mark.asyncio
     async def test_contribute_with_callable_handler(self, sample_context: PromptContext):
         """Test that callable handlers are invoked correctly."""
+
         def mode_handler(mode: str, context: PromptContext) -> str:
             return f"Current mode: {mode}"
 
-        contributor = ContextPromptContributor(
-            context_handlers={"mode": mode_handler}
-        )
+        contributor = ContextPromptContributor(context_handlers={"mode": mode_handler})
 
         result = await contributor.contribute(sample_context)
 
@@ -215,12 +214,11 @@ class TestContextPromptContributor:
     @pytest.mark.asyncio
     async def test_contribute_handles_handler_exceptions(self):
         """Test that exceptions in handlers are caught and logged."""
+
         def failing_handler(value: str, context: PromptContext) -> str:
             raise ValueError("Intentional error")
 
-        contributor = ContextPromptContributor(
-            context_handlers={"mode": failing_handler}
-        )
+        contributor = ContextPromptContributor(context_handlers={"mode": failing_handler})
 
         # Should not raise exception
         result = await contributor.contribute({"mode": "build"})
@@ -230,9 +228,7 @@ class TestContextPromptContributor:
     @pytest.mark.asyncio
     async def test_contribute_returns_empty_for_empty_context(self):
         """Test that empty context returns empty string."""
-        contributor = ContextPromptContributor(
-            context_handlers={"mode": lambda m, c: f"Mode: {m}"}
-        )
+        contributor = ContextPromptContributor(context_handlers={"mode": lambda m, c: f"Mode: {m}"})
 
         result = await contributor.contribute({})
 
@@ -252,9 +248,7 @@ class TestContextPromptContributor:
 
     def test_remove_handler_removes_existing_handler(self):
         """Test that remove_handler() removes a handler."""
-        contributor = ContextPromptContributor(
-            context_handlers={"test": lambda v, c: "test"}
-        )
+        contributor = ContextPromptContributor(context_handlers={"test": lambda v, c: "test"})
 
         contributor.remove_handler("test")
 
@@ -541,6 +535,7 @@ class TestDynamicPromptContributor:
     @pytest.mark.asyncio
     async def test_contribute_with_async_function(self):
         """Test that async contributor function is called correctly."""
+
         async def async_contributor(context: PromptContext) -> str:
             return f"Task: {context.get('task_type', 'unknown')}"
 
@@ -553,6 +548,7 @@ class TestDynamicPromptContributor:
     @pytest.mark.asyncio
     async def test_contribute_with_sync_function(self):
         """Test that sync contributor function is called correctly."""
+
         def sync_contributor(context: PromptContext) -> str:
             return f"Mode: {context.get('mode', 'unknown')}"
 
@@ -574,6 +570,7 @@ class TestDynamicPromptContributor:
     @pytest.mark.asyncio
     async def test_contribute_handles_function_returning_none(self):
         """Test that function returning None is handled gracefully."""
+
         def none_contributor(context: PromptContext) -> None:
             return None
 
@@ -586,6 +583,7 @@ class TestDynamicPromptContributor:
     @pytest.mark.asyncio
     async def test_contribute_propagates_exceptions(self):
         """Test that exceptions in contributor function are propagated."""
+
         async def failing_contributor(context: PromptContext) -> str:
             raise ValueError("Intentional error")
 
@@ -613,6 +611,7 @@ class TestDynamicPromptContributor:
 
     def test_priority_returns_correct_value(self):
         """Test that priority() returns configured value."""
+
         async def dummy_func(context: PromptContext) -> str:
             return "test"
 
@@ -705,6 +704,7 @@ class TestPromptContributorIntegration:
     @pytest.mark.asyncio
     async def test_dynamic_and_static_contributors(self):
         """Test that dynamic and static contributors work together."""
+
         async def dynamic_func(context: PromptContext) -> str:
             return f"Dynamic: {context.get('value', '')}"
 

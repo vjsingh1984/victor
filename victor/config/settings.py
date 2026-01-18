@@ -313,9 +313,7 @@ class ProviderConfig(BaseSettings):
 class ProfileConfig(BaseSettings):
     """Configuration for a model profile."""
 
-    model_config = SettingsConfigDict(
-        extra="allow", protected_namespaces=(), populate_by_name=True
-    )
+    model_config = SettingsConfigDict(extra="allow", protected_namespaces=(), populate_by_name=True)
 
     provider: str = Field(..., description="Provider name (ollama, anthropic, openai, google)")
     model_name: str = Field(
@@ -630,9 +628,7 @@ class Settings(BaseSettings):
         """
         allowed = {"auto", "keyword", "semantic", "hybrid"}
         if v not in allowed:
-            raise ValueError(
-                f"tool_selection_strategy must be one of {allowed}, got '{v}'"
-            )
+            raise ValueError(f"tool_selection_strategy must be one of {allowed}, got '{v}'")
         return v
 
     def model_post_init(self, __context: Any) -> None:
@@ -810,12 +806,11 @@ class Settings(BaseSettings):
     # Automatically falls back to Python tree-sitter if Rust is unavailable.
 
     use_rust_ast_processor: bool = Field(
-        default=True,
-        description="Enable Rust-accelerated AST processing (10x faster than Python)"
+        default=True, description="Enable Rust-accelerated AST processing (10x faster than Python)"
     )
     ast_cache_size: int = Field(
         default=1000,
-        description="Number of ASTs to cache in Rust accelerator (reduces redundant parsing)"
+        description="Number of ASTs to cache in Rust accelerator (reduces redundant parsing)",
     )
 
     # ==========================================================================
@@ -833,11 +828,11 @@ class Settings(BaseSettings):
 
     use_rust_embedding_ops: bool = Field(
         default=True,
-        description="Enable Rust-accelerated embedding similarity operations (3-8x faster)"
+        description="Enable Rust-accelerated embedding similarity operations (3-8x faster)",
     )
     rust_embedding_batch_threshold: int = Field(
         default=10,
-        description="Minimum batch size to use Rust implementation (below this, NumPy is faster)"
+        description="Minimum batch size to use Rust implementation (below this, NumPy is faster)",
     )
 
     # ==========================================================================
@@ -849,31 +844,28 @@ class Settings(BaseSettings):
     # Regex Engine Accelerator (10-20x faster pattern matching)
     use_rust_regex_engine: bool = Field(
         default=True,
-        description="Enable Rust-accelerated regex engine (10-20x faster pattern matching)"
+        description="Enable Rust-accelerated regex engine (10-20x faster pattern matching)",
     )
     regex_cache_size: int = Field(
-        default=100,
-        description="Number of compiled regex sets to cache per language"
+        default=100, description="Number of compiled regex sets to cache per language"
     )
 
     # Signature Computation Accelerator (10x faster deduplication)
     use_rust_signature: bool = Field(
         default=True,
-        description="Enable Rust-accelerated signature computation (10x faster deduplication)"
+        description="Enable Rust-accelerated signature computation (10x faster deduplication)",
     )
     signature_cache_size: int = Field(
-        default=10000,
-        description="Number of signatures to cache for tool call deduplication"
+        default=10000, description="Number of signatures to cache for tool call deduplication"
     )
 
     # File Operations Accelerator (2-3x faster directory traversal)
     use_rust_file_ops: bool = Field(
         default=True,
-        description="Enable Rust-accelerated file operations (2-3x faster directory traversal)"
+        description="Enable Rust-accelerated file operations (2-3x faster directory traversal)",
     )
     file_ops_max_depth: int = Field(
-        default=100,
-        description="Maximum depth for parallel directory traversal"
+        default=100, description="Maximum depth for parallel directory traversal"
     )
 
     # ==========================================================================
@@ -885,44 +877,34 @@ class Settings(BaseSettings):
     # Graph Algorithms Accelerator (3-6x faster graph metrics)
     use_rust_graph_algorithms: bool = Field(
         default=True,
-        description="Enable Rust-accelerated graph algorithms (3-6x faster PageRank, centrality)"
+        description="Enable Rust-accelerated graph algorithms (3-6x faster PageRank, centrality)",
     )
     graph_cache_size: int = Field(
-        default=100,
-        description="Number of graphs to cache for metrics computation"
+        default=100, description="Number of graphs to cache for metrics computation"
     )
 
     # Batch Processing Accelerator (20-40% faster parallel execution)
     use_rust_batch_processor: bool = Field(
         default=True,
-        description="Enable Rust-accelerated batch processing (20-40% faster parallel execution)"
+        description="Enable Rust-accelerated batch processing (20-40% faster parallel execution)",
     )
     batch_max_concurrent: int = Field(
-        default=10,
-        description="Maximum concurrent tasks in batch operations"
+        default=10, description="Maximum concurrent tasks in batch operations"
     )
     batch_timeout_ms: int = Field(
-        default=30000,
-        description="Default timeout for batch tasks (milliseconds)"
+        default=30000, description="Default timeout for batch tasks (milliseconds)"
     )
     batch_retry_policy: str = Field(
-        default="exponential",
-        description="Retry policy: exponential, linear, fixed, none"
+        default="exponential", description="Retry policy: exponential, linear, fixed, none"
     )
 
     # Serialization Accelerator (5-10x faster JSON/YAML parsing)
     use_rust_serialization: bool = Field(
         default=True,
-        description="Enable Rust-accelerated JSON/YAML parsing (5-10x faster config loading)"
+        description="Enable Rust-accelerated JSON/YAML parsing (5-10x faster config loading)",
     )
-    config_cache_size: int = Field(
-        default=100,
-        description="Number of config files to cache"
-    )
-    config_cache_ttl_seconds: int = Field(
-        default=300,
-        description="Config cache TTL (5 minutes)"
-    )
+    config_cache_size: int = Field(default=100, description="Number of config files to cache")
+    config_cache_ttl_seconds: int = Field(default=300, description="Config cache TTL (5 minutes)")
 
     # Context Compaction Settings
     # Controls how conversation history is managed when context grows too large

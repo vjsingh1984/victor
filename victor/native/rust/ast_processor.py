@@ -85,7 +85,7 @@ class ASTProcessorAccelerator:
         self._cache_misses = 0
 
         if self.rust_available:
-            logger.info(f"AST processing: Using Rust accelerator (10x faster)")
+            logger.info("AST processing: Using Rust accelerator (10x faster)")
             # Initialize native cache
             if hasattr(_native, "init_ast_cache"):
                 _native.init_ast_cache(cache_size)
@@ -262,12 +262,14 @@ class ASTProcessorAccelerator:
                 # Extract symbol info
                 symbols = []
                 for node in nodes:
-                    symbols.append({
-                        "name": node.text.decode("utf-8"),
-                        "type": node.parent.type if node.parent else "unknown",
-                        "line": node.start_point[0] + 1,
-                        "column": node.start_point[1],
-                    })
+                    symbols.append(
+                        {
+                            "name": node.text.decode("utf-8"),
+                            "type": node.parent.type if node.parent else "unknown",
+                            "line": node.start_point[0] + 1,
+                            "column": node.start_point[1],
+                        }
+                    )
 
                 results[file_path] = symbols
 

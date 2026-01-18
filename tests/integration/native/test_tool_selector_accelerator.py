@@ -102,7 +102,16 @@ def tool_category_map() -> dict[str, str]:
     }
     # Add categories for remaining tools
     for i in range(10, 100):
-        categories[f"tool_{i}"] = ["file_ops", "search", "execution", "git", "analysis", "refactoring", "testing", "review"][i % 8]
+        categories[f"tool_{i}"] = [
+            "file_ops",
+            "search",
+            "execution",
+            "git",
+            "analysis",
+            "refactoring",
+            "testing",
+            "review",
+        ][i % 8]
     return categories
 
 
@@ -128,9 +137,7 @@ class TestToolSelectorAccelerator:
         assert not accelerator.rust_available
         assert accelerator.get_version() is None
 
-    def test_cosine_similarity_batch(
-        self, reset_accelerator, query_embedding, tool_embeddings
-    ):
+    def test_cosine_similarity_batch(self, reset_accelerator, query_embedding, tool_embeddings):
         """Test cosine similarity batch computation."""
         accelerator = ToolSelectorAccelerator()
         similarities = accelerator.cosine_similarity_batch(query_embedding, tool_embeddings)
@@ -154,9 +161,7 @@ class TestToolSelectorAccelerator:
         similarities = accelerator.cosine_similarity_batch(query_embedding, [])
         assert similarities == []
 
-    def test_cosine_similarity_batch_zero_vector(
-        self, reset_accelerator, tool_embeddings
-    ):
+    def test_cosine_similarity_batch_zero_vector(self, reset_accelerator, tool_embeddings):
         """Test cosine similarity with zero query vector."""
         accelerator = ToolSelectorAccelerator()
         zero_query = [0.0] * 384
@@ -223,17 +228,13 @@ class TestToolSelectorAccelerator:
         assert list(indices) == [3, 5, 7]
         assert list(retrieved_scores) == [0.9, 0.8, 0.7]
 
-    def test_filter_by_category(
-        self, reset_accelerator, tool_names, tool_category_map
-    ):
+    def test_filter_by_category(self, reset_accelerator, tool_names, tool_category_map):
         """Test category filtering."""
         accelerator = ToolSelectorAccelerator()
 
         # Filter to only file_ops and git tools
         allowed_categories = {"file_ops", "git"}
-        filtered = accelerator.filter_by_category(
-            tool_names, allowed_categories, tool_category_map
-        )
+        filtered = accelerator.filter_by_category(tool_names, allowed_categories, tool_category_map)
 
         # Check results
         assert "read_file" in filtered
@@ -258,9 +259,7 @@ class TestToolSelectorAccelerator:
         accelerator = ToolSelectorAccelerator()
 
         # Filter to non-existent category
-        filtered = accelerator.filter_by_category(
-            tool_names, {"nonexistent"}, {}
-        )
+        filtered = accelerator.filter_by_category(tool_names, {"nonexistent"}, {})
         assert filtered == []
 
     def test_filter_and_rank(
@@ -371,6 +370,7 @@ class TestToolSelectorAccelerator:
 
         # Reset metrics
         from victor.native.observability import NativeMetrics
+
         metrics = NativeMetrics.get_instance()
 
         # Perform operations
@@ -492,9 +492,7 @@ class TestToolSelectorAcceleratorIntegration:
         query = [random.random() for _ in range(384)]
 
         # Create embeddings for all tools (realistic scenario)
-        tool_embeddings = [
-            [random.random() for _ in range(384)] for _ in range(len(tool_names))
-        ]
+        tool_embeddings = [[random.random() for _ in range(384)] for _ in range(len(tool_names))]
 
         # Filter to coding-related tools
         coding_categories = {"file_ops", "analysis", "refactoring", "review"}
@@ -522,21 +520,15 @@ class TestToolSelectorAcceleratorIntegration:
         scores = [score for _, score in results]
         assert scores == sorted(scores, reverse=True)
 
-    def test_batch_tool_selection(
-        self, reset_accelerator, tool_names, tool_category_map
-    ):
+    def test_batch_tool_selection(self, reset_accelerator, tool_names, tool_category_map):
         """Test multiple queries in batch."""
         accelerator = ToolSelectorAccelerator()
 
         # Multiple queries
-        queries = [
-            [random.random() for _ in range(384)] for _ in range(5)
-        ]
+        queries = [[random.random() for _ in range(384)] for _ in range(5)]
 
         # Same tools for all queries
-        tool_embeddings = [
-            [random.random() for _ in range(384)] for _ in range(len(tool_names))
-        ]
+        tool_embeddings = [[random.random() for _ in range(384)] for _ in range(len(tool_names))]
 
         # Process all queries
         all_results = []

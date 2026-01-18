@@ -433,6 +433,7 @@ class KeywordToolSelector:
         """
         try:
             from victor.tools.caches import get_tool_selection_cache
+
             cache = get_tool_selection_cache()
             return cache.get_stats()
         except ImportError:
@@ -456,6 +457,7 @@ class KeywordToolSelector:
         # Invalidate selection cache if available
         try:
             from victor.tools.caches import invalidate_tool_selection_cache
+
             invalidate_tool_selection_cache()
         except ImportError:
             pass  # Cache module not available

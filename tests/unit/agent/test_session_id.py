@@ -78,7 +78,7 @@ class TestGenerateSessionId:
         parts = session_id.split("-")
         assert len(parts) == 2
         assert len(parts[0]) == 6  # project root hash
-        assert len(parts[1]) > 0   # base62 timestamp
+        assert len(parts[1]) > 0  # base62 timestamp
 
     def test_generate_session_id_with_project_root(self):
         """Test generating session ID with explicit project root."""

@@ -103,6 +103,7 @@ EXAMPLE_WORKFLOWS = {
 # Test Helpers
 # =============================================================================
 
+
 def load_and_compile_workflow(
     workflow_path: str,
 ) -> Tuple[str, Dict, List]:
@@ -150,6 +151,7 @@ def get_all_workflow_files() -> List[str]:
 # Production Workflow Tests
 # =============================================================================
 
+
 @pytest.mark.workflow
 @pytest.mark.integration
 class TestProductionWorkflows:
@@ -181,62 +183,51 @@ class TestProductionWorkflows:
             try:
                 load_and_compile_workflow(workflow_path)
             except Exception as e:
-                pytest.fail(
-                    f"Workflow {workflow_path} failed to compile: {e}"
-                )
+                pytest.fail(f"Workflow {workflow_path} failed to compile: {e}")
 
     def test_all_coding_workflows(self):
         """Test all coding workflows compile successfully."""
         for workflow_path in PRODUCTION_WORKFLOWS["coding"]:
-            workflow_name, workflows, compiled_graphs = load_and_compile_workflow(
-                workflow_path
-            )
-            assert len(workflows) >= 1, f"Coding workflow {workflow_name} should have at least 1 workflow"
+            workflow_name, workflows, compiled_graphs = load_and_compile_workflow(workflow_path)
+            assert (
+                len(workflows) >= 1
+            ), f"Coding workflow {workflow_name} should have at least 1 workflow"
 
     def test_all_devops_workflows(self):
         """Test all DevOps workflows compile successfully."""
         for workflow_path in PRODUCTION_WORKFLOWS["devops"]:
-            workflow_name, workflows, compiled_graphs = load_and_compile_workflow(
-                workflow_path
-            )
+            workflow_name, workflows, compiled_graphs = load_and_compile_workflow(workflow_path)
             assert len(workflows) >= 1
 
     def test_all_rag_workflows(self):
         """Test all RAG workflows compile successfully."""
         for workflow_path in PRODUCTION_WORKFLOWS["rag"]:
-            workflow_name, workflows, compiled_graphs = load_and_compile_workflow(
-                workflow_path
-            )
+            workflow_name, workflows, compiled_graphs = load_and_compile_workflow(workflow_path)
             assert len(workflows) >= 1
 
     def test_all_dataanalysis_workflows(self):
         """Test all data analysis workflows compile successfully."""
         for workflow_path in PRODUCTION_WORKFLOWS["dataanalysis"]:
-            workflow_name, workflows, compiled_graphs = load_and_compile_workflow(
-                workflow_path
-            )
+            workflow_name, workflows, compiled_graphs = load_and_compile_workflow(workflow_path)
             assert len(workflows) >= 1
 
     def test_all_research_workflows(self):
         """Test all research workflows compile successfully."""
         for workflow_path in PRODUCTION_WORKFLOWS["research"]:
-            workflow_name, workflows, compiled_graphs = load_and_compile_workflow(
-                workflow_path
-            )
+            workflow_name, workflows, compiled_graphs = load_and_compile_workflow(workflow_path)
             assert len(workflows) >= 1
 
     def test_all_benchmark_workflows(self):
         """Test all benchmark workflows compile successfully."""
         for workflow_path in PRODUCTION_WORKFLOWS["benchmark"]:
-            workflow_name, workflows, compiled_graphs = load_and_compile_workflow(
-                workflow_path
-            )
+            workflow_name, workflows, compiled_graphs = load_and_compile_workflow(workflow_path)
             assert len(workflows) >= 1
 
 
 # =============================================================================
 # Known Issues Tests
 # =============================================================================
+
 
 @pytest.mark.workflow
 @pytest.mark.integration
@@ -269,6 +260,7 @@ class TestKnownWorkflowIssues:
 # Example Workflow Tests
 # =============================================================================
 
+
 @pytest.mark.workflow
 @pytest.mark.integration
 class TestExampleWorkflows:
@@ -288,20 +280,22 @@ class TestExampleWorkflows:
         for workflow_path in files:
             # Try to load - may fail with validation error
             try:
-                workflow_name, workflows, compiled_graphs = load_and_compile_workflow(
-                    workflow_path
-                )
+                workflow_name, workflows, compiled_graphs = load_and_compile_workflow(workflow_path)
                 # If we get here, the workflow is valid
                 assert len(workflows) >= 1
             except (ConfigurationError, ValidationError) as e:
                 # Expected for example/migrated workflows
                 # Just verify it's a known validation error type
-                assert "validation failed" in str(e).lower() or "references non-existent node" in str(e).lower()
+                assert (
+                    "validation failed" in str(e).lower()
+                    or "references non-existent node" in str(e).lower()
+                )
 
 
 # =============================================================================
 # Regression Tests
 # =============================================================================
+
 
 @pytest.mark.workflow
 @pytest.mark.integration
@@ -343,7 +337,10 @@ class TestWorkflowRegressions:
             load_and_compile_workflow(workflow_path)
 
         error_message = str(exc_info.value)
-        assert "references non-existent node" in error_message or "validation failed" in error_message.lower()
+        assert (
+            "references non-existent node" in error_message
+            or "validation failed" in error_message.lower()
+        )
 
     def test_invalid_yaml_syntax_detection(self):
         """Test that invalid YAML syntax is properly detected."""
@@ -351,16 +348,18 @@ class TestWorkflowRegressions:
         import tempfile
         import yaml
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             # Write invalid YAML (unquoted colons, bad indentation)
-            f.write("""
+            f.write(
+                """
 workflows:
   test:
     nodes:
       - id: test_node
         type: agent
     invalid_yaml: [unclosed bracket
-    """)
+    """
+            )
             f.flush()
 
             try:
@@ -374,6 +373,7 @@ workflows:
 # =============================================================================
 # Statistics Tests
 # =============================================================================
+
 
 @pytest.mark.workflow
 @pytest.mark.integration
@@ -412,12 +412,15 @@ class TestWorkflowStatistics:
 
         # Success rate should be high
         success_rate = (passed / total) * 100 if total > 0 else 0
-        assert success_rate >= 90, f"Workflow compilation success rate ({success_rate:.1f}%) is below 90%"
+        assert (
+            success_rate >= 90
+        ), f"Workflow compilation success rate ({success_rate:.1f}%) is below 90%"
 
 
 # =============================================================================
 # Node Type Validation Tests
 # =============================================================================
+
 
 @pytest.mark.workflow
 @pytest.mark.integration
@@ -479,4 +482,4 @@ class TestNodeTypes:
 
         # Report any invalid node types found
         if invalid_workflows:
-            pytest.fail(f"Found invalid node types:\n" + "\n".join(invalid_workflows))
+            pytest.fail("Found invalid node types:\n" + "\n".join(invalid_workflows))

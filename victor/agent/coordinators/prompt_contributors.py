@@ -150,9 +150,7 @@ class ContextPromptContributor(IPromptContributor):
                         # Static string contribution
                         contributions.append(handler)
                 except Exception as e:
-                    logger.warning(
-                        f"Context handler for '{key}' failed: {e}"
-                    )
+                    logger.warning(f"Context handler for '{key}' failed: {e}")
 
         return "\n\n".join(contributions)
 
@@ -226,9 +224,7 @@ class ProjectInstructionsContributor(IPromptContributor):
                 project_context = ProjectContext(str(self._root_path))
                 if project_context.load():
                     self._project_context = project_context
-                    logger.info(
-                        f"Loaded project context from {project_context.context_file}"
-                    )
+                    logger.info(f"Loaded project context from {project_context.context_file}")
                 else:
                     logger.debug("No project context file found")
             except Exception as e:

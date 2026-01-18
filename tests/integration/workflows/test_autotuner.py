@@ -408,12 +408,15 @@ class TestPerformanceAutotuner:
 
         # Check priority sorting
         priorities = [s.priority for s in suggestions]
-        assert priorities == sorted(priorities, key=lambda p: {
-            OptimizationPriority.CRITICAL: 0,
-            OptimizationPriority.HIGH: 1,
-            OptimizationPriority.MEDIUM: 2,
-            OptimizationPriority.LOW: 3,
-        }[p])
+        assert priorities == sorted(
+            priorities,
+            key=lambda p: {
+                OptimizationPriority.CRITICAL: 0,
+                OptimizationPriority.HIGH: 1,
+                OptimizationPriority.MEDIUM: 2,
+                OptimizationPriority.LOW: 3,
+            }[p],
+        )
 
     @pytest.mark.asyncio
     async def test_apply_optimizations_dry_run(self, sample_metrics, sample_workflow_config):

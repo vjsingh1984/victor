@@ -240,6 +240,7 @@ class VerticalExtensionLoader(ABC):
 
                 def _make_getter(ext_type, mod_suffix, cls_suffix):
                     """Factory to create getter methods with proper closure."""
+
                     def _getter(subcls):
                         """Auto-generated getter method."""
                         # Build import path from vertical name
@@ -259,6 +260,7 @@ class VerticalExtensionLoader(ABC):
 
                         # Use _get_extension_factory to load the extension
                         return subcls._get_extension_factory(ext_type, import_path, class_name)
+
                     return classmethod(_getter)
 
                 # Add the method to the class
@@ -273,6 +275,7 @@ class VerticalExtensionLoader(ABC):
 
                 def _make_cached_getter(ext_type):
                     """Factory to create cached getter methods with proper closure."""
+
                     def _getter(subcls):
                         """Auto-generated cached getter method."""
                         # Skip if vertical name is empty (abstract base class)
@@ -285,6 +288,7 @@ class VerticalExtensionLoader(ABC):
 
                         # Special handling for middleware
                         if ext_type == "middleware":
+
                             def _create_middleware():
                                 # Try to import from vertical.middleware
                                 try:
@@ -312,6 +316,7 @@ class VerticalExtensionLoader(ABC):
 
                         # Special handling for composed_chains and personas
                         if ext_type in ("composed_chains", "personas"):
+
                             def _create_extension():
                                 try:
                                     if ext_type == "composed_chains":
@@ -331,6 +336,7 @@ class VerticalExtensionLoader(ABC):
 
                         # Default: return None
                         return None
+
                     return classmethod(_getter)
 
                 # Add the method to the class
@@ -881,9 +887,7 @@ class VerticalExtensionLoader(ABC):
                 )
         except Exception as e:
             # Dynamic extensions are optional - don't fail if registry not available
-            logger.debug(
-                f"Could not load dynamic extensions for vertical '{cls.name}': {e}"
-            )
+            logger.debug(f"Could not load dynamic extensions for vertical '{cls.name}': {e}")
 
         # Check for critical failures (strict mode or required extensions)
         critical_errors = [e for e in errors if is_strict or e.is_required]
@@ -979,7 +983,8 @@ class VerticalExtensionLoader(ABC):
         elif version:
             # Invalidate all entries with this version
             keys_to_remove = [
-                k for k, v in cls._extensions_cache.items()
+                k
+                for k, v in cls._extensions_cache.items()
                 if k.startswith(cache_prefix) and v.version == version
             ]
             for key in keys_to_remove:
@@ -1037,10 +1042,7 @@ class VerticalExtensionLoader(ABC):
             - entries: (detailed=True) Per-entry breakdown
         """
         cache_prefix = f"{cls.__name__}:"
-        entries = [
-            (k, v) for k, v in cls._extensions_cache.items()
-            if k.startswith(cache_prefix)
-        ]
+        entries = [(k, v) for k, v in cls._extensions_cache.items() if k.startswith(cache_prefix)]
 
         if not entries:
             return {
@@ -1072,10 +1074,7 @@ class VerticalExtensionLoader(ABC):
         ttl_entries = [v for _, v in entries if v.ttl is not None]
         ttl_remaining = 0.0
         if ttl_entries:
-            remaining = [
-                max(0, v.ttl - v.get_age())
-                for v in ttl_entries
-            ]
+            remaining = [max(0, v.ttl - v.get_age()) for v in ttl_entries]
             ttl_remaining = sum(remaining) / len(remaining)
 
         stats = {

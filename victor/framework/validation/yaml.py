@@ -149,10 +149,7 @@ class ValidationNodeConfig:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ValidationNodeConfig":
         """Create from YAML dict."""
-        validators = [
-            ValidatorConfig.from_dict(v)
-            for v in data.get("validators", [])
-        ]
+        validators = [ValidatorConfig.from_dict(v) for v in data.get("validators", [])]
 
         handler_config = data.get("handler")
         handler = HandlerConfig.from_dict(handler_config) if handler_config else None
@@ -373,6 +370,7 @@ class ValidatorFactory:
         # Create the condition function
         condition_path = cfg.get("condition")
         if condition_path:
+
             def condition(data: Dict[str, Any]) -> bool:
                 parts = condition_path.split(".")
                 value = data
@@ -382,7 +380,9 @@ class ValidatorFactory:
                     else:
                         return False
                 return bool(value)
+
         else:
+
             def condition(data: Dict[str, Any]) -> bool:
                 return data.get("_validate", True)
 
@@ -513,9 +513,7 @@ class HandlerFactory:
             elif min_severity == "warning":
                 return len(result.errors) > 0 or len(result.warnings) > 0
             elif min_severity == "critical":
-                return any(
-                    i.severity.value == "critical" for i in result.errors
-                )
+                return any(i.severity.value == "critical" for i in result.errors)
             return not result.is_valid
 
         # Create fallback handler

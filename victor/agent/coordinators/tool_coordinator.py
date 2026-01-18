@@ -66,6 +66,8 @@ from typing import (
     runtime_checkable,
 )
 
+from victor.agent.argument_normalizer import NormalizationStrategy
+
 if TYPE_CHECKING:
     from victor.agent.tool_pipeline import ToolPipeline, PipelineExecutionResult
     from victor.agent.tool_selection import ToolSelector
@@ -73,7 +75,7 @@ if TYPE_CHECKING:
     from victor.agent.tool_executor import ToolExecutionResult
     from victor.storage.cache.tool_cache import ToolCache
     from victor.tools.base import BaseTool, ToolRegistry
-    from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
+    from victor.agent.argument_normalizer import ArgumentNormalizer
     from victor.agent.tool_calling import ToolCallingAdapter, ToolCallParseResult
     from victor.agent.protocols import ToolAccessContext
     from victor.tools.tool_names import ToolNames
@@ -850,9 +852,7 @@ class ToolCoordinator:
             # Apply adapter-based normalization
             if self._tool_adapter:
                 before_adapter = normalized_args.copy()
-                normalized_args = self._tool_adapter.normalize_arguments(
-                    normalized_args, tool_name
-                )
+                normalized_args = self._tool_adapter.normalize_arguments(normalized_args, tool_name)
 
             # Check for repeated failures
             try:
@@ -1016,9 +1016,7 @@ class ToolCoordinator:
             "budget_used": budget_used,
             "budget_total": budget_total,
             "budget_remaining": self.get_remaining_budget(),
-            "budget_utilization": (
-                budget_used / budget_total if budget_total > 0 else 0
-            ),
+            "budget_utilization": (budget_used / budget_total if budget_total > 0 else 0),
             "executed_tools": list(self._executed_tools),
             "failed_signatures_count": len(self._failed_tool_signatures),
         }

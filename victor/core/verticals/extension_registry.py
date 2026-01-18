@@ -85,8 +85,7 @@ class ExtensionRegistry(IExtensionRegistry):
         # Validate extension implements protocol
         if not isinstance(extension, IExtension):
             raise TypeError(
-                f"Extension must implement IExtension protocol, "
-                f"got {type(extension)}"
+                f"Extension must implement IExtension protocol, " f"got {type(extension)}"
             )
 
         ext_type = extension.extension_type
@@ -98,16 +97,12 @@ class ExtensionRegistry(IExtensionRegistry):
 
         # Check for duplicate
         if name in self._extensions_by_type[ext_type]:
-            raise ValueError(
-                f"Extension '{name}' of type '{ext_type}' is already registered"
-            )
+            raise ValueError(f"Extension '{name}' of type '{ext_type}' is already registered")
 
         # Register extension
         self._extensions_by_type[ext_type][name] = extension
 
-        logger.debug(
-            f"Registered extension '{name}' of type '{ext_type}'"
-        )
+        logger.debug(f"Registered extension '{name}' of type '{ext_type}'")
 
     def unregister_extension(self, extension_type: str, name: str) -> bool:
         """Unregister an extension.
@@ -132,9 +127,7 @@ class ExtensionRegistry(IExtensionRegistry):
         if not self._extensions_by_type[extension_type]:
             del self._extensions_by_type[extension_type]
 
-        logger.debug(
-            f"Unregistered extension '{name}' of type '{extension_type}'"
-        )
+        logger.debug(f"Unregistered extension '{name}' of type '{extension_type}'")
 
         return True
 

@@ -55,6 +55,7 @@ def _check_docker_available() -> bool:
 
     try:
         import docker as docker_module
+
         docker = docker_module
         _docker_available = True
         return True
@@ -78,6 +79,7 @@ def _get_docker_components():
         return docker_module, Container, DockerException
     except ImportError:
         return None, None, Exception
+
 
 from victor.core.errors import FileError, ConfigurationError
 from victor.tools.base import AccessMode, DangerLevel, Priority

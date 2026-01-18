@@ -182,10 +182,9 @@ class HTTPErrorHandlerMixin(ABC):
                         error_data = response.json()
                         if isinstance(error_data, dict):
                             # Try common error fields
-                            json_message = (
-                                error_data.get("error", {}).get("message", "")
-                                or error_data.get("message", "")
-                            )
+                            json_message = error_data.get("error", {}).get(
+                                "message", ""
+                            ) or error_data.get("message", "")
                             # Use JSON message if available, otherwise use text
                             if json_message:
                                 error_body = json_message
@@ -434,10 +433,9 @@ class HTTPErrorHandlerMixin(ABC):
                     try:
                         error_data = response.json()
                         if isinstance(error_data, dict):
-                            retry_after = (
-                                error_data.get("error", {}).get("retry_after")
-                                or error_data.get("retry_after")
-                            )
+                            retry_after = error_data.get("error", {}).get(
+                                "retry_after"
+                            ) or error_data.get("retry_after")
                             if retry_after:
                                 return int(retry_after)
                     except Exception:
@@ -469,7 +467,7 @@ class HTTPErrorHandlerMixin(ABC):
 
         # Check for timeout attribute
         if hasattr(error, "timeout"):
-            timeout = getattr(error, "timeout")
+            timeout = error.timeout
             if isinstance(timeout, (int, float)):
                 return int(timeout)
 

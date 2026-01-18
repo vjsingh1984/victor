@@ -42,13 +42,16 @@ def test_provider_layer_builder_wires_components():
 
     orchestrator = MagicMock()
 
-    with patch(
-        "victor.agent.provider_coordinator.ProviderCoordinatorConfig",
-        return_value="config",
-    ) as config_cls, patch(
-        "victor.agent.provider_coordinator.ProviderCoordinator",
-        return_value="provider-coordinator",
-    ) as coordinator_cls:
+    with (
+        patch(
+            "victor.agent.provider_coordinator.ProviderCoordinatorConfig",
+            return_value="config",
+        ) as config_cls,
+        patch(
+            "victor.agent.provider_coordinator.ProviderCoordinator",
+            return_value="provider-coordinator",
+        ) as coordinator_cls,
+    ):
         builder = ProviderLayerBuilder(settings=settings, factory=factory)
         components = builder.build(
             orchestrator,

@@ -147,9 +147,7 @@ class TestPromptCoordinator:
     def test_init_with_contributors(self):
         """Test initialization with contributors."""
         contributor = MockPromptContributor("test", priority=50)
-        coordinator = PromptCoordinator(
-            contributors=[contributor], enable_cache=False
-        )
+        coordinator = PromptCoordinator(contributors=[contributor], enable_cache=False)
 
         assert len(coordinator._contributors) == 1
         assert coordinator._enable_cache is False
@@ -160,9 +158,7 @@ class TestPromptCoordinator:
         contributor2 = MockPromptContributor("", priority=100)
         contributor3 = MockPromptContributor("", priority=50)
 
-        coordinator = PromptCoordinator(
-            contributors=[contributor1, contributor2, contributor3]
-        )
+        coordinator = PromptCoordinator(contributors=[contributor1, contributor2, contributor3])
 
         # Should be sorted descending: 100, 50, 10
         assert coordinator._contributors[0].priority() == 100
@@ -236,12 +232,8 @@ class TestPromptCoordinator:
     @pytest.mark.asyncio
     async def test_build_task_hint(self, coordinator_with_contributors):
         """Test building task-specific hint."""
-        contributor = TaskHintContributor(
-            {"simple": "Be brief", "complex": "Be thorough"}
-        )
-        coordinator = PromptCoordinator(
-            contributors=[contributor], enable_cache=False
-        )
+        contributor = TaskHintContributor({"simple": "Be brief", "complex": "Be thorough"})
+        coordinator = PromptCoordinator(contributors=[contributor], enable_cache=False)
 
         hint = await coordinator.build_task_hint("simple", {})
 
@@ -376,9 +368,7 @@ class TestPromptCoordinator:
     async def test_cache_disabled(self):
         """Test that caching can be disabled."""
         contributor = MockPromptContributor("Test prompt\n", priority=50)
-        coordinator = PromptCoordinator(
-            contributors=[contributor], enable_cache=False
-        )
+        coordinator = PromptCoordinator(contributors=[contributor], enable_cache=False)
 
         context = {"task": "test"}
 
@@ -478,6 +468,7 @@ class TestPromptCoordinator:
     @pytest.mark.asyncio
     async def test_build_task_hint_with_error(self):
         """Test build_task_hint handles contributor errors gracefully."""
+
         class FailingContributor(BasePromptContributor):
             async def contribute(self, context):
                 raise RuntimeError("Contributor failed")
@@ -498,13 +489,12 @@ class TestPromptCoordinator:
     @pytest.mark.asyncio
     async def test_build_task_hint_all_failing(self):
         """Test build_task_hint when all contributors fail."""
+
         class FailingContributor(BasePromptContributor):
             async def contribute(self, context):
                 raise ValueError("All failing")
 
-        coordinator = PromptCoordinator(
-            contributors=[FailingContributor(priority=50)]
-        )
+        coordinator = PromptCoordinator(contributors=[FailingContributor(priority=50)])
 
         hint = await coordinator.build_task_hint("simple", {})
 
@@ -514,6 +504,7 @@ class TestPromptCoordinator:
     @pytest.mark.asyncio
     async def test_build_system_prompt_multiple_contributors_with_errors(self):
         """Test build_system_prompt with mixed success/failure contributors."""
+
         class FailingContributor(BasePromptContributor):
             async def contribute(self, context):
                 raise ValueError("Failed")
@@ -624,9 +615,7 @@ class TestPromptBuilderCoordinator:
         assert coordinator._tool_calling_caps == mock_tool_calling_caps
         assert coordinator._enable_rl_events is False
 
-    def test_build_system_prompt_with_adapter_small_context(
-        self, coordinator, mock_prompt_builder
-    ):
+    def test_build_system_prompt_with_adapter_small_context(self, coordinator, mock_prompt_builder):
         """Test building prompt for small context window (< 32K)."""
         context_window = 16000  # Small context
 
@@ -642,9 +631,7 @@ class TestPromptBuilderCoordinator:
         assert prompt == "You are a helpful assistant."
         mock_prompt_builder.build.assert_called_once()
 
-    def test_build_system_prompt_with_adapter_large_context(
-        self, coordinator, mock_prompt_builder
-    ):
+    def test_build_system_prompt_with_adapter_large_context(self, coordinator, mock_prompt_builder):
         """Test building prompt for large context window (>= 32K)."""
         context_window = 128000  # Large context
 
@@ -676,9 +663,7 @@ class TestPromptBuilderCoordinator:
             tool_calling_caps=mock_tool_calling_caps, enable_rl_events=True
         )
 
-        with patch(
-            "victor.framework.rl.hooks.get_rl_hooks"
-        ) as mock_get_hooks:
+        with patch("victor.framework.rl.hooks.get_rl_hooks") as mock_get_hooks:
             mock_hooks = MagicMock()
             mock_get_hooks.return_value = mock_hooks
 
@@ -702,9 +687,7 @@ class TestPromptBuilderCoordinator:
         self, coordinator, mock_prompt_builder
     ):
         """Test handling when RL hooks are not available."""
-        with patch(
-            "victor.framework.rl.hooks.get_rl_hooks"
-        ) as mock_get_hooks:
+        with patch("victor.framework.rl.hooks.get_rl_hooks") as mock_get_hooks:
             mock_get_hooks.return_value = None
 
             # Should not raise
@@ -723,9 +706,7 @@ class TestPromptBuilderCoordinator:
         self, coordinator, mock_prompt_builder
     ):
         """Test handling when RL event emission fails."""
-        with patch(
-            "victor.framework.rl.hooks.get_rl_hooks"
-        ) as mock_get_hooks:
+        with patch("victor.framework.rl.hooks.get_rl_hooks") as mock_get_hooks:
             mock_hooks = MagicMock()
             mock_hooks.emit.side_effect = RuntimeError("RL system error")
             mock_get_hooks.return_value = mock_hooks
@@ -742,17 +723,13 @@ class TestPromptBuilderCoordinator:
             # Should still return prompt
             assert prompt is not None
 
-    def test_emit_prompt_used_event_detects_local_provider(
-        self, mock_tool_calling_caps
-    ):
+    def test_emit_prompt_used_event_detects_local_provider(self, mock_tool_calling_caps):
         """Test that local providers are detected correctly."""
         coordinator = PromptBuilderCoordinator(
             tool_calling_caps=mock_tool_calling_caps, enable_rl_events=True
         )
 
-        with patch(
-            "victor.framework.rl.hooks.get_rl_hooks"
-        ) as mock_get_hooks:
+        with patch("victor.framework.rl.hooks.get_rl_hooks") as mock_get_hooks:
             mock_hooks = MagicMock()
             mock_get_hooks.return_value = mock_hooks
 
@@ -770,17 +747,13 @@ class TestPromptBuilderCoordinator:
             event = call_args[0][0]
             assert event.metadata["prompt_style"] == "detailed"
 
-    def test_emit_prompt_used_event_detects_cloud_provider(
-        self, mock_tool_calling_caps
-    ):
+    def test_emit_prompt_used_event_detects_cloud_provider(self, mock_tool_calling_caps):
         """Test that cloud providers are detected correctly."""
         coordinator = PromptBuilderCoordinator(
             tool_calling_caps=mock_tool_calling_caps, enable_rl_events=True
         )
 
-        with patch(
-            "victor.framework.rl.hooks.get_rl_hooks"
-        ) as mock_get_hooks:
+        with patch("victor.framework.rl.hooks.get_rl_hooks") as mock_get_hooks:
             mock_hooks = MagicMock()
             mock_get_hooks.return_value = mock_hooks
 
@@ -798,17 +771,13 @@ class TestPromptBuilderCoordinator:
             event = call_args[0][0]
             assert event.metadata["prompt_style"] == "structured"
 
-    def test_emit_prompt_used_event_analyzes_prompt_content(
-        self, mock_tool_calling_caps
-    ):
+    def test_emit_prompt_used_event_analyzes_prompt_content(self, mock_tool_calling_caps):
         """Test that prompt content is analyzed correctly."""
         coordinator = PromptBuilderCoordinator(
             tool_calling_caps=mock_tool_calling_caps, enable_rl_events=True
         )
 
-        with patch(
-            "victor.framework.rl.hooks.get_rl_hooks"
-        ) as mock_get_hooks:
+        with patch("victor.framework.rl.hooks.get_rl_hooks") as mock_get_hooks:
             mock_hooks = MagicMock()
             mock_get_hooks.return_value = mock_hooks
 
@@ -836,9 +805,7 @@ class TestPromptBuilderCoordinator:
             tool_calling_caps=mock_tool_calling_caps, enable_rl_events=False
         )
 
-        with patch(
-            "victor.framework.rl.hooks.get_rl_hooks"
-        ) as mock_get_hooks:
+        with patch("victor.framework.rl.hooks.get_rl_hooks") as mock_get_hooks:
             prompt = "Test prompt"
 
             coordinator._emit_prompt_used_event(
@@ -861,9 +828,7 @@ class TestPromptBuilderCoordinator:
 
     def test_get_thinking_disabled_prompt_without_prefix(self):
         """Test getting thinking disabled prompt when no prefix is configured."""
-        coordinator = PromptBuilderCoordinator(
-            tool_calling_caps=None, enable_rl_events=False
-        )
+        coordinator = PromptBuilderCoordinator(tool_calling_caps=None, enable_rl_events=False)
 
         base_prompt = "Summarize what you've found."
 
@@ -877,9 +842,7 @@ class TestPromptBuilderCoordinator:
         # Create a mock that explicitly doesn't have the attribute
         caps = MagicMock(spec=[])  # Empty spec, no attributes
         del caps.thinking_disable_prefix  # Ensure it doesn't exist
-        coordinator = PromptBuilderCoordinator(
-            tool_calling_caps=caps, enable_rl_events=False
-        )
+        coordinator = PromptBuilderCoordinator(tool_calling_caps=caps, enable_rl_events=False)
 
         base_prompt = "Summarize what you've found."
 

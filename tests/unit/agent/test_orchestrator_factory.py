@@ -917,9 +917,7 @@ class TestCreateAnalyticsCoordinator:
             ConsoleAnalyticsExporter,
         )
 
-        coordinator = factory.create_analytics_coordinator(
-            enable_console_exporter=True
-        )
+        coordinator = factory.create_analytics_coordinator(enable_console_exporter=True)
 
         assert isinstance(coordinator, AnalyticsCoordinator)
         # Should have at least console exporter
@@ -1022,9 +1020,7 @@ class TestCreateStateCoordinator:
 
         mock_session_state = MagicMock(spec=SessionStateManager)
 
-        coordinator = factory.create_state_coordinator(
-            session_state_manager=mock_session_state
-        )
+        coordinator = factory.create_state_coordinator(session_state_manager=mock_session_state)
 
         assert isinstance(coordinator, StateCoordinator)
 
@@ -1075,9 +1071,7 @@ class TestCreateCoordinators:
 
         assert isinstance(components, CoordinatorComponents)
         assert isinstance(components.response_coordinator, ResponseCoordinator)
-        assert isinstance(
-            components.tool_access_config_coordinator, ToolAccessConfigCoordinator
-        )
+        assert isinstance(components.tool_access_config_coordinator, ToolAccessConfigCoordinator)
         # state_coordinator is None without session_state_manager
         assert components.state_coordinator is None
 
@@ -1108,9 +1102,7 @@ class TestCreateCoordinators:
 
         assert isinstance(components, CoordinatorComponents)
         assert isinstance(components.response_coordinator, ResponseCoordinator)
-        assert isinstance(
-            components.tool_access_config_coordinator, ToolAccessConfigCoordinator
-        )
+        assert isinstance(components.tool_access_config_coordinator, ToolAccessConfigCoordinator)
         assert isinstance(components.state_coordinator, StateCoordinator)
 
 

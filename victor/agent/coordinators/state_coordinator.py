@@ -214,6 +214,7 @@ class StateCoordinator:
                 from victor.agent.conversation_state import (
                     ConversationStateMachine,
                 )
+
                 try:
                     restored = ConversationStateMachine.from_dict(state["conversation"])
                     # Sync state to current machine
@@ -533,20 +534,15 @@ class StateCoordinator:
             state: State dictionary from checkpoint
         """
         # Restore execution tracking
-        self._session_state.execution_state.executed_tools = list(
-            state.get("tool_history", [])
-        )
-        self._session_state.execution_state.observed_files = set(
-            state.get("observed_files", [])
-        )
-        self._session_state.execution_state.tool_calls_used = state.get(
-            "tool_calls_used", 0
-        )
+        self._session_state.execution_state.executed_tools = list(state.get("tool_history", []))
+        self._session_state.execution_state.observed_files = set(state.get("observed_files", []))
+        self._session_state.execution_state.tool_calls_used = state.get("tool_calls_used", 0)
 
         # Restore stage if present
         stage_name = state.get("stage", "INITIAL")
         if self._conversation_state:
             from victor.agent.conversation_state import ConversationStage
+
             try:
                 stage = ConversationStage[stage_name]
                 # Use internal _transition_to method with high confidence

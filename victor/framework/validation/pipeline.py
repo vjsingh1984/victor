@@ -153,7 +153,11 @@ class ValidationResult:
     @property
     def errors(self) -> List[ValidationIssue]:
         """Get all error-level issues."""
-        return [i for i in self.issues if i.severity in (ValidationSeverity.ERROR, ValidationSeverity.CRITICAL)]
+        return [
+            i
+            for i in self.issues
+            if i.severity in (ValidationSeverity.ERROR, ValidationSeverity.CRITICAL)
+        ]
 
     @property
     def warnings(self) -> List[ValidationIssue]:
@@ -233,8 +237,7 @@ class ValidationResult:
             return msg
 
         return (
-            f"Validation failed: {len(self.errors)} error(s), "
-            f"{len(self.warnings)} warning(s)"
+            f"Validation failed: {len(self.errors)} error(s), " f"{len(self.warnings)} warning(s)"
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -389,7 +392,7 @@ class RetryHandler:
         """Handle by retrying if retries available."""
         if context.can_retry():
             # Apply exponential backoff
-            delay = self.backoff_factor * (2 ** context.retry_count)
+            delay = self.backoff_factor * (2**context.retry_count)
             if delay > 0:
                 time.sleep(delay)
             context.increment_retry()
@@ -430,9 +433,7 @@ class SkipHandler:
     ) -> ValidationAction:
         """Log and skip."""
         if self.log_warnings and result.errors:
-            logger.warning(
-                f"Skipping validation failures: {result.summary()}"
-            )
+            logger.warning(f"Skipping validation failures: {result.summary()}")
         return ValidationAction.SKIP
 
 

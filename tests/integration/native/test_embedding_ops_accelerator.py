@@ -272,15 +272,11 @@ class TestCaching:
     def test_cache_hit_on_repeat_query(self, accelerator, query_384, embeddings_384):
         """Test that repeated queries hit the cache."""
         # First call - cache miss
-        similarities1 = accelerator.batch_cosine_similarity(
-            query_384, embeddings_384[:10]
-        )
+        similarities1 = accelerator.batch_cosine_similarity(query_384, embeddings_384[:10])
         stats1 = accelerator.cache_stats
 
         # Second call - cache hit (if Rust is available)
-        similarities2 = accelerator.batch_cosine_similarity(
-            query_384, embeddings_384[:10]
-        )
+        similarities2 = accelerator.batch_cosine_similarity(query_384, embeddings_384[:10])
         stats2 = accelerator.cache_stats
 
         # Results should be identical
@@ -344,9 +340,7 @@ class TestPerformance:
     def test_batch_similarity_performance(self, accelerator, query_384, embeddings_384):
         """Test that batch similarity is reasonably fast."""
         start = time.perf_counter()
-        similarities = accelerator.batch_cosine_similarity(
-            query_384, embeddings_384
-        )
+        similarities = accelerator.batch_cosine_similarity(query_384, embeddings_384)
         duration = time.perf_counter() - start
 
         # Should complete in reasonable time (< 1 second for 100 embeddings)
@@ -370,12 +364,8 @@ class TestPerformance:
         import random
 
         random.seed(47)
-        queries = [
-            [random.uniform(-1, 1) for _ in range(384)] for _ in range(10)
-        ]
-        corpus = [
-            [random.uniform(-1, 1) for _ in range(384)] for _ in range(100)
-        ]
+        queries = [[random.uniform(-1, 1) for _ in range(384)] for _ in range(10)]
+        corpus = [[random.uniform(-1, 1) for _ in range(384)] for _ in range(100)]
 
         start = time.perf_counter()
         matrix = accelerator.similarity_matrix(queries, corpus)
@@ -395,15 +385,11 @@ class TestPerformance:
 class TestRustVsNumpyFallback:
     """Tests comparing Rust and NumPy implementations."""
 
-    def test_numpy_fallback_produces_same_results(
-        self, query_384, embeddings_384
-    ):
+    def test_numpy_fallback_produces_same_results(self, query_384, embeddings_384):
         """Test that NumPy fallback produces identical results."""
         # Rust implementation (if available)
         rust_accelerator = EmbeddingOpsAccelerator(force_numpy=False)
-        rust_similarities = rust_accelerator.batch_cosine_similarity(
-            query_384, embeddings_384[:10]
-        )
+        rust_similarities = rust_accelerator.batch_cosine_similarity(query_384, embeddings_384[:10])
 
         # NumPy implementation
         numpy_accelerator = EmbeddingOpsAccelerator(force_numpy=True)
@@ -503,9 +489,7 @@ class TestEdgeCases:
         normal_vec = [0.1] * 384
 
         # Should not crash or return NaN
-        similarities = accelerator.batch_cosine_similarity(
-            zero_vec, [normal_vec]
-        )
+        similarities = accelerator.batch_cosine_similarity(zero_vec, [normal_vec])
         assert len(similarities) == 1
         # Similarity with zero vector should be 0 (after normalization)
         assert similarities[0] == 0.0
@@ -552,9 +536,7 @@ class TestRealWorldIntegration:
     def test_semantic_search_workflow(self, accelerator, query_384, embeddings_384):
         """Test typical semantic search workflow."""
         # 1. Compute similarities
-        similarities = accelerator.batch_cosine_similarity(
-            query_384, embeddings_384
-        )
+        similarities = accelerator.batch_cosine_similarity(query_384, embeddings_384)
 
         # 2. Get top-k results
         k = 5
@@ -570,12 +552,8 @@ class TestRealWorldIntegration:
         import random
 
         random.seed(48)
-        queries = [
-            [random.uniform(-1, 1) for _ in range(384)] for _ in range(5)
-        ]
-        corpus = [
-            [random.uniform(-1, 1) for _ in range(384)] for _ in range(50)
-        ]
+        queries = [[random.uniform(-1, 1) for _ in range(384)] for _ in range(5)]
+        corpus = [[random.uniform(-1, 1) for _ in range(384)] for _ in range(50)]
 
         # Compute similarity matrix
         matrix = accelerator.similarity_matrix(queries, corpus)
@@ -595,9 +573,7 @@ class TestRealWorldIntegration:
 
         random.seed(49)
         query = [random.uniform(-1, 1) for _ in range(384)]
-        embeddings = [
-            [random.uniform(-1, 1) for _ in range(384)] for _ in range(100)
-        ]
+        embeddings = [[random.uniform(-1, 1) for _ in range(384)] for _ in range(100)]
 
         # First query - populate cache
         _ = accelerator.batch_cosine_similarity(query, embeddings)

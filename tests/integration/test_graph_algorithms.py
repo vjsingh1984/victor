@@ -26,6 +26,7 @@ from pathlib import Path
 # Try to import the native module
 try:
     import victor_native
+
     HAS_NATIVE = True
 except ImportError:
     HAS_NATIVE = False

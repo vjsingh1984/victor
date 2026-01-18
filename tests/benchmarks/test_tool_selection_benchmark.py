@@ -782,7 +782,9 @@ def test_cache_size_comparison():
 
     for size in sorted(results.keys()):
         r = results[size]
-        logger.info(f"{size:<10} {r.avg_latency:<12.3f} {r.p95_latency:<12.3f} {r.throughput:<15.0f}")
+        logger.info(
+            f"{size:<10} {r.avg_latency:<12.3f} {r.p95_latency:<12.3f} {r.throughput:<15.0f}"
+        )
 
     # Verify performance doesn't degrade significantly with size
     if 100 in results and 1000 in results:
@@ -793,9 +795,7 @@ def test_cache_size_comparison():
         logger.info(f"\nPerformance degradation (100 -> 1000): {degradation:.1f}%")
 
         # Allow up to 300% degradation (10x cache size = 3x latency is acceptable)
-        max_degradation = float(
-            os.getenv("VICTOR_BENCHMARK_CACHE_SIZE_DEGRADATION_PCT", "300")
-        )
+        max_degradation = float(os.getenv("VICTOR_BENCHMARK_CACHE_SIZE_DEGRADATION_PCT", "300"))
         assert (
             degradation < max_degradation
         ), f"Cache size degradation too high: {degradation:.1f}% (max: {max_degradation}%)"
@@ -883,7 +883,9 @@ def test_cache_memory_per_entry():
     logger.info(f"Memory per entry: {memory_per_entry_kb:.2f} KB")
 
     # Should be reasonably sized (1-10KB per entry)
-    assert 1024 <= memory_per_entry <= 10240, f"Memory per entry out of range: {memory_per_entry_kb:.2f} KB"
+    assert (
+        1024 <= memory_per_entry <= 10240
+    ), f"Memory per entry out of range: {memory_per_entry_kb:.2f} KB"
 
 
 @pytest.mark.benchmark
@@ -1039,15 +1041,15 @@ def test_generate_benchmark_report():
     # Generate report
     report = [
         "# Tool Selection Cache Performance Report",
-        f"",
+        "",
         f"**Generated:** {suite.end_time.strftime('%Y-%m-%d %H:%M:%S')}",
-        f"",
-        f"## Summary",
-        f"",
-        f"This report summarizes the performance benchmarks for the tool selection",
-        f"caching system. The cache provides 30-50% latency reduction for tool",
-        f"selection operations.",
-        f"",
+        "",
+        "## Summary",
+        "",
+        "This report summarizes the performance benchmarks for the tool selection",
+        "caching system. The cache provides 30-50% latency reduction for tool",
+        "selection operations.",
+        "",
     ]
 
     # Add benchmark table
@@ -1068,7 +1070,7 @@ def test_generate_benchmark_report():
     # Add memory usage
     if hasattr(test_cache_memory_per_entry, "result"):
         r = test_cache_memory_per_entry.result
-        report.append(f"\n## Memory Usage\n")
+        report.append("\n## Memory Usage\n")
         report.append(f"- Per entry: {r['per_entry_kb']:.2f} KB")
         if hasattr(test_cache_memory_1000_entries, "result"):
             r1000 = test_cache_memory_1000_entries.result
@@ -1076,19 +1078,19 @@ def test_generate_benchmark_report():
 
     # Add concurrent access results
     if hasattr(test_concurrent_cache_access, "results"):
-        report.append(f"\n## Concurrent Access\n")
+        report.append("\n## Concurrent Access\n")
         report.append("| Threads | Throughput (ops/s) |")
         report.append("|---------|-------------------|")
         for r in test_concurrent_cache_access.results:
             report.append(f"| {r['threads']} | {r['throughput']:.0f} |")
 
     # Add key findings
-    report.append(f"\n## Key Findings\n")
-    report.append(f"")
-    report.append(f"### Expected vs Actual")
-    report.append(f"")
-    report.append(f"| Metric | Expected | Actual |")
-    report.append(f"|--------|----------|--------|")
+    report.append("\n## Key Findings\n")
+    report.append("")
+    report.append("### Expected vs Actual")
+    report.append("")
+    report.append("| Metric | Expected | Actual |")
+    report.append("|--------|----------|--------|")
 
     if len(suite.results) >= 2:
         cold = suite.results[0]
@@ -1100,13 +1102,13 @@ def test_generate_benchmark_report():
         report.append(f"| Cold cache latency | 30-50ms | {cold.avg_latency:.2f}ms |")
 
     # Add recommendations
-    report.append(f"\n## Recommendations\n")
-    report.append(f"")
-    report.append(f"1. **Cache Size**: Use 500-1000 entries for optimal balance")
-    report.append(f"2. **TTL**: Use 1 hour for query cache, 5 minutes for context cache")
-    report.append(f"3. **Hit Rate**: Expect 40-60% hit rate in production")
-    report.append(f"4. **Memory**: Budget ~2MB for 1000 cached selections")
-    report.append(f"5. **Concurrency**: Cache is thread-safe and scales well")
+    report.append("\n## Recommendations\n")
+    report.append("")
+    report.append("1. **Cache Size**: Use 500-1000 entries for optimal balance")
+    report.append("2. **TTL**: Use 1 hour for query cache, 5 minutes for context cache")
+    report.append("3. **Hit Rate**: Expect 40-60% hit rate in production")
+    report.append("4. **Memory**: Budget ~2MB for 1000 cached selections")
+    report.append("5. **Concurrency**: Cache is thread-safe and scales well")
 
     report_text = "\n".join(report)
 
@@ -1195,9 +1197,7 @@ def test_cache_throughput_threshold():
     logger.info(f"Cache throughput: {throughput:.0f} ops/sec")
 
     # Lower threshold for test environment (accounting for overhead)
-    min_throughput = float(
-        os.getenv("VICTOR_BENCHMARK_CACHE_THROUGHPUT_MIN", "5000")
-    )
+    min_throughput = float(os.getenv("VICTOR_BENCHMARK_CACHE_THROUGHPUT_MIN", "5000"))
     assert throughput > min_throughput, f"Throughput too low: {throughput:.0f} ops/sec"
 
 

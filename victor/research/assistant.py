@@ -196,6 +196,7 @@ IMPORTANT: When asked about topics requiring external information (news, trends,
         Returns:
             Tool dependency provider
         """
+
         def _create():
             from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
 

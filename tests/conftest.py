@@ -95,9 +95,9 @@ def reset_singletons(request):
     # Skip reset for cache, workflow compiler, and server tests to avoid hanging during cleanup
     test_path = str(request.node.fspath)
     is_problematic_test = (
-        "test_cache" in test_path or
-        "test_unified_workflow_compiler" in test_path or
-        "test_server_feature_parity" in test_path
+        "test_cache" in test_path
+        or "test_unified_workflow_compiler" in test_path
+        or "test_server_feature_parity" in test_path
     )
 
     def _reset_all():
@@ -157,8 +157,11 @@ def reset_singletons(request):
 
             # Remove test verticals (heuristic: names containing "test", "mock", "temp")
             test_vertical_names = [
-                name for name in VerticalRegistry._registry.keys()
-                if any(keyword in name.lower() for keyword in ["test", "mock", "temp", "dummy", "fake"])
+                name
+                for name in VerticalRegistry._registry.keys()
+                if any(
+                    keyword in name.lower() for keyword in ["test", "mock", "temp", "dummy", "fake"]
+                )
             ]
 
             for name in test_vertical_names:

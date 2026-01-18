@@ -38,15 +38,19 @@ def test_prompting_builder_wires_components():
     orchestrator.mode_controller = "mode-controller"
     orchestrator._build_system_prompt_with_adapter.return_value = "base-prompt"
 
-    with patch(
-        "victor.agent.builders.prompting_builder.ResponseCoordinator",
-        return_value="response-coordinator",
-    ), patch(
-        "victor.agent.coordinators.prompt_coordinator.PromptBuilderCoordinator",
-        return_value="prompt-coordinator",
-    ), patch(
-        "victor.agent.coordinators.mode_coordinator.ModeCoordinator",
-        return_value="mode-coordinator",
+    with (
+        patch(
+            "victor.agent.builders.prompting_builder.ResponseCoordinator",
+            return_value="response-coordinator",
+        ),
+        patch(
+            "victor.agent.coordinators.prompt_coordinator.PromptBuilderCoordinator",
+            return_value="prompt-coordinator",
+        ),
+        patch(
+            "victor.agent.coordinators.mode_coordinator.ModeCoordinator",
+            return_value="mode-coordinator",
+        ),
     ):
         builder = PromptingBuilder(settings=settings, factory=factory)
         components = builder.build(orchestrator, model="model")

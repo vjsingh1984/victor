@@ -157,7 +157,11 @@ class WorkflowCompiler:
             FileNotFoundError: If file path doesn't exist
         """
         # Check if source is a file path
-        if isinstance(source, str) and len(source) < 500 and not source.startswith((" ", "\t", "\n", "{", "[")):
+        if (
+            isinstance(source, str)
+            and len(source) < 500
+            and not source.startswith((" ", "\t", "\n", "{", "["))
+        ):
             path = Path(source)
             if path.exists():
                 # Load from file
@@ -171,7 +175,9 @@ class WorkflowCompiler:
                 )
             else:
                 # Treat as YAML content string
-                logger.debug(f"Loading workflow from YAML string (path doesn't exist): {source[:50]}...")
+                logger.debug(
+                    f"Loading workflow from YAML string (path doesn't exist): {source[:50]}..."
+                )
                 from victor.workflows.yaml_loader import load_workflow_from_yaml
 
                 result = load_workflow_from_yaml(
@@ -193,7 +199,7 @@ class WorkflowCompiler:
         # Handle dict or single workflow result
         if isinstance(result, dict):
             if not result:
-                raise ValueError(f"No workflows found in source")
+                raise ValueError("No workflows found in source")
             # Return the requested workflow or first one
             if workflow_name and workflow_name in result:
                 return result[workflow_name]
@@ -227,8 +233,7 @@ class WorkflowCompiler:
         compiled = compiler.compile(workflow_def)
 
         logger.info(
-            f"Compiled workflow '{workflow_def.name}' with "
-            f"{len(workflow_def.nodes)} nodes"
+            f"Compiled workflow '{workflow_def.name}' with " f"{len(workflow_def.nodes)} nodes"
         )
 
         return compiled

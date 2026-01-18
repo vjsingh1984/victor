@@ -256,6 +256,7 @@ class TestValidatorFactory:
 
             def validate(self, data: dict, context) -> "ValidationResult":
                 from victor.framework.validation.pipeline import ValidationResult
+
                 return ValidationResult(is_valid=True)
 
         factory.register_validator("custom", CustomValidator)
@@ -422,6 +423,7 @@ class TestValidationPipelineBuilder:
 
             def validate(self, data: dict, context):
                 from victor.framework.validation.pipeline import ValidationResult
+
                 return ValidationResult(is_valid=True)
 
         builder.register_validator("custom", CustomValidator)

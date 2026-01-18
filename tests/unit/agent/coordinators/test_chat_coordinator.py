@@ -67,7 +67,9 @@ class TestChatCoordinatorInitialization:
         orch.add_message = Mock()
         orch._system_added = False
         orch.task_classifier = Mock()
-        orch.task_classifier.classify = Mock(return_value=Mock(tool_budget=5, complexity=TaskComplexity.MEDIUM))
+        orch.task_classifier.classify = Mock(
+            return_value=Mock(tool_budget=5, complexity=TaskComplexity.MEDIUM)
+        )
         orch.settings = Mock()
         orch.settings.chat_max_iterations = 10
         orch.tool_selector = Mock()
@@ -79,9 +81,17 @@ class TestChatCoordinatorInitialization:
         orch._context_compactor = None
         orch._handle_tool_calls = AsyncMock(return_value=[])
         orch.response_completer = Mock()
-        orch.response_completer.ensure_response = AsyncMock(return_value=Mock(content="Fallback response"))
-        orch.response_completer.format_tool_failure_message = Mock(return_value="Tool failed message")
-        orch._cumulative_token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        orch.response_completer.ensure_response = AsyncMock(
+            return_value=Mock(content="Fallback response")
+        )
+        orch.response_completer.format_tool_failure_message = Mock(
+            return_value="Tool failed message"
+        )
+        orch._cumulative_token_usage = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        }
         orch._current_stream_context = None
 
         # Streaming-specific attributes
@@ -116,7 +126,9 @@ class TestChatCoordinatorInitialization:
         orch.task_coordinator = Mock()
         orch.task_coordinator._reminder_manager = None
         orch.task_coordinator.set_reminder_manager = Mock()
-        orch.task_coordinator.prepare_task = Mock(return_value=(Mock(complexity=TaskComplexity.MEDIUM), 10))
+        orch.task_coordinator.prepare_task = Mock(
+            return_value=(Mock(complexity=TaskComplexity.MEDIUM), 10)
+        )
         orch.task_coordinator.current_intent = None
         orch.task_coordinator.temperature = 0.7
         orch.task_coordinator.tool_budget = 10
@@ -139,13 +151,17 @@ class TestChatCoordinatorInitialization:
         orch._recovery_integration.handle_response = AsyncMock(return_value=Mock(action="continue"))
         orch._recovery_integration.record_outcome = Mock()
         orch._chunk_generator = Mock()
-        orch._chunk_generator.generate_content_chunk = Mock(side_effect=lambda c, is_final=False: StreamChunk(content=c, is_final=is_final))
+        orch._chunk_generator.generate_content_chunk = Mock(
+            side_effect=lambda c, is_final=False: StreamChunk(content=c, is_final=is_final)
+        )
         orch._streaming_handler = Mock()
         orch._recovery_coordinator = Mock()
         orch._recovery_coordinator.check_natural_completion = Mock(return_value=None)
         orch._recovery_coordinator.handle_empty_response = Mock(return_value=(None, False))
         orch._recovery_coordinator.check_force_action = Mock(return_value=(False, None))
-        orch._recovery_coordinator.get_recovery_fallback_message = Mock(return_value="Fallback message")
+        orch._recovery_coordinator.get_recovery_fallback_message = Mock(
+            return_value="Fallback message"
+        )
         orch._record_intelligent_outcome = Mock()
         orch._task_completion_detector = Mock()
         orch._task_completion_detector.analyze_response = Mock()
@@ -174,6 +190,7 @@ class TestChatCoordinatorInitialization:
     @staticmethod
     def _create_stream_generator():
         """Create a mock async generator for streaming."""
+
         async def generator(*args, **kwargs):
             yield StreamChunk(content="Hello", is_final=False)
             yield StreamChunk(content=" world", is_final=False)
@@ -205,11 +222,11 @@ class TestChatCoordinatorChat:
         orch.conversation.ensure_system_prompt = Mock()
         orch.provider = Mock()
         orch.provider.supports_tools = Mock(return_value=False)
-        orch.provider.chat = AsyncMock(return_value=CompletionResponse(
-            content="Response content",
-            role="assistant",
-            tool_calls=None
-        ))
+        orch.provider.chat = AsyncMock(
+            return_value=CompletionResponse(
+                content="Response content", role="assistant", tool_calls=None
+            )
+        )
         orch.model = "test-model"
         orch.temperature = 0.7
         orch.max_tokens = 4096
@@ -220,7 +237,9 @@ class TestChatCoordinatorChat:
         orch.add_message = Mock()
         orch._system_added = False
         orch.task_classifier = Mock()
-        orch.task_classifier.classify = Mock(return_value=Mock(tool_budget=5, complexity=TaskComplexity.MEDIUM))
+        orch.task_classifier.classify = Mock(
+            return_value=Mock(tool_budget=5, complexity=TaskComplexity.MEDIUM)
+        )
         orch.settings = Mock()
         orch.settings.chat_max_iterations = 10
         orch.conversation_state = Mock()
@@ -231,7 +250,11 @@ class TestChatCoordinatorChat:
         orch.response_completer = Mock()
         orch.response_completer.ensure_response = AsyncMock(return_value=Mock(content="Fallback"))
         orch.response_completer.format_tool_failure_message = Mock(return_value="Tool failed")
-        orch._cumulative_token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        orch._cumulative_token_usage = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        }
         return orch
 
     @pytest.fixture
@@ -240,7 +263,9 @@ class TestChatCoordinatorChat:
         return ChatCoordinator(orchestrator=mock_orchestrator)
 
     @pytest.mark.asyncio
-    async def test_chat_simple_response(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    async def test_chat_simple_response(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test chat with a simple response (no tool calls)."""
         # Execute
         response = await coordinator.chat("Hello")
@@ -255,15 +280,19 @@ class TestChatCoordinatorChat:
         mock_orchestrator.provider.chat.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_chat_with_token_usage_tracking(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    async def test_chat_with_token_usage_tracking(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test that chat tracks token usage correctly."""
         # Setup
-        mock_orchestrator.provider.chat = AsyncMock(return_value=CompletionResponse(
-            content="Response",
-            role="assistant",
-            tool_calls=None,
-            usage={"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}
-        ))
+        mock_orchestrator.provider.chat = AsyncMock(
+            return_value=CompletionResponse(
+                content="Response",
+                role="assistant",
+                tool_calls=None,
+                usage={"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
+            )
+        )
 
         # Execute
         await coordinator.chat("Hello")
@@ -274,26 +303,32 @@ class TestChatCoordinatorChat:
         assert mock_orchestrator._cumulative_token_usage["total_tokens"] == 150
 
     @pytest.mark.asyncio
-    async def test_chat_with_tool_calls(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    async def test_chat_with_tool_calls(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test chat with tool calls that succeeds on second iteration."""
         # Setup - first call returns tool calls, second returns final response
         mock_orchestrator.provider.supports_tools = Mock(return_value=True)
         mock_orchestrator.tool_selector = Mock()
-        mock_orchestrator.tool_selector.select_tools = AsyncMock(return_value=[{"name": "test_tool"}])
-        mock_orchestrator.tool_selector.prioritize_by_stage = Mock(return_value=[{"name": "test_tool"}])
+        mock_orchestrator.tool_selector.select_tools = AsyncMock(
+            return_value=[{"name": "test_tool"}]
+        )
+        mock_orchestrator.tool_selector.prioritize_by_stage = Mock(
+            return_value=[{"name": "test_tool"}]
+        )
 
         tool_call_response = CompletionResponse(
             content="Thinking...",
             role="assistant",
-            tool_calls=[{"name": "test_tool", "arguments": {}}]
+            tool_calls=[{"name": "test_tool", "arguments": {}}],
         )
         final_response = CompletionResponse(
-            content="Final response",
-            role="assistant",
-            tool_calls=None
+            content="Final response", role="assistant", tool_calls=None
         )
 
-        mock_orchestrator.provider.chat = AsyncMock(side_effect=[tool_call_response, final_response])
+        mock_orchestrator.provider.chat = AsyncMock(
+            side_effect=[tool_call_response, final_response]
+        )
         mock_orchestrator._handle_tool_calls = AsyncMock(return_value=[{"success": True}])
 
         # Execute
@@ -305,15 +340,17 @@ class TestChatCoordinatorChat:
         mock_orchestrator._handle_tool_calls.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_chat_with_empty_response_uses_completer(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    async def test_chat_with_empty_response_uses_completer(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test that empty response triggers response completer."""
         # Setup
-        mock_orchestrator.provider.chat = AsyncMock(return_value=CompletionResponse(
-            content="",
-            role="assistant",
-            tool_calls=None
-        ))
-        mock_orchestrator.response_completer.ensure_response = AsyncMock(return_value=Mock(content="Completed"))
+        mock_orchestrator.provider.chat = AsyncMock(
+            return_value=CompletionResponse(content="", role="assistant", tool_calls=None)
+        )
+        mock_orchestrator.response_completer.ensure_response = AsyncMock(
+            return_value=Mock(content="Completed")
+        )
 
         # Execute
         response = await coordinator.chat("Hello")
@@ -324,7 +361,9 @@ class TestChatCoordinatorChat:
         mock_orchestrator.add_message.assert_called_with("assistant", "Completed")
 
     @pytest.mark.asyncio
-    async def test_chat_max_iterations_exceeded(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    async def test_chat_max_iterations_exceeded(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test that chat stops after max iterations even with tool calls."""
         # Setup
         mock_orchestrator.provider.supports_tools = Mock(return_value=True)
@@ -335,7 +374,7 @@ class TestChatCoordinatorChat:
         tool_response = CompletionResponse(
             content="Still working",
             role="assistant",
-            tool_calls=[{"name": "loop_tool", "arguments": {}}]
+            tool_calls=[{"name": "loop_tool", "arguments": {}}],
         )
         mock_orchestrator.provider.chat = AsyncMock(return_value=tool_response)
         mock_orchestrator._handle_tool_calls = AsyncMock(return_value=[{"success": True}])
@@ -348,7 +387,9 @@ class TestChatCoordinatorChat:
         assert response.content == "Fallback"
 
     @pytest.mark.asyncio
-    async def test_chat_with_thinking_enabled(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    async def test_chat_with_thinking_enabled(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test chat with thinking parameter enabled."""
         # Setup
         mock_orchestrator.thinking = True
@@ -363,11 +404,15 @@ class TestChatCoordinatorChat:
         assert call_kwargs["thinking"]["budget_tokens"] == 10000
 
     @pytest.mark.asyncio
-    async def test_chat_with_context_compaction(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    async def test_chat_with_context_compaction(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test chat with context compaction before API call."""
         # Setup
         mock_compactor = Mock()
-        mock_compactor.check_and_compact = Mock(return_value=Mock(action_taken=True, messages_removed=5, tokens_freed=1000))
+        mock_compactor.check_and_compact = Mock(
+            return_value=Mock(action_taken=True, messages_removed=5, tokens_freed=1000)
+        )
         mock_orchestrator._context_compactor = mock_compactor
 
         # Execute
@@ -377,7 +422,9 @@ class TestChatCoordinatorChat:
         mock_compactor.check_and_compact.assert_called()
 
     @pytest.mark.asyncio
-    async def test_chat_tool_failure_uses_completer(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    async def test_chat_tool_failure_uses_completer(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test that tool failures trigger response completer with failure context."""
         # Setup
         mock_orchestrator.provider.supports_tools = Mock(return_value=True)
@@ -385,14 +432,12 @@ class TestChatCoordinatorChat:
         mock_orchestrator.tool_selector.select_tools = AsyncMock(return_value=[])
 
         tool_response = CompletionResponse(
-            content="",
-            role="assistant",
-            tool_calls=[{"name": "failing_tool", "arguments": {}}]
+            content="", role="assistant", tool_calls=[{"name": "failing_tool", "arguments": {}}]
         )
         mock_orchestrator.provider.chat = AsyncMock(return_value=tool_response)
-        mock_orchestrator._handle_tool_calls = AsyncMock(return_value=[
-            {"success": False, "error": "Tool failed", "name": "failing_tool"}
-        ])
+        mock_orchestrator._handle_tool_calls = AsyncMock(
+            return_value=[{"success": False, "error": "Tool failed", "name": "failing_tool"}]
+        )
 
         # Execute
         response = await coordinator.chat("Use failing tool")
@@ -458,7 +503,9 @@ class TestChatCoordinatorStreamChat:
         orch.task_coordinator = Mock()
         orch.task_coordinator._reminder_manager = None
         orch.task_coordinator.set_reminder_manager = Mock()
-        orch.task_coordinator.prepare_task = Mock(return_value=(Mock(complexity=TaskComplexity.MEDIUM), 10))
+        orch.task_coordinator.prepare_task = Mock(
+            return_value=(Mock(complexity=TaskComplexity.MEDIUM), 10)
+        )
         orch.task_coordinator.current_intent = None
         orch.task_coordinator.temperature = 0.7
         orch.task_coordinator.tool_budget = 10
@@ -483,7 +530,9 @@ class TestChatCoordinatorStreamChat:
         orch._recovery_integration.handle_response = AsyncMock(return_value=Mock(action="continue"))
         orch._recovery_integration.record_outcome = Mock()
         orch._chunk_generator = Mock()
-        orch._chunk_generator.generate_content_chunk = Mock(side_effect=lambda c, is_final=False: StreamChunk(content=c, is_final=is_final))
+        orch._chunk_generator.generate_content_chunk = Mock(
+            side_effect=lambda c, is_final=False: StreamChunk(content=c, is_final=is_final)
+        )
         orch._record_intelligent_outcome = Mock()
         orch._context_compactor = None
         orch._force_finalize = False
@@ -509,7 +558,11 @@ class TestChatCoordinatorStreamChat:
         orch._streaming_controller = Mock()
         orch._streaming_controller.current_session = None
         orch._current_stream_context = None
-        orch._cumulative_token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        orch._cumulative_token_usage = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        }
         orch._streaming_handler = Mock()
         orch._recovery_coordinator = Mock()
         orch._recovery_coordinator.check_natural_completion = Mock(return_value=None)
@@ -522,9 +575,14 @@ class TestChatCoordinatorStreamChat:
     @staticmethod
     def _create_stream_generator():
         """Create a mock async generator for streaming."""
+
         async def generator(*args, **kwargs):
             # Simulate a complete streaming cycle that finishes immediately
-            yield StreamChunk(content="Final response", is_final=True, usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15})
+            yield StreamChunk(
+                content="Final response",
+                is_final=True,
+                usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+            )
 
         return generator
 
@@ -534,8 +592,11 @@ class TestChatCoordinatorStreamChat:
         return ChatCoordinator(orchestrator=mock_orchestrator)
 
     @pytest.mark.asyncio
-    async def test_stream_chat_yields_chunks(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    async def test_stream_chat_yields_chunks(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test that stream_chat yields StreamChunk objects."""
+
         # Setup - mock the internal implementation to avoid complex streaming logic
         async def mock_stream_impl(user_message: str):
             yield StreamChunk(content="Test response", is_final=True)
@@ -552,11 +613,17 @@ class TestChatCoordinatorStreamChat:
         assert any(chunk.content == "Test response" for chunk in chunks)
 
     @pytest.mark.asyncio
-    async def test_stream_chat_updates_cumulative_token_usage(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    async def test_stream_chat_updates_cumulative_token_usage(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test that stream_chat updates cumulative token usage after completion."""
         # Setup - mock the internal implementation and context
         mock_context = Mock()
-        mock_context.cumulative_usage = {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}
+        mock_context.cumulative_usage = {
+            "prompt_tokens": 100,
+            "completion_tokens": 50,
+            "total_tokens": 150,
+        }
         mock_orchestrator._current_stream_context = mock_context
 
         async def mock_stream_impl(user_message: str):
@@ -574,8 +641,11 @@ class TestChatCoordinatorStreamChat:
         assert mock_orchestrator._cumulative_token_usage["total_tokens"] == 150
 
     @pytest.mark.asyncio
-    async def test_stream_chat_cancellation_handling(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    async def test_stream_chat_cancellation_handling(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test that stream_chat handles cancellation requests."""
+
         # Setup - mock implementation that yields cancellation chunk
         async def mock_stream_impl(user_message: str):
             yield StreamChunk(content="\n\n[Cancelled by user]\n", is_final=True)
@@ -754,7 +824,9 @@ class TestChatCoordinatorRateLimitRetry:
         orch._metrics_collector = Mock()
         orch._metrics_collector.record_first_token = Mock()
         orch._provider_coordinator = Mock()
-        orch._provider_coordinator.get_rate_limit_wait_time = Mock(return_value=0.1)  # Short wait for tests
+        orch._provider_coordinator.get_rate_limit_wait_time = Mock(
+            return_value=0.1
+        )  # Short wait for tests
         return orch
 
     @pytest.fixture
@@ -774,7 +846,9 @@ class TestChatCoordinatorRateLimitRetry:
         # Assert - 2.0 * 2^2 = 8.0, but capped at 300
         assert wait_time == 8.0
 
-    def test_get_rate_limit_wait_time_capped(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    def test_get_rate_limit_wait_time_capped(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test that rate limit wait time is capped at 300 seconds."""
         # Setup
         exc = ProviderRateLimitError("Rate limited")
@@ -802,7 +876,9 @@ class TestChatCoordinatorRecoveryMethods:
         orch.tool_budget = 10
         orch._record_intelligent_outcome = Mock()
         orch._chunk_generator = Mock()
-        orch._chunk_generator.generate_content_chunk = Mock(side_effect=lambda c, is_final=False: StreamChunk(content=c, is_final=is_final))
+        orch._chunk_generator.generate_content_chunk = Mock(
+            side_effect=lambda c, is_final=False: StreamChunk(content=c, is_final=is_final)
+        )
         orch._task_tracker = Mock()
         orch._task_tracker.current_task_type = "general"
         orch._task_tracker.is_analysis_task = False
@@ -834,6 +910,7 @@ class TestChatCoordinatorRecoveryMethods:
 
         # Execute
         import time
+
         mock_orchestrator._streaming_controller.current_session.start_time = time.time()
         recovery_ctx = coordinator._create_recovery_context(stream_ctx)
 
@@ -844,7 +921,9 @@ class TestChatCoordinatorRecoveryMethods:
         assert recovery_ctx.provider_name == "test_provider"
         assert recovery_ctx.model == "test-model"
 
-    def test_apply_recovery_action_force_summary(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    def test_apply_recovery_action_force_summary(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test applying force_summary recovery action."""
         # Setup
         stream_ctx = Mock()
@@ -858,7 +937,9 @@ class TestChatCoordinatorRecoveryMethods:
         assert chunk.is_final is True
         assert stream_ctx.force_completion is True
 
-    def test_apply_recovery_action_retry(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    def test_apply_recovery_action_retry(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test applying retry recovery action."""
         # Setup
         stream_ctx = Mock()
@@ -873,7 +954,9 @@ class TestChatCoordinatorRecoveryMethods:
         # Check that the system message was added (with either the message or default)
         assert any(call[0][0] == "system" for call in mock_orchestrator.add_message.call_args_list)
 
-    def test_apply_recovery_action_finalize(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    def test_apply_recovery_action_finalize(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test applying finalize recovery action."""
         # Setup
         stream_ctx = Mock()
@@ -900,19 +983,23 @@ class TestChatCoordinatorRecoveryMethods:
         assert chunk is None
 
     @pytest.mark.asyncio
-    async def test_handle_empty_response_recovery_success(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    async def test_handle_empty_response_recovery_success(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test empty response recovery when successful."""
         # Setup
         stream_ctx = Mock()
         tools = []
-        mock_orchestrator.provider.chat = AsyncMock(return_value=CompletionResponse(
-            content="Recovered content",
-            role="assistant",
-            tool_calls=None
-        ))
+        mock_orchestrator.provider.chat = AsyncMock(
+            return_value=CompletionResponse(
+                content="Recovered content", role="assistant", tool_calls=None
+            )
+        )
 
         # Execute
-        success, tool_calls, final_chunk = await coordinator._handle_empty_response_recovery(stream_ctx, tools)
+        success, tool_calls, final_chunk = await coordinator._handle_empty_response_recovery(
+            stream_ctx, tools
+        )
 
         # Assert
         assert success is True
@@ -921,7 +1008,9 @@ class TestChatCoordinatorRecoveryMethods:
         assert final_chunk.is_final is True
 
     @pytest.mark.asyncio
-    async def test_handle_empty_response_recovery_failure(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    async def test_handle_empty_response_recovery_failure(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test empty response recovery when it fails."""
         # Setup
         stream_ctx = Mock()
@@ -929,7 +1018,9 @@ class TestChatCoordinatorRecoveryMethods:
         mock_orchestrator.provider.chat = AsyncMock(side_effect=Exception("Failed"))
 
         # Execute
-        success, tool_calls, final_chunk = await coordinator._handle_empty_response_recovery(stream_ctx, tools)
+        success, tool_calls, final_chunk = await coordinator._handle_empty_response_recovery(
+            stream_ctx, tools
+        )
 
         # Assert
         assert success is False
@@ -961,7 +1052,9 @@ class TestChatCoordinatorDelegationMethods:
         """Create ChatCoordinator instance."""
         return ChatCoordinator(orchestrator=mock_orchestrator)
 
-    def test_handle_cancellation_detected(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    def test_handle_cancellation_detected(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test handling cancellation when detected."""
         # Setup
         mock_orchestrator._check_cancellation = Mock(return_value=True)
@@ -975,7 +1068,9 @@ class TestChatCoordinatorDelegationMethods:
         # Check for either cancellation message format
         assert "Cancelled" in chunk.content or "cancelled" in chunk.content.lower()
 
-    def test_handle_cancellation_not_detected(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    def test_handle_cancellation_not_detected(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test handling cancellation when not detected."""
         # Execute
         chunk = coordinator._handle_cancellation(elapsed=10.0)
@@ -983,7 +1078,9 @@ class TestChatCoordinatorDelegationMethods:
         # Assert
         assert chunk is None
 
-    def test_check_progress_making_progress(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    def test_check_progress_making_progress(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test check_progress when session is making progress."""
         # Setup
         stream_ctx = Mock()
@@ -1007,7 +1104,9 @@ class TestChatCoordinatorDelegationMethods:
         assert should_force is False
         assert stream_ctx.force_completion is False
 
-    def test_check_progress_not_making_progress(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    def test_check_progress_not_making_progress(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test check_progress when session is stuck."""
         # Setup
         stream_ctx = Mock()
@@ -1086,11 +1185,9 @@ class TestChatCoordinatorEdgeCases:
         orch.conversation.ensure_system_prompt = Mock()
         orch.provider = Mock()
         orch.provider.supports_tools = Mock(return_value=False)
-        orch.provider.chat = AsyncMock(return_value=CompletionResponse(
-            content="",
-            role="assistant",
-            tool_calls=None
-        ))
+        orch.provider.chat = AsyncMock(
+            return_value=CompletionResponse(content="", role="assistant", tool_calls=None)
+        )
         orch.model = "test-model"
         orch.temperature = 0.7
         orch.max_tokens = 4096
@@ -1101,7 +1198,9 @@ class TestChatCoordinatorEdgeCases:
         orch.add_message = Mock()
         orch._system_added = False
         orch.task_classifier = Mock()
-        orch.task_classifier.classify = Mock(return_value=Mock(tool_budget=5, complexity=TaskComplexity.MEDIUM))
+        orch.task_classifier.classify = Mock(
+            return_value=Mock(tool_budget=5, complexity=TaskComplexity.MEDIUM)
+        )
         orch.settings = Mock()
         orch.settings.chat_max_iterations = 10
         orch.conversation_state = Mock()
@@ -1112,7 +1211,11 @@ class TestChatCoordinatorEdgeCases:
         orch.response_completer = Mock()
         orch.response_completer.ensure_response = AsyncMock(return_value=Mock(content=None))
         orch.response_completer.format_tool_failure_message = Mock(return_value="All tools failed")
-        orch._cumulative_token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        orch._cumulative_token_usage = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        }
         return orch
 
     @pytest.fixture
@@ -1121,20 +1224,29 @@ class TestChatCoordinatorEdgeCases:
         return ChatCoordinator(orchestrator=mock_orchestrator)
 
     @pytest.mark.asyncio
-    async def test_chat_completer_fails_uses_fallback(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    async def test_chat_completer_fails_uses_fallback(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test that fallback message is used when completer fails."""
         # Setup - completer returns None
-        mock_orchestrator.response_completer.ensure_response = AsyncMock(return_value=Mock(content=None))
+        mock_orchestrator.response_completer.ensure_response = AsyncMock(
+            return_value=Mock(content=None)
+        )
 
         # Execute
         response = await coordinator.chat("Test fallback")
 
         # Assert
-        assert response.content == "I was unable to generate a complete response. Please try rephrasing your request."
+        assert (
+            response.content
+            == "I was unable to generate a complete response. Please try rephrasing your request."
+        )
         mock_orchestrator.add_message.assert_called()
 
     @pytest.mark.asyncio
-    async def test_chat_with_tool_failures_uses_format_message(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    async def test_chat_with_tool_failures_uses_format_message(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test that tool failure format message is used when tools fail."""
         # Setup
         mock_orchestrator.provider.supports_tools = Mock(return_value=True)
@@ -1142,15 +1254,15 @@ class TestChatCoordinatorEdgeCases:
         mock_orchestrator.tool_selector.select_tools = AsyncMock(return_value=[])
 
         tool_response = CompletionResponse(
-            content="",
-            role="assistant",
-            tool_calls=[{"name": "failing_tool", "arguments": {}}]
+            content="", role="assistant", tool_calls=[{"name": "failing_tool", "arguments": {}}]
         )
         mock_orchestrator.provider.chat = AsyncMock(return_value=tool_response)
-        mock_orchestrator._handle_tool_calls = AsyncMock(return_value=[
-            {"success": False, "error": "Tool error", "name": "failing_tool"}
-        ])
-        mock_orchestrator.response_completer.ensure_response = AsyncMock(return_value=Mock(content=None))
+        mock_orchestrator._handle_tool_calls = AsyncMock(
+            return_value=[{"success": False, "error": "Tool error", "name": "failing_tool"}]
+        )
+        mock_orchestrator.response_completer.ensure_response = AsyncMock(
+            return_value=Mock(content=None)
+        )
 
         # Execute
         response = await coordinator.chat("Use failing tool")
@@ -1160,7 +1272,9 @@ class TestChatCoordinatorEdgeCases:
         mock_orchestrator.response_completer.format_tool_failure_message.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_chat_provider_exception_propagates(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
+    async def test_chat_provider_exception_propagates(
+        self, coordinator: ChatCoordinator, mock_orchestrator: Mock
+    ):
         """Test that provider exceptions are propagated."""
         # Setup
         mock_orchestrator.provider.chat = AsyncMock(side_effect=RuntimeError("Provider error"))

@@ -167,7 +167,7 @@ class WorkflowGraph:
         for node in self.nodes:
             yaml_str.append(f"      - id: {node.id}\n")
             yaml_str.append(f"        type: {node.type.value}\n")
-            yaml_str.append(f"        position:\n")
+            yaml_str.append("        position:\n")
             yaml_str.append(f"          x: {node.x}\n")
             yaml_str.append(f"          y: {node.y}\n")
             yaml_str.append(f"        label: {node.label}\n")
@@ -667,15 +667,17 @@ def test_editor_load_time(benchmark, node_count):
     }.get(node_count, 1000)
 
     total_ms = result["total_time"] * 1000
-    assert total_ms < target_ms, (
-        f"Load time {total_ms:.2f}ms exceeds target {target_ms}ms for {node_count} nodes"
-    )
+    assert (
+        total_ms < target_ms
+    ), f"Load time {total_ms:.2f}ms exceeds target {target_ms}ms for {node_count} nodes"
 
-    print(f"\nLoad Time | Nodes: {node_count:3} | "
-          f"Total: {total_ms:6.2f}ms | "
-          f"Load: {result['load_time']*1000:6.2f}ms | "
-          f"Nodes: {result['nodes_time']*1000:6.2f}ms | "
-          f"Edges: {result['edges_time']*1000:6.2f}ms")
+    print(
+        f"\nLoad Time | Nodes: {node_count:3} | "
+        f"Total: {total_ms:6.2f}ms | "
+        f"Load: {result['load_time']*1000:6.2f}ms | "
+        f"Nodes: {result['nodes_time']*1000:6.2f}ms | "
+        f"Edges: {result['edges_time']*1000:6.2f}ms"
+    )
 
 
 # =============================================================================
@@ -702,14 +704,16 @@ def test_node_rendering_performance(benchmark, node_count):
     render_time = benchmark(render_all_nodes)
     time_per_node = render_time / node_count
 
-    print(f"\nNode Rendering | Nodes: {node_count:3} | "
-          f"Total: {render_time*1000:7.2f}ms | "
-          f"Per-Node: {time_per_node*1000:6.3f}ms")
+    print(
+        f"\nNode Rendering | Nodes: {node_count:3} | "
+        f"Total: {render_time*1000:7.2f}ms | "
+        f"Per-Node: {time_per_node*1000:6.3f}ms"
+    )
 
     # Target: <16ms per node (60fps)
-    assert time_per_node < 0.016, (
-        f"Node rendering {time_per_node*1000:.3f}ms exceeds 16ms target for 60fps"
-    )
+    assert (
+        time_per_node < 0.016
+    ), f"Node rendering {time_per_node*1000:.3f}ms exceeds 16ms target for 60fps"
 
 
 # =============================================================================
@@ -718,12 +722,15 @@ def test_node_rendering_performance(benchmark, node_count):
 
 
 @pytest.mark.benchmark
-@pytest.mark.parametrize("node_count,edge_count", [
-    (10, 15),
-    (50, 75),
-    (100, 150),
-    (200, 300),
-])
+@pytest.mark.parametrize(
+    "node_count,edge_count",
+    [
+        (10, 15),
+        (50, 75),
+        (100, 150),
+        (200, 300),
+    ],
+)
 def test_edge_rendering_performance(benchmark, node_count, edge_count):
     """Benchmark edge rendering performance.
 
@@ -751,9 +758,11 @@ def test_edge_rendering_performance(benchmark, node_count, edge_count):
     render_time = benchmark(render_all_edges)
     time_per_edge = render_time / len(graph.edges) if graph.edges else 0
 
-    print(f"\nEdge Rendering | Edges: {len(graph.edges):3} | "
-          f"Total: {render_time*1000:7.2f}ms | "
-          f"Per-Edge: {time_per_edge*1000:6.3f}ms")
+    print(
+        f"\nEdge Rendering | Edges: {len(graph.edges):3} | "
+        f"Total: {render_time*1000:7.2f}ms | "
+        f"Per-Edge: {time_per_edge*1000:6.3f}ms"
+    )
 
 
 # =============================================================================
@@ -819,8 +828,10 @@ def test_continuous_zoom_pan(benchmark, large_graph):
     total_time = benchmark(continuous_operations)
     avg_time = total_time / 20  # 10 zoom + 10 pan operations
 
-    print(f"\nContinuous Operations | Total: {total_time*1000:7.2f}ms | "
-          f"Avg: {avg_time*1000:6.3f}ms")
+    print(
+        f"\nContinuous Operations | Total: {total_time*1000:7.2f}ms | "
+        f"Avg: {avg_time*1000:6.3f}ms"
+    )
 
     assert avg_time < 0.016, f"Avg operation {avg_time*1000:.3f}ms exceeds 16ms for 60fps"
 
@@ -849,8 +860,10 @@ def test_search_performance(benchmark, node_count):
     result_count = len(editor.search_nodes("Research"))
     search_time = benchmark(search_operation)
 
-    print(f"\nSearch Performance | Nodes: {node_count:3} | "
-          f"Results: {result_count:3} | Time: {search_time*1000:6.3f}ms")
+    print(
+        f"\nSearch Performance | Nodes: {node_count:3} | "
+        f"Results: {result_count:3} | Time: {search_time*1000:6.3f}ms"
+    )
 
     # Check performance targets
     if node_count == 100:
@@ -865,14 +878,17 @@ def test_search_performance(benchmark, node_count):
 
 
 @pytest.mark.benchmark
-@pytest.mark.parametrize("node_count,algorithm", [
-    (50, "grid"),
-    (50, "hierarchical"),
-    (50, "force_directed"),
-    (100, "grid"),
-    (100, "hierarchical"),
-    (100, "force_directed"),
-])
+@pytest.mark.parametrize(
+    "node_count,algorithm",
+    [
+        (50, "grid"),
+        (50, "hierarchical"),
+        (50, "force_directed"),
+        (100, "grid"),
+        (100, "hierarchical"),
+        (100, "force_directed"),
+    ],
+)
 def test_auto_layout_performance(benchmark, node_count, algorithm):
     """Benchmark auto-layout calculation performance.
 
@@ -890,8 +906,10 @@ def test_auto_layout_performance(benchmark, node_count, algorithm):
 
     layout_time = benchmark(calculate_layout)
 
-    print(f"\nAuto-Layout | Algorithm: {algorithm:15} | "
-          f"Nodes: {node_count:3} | Time: {layout_time*1000:7.2f}ms")
+    print(
+        f"\nAuto-Layout | Algorithm: {algorithm:15} | "
+        f"Nodes: {node_count:3} | Time: {layout_time*1000:7.2f}ms"
+    )
 
     # Check performance targets
     if algorithm == "grid" and node_count == 100:
@@ -936,12 +954,14 @@ def test_yaml_export_performance(benchmark, node_count):
         200: 600,
     }.get(node_count, 1000)
 
-    print(f"\nYAML Export | Nodes: {node_count:3} | "
-          f"Time: {export_time*1000:7.2f}ms | Size: {yaml_length:6} bytes")
-
-    assert export_time * 1000 < target_ms, (
-        f"YAML export {export_time*1000:.2f}ms exceeds target {target_ms}ms for {node_count} nodes"
+    print(
+        f"\nYAML Export | Nodes: {node_count:3} | "
+        f"Time: {export_time*1000:7.2f}ms | Size: {yaml_length:6} bytes"
     )
+
+    assert (
+        export_time * 1000 < target_ms
+    ), f"YAML export {export_time*1000:.2f}ms exceeds target {target_ms}ms for {node_count} nodes"
 
 
 @pytest.mark.benchmark
@@ -1029,12 +1049,11 @@ def test_yaml_import_performance(benchmark, node_count):
         200: 1000,
     }.get(node_count, 1500)
 
-    print(f"\nYAML Import | Nodes: {node_count:3} | "
-          f"Time: {import_time*1000:7.2f}ms")
+    print(f"\nYAML Import | Nodes: {node_count:3} | " f"Time: {import_time*1000:7.2f}ms")
 
-    assert import_time * 1000 < target_ms, (
-        f"YAML import {import_time*1000:.2f}ms exceeds target {target_ms}ms for {node_count} nodes"
-    )
+    assert (
+        import_time * 1000 < target_ms
+    ), f"YAML import {import_time*1000:.2f}ms exceeds target {target_ms}ms for {node_count} nodes"
 
 
 # =============================================================================
@@ -1077,12 +1096,14 @@ def test_memory_usage(benchmark, node_count):
         200: 200,
     }.get(node_count, 300)
 
-    print(f"\nMemory Usage | Nodes: {node_count:3} | "
-          f"Total: {memory_mb:6.1f}MB | Per-Node: {memory_per_node_kb:5.1f}KB")
-
-    assert memory_mb < target_mb, (
-        f"Memory usage {memory_mb:.1f}MB exceeds target {target_mb}MB for {node_count} nodes"
+    print(
+        f"\nMemory Usage | Nodes: {node_count:3} | "
+        f"Total: {memory_mb:6.1f}MB | Per-Node: {memory_per_node_kb:5.1f}KB"
     )
+
+    assert (
+        memory_mb < target_mb
+    ), f"Memory usage {memory_mb:.1f}MB exceeds target {target_mb}MB for {node_count} nodes"
 
 
 # =============================================================================
@@ -1130,7 +1151,7 @@ def test_real_world_workflow_editing(benchmark):
     result = benchmark(realistic_session)
 
     assert result is True
-    print(f"\nReal-world Editing Session | Completed successfully")
+    print("\nReal-world Editing Session | Completed successfully")
 
 
 # =============================================================================
@@ -1172,7 +1193,11 @@ def test_editor_performance_summary():
             "edges_ms": edges_time * 1000,
         }
 
-        status = "✓" if total * 1000 < [50, 150, 300, 500, 1000][[10, 25, 50, 100, 200].index(node_count)] else "✗"
+        status = (
+            "✓"
+            if total * 1000 < [50, 150, 300, 500, 1000][[10, 25, 50, 100, 200].index(node_count)]
+            else "✗"
+        )
         print(f"  {node_count:3} nodes {status}  {total*1000:6.2f}ms")
 
     # Test rendering performance
@@ -1216,7 +1241,12 @@ def test_editor_performance_summary():
 
         results["layout"][algorithm] = {"time_ms": total_ms}
 
-        status = "✓" if total_ms < [100, 500, 1000][["grid", "hierarchical", "force_directed"].index(algorithm)] else "✗"
+        status = (
+            "✓"
+            if total_ms
+            < [100, 500, 1000][["grid", "hierarchical", "force_directed"].index(algorithm)]
+            else "✗"
+        )
         print(f"  {algorithm:15} {status}  {total_ms:6.2f}ms")
 
     # Test YAML operations

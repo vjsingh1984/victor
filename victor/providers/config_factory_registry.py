@@ -279,6 +279,7 @@ class OllamaProviderStrategy(ProviderConfigStrategy):
         """Get Ollama config form."""
         try:
             from victor.ui.commands.models import OllamaConfigForm
+
             return OllamaConfigForm
         except ImportError:
             return None
@@ -312,6 +313,7 @@ class LMStudioProviderStrategy(ProviderConfigStrategy):
         """Get LMStudio config form."""
         try:
             from victor.ui.commands.models import LMStudioConfigForm
+
             return LMStudioConfigForm
         except ImportError:
             return None
@@ -341,6 +343,7 @@ class AnthropicProviderStrategy(ProviderConfigStrategy):
         """Get Anthropic config form."""
         try:
             from victor.ui.commands.models import AnthropicConfigForm
+
             return AnthropicConfigForm
         except ImportError:
             return None
@@ -370,6 +373,7 @@ class OpenAIProviderStrategy(ProviderConfigStrategy):
         """Get OpenAI config form."""
         try:
             from victor.ui.commands.models import OpenAIConfigForm
+
             return OpenAIConfigForm
         except ImportError:
             return None
@@ -398,6 +402,7 @@ class GoogleProviderStrategy(ProviderConfigStrategy):
         """Get Google config form."""
         try:
             from victor.ui.commands.models import GoogleConfigForm
+
             return GoogleConfigForm
         except ImportError:
             return None
@@ -425,6 +430,7 @@ class GroqProviderStrategy(ProviderConfigStrategy):
         """Get Groq config form."""
         try:
             from victor.ui.commands.models import GroqConfigForm
+
             return GroqConfigForm
         except ImportError:
             return None
@@ -451,6 +457,7 @@ class CerebrasProviderStrategy(ProviderConfigStrategy):
         """Get Cerebras config form."""
         try:
             from victor.ui.commands.models import CerebrasConfigForm
+
             return CerebrasConfigForm
         except ImportError:
             return None
@@ -475,6 +482,7 @@ class LlamaCppProviderStrategy(ProviderConfigStrategy):
         """Get llama.cpp config form."""
         try:
             from victor.ui.commands.models import LlamaCppConfigForm
+
             return LlamaCppConfigForm
         except ImportError:
             return None
@@ -508,6 +516,7 @@ class VLLMProviderStrategy(ProviderConfigStrategy):
         """Get vLLM config form."""
         try:
             from victor.ui.commands.models import VLLMConfigForm
+
             return VLLMConfigForm
         except ImportError:
             return None

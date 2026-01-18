@@ -335,9 +335,7 @@ class TestFactoryFunctions:
         custom_logger = Logger()
         custom_logger.messages.append("[CUSTOM] initialized")
 
-        container.register(
-            Logger, factory=lambda: custom_logger
-        )
+        container.register(Logger, factory=lambda: custom_logger)
 
         logger = container.get(Logger)
 
@@ -426,12 +424,7 @@ class TestMethodChaining:
 
     def test_fluent_registration(self):
         """Test fluent registration pattern."""
-        container = (
-            DIContainer()
-            .register(Logger)
-            .register(Cache)
-            .register(Database)
-        )
+        container = DIContainer().register(Logger).register(Cache).register(Database)
 
         assert container.is_registered(Logger)
         assert container.is_registered(Cache)

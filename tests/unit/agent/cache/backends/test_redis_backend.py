@@ -36,10 +36,12 @@ from victor.agent.cache.backends.redis import RedisCacheBackend
 @pytest.fixture
 def mock_redis(mock_pubsub):
     """Create a mock Redis client."""
+
     # Create an empty async iterator for default scan_iter
     class EmptyAsyncIterator:
         def __aiter__(self):
             return self
+
         async def __anext__(self):
             raise StopAsyncIteration
 
@@ -60,10 +62,12 @@ def mock_redis(mock_pubsub):
 @pytest.fixture
 def mock_pubsub():
     """Create a mock Redis pubsub client."""
+
     # Create an empty async iterator for default listen
     class EmptyAsyncIterator:
         def __aiter__(self):
             return self
+
         async def __anext__(self):
             raise StopAsyncIteration
 
@@ -95,6 +99,7 @@ def redis_backend(mock_redis, mock_pubsub):
     backend._mock_pubsub = mock_pubsub
     # Manually set pubsub
     backend._pubsub = mock_pubsub
+
     # Override connect to use mocks directly without calling original
     async def mocked_connect():
         # Skip actual connection, just mark as connected
@@ -117,7 +122,10 @@ class TestConnectionLifecycle:
     @pytest.mark.asyncio
     async def test_connect_establishes_connection(self, mock_redis):
         """Test that connect() establishes Redis connection."""
-        with patch("victor.agent.cache.backends.redis.aioredis.from_url", new=AsyncMock(return_value=mock_redis)):
+        with patch(
+            "victor.agent.cache.backends.redis.aioredis.from_url",
+            new=AsyncMock(return_value=mock_redis),
+        ):
             backend = RedisCacheBackend(redis_url="redis://localhost:6379/0")
 
             await backend.connect()
@@ -129,7 +137,10 @@ class TestConnectionLifecycle:
     @pytest.mark.asyncio
     async def test_connect_creates_pubsub(self, mock_redis, mock_pubsub):
         """Test that connect() creates pubsub client."""
-        with patch("victor.agent.cache.backends.redis.aioredis.from_url", new=AsyncMock(return_value=mock_redis)):
+        with patch(
+            "victor.agent.cache.backends.redis.aioredis.from_url",
+            new=AsyncMock(return_value=mock_redis),
+        ):
             backend = RedisCacheBackend(redis_url="redis://localhost:6379/0")
 
             await backend.connect()
@@ -140,7 +151,10 @@ class TestConnectionLifecycle:
     @pytest.mark.asyncio
     async def test_disconnect_closes_pubsub(self, mock_redis, mock_pubsub):
         """Test that disconnect() closes pubsub."""
-        with patch("victor.agent.cache.backends.redis.aioredis.from_url", new=AsyncMock(return_value=mock_redis)):
+        with patch(
+            "victor.agent.cache.backends.redis.aioredis.from_url",
+            new=AsyncMock(return_value=mock_redis),
+        ):
             backend = RedisCacheBackend(
                 redis_url="redis://localhost:6379/0",
                 key_prefix="victor",
@@ -156,7 +170,10 @@ class TestConnectionLifecycle:
     @pytest.mark.asyncio
     async def test_disconnect_closes_redis(self, mock_redis, mock_pubsub):
         """Test that disconnect() closes Redis connection."""
-        with patch("victor.agent.cache.backends.redis.aioredis.from_url", new=AsyncMock(return_value=mock_redis)):
+        with patch(
+            "victor.agent.cache.backends.redis.aioredis.from_url",
+            new=AsyncMock(return_value=mock_redis),
+        ):
             backend = RedisCacheBackend(
                 redis_url="redis://localhost:6379/0",
                 key_prefix="victor",
@@ -172,7 +189,10 @@ class TestConnectionLifecycle:
     @pytest.mark.asyncio
     async def test_multiple_connect_calls_idempotent(self, mock_redis, mock_pubsub):
         """Test that multiple connect() calls are idempotent."""
-        with patch("victor.agent.cache.backends.redis.aioredis.from_url", new=AsyncMock(return_value=mock_redis)):
+        with patch(
+            "victor.agent.cache.backends.redis.aioredis.from_url",
+            new=AsyncMock(return_value=mock_redis),
+        ):
             backend = RedisCacheBackend(
                 redis_url="redis://localhost:6379/0",
                 key_prefix="victor",
@@ -190,7 +210,10 @@ class TestConnectionLifecycle:
     @pytest.mark.asyncio
     async def test_multiple_disconnect_calls_safe(self, mock_redis, mock_pubsub):
         """Test that multiple disconnect() calls are safe."""
-        with patch("victor.agent.cache.backends.redis.aioredis.from_url", new=AsyncMock(return_value=mock_redis)):
+        with patch(
+            "victor.agent.cache.backends.redis.aioredis.from_url",
+            new=AsyncMock(return_value=mock_redis),
+        ):
             backend = RedisCacheBackend(
                 redis_url="redis://localhost:6379/0",
                 key_prefix="victor",
@@ -337,7 +360,9 @@ class TestNamespaceManagement:
         mock_redis.delete.assert_called_once_with(*keys)
 
     @pytest.mark.asyncio
-    async def test_clear_namespace_returns_zero_for_empty_namespace(self, redis_backend, mock_redis):
+    async def test_clear_namespace_returns_zero_for_empty_namespace(
+        self, redis_backend, mock_redis
+    ):
         """Test that clear_namespace() returns 0 when namespace is empty."""
         await redis_backend.connect()
 
@@ -507,14 +532,20 @@ class TestDistributedInvalidation:
         assert ("key2", "test_namespace") in invalidated_keys
 
     @pytest.mark.asyncio
-    async def test_listen_for_invalidation_ignores_non_message_types(self, redis_backend, mock_pubsub):
+    async def test_listen_for_invalidation_ignores_non_message_types(
+        self, redis_backend, mock_pubsub
+    ):
         """Test that listen_for_invalidation() ignores non-message events."""
         await redis_backend.connect()
 
         # Mix of message types
         messages = [
             {"type": "subscribe", "channel": b"victor:invalidate:test_namespace", "data": 1},
-            {"type": "pmessage", "channel": b"victor:invalidate:test_namespace", "data": json.dumps({"key": "key1"}).encode()},
+            {
+                "type": "pmessage",
+                "channel": b"victor:invalidate:test_namespace",
+                "data": json.dumps({"key": "key1"}).encode(),
+            },
         ]
 
         # Create async iterator for messages
@@ -559,7 +590,10 @@ class TestKeyPrefix:
     @pytest.mark.asyncio
     async def test_key_prefix_applied_to_all_operations(self, mock_redis):
         """Test that key prefix is applied to all Redis operations."""
-        with patch("victor.agent.cache.backends.redis.aioredis.from_url", new=AsyncMock(return_value=mock_redis)):
+        with patch(
+            "victor.agent.cache.backends.redis.aioredis.from_url",
+            new=AsyncMock(return_value=mock_redis),
+        ):
             backend = RedisCacheBackend(redis_url="redis://localhost:6379/0", key_prefix="testapp")
             await backend.connect()
 
@@ -575,7 +609,10 @@ class TestKeyPrefix:
     @pytest.mark.asyncio
     async def test_default_key_prefix(self, mock_redis):
         """Test that default key prefix is 'victor'."""
-        with patch("victor.agent.cache.backends.redis.aioredis.from_url", new=AsyncMock(return_value=mock_redis)):
+        with patch(
+            "victor.agent.cache.backends.redis.aioredis.from_url",
+            new=AsyncMock(return_value=mock_redis),
+        ):
             backend = RedisCacheBackend(redis_url="redis://localhost:6379/0")
             await backend.connect()
 
@@ -614,4 +651,5 @@ class TestErrorHandling:
 
 class StopAsyncIteration(StopAsyncIteration):
     """Helper to stop async iteration."""
+
     pass

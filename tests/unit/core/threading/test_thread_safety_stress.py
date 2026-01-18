@@ -172,7 +172,9 @@ class DeadlockDetector:
                 return future.result(timeout=self.timeout_seconds)
             except FuturesTimeoutError:
                 self.deadlock_detected = True
-                raise TimeoutError(f"Potential deadlock detected (timeout after {self.timeout_seconds}s)")
+                raise TimeoutError(
+                    f"Potential deadlock detected (timeout after {self.timeout_seconds}s)"
+                )
 
 
 # =============================================================================
@@ -185,9 +187,7 @@ class TestEventBackendConcurrencyStress:
 
     @pytest.mark.parametrize("num_threads", [10, 50, 100])
     @pytest.mark.parametrize("num_operations", [20, 100])
-    def test_concurrent_subscribe_unsubscribe(
-        self, event_backend, num_threads, num_operations
-    ):
+    def test_concurrent_subscribe_unsubscribe(self, event_backend, num_threads, num_operations):
         """Test concurrent subscribe and unsubscribe operations don't corrupt state.
 
         TDD: This test will FAIL until thread-safe subscription management is implemented.
@@ -237,10 +237,7 @@ class TestEventBackendConcurrencyStress:
             loop.close()
 
         # Run concurrent workers
-        threads = [
-            threading.Thread(target=subscribe_worker, args=(i,))
-            for i in range(num_threads)
-        ]
+        threads = [threading.Thread(target=subscribe_worker, args=(i,)) for i in range(num_threads)]
 
         for t in threads:
             t.start()
@@ -254,13 +251,13 @@ class TestEventBackendConcurrencyStress:
 
         # All subscriptions should be cleaned up
         final_count = event_backend.get_subscription_count()
-        assert final_count == 0, f"Expected 0 subscriptions, got {final_count} (orphaned subscriptions)"
+        assert (
+            final_count == 0
+        ), f"Expected 0 subscriptions, got {final_count} (orphaned subscriptions)"
 
     @pytest.mark.parametrize("num_publishers", [10, 50])
     @pytest.mark.parametrize("num_subscribers", [10, 50])
-    def test_concurrent_publish_subscribe(
-        self, event_backend, num_publishers, num_subscribers
-    ):
+    def test_concurrent_publish_subscribe(self, event_backend, num_publishers, num_subscribers):
         """Test concurrent publishing and subscribing don't cause missed events.
 
         TDD: This test will FAIL until thread-safe event dispatching is implemented.
@@ -324,8 +321,7 @@ class TestEventBackendConcurrencyStress:
 
         # Start subscribers first
         subscriber_threads = [
-            threading.Thread(target=subscriber_worker, args=(i,))
-            for i in range(num_subscribers)
+            threading.Thread(target=subscriber_worker, args=(i,)) for i in range(num_subscribers)
         ]
 
         for t in subscriber_threads:
@@ -335,8 +331,7 @@ class TestEventBackendConcurrencyStress:
 
         # Start publishers
         publisher_threads = [
-            threading.Thread(target=publisher_worker, args=(i,))
-            for i in range(num_publishers)
+            threading.Thread(target=publisher_worker, args=(i,)) for i in range(num_publishers)
         ]
 
         for t in publisher_threads:
@@ -389,6 +384,7 @@ class TestEventBackendConcurrencyStress:
 
             for i in range(100):
                 try:
+
                     async def _subscribe():
                         handle = await backend.subscribe(f"temp.{i}", lambda e: None)
                         return handle
@@ -582,9 +578,9 @@ class TestEmbeddingCacheConcurrencyStress:
                 except Exception as e:
                     errors.append(("clearer", 0, e))
 
-        threads = [
-            threading.Thread(target=populator, args=(i,)) for i in range(10)
-        ] + [threading.Thread(target=clearer) for _ in range(3)]
+        threads = [threading.Thread(target=populator, args=(i,)) for i in range(10)] + [
+            threading.Thread(target=clearer) for _ in range(3)
+        ]
 
         for t in threads:
             t.start()
@@ -673,9 +669,9 @@ class TestToolPipelineMetricsConcurrency:
 
         # Verify per-tool counts match total
         tool_sum = sum(metrics.tool_counts.values())
-        assert tool_sum == expected_total, (
-            f"Tool counts sum {tool_sum} doesn't match total {expected_total}"
-        )
+        assert (
+            tool_sum == expected_total
+        ), f"Tool counts sum {tool_sum} doesn't match total {expected_total}"
 
     def test_concurrent_execution_time_tracking(self, execution_metrics):
         """Test concurrent execution time updates maintain statistics.
@@ -721,9 +717,9 @@ class TestToolPipelineMetricsConcurrency:
         assert 0.001 <= avg <= 1.0, f"Average time invalid: {avg}"
 
         # Verify time list size matches total
-        assert len(metrics.execution_times) == 2000, (
-            f"Time list size {len(metrics.execution_times)} doesn't match total {metrics.total_executions}"
-        )
+        assert (
+            len(metrics.execution_times) == 2000
+        ), f"Time list size {len(metrics.execution_times)} doesn't match total {metrics.total_executions}"
 
     def test_concurrent_metrics_reset(self, execution_metrics):
         """Test concurrent reset doesn't corrupt metrics state.
@@ -768,9 +764,9 @@ class TestToolPipelineMetricsConcurrency:
                 except Exception as e:
                     errors.append(("resetter", 0, e))
 
-        threads = [
-            threading.Thread(target=recorder, args=(i,)) for i in range(10)
-        ] + [threading.Thread(target=resetter)]
+        threads = [threading.Thread(target=recorder, args=(i,)) for i in range(10)] + [
+            threading.Thread(target=resetter)
+        ]
 
         for t in threads:
             t.start()
@@ -843,9 +839,9 @@ class TestServiceContainerConcurrency:
         # Verify all services registered
         expected_count = num_threads * 10
         registered_types = container.get_registered_types()
-        assert len(registered_types) == expected_count, (
-            f"Expected {expected_count} services, got {len(registered_types)}"
-        )
+        assert (
+            len(registered_types) == expected_count
+        ), f"Expected {expected_count} services, got {len(registered_types)}"
 
     def test_concurrent_singleton_resolution(self, service_container):
         """Test concurrent singleton resolution maintains single instance.
@@ -888,9 +884,9 @@ class TestServiceContainerConcurrency:
             t.join(timeout=20)
 
         # Verify only one instance was created
-        assert len(instances_created) == 1, (
-            f"Expected 1 instance created, got {len(instances_created)}: {instances_created}"
-        )
+        assert (
+            len(instances_created) == 1
+        ), f"Expected 1 instance created, got {len(instances_created)}: {instances_created}"
 
         # Verify all resolutions returned same instance
         assert len(instance_ids) == 1, f"Got multiple different instances: {len(instance_ids)}"
@@ -926,9 +922,9 @@ class TestServiceContainerConcurrency:
 
         # Each resolution should create new instance
         expected_instances = 10 * 20
-        assert instance_count[0] == expected_instances, (
-            f"Expected {expected_instances} instances, got {instance_count[0]}"
-        )
+        assert (
+            instance_count[0] == expected_instances
+        ), f"Expected {expected_instances} instances, got {instance_count[0]}"
 
 
 # =============================================================================
@@ -960,12 +956,16 @@ class TestDeadlockDetection:
                     try:
                         # Mix of subscribe, publish, unsubscribe
                         if i % 3 == 0:
+
                             async def _subscribe():
-                                return await backend.subscribe(f"test.{worker_id}.*", lambda e: None)
+                                return await backend.subscribe(
+                                    f"test.{worker_id}.*", lambda e: None
+                                )
 
                             loop.run_until_complete(_subscribe())
 
                         elif i % 3 == 1:
+
                             async def _publish():
                                 return await backend.publish(
                                     MessagingEvent(
@@ -1100,7 +1100,9 @@ class TestDataStructureCorruption:
         # No duplicate keys
         keys = list(cache._cache.keys())
         unique_keys = set(keys)
-        assert len(keys) == len(unique_keys), f"Duplicate keys detected: {len(keys) - len(unique_keys)}"
+        assert len(keys) == len(
+            unique_keys
+        ), f"Duplicate keys detected: {len(keys) - len(unique_keys)}"
 
         # All values are accessible
         for key in keys[:10]:  # Check first 10
@@ -1135,9 +1137,9 @@ class TestDataStructureCorruption:
 
         # Verify dict integrity
         total_counted = sum(metrics.tool_counts.values())
-        assert total_counted == metrics.total_executions, (
-            f"Dict corruption: tool_counts sum {total_counted} != total {metrics.total_executions}"
-        )
+        assert (
+            total_counted == metrics.total_executions
+        ), f"Dict corruption: tool_counts sum {total_counted} != total {metrics.total_executions}"
 
         # Verify all keys are strings
         for key in metrics.tool_counts.keys():
@@ -1170,9 +1172,9 @@ class TestDataStructureCorruption:
 
         # Verify list integrity
         expected_length = 20 * 200
-        assert len(metrics.execution_times) == expected_length, (
-            f"List corruption: length {len(metrics.execution_times)} != expected {expected_length}"
-        )
+        assert (
+            len(metrics.execution_times) == expected_length
+        ), f"List corruption: length {len(metrics.execution_times)} != expected {expected_length}"
 
         # Verify all entries are valid
         for t in metrics.execution_times:
@@ -1199,6 +1201,7 @@ class TestHighConcurrencyScenarios:
             asyncio.set_event_loop(loop)
 
             try:
+
                 async def _subscribe():
                     handle = await backend.subscribe(
                         f"high_concurrency.{worker_id}",
@@ -1272,6 +1275,6 @@ class TestHighConcurrencyScenarios:
 
         # Verify consistency
         expected_total = 150 * 200
-        assert metrics.total_executions == expected_total, (
-            f"Total mismatch: {metrics.total_executions} vs {expected_total}"
-        )
+        assert (
+            metrics.total_executions == expected_total
+        ), f"Total mismatch: {metrics.total_executions} vs {expected_total}"

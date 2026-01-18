@@ -590,9 +590,7 @@ class TestToolExecutionCoordinatorValidation:
     async def test_validate_tool_access_denied(self, coordinator):
         """Test validation when tool access is denied."""
         access_checker = Mock(
-            return_value=ToolAccessDecision(
-                allowed=False, reason="Tool not available"
-            )
+            return_value=ToolAccessDecision(allowed=False, reason="Tool not available")
         )
         coordinator._tool_access_checker = access_checker
 
@@ -690,9 +688,7 @@ class TestToolExecutionCoordinatorRetryLogic:
     async def test_no_retry_on_permanent_error(self, coordinator, mock_executor):
         """Test that permanent errors are not retried."""
         mock_executor.execute = AsyncMock(
-            return_value=MagicMock(
-                success=False, error="Invalid argument: Missing required field"
-            )
+            return_value=MagicMock(success=False, error="Invalid argument: Missing required field")
         )
 
         tool_calls = [{"name": "validation_tool", "arguments": {}}]
@@ -719,7 +715,9 @@ class TestToolExecutionCoordinatorRetryLogic:
         assert mock_executor.execute.call_count == 3  # Max attempts
 
     @pytest.mark.asyncio
-    async def test_retry_disabled(self, mock_executor, mock_registry, mock_normalizer, mock_adapter):
+    async def test_retry_disabled(
+        self, mock_executor, mock_registry, mock_normalizer, mock_adapter
+    ):
         """Test that retries are disabled when configured."""
         config = ToolExecutionConfig(retry_enabled=False)
 
@@ -841,7 +839,7 @@ class TestToolExecutionCoordinatorCache:
         # Verify cache invalidation was triggered after successful execution
         # The invalidate_related_cache is called internally after success
         # We can verify this indirectly by checking the method exists on cache
-        assert hasattr(mock_cache, 'invalidate_paths')
+        assert hasattr(mock_cache, "invalidate_paths")
 
     @pytest.mark.asyncio
     async def test_cache_invalidation_on_execute_bash(self, coordinator, mock_cache):
@@ -854,7 +852,7 @@ class TestToolExecutionCoordinatorCache:
 
         # Verify that cache has the clear_namespaces method available
         # The actual invalidation happens in _invalidate_related_cache
-        assert hasattr(mock_cache, 'clear_namespaces')
+        assert hasattr(mock_cache, "clear_namespaces")
 
 
 class TestToolExecutionCoordinatorStatistics:
@@ -1233,14 +1231,14 @@ class TestToolExecutionCoordinatorResultFormatting:
 
     def test_format_tool_output_default(self, coordinator):
         """Test default tool output formatting."""
-        output = coordinator.format_tool_output(
-            "test_tool", {"arg": "value"}, "result"
-        )
+        output = coordinator.format_tool_output("test_tool", {"arg": "value"}, "result")
 
         assert "test_tool" in output
         assert "result" in output
 
-    def test_format_tool_output_custom_formatter(self, mock_executor, mock_registry, mock_normalizer, mock_adapter):
+    def test_format_tool_output_custom_formatter(
+        self, mock_executor, mock_registry, mock_normalizer, mock_adapter
+    ):
         """Test custom tool output formatter."""
         mock_formatter = Mock()
         mock_formatter.format_tool_output = Mock(return_value="Custom formatted output")
@@ -1481,9 +1479,10 @@ class TestToolExecutionCoordinatorEdgeCases:
     @pytest.mark.asyncio
     async def test_mixed_success_and_failure(self, coordinator, mock_executor):
         """Test handling mixed successful and failed calls."""
+
         # Create a function that returns different results based on tool name
         def execute_side_effect(*args, **kwargs):
-            tool_name = kwargs.get('tool_name') or (args[0] if args else None)
+            tool_name = kwargs.get("tool_name") or (args[0] if args else None)
             if tool_name == "tool2":
                 return MagicMock(success=False, error="Tool failed")
             return MagicMock(success=True, result="output", error=None)

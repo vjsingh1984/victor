@@ -1093,7 +1093,9 @@ class OrchestratorServiceProvider:
         # Get unified embedding model from settings for consistency
         # Use unified_embedding_model (default: BAAI/bge-small-en-v1.5)
         # This ensures parity across all LLM providers for semantic search
-        embedding_model = getattr(self._settings, "unified_embedding_model", "BAAI/bge-small-en-v1.5")
+        embedding_model = getattr(
+            self._settings, "unified_embedding_model", "BAAI/bge-small-en-v1.5"
+        )
         use_semantic_selection = getattr(self._settings, "use_semantic_tool_selection", True)
 
         if not use_semantic_selection:
@@ -1118,7 +1120,7 @@ class OrchestratorServiceProvider:
         # Using different embedding models per provider would break parity and cause inconsistent behavior
         return SemanticToolSelector(
             embedding_model=embedding_model,
-            embedding_provider='sentence-transformers',
+            embedding_provider="sentence-transformers",
         )
 
     def _create_provider_registry(self) -> Any:

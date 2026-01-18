@@ -8,7 +8,9 @@ from victor.config.settings import Settings
 from victor.tools.decorators import tool
 
 
-@pytest.mark.skip(reason="Tests deprecated SemanticToolSelector API. The new unified tool selection strategy factory does not have the same embedding preloading mechanism. This test should be rewritten for the new architecture or removed.")
+@pytest.mark.skip(
+    reason="Tests deprecated SemanticToolSelector API. The new unified tool selection strategy factory does not have the same embedding preloading mechanism. This test should be rewritten for the new architecture or removed."
+)
 @pytest.mark.asyncio
 async def test_embedding_preloading_reduces_latency():
     """

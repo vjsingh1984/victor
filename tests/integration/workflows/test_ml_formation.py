@@ -375,8 +375,7 @@ class TestFeatureExtractor:
 
 
 @pytest.mark.skipif(
-    True,  # Skip by default as it requires scikit-learn
-    reason="Requires scikit-learn installation"
+    True, reason="Requires scikit-learn installation"  # Skip by default as it requires scikit-learn
 )
 class TestModelTrainer:
     """Test suite for ModelTrainer."""
@@ -470,8 +469,7 @@ class TestModelTrainer:
 
 
 @pytest.mark.skipif(
-    True,  # Skip by default as it requires scikit-learn
-    reason="Requires scikit-learn installation"
+    True, reason="Requires scikit-learn installation"  # Skip by default as it requires scikit-learn
 )
 class TestAdaptiveFormationML:
     """Test suite for AdaptiveFormationML."""
@@ -501,9 +499,7 @@ class TestAdaptiveFormationML:
         assert formation in ["sequential", "parallel", "hierarchical", "pipeline", "consensus"]
 
     @pytest.mark.asyncio
-    async def test_predict_formation_with_scores(
-        self, sample_task, team_context, mock_agents
-    ):
+    async def test_predict_formation_with_scores(self, sample_task, team_context, mock_agents):
         """Test prediction with formation scores."""
         selector = AdaptiveFormationML(model_path=None)
 
@@ -596,7 +592,9 @@ class TestAdaptiveFormationML:
             assert "urgency" in importance
             assert all(isinstance(v, float) for v in importance.values())
 
-    async def test_save_online_learning_data(self, sample_task, team_context, mock_agents, tmp_path):
+    async def test_save_online_learning_data(
+        self, sample_task, team_context, mock_agents, tmp_path
+    ):
         """Test saving online learning data."""
         selector = AdaptiveFormationML(
             model_path=None, enable_online_learning=True, online_learning_threshold=100
@@ -632,8 +630,7 @@ class TestAdaptiveFormationML:
 
 
 @pytest.mark.skipif(
-    True,  # Skip by default as it requires scikit-learn
-    reason="Requires scikit-learn installation"
+    True, reason="Requires scikit-learn installation"  # Skip by default as it requires scikit-learn
 )
 class TestMLFormationIntegration:
     """Integration tests for ML formation selection."""

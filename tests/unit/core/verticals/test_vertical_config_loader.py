@@ -105,7 +105,7 @@ provider_hints:
     @pytest.fixture
     def config_file(self, sample_yaml_config):
         """Create a temporary YAML config file."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(sample_yaml_config)
             config_path = Path(f.name)
 
@@ -132,10 +132,7 @@ provider_hints:
         """VerticalConfigLoader should load tools list."""
         config = loader.load_vertical_config("coding", config_file)
 
-        assert config.tools == [
-            "read", "write", "edit", "grep",
-            "code_search", "test", "git"
-        ]
+        assert config.tools == ["read", "write", "edit", "grep", "code_search", "test", "git"]
 
     def test_load_system_prompt_from_yaml(self, loader, config_file):
         """VerticalConfigLoader should load system prompt config."""
@@ -143,7 +140,7 @@ provider_hints:
 
         assert config.system_prompt_config == {
             "source": "file",
-            "path": "prompts/coding_system_prompt.txt"
+            "path": "prompts/coding_system_prompt.txt",
         }
 
     def test_load_stages_from_yaml(self, loader, config_file):
@@ -172,18 +169,13 @@ provider_hints:
         """VerticalConfigLoader should load safety extension config."""
         config = loader.load_vertical_config("coding", config_file)
 
-        assert config.safety_extension == {
-            "class": "victor.coding.safety.CodingSafetyExtension"
-        }
+        assert config.safety_extension == {"class": "victor.coding.safety.CodingSafetyExtension"}
 
     def test_load_workflows_from_yaml(self, loader, config_file):
         """VerticalConfigLoader should load workflow config."""
         config = loader.load_vertical_config("coding", config_file)
 
-        assert config.workflows == {
-            "source": "directory",
-            "path": "workflows/"
-        }
+        assert config.workflows == {"source": "directory", "path": "workflows/"}
 
     def test_load_provider_hints_from_yaml(self, loader, config_file):
         """VerticalConfigLoader should load provider hints."""
@@ -215,14 +207,13 @@ tools:
                 """Add additional tools dynamically."""
                 # Add environment-specific tools
                 import os
+
                 if os.getenv("ENABLE_ADVANCED_TOOLS"):
                     return yaml_tools + ["advanced_tool"]
                 return yaml_tools
 
         config = loader.load_vertical_config(
-            "custom",
-            config_file,
-            escape_hatch_class=CustomVertical
+            "custom", config_file, escape_hatch_class=CustomVertical
         )
 
         # Should have base tools
@@ -268,7 +259,7 @@ class TestVerticalYAMLConfig:
             mode_config=None,
             tool_dependencies=None,
             workflows={"source": "directory"},
-            provider_hints={}
+            provider_hints={},
         )
 
         assert config.name == "coding"
@@ -289,7 +280,7 @@ class TestVerticalYAMLConfig:
             mode_config=None,
             tool_dependencies=None,
             workflows={},
-            provider_hints={}
+            provider_hints={},
         )
 
         config_dict = config.to_dict()

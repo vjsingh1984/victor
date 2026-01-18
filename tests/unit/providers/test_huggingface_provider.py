@@ -46,6 +46,7 @@ class TestHuggingFaceProviderInitialization:
                 provider = HuggingFaceProvider()
                 assert provider._api_key == ""
 
+
 class TestHuggingFaceProviderCapabilities:
     """Tests for HuggingFaceProvider capability reporting."""
 

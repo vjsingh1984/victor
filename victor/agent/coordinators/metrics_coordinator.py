@@ -386,6 +386,7 @@ class MetricsCoordinator:
         self._streaming_state.cancel_event = asyncio.Event()
 
         import time
+
         self._streaming_state.session_start_time = time.time()
 
         logger.debug("Streaming session started")
@@ -448,6 +449,7 @@ class MetricsCoordinator:
             return 0.0
 
         import time
+
         return time.time() - self._streaming_state.session_start_time
 
     @property

@@ -203,15 +203,11 @@ class TestStreamMetrics:
             },
         )
 
-    def test_finalize_stream_metrics_with_valid_metrics(
-        self, coordinator: MetricsCoordinator
-    ):
+    def test_finalize_stream_metrics_with_valid_metrics(self, coordinator: MetricsCoordinator):
         """Test finalize_stream_metrics records to cost tracker."""
         # Setup
         mock_metrics = MockStreamMetrics()
-        coordinator._metrics_collector.finalize_stream_metrics = Mock(
-            return_value=mock_metrics
-        )
+        coordinator._metrics_collector.finalize_stream_metrics = Mock(return_value=mock_metrics)
 
         # Execute
         result = coordinator.finalize_stream_metrics()
@@ -227,15 +223,11 @@ class TestStreamMetrics:
             tool_calls=2,
         )
 
-    def test_finalize_stream_metrics_with_usage_data(
-        self, coordinator: MetricsCoordinator
-    ):
+    def test_finalize_stream_metrics_with_usage_data(self, coordinator: MetricsCoordinator):
         """Test finalize_stream_metrics with usage data parameter."""
         # Setup
         mock_metrics = MockStreamMetrics()
-        coordinator._metrics_collector.finalize_stream_metrics = Mock(
-            return_value=mock_metrics
-        )
+        coordinator._metrics_collector.finalize_stream_metrics = Mock(return_value=mock_metrics)
         usage_data = {"prompt_tokens": 200, "completion_tokens": 100}
 
         # Execute
@@ -243,13 +235,9 @@ class TestStreamMetrics:
 
         # Assert
         assert result == mock_metrics
-        coordinator._metrics_collector.finalize_stream_metrics.assert_called_once_with(
-            usage_data
-        )
+        coordinator._metrics_collector.finalize_stream_metrics.assert_called_once_with(usage_data)
 
-    def test_finalize_stream_metrics_with_none_result(
-        self, coordinator: MetricsCoordinator
-    ):
+    def test_finalize_stream_metrics_with_none_result(self, coordinator: MetricsCoordinator):
         """Test finalize_stream_metrics when collector returns None."""
         # Setup
         coordinator._metrics_collector.finalize_stream_metrics = Mock(return_value=None)
@@ -265,9 +253,7 @@ class TestStreamMetrics:
         """Test get_last_stream_metrics delegates to collector."""
         # Setup
         mock_metrics = MockStreamMetrics()
-        coordinator._metrics_collector.get_last_stream_metrics = Mock(
-            return_value=mock_metrics
-        )
+        coordinator._metrics_collector.get_last_stream_metrics = Mock(return_value=mock_metrics)
 
         # Execute
         result = coordinator.get_last_stream_metrics()
@@ -280,9 +266,7 @@ class TestStreamMetrics:
         """Test get_streaming_metrics_summary delegates to collector."""
         # Setup
         summary = {"total_duration": 10.5, "tokens_per_second": 15.3}
-        coordinator._metrics_collector.get_streaming_metrics_summary = Mock(
-            return_value=summary
-        )
+        coordinator._metrics_collector.get_streaming_metrics_summary = Mock(return_value=summary)
 
         # Execute
         result = coordinator.get_streaming_metrics_summary()
@@ -298,37 +282,27 @@ class TestStreamMetrics:
             {"request_id": "1", "duration": 1.0},
             {"request_id": "2", "duration": 1.5},
         ]
-        coordinator._metrics_collector.get_streaming_metrics_history = Mock(
-            return_value=history
-        )
+        coordinator._metrics_collector.get_streaming_metrics_history = Mock(return_value=history)
 
         # Execute
         result = coordinator.get_streaming_metrics_history()
 
         # Assert
         assert result == history
-        coordinator._metrics_collector.get_streaming_metrics_history.assert_called_once_with(
-            10
-        )
+        coordinator._metrics_collector.get_streaming_metrics_history.assert_called_once_with(10)
 
-    def test_get_streaming_metrics_history_with_custom_limit(
-        self, coordinator: MetricsCoordinator
-    ):
+    def test_get_streaming_metrics_history_with_custom_limit(self, coordinator: MetricsCoordinator):
         """Test get_streaming_metrics_history with custom limit."""
         # Setup
         history = [{"request_id": "1", "duration": 1.0}]
-        coordinator._metrics_collector.get_streaming_metrics_history = Mock(
-            return_value=history
-        )
+        coordinator._metrics_collector.get_streaming_metrics_history = Mock(return_value=history)
 
         # Execute
         result = coordinator.get_streaming_metrics_history(limit=5)
 
         # Assert
         assert result == history
-        coordinator._metrics_collector.get_streaming_metrics_history.assert_called_once_with(
-            5
-        )
+        coordinator._metrics_collector.get_streaming_metrics_history.assert_called_once_with(5)
 
 
 class TestCostTracking:
@@ -365,9 +339,7 @@ class TestCostTracking:
     def test_get_session_cost_formatted(self, coordinator: MetricsCoordinator):
         """Test get_session_cost_formatted returns formatted string."""
         # Setup
-        coordinator._session_cost_tracker.format_inline_cost = Mock(
-            return_value="$0.0123"
-        )
+        coordinator._session_cost_tracker.format_inline_cost = Mock(return_value="$0.0123")
 
         # Execute
         result = coordinator.get_session_cost_formatted()
@@ -403,9 +375,7 @@ class TestCostTracking:
         args = coordinator._session_cost_tracker.export_csv.call_args[0]
         assert isinstance(args[0], Path)
 
-    def test_export_session_costs_default_format(
-        self, coordinator: MetricsCoordinator, tmp_path
-    ):
+    def test_export_session_costs_default_format(self, coordinator: MetricsCoordinator, tmp_path):
         """Test export_session_costs defaults to JSON format."""
         # Setup
         output_path = tmp_path / "costs.txt"
@@ -544,9 +514,7 @@ class TestTokenUsage:
         assert coordinator._cumulative_token_usage["prompt_tokens"] == 125
         assert coordinator._cumulative_token_usage["completion_tokens"] == 50
 
-    def test_update_cumulative_token_usage_with_cache_tokens(
-        self, coordinator: MetricsCoordinator
-    ):
+    def test_update_cumulative_token_usage_with_cache_tokens(self, coordinator: MetricsCoordinator):
         """Test update_cumulative_token_usage with cache tokens."""
         # Setup
         usage_data = {
@@ -634,9 +602,7 @@ class TestToolUsageStats:
             conversation_state_summary=None
         )
 
-    def test_get_tool_usage_stats_with_conversation_summary(
-        self, coordinator: MetricsCoordinator
-    ):
+    def test_get_tool_usage_stats_with_conversation_summary(self, coordinator: MetricsCoordinator):
         """Test get_tool_usage_stats with conversation state."""
         # Setup
         conversation_summary = {"total_messages": 10, "iterations": 3}
@@ -677,16 +643,12 @@ class TestMetricsCollectorDelegation:
         coordinator.record_tool_selection(method="semantic", num_tools=5)
 
         # Assert
-        coordinator._metrics_collector.record_tool_selection.assert_called_once_with(
-            "semantic", 5
-        )
+        coordinator._metrics_collector.record_tool_selection.assert_called_once_with("semantic", 5)
 
     def test_record_tool_execution(self, coordinator: MetricsCoordinator):
         """Test record_tool_execution delegates to collector."""
         # Execute
-        coordinator.record_tool_execution(
-            tool_name="read_file", success=True, elapsed_ms=123.45
-        )
+        coordinator.record_tool_execution(tool_name="read_file", success=True, elapsed_ms=123.45)
 
         # Assert
         coordinator._metrics_collector.record_tool_execution.assert_called_once_with(
@@ -814,9 +776,7 @@ class TestStreamingStateManagement:
         assert coordinator.cancel_event is not None
         assert coordinator._streaming_state.session_start_time is not None
 
-    def test_start_streaming_creates_new_cancel_event(
-        self, coordinator: MetricsCoordinator
-    ):
+    def test_start_streaming_creates_new_cancel_event(self, coordinator: MetricsCoordinator):
         """Test that start_streaming creates a new cancellation event."""
         # Execute
         coordinator.start_streaming()
@@ -843,9 +803,7 @@ class TestStreamingStateManagement:
         assert coordinator.cancel_event is None
         assert coordinator._streaming_state.session_start_time is None
 
-    def test_is_streaming_returns_false_initially(
-        self, coordinator: MetricsCoordinator
-    ):
+    def test_is_streaming_returns_false_initially(self, coordinator: MetricsCoordinator):
         """Test is_streaming returns False before starting."""
         # Execute
         result = coordinator.is_streaming()
@@ -853,9 +811,7 @@ class TestStreamingStateManagement:
         # Assert
         assert result is False
 
-    def test_is_streaming_returns_true_when_active(
-        self, coordinator: MetricsCoordinator
-    ):
+    def test_is_streaming_returns_true_when_active(self, coordinator: MetricsCoordinator):
         """Test is_streaming returns True when streaming."""
         # Setup
         coordinator.start_streaming()
@@ -866,9 +822,7 @@ class TestStreamingStateManagement:
         # Assert
         assert result is True
 
-    def test_is_streaming_returns_false_after_stopping(
-        self, coordinator: MetricsCoordinator
-    ):
+    def test_is_streaming_returns_false_after_stopping(self, coordinator: MetricsCoordinator):
         """Test is_streaming returns False after stopping."""
         # Setup
         coordinator.start_streaming()
@@ -880,9 +834,7 @@ class TestStreamingStateManagement:
         # Assert
         assert result is False
 
-    def test_request_cancellation_when_streaming(
-        self, coordinator: MetricsCoordinator
-    ):
+    def test_request_cancellation_when_streaming(self, coordinator: MetricsCoordinator):
         """Test request_cancellation sets cancel event when streaming."""
         # Setup
         coordinator.start_streaming()
@@ -893,9 +845,7 @@ class TestStreamingStateManagement:
         # Assert
         assert coordinator.is_cancellation_requested() is True
 
-    def test_request_cancellation_when_not_streaming(
-        self, coordinator: MetricsCoordinator
-    ):
+    def test_request_cancellation_when_not_streaming(self, coordinator: MetricsCoordinator):
         """Test request_cancellation is safe when not streaming."""
         # Execute - should not raise
         coordinator.request_cancellation()
@@ -1005,9 +955,7 @@ class TestStreamingStateManagement:
         # Assert - session_start_time is cleared after stopping
         assert elapsed == 0.0
 
-    def test_cancel_event_property_returns_none_initially(
-        self, coordinator: MetricsCoordinator
-    ):
+    def test_cancel_event_property_returns_none_initially(self, coordinator: MetricsCoordinator):
         """Test cancel_event property returns None initially."""
         # Execute
         result = coordinator.cancel_event
@@ -1098,9 +1046,7 @@ class TestMetricsCoordinatorIntegration:
 
         # Finalize metrics
         mock_metrics = MockStreamMetrics()
-        coordinator._metrics_collector.finalize_stream_metrics = Mock(
-            return_value=mock_metrics
-        )
+        coordinator._metrics_collector.finalize_stream_metrics = Mock(return_value=mock_metrics)
 
         result = coordinator.finalize_stream_metrics()
 
@@ -1159,9 +1105,7 @@ class TestMetricsCoordinatorIntegration:
         coordinator.stop_streaming()
         assert coordinator.is_streaming() is False
 
-    def test_export_and_format_cost_workflow(
-        self, coordinator: MetricsCoordinator, tmp_path
-    ):
+    def test_export_and_format_cost_workflow(self, coordinator: MetricsCoordinator, tmp_path):
         """Test workflow of formatting and exporting costs."""
         # Setup mock cost tracker
         coordinator._session_cost_tracker.get_summary = Mock(

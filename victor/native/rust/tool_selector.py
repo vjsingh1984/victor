@@ -209,9 +209,7 @@ class ToolSelectorAccelerator(InstrumentedAccelerator):
             top_k_indices = indices[np.argsort(arr[indices])[::-1]]
             return top_k_indices.tolist()
 
-    def topk_with_scores(
-        self, scores: List[float], k: int
-    ) -> List[Tuple[int, float]]:
+    def topk_with_scores(self, scores: List[float], k: int) -> List[Tuple[int, float]]:
         """Select top-k (index, score) pairs from scores.
 
         Args:
@@ -241,9 +239,7 @@ class ToolSelectorAccelerator(InstrumentedAccelerator):
         else:
             return self._python_topk_with_scores(scores, k)
 
-    def _python_topk_with_scores(
-        self, scores: List[float], k: int
-    ) -> List[Tuple[int, float]]:
+    def _python_topk_with_scores(self, scores: List[float], k: int) -> List[Tuple[int, float]]:
         """Python fallback for top-k with scores."""
         with self._timed_call("topk_with_scores_python"):
             indices = self._python_topk_indices(scores, k)
@@ -279,7 +275,9 @@ class ToolSelectorAccelerator(InstrumentedAccelerator):
                     )
             except Exception as e:
                 logger.error(f"Rust filter_by_category failed: {e}")
-                return self._python_filter_by_category(tools, available_categories, tool_category_map)
+                return self._python_filter_by_category(
+                    tools, available_categories, tool_category_map
+                )
         else:
             return self._python_filter_by_category(tools, available_categories, tool_category_map)
 
@@ -294,11 +292,7 @@ class ToolSelectorAccelerator(InstrumentedAccelerator):
         Uses list comprehension with set membership check.
         """
         with self._timed_call("filter_by_category_python"):
-            return [
-                tool
-                for tool in tools
-                if tool_category_map.get(tool) in available_categories
-            ]
+            return [tool for tool in tools if tool_category_map.get(tool) in available_categories]
 
     def filter_and_rank(
         self,
@@ -329,13 +323,12 @@ class ToolSelectorAccelerator(InstrumentedAccelerator):
             Combined operation is ~20-30% faster than separate calls
         """
         if len(tools) != len(tool_names):
-            raise ValueError(
-                f"Length mismatch: {len(tools)} tools vs {len(tool_names)} names"
-            )
+            raise ValueError(f"Length mismatch: {len(tools)} tools vs {len(tool_names)} names")
 
         # Filter by category first (reduces work for similarity computation)
         filtered_indices = [
-            i for i, name in enumerate(tool_names)
+            i
+            for i, name in enumerate(tool_names)
             if tool_category_map.get(name) in available_categories
         ]
 
@@ -351,10 +344,7 @@ class ToolSelectorAccelerator(InstrumentedAccelerator):
         top_indices = self.topk_indices(similarities, top_k)
 
         # Map back to tool names
-        return [
-            (tool_names[filtered_indices[idx]], similarities[idx])
-            for idx in top_indices
-        ]
+        return [(tool_names[filtered_indices[idx]], similarities[idx]) for idx in top_indices]
 
     @property
     def rust_available(self) -> bool:

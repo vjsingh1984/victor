@@ -77,6 +77,7 @@ logger = logging.getLogger(__name__)
 
 class NodeStatus(Enum):
     """Status of a workflow node execution."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -87,6 +88,7 @@ class NodeStatus(Enum):
 
 class ExecutionEventType(Enum):
     """Types of execution events."""
+
     WORKFLOW_STARTED = "workflow_started"
     WORKFLOW_COMPLETED = "workflow_completed"
     WORKFLOW_FAILED = "workflow_failed"
@@ -106,6 +108,7 @@ class ExecutionEventType(Enum):
 
 class ErrorRecoveryStrategy(Enum):
     """Error recovery strategies."""
+
     FAIL_FAST = "fail_fast"  # Stop execution immediately
     RETRY = "retry"  # Retry failed nodes
     CONTINUE = "continue"  # Continue to next node
@@ -133,6 +136,7 @@ class NodeExecutionEvent:
         duration_seconds: Execution time
         metadata: Additional event metadata
     """
+
     node_id: str
     event_type: ExecutionEventType
     timestamp: float
@@ -154,6 +158,7 @@ class Breakpoint:
         hit_count: Number of times breakpoint was hit
         enabled: Whether breakpoint is enabled
     """
+
     node_id: str
     condition: Optional[Callable[[Dict[str, Any]], bool]] = None
     hit_count: int = 0
@@ -173,6 +178,7 @@ class ExecutionSnapshot:
         breakpoints_hit: Breakpoints hit so far
         errors: Errors encountered
     """
+
     execution_id: str
     timestamp: float
     current_node: Optional[str]
@@ -197,6 +203,7 @@ class ExecutionMetrics:
         error_count: Total errors
         breakpoint_hits: Number of breakpoint hits
     """
+
     total_duration_seconds: float = 0.0
     node_count: int = 0
     nodes_executed: int = 0
@@ -224,6 +231,7 @@ class ExecutionContext:
         snapshots: Execution snapshots
         metrics: Execution metrics
     """
+
     execution_id: str
     workflow_name: str
     start_time: float
@@ -282,9 +290,7 @@ class ExecutionTrace:
         """
         return [e for e in self.events if e.node_id == node_id]
 
-    def get_events_by_type(
-        self, event_type: ExecutionEventType
-    ) -> List[NodeExecutionEvent]:
+    def get_events_by_type(self, event_type: ExecutionEventType) -> List[NodeExecutionEvent]:
         """Get all events of a specific type.
 
         Args:
@@ -339,9 +345,7 @@ class ExecutionTrace:
         """
         event_counts = {}
         for event in self.events:
-            event_counts[event.event_type.value] = (
-                event_counts.get(event.event_type.value, 0) + 1
-            )
+            event_counts[event.event_type.value] = event_counts.get(event.event_type.value, 0) + 1
 
         node_counts = {}
         error_count = 0
@@ -394,6 +398,7 @@ class StateManager:
         """
         # Create deep copy to avoid mutation
         import copy
+
         state_copy = copy.deepcopy(state)
 
         snapshot = {
@@ -421,9 +426,7 @@ class StateManager:
         lines.append("=" * 60)
 
         # Filter internal keys
-        display_state = {
-            k: v for k, v in state.items() if not k.startswith("_")
-        }
+        display_state = {k: v for k, v in state.items() if not k.startswith("_")}
 
         for key, value in display_state.items():
             # Truncate long values
@@ -576,9 +579,7 @@ class ErrorRecovery:
                     )
 
                     # Exponential backoff
-                    delay = self.retry_delay_seconds * (
-                        self.backoff_multiplier ** (attempt - 1)
-                    )
+                    delay = self.retry_delay_seconds * (self.backoff_multiplier ** (attempt - 1))
                     logger.info(f"Retrying node {node_id} (attempt {attempt}), delay: {delay}s")
                     await asyncio.sleep(delay)
 
@@ -666,9 +667,7 @@ class ExecutionHistory:
         }
 
         # Save to file
-        output_path = (
-            self.storage_path / f"{workflow_name}_{execution_id}.json"
-        )
+        output_path = self.storage_path / f"{workflow_name}_{execution_id}.json"
         output_path.write_text(json.dumps(execution_data, indent=2, default=str))
 
         logger.info(f"Execution history saved to {output_path}")

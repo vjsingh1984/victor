@@ -1264,9 +1264,7 @@ def list_presets(
             by_category = list_workflow_presets_by_category()
             if category not in by_category:
                 console.print(f"[bold red]Error:[/] Unknown category: {category}")
-                console.print(
-                    f"Available: {', '.join(sorted(by_category.keys()))}"
-                )
+                console.print(f"Available: {', '.join(sorted(by_category.keys()))}")
                 raise typer.Exit(1)
 
             workflow_names = by_category[category]
@@ -1290,9 +1288,7 @@ def list_presets(
 
                 console.print()
 
-    console.print(
-        "\n[dim]Usage: Use preset names in workflow YAML files or WorkflowBuilder API[/]"
-    )
+    console.print("\n[dim]Usage: Use preset names in workflow YAML files or WorkflowBuilder API[/]")
 
 
 @workflow_app.command("preset-info")
@@ -1345,15 +1341,16 @@ def show_preset_info(
 
         if preset.allowed_tools:
             table.add_row(
-                "Allowed Tools", ", ".join(preset.allowed_tools[:10]) + "..."
-                if len(preset.allowed_tools) > 10
-                else ", ".join(preset.allowed_tools)
+                "Allowed Tools",
+                (
+                    ", ".join(preset.allowed_tools[:10]) + "..."
+                    if len(preset.allowed_tools) > 10
+                    else ", ".join(preset.allowed_tools)
+                ),
             )
 
         if preset.llm_config:
-            table.add_row(
-                "LLM Config", ", ".join(f"{k}={v}" for k, v in preset.llm_config.items())
-            )
+            table.add_row("LLM Config", ", ".join(f"{k}={v}" for k, v in preset.llm_config.items()))
 
         console.print(table)
 
@@ -1399,9 +1396,7 @@ def show_preset_info(
             console.print("\n[bold]Example Context:[/]")
             import json
 
-            console.print(
-                json.dumps(preset.example_context, indent=2, default=str)[:500]
-            )
+            console.print(json.dumps(preset.example_context, indent=2, default=str)[:500])
 
         console.print("\n[bold]Usage Example:[/]")
         console.print(
@@ -1788,6 +1783,7 @@ def debug_workflow(
 
     # Set debug logging
     import logging
+
     level = getattr(logging, log_level.upper(), logging.DEBUG)
     logging.basicConfig(level=level, format="%(levelname)s: %(message)s")
 
@@ -1863,7 +1859,7 @@ def trace_workflow(
         None,
         "--context",
         "-c",
-        help='Initial context as JSON string',
+        help="Initial context as JSON string",
     ),
     trace_file: Optional[str] = typer.Option(
         None,
@@ -2022,7 +2018,9 @@ def show_history(
     table.add_column("Nodes", justify="right")
 
     for record in history:
-        timestamp = datetime.fromtimestamp(record.get("start_time", 0)).strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.fromtimestamp(record.get("start_time", 0)).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
         success_str = "[green]✓[/]" if record.get("success", True) else "[red]✗[/]"
 
         table.add_row(
@@ -2194,10 +2192,7 @@ def show_metrics(
         history = executor.get_history(limit=1000)
 
         # Filter by workflow
-        workflow_executions = [
-            h for h in history
-            if h.get("workflow_name") == workflow_name
-        ]
+        workflow_executions = [h for h in history if h.get("workflow_name") == workflow_name]
 
         if not workflow_executions:
             console.print(f"[dim]No executions found for workflow '{workflow_name}'[/]")
@@ -2235,7 +2230,11 @@ def show_metrics(
         console.print(f"[bold]Execution:[/] {execution_id}")
         console.print(f"  Workflow: {execution.get('workflow_name')}")
         console.print(f"  Duration: {execution.get('duration', 0):.2f}s")
-        console.print(f"  Success: [green]Yes[/]" if execution.get('success', True) else "  Success: [red]No[/]")
+        console.print(
+            f"  Success: [green]Yes[/]"
+            if execution.get("success", True)
+            else "  Success: [red]No[/]"
+        )
         console.print(f"  Nodes executed: {execution.get('nodes_executed', 0)}")
 
         metrics = execution.get("metrics", {})
@@ -2258,7 +2257,7 @@ def show_metrics(
                 "total_executions": len(workflow_executions) if workflow_name else 1,
                 "successful": successful if workflow_name else None,
                 "failed": failed if workflow_name else None,
-                "average_duration": sum(durations)/total if workflow_name else None,
+                "average_duration": sum(durations) / total if workflow_name else None,
             },
         }
 

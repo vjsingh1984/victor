@@ -37,12 +37,15 @@ def test_context_intelligence_builder_wires_components():
     orchestrator._conversation_controller = "conversation-controller"
     orchestrator.debug_logger = "debug-logger"
 
-    with patch(
-        "victor.agent.builders.context_intelligence_builder.get_task_analyzer",
-        return_value="task-analyzer",
-    ), patch(
-        "victor.agent.builders.context_intelligence_builder.create_context_manager",
-        return_value="context-manager",
+    with (
+        patch(
+            "victor.agent.builders.context_intelligence_builder.get_task_analyzer",
+            return_value="task-analyzer",
+        ),
+        patch(
+            "victor.agent.builders.context_intelligence_builder.create_context_manager",
+            return_value="context-manager",
+        ),
     ):
         builder = ContextIntelligenceBuilder(settings=settings, factory=factory)
         components = builder.build(orchestrator)

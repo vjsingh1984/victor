@@ -112,9 +112,7 @@ class ParameterInferenceError(Exception):
         self.correlation_id = str(uuid.uuid4())[:8]
 
         # Build detailed error message
-        error_parts = [
-            f"Cannot infer required parameter '{param_name}' for tool '{tool_name}'"
-        ]
+        error_parts = [f"Cannot infer required parameter '{param_name}' for tool '{tool_name}'"]
 
         if inference_strategy:
             error_parts.append(f"  Inference strategy: {inference_strategy}")

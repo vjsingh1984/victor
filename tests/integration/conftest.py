@@ -143,7 +143,6 @@ def test_conversation_long():
     return messages
 
 
-
 @pytest.fixture
 def mock_prompt_contributors():
     """Create mock prompt contributors for testing.
@@ -155,9 +154,7 @@ def mock_prompt_contributors():
     # System prompt contributor
     system_contributor = MagicMock()
     system_contributor.priority = MagicMock(return_value=100)
-    system_contributor.contribute = AsyncMock(
-        return_value="You are a helpful AI assistant."
-    )
+    system_contributor.contribute = AsyncMock(return_value="You are a helpful AI assistant.")
     contributors.append(system_contributor)
 
     # Task hint contributor
@@ -432,6 +429,7 @@ def integration_test_helpers():
 
     Returns a collection of utility functions for testing.
     """
+
     class Helpers:
         @staticmethod
         def assert_coordinator_interactions(

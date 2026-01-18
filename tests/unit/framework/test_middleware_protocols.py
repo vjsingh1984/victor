@@ -148,9 +148,7 @@ class SimpleTestMiddleware(BaseMiddleware):
         self.before_call_count = 0
         self.after_call_count = 0
 
-    async def before_tool_call(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
         """Track before_tool_call invocations."""
         self.before_call_count += 1
         self._logger.info(f"Before call: {tool_name}")
@@ -358,9 +356,7 @@ class ValidationTestMiddleware(BaseMiddleware):
         super().__init__(**kwargs)
         self.blocked_tools = blocked_tools or set()
 
-    async def before_tool_call(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
         """Block execution for specific tools."""
         if tool_name in self.blocked_tools:
             return MiddlewareResult(

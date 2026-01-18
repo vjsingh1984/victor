@@ -778,6 +778,7 @@ class ParallelExecutorHandler:
         Returns:
             Async task function
         """
+
         async def execute_tool(**kwargs: Any) -> Any:
             result = await tool_registry.execute(
                 tool_name,

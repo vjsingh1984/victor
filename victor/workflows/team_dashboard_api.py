@@ -43,6 +43,7 @@ try:
     from fastapi import FastAPI, HTTPException, Query
     from fastapi.responses import JSONResponse
     from pydantic import BaseModel, Field
+
     FASTAPI_AVAILABLE = True
 except ImportError:
     FASTAPI_AVAILABLE = False
@@ -281,14 +282,12 @@ class TeamDashboardAPI:
 
             # Convert member states
             member_states = {
-                k: MemberStatusResponse(**v.to_dict())
-                for k, v in state.member_states.items()
+                k: MemberStatusResponse(**v.to_dict()) for k, v in state.member_states.items()
             }
 
             # Convert communication logs
             communication_logs = [
-                CommunicationLogResponse(**log.to_dict())
-                for log in state.communication_logs
+                CommunicationLogResponse(**log.to_dict()) for log in state.communication_logs
             ]
 
             # Convert negotiation status
@@ -299,9 +298,9 @@ class TeamDashboardAPI:
                     success=result.success,
                     rounds=result.rounds,
                     consensus_achieved=result.consensus_achieved,
-                    agreed_proposal=result.agreed_proposal.__dict__
-                    if result.agreed_proposal
-                    else None,
+                    agreed_proposal=(
+                        result.agreed_proposal.__dict__ if result.agreed_proposal else None
+                    ),
                     votes=result.votes,
                 )
 
@@ -337,10 +336,7 @@ class TeamDashboardAPI:
             if not state:
                 raise HTTPException(status_code=404, detail="Execution not found")
 
-            return {
-                k: MemberStatusResponse(**v.to_dict())
-                for k, v in state.member_states.items()
-            }
+            return {k: MemberStatusResponse(**v.to_dict()) for k, v in state.member_states.items()}
 
         @self._dashboard_server.app.get(
             "/api/v1/executions/{execution_id}/members/{member_id}",
@@ -478,9 +474,7 @@ class TeamDashboardAPI:
                 success=result.success,
                 rounds=result.rounds,
                 consensus_achieved=result.consensus_achieved,
-                agreed_proposal=result.agreed_proposal.__dict__
-                if result.agreed_proposal
-                else None,
+                agreed_proposal=result.agreed_proposal.__dict__ if result.agreed_proposal else None,
                 votes=result.votes,
             )
 

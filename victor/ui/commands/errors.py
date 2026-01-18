@@ -245,9 +245,11 @@ def list_errors(
             error_info["name"],
             error_info["category"],
             error_info["severity"],
-            error_info["recovery_hint"][:50] + "..."
-            if len(error_info["recovery_hint"]) > 50
-            else error_info["recovery_hint"],
+            (
+                error_info["recovery_hint"][:50] + "..."
+                if len(error_info["recovery_hint"]) > 50
+                else error_info["recovery_hint"]
+            ),
         )
 
     console.print(table)
@@ -324,9 +326,7 @@ def show_error(
 
 @errors_app.command("stats")
 def show_stats(
-    timeframe: str = typer.Option(
-        "24h", "--timeframe", "-t", help="Timeframe: 1h, 24h, 7d"
-    ),
+    timeframe: str = typer.Option("24h", "--timeframe", "-t", help="Timeframe: 1h, 24h, 7d"),
 ) -> None:
     """Show error statistics and trends.
 
@@ -348,9 +348,7 @@ def show_stats(
         console.print(f"\n[bold]Top Error Types:[/]")
         for error_type, count in summary["most_common"][:10]:
             percentage = (count / summary["total_errors"]) * 100
-            console.print(
-                f"  {error_type}: {count} ({percentage:.1f}%)"
-            )
+            console.print(f"  {error_type}: {count} ({percentage:.1f}%)")
 
     # Error rates
     console.print(f"\n[bold]Error Rates (per hour):[/]")
@@ -372,12 +370,8 @@ def show_stats(
 
 @errors_app.command("export")
 def export_metrics(
-    output: str = typer.Argument(
-        "metrics.json", help="Output file path for metrics"
-    ),
-    format: str = typer.Option(
-        "json", "--format", "-f", help="Export format: json, csv"
-    ),
+    output: str = typer.Argument("metrics.json", help="Output file path for metrics"),
+    format: str = typer.Option("json", "--format", "-f", help="Export format: json, csv"),
 ) -> None:
     """Export error metrics to a file.
 
@@ -457,10 +451,13 @@ def open_docs() -> None:
         # Try to open in browser (works on macOS and some Linux systems)
         try:
             import webbrowser
+
             webbrowser.open(f"file://{docs_path.absolute()}")
             console.print("[dim]Opening in browser...[/]")
         except Exception:
-            console.print("[dim]Could not open browser. Use the path above to access documentation.[/]")
+            console.print(
+                "[dim]Could not open browser. Use the path above to access documentation.[/]"
+            )
     else:
         console.print("[yellow]Error documentation not found.[/]")
         console.print("[dim]Expected location: docs/errors.md[/]")

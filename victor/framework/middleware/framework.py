@@ -1452,9 +1452,7 @@ class CacheMiddleware(MiddlewareProtocol):
 
         return time.time() > expiry_time
 
-    async def before_tool_call(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> CacheResult:
+    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> CacheResult:
         """Check cache before tool execution.
 
         Args:
@@ -1549,9 +1547,8 @@ class CacheMiddleware(MiddlewareProtocol):
             # Try async invalidate (fire and forget)
             try:
                 import asyncio
-                asyncio.create_task(
-                    self._cache_backend.delete(cache_key, self._cache_namespace)
-                )
+
+                asyncio.create_task(self._cache_backend.delete(cache_key, self._cache_namespace))
             except Exception:
                 pass
 
@@ -1564,9 +1561,8 @@ class CacheMiddleware(MiddlewareProtocol):
             # Try async clear (fire and forget)
             try:
                 import asyncio
-                asyncio.create_task(
-                    self._cache_backend.clear(self._cache_namespace)
-                )
+
+                asyncio.create_task(self._cache_backend.clear(self._cache_namespace))
             except Exception:
                 pass
 
@@ -1583,12 +1579,12 @@ class CacheMiddleware(MiddlewareProtocol):
         import time
 
         current_time = time.time()
-        self._cache = {
-            k: v for k, v in self._cache.items() if current_time < v[1]
-        }
+        self._cache = {k: v for k, v in self._cache.items() if current_time < v[1]}
 
         total_entries = len(self._cache)
-        hit_rate = self._hits / (self._hits + self._misses) if (self._hits + self._misses) > 0 else 0.0
+        hit_rate = (
+            self._hits / (self._hits + self._misses) if (self._hits + self._misses) > 0 else 0.0
+        )
 
         return {
             "total_entries": total_entries,
@@ -1760,9 +1756,7 @@ class RateLimitMiddleware(MiddlewareProtocol):
 
         return max(0.0, window_end - current_time)
 
-    async def before_tool_call(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> RateLimitResult:
+    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> RateLimitResult:
         """Check rate limit before tool execution.
 
         Args:
@@ -1805,7 +1799,11 @@ class RateLimitMiddleware(MiddlewareProtocol):
         self._call_history[tool_name].append(current_time)
 
         return RateLimitResult(
-            proceed=True, blocked=False, retry_after_seconds=None, call_count=call_count + 1, limit=self._max_calls
+            proceed=True,
+            blocked=False,
+            retry_after_seconds=None,
+            call_count=call_count + 1,
+            limit=self._max_calls,
         )
 
     async def after_tool_call(
@@ -1961,9 +1959,7 @@ class ValidationMiddleware(MiddlewareProtocol):
             self._validate(schema, arguments)
             return MiddlewareResult(proceed=True)
         except ValueError as e:
-            return MiddlewareResult(
-                proceed=False, error_message=f"Validation failed: {str(e)}"
-            )
+            return MiddlewareResult(proceed=False, error_message=f"Validation failed: {str(e)}")
 
     async def after_tool_call(
         self,
@@ -2001,9 +1997,7 @@ class ValidationMiddleware(MiddlewareProtocol):
         if "required" in schema:
             for required_prop in schema["required"]:
                 if required_prop not in arguments:
-                    raise ValueError(
-                        f"Missing required property: '{required_prop}'"
-                    )
+                    raise ValueError(f"Missing required property: '{required_prop}'")
 
         # Check property types
         if "properties" in schema:
@@ -2012,9 +2006,7 @@ class ValidationMiddleware(MiddlewareProtocol):
                     prop_value = arguments[prop_name]
                     self._validate_property(prop_name, prop_value, prop_schema)
 
-    def _validate_property(
-        self, prop_name: str, value: Any, prop_schema: Dict[str, Any]
-    ) -> None:
+    def _validate_property(self, prop_name: str, value: Any, prop_schema: Dict[str, Any]) -> None:
         """Validate a single property against its schema.
 
         Args:
@@ -2144,9 +2136,7 @@ class SafetyCheckMiddleware(MiddlewareProtocol):
             if self._is_dangerous_command(command):
                 return MiddlewareResult(
                     proceed=False,
-                    error_message=(
-                        f"Command '{command}' is blocked for safety reasons"
-                    ),
+                    error_message=(f"Command '{command}' is blocked for safety reasons"),
                 )
 
         return MiddlewareResult(proceed=True)

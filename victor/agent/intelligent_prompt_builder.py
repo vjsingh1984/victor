@@ -254,7 +254,7 @@ class ProfileLearningStore:
         # Try to create the directory, fall back to global directory if project dir is read-only
         try:
             self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        except OSError as e:
+        except OSError:
             # If project directory is read-only, fall back to global victor directory
             import os
             from pathlib import Path
@@ -267,6 +267,7 @@ class ProfileLearningStore:
             except OSError:
                 # Last resort: use temp directory
                 import tempfile
+
                 global_dir = Path(tempfile.gettempdir()) / "victor"
                 self.db_path = global_dir / "profile_learning.db"
                 self.db_path.parent.mkdir(parents=True, exist_ok=True)

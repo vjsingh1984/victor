@@ -176,9 +176,7 @@ class TestContextBudgetChecking:
     """
 
     @pytest.mark.asyncio
-    async def test_context_budget_checking(
-        self, legacy_orchestrator, mock_context_coordinator
-    ):
+    async def test_context_budget_checking(self, legacy_orchestrator, mock_context_coordinator):
         """Test that context budget is checked through ContextCoordinator.
 
         Scenario:
@@ -215,9 +213,7 @@ class TestContextBudgetChecking:
         is_within = await mock_context_coordinator.is_within_budget(context, budget)
 
         # Verify budget check was called
-        mock_context_coordinator.is_within_budget.assert_called_once_with(
-            context, budget
-        )
+        mock_context_coordinator.is_within_budget.assert_called_once_with(context, budget)
 
         # Verify result
         assert is_within is True  # 3000 < 4096 - 500
@@ -256,9 +252,7 @@ class TestCompactionExecution:
     """
 
     @pytest.mark.asyncio
-    async def test_compaction_execution(
-        self, legacy_orchestrator, mock_context_coordinator
-    ):
+    async def test_compaction_execution(self, legacy_orchestrator, mock_context_coordinator):
         """Test that context compaction is executed when context overflows.
 
         Scenario:
@@ -281,9 +275,7 @@ class TestCompactionExecution:
         legacy_orchestrator._context_coordinator = mock_context_coordinator
 
         # Create context that exceeds budget
-        large_messages = [
-            {"role": "user", "content": f"Message {i}" * 100} for i in range(50)
-        ]
+        large_messages = [{"role": "user", "content": f"Message {i}" * 100} for i in range(50)]
 
         context = CompactionContext(
             messages=large_messages,
@@ -378,9 +370,7 @@ class TestAnalyticsDataCollection:
             event_types=["tool_call"],
         )
 
-        tool_call_results = await mock_analytics_coordinator.query_analytics(
-            query_tool_calls
-        )
+        tool_call_results = await mock_analytics_coordinator.query_analytics(query_tool_calls)
 
         assert len(tool_call_results) == 2  # Two tool_call events
         assert all(e.event_type == "tool_call" for e in tool_call_results)
@@ -407,9 +397,7 @@ class TestPromptCoordinatorBuilding:
     """
 
     @pytest.mark.asyncio
-    async def test_prompt_coordinator_building(
-        self, legacy_orchestrator, mock_prompt_coordinator
-    ):
+    async def test_prompt_coordinator_building(self, legacy_orchestrator, mock_prompt_coordinator):
         """Test that prompts are built through PromptCoordinator.
 
         Scenario:
@@ -440,14 +428,10 @@ class TestPromptCoordinatorBuilding:
             constraints={"max_iterations": 10},
         )
 
-        system_prompt = await mock_prompt_coordinator.build_system_prompt(
-            prompt_context
-        )
+        system_prompt = await mock_prompt_coordinator.build_system_prompt(prompt_context)
 
         # Verify coordinator called
-        mock_prompt_coordinator.build_system_prompt.assert_called_once_with(
-            prompt_context
-        )
+        mock_prompt_coordinator.build_system_prompt.assert_called_once_with(prompt_context)
 
         # Verify prompt content
         assert isinstance(system_prompt, str)
@@ -489,9 +473,7 @@ class TestChatEventTracking:
     """
 
     @pytest.mark.asyncio
-    async def test_chat_event_tracking(
-        self, legacy_orchestrator, mock_analytics_coordinator
-    ):
+    async def test_chat_event_tracking(self, legacy_orchestrator, mock_analytics_coordinator):
         """Test that chat events are tracked.
 
         Scenario:
@@ -687,9 +669,7 @@ class TestSimpleChatFlow:
         test_provider.chat = AsyncMock(side_effect=mock_chat)
 
         # Call chat through orchestrator
-        response = await test_provider.chat(
-            messages=[{"role": "user", "content": user_message}]
-        )
+        response = await test_provider.chat(messages=[{"role": "user", "content": user_message}])
 
         # Verify response
         assert response.content == "I'm doing well, thank you!"
@@ -722,9 +702,7 @@ class TestToolExecutionFlow:
     """
 
     @pytest.mark.asyncio
-    async def test_tool_execution_flow(
-        self, legacy_orchestrator, mock_tool, test_container
-    ):
+    async def test_tool_execution_flow(self, legacy_orchestrator, mock_tool, test_container):
         """Test tool execution through ToolCoordinator.
 
         Scenario:
@@ -743,9 +721,7 @@ class TestToolExecutionFlow:
         - Required: Test ToolCoordinator with orchestrator
         """
         # Get ToolPipeline from container
-        tool_pipeline = test_container.get_service(
-            type("ToolPipeline", (), {})  # Mock type
-        )
+        tool_pipeline = test_container.get_service(type("ToolPipeline", (), {}))  # Mock type
 
         # Execute tool call
         tool_calls = [
@@ -857,9 +833,7 @@ class TestChatToolCoordinatorInteraction:
     """
 
     @pytest.mark.asyncio
-    async def test_chat_tool_interaction(
-        self, legacy_orchestrator, mock_tool, test_container
-    ):
+    async def test_chat_tool_interaction(self, legacy_orchestrator, mock_tool, test_container):
         """Test ChatCoordinator and ToolCoordinator interaction.
 
         Scenario:
@@ -908,9 +882,7 @@ class TestErrorHandlingAcrossCoordinators:
     """
 
     @pytest.mark.asyncio
-    async def test_analytics_coordinator_failure(
-        self, legacy_orchestrator, test_provider
-    ):
+    async def test_analytics_coordinator_failure(self, legacy_orchestrator, test_provider):
         """Test that analytics coordinator failure doesn't break chat.
 
         Scenario:
@@ -942,17 +914,13 @@ class TestErrorHandlingAcrossCoordinators:
         legacy_orchestrator._analytics_coordinator = failing_analytics
 
         # Chat should still work
-        response = await test_provider.chat(
-            messages=[{"role": "user", "content": "Hello"}]
-        )
+        response = await test_provider.chat(messages=[{"role": "user", "content": "Hello"}])
 
         # Verify response despite analytics failure
         assert response is not None
 
     @pytest.mark.asyncio
-    async def test_context_coordinator_failure(
-        self, legacy_orchestrator, mock_context_coordinator
-    ):
+    async def test_context_coordinator_failure(self, legacy_orchestrator, mock_context_coordinator):
         """Test that context coordinator failure is handled gracefully.
 
         Scenario:
@@ -969,6 +937,7 @@ class TestErrorHandlingAcrossCoordinators:
         - NOT TESTED: Error recovery needs testing
         - Required: Test fallback mechanisms
         """
+
         # Make compaction fail
         async def failing_compact(context, budget):
             raise RuntimeError("Compaction service unavailable")
@@ -1037,9 +1006,7 @@ class TestConfigCoordinatorLoading:
         assert len(result.errors) == 0
 
     @pytest.mark.asyncio
-    async def test_config_validation_errors(
-        self, legacy_orchestrator, mock_config_coordinator
-    ):
+    async def test_config_validation_errors(self, legacy_orchestrator, mock_config_coordinator):
         """Test ConfigCoordinator validation with errors.
 
         Scenario:

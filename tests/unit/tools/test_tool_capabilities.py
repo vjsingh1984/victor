@@ -12,15 +12,15 @@ from victor.tools.capabilities.definitions import BUILTIN_CAPABILITIES
 
 class TestToolCapabilityEnum:
     """Test ToolCapability enum has required capabilities."""
-    
+
     def test_file_read_exists(self):
-        assert hasattr(ToolCapability, 'FILE_READ')
+        assert hasattr(ToolCapability, "FILE_READ")
         assert ToolCapability.FILE_READ.value == "file_read"
-    
+
     def test_file_write_exists(self):
-        assert hasattr(ToolCapability, 'FILE_WRITE')
+        assert hasattr(ToolCapability, "FILE_WRITE")
         assert ToolCapability.FILE_WRITE.value == "file_write"
-    
+
     def test_has_at_least_30_capabilities(self):
         """Test that ToolCapability enum has 30+ capabilities."""
         capabilities = [cap.value for cap in ToolCapability]
@@ -29,7 +29,7 @@ class TestToolCapabilityEnum:
 
 class TestCapabilityDefinition:
     """Test CapabilityDefinition dataclass."""
-    
+
     def test_create_definition(self):
         definition = CapabilityDefinition(
             name=ToolCapability.FILE_READ,
@@ -44,7 +44,7 @@ class TestCapabilityDefinition:
 
 class TestCapabilityRegistry:
     """Test CapabilityRegistry."""
-    
+
     def test_register_and_get_tools(self):
         registry = CapabilityRegistry()
         definition = CapabilityDefinition(
@@ -57,7 +57,7 @@ class TestCapabilityRegistry:
         registry.register_capability(definition)
         tools = registry.get_tools_for_capability(ToolCapability.FILE_READ)
         assert "read" in tools
-    
+
     def test_duplicate_raises_error(self):
         registry = CapabilityRegistry()
         definition = CapabilityDefinition(
@@ -70,26 +70,30 @@ class TestCapabilityRegistry:
         registry.register_capability(definition)
         with pytest.raises(ValueError):
             registry.register_capability(definition)
-    
+
     def test_resolve_dependencies(self):
         registry = CapabilityRegistry()
-        
-        registry.register_capability(CapabilityDefinition(
-            name=ToolCapability.FILE_READ,
-            description="Read files",
-            tools=["read"],
-            dependencies=[],
-            conflicts=[],
-        ))
-        
-        registry.register_capability(CapabilityDefinition(
-            name=ToolCapability.FILE_WRITE,
-            description="Write files",
-            tools=["write"],
-            dependencies=[ToolCapability.FILE_READ],
-            conflicts=[],
-        ))
-        
+
+        registry.register_capability(
+            CapabilityDefinition(
+                name=ToolCapability.FILE_READ,
+                description="Read files",
+                tools=["read"],
+                dependencies=[],
+                conflicts=[],
+            )
+        )
+
+        registry.register_capability(
+            CapabilityDefinition(
+                name=ToolCapability.FILE_WRITE,
+                description="Write files",
+                tools=["write"],
+                dependencies=[ToolCapability.FILE_READ],
+                conflicts=[],
+            )
+        )
+
         resolved = registry.resolve_dependencies([ToolCapability.FILE_WRITE])
         assert ToolCapability.FILE_WRITE in resolved
         assert ToolCapability.FILE_READ in resolved
@@ -97,17 +101,19 @@ class TestCapabilityRegistry:
 
 class TestCapabilitySelector:
     """Test CapabilitySelector."""
-    
+
     def test_select_tools_simple(self):
         registry = CapabilityRegistry()
-        registry.register_capability(CapabilityDefinition(
-            name=ToolCapability.FILE_READ,
-            description="Read files",
-            tools=["read", "ls"],
-            dependencies=[],
-            conflicts=[],
-        ))
-        
+        registry.register_capability(
+            CapabilityDefinition(
+                name=ToolCapability.FILE_READ,
+                description="Read files",
+                tools=["read", "ls"],
+                dependencies=[],
+                conflicts=[],
+            )
+        )
+
         selector = CapabilitySelector(registry)
         tools = selector.select_tools(
             required_capabilities=[ToolCapability.FILE_READ],
@@ -115,17 +121,19 @@ class TestCapabilitySelector:
         )
         assert "read" in tools
         assert "ls" in tools
-    
+
     def test_select_tools_with_exclusions(self):
         registry = CapabilityRegistry()
-        registry.register_capability(CapabilityDefinition(
-            name=ToolCapability.FILE_READ,
-            description="Read files",
-            tools=["read", "ls"],
-            dependencies=[],
-            conflicts=[],
-        ))
-        
+        registry.register_capability(
+            CapabilityDefinition(
+                name=ToolCapability.FILE_READ,
+                description="Read files",
+                tools=["read", "ls"],
+                dependencies=[],
+                conflicts=[],
+            )
+        )
+
         selector = CapabilitySelector(registry)
         tools = selector.select_tools(
             required_capabilities=[ToolCapability.FILE_READ],
@@ -137,21 +145,21 @@ class TestCapabilitySelector:
 
 class TestBuiltinCapabilities:
     """Test built-in capability definitions."""
-    
+
     def test_builtin_is_list(self):
         assert isinstance(BUILTIN_CAPABILITIES, list)
-    
+
     def test_builtin_not_empty(self):
         assert len(BUILTIN_CAPABILITIES) > 0
-    
+
     def test_all_are_definitions(self):
         for cap in BUILTIN_CAPABILITIES:
             assert isinstance(cap, CapabilityDefinition)
-    
+
     def test_file_read_exists(self):
         names = [cap.name for cap in BUILTIN_CAPABILITIES]
         assert ToolCapability.FILE_READ in names
-    
+
     def test_file_write_depends_on_read(self):
         file_write = None
         for cap in BUILTIN_CAPABILITIES:
@@ -167,102 +175,102 @@ class TestExtendedCapabilities:
 
     def test_code_refactoring_exists(self):
         """Test CODE_REFACTORING capability exists."""
-        assert hasattr(ToolCapability, 'CODE_REFACTORING')
+        assert hasattr(ToolCapability, "CODE_REFACTORING")
         assert ToolCapability.CODE_REFACTORING.value == "code_refactoring"
 
     def test_semantic_search_exists(self):
         """Test SEMANTIC_SEARCH capability exists."""
-        assert hasattr(ToolCapability, 'SEMANTIC_SEARCH')
+        assert hasattr(ToolCapability, "SEMANTIC_SEARCH")
         assert ToolCapability.SEMANTIC_SEARCH.value == "semantic_search"
 
     def test_knowledge_base_exists(self):
         """Test KNOWLEDGE_BASE capability exists."""
-        assert hasattr(ToolCapability, 'KNOWLEDGE_BASE')
+        assert hasattr(ToolCapability, "KNOWLEDGE_BASE")
         assert ToolCapability.KNOWLEDGE_BASE.value == "knowledge_base"
 
     def test_change_management_exists(self):
         """Test CHANGE_MANAGEMENT capability exists."""
-        assert hasattr(ToolCapability, 'CHANGE_MANAGEMENT')
+        assert hasattr(ToolCapability, "CHANGE_MANAGEMENT")
         assert ToolCapability.CHANGE_MANAGEMENT.value == "change_management"
 
     def test_containerization_exists(self):
         """Test CONTAINERIZATION capability exists."""
-        assert hasattr(ToolCapability, 'CONTAINERIZATION')
+        assert hasattr(ToolCapability, "CONTAINERIZATION")
         assert ToolCapability.CONTAINERIZATION.value == "containerization"
 
     def test_cloud_infra_exists(self):
         """Test CLOUD_INFRA capability exists."""
-        assert hasattr(ToolCapability, 'CLOUD_INFRA')
+        assert hasattr(ToolCapability, "CLOUD_INFRA")
         assert ToolCapability.CLOUD_INFRA.value == "cloud_infra"
 
     def test_monitoring_exists(self):
         """Test MONITORING capability exists."""
-        assert hasattr(ToolCapability, 'MONITORING')
+        assert hasattr(ToolCapability, "MONITORING")
         assert ToolCapability.MONITORING.value == "monitoring"
 
     def test_scaffolding_exists(self):
         """Test SCAFFOLDING capability exists."""
-        assert hasattr(ToolCapability, 'SCAFFOLDING')
+        assert hasattr(ToolCapability, "SCAFFOLDING")
         assert ToolCapability.SCAFFOLDING.value == "scaffolding"
 
     def test_code_execution_exists(self):
         """Test CODE_EXECUTION capability exists."""
-        assert hasattr(ToolCapability, 'CODE_EXECUTION')
+        assert hasattr(ToolCapability, "CODE_EXECUTION")
         assert ToolCapability.CODE_EXECUTION.value == "code_execution"
 
     def test_browser_automation_exists(self):
         """Test BROWSER_AUTOMATION capability exists."""
-        assert hasattr(ToolCapability, 'BROWSER_AUTOMATION')
+        assert hasattr(ToolCapability, "BROWSER_AUTOMATION")
         assert ToolCapability.BROWSER_AUTOMATION.value == "browser_automation"
 
     def test_messaging_exists(self):
         """Test MESSAGING capability exists."""
-        assert hasattr(ToolCapability, 'MESSAGING')
+        assert hasattr(ToolCapability, "MESSAGING")
         assert ToolCapability.MESSAGING.value == "messaging"
 
     def test_issue_tracking_exists(self):
         """Test ISSUE_TRACKING capability exists."""
-        assert hasattr(ToolCapability, 'ISSUE_TRACKING')
+        assert hasattr(ToolCapability, "ISSUE_TRACKING")
         assert ToolCapability.ISSUE_TRACKING.value == "issue_tracking"
 
     def test_notification_exists(self):
         """Test NOTIFICATION capability exists."""
-        assert hasattr(ToolCapability, 'NOTIFICATION')
+        assert hasattr(ToolCapability, "NOTIFICATION")
         assert ToolCapability.NOTIFICATION.value == "notification"
 
     def test_workflow_orchestration_exists(self):
         """Test WORKFLOW_ORCHESTRATION capability exists."""
-        assert hasattr(ToolCapability, 'WORKFLOW_ORCHESTRATION')
+        assert hasattr(ToolCapability, "WORKFLOW_ORCHESTRATION")
         assert ToolCapability.WORKFLOW_ORCHESTRATION.value == "workflow_orchestration"
 
     def test_lsp_integration_exists(self):
         """Test LSP_INTEGRATION capability exists."""
-        assert hasattr(ToolCapability, 'LSP_INTEGRATION')
+        assert hasattr(ToolCapability, "LSP_INTEGRATION")
         assert ToolCapability.LSP_INTEGRATION.value == "lsp_integration"
 
     def test_ai_assistance_exists(self):
         """Test AI_ASSISTANCE capability exists."""
-        assert hasattr(ToolCapability, 'AI_ASSISTANCE')
+        assert hasattr(ToolCapability, "AI_ASSISTANCE")
         assert ToolCapability.AI_ASSISTANCE.value == "ai_assistance"
 
     def test_security_scanning_exists(self):
         """Test SECURITY_SCANNING capability exists."""
-        assert hasattr(ToolCapability, 'SECURITY_SCANNING')
+        assert hasattr(ToolCapability, "SECURITY_SCANNING")
         assert ToolCapability.SECURITY_SCANNING.value == "security_scanning"
 
     def test_compliance_audit_exists(self):
         """Test COMPLIANCE_AUDIT capability exists."""
-        assert hasattr(ToolCapability, 'COMPLIANCE_AUDIT')
+        assert hasattr(ToolCapability, "COMPLIANCE_AUDIT")
         assert ToolCapability.COMPLIANCE_AUDIT.value == "compliance_audit"
 
     def test_api_integration_exists(self):
         """Test API_INTEGRATION capability exists."""
-        assert hasattr(ToolCapability, 'API_INTEGRATION')
+        assert hasattr(ToolCapability, "API_INTEGRATION")
         assert ToolCapability.API_INTEGRATION.value == "api_integration"
 
     def test_graph_analysis_exists(self):
         """Test GRAPH_ANALYSIS capability exists."""
-        assert hasattr(ToolCapability, 'GRAPH_ANALYSIS')
+        assert hasattr(ToolCapability, "GRAPH_ANALYSIS")
         assert ToolCapability.GRAPH_ANALYSIS.value == "graph_analysis"
 
 
@@ -335,13 +343,26 @@ class TestBackwardCompatibility:
         """Test that original 18 capabilities remain unchanged."""
         # Original capabilities from the first implementation
         original_capabilities = [
-            "FILE_READ", "FILE_WRITE", "FILE_MANAGEMENT",
-            "CODE_ANALYSIS", "CODE_SEARCH", "CODE_REVIEW", "CODE_INTELLIGENCE",
+            "FILE_READ",
+            "FILE_WRITE",
+            "FILE_MANAGEMENT",
+            "CODE_ANALYSIS",
+            "CODE_SEARCH",
+            "CODE_REVIEW",
+            "CODE_INTELLIGENCE",
             "WEB_SEARCH",
-            "VERSION_CONTROL", "DATABASE", "DOCKER", "CI_CD",
-            "TESTING", "DOCUMENTATION", "DEPENDENCY",
-            "BASH", "BROWSER",
-            "CACHE", "BATCH", "AUDIT"
+            "VERSION_CONTROL",
+            "DATABASE",
+            "DOCKER",
+            "CI_CD",
+            "TESTING",
+            "DOCUMENTATION",
+            "DEPENDENCY",
+            "BASH",
+            "BROWSER",
+            "CACHE",
+            "BATCH",
+            "AUDIT",
         ]
 
         for cap_name in original_capabilities:
@@ -372,6 +393,7 @@ class MockTool:
         cost_tier=None,
     ):
         from victor.tools.enums import CostTier
+
         self._name = name
         self._description = description
         self._metadata = metadata
@@ -395,6 +417,7 @@ class MockTool:
 
     def get_metadata(self):
         from victor.tools.metadata import ToolMetadata
+
         if self._metadata:
             return self._metadata
         return ToolMetadata.generate_from_tool(
@@ -419,14 +442,12 @@ class TestCapabilityRegistryAutoDiscovery:
         read_tool = MockTool(
             name="file_read",
             description="Read files from filesystem",
-            metadata=ToolMetadata(
-                category="filesystem",
-                keywords=["read", "file"]
-            )
+            metadata=ToolMetadata(category="filesystem", keywords=["read", "file"]),
         )
 
         # Auto-discover should register the capability
         import asyncio
+
         asyncio.run(registry.auto_discover_capabilities([read_tool]))
 
         # Verify capability was registered
@@ -441,17 +462,18 @@ class TestCapabilityRegistryAutoDiscovery:
         git_tool = MockTool(
             name="git",
             description="Git version control",
-            metadata=None  # Auto-generated metadata will have category="git"
+            metadata=None,  # Auto-generated metadata will have category="git"
         )
 
         docker_tool = MockTool(
             name="docker_tool",
             description="Docker container management",
-            metadata=None  # Auto-generated metadata will have category="docker"
+            metadata=None,  # Auto-generated metadata will have category="docker"
         )
 
         # Auto-discover should map categories to capabilities
         import asyncio
+
         asyncio.run(registry.auto_discover_capabilities([git_tool, docker_tool]))
 
         # Verify git -> VERSION_CONTROL
@@ -473,12 +495,13 @@ class TestCapabilityRegistryAutoDiscovery:
         unclear_tool = MockTool(
             name="mystery_tool",
             description="Does something unclear",
-            metadata=None  # Will generate category="mystery"
+            metadata=None,  # Will generate category="mystery"
         )
 
         # Mock logger to capture warnings
-        with patch('victor.tools.capabilities.system.logger') as mock_logger:
+        with patch("victor.tools.capabilities.system.logger") as mock_logger:
             import asyncio
+
             asyncio.run(registry.auto_discover_capabilities([unclear_tool]))
 
             # Verify warning was logged
@@ -507,14 +530,12 @@ class TestCapabilityRegistryAutoDiscovery:
         auto_tool = MockTool(
             name="auto_read_tool",
             description="Auto-discovered read tool",
-            metadata=ToolMetadata(
-                category="filesystem",
-                keywords=["read"]
-            )
+            metadata=ToolMetadata(category="filesystem", keywords=["read"]),
         )
 
         # Auto-discovery should not override manual registration
         import asyncio
+
         asyncio.run(registry.auto_discover_capabilities([auto_tool]))
 
         # Verify manual registration is preserved
@@ -564,22 +585,26 @@ class TestCapabilityRegistryGetCapabilityForTool:
         registry = CapabilityRegistry()
 
         # Register FILE_READ with read_tool
-        registry.register_capability(CapabilityDefinition(
-            name=ToolCapability.FILE_READ,
-            description="Read files",
-            tools=["read_tool"],
-            dependencies=[],
-            conflicts=[],
-        ))
+        registry.register_capability(
+            CapabilityDefinition(
+                name=ToolCapability.FILE_READ,
+                description="Read files",
+                tools=["read_tool"],
+                dependencies=[],
+                conflicts=[],
+            )
+        )
 
         # Register FILE_MANAGEMENT also with read_tool
-        registry.register_capability(CapabilityDefinition(
-            name=ToolCapability.FILE_MANAGEMENT,
-            description="Manage files",
-            tools=["read_tool", "copy_tool"],
-            dependencies=[],
-            conflicts=[],
-        ))
+        registry.register_capability(
+            CapabilityDefinition(
+                name=ToolCapability.FILE_MANAGEMENT,
+                description="Manage files",
+                tools=["read_tool", "copy_tool"],
+                dependencies=[],
+                conflicts=[],
+            )
+        )
 
         # Should return one of them (first found)
         capability = registry.get_capability_for_tool("read_tool")
@@ -594,22 +619,26 @@ class TestCapabilityRegistryGetAllTools:
         registry = CapabilityRegistry()
 
         # Register FILE_READ with read_tool
-        registry.register_capability(CapabilityDefinition(
-            name=ToolCapability.FILE_READ,
-            description="Read files",
-            tools=["read_tool", "cat"],
-            dependencies=[],
-            conflicts=[],
-        ))
+        registry.register_capability(
+            CapabilityDefinition(
+                name=ToolCapability.FILE_READ,
+                description="Read files",
+                tools=["read_tool", "cat"],
+                dependencies=[],
+                conflicts=[],
+            )
+        )
 
         # Register FILE_WRITE with write_tool and cat (overlap)
-        registry.register_capability(CapabilityDefinition(
-            name=ToolCapability.FILE_WRITE,
-            description="Write files",
-            tools=["write_tool", "cat"],
-            dependencies=[],
-            conflicts=[],
-        ))
+        registry.register_capability(
+            CapabilityDefinition(
+                name=ToolCapability.FILE_WRITE,
+                description="Write files",
+                tools=["write_tool", "cat"],
+                dependencies=[],
+                conflicts=[],
+            )
+        )
 
         # Get all tools
         all_tools = registry.get_all_tools()
@@ -652,7 +681,9 @@ class TestCapabilitySelectorRecommendCapabilities:
     def test_recommend_for_testing_task(self):
         """Test recommending capabilities for testing task."""
         selector = CapabilitySelector()
-        capabilities = selector.recommend_capabilities("Run unit tests and generate coverage report")
+        capabilities = selector.recommend_capabilities(
+            "Run unit tests and generate coverage report"
+        )
 
         # Should recommend testing capability
         assert ToolCapability.TESTING in capabilities
@@ -682,21 +713,25 @@ class TestCapabilitySelectorGetCapabilitySummary:
         registry = CapabilityRegistry()
 
         # Register capabilities
-        registry.register_capability(CapabilityDefinition(
-            name=ToolCapability.FILE_READ,
-            description="Read files",
-            tools=["read", "cat"],
-            dependencies=[],
-            conflicts=[],
-        ))
+        registry.register_capability(
+            CapabilityDefinition(
+                name=ToolCapability.FILE_READ,
+                description="Read files",
+                tools=["read", "cat"],
+                dependencies=[],
+                conflicts=[],
+            )
+        )
 
-        registry.register_capability(CapabilityDefinition(
-            name=ToolCapability.FILE_WRITE,
-            description="Write files",
-            tools=["write", "edit"],
-            dependencies=[],
-            conflicts=[],
-        ))
+        registry.register_capability(
+            CapabilityDefinition(
+                name=ToolCapability.FILE_WRITE,
+                description="Write files",
+                tools=["write", "edit"],
+                dependencies=[],
+                conflicts=[],
+            )
+        )
 
         selector = CapabilitySelector(registry)
         summary = selector.get_capability_summary()
@@ -734,31 +769,23 @@ class TestAutoDiscoveryIntegration:
             MockTool(
                 name="git",
                 description="Version control",
-                metadata=ToolMetadata(
-                    category="git",
-                    keywords=["commit", "branch"]
-                )
+                metadata=ToolMetadata(category="git", keywords=["commit", "branch"]),
             ),
             MockTool(
                 name="read",
                 description="Read files",
-                metadata=ToolMetadata(
-                    category="filesystem",
-                    keywords=["read", "file"]
-                )
+                metadata=ToolMetadata(category="filesystem", keywords=["read", "file"]),
             ),
             MockTool(
                 name="docker_tool",
                 description="Docker operations",
-                metadata=ToolMetadata(
-                    category="docker",
-                    keywords=["container", "docker"]
-                )
+                metadata=ToolMetadata(category="docker", keywords=["container", "docker"]),
             ),
         ]
 
         # Auto-discover
         import asyncio
+
         asyncio.run(registry.auto_discover_capabilities(tools))
 
         # Query tools by capability
@@ -792,21 +819,15 @@ class TestAutoDiscoveryIntegration:
             MockTool(
                 name="cache_tool",
                 description="Caching tool",
-                metadata=ToolMetadata(
-                    category="cache",
-                    keywords=["cache", "memoize"]
-                )
+                metadata=ToolMetadata(category="cache", keywords=["cache", "memoize"]),
             ),
             # Tool with auto-generated metadata
-            MockTool(
-                name="git",
-                description="Version control",
-                metadata=None
-            ),
+            MockTool(name="git", description="Version control", metadata=None),
         ]
 
         # Auto-discover
         import asyncio
+
         asyncio.run(registry.auto_discover_capabilities(tools))
 
         # Both should be registered

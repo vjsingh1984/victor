@@ -248,17 +248,11 @@ class SessionManager:
                 if loop.is_running():
                     # In async context, need to handle differently
                     # For now, fall back to creating new loop
-                    session_dict = asyncio.run(
-                        self._repository.get_session(session_id)
-                    )
+                    session_dict = asyncio.run(self._repository.get_session(session_id))
                 else:
-                    session_dict = loop.run_until_complete(
-                        self._repository.get_session(session_id)
-                    )
+                    session_dict = loop.run_until_complete(self._repository.get_session(session_id))
             except RuntimeError:
-                session_dict = asyncio.run(
-                    self._repository.get_session(session_id)
-                )
+                session_dict = asyncio.run(self._repository.get_session(session_id))
 
             if session_dict is None:
                 return None
@@ -285,17 +279,11 @@ class SessionManager:
             try:
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
-                    session_dict = asyncio.run(
-                        self._repository.get_latest_session()
-                    )
+                    session_dict = asyncio.run(self._repository.get_latest_session())
                 else:
-                    session_dict = loop.run_until_complete(
-                        self._repository.get_latest_session()
-                    )
+                    session_dict = loop.run_until_complete(self._repository.get_latest_session())
             except RuntimeError:
-                session_dict = asyncio.run(
-                    self._repository.get_latest_session()
-                )
+                session_dict = asyncio.run(self._repository.get_latest_session())
 
             if session_dict is None:
                 return None
@@ -326,17 +314,11 @@ class SessionManager:
             try:
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
-                    sessions = asyncio.run(
-                        self._repository.list_sessions(limit=limit)
-                    )
+                    sessions = asyncio.run(self._repository.list_sessions(limit=limit))
                 else:
-                    sessions = loop.run_until_complete(
-                        self._repository.list_sessions(limit=limit)
-                    )
+                    sessions = loop.run_until_complete(self._repository.list_sessions(limit=limit))
             except RuntimeError:
-                sessions = asyncio.run(
-                    self._repository.list_sessions(limit=limit)
-                )
+                sessions = asyncio.run(self._repository.list_sessions(limit=limit))
             return sessions
 
         # Legacy direct database access
@@ -379,17 +361,11 @@ class SessionManager:
             try:
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
-                    deleted = asyncio.run(
-                        self._repository.delete_session(session_id)
-                    )
+                    deleted = asyncio.run(self._repository.delete_session(session_id))
                 else:
-                    deleted = loop.run_until_complete(
-                        self._repository.delete_session(session_id)
-                    )
+                    deleted = loop.run_until_complete(self._repository.delete_session(session_id))
             except RuntimeError:
-                deleted = asyncio.run(
-                    self._repository.delete_session(session_id)
-                )
+                deleted = asyncio.run(self._repository.delete_session(session_id))
             return deleted
 
         # Legacy direct database access

@@ -286,9 +286,7 @@ class TestSessionCoordinator:
     # Initialization Tests
     # ========================================================================
 
-    def test_initialization_with_required_dependencies(
-        self, mock_session_state: Mock
-    ):
+    def test_initialization_with_required_dependencies(self, mock_session_state: Mock):
         """Test coordinator initialization with required dependencies."""
         coordinator = SessionCoordinator(
             session_state_manager=mock_session_state,
@@ -331,9 +329,7 @@ class TestSessionCoordinator:
     # Session Lifecycle Tests
     # ========================================================================
 
-    def test_create_session_generates_session_id(
-        self, coordinator: SessionCoordinator
-    ):
+    def test_create_session_generates_session_id(self, coordinator: SessionCoordinator):
         """Test create_session generates a session ID when not provided."""
         session_id = coordinator.create_session()
 
@@ -344,9 +340,7 @@ class TestSessionCoordinator:
         assert coordinator._current_session.session_id == session_id
         assert coordinator._current_session.is_active is True
 
-    def test_create_session_with_custom_session_id(
-        self, coordinator: SessionCoordinator
-    ):
+    def test_create_session_with_custom_session_id(self, coordinator: SessionCoordinator):
         """Test create_session with custom session ID."""
         custom_id = "my-custom-session"
         session_id = coordinator.create_session(session_id=custom_id)
@@ -391,9 +385,7 @@ class TestSessionCoordinator:
         assert session_id is not None
         assert coordinator._memory_session_id is None
 
-    def test_end_session_marks_inactive(
-        self, coordinator: SessionCoordinator
-    ):
+    def test_end_session_marks_inactive(self, coordinator: SessionCoordinator):
         """Test end_session marks current session as inactive."""
         coordinator.create_session()
         assert coordinator.is_active is True
@@ -411,9 +403,7 @@ class TestSessionCoordinator:
 
         mock_memory_manager.end_session.assert_called_once_with("mem-session-123")
 
-    def test_end_session_without_current_session(
-        self, coordinator: SessionCoordinator
-    ):
+    def test_end_session_without_current_session(self, coordinator: SessionCoordinator):
         """Test end_session when no current session exists."""
         # Should not raise
         coordinator.end_session()
@@ -470,9 +460,7 @@ class TestSessionCoordinator:
 
         mock_session_state.reset.assert_called_once_with(preserve_token_usage=True)
 
-    def test_reset_session_without_lifecycle_manager(
-        self, mock_session_state: Mock
-    ):
+    def test_reset_session_without_lifecycle_manager(self, mock_session_state: Mock):
         """Test reset_session when lifecycle manager is None."""
         coordinator = SessionCoordinator(
             session_state_manager=mock_session_state,
@@ -485,14 +473,13 @@ class TestSessionCoordinator:
 
         mock_session_state.reset.assert_called_once_with(preserve_token_usage=False)
 
-    def test_reset_session_updates_activity_timestamp(
-        self, coordinator: SessionCoordinator
-    ):
+    def test_reset_session_updates_activity_timestamp(self, coordinator: SessionCoordinator):
         """Test reset_session updates last_activity timestamp."""
         coordinator.create_session()
         original_activity = coordinator._current_session.last_activity
 
         import time
+
         time.sleep(0.01)  # Small delay to ensure timestamp difference
 
         coordinator.reset_session()
@@ -511,9 +498,7 @@ class TestSessionCoordinator:
         assert coordinator_full._current_session.session_id == "recovery-session-123"
         mock_lifecycle_manager.recover_session.assert_called_once()
 
-    def test_recover_session_without_memory_manager(
-        self, coordinator: SessionCoordinator
-    ):
+    def test_recover_session_without_memory_manager(self, coordinator: SessionCoordinator):
         """Test recover_session when memory manager is not available."""
         success = coordinator.recover_session("some-session")
 
@@ -614,9 +599,7 @@ class TestSessionCoordinator:
         assert info.session_id == coordinator.session_id
         assert info.is_active is True
 
-    def test_get_session_stats(
-        self, coordinator: SessionCoordinator, mock_session_state: Mock
-    ):
+    def test_get_session_stats(self, coordinator: SessionCoordinator, mock_session_state: Mock):
         """Test get_session_stats returns comprehensive statistics."""
         coordinator.create_session()
         stats = coordinator.get_session_stats()
@@ -669,9 +652,7 @@ class TestSessionCoordinator:
         assert "enabled" in stats
         assert "session_id" in stats
 
-    def test_get_session_summary(
-        self, coordinator: SessionCoordinator, mock_session_state: Mock
-    ):
+    def test_get_session_summary(self, coordinator: SessionCoordinator, mock_session_state: Mock):
         """Test get_session_summary includes session IDs."""
         coordinator.create_session()
         summary = coordinator.get_session_summary()
@@ -728,9 +709,7 @@ class TestSessionCoordinator:
         mock_checkpoint_manager.save_checkpoint.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_save_checkpoint_without_manager(
-        self, coordinator: SessionCoordinator
-    ):
+    async def test_save_checkpoint_without_manager(self, coordinator: SessionCoordinator):
         """Test save_checkpoint when checkpoint manager is None."""
         checkpoint_id = await coordinator.save_checkpoint()
 
@@ -764,9 +743,7 @@ class TestSessionCoordinator:
         mock_checkpoint_manager: Mock,
     ):
         """Test save_checkpoint handles serialization errors."""
-        mock_checkpoint_manager.save_checkpoint.side_effect = ValueError(
-            "Cannot serialize"
-        )
+        mock_checkpoint_manager.save_checkpoint.side_effect = ValueError("Cannot serialize")
 
         coordinator = SessionCoordinator(
             session_state_manager=mock_session_state,
@@ -790,14 +767,10 @@ class TestSessionCoordinator:
         success = await coordinator_full.restore_checkpoint("checkpoint-123")
 
         assert success is True
-        mock_checkpoint_manager.restore_checkpoint.assert_called_once_with(
-            "checkpoint-123"
-        )
+        mock_checkpoint_manager.restore_checkpoint.assert_called_once_with("checkpoint-123")
 
     @pytest.mark.asyncio
-    async def test_restore_checkpoint_without_manager(
-        self, coordinator: SessionCoordinator
-    ):
+    async def test_restore_checkpoint_without_manager(self, coordinator: SessionCoordinator):
         """Test restore_checkpoint when checkpoint manager is None."""
         success = await coordinator.restore_checkpoint("checkpoint-123")
 
@@ -811,9 +784,7 @@ class TestSessionCoordinator:
         mock_checkpoint_manager: Mock,
     ):
         """Test restore_checkpoint handles I/O errors."""
-        mock_checkpoint_manager.restore_checkpoint.side_effect = IOError(
-            "File not found"
-        )
+        mock_checkpoint_manager.restore_checkpoint.side_effect = IOError("File not found")
 
         coordinator = SessionCoordinator(
             session_state_manager=mock_session_state,
@@ -832,9 +803,7 @@ class TestSessionCoordinator:
         mock_checkpoint_manager: Mock,
     ):
         """Test restore_checkpoint handles invalid data."""
-        mock_checkpoint_manager.restore_checkpoint.side_effect = KeyError(
-            "Missing key"
-        )
+        mock_checkpoint_manager.restore_checkpoint.side_effect = KeyError("Missing key")
 
         coordinator = SessionCoordinator(
             session_state_manager=mock_session_state,
@@ -857,9 +826,7 @@ class TestSessionCoordinator:
         # Return value depends on checkpoint manager's threshold logic
 
     @pytest.mark.asyncio
-    async def test_maybe_auto_checkpoint_without_manager(
-        self, coordinator: SessionCoordinator
-    ):
+    async def test_maybe_auto_checkpoint_without_manager(self, coordinator: SessionCoordinator):
         """Test maybe_auto_checkpoint when checkpoint manager is None."""
         checkpoint_id = await coordinator.maybe_auto_checkpoint()
 
@@ -955,9 +922,7 @@ class TestSessionCoordinator:
         assert sessions[0]["last_activity"] is None
         mock_memory_manager.list_sessions.assert_called_once_with(limit=10)
 
-    def test_get_recent_sessions_without_memory_manager(
-        self, coordinator: SessionCoordinator
-    ):
+    def test_get_recent_sessions_without_memory_manager(self, coordinator: SessionCoordinator):
         """Test get_recent_sessions when memory manager is None."""
         sessions = coordinator.get_recent_sessions()
 
@@ -1019,9 +984,7 @@ class TestSessionCoordinator:
     # Token Usage Tests
     # ========================================================================
 
-    def test_get_token_usage(
-        self, coordinator: SessionCoordinator, mock_session_state: Mock
-    ):
+    def test_get_token_usage(self, coordinator: SessionCoordinator, mock_session_state: Mock):
         """Test get_token_usage delegates to session state."""
         usage = coordinator.get_token_usage()
 
@@ -1032,9 +995,7 @@ class TestSessionCoordinator:
             "total_tokens": 150,
         }
 
-    def test_update_token_usage(
-        self, coordinator: SessionCoordinator, mock_session_state: Mock
-    ):
+    def test_update_token_usage(self, coordinator: SessionCoordinator, mock_session_state: Mock):
         """Test update_token_usage delegates to session state."""
         coordinator.update_token_usage(
             prompt_tokens=200,
@@ -1063,9 +1024,7 @@ class TestSessionCoordinator:
             cache_read_input_tokens=0,
         )
 
-    def test_reset_token_usage(
-        self, coordinator: SessionCoordinator, mock_session_state: Mock
-    ):
+    def test_reset_token_usage(self, coordinator: SessionCoordinator, mock_session_state: Mock):
         """Test reset_token_usage delegates to session state."""
         coordinator.reset_token_usage()
 
@@ -1091,9 +1050,7 @@ class TestSessionCoordinator:
         )
         assert context == [{"role": "user", "content": "Hello"}]
 
-    def test_get_memory_context_without_memory_manager(
-        self, coordinator: SessionCoordinator
-    ):
+    def test_get_memory_context_without_memory_manager(self, coordinator: SessionCoordinator):
         """Test get_memory_context without memory manager."""
         fallback_messages = [{"role": "system", "content": "Fallback"}]
 
@@ -1146,9 +1103,7 @@ class TestSessionCoordinator:
         assert context == [{"role": "user", "content": "Converted"}]
         mock_msg.model_dump.assert_called_once()
 
-    def test_get_memory_context_without_session(
-        self, coordinator_full: SessionCoordinator
-    ):
+    def test_get_memory_context_without_session(self, coordinator_full: SessionCoordinator):
         """Test get_memory_context when memory session not created."""
         # Don't create a session
         fallback_messages = [{"role": "user", "content": "No session"}]
@@ -1157,9 +1112,7 @@ class TestSessionCoordinator:
 
         assert context == fallback_messages
 
-    def test_get_memory_context_empty_fallback(
-        self, coordinator: SessionCoordinator
-    ):
+    def test_get_memory_context_empty_fallback(self, coordinator: SessionCoordinator):
         """Test get_memory_context returns empty list when no fallback."""
         context = coordinator.get_memory_context(messages=None)
 
@@ -1293,9 +1246,7 @@ class TestSessionCoordinatorIntegration:
         assert coordinator.is_active is False
         assert coordinator.session_id == session_id  # ID preserved
 
-    def test_session_reset_flow(
-        self, mock_session_state: Mock, mock_lifecycle_manager: Mock
-    ):
+    def test_session_reset_flow(self, mock_session_state: Mock, mock_lifecycle_manager: Mock):
         """Test session reset maintains session but clears state."""
         coordinator = SessionCoordinator(
             session_state_manager=mock_session_state,

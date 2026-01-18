@@ -147,9 +147,7 @@ class VerticalConfigLoader:
             logger.error(f"Validation failed for {yaml_path}: {e}")
             return None
 
-    def _build_config(
-        self, yaml_data: Dict[str, Any], base_path: Path
-    ) -> VerticalConfig:
+    def _build_config(self, yaml_data: Dict[str, Any], base_path: Path) -> VerticalConfig:
         """Build VerticalConfig from parsed YAML data.
 
         Args:
@@ -267,9 +265,7 @@ class VerticalConfigLoader:
 
         return tools_list
 
-    def _parse_system_prompt(
-        self, prompt_config: Dict[str, Any], base_path: Path
-    ) -> str:
+    def _parse_system_prompt(self, prompt_config: Dict[str, Any], base_path: Path) -> str:
         """Parse system prompt configuration.
 
         Args:

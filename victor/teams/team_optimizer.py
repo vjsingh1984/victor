@@ -229,9 +229,13 @@ class TeamOptimizer:
         if self.optimizer_type == "greedy":
             result = self._greedy_optimize(task, available_members, objective, constraints, context)
         elif self.optimizer_type == "genetic":
-            result = self._genetic_optimize(task, available_members, objective, constraints, context)
+            result = self._genetic_optimize(
+                task, available_members, objective, constraints, context
+            )
         elif self.optimizer_type == "bayesian":
-            result = self._bayesian_optimize(task, available_members, objective, constraints, context)
+            result = self._bayesian_optimize(
+                task, available_members, objective, constraints, context
+            )
         elif self.optimizer_type == "random":
             result = self._random_optimize(task, available_members, objective, constraints, context)
         else:
@@ -281,9 +285,7 @@ class TeamOptimizer:
 
                 # Test each allowed formation
                 for formation in self._get_formations_to_test(constraints):
-                    config = self._create_config(
-                        test_members, formation, constraints, context
-                    )
+                    config = self._create_config(test_members, formation, constraints, context)
 
                     if not constraints.validate(config):
                         continue
@@ -303,7 +305,8 @@ class TeamOptimizer:
                 break
 
         return OptimizationResult(
-            optimal_config=best_config or self._create_default_config(available_members, constraints),
+            optimal_config=best_config
+            or self._create_default_config(available_members, constraints),
             score=best_score if best_score > float("-inf") else 0.0,
             predicted_metrics=best_metrics,
             alternative_configs=alternatives[:5],  # Top 5 alternatives
@@ -386,7 +389,8 @@ class TeamOptimizer:
                 alternatives = [(x[0], x[1]) for x in scored_population[:6]]
 
         return OptimizationResult(
-            optimal_config=best_config or self._create_default_config(available_members, constraints),
+            optimal_config=best_config
+            or self._create_default_config(available_members, constraints),
             score=best_score if best_score > float("-inf") else 0.0,
             predicted_metrics=best_metrics,
             alternative_configs=alternatives[1:6],  # Exclude best itself
@@ -458,7 +462,8 @@ class TeamOptimizer:
                 alternatives.append((config, score))
 
         return OptimizationResult(
-            optimal_config=best_config or self._create_default_config(available_members, constraints),
+            optimal_config=best_config
+            or self._create_default_config(available_members, constraints),
             score=best_score if best_score > float("-inf") else 0.0,
             predicted_metrics=best_metrics,
             alternative_configs=sorted(alternatives[1:6], key=lambda x: x[1], reverse=True),
@@ -589,7 +594,9 @@ class TeamOptimizer:
             total_tool_budget=constraints.min_budget,
         )
 
-    def _get_formations_to_test(self, constraints: OptimizationConstraints) -> List["TeamFormation"]:
+    def _get_formations_to_test(
+        self, constraints: OptimizationConstraints
+    ) -> List["TeamFormation"]:
         """Get formations to test.
 
         Args:
@@ -647,7 +654,9 @@ class TeamOptimizer:
         from victor.teams.types import TeamConfig, TeamFormation
 
         # Random team size
-        team_size = random.randint(constraints.min_members, min(len(available_members), constraints.max_members))
+        team_size = random.randint(
+            constraints.min_members, min(len(available_members), constraints.max_members)
+        )
 
         # Random members
         members = random.sample(available_members, team_size)
@@ -704,7 +713,8 @@ class TeamOptimizer:
         # Combine members from both parents
         all_members = list({m.id: m for m in parent1.members + parent2.members}.values())
         child_members = random.sample(
-            all_members, random.randint(min(len(parent1.members), len(parent2.members)), len(all_members))
+            all_members,
+            random.randint(min(len(parent1.members), len(parent2.members)), len(all_members)),
         )
 
         # Randomly inherit formation or budget
@@ -740,7 +750,9 @@ class TeamOptimizer:
         from victor.teams.types import TeamFormation
 
         # Random mutation type
-        mutation_type = random.choice(["add_member", "remove_member", "change_formation", "change_budget"])
+        mutation_type = random.choice(
+            ["add_member", "remove_member", "change_formation", "change_budget"]
+        )
 
         if mutation_type == "add_member" and len(individual.members) < constraints.max_members:
             # Add random member

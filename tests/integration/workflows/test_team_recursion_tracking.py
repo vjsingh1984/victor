@@ -140,10 +140,7 @@ class TestTeamCoordinatorRecursionIntegration:
         coordinator.add_member(member)
 
         # Execute task
-        result = await coordinator.execute_task(
-            "Test task",
-            {"team_name": "TestTeam"}
-        )
+        result = await coordinator.execute_task("Test task", {"team_name": "TestTeam"})
 
         # Verify execution succeeded
         assert result["success"] is True
@@ -170,10 +167,7 @@ class TestTeamCoordinatorRecursionIntegration:
         assert custom_ctx.current_depth == 1
 
         # Execute team (should go to depth 2)
-        result = await coordinator.execute_task(
-            "Test task",
-            {"team_name": "TestTeam"}
-        )
+        result = await coordinator.execute_task("Test task", {"team_name": "TestTeam"})
 
         # Verify execution succeeded
         assert result["success"] is True
@@ -205,10 +199,7 @@ class TestTeamCoordinatorRecursionIntegration:
 
         # Try to execute team - should fail with RecursionDepthError
         with pytest.raises(RecursionDepthError) as exc_info:
-            await coordinator.execute_task(
-                "Test task",
-                {"team_name": "TestTeam"}
-            )
+            await coordinator.execute_task("Test task", {"team_name": "TestTeam"})
 
         # Verify error details
         error = exc_info.value
@@ -245,10 +236,7 @@ class TestTeamCoordinatorRecursionIntegration:
         coordinator._emit_team_event = capture_event
 
         # Execute task
-        result = await coordinator.execute_task(
-            "Test task",
-            {"team_name": "TestTeam"}
-        )
+        result = await coordinator.execute_task("Test task", {"team_name": "TestTeam"})
 
         # Verify events were emitted
         assert len(emitted_events) >= 1
@@ -283,10 +271,7 @@ class TestTeamCoordinatorRecursionIntegration:
         coordinator._recursion_ctx = custom_ctx
 
         # Execute task (should fail)
-        result = await coordinator.execute_task(
-            "Test task",
-            {"team_name": "TestTeam"}
-        )
+        result = await coordinator.execute_task("Test task", {"team_name": "TestTeam"})
 
         # Verify execution failed but didn't crash
         assert result["success"] is False
@@ -318,10 +303,7 @@ class TestTeamCoordinatorRecursionIntegration:
         coordinator2.add_member(MockTeamMember("member2", "Done"))
 
         # Execute first coordinator
-        result1 = await coordinator1.execute_task(
-            "Task 1",
-            {"team_name": "Team1"}
-        )
+        result1 = await coordinator1.execute_task("Task 1", {"team_name": "Team1"})
         assert result1["success"] is True
 
         # Depth should be 0 after execution
@@ -331,10 +313,7 @@ class TestTeamCoordinatorRecursionIntegration:
         shared_ctx.enter("workflow", "outer")
 
         # Execute second coordinator (should be at depth 2 during execution)
-        result2 = await coordinator2.execute_task(
-            "Task 2",
-            {"team_name": "Team2"}
-        )
+        result2 = await coordinator2.execute_task("Task 2", {"team_name": "Team2"})
         assert result2["success"] is True
 
         # Depth should be back to 1

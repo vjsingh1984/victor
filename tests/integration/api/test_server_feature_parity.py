@@ -46,6 +46,7 @@ async def legacy_server_app():
     try:
         # Import the legacy server module
         from web.server import main as legacy_main
+
         return legacy_main.app
     except ImportError as e:
         pytest.skip(f"Legacy server not available: {e}")
@@ -55,6 +56,7 @@ async def legacy_server_app():
 async def canonical_server_app():
     """Load the canonical server app."""
     from victor.integrations.api.fastapi_server import create_fastapi_app
+
     return create_fastapi_app()
 
 
@@ -73,7 +75,9 @@ async def canonical_http_client(canonical_server_app, mocker):
 
     # Mock the orchestrator to avoid real LLM calls
     mock_orchestrator = MagicMock()
-    mock_orchestrator.chat = AsyncMock(return_value=MagicMock(content="Test response", tool_calls=None))
+    mock_orchestrator.chat = AsyncMock(
+        return_value=MagicMock(content="Test response", tool_calls=None)
+    )
 
     # Make stream_chat return an async generator
     async def mock_stream_gen(prompt):
@@ -184,6 +188,7 @@ class TestDeprecationWarnings:
         """Test that legacy server module has deprecation notice."""
         try:
             from web.server import main as legacy_main
+
             module_file = Path(legacy_main.__file__)
 
             # Read the module source
@@ -192,8 +197,9 @@ class TestDeprecationWarnings:
             # Check for deprecation notice
             assert "DEPRECATED" in source, "Legacy server should have deprecation notice"
             assert "v0.6.0" in source, "Deprecation notice should mention removal version"
-            assert "victor/integrations/api/fastapi_server.py" in source, \
-                "Notice should point to canonical server"
+            assert (
+                "victor/integrations/api/fastapi_server.py" in source
+            ), "Notice should point to canonical server"
 
         except ImportError:
             pytest.skip("Legacy server not available")
@@ -206,8 +212,9 @@ class TestDeprecationWarnings:
         source = module_file.read_text()
 
         # Should not have deprecation notice
-        assert "DEPRECATED" not in source or "canonical" in source.lower(), \
-            "Canonical server should not be marked as deprecated"
+        assert (
+            "DEPRECATED" not in source or "canonical" in source.lower()
+        ), "Canonical server should not be marked as deprecated"
 
     def test_legacy_server_import_warning(self):
         """Test that importing legacy server triggers warning."""
@@ -329,8 +336,9 @@ class TestRenderingFeatureParity:
 
         # Document that this endpoint doesn't exist
         # In production, rendering might be handled by a separate service
-        assert response.status_code == 404, \
-            "Canonical server doesn't have render endpoints (expected)"
+        assert (
+            response.status_code == 404
+        ), "Canonical server doesn't have render endpoints (expected)"
 
 
 @pytest.mark.integration
@@ -349,16 +357,14 @@ class TestChatFeatureParity:
         from web.server import main as legacy_main
 
         routes = get_fastapi_routes(legacy_main.app)
-        assert "/ws" in routes or "/ws/" in routes, \
-            "Legacy server should have WebSocket endpoint"
+        assert "/ws" in routes or "/ws/" in routes, "Legacy server should have WebSocket endpoint"
 
     @pytest.mark.asyncio
     async def test_canonical_chat_endpoints(self, canonical_http_client):
         """Test canonical server chat endpoints."""
         # Canonical server has REST chat endpoints
         response = await canonical_http_client.post(
-            "/chat",
-            json={"messages": [{"role": "user", "content": "test"}]}
+            "/chat", json={"messages": [{"role": "user", "content": "test"}]}
         )
 
         # Should not be 404 (might fail due to orchestrator not initialized, but that's ok)
@@ -366,8 +372,7 @@ class TestChatFeatureParity:
 
         # Also check streaming endpoint
         response = await canonical_http_client.post(
-            "/chat/stream",
-            json={"messages": [{"role": "user", "content": "test"}]}
+            "/chat/stream", json={"messages": [{"role": "user", "content": "test"}]}
         )
         assert response.status_code != 404
 
@@ -379,10 +384,7 @@ class TestSessionManagementParity:
     @pytest.mark.asyncio
     async def test_legacy_session_token_endpoint(self, legacy_http_client):
         """Test legacy server session token endpoint."""
-        response = await legacy_http_client.post(
-            "/session/token",
-            json={"session_id": None}
-        )
+        response = await legacy_http_client.post("/session/token", json={"session_id": None})
 
         # Should work (might need auth, but endpoint exists)
         assert response.status_code != 404
@@ -406,6 +408,7 @@ class TestWebSocketFeatureParity:
         """Test legacy server has WebSocket route."""
         try:
             from web.server import main as legacy_main
+
             routes = get_fastapi_routes(legacy_main.app)
 
             # Legacy server has /ws WebSocket endpoint
@@ -418,12 +421,14 @@ class TestWebSocketFeatureParity:
     def test_canonical_websocket_routes(self):
         """Test canonical server WebSocket routes."""
         from victor.integrations.api import fastapi_server
+
         routes = get_fastapi_routes(fastapi_server.create_fastapi_app())
 
         # Canonical server has multiple WebSocket endpoints
         ws_routes = [r for r in routes.keys() if "ws" in r.lower()]
-        assert len(ws_routes) >= 2, \
-            "Canonical server should have multiple WebSocket routes (/ws, /ws/events)"
+        assert (
+            len(ws_routes) >= 2
+        ), "Canonical server should have multiple WebSocket routes (/ws, /ws/events)"
 
     @pytest.mark.asyncio
     async def test_websocket_endpoint_comparison(self):
@@ -433,19 +438,22 @@ class TestWebSocketFeatureParity:
 
         try:
             from web.server import main as legacy_main
+
             legacy_routes = get_fastapi_routes(legacy_main.app)
         except ImportError:
             legacy_routes = {}
 
         from victor.integrations.api import fastapi_server
+
         canonical_routes = get_fastapi_routes(fastapi_server.create_fastapi_app())
 
         legacy_ws = set(r for r in legacy_routes.keys() if "ws" in r.lower())
         canonical_ws = set(r for r in canonical_routes.keys() if "ws" in r.lower())
 
         # Canonical should have more WebSocket endpoints
-        assert len(canonical_ws) >= len(legacy_ws), \
-            "Canonical server should have >= WebSocket endpoints than legacy"
+        assert len(canonical_ws) >= len(
+            legacy_ws
+        ), "Canonical server should have >= WebSocket endpoints than legacy"
 
 
 # =============================================================================
@@ -539,18 +547,15 @@ class TestFeatureCompletenessMatrix:
             "health_check": {"legacy": True, "canonical": True},
             "websocket_chat": {"legacy": True, "canonical": True},
             "session_management": {"legacy": True, "canonical": True},
-
             # Rendering (legacy only)
             "plantuml_rendering": {"legacy": True, "canonical": False},
             "mermaid_rendering": {"legacy": True, "canonical": False},
             "graphviz_rendering": {"legacy": True, "canonical": False},
             "d2_rendering": {"legacy": True, "canonical": False},
-
             # REST API (canonical only)
             "rest_chat": {"legacy": False, "canonical": True},
             "rest_completions": {"legacy": False, "canonical": True},
             "rest_search": {"legacy": False, "canonical": True},
-
             # Advanced features (canonical only)
             "background_agents": {"legacy": False, "canonical": True},
             "workflow_management": {"legacy": False, "canonical": True},
@@ -561,11 +566,9 @@ class TestFeatureCompletenessMatrix:
             "workspace_analysis": {"legacy": False, "canonical": True},
             "rl_stats": {"legacy": False, "canonical": True},
             "mcp_integration": {"legacy": False, "canonical": True},
-
             # Event streaming (canonical only)
             "event_bridge_ws": {"legacy": False, "canonical": True},
             "workflow_visualization": {"legacy": False, "canonical": True},
-
             # Placeholder endpoints
             "history_endpoint": {"legacy": True, "canonical": True},
             "models_endpoint": {"legacy": True, "canonical": True},
@@ -603,8 +606,7 @@ class TestFeatureCompletenessMatrix:
         assert "team_coordination" in canonical_only
 
         # Canonical server is feature-rich compared to legacy
-        assert len(canonical_only) > 10, \
-            "Canonical server should have significantly more features"
+        assert len(canonical_only) > 10, "Canonical server should have significantly more features"
 
     def test_shared_features(self, feature_matrix):
         """Identify features in both servers."""
@@ -671,6 +673,7 @@ class TestMigrationReadiness:
         # Test that canonical server has WebSocket support
         # (required for chat functionality)
         from victor.integrations.api import fastapi_server
+
         routes = get_fastapi_routes(fastapi_server.create_fastapi_app())
 
         ws_routes = [r for r in routes.keys() if "ws" in r.lower()]
@@ -679,8 +682,9 @@ class TestMigrationReadiness:
         # Document that rendering features are missing
         # (not a blocker, but requires separate solution)
         response = await canonical_http_client.post("/render/plantuml", content="test")
-        assert response.status_code == 404, \
-            "Rendering endpoints missing (needs alternative solution)"
+        assert (
+            response.status_code == 404
+        ), "Rendering endpoints missing (needs alternative solution)"
 
 
 # =============================================================================
@@ -712,7 +716,7 @@ class TestPerformanceCharacteristics:
         assert canonical_latency < 100, f"Canonical health check too slow: {canonical_latency}ms"
 
         # Document the difference
-        print(f"\nLatency comparison:")
+        print("\nLatency comparison:")
         print(f"  Legacy server: {legacy_latency:.2f}ms")
         print(f"  Canonical server: {canonical_latency:.2f}ms")
         print(f"  Difference: {abs(canonical_latency - legacy_latency):.2f}ms")
@@ -776,35 +780,35 @@ class TestMigrationReport:
         print("\n" + "=" * 70)
         print("MIGRATION SUMMARY REPORT")
         print("=" * 70)
-        print(f"\nLegacy Server:")
+        print("\nLegacy Server:")
         print(f"  Total endpoints: {summary['legacy_server']['total_endpoints']}")
-        print(f"  By category:")
-        for cat, count in sorted(summary['legacy_server']['by_category'].items()):
+        print("  By category:")
+        for cat, count in sorted(summary["legacy_server"]["by_category"].items()):
             print(f"    {cat}: {count}")
 
-        print(f"\nCanonical Server:")
+        print("\nCanonical Server:")
         print(f"  Total endpoints: {summary['canonical_server']['total_endpoints']}")
-        print(f"  By category:")
-        for cat, count in sorted(summary['canonical_server']['by_category'].items()):
+        print("  By category:")
+        for cat, count in sorted(summary["canonical_server"]["by_category"].items()):
             print(f"    {cat}: {count}")
 
-        print(f"\nMigration Status:")
+        print("\nMigration Status:")
         print(f"  Ready: {summary['migration_status']['ready_for_migration']}")
         print(f"  Blockers: {len(summary['migration_status']['blockers'])}")
-        if summary['migration_status']['blockers']:
-            for blocker in summary['migration_status']['blockers']:
+        if summary["migration_status"]["blockers"]:
+            for blocker in summary["migration_status"]["blockers"]:
                 print(f"    - {blocker}")
         print(f"  Warnings: {len(summary['migration_status']['warnings'])}")
-        for warning in summary['migration_status']['warnings']:
+        for warning in summary["migration_status"]["warnings"]:
             print(f"    - {warning}")
-        print(f"\nRecommendations:")
-        for rec in summary['migration_status']['recommendations']:
+        print("\nRecommendations:")
+        for rec in summary["migration_status"]["recommendations"]:
             print(f"  - {rec}")
 
         print("\n" + "=" * 70)
 
         # Assert migration readiness
-        assert summary["migration_status"]["ready_for_migration"], \
-            "Should be ready for migration"
-        assert len(summary["migration_status"]["blockers"]) == 0, \
-            "Should have no migration blockers"
+        assert summary["migration_status"]["ready_for_migration"], "Should be ready for migration"
+        assert (
+            len(summary["migration_status"]["blockers"]) == 0
+        ), "Should have no migration blockers"

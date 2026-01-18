@@ -204,6 +204,7 @@ class TestCacheBackendProtocol:
 # Test Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def backend():
     """Provide a cache backend instance for testing."""

@@ -211,9 +211,7 @@ workflows:
 
             # Compile with custom depth override (if supported)
             # This tests that the compiler accepts max_recursion_depth parameter
-            compiled_custom = compiler.compile_definition(
-                workflow_def, max_recursion_depth=10
-            )
+            compiled_custom = compiler.compile_definition(workflow_def, max_recursion_depth=10)
             assert compiled_custom is not None
         finally:
             Path(temp_file).unlink()
@@ -602,6 +600,7 @@ workflows:
             # If nodes have type information, verify they're team nodes
             if node_types:
                 from victor.workflows.definition import WorkflowNodeType
+
                 for node_id, node_type in node_types.items():
                     if node_id in ["research_team", "implement_team", "review_team"]:
                         # Check if it's a team type (either string "team" or WorkflowNodeType.TEAM)

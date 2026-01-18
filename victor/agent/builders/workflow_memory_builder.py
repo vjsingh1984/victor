@@ -77,14 +77,19 @@ class WorkflowMemoryBuilder(FactoryAwareBuilder):
 
         # Persistent conversation memory with SQLite backing (via factory)
         # Provides session recovery, token-aware pruning, and multi-turn context retention
-        orchestrator.memory_manager, orchestrator._memory_session_id = factory.create_memory_components(
-            orchestrator.provider_name, orchestrator._tool_calling_caps_internal.native_tool_calls
+        orchestrator.memory_manager, orchestrator._memory_session_id = (
+            factory.create_memory_components(
+                orchestrator.provider_name,
+                orchestrator._tool_calling_caps_internal.native_tool_calls,
+            )
         )
         components["memory_manager"] = orchestrator.memory_manager
         components["memory_session_id"] = orchestrator._memory_session_id
 
         # Initialize LanceDB embedding store for efficient semantic retrieval if memory enabled
-        if orchestrator.memory_manager and getattr(self.settings, "conversation_embeddings_enabled", True):
+        if orchestrator.memory_manager and getattr(
+            self.settings, "conversation_embeddings_enabled", True
+        ):
             try:
                 orchestrator._init_conversation_embedding_store()
             except ImportError as embed_err:

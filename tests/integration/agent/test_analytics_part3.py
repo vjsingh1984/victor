@@ -171,9 +171,7 @@ class TestSessionStatsIntegration:
         # assert stats["message_count"] == 2
 
     @pytest.mark.asyncio
-    async def test_get_session_stats_with_invalid_session_id(
-        self, memory_store: ConversationStore
-    ):
+    async def test_get_session_stats_with_invalid_session_id(self, memory_store: ConversationStore):
         """Test get_session_stats with non-existent session.
 
         Scenario:
@@ -367,9 +365,7 @@ class TestFlushAnalyticsIntegration:
 
         # Create working tracker
         working_tracker = MagicMock()
-        working_tracker.get_statistics = MagicMock(
-            return_value={"unique_transitions": 10}
-        )
+        working_tracker.get_statistics = MagicMock(return_value={"unique_transitions": 10})
 
         # Create coordinator with failing exporter
         coordinator = EvaluationCoordinator(

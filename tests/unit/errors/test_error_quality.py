@@ -316,8 +316,7 @@ class TestRecoveryHints:
             assert error.recovery_hint is not None
             # Should mention checking or fixing
             assert any(
-                word in error.recovery_hint.lower()
-                for word in ["check", "verify", "fix", "try"]
+                word in error.recovery_hint.lower() for word in ["check", "verify", "fix", "try"]
             )
 
     def test_workflow_error_recovery_includes_checkpoint(self):

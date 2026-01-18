@@ -419,7 +419,10 @@ class InputWidget(Static):
         elif event.key == "down":
             # Allow "down" to navigate history only if already browsing
             if self._history_index != -1:
-                is_at_bottom = self._input.cursor_location[CURSOR_ROW_INDEX] == len(self._input.document.lines) - 1
+                is_at_bottom = (
+                    self._input.cursor_location[CURSOR_ROW_INDEX]
+                    == len(self._input.document.lines) - 1
+                )
                 if is_at_bottom:
                     self._history_next()
                     event.prevent_default()
@@ -609,7 +612,9 @@ class ToolCallWidget(Static):
                 if len(self.error_message.split("\n")[0]) > 60:
                     first_line += "..."
                 self._error_summary = first_line
-                self._show_expand_button = "\n" in self.error_message or len(self.error_message) > 60
+                self._show_expand_button = (
+                    "\n" in self.error_message or len(self.error_message) > 60
+                )
 
                 yield Label(f"Error: {self._error_summary}", classes="error-summary")
                 if self._show_expand_button:
@@ -622,10 +627,12 @@ class ToolCallWidget(Static):
                     yield Vertical(
                         Label(truncated_error, id="error-text"),
                         id="error-details",
-                        classes="error-details hidden"
+                        classes="error-details hidden",
                     )
 
-    def update_status(self, status: str, elapsed: float | None = None, error_message: str | None = None) -> None:
+    def update_status(
+        self, status: str, elapsed: float | None = None, error_message: str | None = None
+    ) -> None:
         """Update tool call status and auto-collapse if complete.
 
         Args:
@@ -728,9 +735,6 @@ class ToolCallWidget(Static):
                     expand_btn.label = "[+] Show Details"
             except Exception:
                 pass  # Silently fail if widgets not found
-
-
-
 
 
 class ThinkingWidget(Static):
@@ -1056,6 +1060,7 @@ class StreamingMessageBlock(Static):
         # Skip debouncing during initialization (no app context yet)
         # Check if widget is mounted by testing if we can access app
         from textual._context import NoActiveAppError
+
         try:
             # Try to access app - will raise NoActiveAppError if not mounted
             _ = self.app
@@ -1078,10 +1083,7 @@ class StreamingMessageBlock(Static):
             self._render_timer.stop()
 
         # Schedule debounced render
-        self._render_timer = self.set_timer(
-            self._render_debounce_ms / 1000.0,
-            self._do_render
-        )
+        self._render_timer = self.set_timer(self._render_debounce_ms / 1000.0, self._do_render)
 
     def watch_is_streaming(self, streaming: bool) -> None:
         """Show/hide streaming cursor."""
@@ -1106,7 +1108,10 @@ class StreamingMessageBlock(Static):
 
                 if content_lines > 100 and not self.is_streaming:
                     # Use incremental rendering for large completed messages
-                    if not hasattr(self, "_incremental_renderer") or self._incremental_renderer is None:
+                    if (
+                        not hasattr(self, "_incremental_renderer")
+                        or self._incremental_renderer is None
+                    ):
                         self._incremental_renderer = IncrementalMarkdownRenderer(self.content)
                         self._incremental_renderer.render_next_chunk(body)
                         # Schedule remaining chunks
@@ -1397,19 +1402,16 @@ class VirtualScrollContainer(VerticalScroll):
         elif not should_enable and self._use_virtual_scrolling:
             self._use_virtual_scrolling = False
 
-    def _add_message_to_store(
-        self,
-        role: str,
-        content: str,
-        msg_type: str = "message"
-    ) -> None:
+    def _add_message_to_store(self, role: str, content: str, msg_type: str = "message") -> None:
         """Add message data to virtual store (lightweight operation)."""
-        self._all_messages.append({
-            "role": role,
-            "content": content,
-            "type": msg_type,
-            "id": self._message_count,
-        })
+        self._all_messages.append(
+            {
+                "role": role,
+                "content": content,
+                "type": msg_type,
+                "id": self._message_count,
+            }
+        )
         self._message_count += 1
         self._check_enable_virtual_scrolling()
 

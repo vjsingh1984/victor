@@ -103,15 +103,17 @@ class TaskFeatures:
         Returns:
             Feature vector
         """
-        return np.array([
-            self.complexity,
-            self.estimated_lines_of_code,
-            self.file_count,
-            self.urgency,
-            self.dependencies,
-            self.novelty,
-            len(self.required_expertise),
-        ])
+        return np.array(
+            [
+                self.complexity,
+                self.estimated_lines_of_code,
+                self.file_count,
+                self.urgency,
+                self.dependencies,
+                self.novelty,
+                len(self.required_expertise),
+            ]
+        )
 
     @classmethod
     def from_task(cls, task: str, context: Dict[str, Any]) -> "TaskFeatures":
@@ -183,18 +185,22 @@ class TeamFeatures:
         Returns:
             Feature vector
         """
-        return np.array([
-            self.member_count,
-            self.total_tool_budget,
-            self.expertise_coverage,
-            self.diversity,
-            self.avg_confidence,
-            float(self.has_manager),
-            self.max_delegation_depth,
-        ])
+        return np.array(
+            [
+                self.member_count,
+                self.total_tool_budget,
+                self.expertise_coverage,
+                self.diversity,
+                self.avg_confidence,
+                float(self.has_manager),
+                self.max_delegation_depth,
+            ]
+        )
 
     @classmethod
-    def from_team_config(cls, team_config: "TeamConfig", task_features: TaskFeatures) -> "TeamFeatures":
+    def from_team_config(
+        cls, team_config: "TeamConfig", task_features: TaskFeatures
+    ) -> "TeamFeatures":
         """Extract features from team configuration.
 
         Args:
@@ -456,7 +462,9 @@ class TeamPredictor:
         member_factor = max(0.5, 1.0 - (team_features.member_count - 1) * 0.1)
         budget_factor = 1.0 + (team_features.total_tool_budget / 100) * 0.3
 
-        predicted_time = base_time * complexity_factor * loc_factor * file_factor * member_factor * budget_factor
+        predicted_time = (
+            base_time * complexity_factor * loc_factor * file_factor * member_factor * budget_factor
+        )
 
         # Confidence based on historical data
         confidence = min(0.9, 0.5 + len(self._historical_records) / 1000)
@@ -507,7 +515,9 @@ class TeamPredictor:
         # Adjust based on budget
         budget_bonus = min(0.05, team_features.total_tool_budget / 2000 * 0.05)
 
-        predicted_prob = base_prob + expertise_bonus - complexity_penalty + team_bonus + budget_bonus
+        predicted_prob = (
+            base_prob + expertise_bonus - complexity_penalty + team_bonus + budget_bonus
+        )
         predicted_prob = max(0.0, min(1.0, predicted_prob))
 
         confidence = min(0.95, 0.6 + len(self._historical_records) / 500)
@@ -652,9 +662,9 @@ class TeamPredictor:
         formation_scores = {}
 
         # Sequential: good for simple, single-file tasks
-        sequential_score = (
-            1.0 - task_features.complexity
-        ) * 0.7 + (1.0 / max(1, task_features.file_count)) * 0.3
+        sequential_score = (1.0 - task_features.complexity) * 0.7 + (
+            1.0 / max(1, task_features.file_count)
+        ) * 0.3
         formation_scores["sequential"] = sequential_score
 
         # Parallel: good for multi-file, complex tasks
@@ -664,9 +674,7 @@ class TeamPredictor:
         formation_scores["parallel"] = parallel_score
 
         # Hierarchical: good for complex tasks with clear manager
-        hierarchical_score = (
-            task_features.complexity * 0.6 + float(team_features.has_manager) * 0.4
-        )
+        hierarchical_score = task_features.complexity * 0.6 + float(team_features.has_manager) * 0.4
         formation_scores["hierarchical"] = hierarchical_score
 
         # Pipeline: good for sequential dependencies

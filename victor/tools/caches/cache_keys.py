@@ -314,8 +314,7 @@ class CacheKeyGenerator:
         # OPTIMIZATION: Use list comprehension for faster string building
         # This is ~30% faster than repeated string concatenation
         parts = [
-            f"{msg.get('role', 'unknown')}:{str(msg.get('content', ''))[:100]}"
-            for msg in recent
+            f"{msg.get('role', 'unknown')}:{str(msg.get('content', ''))[:100]}" for msg in recent
         ]
 
         combined = "|".join(parts)

@@ -38,6 +38,7 @@ class TestWorkflowClassDecorator:
         class TestWorkflow1(BaseWorkflow):
             name = "test_workflow_1"
             description = "Test workflow 1"
+
             def run(self, context):
                 return context
 
@@ -50,6 +51,7 @@ class TestWorkflowClassDecorator:
         class TestWorkflow2(BaseWorkflow):
             name = "test_workflow_2"
             description = "Test workflow 2"
+
             def run(self, context):
                 return context
 
@@ -64,12 +66,14 @@ class TestWorkflowClassDecorator:
         @workflow_class
         class TestWorkflow3(BaseWorkflow):
             name = "test_workflow_3"
+
             def run(self, context):
                 return context
 
         @workflow_class
         class TestWorkflow4(BaseWorkflow):
             name = "test_workflow_4"
+
             def run(self, context):
                 return context
 
@@ -200,7 +204,7 @@ class TestGetWorkflowByName:
 
 
 class TestWorkflowDiscoveryIntegration:
-    """Integration tests for workflow """
+    """Integration tests for workflow"""
 
     def test_discovery_and_registration_flow(self):
         """Test the complete discovery and registration flow."""
@@ -228,6 +232,7 @@ class TestWorkflowDiscoveryIntegration:
         class TestWorkflow7(BaseWorkflow):
             name = "test_workflow_7"
             description = "Test workflow 7"
+
             def run(self, context):
                 return context
 

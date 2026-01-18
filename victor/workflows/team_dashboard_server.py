@@ -59,6 +59,7 @@ try:
     from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
     from fastapi.responses import JSONResponse
     from fastapi.middleware.cors import CORSMiddleware
+
     FASTAPI_AVAILABLE = True
 except ImportError:
     FASTAPI_AVAILABLE = False
@@ -190,12 +191,12 @@ class TeamExecutionState:
             "execution_id": self.execution_id,
             "team_id": self.team_id,
             "formation": self.formation,
-            "member_states": {
-                k: v.to_dict() for k, v in self.member_states.items()
-            },
+            "member_states": {k: v.to_dict() for k, v in self.member_states.items()},
             "shared_context": self.shared_context,
             "communication_logs": [log.to_dict() for log in self.communication_logs],
-            "negotiation_status": self.negotiation_status.__dict__ if self.negotiation_status else None,
+            "negotiation_status": (
+                self.negotiation_status.__dict__ if self.negotiation_status else None
+            ),
             "start_time": self.start_time.isoformat() if self.start_time else None,
             "end_time": self.end_time.isoformat() if self.end_time else None,
             "duration_seconds": self.duration_seconds,
@@ -545,8 +546,7 @@ class TeamDashboardServer:
                 "status": "healthy",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "active_connections": sum(
-                    len(conns)
-                    for conns in self._connection_manager._active_connections.values()
+                    len(conns) for conns in self._connection_manager._active_connections.values()
                 ),
                 "tracked_executions": len(self._execution_states),
             }
@@ -946,7 +946,9 @@ class TeamDashboardServer:
                 "rounds": result.rounds,
                 "consensus_achieved": result.consensus_achieved,
                 "votes": result.votes,
-                "agreed_proposal": result.agreed_proposal.__dict__ if result.agreed_proposal else None,
+                "agreed_proposal": (
+                    result.agreed_proposal.__dict__ if result.agreed_proposal else None
+                ),
             },
         )
 
@@ -981,11 +983,7 @@ class TeamDashboardServer:
         Returns:
             List of execution IDs
         """
-        return [
-            eid
-            for eid, state in self._execution_states.items()
-            if state.end_time is None
-        ]
+        return [eid for eid, state in self._execution_states.items() if state.end_time is None]
 
 
 # =============================================================================

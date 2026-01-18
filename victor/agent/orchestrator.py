@@ -165,6 +165,7 @@ from victor.agent.capability_registry import CapabilityRegistryMixin
 
 # Config and enums (used at runtime)
 from victor.config.config_loaders import get_provider_limits
+
 # ConversationEmbeddingStore imported lazily in _init_conversation_embedding_store to avoid loading LanceDB at module import time
 from victor.agent.conversation_state import ConversationStateMachine, ConversationStage
 from victor.agent.action_authorizer import ActionIntent, INTENT_BLOCKED_TOOLS
@@ -201,7 +202,12 @@ from victor.agent.session_state_manager import SessionStateManager, create_sessi
 
 # New Phase 1 extractions (Task 1)
 from victor.agent.configuration_manager import ConfigurationManager, create_configuration_manager
-from victor.agent.memory_manager import MemoryManager, SessionRecoveryManager, create_memory_manager, create_session_recovery_manager
+from victor.agent.memory_manager import (
+    MemoryManager,
+    SessionRecoveryManager,
+    create_memory_manager,
+    create_session_recovery_manager,
+)
 
 # Recovery - enums and functions used at runtime
 from victor.agent.recovery import RecoveryOutcome, FailureType, RecoveryAction
@@ -526,7 +532,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
         self._factory.initialize_orchestrator(self)
 
-
     def _on_tool_start_callback(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Callback when tool execution starts (from ToolPipeline)."""
         iteration = self._tool_pipeline.calls_used if hasattr(self, "_tool_pipeline") else 0
@@ -789,7 +794,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         self._memory_manager_wrapper = value if value is not None else None
         # Update SessionRecoveryManager's reference if it exists
-        if hasattr(self, "_session_recovery_manager") and self._session_recovery_manager is not None:
+        if (
+            hasattr(self, "_session_recovery_manager")
+            and self._session_recovery_manager is not None
+        ):
             self._session_recovery_manager._memory_manager = value if value is not None else None
 
     @property
@@ -2774,7 +2782,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 # Note: This requires the task analyzer to have analyzed the current task
                 task_complexity = getattr(self._task_analyzer, "_last_complexity", None)
                 if task_complexity:
-                    task_complexity = task_complexity.value if hasattr(task_complexity, "value") else str(task_complexity)
+                    task_complexity = (
+                        task_complexity.value
+                        if hasattr(task_complexity, "value")
+                        else str(task_complexity)
+                    )
         except Exception as e:
             logger.debug(f"Unable to get task complexity: {e}")
 
@@ -3664,9 +3676,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         return self._chat_coordinator._handle_force_completion_with_handler(ctx)
 
-    def _create_recovery_context(
-        self, stream_ctx: "StreamingChatContext"
-    ) -> Any:
+    def _create_recovery_context(self, stream_ctx: "StreamingChatContext") -> Any:
         """Create RecoveryContext via ChatCoordinator.
 
         Delegates to ChatCoordinator._create_recovery_context() for
@@ -3680,9 +3690,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         return self._chat_coordinator._create_recovery_context(stream_ctx)
 
-    async def _handle_budget_exhausted(
-        self, stream_ctx: "StreamingChatContext"
-    ) -> Any:
+    async def _handle_budget_exhausted(self, stream_ctx: "StreamingChatContext") -> Any:
         """Handle budget exhausted condition via ChatCoordinator.
 
         Delegates to ChatCoordinator._handle_budget_exhausted() for
@@ -3697,9 +3705,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         async for chunk in self._chat_coordinator._handle_budget_exhausted(stream_ctx):
             yield chunk
 
-    async def _handle_force_final_response(
-        self, stream_ctx: "StreamingChatContext"
-    ) -> Any:
+    async def _handle_force_final_response(self, stream_ctx: "StreamingChatContext") -> Any:
         """Handle force final response via ChatCoordinator.
 
         Delegates to ChatCoordinator._handle_force_final_response() for
@@ -4245,13 +4251,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             return
 
         if not health["can_auto_recover"]:
-            raise RuntimeError(
-                f"Tool selector cannot be recovered: {health['message']}"
-            )
+            raise RuntimeError(f"Tool selector cannot be recovered: {health['message']}")
 
-        logger.warning(
-            f"Tool selector not initialized, auto-recovering: {health['message']}"
-        )
+        logger.warning(f"Tool selector not initialized, auto-recovering: {health['message']}")
 
         # Attempt initialization
         if hasattr(self.tool_selector, "initialize_tool_embeddings"):
@@ -4306,9 +4308,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             orchestrator.intent_detector = components.services.action_authorizer
             orchestrator.search_router = components.services.search_router
 
-            orchestrator._conversation_controller = (
-                components.conversation.conversation_controller
-            )
+            orchestrator._conversation_controller = components.conversation.conversation_controller
             orchestrator.memory_manager = components.conversation.memory_manager
             orchestrator._memory_session_id = components.conversation.memory_session_id
             orchestrator.conversation_state = components.conversation.conversation_state

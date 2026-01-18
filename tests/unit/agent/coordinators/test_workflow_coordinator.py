@@ -72,9 +72,7 @@ class TestWorkflowCoordinator:
         return WorkflowRegistry()
 
     @pytest.fixture
-    def coordinator(
-        self, mock_workflow_registry: Mock
-    ) -> WorkflowCoordinator:
+    def coordinator(self, mock_workflow_registry: Mock) -> WorkflowCoordinator:
         """Create workflow coordinator with mock registry."""
         return WorkflowCoordinator(
             workflow_registry=mock_workflow_registry,
@@ -91,9 +89,7 @@ class TestWorkflowCoordinator:
 
     # Test initialization
 
-    def test_initialization_with_workflow_registry(
-        self, mock_workflow_registry: Mock
-    ):
+    def test_initialization_with_workflow_registry(self, mock_workflow_registry: Mock):
         """Test that coordinator initializes with workflow registry."""
         # Execute
         coordinator = WorkflowCoordinator(
@@ -130,9 +126,7 @@ class TestWorkflowCoordinator:
         count = coordinator.register_default_workflows()
 
         # Assert
-        mock_register_builtin.assert_called_once_with(
-            coordinator.workflow_registry
-        )
+        mock_register_builtin.assert_called_once_with(coordinator.workflow_registry)
         assert count == 5
 
     @patch("victor.workflows.discovery.register_builtin_workflows")
@@ -254,9 +248,7 @@ class TestWorkflowCoordinator:
         """Test list_workflows with many registered workflows."""
         # Setup
         workflow_names = [f"workflow_{i}" for i in range(100)]
-        mock_workflow_registry._workflows = {
-            name: Mock() for name in workflow_names
-        }
+        mock_workflow_registry._workflows = {name: Mock() for name in workflow_names}
 
         # Execute
         workflows = coordinator.list_workflows()
@@ -406,9 +398,7 @@ class TestWorkflowCoordinator:
     ):
         """Test get_workflow_count with many workflows."""
         # Setup
-        mock_workflow_registry._workflows = {
-            f"workflow_{i}": Mock() for i in range(50)
-        }
+        mock_workflow_registry._workflows = {f"workflow_{i}": Mock() for i in range(50)}
 
         # Execute
         count = coordinator.get_workflow_count()
@@ -452,9 +442,7 @@ class TestWorkflowCoordinatorIntegration:
         return WorkflowRegistry()
 
     @pytest.fixture
-    def coordinator(
-        self, workflow_registry: WorkflowRegistry
-    ) -> WorkflowCoordinator:
+    def coordinator(self, workflow_registry: WorkflowRegistry) -> WorkflowCoordinator:
         """Create workflow coordinator with real registry."""
         return WorkflowCoordinator(
             workflow_registry=workflow_registry,
@@ -483,10 +471,7 @@ class TestWorkflowCoordinatorIntegration:
     ):
         """Test registering and listing multiple workflows."""
         # Register multiple workflows
-        workflows = [
-            MockWorkflow(f"workflow_{i}", f"Description {i}")
-            for i in range(5)
-        ]
+        workflows = [MockWorkflow(f"workflow_{i}", f"Description {i}") for i in range(5)]
 
         for workflow in workflows:
             workflow_registry.register(workflow)
@@ -535,9 +520,7 @@ class TestWorkflowCoordinatorEdgeCases:
         return registry
 
     @pytest.fixture
-    def coordinator(
-        self, mock_workflow_registry: Mock
-    ) -> WorkflowCoordinator:
+    def coordinator(self, mock_workflow_registry: Mock) -> WorkflowCoordinator:
         """Create workflow coordinator."""
         return WorkflowCoordinator(
             workflow_registry=mock_workflow_registry,
@@ -555,9 +538,7 @@ class TestWorkflowCoordinatorEdgeCases:
             "workflow:with:colons",
             "workflow/with/slashes",
         ]
-        mock_workflow_registry._workflows = {
-            name: Mock() for name in special_names
-        }
+        mock_workflow_registry._workflows = {name: Mock() for name in special_names}
 
         # Execute & Assert
         for name in special_names:
@@ -580,9 +561,7 @@ class TestWorkflowCoordinatorEdgeCases:
             "workflow_مرحبا",
             "workflow_🚀",
         ]
-        mock_workflow_registry._workflows = {
-            name: Mock() for name in unicode_names
-        }
+        mock_workflow_registry._workflows = {name: Mock() for name in unicode_names}
 
         # Execute & Assert
         for name in unicode_names:
@@ -685,6 +664,7 @@ class TestWorkflowCoordinatorEdgeCases:
 
         # Use PropertyMock for the _workflows attribute
         from unittest.mock import PropertyMock
+
         type(registry)._workflows = PropertyMock(return_value=workflows_dict)
 
         # Create coordinator
@@ -706,9 +686,7 @@ class TestWorkflowCoordinatorWithRealWorkflows:
         return WorkflowRegistry()
 
     @pytest.fixture
-    def coordinator(
-        self, workflow_registry: WorkflowRegistry
-    ) -> WorkflowCoordinator:
+    def coordinator(self, workflow_registry: WorkflowRegistry) -> WorkflowCoordinator:
         """Create workflow coordinator."""
         return WorkflowCoordinator(
             workflow_registry=workflow_registry,

@@ -71,12 +71,16 @@ class ConfigWorkflowBuilder(FactoryAwareBuilder):
             conversation=orchestrator.conversation,
             lifecycle_manager=orchestrator._lifecycle_manager,
             memory_manager_wrapper=orchestrator._memory_manager_wrapper,
-            usage_logger=orchestrator.usage_logger if hasattr(orchestrator, "usage_logger") else None,
+            usage_logger=(
+                orchestrator.usage_logger if hasattr(orchestrator, "usage_logger") else None
+            ),
         )
         components["conversation_coordinator"] = orchestrator._conversation_coordinator
 
         # Initialize SearchCoordinator for search query routing
-        orchestrator._search_coordinator = SearchCoordinator(search_router=orchestrator.search_router)
+        orchestrator._search_coordinator = SearchCoordinator(
+            search_router=orchestrator.search_router
+        )
         components["search_coordinator"] = orchestrator._search_coordinator
 
         # Initialize TeamCoordinator for team specification and suggestions
@@ -93,7 +97,11 @@ class ConfigWorkflowBuilder(FactoryAwareBuilder):
         # SessionRecoveryManager: Handles session recovery operations
         orchestrator._session_recovery_manager = create_session_recovery_manager(
             memory_manager=orchestrator._memory_manager_wrapper,
-            lifecycle_manager=orchestrator._lifecycle_manager if hasattr(orchestrator, "_lifecycle_manager") else None,
+            lifecycle_manager=(
+                orchestrator._lifecycle_manager
+                if hasattr(orchestrator, "_lifecycle_manager")
+                else None
+            ),
         )
         components["session_recovery_manager"] = orchestrator._session_recovery_manager
 
@@ -108,7 +116,9 @@ class ConfigWorkflowBuilder(FactoryAwareBuilder):
             provider_name = orchestrator.provider_name or ""
             model_name = orchestrator.model or ""
 
-            logger.debug(f"Fetching provider limits for provider={provider_name}, model={model_name}")
+            logger.debug(
+                f"Fetching provider limits for provider={provider_name}, model={model_name}"
+            )
 
             provider_limits = get_provider_limits(
                 provider=provider_name,
@@ -134,7 +144,9 @@ class ConfigWorkflowBuilder(FactoryAwareBuilder):
         # Update the streaming handler with provider-specific session idle timeout
         if hasattr(orchestrator._streaming_handler, "session_idle_timeout"):
             old_timeout = orchestrator._streaming_handler.session_idle_timeout
-            orchestrator._streaming_handler.session_idle_timeout = orchestrator._session_idle_timeout
+            orchestrator._streaming_handler.session_idle_timeout = (
+                orchestrator._session_idle_timeout
+            )
             logger.info(
                 f"Updated streaming handler session_idle_timeout: {old_timeout}s -> {orchestrator._session_idle_timeout}s"
             )

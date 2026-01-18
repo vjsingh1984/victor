@@ -72,6 +72,7 @@ logger = logging.getLogger(__name__)
 
 class DebugAction(Enum):
     """Debug actions."""
+
     CONTINUE = "continue"
     STEP_OVER = "step_over"
     STEP_INTO = "step_into"
@@ -83,6 +84,7 @@ class DebugAction(Enum):
 
 class DebugState(Enum):
     """Debugger state."""
+
     IDLE = "idle"
     RUNNING = "running"
     PAUSED = "paused"
@@ -107,6 +109,7 @@ class BreakpointInfo:
         enabled: Whether enabled
         temp: Whether temporary (delete after first hit)
     """
+
     node_id: str
     condition: Optional[Callable[[Dict[str, Any]], bool]] = None
     hit_count: int = 0
@@ -124,6 +127,7 @@ class StackFrame:
         state: State at this frame
         timestamp: Timestamp
     """
+
     node_id: str
     node_type: str
     state: Dict[str, Any]
@@ -144,6 +148,7 @@ class DebugSession:
         current_state: Current workflow state
         events: Debug events
     """
+
     session_id: str
     workflow_name: str
     start_time: float
@@ -180,6 +185,7 @@ class WorkflowDebugger:
 
         # Create debug session
         import uuid
+
         self.session = DebugSession(
             session_id=str(uuid.uuid4()),
             workflow_name=self.workflow_name,
@@ -374,9 +380,7 @@ class WorkflowDebugger:
             State after step
         """
         if self.session.state not in {DebugState.PAUSED, DebugState.AT_BREAKPOINT}:
-            raise RuntimeError(
-                f"Cannot step into in state {self.session.state.value}"
-            )
+            raise RuntimeError(f"Cannot step into in state {self.session.state.value}")
 
         logger.info("Stepping into")
         self._step_action = DebugAction.STEP_INTO
@@ -394,9 +398,7 @@ class WorkflowDebugger:
             State after step
         """
         if self.session.state not in {DebugState.PAUSED, DebugState.AT_BREAKPOINT}:
-            raise RuntimeError(
-                f"Cannot step out in state {self.session.state.value}"
-            )
+            raise RuntimeError(f"Cannot step out in state {self.session.state.value}")
 
         logger.info("Stepping out")
         self._step_action = DebugAction.STEP_OUT
@@ -414,9 +416,7 @@ class WorkflowDebugger:
             State when breakpoint hit or execution complete
         """
         if self.session.state not in {DebugState.PAUSED, DebugState.AT_BREAKPOINT}:
-            raise RuntimeError(
-                f"Cannot continue in state {self.session.state.value}"
-            )
+            raise RuntimeError(f"Cannot continue in state {self.session.state.value}")
 
         logger.info("Continuing execution")
         self._step_action = DebugAction.CONTINUE
@@ -460,11 +460,7 @@ class WorkflowDebugger:
         Returns:
             Variables dictionary
         """
-        return {
-            k: v
-            for k, v in self.session.current_state.items()
-            if not k.startswith("_")
-        }
+        return {k: v for k, v in self.session.current_state.items() if not k.startswith("_")}
 
     def get_variable(self, name: str) -> Any:
         """Get a specific variable value.

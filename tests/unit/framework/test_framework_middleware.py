@@ -917,9 +917,7 @@ class TestCacheMiddleware:
         assert result1.proceed is True
 
         # Simulate successful result
-        await middleware.after_tool_call(
-            "read", args, "file content", success=True
-        )
+        await middleware.after_tool_call("read", args, "file content", success=True)
 
         # Second call - cache hit
         result2 = await middleware.before_tool_call("read", args)
@@ -941,9 +939,7 @@ class TestCacheMiddleware:
         args = {"path": "/tmp/test.txt"}
 
         await middleware.before_tool_call("read", args)
-        await middleware.after_tool_call(
-            "read", args, "error", success=False
-        )
+        await middleware.after_tool_call("read", args, "error", success=False)
 
         # Should not cache failed calls
         result2 = await middleware.before_tool_call("read", args)
@@ -1108,6 +1104,7 @@ class TestRateLimitMiddleware:
 
         # Wait for window to expire
         import asyncio
+
         await asyncio.sleep(1.1)
 
         # Should be allowed again
@@ -1276,9 +1273,7 @@ class TestSafetyCheckMiddleware:
     @pytest.mark.asyncio
     async def test_blocks_write_outside_allowed_paths(self):
         """Should block writes to paths outside allowed list."""
-        middleware = SafetyCheckMiddleware(
-            allowed_paths={"/tmp", "/home/user/workspace"}
-        )
+        middleware = SafetyCheckMiddleware(allowed_paths={"/tmp", "/home/user/workspace"})
 
         result = await middleware.before_tool_call("write_file", {"path": "/etc/passwd"})
 
@@ -1288,9 +1283,7 @@ class TestSafetyCheckMiddleware:
     @pytest.mark.asyncio
     async def test_allows_write_in_allowed_paths(self):
         """Should allow writes to allowed paths."""
-        middleware = SafetyCheckMiddleware(
-            allowed_paths={"/tmp", "/home/user/workspace"}
-        )
+        middleware = SafetyCheckMiddleware(allowed_paths={"/tmp", "/home/user/workspace"})
 
         result = await middleware.before_tool_call("write_file", {"path": "/tmp/test.txt"})
 
@@ -1301,9 +1294,7 @@ class TestSafetyCheckMiddleware:
         """Should block dangerous shell commands."""
         middleware = SafetyCheckMiddleware(blocked_tools=set())
 
-        result = await middleware.before_tool_call(
-            "execute_bash", {"command": "rm -rf /"}
-        )
+        result = await middleware.before_tool_call("execute_bash", {"command": "rm -rf /"})
 
         assert result.proceed is False
         assert "blocked for safety reasons" in result.error_message

@@ -334,9 +334,7 @@ class TestCombinedToolValidator:
         registry = MockToolRegistry(["read"])
         validator = CombinedToolValidator(registry)
 
-        assert isinstance(
-            validator.get_availability_validator(), ToolAvailabilityValidator
-        )
+        assert isinstance(validator.get_availability_validator(), ToolAvailabilityValidator)
         assert isinstance(validator.get_budget_validator(), ToolBudgetValidator)
 
 

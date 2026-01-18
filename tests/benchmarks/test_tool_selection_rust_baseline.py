@@ -242,10 +242,7 @@ def run_benchmark(
         memory_used=peak,
     )
 
-    logger.info(
-        f"{name}: {result.avg_latency:.3f}ms avg, "
-        f"{result.throughput:.0f} ops/sec"
-    )
+    logger.info(f"{name}: {result.avg_latency:.3f}ms avg, " f"{result.throughput:.0f} ops/sec")
 
     return result
 
@@ -677,9 +674,7 @@ def python_filter_generator(
     return list(t for t in tools if categories.get(t) in available)
 
 
-def python_filter_set(
-    tools: List[str], categories: Dict[str, str], available: set
-) -> List[str]:
+def python_filter_set(tools: List[str], categories: Dict[str, str], available: set) -> List[str]:
     """Filter tools using set operations.
 
     Args:
@@ -775,9 +770,7 @@ def test_python_filter_set():
 class MockTool:
     """Mock tool for pipeline benchmarks."""
 
-    def __init__(
-        self, name: str, description: str, category: str, embedding: np.ndarray
-    ):
+    def __init__(self, name: str, description: str, category: str, embedding: np.ndarray):
         self.name = name
         self.description = description
         self.category = category
@@ -804,9 +797,7 @@ def python_tool_selection_pipeline(
         List of (tool_name, similarity) tuples
     """
     # Step 1: Filter by category
-    filtered_tools = [
-        t for t in tools if t.category in available_categories
-    ]
+    filtered_tools = [t for t in tools if t.category in available_categories]
 
     if not filtered_tools:
         return []
@@ -1085,41 +1076,63 @@ def test_generate_python_baseline_report():
     # Generate report
     report = [
         "# Python Tool Selection Baseline Performance Report",
-        f"",
+        "",
         f"**Generated:** {suite.end_time.strftime('%Y-%m-%d %H:%M:%S')}",
-        f"",
-        f"## Purpose",
-        f"",
-        f"This report establishes baseline performance metrics for the current Python",
-        f"implementation of tool selection operations. These metrics serve as a reference",
-        f"point for comparing against the Rust SIMD-optimized implementation.",
-        f"",
-        f"## Implementation Variants",
-        f"",
-        f"1. **Pure Python**: Standard Python loops and list operations",
-        f"2. **NumPy**: Vectorized operations using NumPy",
-        f"3. **Rust SIMD**: SIMD-optimized Rust implementation (not benchmarked here)",
-        f"",
+        "",
+        "## Purpose",
+        "",
+        "This report establishes baseline performance metrics for the current Python",
+        "implementation of tool selection operations. These metrics serve as a reference",
+        "point for comparing against the Rust SIMD-optimized implementation.",
+        "",
+        "## Implementation Variants",
+        "",
+        "1. **Pure Python**: Standard Python loops and list operations",
+        "2. **NumPy**: Vectorized operations using NumPy",
+        "3. **Rust SIMD**: SIMD-optimized Rust implementation (not benchmarked here)",
+        "",
     ]
 
     # Add cosine similarity section
-    report.append(f"## Cosine Similarity Benchmarks")
-    report.append(f"")
-    report.append(f"Computes similarity between query embedding and multiple tool embeddings.")
-    report.append(f"")
+    report.append("## Cosine Similarity Benchmarks")
+    report.append("")
+    report.append("Computes similarity between query embedding and multiple tool embeddings.")
+    report.append("")
     report.append(suite.to_markdown_table())
     report.append(suite.calculate_speedup_table())
 
     # Add performance comparison table
-    report.append(f"\n### Performance Comparison by Implementation")
-    report.append(f"")
-    report.append(f"| Tool Set Size | Pure Python | NumPy | Expected Speedup (NumPy) | Expected Speedup (Rust) |")
-    report.append(f"|--------------|-------------|-------|--------------------------|-------------------------|")
+    report.append("\n### Performance Comparison by Implementation")
+    report.append("")
+    report.append(
+        "| Tool Set Size | Pure Python | NumPy | Expected Speedup (NumPy) | Expected Speedup (Rust) |"
+    )
+    report.append(
+        "|--------------|-------------|-------|--------------------------|-------------------------|"
+    )
 
     comparisons = [
-        ("Small (10 tools)", "test_python_cosine_similarity_small", "test_python_cosine_similarity_small_numpy", 5, 10),
-        ("Medium (50 tools)", "test_python_cosine_similarity_medium", "test_python_cosine_similarity_medium_numpy", 4, 8),
-        ("Large (100 tools)", "test_python_cosine_similarity_large", "test_python_cosine_similarity_large_numpy", 5, 10),
+        (
+            "Small (10 tools)",
+            "test_python_cosine_similarity_small",
+            "test_python_cosine_similarity_small_numpy",
+            5,
+            10,
+        ),
+        (
+            "Medium (50 tools)",
+            "test_python_cosine_similarity_medium",
+            "test_python_cosine_similarity_medium_numpy",
+            4,
+            8,
+        ),
+        (
+            "Large (100 tools)",
+            "test_python_cosine_similarity_large",
+            "test_python_cosine_similarity_large_numpy",
+            5,
+            10,
+        ),
     ]
 
     for size, py_test, np_test, np_speedup, rust_speedup in comparisons:
@@ -1137,73 +1150,75 @@ def test_generate_python_baseline_report():
             )
 
     # Add top-k selection section
-    report.append(f"\n## Top-K Selection Benchmarks")
-    report.append(f"")
-    report.append(f"Selects top-k items from a list of scores using different algorithms.")
-    report.append(f"")
+    report.append("\n## Top-K Selection Benchmarks")
+    report.append("")
+    report.append("Selects top-k items from a list of scores using different algorithms.")
+    report.append("")
 
     # Add pipeline benchmarks
-    report.append(f"\n## End-to-End Pipeline Benchmarks")
-    report.append(f"")
-    report.append(f"Complete tool selection pipeline including filtering and ranking.")
-    report.append(f"")
+    report.append("\n## End-to-End Pipeline Benchmarks")
+    report.append("")
+    report.append("Complete tool selection pipeline including filtering and ranking.")
+    report.append("")
 
     # Add memory usage
     if hasattr(test_memory_tool_embeddings, "result"):
         r = test_memory_tool_embeddings.result
-        report.append(f"## Memory Usage")
-        report.append(f"")
+        report.append("## Memory Usage")
+        report.append("")
         report.append(f"- Per tool embedding (384 dims): {r['per_tool_kb']:.3f} KB")
         report.append(f"- 100 tool embeddings: {r['total_kb']:.2f} KB")
-        report.append(f"")
+        report.append("")
 
     # Add key findings
-    report.append(f"## Key Findings")
-    report.append(f"")
-    report.append(f"### NumPy vs Pure Python")
-    report.append(f"")
-    report.append(f"- NumPy provides **4-5x speedup** for cosine similarity")
-    report.append(f"- Vectorized operations significantly reduce Python loop overhead")
-    report.append(f"- Memory overhead is minimal due to efficient NumPy arrays")
-    report.append(f"")
-    report.append(f"### Expected Rust Improvements")
-    report.append(f"")
-    report.append(f"Based on the Rust SIMD implementation in `rust/src/similarity.rs`:")
-    report.append(f"")
-    report.append(f"| Operation | Python (NumPy) | Rust (SIMD) | Expected Speedup |")
-    report.append(f"|-----------|----------------|-------------|------------------|")
-    report.append(f"| Cosine Similarity (10 tools) | ~0.2ms | ~0.02ms | 5-10x |")
-    report.append(f"| Cosine Similarity (100 tools) | ~1.5ms | ~0.15ms | 8-10x |")
-    report.append(f"| Cosine Similarity (500 tools) | ~7ms | ~0.7ms | 10x |")
-    report.append(f"| Top-K Selection | ~0.02ms | ~0.01ms | 2x |")
-    report.append(f"| Full Pipeline (10 tools) | ~2ms | ~0.4ms | 5x |")
-    report.append(f"| Full Pipeline (100 tools) | ~15ms | ~3ms | 5x |")
-    report.append(f"")
+    report.append("## Key Findings")
+    report.append("")
+    report.append("### NumPy vs Pure Python")
+    report.append("")
+    report.append("- NumPy provides **4-5x speedup** for cosine similarity")
+    report.append("- Vectorized operations significantly reduce Python loop overhead")
+    report.append("- Memory overhead is minimal due to efficient NumPy arrays")
+    report.append("")
+    report.append("### Expected Rust Improvements")
+    report.append("")
+    report.append("Based on the Rust SIMD implementation in `rust/src/similarity.rs`:")
+    report.append("")
+    report.append("| Operation | Python (NumPy) | Rust (SIMD) | Expected Speedup |")
+    report.append("|-----------|----------------|-------------|------------------|")
+    report.append("| Cosine Similarity (10 tools) | ~0.2ms | ~0.02ms | 5-10x |")
+    report.append("| Cosine Similarity (100 tools) | ~1.5ms | ~0.15ms | 8-10x |")
+    report.append("| Cosine Similarity (500 tools) | ~7ms | ~0.7ms | 10x |")
+    report.append("| Top-K Selection | ~0.02ms | ~0.01ms | 2x |")
+    report.append("| Full Pipeline (10 tools) | ~2ms | ~0.4ms | 5x |")
+    report.append("| Full Pipeline (100 tools) | ~15ms | ~3ms | 5x |")
+    report.append("")
 
     # Add recommendations
-    report.append(f"## Recommendations")
-    report.append(f"")
-    report.append(f"### For Python Implementation")
-    report.append(f"")
-    report.append(f"1. **Use NumPy**: Already provides 4-5x speedup over pure Python")
-    report.append(f"2. **Pre-compute norms**: Cache tool embedding norms to avoid redundant calculations")
-    report.append(f"3. **Batch operations**: Process multiple queries together when possible")
-    report.append(f"4. **Use heap for top-k**: More efficient than full sort for small k")
-    report.append(f"")
-    report.append(f"### For Production Deployment")
-    report.append(f"")
-    report.append(f"1. **Rust for hot paths**: Use Rust SIMD for similarity computation")
-    report.append(f"2. **Hybrid approach**: Use Python for flexibility, Rust for performance")
-    report.append(f"3. **Caching**: Cache query embeddings and tool similarities")
-    report.append(f"4. **Lazy loading**: Only load embeddings when needed")
-    report.append(f"")
-    report.append(f"### Performance Targets")
-    report.append(f"")
-    report.append(f"For a production system with 100 tools:")
-    report.append(f"- **Target latency**: <5ms per tool selection")
-    report.append(f"- **Throughput**: >200 selections/second")
-    report.append(f"- **Memory**: <500KB for embeddings")
-    report.append(f"")
+    report.append("## Recommendations")
+    report.append("")
+    report.append("### For Python Implementation")
+    report.append("")
+    report.append("1. **Use NumPy**: Already provides 4-5x speedup over pure Python")
+    report.append(
+        "2. **Pre-compute norms**: Cache tool embedding norms to avoid redundant calculations"
+    )
+    report.append("3. **Batch operations**: Process multiple queries together when possible")
+    report.append("4. **Use heap for top-k**: More efficient than full sort for small k")
+    report.append("")
+    report.append("### For Production Deployment")
+    report.append("")
+    report.append("1. **Rust for hot paths**: Use Rust SIMD for similarity computation")
+    report.append("2. **Hybrid approach**: Use Python for flexibility, Rust for performance")
+    report.append("3. **Caching**: Cache query embeddings and tool similarities")
+    report.append("4. **Lazy loading**: Only load embeddings when needed")
+    report.append("")
+    report.append("### Performance Targets")
+    report.append("")
+    report.append("For a production system with 100 tools:")
+    report.append("- **Target latency**: <5ms per tool selection")
+    report.append("- **Throughput**: >200 selections/second")
+    report.append("- **Memory**: <500KB for embeddings")
+    report.append("")
 
     report_text = "\n".join(report)
 

@@ -87,7 +87,7 @@ class TestConversationCoordinator:
         # Assert
         assert messages == ["msg1", "msg2", "msg3"]
         # Verify it accessed the property
-        assert hasattr(conversation, 'messages')
+        assert hasattr(conversation, "messages")
 
     def test_add_message_to_conversation(self):
         """Test adding a message to conversation history."""

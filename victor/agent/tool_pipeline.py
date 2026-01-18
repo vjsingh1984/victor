@@ -71,6 +71,7 @@ from victor.config.tool_selection_defaults import (
 # Import signature accelerator for 10-20x faster signature generation and deduplication
 try:
     from victor.native.accelerators import get_signature_accelerator
+
     _SIGNATURE_ACCELERATOR_AVAILABLE = True
 except ImportError:
     _SIGNATURE_ACCELERATOR_AVAILABLE = False
@@ -79,6 +80,7 @@ except ImportError:
 # Legacy import for backward compatibility
 try:
     from victor.processing.native import compute_signature as native_compute_signature
+
     _NATIVE_SIGNATURE_AVAILABLE = True
 except ImportError:
     _NATIVE_SIGNATURE_AVAILABLE = False
@@ -135,7 +137,7 @@ class ExecutionMetrics:
     failed_executions: int = 0
     skipped_executions: int = 0
     total_execution_time: float = 0.0
-    min_execution_time: float = float('inf')
+    min_execution_time: float = float("inf")
     max_execution_time: float = 0.0
     execution_times: List[float] = field(default_factory=list)
     tool_counts: Dict[str, int] = field(default_factory=dict)
@@ -275,7 +277,7 @@ class ExecutionMetrics:
             self.failed_executions = 0
             self.skipped_executions = 0
             self.total_execution_time = 0.0
-            self.min_execution_time = float('inf')
+            self.min_execution_time = float("inf")
             self.max_execution_time = 0.0
             self.execution_times.clear()
             self.tool_counts.clear()
@@ -302,7 +304,9 @@ class ExecutionMetrics:
             total = self.total_executions
 
         # Calculate derived metrics outside lock
-        hit_rate = cache_hits / (cache_hits + cache_misses) if (cache_hits + cache_misses) > 0 else 0.0
+        hit_rate = (
+            cache_hits / (cache_hits + cache_misses) if (cache_hits + cache_misses) > 0 else 0.0
+        )
         success_rate = successful / (successful + failed) if (successful + failed) > 0 else 0.0
         avg_time = total_time / len(times) if times else 0.0
 
@@ -333,7 +337,7 @@ class ExecutionMetrics:
             "avg_execution_time": avg_time,
             "median_execution_time": median,
             "p95_execution_time": p95,
-            "min_execution_time": min_time if min_time != float('inf') else 0.0,
+            "min_execution_time": min_time if min_time != float("inf") else 0.0,
             "max_execution_time": max_time,
             "top_tools": top_tools,
             "tool_errors": errors,
@@ -817,8 +821,7 @@ class ToolPipeline:
             self._signature_accelerator = get_signature_accelerator()
             if self._signature_accelerator.rust_available:
                 logger.info(
-                    "Tool pipeline: Using Rust signature accelerator "
-                    "(10x faster deduplication)"
+                    "Tool pipeline: Using Rust signature accelerator " "(10x faster deduplication)"
                 )
         else:
             self._signature_accelerator = None

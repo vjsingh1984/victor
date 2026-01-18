@@ -1102,7 +1102,9 @@ class ProjectDatabaseManager:
             logger.debug(f"Project schema version {current_version} is up to date")
             return
 
-        logger.info(f"Migrating project schema from version {current_version} to {CURRENT_SCHEMA_VERSION}")
+        logger.info(
+            f"Migrating project schema from version {current_version} to {CURRENT_SCHEMA_VERSION}"
+        )
 
         # Run version migrations
         for target_version in range(current_version + 1, CURRENT_SCHEMA_VERSION + 1):

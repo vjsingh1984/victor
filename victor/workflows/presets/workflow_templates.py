@@ -51,6 +51,7 @@ class WorkflowPreset:
 # CODE REVIEW WORKFLOW
 # =============================================================================()
 
+
 def _build_code_review_workflow() -> WorkflowDefinition:
     """Build code review workflow with researcher → reviewer → triage."""
 
@@ -127,6 +128,7 @@ CODE_REVIEW_WORKFLOW = WorkflowPreset(
 # REFACTORING WORKFLOW
 # =============================================================================()
 
+
 def _build_refactoring_workflow() -> WorkflowDefinition:
     """Build refactoring workflow with analysis → planning → execution → verification."""
 
@@ -201,13 +203,12 @@ REFACTORING_WORKFLOW = WorkflowPreset(
 # RESEARCH WORKFLOW
 # =============================================================================()
 
+
 def _build_research_workflow() -> WorkflowDefinition:
     """Build research workflow with exploration → synthesis → reporting."""
 
     return (
-        WorkflowBuilder(
-            "research", "Deep research with exploration and synthesis"
-        )
+        WorkflowBuilder("research", "Deep research with exploration and synthesis")
         .add_agent(
             "explore",
             "code_researcher",
@@ -249,6 +250,7 @@ RESEARCH_WORKFLOW = WorkflowPreset(
 # =============================================================================
 # BUG INVESTIGATION WORKFLOW
 # =============================================================================()
+
 
 def _build_bug_investigation_workflow() -> WorkflowDefinition:
     """Build bug investigation workflow with reproduction → analysis → fix."""
@@ -324,6 +326,7 @@ BUG_INVESTIGATION_WORKFLOW = WorkflowPreset(
 # FEATURE DEVELOPMENT WORKFLOW
 # =============================================================================()
 
+
 def _build_feature_development_workflow() -> WorkflowDefinition:
     """Build feature development workflow with planning → implementation → testing."""
 
@@ -381,6 +384,7 @@ FEATURE_DEVELOPMENT_WORKFLOW = WorkflowPreset(
 # =============================================================================
 # SECURITY AUDIT WORKFLOW
 # =============================================================================()
+
 
 def _build_security_audit_workflow() -> WorkflowDefinition:
     """Build security audit workflow with scanning → analysis → recommendations."""
@@ -492,9 +496,7 @@ def list_workflow_presets_by_category() -> Dict[str, List[str]]:
     return by_category
 
 
-def create_workflow_from_preset(
-    preset_name: str, **kwargs
-) -> Optional[WorkflowDefinition]:
+def create_workflow_from_preset(preset_name: str, **kwargs) -> Optional[WorkflowDefinition]:
     """Create a workflow from a preset with optional customization.
 
     Args:

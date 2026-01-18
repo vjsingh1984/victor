@@ -173,9 +173,7 @@ def test_container():
         # ContextCompactor
         elif "ContextCompactor" in service_str:
             compactor = MagicMock()
-            compactor.compact = AsyncMock(
-                side_effect=lambda conv, max_tokens: conv
-            )
+            compactor.compact = AsyncMock(side_effect=lambda conv, max_tokens: conv)
             return compactor
 
         # UsageAnalytics
@@ -257,7 +255,6 @@ def legacy_orchestrator(legacy_orchestrator_factory, test_container):
     orchestrator.active_session_id = "test_session_legacy"
 
     return orchestrator
-
 
 
 # ============================================================================
@@ -488,6 +485,7 @@ def mock_config_coordinator():
 
     async def mock_validate_config(config):
         from victor.agent.coordinators.config_coordinator import ValidationResult
+
         return ValidationResult(valid=True, errors=[])
 
     config_coord.load_config = AsyncMock(side_effect=mock_load_config)
@@ -525,9 +523,7 @@ def mock_context_coordinator():
     async def mock_is_within_budget(context: CompactionContext, budget: ContextBudget):
         return context.get("token_count", 0) < budget.get("max_tokens", 4096)
 
-    async def mock_compact_context(
-        context: CompactionContext, budget: ContextBudget
-    ):
+    async def mock_compact_context(context: CompactionContext, budget: ContextBudget):
         messages = context.get("messages", [])
         compacted = messages[-10:]  # Keep last 10
         return CompactionResult(
@@ -653,9 +649,7 @@ def performance_monitor():
                 return 0.0
             return sum(self.metrics[operation]) / len(self.metrics[operation])
 
-        def get_overhead_percentage(
-            self, base_time: float, operation: str
-        ) -> float:
+        def get_overhead_percentage(self, base_time: float, operation: str) -> float:
             """Calculate coordinator overhead as percentage."""
             avg_time = self.get_average_time(operation)
             if avg_time == 0:
@@ -676,18 +670,13 @@ def test_helpers():
 
     Returns a collection of utility functions for testing.
     """
+
     class Helpers:
         @staticmethod
-        async def wait_for_condition(
-            condition, timeout: float = 5.0, interval: float = 0.1
-        ):
+        async def wait_for_condition(condition, timeout: float = 5.0, interval: float = 0.1):
             """Wait for a condition to become true."""
             start = asyncio.get_event_loop().time()
-            while (
-                await condition()
-                if asyncio.iscoroutinefunction(condition)
-                else condition()
-            ):
+            while await condition() if asyncio.iscoroutinefunction(condition) else condition():
                 if asyncio.get_event_loop().time() - start >= timeout:
                     raise TimeoutError(f"Condition not met within {timeout}s")
                 await asyncio.sleep(interval)
@@ -698,9 +687,7 @@ def test_helpers():
             return {"role": role, "content": content}
 
         @staticmethod
-        def create_mock_tool_call(
-            tool_name: str, arguments: Dict[str, Any]
-        ) -> Dict[str, Any]:
+        def create_mock_tool_call(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
             """Create a mock tool call for testing."""
             return {
                 "id": f"call_{tool_name}_123",

@@ -79,7 +79,7 @@ class CachedSelection:
         timestamp: When this selection was cached
         hit_count: Number of times this cache entry was accessed
         ttl: Time-to-live in seconds
-        metadata: Additional metadata (selection time, scores, etc.)
+        metadata: Additional metadata (selection time, scores, latency, etc.)
     """
 
     value: List[str]
@@ -88,6 +88,7 @@ class CachedSelection:
     hit_count: int = 0
     ttl: Optional[int] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+    selection_latency_ms: float = 0.0  # Track selection time for performance metrics
 
     def is_expired(self) -> bool:
         """Check if this cached selection has expired.
@@ -123,6 +124,8 @@ class CacheMetrics:
         total_lookups: Total number of cache lookups
         total_entries: Current number of cached entries
         memory_usage_bytes: Estimated memory usage
+        total_latency_saved_ms: Total latency saved by cache hits (ms)
+        avg_latency_per_hit_ms: Average latency saved per cache hit (ms)
     """
 
     hits: int = 0
@@ -131,6 +134,8 @@ class CacheMetrics:
     total_lookups: int = 0
     total_entries: int = 0
     memory_usage_bytes: int = 0
+    total_latency_saved_ms: float = 0.0
+    avg_latency_per_hit_ms: float = 0.0
 
     @property
     def hit_rate(self) -> float:
@@ -143,10 +148,17 @@ class CacheMetrics:
             return 0.0
         return self.hits / self.total_lookups
 
-    def record_hit(self) -> None:
-        """Record a cache hit."""
+    def record_hit(self, latency_saved_ms: float = 0.0) -> None:
+        """Record a cache hit.
+
+        Args:
+            latency_saved_ms: Latency saved by this cache hit (ms)
+        """
         self.hits += 1
         self.total_lookups += 1
+        if latency_saved_ms > 0:
+            self.total_latency_saved_ms += latency_saved_ms
+            self.avg_latency_per_hit_ms = self.total_latency_saved_ms / self.hits
 
     def record_miss(self) -> None:
         """Record a cache miss."""
@@ -287,11 +299,14 @@ class ToolSelectionCache:
             self._record_miss(namespace)
             return None
 
-        # Record hit (registry already handles TTL validation)
+        # Record hit with latency saved
+        latency_saved = entry.selection_latency_ms
         entry.record_hit()
-        self._record_hit(namespace)
+        self._record_hit(namespace, latency_saved)
 
-        logger.debug(f"Cache hit: namespace={namespace}, key={key[:8]}...")
+        logger.debug(
+            f"Cache hit: namespace={namespace}, key={key[:8]}..., " f"saved={latency_saved:.2f}ms"
+        )
         return entry
 
     def put(
@@ -302,6 +317,7 @@ class ToolSelectionCache:
         namespace: str = NAMESPACE_QUERY,
         ttl: Optional[int] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        selection_latency_ms: float = 0.0,
     ) -> None:
         """Store selection in cache.
 
@@ -312,6 +328,7 @@ class ToolSelectionCache:
             namespace: Cache namespace (query, context, rl)
             ttl: Time-to-live in seconds (None for namespace default)
             metadata: Optional metadata (scores, latency, etc.)
+            selection_latency_ms: Time taken for this selection (for metrics)
         """
         if not self._enabled:
             return
@@ -325,17 +342,21 @@ class ToolSelectionCache:
         if ttl is None:
             ttl = self._get_default_ttl(namespace)
 
-        # Create cached selection
+        # Create cached selection with latency tracking
         cached = CachedSelection(
             value=value,
             tools=tools or [],
             ttl=ttl,
             metadata=metadata or {},
+            selection_latency_ms=selection_latency_ms,
         )
 
         # Store in registry
         registry.register(key, cached, ttl=ttl)
-        logger.debug(f"Cache put: namespace={namespace}, key={key[:8]}..., tools={len(value)}")
+        logger.debug(
+            f"Cache put: namespace={namespace}, key={key[:8]}..., "
+            f"tools={len(value)}, latency={selection_latency_ms:.2f}ms"
+        )
 
     # ========================================================================
     # Convenience Methods for Each Namespace
@@ -358,6 +379,7 @@ class ToolSelectionCache:
         value: List[str],
         tools: Optional[List[ToolDefinition]] = None,
         ttl: Optional[int] = None,
+        selection_latency_ms: float = 0.0,
     ) -> None:
         """Store query-based selection in cache.
 
@@ -366,8 +388,16 @@ class ToolSelectionCache:
             value: List of tool names
             tools: Optional full ToolDefinition objects
             ttl: Time-to-live (defaults to DEFAULT_QUERY_TTL)
+            selection_latency_ms: Time taken for this selection (for metrics)
         """
-        self.put(key, value, tools, namespace=self.NAMESPACE_QUERY, ttl=ttl)
+        self.put(
+            key,
+            value,
+            tools,
+            namespace=self.NAMESPACE_QUERY,
+            ttl=ttl,
+            selection_latency_ms=selection_latency_ms,
+        )
 
     def get_context(self, key: str) -> Optional[CachedSelection]:
         """Get cached context-aware selection.
@@ -386,6 +416,7 @@ class ToolSelectionCache:
         value: List[str],
         tools: Optional[List[ToolDefinition]] = None,
         ttl: Optional[int] = None,
+        selection_latency_ms: float = 0.0,
     ) -> None:
         """Store context-aware selection in cache.
 
@@ -394,8 +425,16 @@ class ToolSelectionCache:
             value: List of tool names
             tools: Optional full ToolDefinition objects
             ttl: Time-to-live (defaults to DEFAULT_CONTEXT_TTL)
+            selection_latency_ms: Time taken for this selection (for metrics)
         """
-        self.put(key, value, tools, namespace=self.NAMESPACE_CONTEXT, ttl=ttl)
+        self.put(
+            key,
+            value,
+            tools,
+            namespace=self.NAMESPACE_CONTEXT,
+            ttl=ttl,
+            selection_latency_ms=selection_latency_ms,
+        )
 
     def get_rl(self, key: str) -> Optional[CachedSelection]:
         """Get cached RL-based ranking.
@@ -414,6 +453,7 @@ class ToolSelectionCache:
         value: List[str],
         tools: Optional[List[ToolDefinition]] = None,
         ttl: Optional[int] = None,
+        selection_latency_ms: float = 0.0,
     ) -> None:
         """Store RL-based ranking in cache.
 
@@ -422,8 +462,16 @@ class ToolSelectionCache:
             value: List of tool names (ranked)
             tools: Optional full ToolDefinition objects
             ttl: Time-to-live (defaults to DEFAULT_RL_TTL)
+            selection_latency_ms: Time taken for this selection (for metrics)
         """
-        self.put(key, value, tools, namespace=self.NAMESPACE_RL, ttl=ttl)
+        self.put(
+            key,
+            value,
+            tools,
+            namespace=self.NAMESPACE_RL,
+            ttl=ttl,
+            selection_latency_ms=selection_latency_ms,
+        )
 
     # ========================================================================
     # Cache Invalidation
@@ -538,7 +586,7 @@ class ToolSelectionCache:
         """Get comprehensive cache statistics.
 
         Returns:
-            Dictionary with cache stats
+            Dictionary with cache stats including latency metrics
         """
         stats = {
             "enabled": self._enabled,
@@ -559,6 +607,8 @@ class ToolSelectionCache:
                 "evictions": metrics.evictions,
                 "total_entries": metrics.total_entries,
                 "utilization": registry_stats.get("utilization", 0.0),
+                "total_latency_saved_ms": metrics.total_latency_saved_ms,
+                "avg_latency_per_hit_ms": metrics.avg_latency_per_hit_ms,
             }
 
         # Add combined stats
@@ -569,6 +619,8 @@ class ToolSelectionCache:
             "hit_rate": combined.hit_rate,
             "evictions": combined.evictions,
             "total_entries": combined.total_entries,
+            "total_latency_saved_ms": combined.total_latency_saved_ms,
+            "avg_latency_per_hit_ms": combined.avg_latency_per_hit_ms,
         }
 
         return stats
@@ -628,15 +680,16 @@ class ToolSelectionCache:
         }
         return ttls.get(namespace, self._query_ttl)
 
-    def _record_hit(self, namespace: str) -> None:
+    def _record_hit(self, namespace: str, latency_saved_ms: float = 0.0) -> None:
         """Record a cache hit.
 
         Args:
             namespace: Cache namespace
+            latency_saved_ms: Latency saved by this cache hit (ms)
         """
         with self._metrics_lock:
             if namespace in self._metrics:
-                self._metrics[namespace].record_hit()
+                self._metrics[namespace].record_hit(latency_saved_ms)
 
     def _record_miss(self, namespace: str) -> None:
         """Record a cache miss.

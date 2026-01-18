@@ -121,10 +121,7 @@ class JoinStrategy(str, Enum):
             return cls(value.lower())
         except ValueError:
             valid = [s.value for s in cls]
-            raise ValueError(
-                f"Invalid join_strategy '{value}'. "
-                f"Must be one of: {valid}"
-            )
+            raise ValueError(f"Invalid join_strategy '{value}'. " f"Must be one of: {valid}")
 
 
 class ErrorStrategy(str, Enum):
@@ -150,10 +147,7 @@ class ErrorStrategy(str, Enum):
             return cls(value.lower())
         except ValueError:
             valid = [s.value for s in cls]
-            raise ValueError(
-                f"Invalid error_strategy '{value}'. "
-                f"Must be one of: {valid}"
-            )
+            raise ValueError(f"Invalid error_strategy '{value}'. " f"Must be one of: {valid}")
 
 
 # =============================================================================

@@ -43,14 +43,13 @@ class TestParallelFormation:
 
     def test_parallel_team_configuration(self):
         """Test parallel formation is correctly configured."""
-        workflows = load_workflow_from_file(
-            "victor/research/workflows/examples/team_research.yaml"
-        )
+        workflows = load_workflow_from_file("victor/research/workflows/examples/team_research.yaml")
         workflow_def = workflows.get("comprehensive_team_research")
 
         # Find parallel team nodes
         team_nodes = [
-            n for n in workflow_def.nodes.values()  # Fixed: iterate over values
+            n
+            for n in workflow_def.nodes.values()  # Fixed: iterate over values
             if isinstance(n, TeamNodeWorkflow) and n.team_formation == "parallel"
         ]
 
@@ -60,7 +59,11 @@ class TestParallelFormation:
             if isinstance(node, TeamNodeWorkflow):
                 # Test formation is valid
                 assert node.team_formation in [
-                    "parallel", "sequential", "pipeline", "hierarchical", "consensus"
+                    "parallel",
+                    "sequential",
+                    "pipeline",
+                    "hierarchical",
+                    "consensus",
                 ]
 
     def test_parallel_teams_independent_execution(self):
@@ -108,13 +111,17 @@ workflows:
         config = YAMLWorkflowConfig()
         from victor.workflows.yaml_loader import load_workflow_from_yaml
 
-        workflow_def = load_workflow_from_yaml(yaml_content, "parallel_test", config)  # Returns WorkflowDefinition directly
+        workflow_def = load_workflow_from_yaml(
+            yaml_content, "parallel_test", config
+        )  # Returns WorkflowDefinition directly
 
         # Verify parallel team
         team_node = next(n for n in workflow_def.nodes.values() if isinstance(n, TeamNodeWorkflow))
         assert team_node.team_formation == "parallel"
         assert len(team_node.members) == 3
-        assert all(m.get("priority", 0) == 0 for m in team_node.members), "Parallel members should have same priority"
+        assert all(
+            m.get("priority", 0) == 0 for m in team_node.members
+        ), "Parallel members should have same priority"
 
 
 class TestSequentialFormation:
@@ -122,16 +129,15 @@ class TestSequentialFormation:
 
     def test_sequential_team_configuration(self):
         """Test sequential formation from production workflow."""
-        workflows = load_workflow_from_file(
-            "victor/research/workflows/examples/team_research.yaml"
-        )
+        workflows = load_workflow_from_file("victor/research/workflows/examples/team_research.yaml")
         workflow_def = workflows.get("quick_team_research")
 
         assert workflow_def is not None, "quick_team_research should exist"
 
         # Find sequential team
         team_nodes = [
-            n for n in workflow_def.nodes.values()  # Fixed: iterate over values
+            n
+            for n in workflow_def.nodes.values()  # Fixed: iterate over values
             if isinstance(n, TeamNodeWorkflow) and n.team_formation == "sequential"
         ]
 
@@ -189,7 +195,9 @@ workflows:
 """
 
         config = YAMLWorkflowConfig()
-        workflow_def = load_workflow_from_yaml(yaml_content, "sequential_test", config)  # Returns WorkflowDefinition directly
+        workflow_def = load_workflow_from_yaml(
+            yaml_content, "sequential_test", config
+        )  # Returns WorkflowDefinition directly
 
         team_node = next(n for n in workflow_def.nodes.values() if isinstance(n, TeamNodeWorkflow))
         assert team_node.team_formation == "sequential"
@@ -205,14 +213,13 @@ class TestPipelineFormation:
 
     def test_pipeline_from_production_workflow(self):
         """Test pipeline formation from comprehensive team research."""
-        workflows = load_workflow_from_file(
-            "victor/research/workflows/examples/team_research.yaml"
-        )
+        workflows = load_workflow_from_file("victor/research/workflows/examples/team_research.yaml")
         workflow_def = workflows["comprehensive_team_research"]
 
         # Find pipeline team
         team_nodes = [
-            n for n in workflow_def.nodes.values()  # Fixed: iterate over values
+            n
+            for n in workflow_def.nodes.values()  # Fixed: iterate over values
             if isinstance(n, TeamNodeWorkflow) and n.team_formation == "pipeline"
         ]
 
@@ -231,17 +238,18 @@ class TestPipelineFormation:
 
         # Verify priority ordering (critical for pipeline)
         priorities = [m.get("priority", 0) for m in team_node.members]
-        assert priorities == list(range(len(priorities))), "Pipeline should have sequential priorities 0,1,2,3"
+        assert priorities == list(
+            range(len(priorities))
+        ), "Pipeline should have sequential priorities 0,1,2,3"
 
     def test_pipeline_stage_mapping(self):
         """Test that pipeline stages map correctly to members."""
-        workflows = load_workflow_from_file(
-            "victor/research/workflows/examples/team_research.yaml"
-        )
+        workflows = load_workflow_from_file("victor/research/workflows/examples/team_research.yaml")
         workflow_def = workflows["comprehensive_team_research"]
 
         team_node = next(
-            n for n in workflow_def.nodes.values()  # Fixed: iterate over values
+            n
+            for n in workflow_def.nodes.values()  # Fixed: iterate over values
             if isinstance(n, TeamNodeWorkflow) and n.team_formation == "pipeline"
         )
 
@@ -250,7 +258,7 @@ class TestPipelineFormation:
             "broad_researcher",
             "deep_dive_specialist",
             "source_evaluator",
-            "research_synthesizer"
+            "research_synthesizer",
         ]
 
         actual_stages = [m.get("id") for m in team_node.members]
@@ -261,7 +269,7 @@ class TestPipelineFormation:
             "broad_researcher": "Broad Researcher",
             "deep_dive_specialist": "Deep Dive Specialist",
             "source_evaluator": "Source Evaluator",
-            "research_synthesizer": "Research Synthesizer"
+            "research_synthesizer": "Research Synthesizer",
         }
 
         for member in team_node.members:
@@ -323,7 +331,9 @@ workflows:
 """
 
         config = YAMLWorkflowConfig()
-        workflow_def = load_workflow_from_yaml(yaml_content, "hierarchical_test", config)  # Returns WorkflowDefinition directly
+        workflow_def = load_workflow_from_yaml(
+            yaml_content, "hierarchical_test", config
+        )  # Returns WorkflowDefinition directly
 
         team_node = next(n for n in workflow_def.nodes.values() if isinstance(n, TeamNodeWorkflow))
         assert team_node.team_formation == "hierarchical"
@@ -384,7 +394,9 @@ workflows:
 """
 
         config = YAMLWorkflowConfig()
-        workflow_def = load_workflow_from_yaml(yaml_content, "consensus_test", config)  # Returns WorkflowDefinition directly
+        workflow_def = load_workflow_from_yaml(
+            yaml_content, "consensus_test", config
+        )  # Returns WorkflowDefinition directly
 
         team_node = next(n for n in workflow_def.nodes.values() if isinstance(n, TeamNodeWorkflow))
         assert team_node.team_formation == "consensus"
@@ -439,7 +451,9 @@ workflows:
 """
 
         config = YAMLWorkflowConfig()
-        workflow_def = load_workflow_from_yaml(yaml_content, "round_robin_test", config)  # Returns WorkflowDefinition directly
+        workflow_def = load_workflow_from_yaml(
+            yaml_content, "round_robin_test", config
+        )  # Returns WorkflowDefinition directly
 
         team_node = next(n for n in workflow_def.nodes.values() if isinstance(n, TeamNodeWorkflow))
         assert team_node.team_formation == "round_robin"
@@ -491,7 +505,9 @@ workflows:
 """
 
         config = YAMLWorkflowConfig()
-        workflow_def = load_workflow_from_yaml(yaml_content, "dynamic_test", config)  # Returns WorkflowDefinition directly
+        workflow_def = load_workflow_from_yaml(
+            yaml_content, "dynamic_test", config
+        )  # Returns WorkflowDefinition directly
 
         team_node = next(n for n in workflow_def.nodes.values() if isinstance(n, TeamNodeWorkflow))
         assert team_node.team_formation == "dynamic"
@@ -540,7 +556,9 @@ workflows:
 """
 
         config = YAMLWorkflowConfig()
-        workflow_def = load_workflow_from_yaml(yaml_content, "custom_test", config)  # Returns WorkflowDefinition directly
+        workflow_def = load_workflow_from_yaml(
+            yaml_content, "custom_test", config
+        )  # Returns WorkflowDefinition directly
 
         team_node = next(n for n in workflow_def.nodes.values() if isinstance(n, TeamNodeWorkflow))
         assert team_node.team_formation == "custom"
@@ -562,7 +580,7 @@ class TestFormationCompilation:
             "consensus",
             "round_robin",
             "dynamic",
-            "custom"
+            "custom",
         ]
 
         compiler = UnifiedWorkflowCompiler(enable_caching=True)
@@ -591,7 +609,9 @@ workflows:
 """
 
             config = YAMLWorkflowConfig()
-            workflow_def = load_workflow_from_yaml(yaml_content, f"{formation}_test", config)  # Returns WorkflowDefinition directly
+            workflow_def = load_workflow_from_yaml(
+                yaml_content, f"{formation}_test", config
+            )  # Returns WorkflowDefinition directly
 
             # Should compile without errors
             compiled = compiler.compile_definition(workflow_def)
@@ -621,20 +641,21 @@ workflows:
 """
 
         config = YAMLWorkflowConfig()
-        workflow_def = load_workflow_from_yaml(yaml_content, "invalid_pipeline", config)  # Returns WorkflowDefinition directly
+        workflow_def = load_workflow_from_yaml(
+            yaml_content, "invalid_pipeline", config
+        )  # Returns WorkflowDefinition directly
 
         team_node = next(n for n in workflow_def.nodes.values() if isinstance(n, TeamNodeWorkflow))
         assert len(team_node.members) >= 1  # May be allowed but not useful
 
     def test_validate_priority_ordering(self):
         """Test that priorities are correctly ordered for formations."""
-        workflows = load_workflow_from_file(
-            "victor/research/workflows/examples/team_research.yaml"
-        )
+        workflows = load_workflow_from_file("victor/research/workflows/examples/team_research.yaml")
         workflow_def = workflows["comprehensive_team_research"]
 
         team_node = next(
-            n for n in workflow_def.nodes.values()  # Fixed: iterate over values
+            n
+            for n in workflow_def.nodes.values()  # Fixed: iterate over values
             if isinstance(n, TeamNodeWorkflow) and n.team_formation == "pipeline"
         )
 
@@ -664,7 +685,9 @@ workflows:
 """
 
         config = YAMLWorkflowConfig()
-        workflow_def = load_workflow_from_yaml(yaml_content, "hierarchical", config)  # Returns WorkflowDefinition directly
+        workflow_def = load_workflow_from_yaml(
+            yaml_content, "hierarchical", config
+        )  # Returns WorkflowDefinition directly
 
         team_node = next(n for n in workflow_def.nodes.values() if isinstance(n, TeamNodeWorkflow))
         assert team_node.team_formation == "hierarchical"
@@ -698,7 +721,9 @@ workflows:
 """
 
         config = YAMLWorkflowConfig()
-        workflow_def = load_workflow_from_yaml(yaml_content, "parallel", config)  # Returns WorkflowDefinition directly
+        workflow_def = load_workflow_from_yaml(
+            yaml_content, "parallel", config
+        )  # Returns WorkflowDefinition directly
 
         team_node = next(n for n in workflow_def.nodes.values() if isinstance(n, TeamNodeWorkflow))
         assert team_node.team_formation == "parallel"
@@ -727,7 +752,9 @@ workflows:
 """
 
         config = YAMLWorkflowConfig()
-        workflow_def = load_workflow_from_yaml(yaml_content, "consensus", config)  # Returns WorkflowDefinition directly
+        workflow_def = load_workflow_from_yaml(
+            yaml_content, "consensus", config
+        )  # Returns WorkflowDefinition directly
 
         team_node = next(n for n in workflow_def.nodes.values() if isinstance(n, TeamNodeWorkflow))
         assert team_node.team_formation == "consensus"
@@ -738,9 +765,7 @@ class TestFormationExecutionParameters:
 
     def test_timeout_configuration(self):
         """Test timeout configuration per formation."""
-        workflows = load_workflow_from_file(
-            "victor/coding/workflows/team_node_example.yaml"
-        )
+        workflows = load_workflow_from_file("victor/coding/workflows/team_node_example.yaml")
         workflow_def = workflows["team_node_demo"]
 
         team_nodes = [n for n in workflow_def.nodes if isinstance(n, TeamNodeWorkflow)]
@@ -752,9 +777,7 @@ class TestFormationExecutionParameters:
 
     def test_tool_budget_distribution(self):
         """Test tool budget is distributed correctly."""
-        workflows = load_workflow_from_file(
-            "victor/coding/workflows/team_node_example.yaml"
-        )
+        workflows = load_workflow_from_file("victor/coding/workflows/team_node_example.yaml")
         workflow_def = workflows["team_node_demo"]
 
         team_nodes = [n for n in workflow_def.nodes if isinstance(n, TeamNodeWorkflow)]
@@ -769,9 +792,7 @@ class TestFormationExecutionParameters:
 
     def test_max_iterations_configuration(self):
         """Test max iterations per formation."""
-        workflows = load_workflow_from_file(
-            "victor/coding/workflows/team_node_example.yaml"
-        )
+        workflows = load_workflow_from_file("victor/coding/workflows/team_node_example.yaml")
         workflow_def = workflows["team_node_demo"]
 
         team_nodes = [n for n in workflow_def.nodes if isinstance(n, TeamNodeWorkflow)]
@@ -787,13 +808,12 @@ class TestFormationMemberExpertise:
 
     def test_member_expertise_defined(self):
         """Test that team members have expertise defined."""
-        workflows = load_workflow_from_file(
-            "victor/research/workflows/examples/team_research.yaml"
-        )
+        workflows = load_workflow_from_file("victor/research/workflows/examples/team_research.yaml")
         workflow_def = workflows["comprehensive_team_research"]
 
         team_node = next(
-            n for n in workflow_def.nodes.values()  # Fixed: iterate over values
+            n
+            for n in workflow_def.nodes.values()  # Fixed: iterate over values
             if isinstance(n, TeamNodeWorkflow) and n.team_formation == "pipeline"
         )
 
@@ -806,13 +826,12 @@ class TestFormationMemberExpertise:
 
     def test_member_backstory_defined(self):
         """Test that team members have backstory defined."""
-        workflows = load_workflow_from_file(
-            "victor/research/workflows/examples/team_research.yaml"
-        )
+        workflows = load_workflow_from_file("victor/research/workflows/examples/team_research.yaml")
         workflow_def = workflows["comprehensive_team_research"]
 
         team_node = next(
-            n for n in workflow_def.nodes.values()  # Fixed: iterate over values
+            n
+            for n in workflow_def.nodes.values()  # Fixed: iterate over values
             if isinstance(n, TeamNodeWorkflow) and n.team_formation == "pipeline"
         )
 
@@ -825,9 +844,7 @@ class TestFormationMemberExpertise:
 
     def test_member_personality_defined(self):
         """Test that team members have personality defined."""
-        workflows = load_workflow_from_file(
-            "victor/coding/workflows/team_node_example.yaml"
-        )
+        workflows = load_workflow_from_file("victor/coding/workflows/team_node_example.yaml")
         workflow_def = workflows["team_node_demo"]
 
         team_nodes = [n for n in workflow_def.nodes if isinstance(n, TeamNodeWorkflow)]

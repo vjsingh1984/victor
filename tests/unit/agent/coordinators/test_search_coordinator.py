@@ -52,9 +52,7 @@ class TestSearchCoordinator:
         return router
 
     @pytest.fixture
-    def coordinator(
-        self, mock_search_router: Mock
-    ) -> SearchCoordinator:
+    def coordinator(self, mock_search_router: Mock) -> SearchCoordinator:
         """Create search coordinator with default mocks."""
         return SearchCoordinator(search_router=mock_search_router)
 
@@ -186,9 +184,7 @@ class TestSearchCoordinator:
         )
 
         # Execute
-        result = coordinator.route_search_query(
-            "how do I understand and explain this"
-        )
+        result = coordinator.route_search_query("how do I understand and explain this")
 
         # Assert
         assert result["recommended_tool"] == "semantic_code_search"
@@ -490,9 +486,7 @@ class TestSearchCoordinator:
 
     # Test initialization and configuration
 
-    def test_coordinator_initialization_with_search_router(
-        self, mock_search_router: Mock
-    ):
+    def test_coordinator_initialization_with_search_router(self, mock_search_router: Mock):
         """Test coordinator initialization with search router."""
         # Execute
         coordinator = SearchCoordinator(search_router=mock_search_router)
@@ -583,9 +577,7 @@ class TestSearchCoordinatorEdgeCases:
         return router
 
     @pytest.fixture
-    def coordinator(
-        self, mock_search_router: Mock
-    ) -> SearchCoordinator:
+    def coordinator(self, mock_search_router: Mock) -> SearchCoordinator:
         """Create search coordinator."""
         return SearchCoordinator(search_router=mock_search_router)
 
@@ -621,8 +613,9 @@ class TestSearchCoordinatorEdgeCases:
 
         # Verify all SearchType values are mapped
         for search_type in SearchType:
-            assert search_type in SearchCoordinator.TOOL_MAP, \
-                f"SearchType.{search_type.name} is not in TOOL_MAP"
+            assert (
+                search_type in SearchCoordinator.TOOL_MAP
+            ), f"SearchType.{search_type.name} is not in TOOL_MAP"
 
     def test_get_recommended_tool_when_router_raises(
         self, coordinator: SearchCoordinator, mock_search_router: Mock
@@ -708,9 +701,7 @@ class TestSearchCoordinatorEdgeCases:
         assert result["recommended_tool"] == "code_search"
         mock_search_router.route.assert_called_once_with(query)
 
-    def test_concurrent_route_calls(
-        self, coordinator: SearchCoordinator, mock_search_router: Mock
-    ):
+    def test_concurrent_route_calls(self, coordinator: SearchCoordinator, mock_search_router: Mock):
         """Test that multiple concurrent route calls work correctly."""
         # Setup
         mock_search_router.route.return_value = SearchRoute(
@@ -722,10 +713,7 @@ class TestSearchCoordinatorEdgeCases:
         )
 
         # Execute - multiple calls
-        results = [
-            coordinator.route_search_query(f"query{i}")
-            for i in range(10)
-        ]
+        results = [coordinator.route_search_query(f"query{i}") for i in range(10)]
 
         # Assert
         assert len(results) == 10
@@ -750,10 +738,7 @@ class TestSearchCoordinatorToolMapping:
         from victor.agent.coordinators.search_coordinator import SearchCoordinator
 
         assert SearchCoordinator.TOOL_MAP[SearchType.KEYWORD] == "code_search"
-        assert (
-            SearchCoordinator.TOOL_MAP[SearchType.SEMANTIC]
-            == "semantic_code_search"
-        )
+        assert SearchCoordinator.TOOL_MAP[SearchType.SEMANTIC] == "semantic_code_search"
         assert SearchCoordinator.TOOL_MAP[SearchType.HYBRID] == "both"
 
     def test_tool_map_is_class_attribute(self):

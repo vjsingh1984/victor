@@ -488,6 +488,7 @@ class TaskComplexityService:
             if result.nudge_applied:
                 try:
                     from victor.classification import PATTERNS
+
                     if result.nudge_applied in PATTERNS:
                         complexity = PATTERNS[result.nudge_applied].complexity
                     else:

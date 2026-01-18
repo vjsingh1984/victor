@@ -510,6 +510,7 @@ class TestServiceProtocols:
 
         # Verify they are callable
         import asyncio
+
         assert asyncio.iscoroutinefunction(service.start)
         assert asyncio.iscoroutinefunction(service.stop)
         assert asyncio.iscoroutinefunction(service.health_check)

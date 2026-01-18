@@ -194,9 +194,7 @@ class BackendSearchRouter(ISearchRouter):
             )
 
             if not backend.is_available():
-                logger.debug(
-                    f"Backend {backend_name} unavailable, trying next backend"
-                )
+                logger.debug(f"Backend {backend_name} unavailable, trying next backend")
                 failed_backends[backend_name] = RuntimeError("Backend not available")
                 continue
 
@@ -220,9 +218,7 @@ class BackendSearchRouter(ISearchRouter):
                 )
 
             except Exception as e:
-                logger.warning(
-                    f"Backend {backend_name} failed: {e}, trying next backend"
-                )
+                logger.warning(f"Backend {backend_name} failed: {e}, trying next backend")
                 failed_backends[backend_name] = e
                 continue
 

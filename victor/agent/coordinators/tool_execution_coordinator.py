@@ -633,6 +633,7 @@ class ToolExecutionCoordinator:
         """
         try:
             from victor.tools.decorators import resolve_tool_name
+
             return resolve_tool_name(tool_name)
         except Exception:
             return tool_name
@@ -690,9 +691,7 @@ class ToolExecutionCoordinator:
         )
 
         # Apply adapter-based normalization
-        normalized_args = self._tool_adapter.normalize_arguments(
-            normalized_args, tool_name
-        )
+        normalized_args = self._tool_adapter.normalize_arguments(normalized_args, tool_name)
 
         return normalized_args
 
@@ -846,7 +845,10 @@ class ToolExecutionCoordinator:
         self._stats.budget_used += amount
         self._stats.budget_remaining -= amount
 
-        if self._on_budget_warning and self._stats.budget_remaining < self._config.max_tool_budget * 0.2:
+        if (
+            self._on_budget_warning
+            and self._stats.budget_remaining < self._config.max_tool_budget * 0.2
+        ):
             self._on_budget_warning(self._stats.budget_remaining, self._config.max_tool_budget)
 
 

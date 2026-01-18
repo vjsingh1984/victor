@@ -39,6 +39,7 @@ class CapabilityType(str):
         VALIDATOR: Validator capability
         OBSERVER: Observer capability
     """
+
     TOOL = "tool"
     WORKFLOW = "workflow"
     MIDDLEWARE = "middleware"
@@ -128,7 +129,8 @@ class CapabilitySet:
         """
         if capability_type:
             return [
-                name for name, cap in self.capabilities.items()
+                name
+                for name, cap in self.capabilities.items()
                 if cap.type == capability_type and cap.enabled
             ]
         return [name for name, cap in self.capabilities.items() if cap.enabled]
@@ -239,10 +241,7 @@ class CapabilityLoader:
 
             capabilities = {}
             for name, cap_data in data.get("capabilities", {}).items():
-                capabilities[name] = Capability(
-                    name=name,
-                    **cap_data
-                )
+                capabilities[name] = Capability(name=name, **cap_data)
 
             handlers = data.get("handlers", {})
 
@@ -282,9 +281,7 @@ class CapabilityLoader:
         return capability_set.get_capability(capability_name)
 
     def list_capabilities(
-        self,
-        vertical_name: str,
-        capability_type: str | None = None
+        self, vertical_name: str, capability_type: str | None = None
     ) -> List[str]:
         """List capabilities for a vertical.
 

@@ -83,6 +83,7 @@ from victor.core.verticals.vertical_loader import (
     get_active_vertical,
     get_vertical_extensions,
 )
+
 # Layer boundary enforcement: moved from victor.agent.vertical_context
 from victor.core.verticals.context import (
     VerticalContext,

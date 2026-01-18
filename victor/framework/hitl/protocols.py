@@ -314,21 +314,15 @@ class BaseHITLGate:
     def with_context(self, context: Dict[str, Any]) -> "BaseHITLGate":
         """Create a new gate with additional context."""
         new_context = {**self.context, **context}
-        return self.__class__(
-            **{**self.__dict__, "context": new_context}
-        )
+        return self.__class__(**{**self.__dict__, "context": new_context})
 
     def with_timeout(self, timeout: float) -> "BaseHITLGate":
         """Create a new gate with custom timeout."""
-        return self.__class__(
-            **{**self.__dict__, "timeout_seconds": timeout}
-        )
+        return self.__class__(**{**self.__dict__, "timeout_seconds": timeout})
 
     def with_fallback(self, strategy: FallbackStrategy) -> "BaseHITLGate":
         """Create a new gate with custom fallback."""
-        return self.__class__(
-            **{**self.__dict__, "fallback_strategy": strategy}
-        )
+        return self.__class__(**{**self.__dict__, "fallback_strategy": strategy})
 
     def _render_prompt(self, additional_context: Optional[Dict[str, Any]] = None) -> str:
         """Render prompt with context variables."""

@@ -458,7 +458,9 @@ class FeatureExtractor:
         score += min(question_count * 0.1, 0.3)
 
         # Exploration phrases
-        if any(phrase in content.lower() for phrase in ["need to explore", "let's try", "not sure"]):
+        if any(
+            phrase in content.lower() for phrase in ["need to explore", "let's try", "not sure"]
+        ):
             score += 0.2
 
         return min(score, 1.0)
@@ -550,7 +552,9 @@ class FeatureExtractor:
             # Time constraints
             time_limit = context.get("time_limit")
             # Ensure time_limit is a number before comparison
-            if time_limit and isinstance(time_limit, (int, float)) and time_limit < 300:  # 5 minutes
+            if (
+                time_limit and isinstance(time_limit, (int, float)) and time_limit < 300
+            ):  # 5 minutes
                 score += 0.3
 
         return min(score, 1.0)

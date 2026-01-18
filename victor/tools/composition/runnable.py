@@ -745,7 +745,7 @@ class ToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
                     "tool_name": self._tool.name,
                     "arguments": mapped_input,
                     "correlation_id": correlation_id,
-                }
+                },
             )
 
             # Return error result with correlation ID

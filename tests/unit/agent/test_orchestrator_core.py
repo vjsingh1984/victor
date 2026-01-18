@@ -2795,7 +2795,9 @@ class TestResolveShellVariant:
         # This is the most reliable way to test the behavior without worrying about
         # the internal state of the mode controller
         with patch.object(
-            orchestrator._mode_coordinator, "resolve_shell_variant", return_value=ToolNames.SHELL_READONLY
+            orchestrator._mode_coordinator,
+            "resolve_shell_variant",
+            return_value=ToolNames.SHELL_READONLY,
         ):
             result = orchestrator._resolve_shell_variant("run")
             assert result == ToolNames.SHELL_READONLY
@@ -2928,7 +2930,11 @@ class TestRecoverSession:
         orchestrator.memory_manager = mock_manager
 
         # Mock LifecycleManager.recover_session to return False (session not found)
-        with patch.object(orchestrator._session_recovery_manager._lifecycle_manager, "recover_session", return_value=False):
+        with patch.object(
+            orchestrator._session_recovery_manager._lifecycle_manager,
+            "recover_session",
+            return_value=False,
+        ):
             result = orchestrator.recover_session("nonexistent-session")
 
         assert result is False
@@ -2946,7 +2952,11 @@ class TestRecoverSession:
         orchestrator.memory_manager = mock_manager
 
         # Mock LifecycleManager.recover_session to return False (so it falls back to direct recovery)
-        with patch.object(orchestrator._session_recovery_manager._lifecycle_manager, "recover_session", return_value=False):
+        with patch.object(
+            orchestrator._session_recovery_manager._lifecycle_manager,
+            "recover_session",
+            return_value=False,
+        ):
             result = orchestrator.recover_session("session-123")
 
         assert result is True
@@ -2962,7 +2972,11 @@ class TestRecoverSession:
         orchestrator.memory_manager = mock_manager
 
         # Mock LifecycleManager.recover_session to raise an exception
-        with patch.object(orchestrator._session_recovery_manager._lifecycle_manager, "recover_session", side_effect=Exception("LC error")):
+        with patch.object(
+            orchestrator._session_recovery_manager._lifecycle_manager,
+            "recover_session",
+            side_effect=Exception("LC error"),
+        ):
             result = orchestrator.recover_session("session-123")
 
         assert result is False
@@ -2978,9 +2992,15 @@ class TestGetMemoryContext:
 
         # Mock conversation.messages using PropertyMock
         from unittest.mock import PropertyMock
+
         mock_msg = MagicMock()
         mock_msg.model_dump.return_value = {"role": "user", "content": "test"}
-        with patch.object(type(orchestrator.conversation), "messages", new_callable=PropertyMock, return_value=[mock_msg]):
+        with patch.object(
+            type(orchestrator.conversation),
+            "messages",
+            new_callable=PropertyMock,
+            return_value=[mock_msg],
+        ):
             result = orchestrator.get_memory_context()
 
         assert len(result) == 1
@@ -2992,9 +3012,15 @@ class TestGetMemoryContext:
         orchestrator._memory_session_id = None
 
         from unittest.mock import PropertyMock
+
         mock_msg = MagicMock()
         mock_msg.model_dump.return_value = {"role": "assistant", "content": "hello"}
-        with patch.object(type(orchestrator.conversation), "messages", new_callable=PropertyMock, return_value=[mock_msg]):
+        with patch.object(
+            type(orchestrator.conversation),
+            "messages",
+            new_callable=PropertyMock,
+            return_value=[mock_msg],
+        ):
             result = orchestrator.get_memory_context()
 
         assert len(result) == 1
@@ -3022,9 +3048,15 @@ class TestGetMemoryContext:
         orchestrator._memory_session_id = "session-123"
 
         from unittest.mock import PropertyMock
+
         mock_msg = MagicMock()
         mock_msg.model_dump.return_value = {"role": "user", "content": "fallback"}
-        with patch.object(type(orchestrator.conversation), "messages", new_callable=PropertyMock, return_value=[mock_msg]):
+        with patch.object(
+            type(orchestrator.conversation),
+            "messages",
+            new_callable=PropertyMock,
+            return_value=[mock_msg],
+        ):
             result = orchestrator.get_memory_context()
 
         assert len(result) == 1

@@ -64,10 +64,11 @@ class TestMarkdownDebounce:
         """Test that content changes schedule a debounced render when app context exists."""
         # Mock the app property to simulate having an app context
         from unittest.mock import PropertyMock
-        with patch.object(type(streaming_message), 'app', new_callable=PropertyMock) as mock_app:
+
+        with patch.object(type(streaming_message), "app", new_callable=PropertyMock) as mock_app:
             mock_app.return_value = Mock()  # Simulate app exists
 
-            with patch.object(streaming_message, 'set_timer') as mock_timer:
+            with patch.object(streaming_message, "set_timer") as mock_timer:
                 streaming_message.watch_content("test content")
 
                 # Verify timer was scheduled
@@ -86,10 +87,11 @@ class TestMarkdownDebounce:
 
         # Mock the app property to simulate having an app context
         from unittest.mock import PropertyMock
-        with patch.object(type(streaming_message), 'app', new_callable=PropertyMock) as mock_app:
+
+        with patch.object(type(streaming_message), "app", new_callable=PropertyMock) as mock_app:
             mock_app.return_value = Mock()  # Simulate app exists
 
-            with patch.object(streaming_message, 'set_timer') as mock_set_timer:
+            with patch.object(streaming_message, "set_timer") as mock_set_timer:
                 streaming_message.watch_content("new content")
 
                 # Verify previous timer was stopped
@@ -144,7 +146,8 @@ class TestMarkdownDebounce:
         """Test that renders are debounced with correct timing."""
         # Mock the app property to simulate having an app context
         from unittest.mock import PropertyMock
-        with patch.object(type(streaming_message), 'app', new_callable=PropertyMock) as mock_app:
+
+        with patch.object(type(streaming_message), "app", new_callable=PropertyMock) as mock_app:
             mock_app.return_value = Mock()  # Simulate app exists
 
             # Mock timer to track render scheduling
@@ -207,7 +210,7 @@ class TestScrollThrottle:
 
     def test_throttled_scroll_first_call(self, conversation_log):
         """Test that first scroll call executes immediately."""
-        with patch.object(conversation_log, 'scroll_end') as mock_scroll:
+        with patch.object(conversation_log, "scroll_end") as mock_scroll:
             conversation_log._throttled_scroll_end()
 
             # Should scroll immediately (first call)
@@ -217,7 +220,7 @@ class TestScrollThrottle:
 
     def test_throttled_scroll_rapid_calls(self, conversation_log):
         """Test that rapid calls are throttled."""
-        with patch.object(conversation_log, 'scroll_end') as mock_scroll:
+        with patch.object(conversation_log, "scroll_end") as mock_scroll:
             # First call - should scroll
             conversation_log._throttled_scroll_end()
             assert mock_scroll.call_count == 1
@@ -231,7 +234,7 @@ class TestScrollThrottle:
 
     def test_throttled_scroll_after_delay(self, conversation_log):
         """Test that scroll works after throttle delay."""
-        with patch.object(conversation_log, 'scroll_end') as mock_scroll:
+        with patch.object(conversation_log, "scroll_end") as mock_scroll:
             # First call
             conversation_log._throttled_scroll_end()
             first_time = conversation_log._last_scroll_time
@@ -252,7 +255,7 @@ class TestScrollThrottle:
         mock_streaming_msg = Mock()
         conversation_log._streaming_message = mock_streaming_msg
 
-        with patch.object(conversation_log, '_throttled_scroll_end') as mock_scroll:
+        with patch.object(conversation_log, "_throttled_scroll_end") as mock_scroll:
             conversation_log.update_streaming("test content")
 
             # Should update content
@@ -266,7 +269,7 @@ class TestScrollThrottle:
         mock_streaming_msg = Mock()
         conversation_log._streaming_message = mock_streaming_msg
 
-        with patch.object(conversation_log, '_throttled_scroll_end') as mock_scroll:
+        with patch.object(conversation_log, "_throttled_scroll_end") as mock_scroll:
             conversation_log.append_streaming_chunk("chunk")
 
             # Should append chunk
@@ -280,7 +283,7 @@ class TestScrollThrottle:
         mock_streaming_msg = Mock()
         conversation_log._streaming_message = mock_streaming_msg
 
-        with patch.object(conversation_log, 'scroll_end') as mock_scroll:
+        with patch.object(conversation_log, "scroll_end") as mock_scroll:
             # Simulate 100 rapid content updates (fast streaming)
             for i in range(100):
                 conversation_log.update_streaming(f"content {i}")
@@ -293,7 +296,7 @@ class TestScrollThrottle:
 
     def test_scroll_throttle_timing_accuracy(self, conversation_log):
         """Test that scroll throttle timing is accurate."""
-        with patch.object(conversation_log, 'scroll_end') as mock_scroll:
+        with patch.object(conversation_log, "scroll_end") as mock_scroll:
             # First scroll
             conversation_log._throttled_scroll_end()
             first_time = conversation_log._last_scroll_time
@@ -315,7 +318,7 @@ class TestScrollThrottle:
         mock_streaming_msg = Mock()
         conversation_log._streaming_message = mock_streaming_msg
 
-        with patch.object(conversation_log, 'scroll_end') as mock_scroll:
+        with patch.object(conversation_log, "scroll_end") as mock_scroll:
             conversation_log.finish_streaming()
 
             # Should scroll immediately (unthrottled for final scroll)
@@ -365,8 +368,8 @@ class TestPerformanceIntegration:
         streaming_msg._cached_content = None
         conversation_log._streaming_message = streaming_msg
 
-        with patch.object(streaming_msg, 'finish_streaming') as mock_finish:
-            with patch.object(conversation_log, 'scroll_end') as mock_scroll:
+        with patch.object(streaming_msg, "finish_streaming") as mock_finish:
+            with patch.object(conversation_log, "scroll_end") as mock_scroll:
                 conversation_log.finish_streaming()
 
                 # Should finish streaming
@@ -397,7 +400,7 @@ class TestEdgeCases:
         """Test that scroll works when no streaming message exists."""
         conversation_log._streaming_message = None
 
-        with patch.object(conversation_log, 'scroll_end') as mock_scroll:
+        with patch.object(conversation_log, "scroll_end") as mock_scroll:
             conversation_log.update_streaming("test")
 
             # Should not scroll (no streaming message)
@@ -418,7 +421,7 @@ class TestEdgeCases:
         """Test behavior with zero throttle delay."""
         conversation_log._scroll_throttle_ms = 0
 
-        with patch.object(conversation_log, 'scroll_end') as mock_scroll:
+        with patch.object(conversation_log, "scroll_end") as mock_scroll:
             # All calls should execute (no throttling)
             for _ in range(5):
                 conversation_log._throttled_scroll_end()
@@ -438,9 +441,7 @@ class TestToolWidgetCollapse:
     def test_initial_state(self):
         """Test that tool widget starts in non-collapsed state."""
         widget = ToolCallWidget(
-            tool_name="test_tool",
-            arguments={"arg1": "value1"},
-            status="pending"
+            tool_name="test_tool", arguments={"arg1": "value1"}, status="pending"
         )
         assert widget._is_collapsed is False
         assert widget._is_complete is False
@@ -449,13 +450,11 @@ class TestToolWidgetCollapse:
     def test_collapse_on_completion(self):
         """Test that widget collapses after completion."""
         widget = ToolCallWidget(
-            tool_name="test_tool",
-            arguments={"arg1": "value1"},
-            status="pending"
+            tool_name="test_tool", arguments={"arg1": "value1"}, status="pending"
         )
 
         # Mock the timer to prevent actual waiting
-        with patch.object(widget, 'set_timer') as mock_timer:
+        with patch.object(widget, "set_timer") as mock_timer:
             widget.update_status("success", elapsed=1.5)
 
             # Should schedule collapse timer
@@ -470,9 +469,7 @@ class TestToolWidgetCollapse:
     def test_manual_collapse(self):
         """Test manual collapse via _collapse method."""
         widget = ToolCallWidget(
-            tool_name="test_tool",
-            arguments={"arg1": "value1"},
-            status="success"
+            tool_name="test_tool", arguments={"arg1": "value1"}, status="success"
         )
 
         # Manually collapse
@@ -484,9 +481,7 @@ class TestToolWidgetCollapse:
     def test_manual_expand(self):
         """Test manual expand via _expand method."""
         widget = ToolCallWidget(
-            tool_name="test_tool",
-            arguments={"arg1": "value1"},
-            status="success"
+            tool_name="test_tool", arguments={"arg1": "value1"}, status="success"
         )
 
         # Collapse first
@@ -501,16 +496,14 @@ class TestToolWidgetCollapse:
     def test_click_toggle(self):
         """Test that clicking toggles collapse state."""
         widget = ToolCallWidget(
-            tool_name="test_tool",
-            arguments={"arg1": "value1"},
-            status="success"
+            tool_name="test_tool", arguments={"arg1": "value1"}, status="success"
         )
 
         # Initial state: not collapsed
         assert widget._is_collapsed is False
 
         # First click: should collapse
-        with patch.object(widget, 'set_timer'):
+        with patch.object(widget, "set_timer"):
             widget.on_click()
         assert widget._is_collapsed is True
 
@@ -521,9 +514,7 @@ class TestToolWidgetCollapse:
     def test_collapse_timer_stopped_on_manual_toggle(self):
         """Test that collapse timer is stopped when manually toggled."""
         widget = ToolCallWidget(
-            tool_name="test_tool",
-            arguments={"arg1": "value1"},
-            status="pending"
+            tool_name="test_tool", arguments={"arg1": "value1"}, status="pending"
         )
 
         # Set up a mock timer
@@ -544,9 +535,7 @@ class TestToolWidgetErrorDetails:
     def test_no_error_initially(self):
         """Test that widget has no error initially."""
         widget = ToolCallWidget(
-            tool_name="test_tool",
-            arguments={"arg1": "value1"},
-            status="pending"
+            tool_name="test_tool", arguments={"arg1": "value1"}, status="pending"
         )
         assert widget.error_message is None
         assert widget._show_expand_button is False
@@ -556,13 +545,11 @@ class TestToolWidgetErrorDetails:
         """Test that error message is stored on failure."""
         error_msg = "Connection failed: timeout"
         widget = ToolCallWidget(
-            tool_name="test_tool",
-            arguments={"arg1": "value1"},
-            status="pending"
+            tool_name="test_tool", arguments={"arg1": "value1"}, status="pending"
         )
 
         # Update with error
-        with patch.object(widget, 'set_timer'):
+        with patch.object(widget, "set_timer"):
             widget.update_status("error", elapsed=1.0, error_message=error_msg)
 
         assert widget.error_message == error_msg
@@ -575,7 +562,7 @@ class TestToolWidgetErrorDetails:
             tool_name="test_tool",
             arguments={"arg1": "value1"},
             status="error",
-            error_message=error_msg
+            error_message=error_msg,
         )
 
         # Compose to trigger error summary calculation
@@ -593,7 +580,7 @@ class TestToolWidgetErrorDetails:
             tool_name="test_tool",
             arguments={"arg1": "value1"},
             status="error",
-            error_message=error_msg
+            error_message=error_msg,
         )
 
         # Calculate expected summary
@@ -611,7 +598,7 @@ class TestToolWidgetErrorDetails:
             tool_name="test_tool",
             arguments={"arg1": "value1"},
             status="error",
-            error_message=error_msg
+            error_message=error_msg,
         )
 
         # Check if expand button should be shown
@@ -625,7 +612,7 @@ class TestToolWidgetErrorDetails:
             tool_name="test_tool",
             arguments={"arg1": "value1"},
             status="error",
-            error_message=error_msg
+            error_message=error_msg,
         )
 
         # Check if expand button should be shown
@@ -640,7 +627,7 @@ class TestToolWidgetErrorDetails:
             tool_name="test_tool",
             arguments={"arg1": "value1"},
             status="error",
-            error_message=error_msg
+            error_message=error_msg,
         )
 
         # Truncate to 20 lines (lines 0-19, so 20 total)
@@ -655,19 +642,17 @@ class TestToolWidgetErrorDetails:
     def test_update_status_preserves_error_message(self):
         """Test that updating status preserves error message."""
         widget = ToolCallWidget(
-            tool_name="test_tool",
-            arguments={"arg1": "value1"},
-            status="pending"
+            tool_name="test_tool", arguments={"arg1": "value1"}, status="pending"
         )
 
         error_msg = "Connection timeout"
-        with patch.object(widget, 'set_timer'):
+        with patch.object(widget, "set_timer"):
             widget.update_status("error", elapsed=1.0, error_message=error_msg)
 
         assert widget.error_message == error_msg
 
         # Update again with new elapsed time
-        with patch.object(widget, 'set_timer'):
+        with patch.object(widget, "set_timer"):
             widget.update_status("error", elapsed=2.0, error_message=error_msg)
 
         # Error message should still be there
@@ -680,9 +665,7 @@ class TestToolWidgetIntegration:
     def test_complete_workflow_success(self):
         """Test complete workflow for successful tool call."""
         widget = ToolCallWidget(
-            tool_name="read_file",
-            arguments={"path": "/tmp/file.txt"},
-            status="pending"
+            tool_name="read_file", arguments={"path": "/tmp/file.txt"}, status="pending"
         )
 
         # Initial state
@@ -690,7 +673,7 @@ class TestToolWidgetIntegration:
         assert widget._is_collapsed is False
 
         # Tool completes successfully
-        with patch.object(widget, 'set_timer'):
+        with patch.object(widget, "set_timer"):
             widget.update_status("success", elapsed=0.5)
 
         # Should be marked complete
@@ -710,16 +693,14 @@ class TestToolWidgetIntegration:
         """Test complete workflow for failed tool call with error details."""
         error_msg = "File not found: /tmp/nonexistent.txt\n\nStack trace:\n  at line 42"
         widget = ToolCallWidget(
-            tool_name="read_file",
-            arguments={"path": "/tmp/nonexistent.txt"},
-            status="pending"
+            tool_name="read_file", arguments={"path": "/tmp/nonexistent.txt"}, status="pending"
         )
 
         # Initial state
         assert widget.error_message is None
 
         # Tool fails with error
-        with patch.object(widget, 'set_timer'):
+        with patch.object(widget, "set_timer"):
             widget.update_status("error", elapsed=0.3, error_message=error_msg)
 
         # Should have error details
@@ -738,9 +719,7 @@ class TestToolWidgetIntegration:
     def test_multiple_status_updates(self):
         """Test multiple status updates (e.g., pending -> running -> success)."""
         widget = ToolCallWidget(
-            tool_name="long_running_tool",
-            arguments={"duration": "10s"},
-            status="pending"
+            tool_name="long_running_tool", arguments={"duration": "10s"}, status="pending"
         )
 
         # Status: pending
@@ -752,7 +731,7 @@ class TestToolWidgetIntegration:
         assert widget._is_complete is False
 
         # Status: success (complete)
-        with patch.object(widget, 'set_timer'):
+        with patch.object(widget, "set_timer"):
             widget.update_status("success", elapsed=10.0)
 
         assert widget.status == "success"
@@ -765,7 +744,7 @@ class TestToolWidgetCSS:
 
     def test_default_css_exists(self):
         """Test that ToolCallWidget has DEFAULT_CSS defined."""
-        assert hasattr(ToolCallWidget, 'DEFAULT_CSS')
+        assert hasattr(ToolCallWidget, "DEFAULT_CSS")
         assert ToolCallWidget.DEFAULT_CSS != ""
 
     def test_error_details_css(self):
@@ -778,16 +757,13 @@ class TestToolWidgetCSS:
 
     def test_status_classes(self):
         """Test that status classes are applied."""
-        widget = ToolCallWidget(
-            tool_name="test_tool",
-            status="pending"
-        )
+        widget = ToolCallWidget(tool_name="test_tool", status="pending")
 
         # Should have status class
         assert "pending" in widget.classes
 
         # Update status (mock timer to avoid async context issues)
-        with patch.object(widget, 'set_timer'):
+        with patch.object(widget, "set_timer"):
             widget.update_status("success")
             assert "success" in widget.classes
             assert "pending" not in widget.classes
@@ -802,25 +778,18 @@ class TestToolWidgetButtonHandling:
 
     def test_button_handler_exists(self):
         """Test that on_button_pressed method exists."""
-        widget = ToolCallWidget(
-            tool_name="test_tool",
-            status="error",
-            error_message="Test error"
-        )
+        widget = ToolCallWidget(tool_name="test_tool", status="error", error_message="Test error")
 
-        assert hasattr(widget, 'on_button_pressed')
-        assert callable(getattr(widget, 'on_button_pressed'))
+        assert hasattr(widget, "on_button_pressed")
+        assert callable(getattr(widget, "on_button_pressed"))
 
     def test_button_handler_graceful_failure(self):
         """Test that button handler fails gracefully if widgets not found."""
-        widget = ToolCallWidget(
-            tool_name="test_tool",
-            status="error",
-            error_message="Test error"
-        )
+        widget = ToolCallWidget(tool_name="test_tool", status="error", error_message="Test error")
 
         # Create a mock button event
         from textual.widgets import Button
+
         mock_button = Mock()
         mock_button.id = "expand-error"
 
@@ -848,16 +817,14 @@ class TestSessionRestoreProgress:
     def test_progress_modal_import(self):
         """Test that SessionRestoreProgress can be imported."""
         from victor.ui.tui.app import SessionRestoreProgress
+
         assert SessionRestoreProgress is not None
 
     def test_progress_modal_initialization(self):
         """Test SessionRestoreProgress initialization."""
         from victor.ui.tui.app import SessionRestoreProgress
 
-        modal = SessionRestoreProgress(
-            total=100,
-            session_name="Test Session"
-        )
+        modal = SessionRestoreProgress(total=100, session_name="Test Session")
 
         assert modal.total == 100
         assert modal.current == 0
@@ -867,10 +834,7 @@ class TestSessionRestoreProgress:
         """Test updating progress in SessionRestoreProgress."""
         from victor.ui.tui.app import SessionRestoreProgress
 
-        modal = SessionRestoreProgress(
-            total=100,
-            session_name="Test Session"
-        )
+        modal = SessionRestoreProgress(total=100, session_name="Test Session")
 
         # Update progress - should handle missing widgets gracefully
         # The modal should not crash even if widgets aren't mounted yet
@@ -886,10 +850,7 @@ class TestSessionRestoreProgress:
         """Test that percentage is calculated correctly."""
         from victor.ui.tui.app import SessionRestoreProgress
 
-        modal = SessionRestoreProgress(
-            total=100,
-            session_name="Test Session"
-        )
+        modal = SessionRestoreProgress(total=100, session_name="Test Session")
 
         # Test percentage calculation
         percentage = (50 / 100) * 100
@@ -946,10 +907,10 @@ class TestPhase2Regression:
         from unittest.mock import PropertyMock
 
         # Test that debouncing is still active
-        with patch.object(type(streaming_message), 'app', new_callable=PropertyMock) as mock_app:
+        with patch.object(type(streaming_message), "app", new_callable=PropertyMock) as mock_app:
             mock_app.return_value = Mock()
 
-            with patch.object(streaming_message, 'set_timer') as mock_timer:
+            with patch.object(streaming_message, "set_timer") as mock_timer:
                 streaming_message.watch_content("test content")
 
                 # Should still schedule timer (Phase 1 behavior)
@@ -960,7 +921,7 @@ class TestPhase2Regression:
         import time
 
         # Test that throttling is still active
-        with patch.object(conversation_log, 'scroll_end') as mock_scroll:
+        with patch.object(conversation_log, "scroll_end") as mock_scroll:
             conversation_log._throttled_scroll_end()
             assert mock_scroll.call_count == 1
 
@@ -974,9 +935,7 @@ class TestPhase2Regression:
     def test_phase1_virtual_scrolling_still_works(self):
         """Test that virtual scrolling from Phase 1 still works."""
         log = EnhancedConversationLog()
-        assert hasattr(log, 'VIRTUAL_SCROLL_THRESHOLD')
+        assert hasattr(log, "VIRTUAL_SCROLL_THRESHOLD")
         assert log.VIRTUAL_SCROLL_THRESHOLD == 100
-        assert hasattr(log, 'BUFFER_SIZE')
+        assert hasattr(log, "BUFFER_SIZE")
         assert log.BUFFER_SIZE == 10
-
-

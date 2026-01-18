@@ -188,9 +188,7 @@ class CoordinatorMetricsCollector:
     # ========================================================================
 
     @contextmanager
-    def track_coordinator(
-        self, coordinator_name: str, metadata: Optional[Dict[str, Any]] = None
-    ):
+    def track_coordinator(self, coordinator_name: str, metadata: Optional[Dict[str, Any]] = None):
         """Context manager for tracking coordinator execution.
 
         Args:
@@ -434,8 +432,12 @@ class CoordinatorMetricsCollector:
                 "min_duration_ms": min(durations),
                 "max_duration_ms": max(durations),
                 "p50_duration_ms": durations[len(durations) // 2],
-                "p95_duration_ms": durations[int(len(durations) * 0.95)] if len(durations) > 1 else durations[0],
-                "p99_duration_ms": durations[int(len(durations) * 0.99)] if len(durations) > 1 else durations[0],
+                "p95_duration_ms": (
+                    durations[int(len(durations) * 0.95)] if len(durations) > 1 else durations[0]
+                ),
+                "p99_duration_ms": (
+                    durations[int(len(durations) * 0.99)] if len(durations) > 1 else durations[0]
+                ),
                 "error_count": total_errors,
                 "error_rate": total_errors / len(executions),
                 "cache_hit_rate": cache_hits / total_cache_ops if total_cache_ops > 0 else 0,

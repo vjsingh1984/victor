@@ -355,7 +355,9 @@ class DIInspector:
                     for dep in service.dependencies:
                         print(f"  -> {dep}")
 
-    def _print_dependency_tree(self, service_name: str, depth: int = 0, visited: Optional[Set[str]] = None) -> None:
+    def _print_dependency_tree(
+        self, service_name: str, depth: int = 0, visited: Optional[Set[str]] = None
+    ) -> None:
         """Print dependency tree recursively."""
         if visited is None:
             visited = set()
@@ -417,9 +419,13 @@ class DIInspector:
     def get_statistics(self) -> Dict[str, Any]:
         """Get container statistics."""
         total = len(self.services)
-        singletons = sum(1 for s in self.services.values() if s.lifetime == ServiceLifetime.SINGLETON)
+        singletons = sum(
+            1 for s in self.services.values() if s.lifetime == ServiceLifetime.SINGLETON
+        )
         scoped = sum(1 for s in self.services.values() if s.lifetime == ServiceLifetime.SCOPED)
-        transient = sum(1 for s in self.services.values() if s.lifetime == ServiceLifetime.TRANSIENT)
+        transient = sum(
+            1 for s in self.services.values() if s.lifetime == ServiceLifetime.TRANSIENT
+        )
 
         created = sum(1 for s in self.services.values() if s.is_created)
 
@@ -482,9 +488,9 @@ class DIInspector:
         print(f"\nInstantiated: {stats['created']}")
         print(f"Not instantiated: {stats['total_services'] - stats['created']}")
 
-        if stats['most_depended_upon']:
+        if stats["most_depended_upon"]:
             print("\nTop 10 most depended-upon services:")
-            for name, count in stats['most_depended_upon']:
+            for name, count in stats["most_depended_upon"]:
                 print(f"  {name}: {count}")
 
 
@@ -574,7 +580,9 @@ Examples:
         return 1
 
     # Show summary by default
-    if not any([args.list, args.service, args.show_dependencies, args.check_resolution, args.export]):
+    if not any(
+        [args.list, args.service, args.show_dependencies, args.check_resolution, args.export]
+    ):
         inspector.print_summary()
         return 0
 

@@ -178,14 +178,15 @@ class CacheBackendFactory:
             return CacheBackendFactory._create_sqlite_backend(options)
 
         else:
-            supported = ', '.join([
-                CacheBackendFactory.BACKEND_MEMORY,
-                CacheBackendFactory.BACKEND_REDIS,
-                CacheBackendFactory.BACKEND_SQLITE,
-            ])
+            supported = ", ".join(
+                [
+                    CacheBackendFactory.BACKEND_MEMORY,
+                    CacheBackendFactory.BACKEND_REDIS,
+                    CacheBackendFactory.BACKEND_SQLITE,
+                ]
+            )
             raise ValueError(
-                f"Unknown backend type: {backend_type}. "
-                f"Supported types: {supported}"
+                f"Unknown backend type: {backend_type}. " f"Supported types: {supported}"
             )
 
     @staticmethod
@@ -320,8 +321,7 @@ class CacheBackendFactory:
         ]
         if backend_type not in valid_types:
             errors.append(
-                f"Unknown backend type: {backend_type}. "
-                f"Supported: {', '.join(valid_types)}"
+                f"Unknown backend type: {backend_type}. " f"Supported: {', '.join(valid_types)}"
             )
             return False, errors
 

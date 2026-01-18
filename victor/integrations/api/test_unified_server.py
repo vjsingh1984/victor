@@ -29,6 +29,7 @@ async def test_imports() -> bool:
     try:
         # Main API server
         from victor.integrations.api.fastapi_server import VictorFastAPIServer
+
         print("✓ Main API server (VictorFastAPIServer)")
     except ImportError as e:
         print(f"✗ Main API server: {e}")
@@ -41,6 +42,7 @@ async def test_imports() -> bool:
             SQLiteHITLStore,
             create_hitl_router,
         )
+
         print("✓ HITL API server components")
     except ImportError as e:
         print(f"✗ HITL API: {e}")
@@ -49,6 +51,7 @@ async def test_imports() -> bool:
     try:
         # Workflow editor (may not be available)
         from tools.workflow_editor.backend.api import app as workflow_app
+
         print("✓ Workflow editor API")
     except ImportError as e:
         print(f"⚠ Workflow editor API (optional): {e}")
@@ -60,6 +63,7 @@ async def test_imports() -> bool:
             create_unified_server,
             run_unified_server,
         )
+
         print("✓ Unified server factory")
     except ImportError as e:
         print(f"✗ Unified server: {e}")
@@ -97,7 +101,7 @@ async def test_server_creation() -> bool:
         # Check for expected routes
         route_paths = []
         for route in app.routes:
-            if hasattr(route, 'path'):
+            if hasattr(route, "path"):
                 route_paths.append(route.path)
 
         expected_routes = [
@@ -121,6 +125,7 @@ async def test_server_creation() -> bool:
     except Exception as e:
         print(f"\n❌ Server creation error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -140,7 +145,7 @@ async def test_endpoint_structure() -> bool:
         system_routes = []
 
         for route in app.routes:
-            if hasattr(route, 'path'):
+            if hasattr(route, "path"):
                 path = route.path
                 if path.startswith("/api/"):
                     api_routes.append(path)
@@ -169,6 +174,7 @@ async def test_endpoint_structure() -> bool:
     except Exception as e:
         print(f"\n❌ Endpoint structure error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -182,23 +188,27 @@ async def test_hitl_integration() -> bool:
 
         app = create_unified_server(enable_hitl=True, hitl_persistent=False)
 
-        if hasattr(app.state, 'hitl_store'):
+        if hasattr(app.state, "hitl_store"):
             print("✓ HITL store initialized")
 
             # Test store operations
             await app.state.hitl_store.store_request(
-                request=type('Request', (), {
-                    'request_id': 'test-123',
-                    'node_id': 'test-node',
-                    'hitl_type': type('Type', (), {'value': 'approval'})(),
-                    'prompt': 'Test approval',
-                    'context': {},
-                    'choices': None,
-                    'default_value': None,
-                    'timeout': 300,
-                    'fallback': type('Fallback', (), {'value': 'continue'})(),
-                })(),
-                workflow_id='test-workflow',
+                request=type(
+                    "Request",
+                    (),
+                    {
+                        "request_id": "test-123",
+                        "node_id": "test-node",
+                        "hitl_type": type("Type", (), {"value": "approval"})(),
+                        "prompt": "Test approval",
+                        "context": {},
+                        "choices": None,
+                        "default_value": None,
+                        "timeout": 300,
+                        "fallback": type("Fallback", (), {"value": "continue"})(),
+                    },
+                )(),
+                workflow_id="test-workflow",
             )
 
             pending = await app.state.hitl_store.list_pending()
@@ -213,6 +223,7 @@ async def test_hitl_integration() -> bool:
     except Exception as e:
         print(f"\n❌ HITL integration error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -244,6 +255,7 @@ async def test_health_check() -> bool:
     except Exception as e:
         print(f"\n❌ Health check error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 

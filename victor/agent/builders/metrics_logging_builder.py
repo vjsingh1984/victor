@@ -78,7 +78,9 @@ class MetricsLoggingBuilder(FactoryAwareBuilder):
             usage_logger=orchestrator.usage_logger,
             debug_logger=orchestrator.debug_logger,
             tool_cost_lookup=lambda name: (
-                orchestrator.tools.get_tool_cost(name) if hasattr(orchestrator, "tools") else CostTier.FREE
+                orchestrator.tools.get_tool_cost(name)
+                if hasattr(orchestrator, "tools")
+                else CostTier.FREE
             ),
         )
         components["metrics_collector"] = orchestrator._metrics_collector

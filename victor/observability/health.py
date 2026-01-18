@@ -260,9 +260,7 @@ class CoordinatorHealthService:
 
         # Check all coordinators
         if self._coordinator_checks:
-            tasks = [
-                check.check() for check in self._coordinator_checks.values()
-            ]
+            tasks = [check.check() for check in self._coordinator_checks.values()]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             for check, result in zip(self._coordinator_checks.values(), results, strict=False):
@@ -383,7 +381,9 @@ def setup_health_endpoints(
             status_code=200 if report.is_healthy else 503,
         )
 
-    logger.info("Health check endpoints registered: /health, /health/ready, /health/live, /health/detailed")
+    logger.info(
+        "Health check endpoints registered: /health, /health/ready, /health/live, /health/detailed"
+    )
 
 
 # =============================================================================

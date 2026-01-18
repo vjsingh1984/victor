@@ -461,7 +461,9 @@ class TeamCommunicationProtocol:
             member: Member to unsubscribe
         """
         if topic in self._message_handlers:
-            self._message_handlers[topic] = [m for m in self._message_handlers[topic] if m.id != member.id]
+            self._message_handlers[topic] = [
+                m for m in self._message_handlers[topic] if m.id != member.id
+            ]
 
     async def publish(self, topic: str, message: str, sender_id: str = "system") -> int:
         """Publish message to all subscribers of a topic.
@@ -567,7 +569,9 @@ class TeamCommunicationProtocol:
             "total_messages": len(self._communication_log),
             "by_type": by_type,
             "by_sender": by_sender,
-            "avg_response_time_ms": total_response_time / response_count if response_count > 0 else 0,
+            "avg_response_time_ms": (
+                total_response_time / response_count if response_count > 0 else 0
+            ),
         }
 
 
@@ -712,7 +716,10 @@ class SharedTeamContext:
             previous_value = self._state.get(key)
 
             # Resolve conflict based on strategy
-            if previous_value is not None and self._conflict_resolution != ConflictResolutionStrategy.LAST_WRITE_WINS:
+            if (
+                previous_value is not None
+                and self._conflict_resolution != ConflictResolutionStrategy.LAST_WRITE_WINS
+            ):
                 resolved_value = await self._resolve_conflict(key, previous_value, value, member_id)
             else:
                 resolved_value = value
@@ -1160,9 +1167,8 @@ class NegotiationFramework:
                 message = AgentMessage(
                     sender_id="negotiator",
                     recipient_id=member_id,
-                    content=f"Please vote on: {topic}\nProposals:\n" + "\n".join(
-                        f"{i+1}. {prop.content}" for i, prop in enumerate(proposals)
-                    ),
+                    content=f"Please vote on: {topic}\nProposals:\n"
+                    + "\n".join(f"{i+1}. {prop.content}" for i, prop in enumerate(proposals)),
                     message_type=MessageType.QUERY,
                     data={"round": rounds, "topic": topic},
                 )
@@ -1221,9 +1227,8 @@ class NegotiationFramework:
             message = AgentMessage(
                 sender_id="negotiator",
                 recipient_id=member_id,
-                content=f"Rank proposals for: {topic}\n" + "\n".join(
-                    f"{i+1}. {prop.content}" for i, prop in enumerate(proposals)
-                ),
+                content=f"Rank proposals for: {topic}\n"
+                + "\n".join(f"{i+1}. {prop.content}" for i, prop in enumerate(proposals)),
                 message_type=MessageType.QUERY,
                 data={"topic": topic},
             )
@@ -1251,7 +1256,11 @@ class NegotiationFramework:
         # Calculate average rank for each proposal
         avg_ranks: Dict[str, float] = {}
         for prop in proposals:
-            ranks = [preferences[m].index(prop.content) + 1 for m in preferences if prop.content in preferences[m]]
+            ranks = [
+                preferences[m].index(prop.content) + 1
+                for m in preferences
+                if prop.content in preferences[m]
+            ]
             if ranks:
                 avg_ranks[prop.id] = sum(ranks) / len(ranks)
 
@@ -1301,7 +1310,9 @@ class NegotiationFramework:
                     sender_id="negotiator",
                     recipient_id=member_id,
                     content=f"Rank remaining proposals for: {topic}\n"
-                    + "\n".join(f"{i+1}. {prop.content}" for i, prop in enumerate(active_proposals)),
+                    + "\n".join(
+                        f"{i+1}. {prop.content}" for i, prop in enumerate(active_proposals)
+                    ),
                     message_type=MessageType.QUERY,
                     data={"round": rounds, "topic": topic},
                 )

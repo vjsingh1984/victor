@@ -46,6 +46,7 @@ logger = logging.getLogger(__name__)
 # Try to import native Rust implementation
 try:
     from victor_native import signature as _native_signature
+
     _RUST_AVAILABLE = True
     logger.info("Rust signature accelerator loaded")
 except ImportError:
@@ -62,6 +63,7 @@ class ToolCallData:
         arguments: Tool arguments (dict)
         signature: Computed signature (filled by accelerator)
     """
+
     tool_name: str
     arguments: Dict[str, Any]
     signature: str = ""
@@ -73,6 +75,7 @@ class ToolCallData:
 @dataclass
 class SignatureCacheStats:
     """Statistics for signature cache."""
+
     total_computations: int = 0
     cache_hits: int = 0
     cache_misses: int = 0

@@ -105,9 +105,7 @@ class PromptingBuilder(FactoryAwareBuilder):
                 + "\n\n"
                 + orchestrator.project_context.get_system_prompt_addition()
             )
-            logger.info(
-                f"Loaded project context from {orchestrator.project_context.context_file}"
-            )
+            logger.info(f"Loaded project context from {orchestrator.project_context.context_file}")
         else:
             orchestrator._system_prompt = base_system_prompt
 

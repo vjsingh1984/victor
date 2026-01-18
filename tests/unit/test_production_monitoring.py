@@ -456,6 +456,7 @@ class TestStructuredLogging:
 
         # Add handler to capture output
         import io
+
         handler = logging.StreamHandler(io.StringIO())
         handler.setFormatter(StructuredFormatter())
         python_logger.addHandler(handler)

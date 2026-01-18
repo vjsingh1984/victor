@@ -112,7 +112,9 @@ class OrchestratorPool:
             )
             return orchestrator
         except Exception as e:
-            logger.error(f"OrchestratorPool: Failed to create orchestrator for profile '{profile}': {e}")
+            logger.error(
+                f"OrchestratorPool: Failed to create orchestrator for profile '{profile}': {e}"
+            )
             raise RuntimeError(f"Failed to create orchestrator for profile '{profile}': {e}") from e
 
     def get_default_orchestrator(self) -> Any:
@@ -186,7 +188,9 @@ class OrchestratorPool:
             )
             return provider
         except Exception as e:
-            logger.error(f"OrchestratorPool: Failed to create provider for profile '{profile}': {e}")
+            logger.error(
+                f"OrchestratorPool: Failed to create provider for profile '{profile}': {e}"
+            )
             raise RuntimeError(f"Failed to create provider for profile '{profile}': {e}") from e
 
     def clear_cache(self, profile: Optional[str] = None) -> None:

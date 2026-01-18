@@ -255,9 +255,7 @@ class ProtocolInspector:
             for node in ast.walk(tree):
                 if isinstance(node, ast.ClassDef):
                     class_name = node.name
-                    implemented = self._check_protocol_implementation(
-                        node, protocol_name
-                    )
+                    implemented = self._check_protocol_implementation(node, protocol_name)
 
                     if implemented:
                         module = self._get_module_name(file_path)
@@ -332,9 +330,7 @@ class ProtocolInspector:
                 # Check for type annotations
                 if isinstance(node, ast.AnnAssign):
                     if self._contains_protocol_reference(node.annotation, protocol_name):
-                        usage_context = self._get_usage_context(
-                            lines, node.lineno, file_path
-                        )
+                        usage_context = self._get_usage_context(lines, node.lineno, file_path)
                         self.usage_map[protocol_name].append(usage_context)
 
                 # Check for function arguments
@@ -342,18 +338,14 @@ class ProtocolInspector:
                     if node.annotation and self._contains_protocol_reference(
                         node.annotation, protocol_name
                     ):
-                        usage_context = self._get_usage_context(
-                            lines, node.lineno, file_path
-                        )
+                        usage_context = self._get_usage_context(lines, node.lineno, file_path)
                         self.usage_map[protocol_name].append(usage_context)
 
                 # Check for imports
                 elif isinstance(node, ast.ImportFrom):
                     for alias in node.names:
                         if alias.name == protocol_name:
-                            usage_context = self._get_usage_context(
-                                lines, node.lineno, file_path
-                            )
+                            usage_context = self._get_usage_context(lines, node.lineno, file_path)
                             self.usage_map[protocol_name].append(usage_context)
 
         except Exception as e:

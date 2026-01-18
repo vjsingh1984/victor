@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 # Try to import native Rust implementation
 try:
     from victor_native import file_ops as _native_file_ops
+
     _RUST_AVAILABLE = True
     logger.info("Rust file operations accelerator loaded")
 except ImportError:
@@ -63,6 +64,7 @@ class FileInfo:
         modified: Modification timestamp (Unix time)
         depth: Depth from root directory
     """
+
     path: str
     file_type: str  # "file", "directory", "symlink"
     size: int
@@ -76,6 +78,7 @@ class FileInfo:
 @dataclass
 class FileOpsCacheStats:
     """Statistics for file operations cache."""
+
     total_walks: int = 0
     total_files_visited: int = 0
     total_duration_ms: float = 0.0
@@ -91,11 +94,7 @@ class FileOpsCacheStats:
     @property
     def avg_walk_ms(self) -> float:
         """Average walk time in milliseconds."""
-        return (
-            self.total_duration_ms / self.total_walks
-            if self.total_walks > 0
-            else 0.0
-        )
+        return self.total_duration_ms / self.total_walks if self.total_walks > 0 else 0.0
 
     def to_dict(self) -> Dict[str, float]:
         """Convert to dictionary for serialization."""
@@ -181,9 +180,7 @@ class FileOpsAccelerator:
         duration_ms = (time.monotonic() - start_time) * 1000
         self._stats.record_walk(duration_ms, len(files))
 
-        logger.debug(
-            f"Walked {root}: {len(files)} files in {duration_ms:.2f}ms"
-        )
+        logger.debug(f"Walked {root}: {len(files)} files in {duration_ms:.2f}ms")
 
         return files
 
@@ -275,9 +272,7 @@ class FileOpsAccelerator:
                 dirnames[:] = [
                     d
                     for d in dirnames
-                    if not any(
-                        fnmatch.fnmatch(d, pattern) for pattern in ignore_patterns
-                    )
+                    if not any(fnmatch.fnmatch(d, pattern) for pattern in ignore_patterns)
                 ]
 
             # Process files
@@ -286,9 +281,7 @@ class FileOpsAccelerator:
 
                 # Skip if doesn't match patterns
                 if patterns:
-                    if not any(
-                        fnmatch.fnmatch(filename, pattern) for pattern in patterns
-                    ):
+                    if not any(fnmatch.fnmatch(filename, pattern) for pattern in patterns):
                         continue
 
                 try:

@@ -69,14 +69,28 @@ class ConversationPipelineBuilder(FactoryAwareBuilder):
         orchestrator._lifecycle_manager = factory.create_lifecycle_manager(
             conversation_controller=orchestrator._conversation_controller,
             metrics_collector=(
-                orchestrator._metrics_collector if hasattr(orchestrator, "_metrics_collector") else None
+                orchestrator._metrics_collector
+                if hasattr(orchestrator, "_metrics_collector")
+                else None
             ),
             context_compactor=(
-                orchestrator._context_compactor if hasattr(orchestrator, "_context_compactor") else None
+                orchestrator._context_compactor
+                if hasattr(orchestrator, "_context_compactor")
+                else None
             ),
-            sequence_tracker=orchestrator._sequence_tracker if hasattr(orchestrator, "_sequence_tracker") else None,
-            usage_analytics=orchestrator._usage_analytics if hasattr(orchestrator, "_usage_analytics") else None,
-            reminder_manager=orchestrator._reminder_manager if hasattr(orchestrator, "_reminder_manager") else None,
+            sequence_tracker=(
+                orchestrator._sequence_tracker
+                if hasattr(orchestrator, "_sequence_tracker")
+                else None
+            ),
+            usage_analytics=(
+                orchestrator._usage_analytics if hasattr(orchestrator, "_usage_analytics") else None
+            ),
+            reminder_manager=(
+                orchestrator._reminder_manager
+                if hasattr(orchestrator, "_reminder_manager")
+                else None
+            ),
         )
         components["lifecycle_manager"] = orchestrator._lifecycle_manager
 
@@ -99,7 +113,10 @@ class ConversationPipelineBuilder(FactoryAwareBuilder):
         components["tool_pipeline"] = orchestrator._tool_pipeline
 
         # Wire pending semantic cache to tool pipeline (deferred from embedding store init)
-        if hasattr(orchestrator, "_pending_semantic_cache") and orchestrator._pending_semantic_cache is not None:
+        if (
+            hasattr(orchestrator, "_pending_semantic_cache")
+            and orchestrator._pending_semantic_cache is not None
+        ):
             orchestrator._tool_pipeline.set_semantic_cache(orchestrator._pending_semantic_cache)
             logger.info("[AgentOrchestrator] Semantic tool result cache enabled")
             orchestrator._pending_semantic_cache = None  # Clear reference

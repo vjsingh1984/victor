@@ -237,6 +237,7 @@ class TestVerticalConfigLoaderValidation:
 # Test Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def loader():
     """Provide VerticalConfigLoader instance."""

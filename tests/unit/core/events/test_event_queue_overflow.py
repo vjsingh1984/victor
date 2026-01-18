@@ -46,6 +46,7 @@ from victor.core.events import (
 
 class OverflowStrategy(str, Enum):
     """Overflow handling strategies."""
+
     DROP_OLDEST = "drop_oldest"  # Drop oldest events when queue full
     BLOCK = "block"  # Block until space available
     REJECT = "reject"  # Reject new events when queue full
@@ -53,6 +54,7 @@ class OverflowStrategy(str, Enum):
 
 class EventPriority(str, Enum):
     """Event priority levels."""
+
     CRITICAL = "critical"  # Must not be dropped
     HIGH = "high"
     NORMAL = "normal"

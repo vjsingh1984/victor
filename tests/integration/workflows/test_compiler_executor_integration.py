@@ -57,11 +57,13 @@ class TestCompilerExecutorIntegration:
     def test_workflow_compiler_imports(self):
         """Test that WorkflowCompiler can be imported."""
         from victor.workflows.compiler.unified_compiler import WorkflowCompiler
+
         assert WorkflowCompiler is not None
 
     def test_state_graph_executor_imports(self):
         """Test that StateGraphExecutor can be imported."""
         from victor.workflows.executors import StateGraphExecutor
+
         assert StateGraphExecutor is not None
 
     def test_compiler_initialization(self):
@@ -81,8 +83,8 @@ class TestCompilerExecutorIntegration:
         )
 
         assert compiler is not None
-        assert hasattr(compiler, 'compile')
-        assert hasattr(compiler, '_yaml_config')
+        assert hasattr(compiler, "compile")
+        assert hasattr(compiler, "_yaml_config")
 
     def test_executor_initialization(self):
         """Test that StateGraphExecutor can be initialized with a mock graph."""
@@ -96,8 +98,8 @@ class TestCompilerExecutorIntegration:
         executor = StateGraphExecutor(mock_graph)
 
         assert executor is not None
-        assert hasattr(executor, 'invoke')
-        assert hasattr(executor, 'stream')
+        assert hasattr(executor, "invoke")
+        assert hasattr(executor, "stream")
 
     def test_compiler_executor_protocol_compliance(self):
         """Test that compiler and executor comply with protocols."""
@@ -107,8 +109,8 @@ class TestCompilerExecutorIntegration:
         )
 
         # Check protocol exists
-        assert hasattr(WorkflowCompilerProtocol, 'compile')
-        assert hasattr(CompiledGraphProtocol, 'invoke')
+        assert hasattr(WorkflowCompilerProtocol, "compile")
+        assert hasattr(CompiledGraphProtocol, "invoke")
 
     def test_sample_workflow_structure(self):
         """Test that sample workflow YAML is valid structure."""
@@ -117,17 +119,17 @@ class TestCompilerExecutorIntegration:
         # Parse the sample workflow
         parsed = yaml.safe_load(SAMPLE_WORKFLOW_YAML)
 
-        assert 'workflows' in parsed
-        assert 'simple_linear' in parsed['workflows']
+        assert "workflows" in parsed
+        assert "simple_linear" in parsed["workflows"]
 
-        workflow = parsed['workflows']['simple_linear']
-        assert 'nodes' in workflow
-        assert len(workflow['nodes']) == 3
+        workflow = parsed["workflows"]["simple_linear"]
+        assert "nodes" in workflow
+        assert len(workflow["nodes"]) == 3
 
         # Check node types
-        node_types = {node['type'] for node in workflow['nodes']}
-        assert 'compute' in node_types
-        assert 'transform' in node_types
+        node_types = {node["type"] for node in workflow["nodes"]}
+        assert "compute" in node_types
+        assert "transform" in node_types
 
     @pytest.mark.skip("Requires actual YAML loader and validator setup")
     def test_compile_simple_workflow(self):
@@ -174,8 +176,8 @@ class TestSeparationOfConcerns:
 
         # Compiler should NOT have execution methods
         # (those belong to executor)
-        assert not hasattr(compiler, 'execute')
-        assert not hasattr(compiler, 'run_workflow')
+        assert not hasattr(compiler, "execute")
+        assert not hasattr(compiler, "run_workflow")
 
     def test_executor_has_no_compilation_logic(self):
         """Verify executor doesn't have compilation methods."""
@@ -187,9 +189,9 @@ class TestSeparationOfConcerns:
 
         # Executor should NOT have compilation methods
         # (those belong to compiler)
-        assert not hasattr(executor, 'compile')
-        assert not hasattr(executor, 'load_yaml')
-        assert not hasattr(executor, 'build_graph')
+        assert not hasattr(executor, "compile")
+        assert not hasattr(executor, "load_yaml")
+        assert not hasattr(executor, "build_graph")
 
 
 if __name__ == "__main__":

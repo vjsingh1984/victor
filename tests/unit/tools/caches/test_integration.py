@@ -49,6 +49,7 @@ class MockTool:
     def get_metadata(self):
         """Return mock metadata."""
         from victor.tools.metadata import ToolMetadata
+
         return ToolMetadata(
             categories=["test"],
             keywords=[name],
@@ -119,10 +120,12 @@ class TestSemanticToolSelectorCaching:
         cache = get_tool_selection_cache()
         key_gen = cache._get_key_generator = MagicMock()
         from victor.tools.caches import get_cache_key_generator
+
         real_key_gen = get_cache_key_generator()
         cache._get_key_generator = lambda: real_key_gen
 
         from victor.tools.caches import get_cache_key_generator
+
         key_gen = get_cache_key_generator()
         tools_hash = key_gen.calculate_tools_hash(mock_tools)
         config_hash = selector._get_config_hash(0.18)
@@ -179,6 +182,7 @@ class TestSemanticToolSelectorCaching:
             # Check cache was populated
             cache = get_tool_selection_cache()
             from victor.tools.caches import get_cache_key_generator
+
             key_gen = get_cache_key_generator()
             tools_hash = key_gen.calculate_tools_hash(mock_tools)
             config_hash = selector._get_config_hash(0.18)
@@ -200,6 +204,7 @@ class TestSemanticToolSelectorCaching:
         # Populate cache
         cache = get_tool_selection_cache()
         from victor.tools.caches import get_cache_key_generator
+
         key_gen = get_cache_key_generator()
         tools_hash = key_gen.calculate_tools_hash(mock_tools)
         config_hash = selector._get_config_hash(0.18)
@@ -229,6 +234,7 @@ class TestKeywordToolSelectorCaching:
         # Pre-populate cache
         cache = get_tool_selection_cache()
         from victor.tools.caches import get_cache_key_generator
+
         key_gen = get_cache_key_generator()
         tools_hash = key_gen.calculate_tools_hash(mock_tools)
         config_hash = selector._get_config_hash()
@@ -271,6 +277,7 @@ class TestKeywordToolSelectorCaching:
         # Check cache was populated
         cache = get_tool_selection_cache()
         from victor.tools.caches import get_cache_key_generator
+
         key_gen = get_cache_key_generator()
         tools_hash = key_gen.calculate_tools_hash(mock_tools)
         config_hash = selector._get_config_hash()
@@ -286,6 +293,7 @@ class TestKeywordToolSelectorCaching:
         # Populate cache
         cache = get_tool_selection_cache()
         from victor.tools.caches import get_cache_key_generator
+
         key_gen = get_cache_key_generator()
         tools_hash = key_gen.calculate_tools_hash(mock_tools)
         config_hash = selector._get_config_hash()
@@ -350,6 +358,7 @@ class TestHybridToolSelectorCaching:
         # Pre-populate cache
         cache = get_tool_selection_cache()
         from victor.tools.caches import get_cache_key_generator
+
         key_gen = get_cache_key_generator()
 
         # Mock tools hash calculation

@@ -118,7 +118,9 @@ class TestUnifiedEmbeddingModel:
             MockST.return_value = mock_model
 
             config = EmbeddingModelConfig(
-                embedding_type="sentence-transformers", model_name="all-MiniLM-L12-v2", dimension=384
+                embedding_type="sentence-transformers",
+                model_name="all-MiniLM-L12-v2",
+                dimension=384,
             )
 
             model = SentenceTransformerModel(config)
@@ -320,7 +322,9 @@ class TestMemoryOptimization:
         """Document that separate models would use 200MB vs 120MB."""
         # Tool selection model
         tool_model = EmbeddingModelConfig(
-            embedding_type="sentence-transformers", model_name="all-MiniLM-L6-v2", dimension=384  # 80MB
+            embedding_type="sentence-transformers",
+            model_name="all-MiniLM-L6-v2",
+            dimension=384,  # 80MB
         )
 
         # Codebase search model

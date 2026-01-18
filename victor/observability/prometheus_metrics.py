@@ -154,7 +154,9 @@ class Histogram:
     name: str
     help: str
     labels: Dict[str, str] = field(default_factory=dict)
-    buckets: List[float] = field(default_factory=lambda: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0])
+    buckets: List[float] = field(
+        default_factory=lambda: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+    )
     _sum: float = 0.0
     _count: int = 0
     _bucket_counts: Dict[float, int] = field(default_factory=dict)
@@ -202,7 +204,7 @@ class Histogram:
                 bucket_label = label_str.replace("}", f',le="{bucket}"}}')
             else:
                 bucket_label = f'{{le="{bucket}"}}'
-            lines.append(f'{self.name}_bucket{bucket_label} {cumulative}')
+            lines.append(f"{self.name}_bucket{bucket_label} {cumulative}")
 
         # Sum and count
         lines.append(f"{self.name}_sum{label_str} {self._sum}")
@@ -306,7 +308,7 @@ class PrometheusRegistry:
                     name=name,
                     help=help,
                     labels=labels or {},
-                    buckets=buckets or Histogram.__dataclass_fields__['buckets'].default_factory(),
+                    buckets=buckets or Histogram.__dataclass_fields__["buckets"].default_factory(),
                 )
             return self._histograms[key]
 
@@ -447,7 +449,9 @@ class PrometheusMetricsExporter:
         # Overall metrics
         lines.append(f"victor_coordinator_uptime_seconds {overall_stats['uptime_seconds']:.2f}")
         lines.append(f"victor_coordinator_total_executions {overall_stats['total_executions']}")
-        lines.append(f"victor_coordinator_active_coordinators {overall_stats['total_coordinators']}")
+        lines.append(
+            f"victor_coordinator_active_coordinators {overall_stats['total_coordinators']}"
+        )
 
         # Analytics events (Counter)
         for event_name, count in overall_stats.get("analytics_events", {}).items():
@@ -458,12 +462,12 @@ class PrometheusMetricsExporter:
         lines.append(f"victor_coordinator_error_rate {error_rate:.4f}")
 
         # Throughput (Gauge)
-        uptime = max(overall_stats['uptime_seconds'], 1)
-        throughput = overall_stats['total_executions'] / uptime
+        uptime = max(overall_stats["uptime_seconds"], 1)
+        throughput = overall_stats["total_executions"] / uptime
         lines.append(f"victor_coordinator_throughput {throughput:.4f}")
 
         # Scrape metadata
-        lines.append(f'victor_scrape_timestamp_seconds {time.time():.3f}')
+        lines.append(f"victor_scrape_timestamp_seconds {time.time():.3f}")
 
         return "\n".join(lines)
 
@@ -478,6 +482,7 @@ class PrometheusMetricsExporter:
             app = FastAPI()
             app.add_route("/metrics", exporter.get_endpoint())
         """
+
         async def metrics_handler():
             """Handle metrics scrape request."""
             from fastapi.responses import PlainTextResponse
@@ -557,6 +562,7 @@ def track_prometheus_metrics(
                 # Do work
                 pass
     """
+
     def decorator(func):
         def wrapper(*args, **kwargs):
             name = coordinator_name or func.__qualname__
@@ -587,6 +593,7 @@ def track_prometheus_metrics(
                 histogram.observe(duration)
 
         return wrapper
+
     return decorator
 
 

@@ -45,10 +45,10 @@ class MockCompactionStrategy(BaseCompactionStrategy):
     async def compact(self, context, budget):
         # Simple compaction: reduce token count
         new_tokens = context.get("token_count", 0) - self._tokens_to_save
-        compacted_context = ({
+        compacted_context = {
             **context,
             "token_count": max(new_tokens, 0),
-        })
+        }
         return CompactionResult(
             compacted_context=compacted_context,
             tokens_saved=self._tokens_to_save,
@@ -88,8 +88,8 @@ class TestBaseCompactionStrategy:
     async def test_can_apply_exceeds_budget(self):
         """Test can_apply returns True when exceeds budget."""
         strategy = BaseCompactionStrategy(name="test")
-        context = ({"token_count": 5000})
-        budget = ({"max_tokens": 4096})
+        context = {"token_count": 5000}
+        budget = {"max_tokens": 4096}
 
         result = await strategy.can_apply(context, budget)
 
@@ -102,6 +102,7 @@ class TestBaseCompactionStrategy:
         with pytest.raises(NotImplementedError):
             # Need to call it via asyncio since it's async
             import asyncio
+
             asyncio.run(strategy.compact({}, {}))
 
     def test_estimated_savings(self):
@@ -131,15 +132,12 @@ class TestTruncationCompactionStrategy:
     async def test_compact_removes_oldest_messages(self):
         """Test that oldest messages are removed."""
         strategy = TruncationCompactionStrategy(reserve_messages=2)
-        messages = [
-            {"role": "user", "content": f"Message {i}"}
-            for i in range(10)
-        ]
-        context = ({
+        messages = [{"role": "user", "content": f"Message {i}"} for i in range(10)]
+        context = {
             "messages": messages,
             "token_count": 5000,
-        })
-        budget = ({"max_tokens": 2000})
+        }
+        budget = {"max_tokens": 2000}
 
         result = await strategy.compact(context, budget)
 
@@ -152,15 +150,12 @@ class TestTruncationCompactionStrategy:
     async def test_compact_preserves_reserved_messages(self):
         """Test that reserved messages are preserved."""
         strategy = TruncationCompactionStrategy(reserve_messages=10)
-        messages = [
-            {"role": "user", "content": f"Message {i}"}
-            for i in range(5)
-        ]
-        context = ({
+        messages = [{"role": "user", "content": f"Message {i}"} for i in range(5)]
+        context = {
             "messages": messages,
             "token_count": 3000,
-        })
-        budget = ({"max_tokens": 2000})
+        }
+        budget = {"max_tokens": 2000}
 
         result = await strategy.compact(context, budget)
 
@@ -173,11 +168,11 @@ class TestTruncationCompactionStrategy:
         """Test that tokens_saved is calculated correctly."""
         strategy = TruncationCompactionStrategy(reserve_messages=5)
         messages = [{"role": "user", "content": "Message"} for _ in range(100)]
-        context = ({
+        context = {
             "messages": messages,
             "token_count": 10000,
-        })
-        budget = ({"max_tokens": 1000})
+        }
+        budget = {"max_tokens": 1000}
 
         result = await strategy.compact(context, budget)
 
@@ -204,7 +199,9 @@ class TestContextCoordinator:
     def coordinator_with_strategies(self):
         """Create coordinator with mock strategies."""
         strategy1 = MockCompactionStrategy(name="strategy1", can_apply_result=False)
-        strategy2 = MockCompactionStrategy(name="strategy2", can_apply_result=True, tokens_to_save=2000)
+        strategy2 = MockCompactionStrategy(
+            name="strategy2", can_apply_result=True, tokens_to_save=2000
+        )
         return ContextCoordinator(strategies=[strategy1, strategy2])
 
     def test_init_empty(self):
@@ -218,9 +215,7 @@ class TestContextCoordinator:
     def test_init_with_strategies(self):
         """Test initialization with strategies."""
         strategy = MockCompactionStrategy()
-        coordinator = ContextCoordinator(
-            strategies=[strategy], enable_auto_compaction=False
-        )
+        coordinator = ContextCoordinator(strategies=[strategy], enable_auto_compaction=False)
 
         assert len(coordinator._strategies) == 1
         assert coordinator._enable_auto_compaction is False
@@ -228,8 +223,8 @@ class TestContextCoordinator:
     @pytest.mark.asyncio
     async def test_compact_context_within_budget(self, coordinator):
         """Test compaction when context is within budget."""
-        context = ({"token_count": 3000})
-        budget = ({"max_tokens": 4096})
+        context = {"token_count": 3000}
+        budget = {"max_tokens": 4096}
 
         result = await coordinator.compact_context(context, budget)
 
@@ -241,8 +236,8 @@ class TestContextCoordinator:
     @pytest.mark.asyncio
     async def test_compact_context_exceeds_budget(self, coordinator_with_strategies):
         """Test compaction when context exceeds budget."""
-        context = ({"token_count": 5000})
-        budget = ({"max_tokens": 4096})
+        context = {"token_count": 5000}
+        budget = {"max_tokens": 4096}
 
         result = await coordinator_with_strategies.compact_context(context, budget)
 
@@ -253,11 +248,13 @@ class TestContextCoordinator:
     async def test_compact_context_uses_first_applicable_strategy(self):
         """Test that first applicable strategy is used."""
         strategy1 = MockCompactionStrategy(name="first", can_apply_result=True, tokens_to_save=1000)
-        strategy2 = MockCompactionStrategy(name="second", can_apply_result=True, tokens_to_save=2000)
+        strategy2 = MockCompactionStrategy(
+            name="second", can_apply_result=True, tokens_to_save=2000
+        )
         coordinator = ContextCoordinator(strategies=[strategy1, strategy2])
 
-        context = ({"token_count": 5000})
-        budget = ({"max_tokens": 4096})
+        context = {"token_count": 5000}
+        budget = {"max_tokens": 4096}
 
         result = await coordinator.compact_context(context, budget)
 
@@ -271,8 +268,8 @@ class TestContextCoordinator:
         strategy = MockCompactionStrategy(name="mock", can_apply_result=False)
         coordinator = ContextCoordinator(strategies=[strategy])
 
-        context = ({"token_count": 5000})
-        budget = ({"max_tokens": 4096})
+        context = {"token_count": 5000}
+        budget = {"max_tokens": 4096}
 
         with pytest.raises(ContextCompactionError) as exc_info:
             await coordinator.compact_context(context, budget)
@@ -286,8 +283,8 @@ class TestContextCoordinator:
         working_strategy = MockCompactionStrategy(name="working", can_apply_result=True)
         coordinator = ContextCoordinator(strategies=[failing_strategy, working_strategy])
 
-        context = ({"token_count": 5000})
-        budget = ({"max_tokens": 4096})
+        context = {"token_count": 5000}
+        budget = {"max_tokens": 4096}
 
         result = await coordinator.compact_context(context, budget)
 
@@ -306,7 +303,7 @@ class TestContextCoordinator:
 
     def test_estimate_token_count_from_context(self, coordinator):
         """Test estimation when token_count is in context."""
-        context = ({"token_count": 3500})
+        context = {"token_count": 3500}
 
         tokens = coordinator.estimate_token_count(context)
 
@@ -314,12 +311,12 @@ class TestContextCoordinator:
 
     def test_estimate_token_count_from_messages(self, coordinator):
         """Test estimation from messages when no token_count."""
-        context = ({
+        context = {
             "messages": [
                 {"content": "Hello world " * 100},  # ~1100 chars
                 {"content": "Testing message " * 50},  # ~700 chars
             ]
-        })
+        }
 
         tokens = coordinator.estimate_token_count(context)
 
@@ -328,8 +325,8 @@ class TestContextCoordinator:
 
     def test_is_within_budget_true(self, coordinator):
         """Test is_within_budget returns True when within budget."""
-        context = ({"token_count": 3000})
-        budget = ({"max_tokens": 4096})
+        context = {"token_count": 3000}
+        budget = {"max_tokens": 4096}
 
         result = coordinator.is_within_budget(context, budget)
 
@@ -337,8 +334,8 @@ class TestContextCoordinator:
 
     def test_is_within_budget_false(self, coordinator):
         """Test is_within_budget returns False when exceeds budget."""
-        context = ({"token_count": 5000})
-        budget = ({"max_tokens": 4096})
+        context = {"token_count": 5000}
+        budget = {"max_tokens": 4096}
 
         result = coordinator.is_within_budget(context, budget)
 
@@ -346,8 +343,8 @@ class TestContextCoordinator:
 
     def test_is_within_budget_default_max_tokens(self, coordinator):
         """Test is_within_budget uses default max_tokens."""
-        context = ({"token_count": 3000})
-        budget = ({})  # No max_tokens specified
+        context = {"token_count": 3000}
+        budget = {}  # No max_tokens specified
 
         result = coordinator.is_within_budget(context, budget)
 
@@ -382,11 +379,12 @@ class TestContextCoordinator:
 
     def test_get_compaction_history(self, coordinator_with_strategies):
         """Test getting compaction history."""
-        context = ({"token_count": 5000})
-        budget = ({"max_tokens": 4096})
+        context = {"token_count": 5000}
+        budget = {"max_tokens": 4096}
 
         # Perform compaction
         import asyncio
+
         asyncio.run(coordinator_with_strategies.compact_context(context, budget))
 
         history = coordinator_with_strategies.get_compaction_history()
@@ -397,11 +395,12 @@ class TestContextCoordinator:
 
     def test_clear_compaction_history(self, coordinator_with_strategies):
         """Test clearing compaction history."""
-        context = ({"token_count": 5000})
-        budget = ({"max_tokens": 4096})
+        context = {"token_count": 5000}
+        budget = {"max_tokens": 4096}
 
         # Perform compaction
         import asyncio
+
         asyncio.run(coordinator_with_strategies.compact_context(context, budget))
 
         # Clear history
@@ -413,8 +412,8 @@ class TestContextCoordinator:
     @pytest.mark.asyncio
     async def test_compact_context_records_history(self, coordinator_with_strategies):
         """Test that compaction operations are recorded."""
-        context = ({"token_count": 5000})
-        budget = ({"max_tokens": 4096})
+        context = {"token_count": 5000}
+        budget = {"max_tokens": 4096}
 
         await coordinator_with_strategies.compact_context(context, budget)
 
@@ -440,9 +439,7 @@ class TestSummarizationCompactionStrategy:
 
     def test_init_custom_params(self):
         """Test initialization with custom parameters."""
-        strategy = SummarizationCompactionStrategy(
-            reserve_messages=3, summarize_threshold=500
-        )
+        strategy = SummarizationCompactionStrategy(reserve_messages=3, summarize_threshold=500)
 
         assert strategy._reserve_messages == 3
         assert strategy._summarize_threshold == 500
@@ -463,8 +460,8 @@ class TestSummarizationCompactionStrategy:
     async def test_can_apply_exceeds_threshold(self):
         """Test can_apply returns True when exceeds threshold."""
         strategy = SummarizationCompactionStrategy(summarize_threshold=1000)
-        context = ({"token_count": 5500})
-        budget = ({"max_tokens": 4096})
+        context = {"token_count": 5500}
+        budget = {"max_tokens": 4096}
 
         # 5500 > 4096 + 1000 = 5096, so should apply
         result = await strategy.can_apply(context, budget)
@@ -475,15 +472,12 @@ class TestSummarizationCompactionStrategy:
     async def test_compact_summarizes_old_messages(self):
         """Test that old messages are summarized."""
         strategy = SummarizationCompactionStrategy(reserve_messages=3)
-        messages = [
-            {"role": "user", "content": f"Old message {i}"}
-            for i in range(10)
-        ]
-        context = ({
+        messages = [{"role": "user", "content": f"Old message {i}"} for i in range(10)]
+        context = {
             "messages": messages,
             "token_count": 8000,
-        })
-        budget = ({"max_tokens": 2000})
+        }
+        budget = {"max_tokens": 2000}
 
         result = await strategy.compact(context, budget)
 
@@ -498,15 +492,12 @@ class TestSummarizationCompactionStrategy:
     async def test_compact_preserves_recent_messages(self):
         """Test that recent messages are preserved."""
         strategy = SummarizationCompactionStrategy(reserve_messages=5)
-        messages = [
-            {"role": "user", "content": f"Message {i}"}
-            for i in range(10)
-        ]
-        context = ({
+        messages = [{"role": "user", "content": f"Message {i}"} for i in range(10)]
+        context = {
             "messages": messages,
             "token_count": 6000,
-        })
-        budget = ({"max_tokens": 2000})
+        }
+        budget = {"max_tokens": 2000}
 
         result = await strategy.compact(context, budget)
 
@@ -519,15 +510,12 @@ class TestSummarizationCompactionStrategy:
     async def test_compact_not_enough_messages(self):
         """Test compact when there aren't enough messages."""
         strategy = SummarizationCompactionStrategy(reserve_messages=10)
-        messages = [
-            {"role": "user", "content": f"Message {i}"}
-            for i in range(5)
-        ]
-        context = ({
+        messages = [{"role": "user", "content": f"Message {i}"} for i in range(5)]
+        context = {
             "messages": messages,
             "token_count": 3000,
-        })
-        budget = ({"max_tokens": 2000})
+        }
+        budget = {"max_tokens": 2000}
 
         result = await strategy.compact(context, budget)
 
@@ -556,9 +544,7 @@ class TestSemanticCompactionStrategy:
 
     def test_init_custom_params(self):
         """Test initialization with custom parameters."""
-        strategy = SemanticCompactionStrategy(
-            reserve_messages=5, similarity_threshold=0.9
-        )
+        strategy = SemanticCompactionStrategy(reserve_messages=5, similarity_threshold=0.9)
 
         assert strategy._reserve_messages == 5
         assert strategy._similarity_threshold == 0.9
@@ -567,8 +553,8 @@ class TestSemanticCompactionStrategy:
     async def test_can_apply_exceeds_budget(self):
         """Test can_apply returns True when exceeds budget."""
         strategy = SemanticCompactionStrategy()
-        context = ({"token_count": 5000})
-        budget = ({"max_tokens": 4096})
+        context = {"token_count": 5000}
+        budget = {"max_tokens": 4096}
 
         result = await strategy.can_apply(context, budget)
 
@@ -584,11 +570,11 @@ class TestSemanticCompactionStrategy:
             {"role": "user", "content": "Different message"},
             {"role": "user", "content": "Another different message"},
         ]
-        context = ({
+        context = {
             "messages": messages,
             "token_count": 4000,
-        })
-        budget = ({"max_tokens": 2000})
+        }
+        budget = {"max_tokens": 2000}
 
         result = await strategy.compact(context, budget)
 
@@ -600,15 +586,12 @@ class TestSemanticCompactionStrategy:
     async def test_compact_preserves_recent_messages(self):
         """Test that recent messages are preserved."""
         strategy = SemanticCompactionStrategy(reserve_messages=2)
-        messages = [
-            {"role": "user", "content": f"Message {i}"}
-            for i in range(10)
-        ]
-        context = ({
+        messages = [{"role": "user", "content": f"Message {i}"} for i in range(10)]
+        context = {
             "messages": messages,
             "token_count": 5000,
-        })
-        budget = ({"max_tokens": 2000})
+        }
+        budget = {"max_tokens": 2000}
 
         result = await strategy.compact(context, budget)
 
@@ -620,15 +603,12 @@ class TestSemanticCompactionStrategy:
     async def test_compact_not_enough_messages(self):
         """Test compact when there aren't enough messages."""
         strategy = SemanticCompactionStrategy(reserve_messages=10)
-        messages = [
-            {"role": "user", "content": f"Message {i}"}
-            for i in range(5)
-        ]
-        context = ({
+        messages = [{"role": "user", "content": f"Message {i}"} for i in range(5)]
+        context = {
             "messages": messages,
             "token_count": 3000,
-        })
-        budget = ({"max_tokens": 2000})
+        }
+        budget = {"max_tokens": 2000}
 
         result = await strategy.compact(context, budget)
 
@@ -657,9 +637,7 @@ class TestHybridCompactionStrategy:
 
     def test_init_custom_params(self):
         """Test initialization with custom parameters."""
-        strategy = HybridCompactionStrategy(
-            reserve_messages=4, summarize_threshold=500
-        )
+        strategy = HybridCompactionStrategy(reserve_messages=4, summarize_threshold=500)
 
         assert strategy._reserve_messages == 4
         assert strategy._summarize_threshold == 500
@@ -669,17 +647,15 @@ class TestHybridCompactionStrategy:
         strategy = HybridCompactionStrategy()
 
         assert isinstance(strategy._semantic_strategy, SemanticCompactionStrategy)
-        assert isinstance(
-            strategy._summarization_strategy, SummarizationCompactionStrategy
-        )
+        assert isinstance(strategy._summarization_strategy, SummarizationCompactionStrategy)
         assert isinstance(strategy._truncation_strategy, TruncationCompactionStrategy)
 
     @pytest.mark.asyncio
     async def test_can_apply_exceeds_budget(self):
         """Test can_apply returns True when exceeds budget."""
         strategy = HybridCompactionStrategy()
-        context = ({"token_count": 5000})
-        budget = ({"max_tokens": 4096})
+        context = {"token_count": 5000}
+        budget = {"max_tokens": 4096}
 
         result = await strategy.can_apply(context, budget)
 
@@ -689,15 +665,12 @@ class TestHybridCompactionStrategy:
     async def test_compact_uses_semantic_first(self):
         """Test that semantic compaction is tried first."""
         strategy = HybridCompactionStrategy()
-        messages = [
-            {"role": "user", "content": f"Message {i}"}
-            for i in range(20)
-        ]
-        context = ({
+        messages = [{"role": "user", "content": f"Message {i}"} for i in range(20)]
+        context = {
             "messages": messages,
             "token_count": 15000,  # Large context
-        })
-        budget = ({"max_tokens": 5000})  # Need significant reduction
+        }
+        budget = {"max_tokens": 5000}  # Need significant reduction
 
         result = await strategy.compact(context, budget)
 
@@ -711,15 +684,12 @@ class TestHybridCompactionStrategy:
     async def test_compact_falls_back_to_truncation(self):
         """Test that truncation is used as fallback."""
         strategy = HybridCompactionStrategy(reserve_messages=3)
-        messages = [
-            {"role": "user", "content": f"Message {i}"}
-            for i in range(100)
-        ]
-        context = ({
+        messages = [{"role": "user", "content": f"Message {i}"} for i in range(100)]
+        context = {
             "messages": messages,
             "token_count": 50000,  # Very large context
-        })
-        budget = ({"max_tokens": 1000})  # Very small budget
+        }
+        budget = {"max_tokens": 1000}  # Very small budget
 
         result = await strategy.compact(context, budget)
 
@@ -733,15 +703,12 @@ class TestHybridCompactionStrategy:
     async def test_compact_stops_early_if_successful(self):
         """Test that compaction stops early if budget is met."""
         strategy = HybridCompactionStrategy(reserve_messages=5)
-        messages = [
-            {"role": "user", "content": f"Message {i}"}
-            for i in range(15)
-        ]
-        context = ({
+        messages = [{"role": "user", "content": f"Message {i}"} for i in range(15)]
+        context = {
             "messages": messages,
             "token_count": 8000,
-        })
-        budget = ({"max_tokens": 6000})  # Only need small reduction
+        }
+        budget = {"max_tokens": 6000}  # Only need small reduction
 
         result = await strategy.compact(context, budget)
 
@@ -754,11 +721,11 @@ class TestHybridCompactionStrategy:
         """Test that total savings are calculated correctly."""
         strategy = HybridCompactionStrategy()
         original_tokens = 10000
-        context = ({
+        context = {
             "messages": [{"role": "user", "content": "msg"} for _ in range(50)],
             "token_count": original_tokens,
-        })
-        budget = ({"max_tokens": 2000})
+        }
+        budget = {"max_tokens": 2000}
 
         result = await strategy.compact(context, budget)
 
@@ -783,15 +750,12 @@ class TestContextCoordinatorWithNewStrategies:
         strategy = SummarizationCompactionStrategy()
         coordinator = ContextCoordinator(strategies=[strategy])
 
-        messages = [
-            {"role": "user", "content": f"Message {i}"}
-            for i in range(10)
-        ]
-        context = ({
+        messages = [{"role": "user", "content": f"Message {i}"} for i in range(10)]
+        context = {
             "messages": messages,
             "token_count": 7000,
-        })
-        budget = ({"max_tokens": 4096})
+        }
+        budget = {"max_tokens": 4096}
 
         result = await coordinator.compact_context(context, budget)
 
@@ -816,11 +780,11 @@ class TestContextCoordinatorWithNewStrategies:
             {"role": "user", "content": "Unique message 4"},
             {"role": "user", "content": "Unique message 5"},
         ]
-        context = ({
+        context = {
             "messages": messages,
             "token_count": 6000,
-        })
-        budget = ({"max_tokens": 4096})
+        }
+        budget = {"max_tokens": 4096}
 
         result = await coordinator.compact_context(context, budget)
 
@@ -834,15 +798,12 @@ class TestContextCoordinatorWithNewStrategies:
         strategy = HybridCompactionStrategy()
         coordinator = ContextCoordinator(strategies=[strategy])
 
-        messages = [
-            {"role": "user", "content": f"Message {i}"}
-            for i in range(20)
-        ]
-        context = ({
+        messages = [{"role": "user", "content": f"Message {i}"} for i in range(20)]
+        context = {
             "messages": messages,
             "token_count": 15000,
-        })
-        budget = ({"max_tokens": 5000})
+        }
+        budget = {"max_tokens": 5000}
 
         result = await coordinator.compact_context(context, budget)
 
@@ -859,15 +820,12 @@ class TestContextCoordinatorWithNewStrategies:
         ]
         coordinator = ContextCoordinator(strategies=strategies)
 
-        messages = [
-            {"role": "user", "content": f"Message {i}"}
-            for i in range(15)
-        ]
-        context = ({
+        messages = [{"role": "user", "content": f"Message {i}"} for i in range(15)]
+        context = {
             "messages": messages,
             "token_count": 8000,
-        })
-        budget = ({"max_tokens": 4096})
+        }
+        budget = {"max_tokens": 4096}
 
         result = await coordinator.compact_context(context, budget)
 

@@ -60,12 +60,14 @@ def mock_agents():
         agent.id = f"agent_{i}"
 
         # Create closure to capture agent.id
-        async def mock_execute(task: AgentMessage, context: TeamContext, agent_id=agent.id) -> MemberResult:
+        async def mock_execute(
+            task: AgentMessage, context: TeamContext, agent_id=agent.id
+        ) -> MemberResult:
             return MemberResult(
                 member_id=agent_id,
                 success=True,
                 output=f"Executed: {task.content}",
-                metadata={"task": task.content}
+                metadata={"task": task.content},
             )
 
         agent.execute = AsyncMock(side_effect=mock_execute)
@@ -152,6 +154,7 @@ class TestDynamicFormation:
         self, mock_agents, team_context, sample_task
     ):
         """Test formation switching when dependencies are detected."""
+
         # Create agents that indicate dependencies
         async def dependent_execute(task: str, context: Dict[str, Any] = None) -> str:
             return "This task depends on previous results"
@@ -367,7 +370,13 @@ class TestAdaptiveFormation:
         # Mock _score_formations to return low scores, triggering default_formation usage
         def mock_score(characteristics):
             # Return very low scores to trigger fallback to default_formation
-            return {"sequential": 0.1, "parallel": 0.1, "hierarchical": 0.1, "pipeline": 0.1, "consensus": 0.1}
+            return {
+                "sequential": 0.1,
+                "parallel": 0.1,
+                "hierarchical": 0.1,
+                "pipeline": 0.1,
+                "consensus": 0.1,
+            }
 
         formation._score_formations = mock_score
 
@@ -449,10 +458,9 @@ class TestHybridFormation:
             assert "results" in phase_result
 
     @pytest.mark.asyncio
-    async def test_hybrid_formation_stop_on_failure(
-        self, mock_agents, team_context, sample_task
-    ):
+    async def test_hybrid_formation_stop_on_failure(self, mock_agents, team_context, sample_task):
         """Test stop_on_first_failure behavior."""
+
         # Create an agent that fails
         async def failing_execute(task: str, context: Dict[str, Any] = None) -> str:
             raise Exception("Phase failed")
@@ -482,6 +490,7 @@ class TestHybridFormation:
     @pytest.mark.asyncio
     async def test_hybrid_formation_duration_budget(self, mock_agents, team_context, sample_task):
         """Test phase duration budget enforcement."""
+
         async def slow_execute(task: str, context: Dict[str, Any] = None) -> str:
             await asyncio.sleep(0.2)  # Simulate slow execution
             return "Done"

@@ -194,9 +194,7 @@ class PromptCoordinator:
                     sections.append(contribution)
             except Exception as e:
                 # Log error but continue to next contributor
-                logger.warning(
-                    f"Prompt contributor {contributor.__class__.__name__} failed: {e}"
-                )
+                logger.warning(f"Prompt contributor {contributor.__class__.__name__} failed: {e}")
 
         # Join sections with newlines
         prompt = "\n\n".join(sections)
@@ -361,6 +359,7 @@ class PromptBuildError(Exception):
 
 
 # Built-in prompt contributors
+
 
 class BasePromptContributor(IPromptContributor):
     """Base class for prompt contributors.

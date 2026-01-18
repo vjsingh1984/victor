@@ -49,6 +49,7 @@ from victor.rag import RAGAssistant
 # Test Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def config_loader() -> VerticalConfigLoader:
     """Get a config loader instance."""
@@ -65,35 +66,23 @@ def sample_yaml_config() -> Dict[str, Any]:
             "description": "Test vertical for unit tests",
         },
         "core": {
-            "tools": {
-                "list": ["read", "write", "edit", "grep"]
-            },
-            "system_prompt": {
-                "source": "inline",
-                "text": "You are a test assistant."
-            },
+            "tools": {"list": ["read", "write", "edit", "grep"]},
+            "system_prompt": {"source": "inline", "text": "You are a test assistant."},
             "stages": {
                 "INITIAL": {
                     "name": "INITIAL",
                     "description": "Initial stage",
                     "tools": ["read", "ls"],
                     "keywords": ["what", "how"],
-                    "next_stages": ["EXECUTION"]
+                    "next_stages": ["EXECUTION"],
                 }
-            }
+            },
         },
-        "provider": {
-            "hints": {
-                "preferred": ["anthropic", "openai"]
-            }
-        },
+        "provider": {"hints": {"preferred": ["anthropic", "openai"]}},
         "extensions": {
             "middleware": [],
-            "safety": {
-                "module": "test.safety",
-                "class": "TestSafetyExtension"
-            }
-        }
+            "safety": {"module": "test.safety", "class": "TestSafetyExtension"},
+        },
     }
 
 
@@ -109,15 +98,13 @@ def temp_yaml_file(sample_yaml_config: Dict[str, Any]) -> Path:
 # YAML Loading Tests (Tests 1-5)
 # =============================================================================
 
+
 class TestYAMLLoading:
     """Test YAML file loading and parsing."""
 
     def test_load_valid_yaml(self, config_loader: VerticalConfigLoader, temp_yaml_file: Path):
         """Test loading a valid YAML file."""
-        config = config_loader.load_vertical_config(
-            "test_vertical",
-            temp_yaml_file
-        )
+        config = config_loader.load_vertical_config("test_vertical", temp_yaml_file)
 
         assert config is not None
         assert config.name == "test_vertical"
@@ -128,8 +115,7 @@ class TestYAMLLoading:
         """Test loading a non-existent file raises FileNotFoundError."""
         with pytest.raises(FileNotFoundError):
             config_loader.load_vertical_config(
-                "test_vertical",
-                Path("/nonexistent/path/vertical.yaml")
+                "test_vertical", Path("/nonexistent/path/vertical.yaml")
             )
 
     def test_load_invalid_yaml(self, config_loader: VerticalConfigLoader):
@@ -174,6 +160,7 @@ class TestYAMLLoading:
 # Tool Loading Tests (Tests 6-10)
 # =============================================================================
 
+
 class TestToolLoading:
     """Test tool list loading from YAML."""
 
@@ -184,10 +171,10 @@ class TestToolLoading:
             "core": {
                 "tools": ["read", "write", "edit"],
                 "system_prompt": {"source": "inline", "text": "Test"},
-                "stages": {}
+                "stages": {},
             },
             "provider": {"hints": {}},
-            "extensions": {}
+            "extensions": {},
         }
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
@@ -203,14 +190,12 @@ class TestToolLoading:
         yaml_config = {
             "metadata": {"name": "test", "version": "1.0", "description": "Test"},
             "core": {
-                "tools": {
-                    "list": ["read", "write", "edit"]
-                },
+                "tools": {"list": ["read", "write", "edit"]},
                 "system_prompt": {"source": "inline", "text": "Test"},
-                "stages": {}
+                "stages": {},
             },
             "provider": {"hints": {}},
-            "extensions": {}
+            "extensions": {},
         }
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
@@ -228,10 +213,10 @@ class TestToolLoading:
             "core": {
                 "tools": [],
                 "system_prompt": {"source": "inline", "text": "Test"},
-                "stages": {}
+                "stages": {},
             },
             "provider": {"hints": {}},
-            "extensions": {}
+            "extensions": {},
         }
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
@@ -247,6 +232,7 @@ class TestToolLoading:
 # System Prompt Tests (Tests 11-15)
 # =============================================================================
 
+
 class TestSystemPrompt:
     """Test system prompt loading from YAML."""
 
@@ -258,14 +244,11 @@ class TestSystemPrompt:
             "metadata": {"name": "test", "version": "1.0", "description": "Test"},
             "core": {
                 "tools": [],
-                "system_prompt": {
-                    "source": "inline",
-                    "text": prompt_text
-                },
-                "stages": {}
+                "system_prompt": {"source": "inline", "text": prompt_text},
+                "stages": {},
             },
             "provider": {"hints": {}},
-            "extensions": {}
+            "extensions": {},
         }
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
@@ -289,14 +272,11 @@ class TestSystemPrompt:
             "metadata": {"name": "test", "version": "1.0", "description": "Test"},
             "core": {
                 "tools": [],
-                "system_prompt": {
-                    "source": "file",
-                    "path": str(prompt_path)
-                },
-                "stages": {}
+                "system_prompt": {"source": "file", "path": str(prompt_path)},
+                "stages": {},
             },
             "provider": {"hints": {}},
-            "extensions": {}
+            "extensions": {},
         }
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
@@ -312,6 +292,7 @@ class TestSystemPrompt:
 # =============================================================================
 # Stage Definition Tests (Tests 16-20)
 # =============================================================================
+
 
 class TestStageDefinitions:
     """Test stage definition loading from YAML."""
@@ -329,12 +310,12 @@ class TestStageDefinitions:
                         "description": "Initial stage",
                         "tools": ["read"],
                         "keywords": ["what"],
-                        "next_stages": ["EXECUTION"]
+                        "next_stages": ["EXECUTION"],
                     }
-                }
+                },
             },
             "provider": {"hints": {}},
-            "extensions": {}
+            "extensions": {},
         }
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
@@ -353,10 +334,10 @@ class TestStageDefinitions:
             "core": {
                 "tools": [],
                 "system_prompt": {"source": "inline", "text": "Test"},
-                "stages": {}
+                "stages": {},
             },
             "provider": {"hints": {}},
-            "extensions": {}
+            "extensions": {},
         }
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
@@ -372,6 +353,7 @@ class TestStageDefinitions:
 # Middleware Loading Tests (Tests 21-25)
 # =============================================================================
 
+
 class TestMiddlewareLoading:
     """Test middleware configuration loading from YAML."""
 
@@ -382,18 +364,14 @@ class TestMiddlewareLoading:
             "core": {
                 "tools": [],
                 "system_prompt": {"source": "inline", "text": "Test"},
-                "stages": {}
+                "stages": {},
             },
             "provider": {"hints": {}},
             "extensions": {
                 "middleware": [
-                    {
-                        "class": "test.middleware.TestMiddleware",
-                        "enabled": True,
-                        "priority": "high"
-                    }
+                    {"class": "test.middleware.TestMiddleware", "enabled": True, "priority": "high"}
                 ]
-            }
+            },
         }
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
@@ -412,12 +390,10 @@ class TestMiddlewareLoading:
             "core": {
                 "tools": [],
                 "system_prompt": {"source": "inline", "text": "Test"},
-                "stages": {}
+                "stages": {},
             },
             "provider": {"hints": {}},
-            "extensions": {
-                "middleware": []
-            }
+            "extensions": {"middleware": []},
         }
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
@@ -433,6 +409,7 @@ class TestMiddlewareLoading:
 # Extension Loading Tests (Tests 26-28)
 # =============================================================================
 
+
 class TestExtensionLoading:
     """Test extension configuration loading."""
 
@@ -443,15 +420,10 @@ class TestExtensionLoading:
             "core": {
                 "tools": [],
                 "system_prompt": {"source": "inline", "text": "Test"},
-                "stages": {}
+                "stages": {},
             },
             "provider": {"hints": {}},
-            "extensions": {
-                "safety": {
-                    "module": "test.safety",
-                    "class": "TestSafetyExtension"
-                }
-            }
+            "extensions": {"safety": {"module": "test.safety", "class": "TestSafetyExtension"}},
         }
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
@@ -470,15 +442,12 @@ class TestExtensionLoading:
             "core": {
                 "tools": [],
                 "system_prompt": {"source": "inline", "text": "Test"},
-                "stages": {}
+                "stages": {},
             },
             "provider": {"hints": {}},
             "extensions": {
-                "prompt_contributor": {
-                    "module": "test.prompts",
-                    "class": "TestPromptContributor"
-                }
-            }
+                "prompt_contributor": {"module": "test.prompts", "class": "TestPromptContributor"}
+            },
         }
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
@@ -494,6 +463,7 @@ class TestExtensionLoading:
 # =============================================================================
 # Real Vertical Tests (Tests 29-30)
 # =============================================================================
+
 
 class TestRealVerticals:
     """Test YAML loading for real verticals."""
@@ -547,6 +517,7 @@ class TestRealVerticals:
 # Legacy Format Tests (Tests 31-32)
 # =============================================================================
 
+
 class TestLegacyFormat:
     """Test backward compatibility with legacy YAML format."""
 
@@ -557,13 +528,10 @@ class TestLegacyFormat:
             "version": "1.0.0",
             "description": "Test vertical",
             "tools": ["read", "write"],
-            "system_prompt": {
-                "source": "inline",
-                "text": "Test prompt"
-            },
+            "system_prompt": {"source": "inline", "text": "Test prompt"},
             "stages": {},
             "provider_hints": {},
-            "middleware": []
+            "middleware": [],
         }
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
@@ -581,22 +549,15 @@ class TestLegacyFormat:
             "metadata": {
                 "name": "test_vertical",
                 "version": "1.0.0",
-                "description": "Test vertical"
+                "description": "Test vertical",
             },
             "core": {
                 "tools": ["read", "write"],
-                "system_prompt": {
-                    "source": "inline",
-                    "text": "Test prompt"
-                },
-                "stages": {}
+                "system_prompt": {"source": "inline", "text": "Test prompt"},
+                "stages": {},
             },
-            "provider": {
-                "hints": {}
-            },
-            "extensions": {
-                "middleware": []
-            }
+            "provider": {"hints": {}},
+            "extensions": {"middleware": []},
         }
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:

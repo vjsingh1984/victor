@@ -559,8 +559,7 @@ class ToolCacheManager:
         """
         if not self._enable_file_watching:
             raise RuntimeError(
-                "File watching is not enabled. "
-                "Set enable_file_watching=True in constructor."
+                "File watching is not enabled. " "Set enable_file_watching=True in constructor."
             )
 
         if self._file_watcher is not None:
@@ -588,16 +587,12 @@ class ToolCacheManager:
             elif p.is_dir():
                 await self._file_watcher.watch_directory(path, recursive=True)
             else:
-                self._logger.warning(
-                    f"Path does not exist, skipping: {path}"
-                )
+                self._logger.warning(f"Path does not exist, skipping: {path}")
 
         # Start background task to process file changes
         self._file_watch_task = asyncio.create_task(self._process_file_changes())
 
-        self._logger.info(
-            f"File watching started for {len(file_paths)} path(s)"
-        )
+        self._logger.info(f"File watching started for {len(file_paths)} path(s)")
 
     async def stop_file_watching(self) -> None:
         """Stop file watching and clean up resources.
@@ -664,13 +659,10 @@ class ToolCacheManager:
 
             if invalidated > 0:
                 self._logger.info(
-                    f"Invalidated {invalidated} cache entries "
-                    f"due to file change: {file_path}"
+                    f"Invalidated {invalidated} cache entries " f"due to file change: {file_path}"
                 )
         except Exception as e:
-            self._logger.error(
-                f"Failed to invalidate cache for {file_path}: {e}"
-            )
+            self._logger.error(f"Failed to invalidate cache for {file_path}: {e}")
 
 
 __all__ = [

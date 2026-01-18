@@ -149,9 +149,7 @@ class TestValidationContext:
 
     def test_get_nested(self):
         """Test getting nested values."""
-        context = ValidationContext(
-            data={"user": {"profile": {"name": "John"}}}
-        )
+        context = ValidationContext(data={"user": {"profile": {"name": "John"}}})
         assert context.get_nested("user.profile.name") == "John"
         assert context.get_nested("user.missing") is None
 

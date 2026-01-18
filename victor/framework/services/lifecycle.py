@@ -815,7 +815,9 @@ class HTTPServiceHandler(BaseService):
                 auth=self._http_config.auth,
                 verify=self._http_config.verify_ssl,
             )
-            logger.debug(f"HTTP client '{self._metadata.name}' created for {self._http_config.base_url}")
+            logger.debug(
+                f"HTTP client '{self._metadata.name}' created for {self._http_config.base_url}"
+            )
 
         except ImportError:
             raise ServiceStartError(

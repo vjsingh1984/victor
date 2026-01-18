@@ -532,9 +532,7 @@ class TestLifecycleManager:
         metrics_collector.reset_stats.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_cleanup_session_without_compactor(
-        self, lifecycle_manager, context_compactor
-    ):
+    async def test_cleanup_session_without_compactor(self, lifecycle_manager, context_compactor):
         """Test session cleanup when context compactor is None."""
         # Remove context compactor
         lifecycle_manager._context_compactor = None
@@ -587,9 +585,7 @@ class TestLifecycleManager:
     async def test_get_session_status(self, lifecycle_manager):
         """Test getting session status."""
         # Setup message count
-        lifecycle_manager._conversation_controller.message_count = MagicMock(
-            return_value=42
-        )
+        lifecycle_manager._conversation_controller.message_count = MagicMock(return_value=42)
 
         # Get status
         status = await lifecycle_manager.get_session_status("test-session-status")

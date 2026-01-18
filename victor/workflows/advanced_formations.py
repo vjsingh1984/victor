@@ -205,11 +205,9 @@ class DynamicFormation(BaseFormationStrategy):
         # Initialize formation if needed
         if self._current_formation is None:
             self._current_formation = self._create_formation(self.initial_formation)
-            self._formation_history.append({
-                "timestamp": time.time(),
-                "formation": self.initial_formation,
-                "reason": "initial"
-            })
+            self._formation_history.append(
+                {"timestamp": time.time(), "formation": self.initial_formation, "reason": "initial"}
+            )
 
         # Execute with current formation
         start_time = time.time()
@@ -281,11 +279,21 @@ class DynamicFormation(BaseFormationStrategy):
         """
         # Lazy import to avoid circular dependencies
         formations = {
-            "sequential": lambda: self._import_and_create("victor.coordination.formations.sequential", "SequentialFormation"),
-            "parallel": lambda: self._import_and_create("victor.coordination.formations.parallel", "ParallelFormation"),
-            "hierarchical": lambda: self._import_and_create("victor.coordination.formations.hierarchical", "HierarchicalFormation"),
-            "pipeline": lambda: self._import_and_create("victor.coordination.formations.pipeline", "PipelineFormation"),
-            "consensus": lambda: self._import_and_create("victor.coordination.formations.consensus", "ConsensusFormation"),
+            "sequential": lambda: self._import_and_create(
+                "victor.coordination.formations.sequential", "SequentialFormation"
+            ),
+            "parallel": lambda: self._import_and_create(
+                "victor.coordination.formations.parallel", "ParallelFormation"
+            ),
+            "hierarchical": lambda: self._import_and_create(
+                "victor.coordination.formations.hierarchical", "HierarchicalFormation"
+            ),
+            "pipeline": lambda: self._import_and_create(
+                "victor.coordination.formations.pipeline", "PipelineFormation"
+            ),
+            "consensus": lambda: self._import_and_create(
+                "victor.coordination.formations.consensus", "ConsensusFormation"
+            ),
         }
 
         creator = formations.get(formation_name)
@@ -293,7 +301,9 @@ class DynamicFormation(BaseFormationStrategy):
             return creator()
 
         # Raise error for unknown formations
-        raise ValueError(f"Unknown formation '{formation_name}'. Valid formations: {list(formations.keys())}")
+        raise ValueError(
+            f"Unknown formation '{formation_name}'. Valid formations: {list(formations.keys())}"
+        )
 
     def _import_and_create(self, module_path: str, class_name: str) -> BaseFormationStrategy:
         """Import and create a formation instance.
@@ -755,7 +765,9 @@ class AdaptiveFormation(BaseFormationStrategy):
             try:
                 results = await formation.execute(agents, context, task)
             except Exception as exec_error:
-                logger.warning(f"Formation {selected_formation} failed, using fallback: {exec_error}")
+                logger.warning(
+                    f"Formation {selected_formation} failed, using fallback: {exec_error}"
+                )
                 formation = self._create_formation(self.fallback_formation)
                 selected_formation = self.fallback_formation
                 fallback_used = True
@@ -845,9 +857,21 @@ class AdaptiveFormation(BaseFormationStrategy):
         # Complexity based on length and keyword density
         # Check for complexity keywords first
         complexity_keywords = [
-            "complex", "complicated", "difficult", "intricate", "sophisticated",
-            "multi-faceted", "multi-facets", "multiple", "various", "several",
-            "investigation", "analysis", "research", "comprehensive", "detailed"
+            "complex",
+            "complicated",
+            "difficult",
+            "intricate",
+            "sophisticated",
+            "multi-faceted",
+            "multi-facets",
+            "multiple",
+            "various",
+            "several",
+            "investigation",
+            "analysis",
+            "research",
+            "comprehensive",
+            "detailed",
         ]
         complexity_keyword_count = sum(1 for kw in complexity_keywords if kw in content)
 
@@ -869,7 +893,14 @@ class AdaptiveFormation(BaseFormationStrategy):
             characteristics.urgency = 0.3
 
         # Uncertainty from keywords
-        uncertainty_keywords = ["maybe", "possibly", "uncertain", "explore", "investigate", "figure out"]
+        uncertainty_keywords = [
+            "maybe",
+            "possibly",
+            "uncertain",
+            "explore",
+            "investigate",
+            "figure out",
+        ]
         if any(kw in content for kw in uncertainty_keywords):
             characteristics.uncertainty = 0.8
         else:
@@ -967,7 +998,10 @@ class AdaptiveFormation(BaseFormationStrategy):
         formations = {
             "sequential": ("victor.coordination.formations.sequential", "SequentialFormation"),
             "parallel": ("victor.coordination.formations.parallel", "ParallelFormation"),
-            "hierarchical": ("victor.coordination.formations.hierarchical", "HierarchicalFormation"),
+            "hierarchical": (
+                "victor.coordination.formations.hierarchical",
+                "HierarchicalFormation",
+            ),
             "pipeline": ("victor.coordination.formations.pipeline", "PipelineFormation"),
             "consensus": ("victor.coordination.formations.consensus", "ConsensusFormation"),
         }
@@ -979,7 +1013,9 @@ class AdaptiveFormation(BaseFormationStrategy):
             return formation_class()
 
         # Raise error for unknown formations
-        raise ValueError(f"Unknown formation '{formation_name}'. Valid formations: {list(formations.keys())}")
+        raise ValueError(
+            f"Unknown formation '{formation_name}'. Valid formations: {list(formations.keys())}"
+        )
 
     def _enhance_results(
         self,
@@ -1178,9 +1214,7 @@ class HybridFormation(BaseFormationStrategy):
 
                 # Execute phase
                 phase_start = time.time()
-                results = await self._execute_phase(
-                    formation, agents, context, phase_task, phase
-                )
+                results = await self._execute_phase(formation, agents, context, phase_task, phase)
                 phase_duration = time.time() - phase_start
 
                 # Store phase results
@@ -1207,7 +1241,9 @@ class HybridFormation(BaseFormationStrategy):
                 # Check completion criteria
                 if phase.completion_criteria and not phase.completion_criteria(results):
                     if self.enable_phase_logging:
-                        logger.info(f"Phase {phase_index + 1} completion criteria not met, continuing")
+                        logger.info(
+                            f"Phase {phase_index + 1} completion criteria not met, continuing"
+                        )
 
             total_duration = time.time() - start_time
 
@@ -1253,7 +1289,10 @@ class HybridFormation(BaseFormationStrategy):
         formations = {
             "sequential": ("victor.coordination.formations.sequential", "SequentialFormation"),
             "parallel": ("victor.coordination.formations.parallel", "ParallelFormation"),
-            "hierarchical": ("victor.coordination.formations.hierarchical", "HierarchicalFormation"),
+            "hierarchical": (
+                "victor.coordination.formations.hierarchical",
+                "HierarchicalFormation",
+            ),
             "pipeline": ("victor.coordination.formations.pipeline", "PipelineFormation"),
             "consensus": ("victor.coordination.formations.consensus", "ConsensusFormation"),
         }
@@ -1265,9 +1304,13 @@ class HybridFormation(BaseFormationStrategy):
             return formation_class()
 
         # Raise error for unknown formations
-        raise ValueError(f"Unknown formation '{formation_name}'. Valid formations: {list(formations.keys())}")
+        raise ValueError(
+            f"Unknown formation '{formation_name}'. Valid formations: {list(formations.keys())}"
+        )
 
-    def _create_phase_task(self, original_task: AgentMessage, phase: HybridPhase, phase_index: int) -> AgentMessage:
+    def _create_phase_task(
+        self, original_task: AgentMessage, phase: HybridPhase, phase_index: int
+    ) -> AgentMessage:
         """Create a phase-specific task message.
 
         Args:

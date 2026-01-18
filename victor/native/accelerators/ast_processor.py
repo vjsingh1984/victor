@@ -106,18 +106,12 @@ class ParseStats:
     @property
     def avg_duration_ms(self) -> float:
         """Average parsing duration in milliseconds."""
-        return (
-            self.total_duration_ms / self.total_parses if self.total_parses > 0 else 0.0
-        )
+        return self.total_duration_ms / self.total_parses if self.total_parses > 0 else 0.0
 
     @property
     def cache_hit_rate(self) -> float:
         """Cache hit rate as a percentage."""
-        return (
-            (self.cache_hits / self.total_parses * 100)
-            if self.total_parses > 0
-            else 0.0
-        )
+        return (self.cache_hits / self.total_parses * 100) if self.total_parses > 0 else 0.0
 
     def to_dict(self) -> Dict[str, float]:
         """Convert to dictionary for serialization."""
@@ -323,21 +317,15 @@ class AstProcessorAccelerator:
 
         if self._use_rust:
             try:
-                result = self._processor.parse_to_ast(
-                    source_code, normalized_lang, file_path
-                )
+                result = self._processor.parse_to_ast(source_code, normalized_lang, file_path)
                 duration_ms = (time.perf_counter() - start) * 1000
                 self._stats.record_parse(duration_ms, cache_hit=False)
                 return result
             except Exception as e:
                 logger.error(f"Rust parse_to_ast failed: {e}")
-                return self._python_parse_to_ast(
-                    source_code, normalized_lang, file_path, start
-                )
+                return self._python_parse_to_ast(source_code, normalized_lang, file_path, start)
         else:
-            return self._python_parse_to_ast(
-                source_code, normalized_lang, file_path, start
-            )
+            return self._python_parse_to_ast(source_code, normalized_lang, file_path, start)
 
     def _python_parse_to_ast(
         self,
@@ -418,9 +406,7 @@ class AstProcessorAccelerator:
 
             return parser
         except ImportError as e:
-            logger.warning(
-                f"Failed to import tree-sitter language module for {language}: {e}"
-            )
+            logger.warning(f"Failed to import tree-sitter language module for {language}: {e}")
             return None
         except Exception as e:
             logger.error(f"Failed to load Python parser for {language}: {e}")
@@ -507,9 +493,7 @@ class AstProcessorAccelerator:
                         )
 
             duration_ms = (time.perf_counter() - start_time) * 1000
-            return AstQueryResult(
-                captures=captures, matches=len(captures), duration_ms=duration_ms
-            )
+            return AstQueryResult(captures=captures, matches=len(captures), duration_ms=duration_ms)
         except Exception as e:
             logger.error(f"Python execute_query failed: {e}")
             duration_ms = (time.perf_counter() - start_time) * 1000

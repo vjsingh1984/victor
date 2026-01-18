@@ -145,9 +145,7 @@ class TestAnalyticsCoordinatorDelegation:
 
         TODO: Implement after orchestrator integration
         """
-        pytest.skip(
-            "TODO: Implement after orchestrator has analytics coordinator integration"
-        )
+        pytest.skip("TODO: Implement after orchestrator has analytics coordinator integration")
 
         # Import will fail until implemented
         # from victor.agent.orchestrator import AgentOrchestrator
@@ -156,9 +154,7 @@ class TestAnalyticsCoordinatorDelegation:
         # assert hasattr(orchestrator, "_analytics_coordinator")
         # assert isinstance(orchestrator._analytics_coordinator, AnalyticsCoordinator)
 
-    def test_finalize_stream_metrics_delegates_to_coordinator(
-        self, mock_analytics_coordinator
-    ):
+    def test_finalize_stream_metrics_delegates_to_coordinator(self, mock_analytics_coordinator):
         """Test finalize_stream_metrics delegates to coordinator.
 
         Verifies:
@@ -168,9 +164,7 @@ class TestAnalyticsCoordinatorDelegation:
 
         TODO: Implement after orchestrator integration
         """
-        pytest.skip(
-            "TODO: Implement after orchestrator has analytics coordinator integration"
-        )
+        pytest.skip("TODO: Implement after orchestrator has analytics coordinator integration")
 
         # from victor.agent.orchestrator import AgentOrchestrator
         #
@@ -190,9 +184,7 @@ class TestAnalyticsCoordinatorDelegation:
         #     usage_data
         # )
 
-    def test_get_last_stream_metrics_delegates_to_coordinator(
-        self, mock_analytics_coordinator
-    ):
+    def test_get_last_stream_metrics_delegates_to_coordinator(self, mock_analytics_coordinator):
         """Test get_last_stream_metrics delegates to coordinator.
 
         Verifies:
@@ -202,9 +194,7 @@ class TestAnalyticsCoordinatorDelegation:
 
         TODO: Implement after orchestrator integration
         """
-        pytest.skip(
-            "TODO: Implement after orchestrator has analytics coordinator integration"
-        )
+        pytest.skip("TODO: Implement after orchestrator has analytics coordinator integration")
 
         # from victor.agent.orchestrator import AgentOrchestrator
         #
@@ -232,9 +222,7 @@ class TestAnalyticsCoordinatorDelegation:
 
         TODO: Implement after orchestrator integration
         """
-        pytest.skip(
-            "TODO: Implement after orchestrator has analytics coordinator integration"
-        )
+        pytest.skip("TODO: Implement after orchestrator has analytics coordinator integration")
 
         # from victor.agent.orchestrator import AgentOrchestrator
         #
@@ -257,9 +245,7 @@ class TestAnalyticsCoordinatorDelegation:
         # mock_analytics_coordinator.get_streaming_metrics_summary.assert_called_once()
         # assert result == mock_summary
 
-    def test_get_session_cost_summary_delegates_to_coordinator(
-        self, mock_analytics_coordinator
-    ):
+    def test_get_session_cost_summary_delegates_to_coordinator(self, mock_analytics_coordinator):
         """Test get_session_cost_summary delegates to coordinator.
 
         Verifies:
@@ -269,9 +255,7 @@ class TestAnalyticsCoordinatorDelegation:
 
         TODO: Implement after orchestrator integration
         """
-        pytest.skip(
-            "TODO: Implement after orchestrator has analytics coordinator integration"
-        )
+        pytest.skip("TODO: Implement after orchestrator has analytics coordinator integration")
 
         # from victor.agent.orchestrator import AgentOrchestrator
         #
@@ -294,9 +278,7 @@ class TestAnalyticsCoordinatorDelegation:
         # mock_analytics_coordinator.get_session_cost_summary.assert_called_once()
         # assert result == mock_cost_summary
 
-    def test_get_session_stats_delegates_to_coordinator(
-        self, mock_analytics_coordinator
-    ):
+    def test_get_session_stats_delegates_to_coordinator(self, mock_analytics_coordinator):
         """Test get_session_stats delegates to coordinator with proper params.
 
         Verifies:
@@ -306,9 +288,7 @@ class TestAnalyticsCoordinatorDelegation:
 
         TODO: Implement after orchestrator integration
         """
-        pytest.skip(
-            "TODO: Implement after orchestrator has analytics coordinator integration"
-        )
+        pytest.skip("TODO: Implement after orchestrator has analytics coordinator integration")
 
         # from victor.agent.orchestrator import AgentOrchestrator
         #
@@ -330,9 +310,7 @@ class TestAnalyticsCoordinatorDelegation:
     # Helper Methods
     # ========================================================================
 
-    def _create_test_orchestrator(
-        self, mock_analytics_coordinator: MagicMock = None
-    ) -> Any:
+    def _create_test_orchestrator(self, mock_analytics_coordinator: MagicMock = None) -> Any:
         """Create a test orchestrator with mocked coordinator.
 
         Args:

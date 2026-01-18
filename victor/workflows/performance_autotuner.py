@@ -368,7 +368,9 @@ class PerformanceAnalyzer:
             return insights
 
         avg_duration = statistics.mean(durations)
-        p95_duration = statistics.quantiles(durations, n=20)[18] if len(durations) >= 20 else max(durations)
+        p95_duration = (
+            statistics.quantiles(durations, n=20)[18] if len(durations) >= 20 else max(durations)
+        )
         baseline_duration = self.baseline_metrics["avg_duration_seconds"]
 
         # Check if average is above baseline
@@ -504,7 +506,9 @@ class PerformanceAnalyzer:
             if not formation_data:
                 continue
 
-            durations = [d.get("duration_seconds", 0) for d in formation_data if d.get("duration_seconds")]
+            durations = [
+                d.get("duration_seconds", 0) for d in formation_data if d.get("duration_seconds")
+            ]
             if not durations:
                 continue
 
@@ -556,7 +560,9 @@ class PerformanceAnalyzer:
             if size <= 2 or len(size_data) < 3:
                 continue
 
-            durations = [d.get("duration_seconds", 0) for d in size_data if d.get("duration_seconds")]
+            durations = [
+                d.get("duration_seconds", 0) for d in size_data if d.get("duration_seconds")
+            ]
             if not durations:
                 continue
 
@@ -1133,8 +1139,7 @@ class PerformanceAutotuner:
         rollback_config = result.rollback_config
 
         logger.info(
-            f"Rolling back optimization for team {team_id}: "
-            f"{result.optimization.description}"
+            f"Rolling back optimization for team {team_id}: " f"{result.optimization.description}"
         )
 
         # In a real implementation, this would update the workflow configuration
@@ -1167,7 +1172,9 @@ class PerformanceAutotuner:
 # =============================================================================
 
 
-def analyze_team_performance(team_id: str, metrics_file: Optional[Path] = None) -> List[PerformanceInsight]:
+def analyze_team_performance(
+    team_id: str, metrics_file: Optional[Path] = None
+) -> List[PerformanceInsight]:
     """Analyze team performance and return insights.
 
     Args:

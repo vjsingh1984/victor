@@ -617,7 +617,11 @@ class TestWorkflowExecutor:
 
     def test_get_compute_handler(self):
         """Test getting compute handler."""
-        from victor.workflows.executor import WorkflowExecutor, get_compute_handler, register_compute_handler
+        from victor.workflows.executor import (
+            WorkflowExecutor,
+            get_compute_handler,
+            register_compute_handler,
+        )
 
         # Create a custom handler
         async def custom_handler(node, context, tool_registry):

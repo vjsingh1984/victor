@@ -46,7 +46,9 @@ class TestProviderCoordinatorInit:
         manager.tool_adapter = Mock()
         manager.capabilities = Mock()
         manager.switch_count = 0
-        manager.get_info = Mock(return_value={"provider": "anthropic", "model": "claude-sonnet-4-20250514"})
+        manager.get_info = Mock(
+            return_value={"provider": "anthropic", "model": "claude-sonnet-4-20250514"}
+        )
         manager.get_current_state = Mock(return_value=None)
         manager.get_healthy_providers = AsyncMock(return_value=["anthropic", "openai"])
         manager.start_health_monitoring = AsyncMock()
@@ -64,9 +66,7 @@ class TestProviderCoordinatorInit:
         settings.get_provider_settings = Mock(return_value={"api_key": "test-key"})
         return settings
 
-    def test_init_with_default_config(
-        self, mock_provider_manager: Mock, mock_settings: Mock
-    ):
+    def test_init_with_default_config(self, mock_provider_manager: Mock, mock_settings: Mock):
         """Test initialization with default configuration."""
         # Execute
         coordinator = ProviderCoordinator(
@@ -85,9 +85,7 @@ class TestProviderCoordinatorInit:
         assert coordinator._last_rate_limit_time is None
         assert coordinator._capability_cache == {}
 
-    def test_init_with_custom_config(
-        self, mock_provider_manager: Mock, mock_settings: Mock
-    ):
+    def test_init_with_custom_config(self, mock_provider_manager: Mock, mock_settings: Mock):
         """Test initialization with custom configuration."""
         # Setup
         config = ProviderCoordinatorConfig(
@@ -143,9 +141,7 @@ class TestProviderCoordinatorProperties:
         return Mock()
 
     @pytest.fixture
-    def coordinator(
-        self, mock_provider_manager: Mock, mock_settings: Mock
-    ) -> ProviderCoordinator:
+    def coordinator(self, mock_provider_manager: Mock, mock_settings: Mock) -> ProviderCoordinator:
         """Create coordinator instance."""
         return ProviderCoordinator(
             provider_manager=mock_provider_manager,
@@ -234,9 +230,7 @@ class TestProviderSwitching:
         return settings
 
     @pytest.fixture
-    def coordinator(
-        self, mock_provider_manager: Mock, mock_settings: Mock
-    ) -> ProviderCoordinator:
+    def coordinator(self, mock_provider_manager: Mock, mock_settings: Mock) -> ProviderCoordinator:
         """Create coordinator instance."""
         return ProviderCoordinator(
             provider_manager=mock_provider_manager,
@@ -359,9 +353,7 @@ class TestProviderSwitching:
     ):
         """Test that switch_model handles exceptions gracefully."""
         # Setup
-        mock_provider_manager.switch_model = AsyncMock(
-            side_effect=Exception("Model not found")
-        )
+        mock_provider_manager.switch_model = AsyncMock(side_effect=Exception("Model not found"))
 
         # Execute
         result = await coordinator.switch_model("invalid-model")
@@ -409,9 +401,7 @@ class TestHealthMonitoring:
         return Mock()
 
     @pytest.fixture
-    def coordinator(
-        self, mock_provider_manager: Mock, mock_settings: Mock
-    ) -> ProviderCoordinator:
+    def coordinator(self, mock_provider_manager: Mock, mock_settings: Mock) -> ProviderCoordinator:
         """Create coordinator instance."""
         return ProviderCoordinator(
             provider_manager=mock_provider_manager,
@@ -541,9 +531,7 @@ class TestRateLimiting:
         return Mock()
 
     @pytest.fixture
-    def coordinator(
-        self, mock_provider_manager: Mock, mock_settings: Mock
-    ) -> ProviderCoordinator:
+    def coordinator(self, mock_provider_manager: Mock, mock_settings: Mock) -> ProviderCoordinator:
         """Create coordinator instance."""
         return ProviderCoordinator(
             provider_manager=mock_provider_manager,
@@ -658,9 +646,7 @@ class TestRateLimiting:
         # Assert
         assert wait_time == 20.0
 
-    def test_get_rate_limit_wait_time_from_response_headers(
-        self, coordinator: ProviderCoordinator
-    ):
+    def test_get_rate_limit_wait_time_from_response_headers(self, coordinator: ProviderCoordinator):
         """Test extracting wait time from Retry-After response header."""
         # Setup
         mock_response = Mock()
@@ -674,9 +660,7 @@ class TestRateLimiting:
         # Assert
         assert wait_time == 90.0
 
-    def test_get_rate_limit_wait_time_fallback_to_default(
-        self, coordinator: ProviderCoordinator
-    ):
+    def test_get_rate_limit_wait_time_fallback_to_default(self, coordinator: ProviderCoordinator):
         """Test falling back to default wait time when parsing fails."""
         # Setup
         error = Exception("Unknown error")
@@ -687,9 +671,7 @@ class TestRateLimiting:
         # Assert
         assert wait_time == coordinator.config.default_rate_limit_wait
 
-    def test_track_rate_limit_increments_count(
-        self, coordinator: ProviderCoordinator
-    ):
+    def test_track_rate_limit_increments_count(self, coordinator: ProviderCoordinator):
         """Test that tracking rate limit increments the count."""
         # Setup
         error = Exception("Rate limited")
@@ -701,9 +683,7 @@ class TestRateLimiting:
         assert coordinator._rate_limit_count == 1
         assert coordinator._last_rate_limit_time is not None
 
-    def test_track_rate_limit_multiple_times(
-        self, coordinator: ProviderCoordinator
-    ):
+    def test_track_rate_limit_multiple_times(self, coordinator: ProviderCoordinator):
         """Test tracking multiple rate limit errors."""
         # Setup
         error = Exception("Rate limited")
@@ -716,9 +696,7 @@ class TestRateLimiting:
         # Assert
         assert coordinator._rate_limit_count == 3
 
-    def test_get_rate_limit_stats(
-        self, coordinator: ProviderCoordinator
-    ):
+    def test_get_rate_limit_stats(self, coordinator: ProviderCoordinator):
         """Test getting rate limit statistics."""
         # Setup
         coordinator._rate_limit_count = 5
@@ -753,9 +731,7 @@ class TestCapabilityDiscovery:
         return Mock()
 
     @pytest.fixture
-    def coordinator(
-        self, mock_provider_manager: Mock, mock_settings: Mock
-    ) -> ProviderCoordinator:
+    def coordinator(self, mock_provider_manager: Mock, mock_settings: Mock) -> ProviderCoordinator:
         """Create coordinator instance."""
         return ProviderCoordinator(
             provider_manager=mock_provider_manager,
@@ -878,12 +854,12 @@ class TestPostSwitchHooks:
 
         # Simulate state changes after switch
         async def switch_provider_side_effect(**kwargs):
-            manager.provider_name = kwargs.get('provider_name', 'openai')
-            manager.model = kwargs.get('model', 'gpt-4')
+            manager.provider_name = kwargs.get("provider_name", "openai")
+            manager.model = kwargs.get("model", "gpt-4")
             return True
 
         async def switch_model_side_effect(**kwargs):
-            manager.model = kwargs.get('model', 'gpt-4')
+            manager.model = kwargs.get("model", "gpt-4")
             return True
 
         def get_current_state_side_effect():
@@ -908,9 +884,7 @@ class TestPostSwitchHooks:
         return settings
 
     @pytest.fixture
-    def coordinator(
-        self, mock_provider_manager: Mock, mock_settings: Mock
-    ) -> ProviderCoordinator:
+    def coordinator(self, mock_provider_manager: Mock, mock_settings: Mock) -> ProviderCoordinator:
         """Create coordinator instance."""
         return ProviderCoordinator(
             provider_manager=mock_provider_manager,
@@ -1018,9 +992,7 @@ class TestLifecycle:
         return Mock()
 
     @pytest.fixture
-    def coordinator(
-        self, mock_provider_manager: Mock, mock_settings: Mock
-    ) -> ProviderCoordinator:
+    def coordinator(self, mock_provider_manager: Mock, mock_settings: Mock) -> ProviderCoordinator:
         """Create coordinator instance."""
         return ProviderCoordinator(
             provider_manager=mock_provider_manager,

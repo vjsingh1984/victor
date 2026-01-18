@@ -37,6 +37,7 @@ from victor.agent.coordinators.state_coordinator import (
 @dataclass
 class MockExecutionState:
     """Mock execution state."""
+
     executed_tools: list = None
     observed_files: set = None
     tool_calls_used: int = 0
@@ -117,6 +118,7 @@ class MockSessionStateManager:
 
 class MockConversationStage:
     """Mock conversation stage."""
+
     INITIAL = None
     EXECUTION = None
 
@@ -147,15 +149,15 @@ class MockConversationStateMachine:
         return self._stage
 
     def to_dict(self):
-        return {"stage": self._stage.name if hasattr(self._stage, 'name') else self._stage}
+        return {"stage": self._stage.name if hasattr(self._stage, "name") else self._stage}
 
     def _transition_to(self, stage, confidence=1.0):
         # Handle both string and enum-like objects
         if isinstance(stage, str):
             self._stage = stage
-        elif hasattr(stage, 'name'):
+        elif hasattr(stage, "name"):
             self._stage = stage.name
-        elif hasattr(stage, 'value'):
+        elif hasattr(stage, "value"):
             self._stage = stage.value
         else:
             self._stage = str(stage)
@@ -171,7 +173,7 @@ class MockConversationStateMachine:
     def get_state_summary(self):
         """Get state summary."""
         return {
-            "stage": self._stage.name if hasattr(self._stage, 'name') else self._stage,
+            "stage": self._stage.name if hasattr(self._stage, "name") else self._stage,
             "recorded_tools": self._recorded_tools,
         }
 
@@ -322,9 +324,7 @@ class TestStateCoordinator:
         # The _stage should now be a string (extracted from the mock stage object)
         assert mock_conversation_state._stage == "execution"
 
-    def test_transition_to_without_conversation_state(
-        self, mock_session_state
-    ):
+    def test_transition_to_without_conversation_state(self, mock_session_state):
         """Test transition without conversation state."""
         coordinator = StateCoordinator(
             session_state_manager=mock_session_state,

@@ -978,7 +978,11 @@ class WorkflowCacheManager:
                 "total_caches": len(self._caches),
                 "total_hits": total_hits,
                 "total_misses": total_misses,
-                "hit_rate": total_hits / (total_hits + total_misses) if (total_hits + total_misses) > 0 else 0.0,
+                "hit_rate": (
+                    total_hits / (total_hits + total_misses)
+                    if (total_hits + total_misses) > 0
+                    else 0.0
+                ),
                 "total_size": total_size,
             }
 
@@ -1227,7 +1231,9 @@ class WorkflowDefinitionCache:
         if len(args) == 4:
             path, workflow_name, config_hash, definition = args
             return self.put_by_path(Path(path), workflow_name, config_hash, definition)
-        raise TypeError("set() expects (key, definition) or (path, workflow_name, config_hash, definition)")
+        raise TypeError(
+            "set() expects (key, definition) or (path, workflow_name, config_hash, definition)"
+        )
 
     def invalidate(self, key: Union[str, Path]) -> int:
         """Invalidate cached definition by key or file path."""

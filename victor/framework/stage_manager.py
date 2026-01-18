@@ -72,8 +72,9 @@ from typing import (
     runtime_checkable,
 )
 
+# Import from victor.core to enforce layer boundaries (Framework should not depend on Agent)
+from victor.core.state import ConversationStage
 from victor.agent.conversation_state import (
-    ConversationStage,
     ConversationStateMachine,
     STAGE_ORDER,
 )

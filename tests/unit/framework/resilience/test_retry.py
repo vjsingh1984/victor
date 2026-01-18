@@ -49,11 +49,13 @@ class TestRetryConfig:
 
     def test_from_dict(self):
         """Test creating config from dictionary."""
-        config = RetryConfig.from_dict({
-            "max_retries": 5,
-            "base_delay": 2.0,
-            "max_delay": 120.0,
-        })
+        config = RetryConfig.from_dict(
+            {
+                "max_retries": 5,
+                "base_delay": 2.0,
+                "max_delay": 120.0,
+            }
+        )
         assert config.max_retries == 5
         assert config.base_delay == 2.0
         assert config.max_delay == 120.0
@@ -76,6 +78,7 @@ class TestRetryWithBackoff:
     @pytest.mark.asyncio
     async def test_successful_call_no_retry(self):
         """Test successful call without retries."""
+
         async def mock_func():
             return "success"
 
@@ -105,6 +108,7 @@ class TestRetryWithBackoff:
     @pytest.mark.asyncio
     async def test_exhausted_retries(self):
         """Test failure after exhausting retries."""
+
         async def always_failing_func():
             raise ConnectionError("Always fails")
 
@@ -167,6 +171,7 @@ class TestWithExponentialBackoffDecorator:
     @pytest.mark.asyncio
     async def test_async_decorator_success(self):
         """Test async decorator with successful execution."""
+
         @with_exponential_backoff(max_retries=3, base_delay=0.01)
         async def test_func():
             return "result"
@@ -193,6 +198,7 @@ class TestWithExponentialBackoffDecorator:
 
     def test_sync_decorator_success(self):
         """Test sync decorator with successful execution."""
+
         @with_exponential_backoff_sync(max_retries=3, base_delay=0.01)
         def test_func():
             return "result"

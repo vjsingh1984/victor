@@ -226,9 +226,7 @@ class OrchestratorComponents:
     )
 
     # New coordinators (Stream E4)
-    coordinators: CoordinatorComponents = field(
-        default_factory=CoordinatorComponents
-    )
+    coordinators: CoordinatorComponents = field(default_factory=CoordinatorComponents)
     # Raw attribute snapshot (Phase 1 compatibility bridge)
     attributes: Dict[str, Any] = field(default_factory=dict)
 
@@ -559,9 +557,7 @@ class OrchestratorFactory(ModeAwareMixin):
     # Coordinator Creation Methods (Phase 1.4)
     # ==========================================================================
 
-    def create_config_coordinator(
-        self, config_providers: Optional[List[Any]] = None
-    ) -> Any:
+    def create_config_coordinator(self, config_providers: Optional[List[Any]] = None) -> Any:
         """Create configuration coordinator.
 
         Args:
@@ -574,9 +570,7 @@ class OrchestratorFactory(ModeAwareMixin):
 
         return ConfigCoordinator(providers=config_providers or [])
 
-    def create_prompt_coordinator(
-        self, prompt_contributors: Optional[List[Any]] = None
-    ) -> Any:
+    def create_prompt_coordinator(self, prompt_contributors: Optional[List[Any]] = None) -> Any:
         """Create prompt coordinator.
 
         Args:
@@ -589,9 +583,7 @@ class OrchestratorFactory(ModeAwareMixin):
 
         return PromptCoordinator(contributors=prompt_contributors or [])
 
-    def create_context_coordinator(
-        self, compaction_strategies: Optional[List[Any]] = None
-    ) -> Any:
+    def create_context_coordinator(self, compaction_strategies: Optional[List[Any]] = None) -> Any:
         """Create context coordinator.
 
         Args:
@@ -664,12 +656,8 @@ class OrchestratorFactory(ModeAwareMixin):
 
         config = ResponseCoordinatorConfig(
             max_garbage_chunks=getattr(self.settings, "max_garbage_chunks", 3),
-            enable_tool_call_extraction=getattr(
-                self.settings, "enable_tool_call_extraction", True
-            ),
-            enable_content_sanitization=getattr(
-                self.settings, "enable_content_sanitization", True
-            ),
+            enable_tool_call_extraction=getattr(self.settings, "enable_tool_call_extraction", True),
+            enable_content_sanitization=getattr(self.settings, "enable_content_sanitization", True),
             min_content_length=getattr(self.settings, "min_content_length", 20),
         )
 
@@ -2404,7 +2392,9 @@ class OrchestratorFactory(ModeAwareMixin):
             # Fall back to default context_window if unable to get provider limits
             logger.debug(f"Unable to set context_window from provider limits: {e}")
 
-        logger.debug(f"Debug logger initialized: enabled={debug_logger.enabled}, context_window={debug_logger.context_window:,}")
+        logger.debug(
+            f"Debug logger initialized: enabled={debug_logger.enabled}, context_window={debug_logger.context_window:,}"
+        )
         return debug_logger
 
     def create_tool_access_controller(self, registry: Any = None) -> Any:

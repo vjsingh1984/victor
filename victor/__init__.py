@@ -71,10 +71,12 @@ def __getattr__(name: str):
 
     if name == "AgentOrchestrator":
         from victor.agent import AgentOrchestrator as AO
+
         globals()["AgentOrchestrator"] = AO
         return AO
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 # Framework API (simplified - new golden path)
 from victor.framework import (

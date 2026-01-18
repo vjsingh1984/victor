@@ -139,7 +139,9 @@ class MessagingEvent:
     _acknowledged: bool = field(default=False, compare=False, repr=False)
     _delivery_count: int = field(default=0, compare=False, repr=False)
     _max_delivery_count: int = field(default=3, compare=False, repr=False)
-    _nack_requeue: bool = field(default=False, compare=False, repr=False)  # Track explicit NACK with requeue
+    _nack_requeue: bool = field(
+        default=False, compare=False, repr=False
+    )  # Track explicit NACK with requeue
 
     def is_acknowledged(self) -> bool:
         """Check if event has been acknowledged."""

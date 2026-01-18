@@ -274,9 +274,7 @@ class DIContainer:
                             lifetime=lifetime,
                             factory=factory,
                         )
-                        logger.debug(
-                            f"Registered {service_type.__name__} as {interface.__name__}"
-                        )
+                        logger.debug(f"Registered {service_type.__name__} as {interface.__name__}")
 
         return self
 

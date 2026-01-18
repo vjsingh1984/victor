@@ -313,9 +313,7 @@ class CapabilityRegistry:
             ValueError: If capability already registered
         """
         if definition.name in self._capabilities:
-            raise ValueError(
-                f"Capability {definition.name.value} already registered"
-            )
+            raise ValueError(f"Capability {definition.name.value} already registered")
 
         self._capabilities[definition.name] = definition
         logger.debug(f"Registered capability: {definition.name.value}")
@@ -347,9 +345,7 @@ class CapabilityRegistry:
 
         if include_dependencies:
             for dep_capability in definition.dependencies:
-                dep_tools = self.get_tools_for_capability(
-                    dep_capability, include_dependencies=True
-                )
+                dep_tools = self.get_tools_for_capability(dep_capability, include_dependencies=True)
                 tools.update(dep_tools)
 
         return tools
@@ -388,9 +384,7 @@ class CapabilityRegistry:
 
         return conflicts
 
-    def resolve_dependencies(
-        self, capabilities: List[ToolCapability]
-    ) -> List[ToolCapability]:
+    def resolve_dependencies(self, capabilities: List[ToolCapability]) -> List[ToolCapability]:
         """Resolve capability dependencies.
 
         Returns a list of capabilities including all dependencies,
@@ -480,9 +474,7 @@ class CapabilityRegistry:
                     definition = self._capabilities[capability]
                     if tool.name not in definition.tools:
                         definition.tools.append(tool.name)
-                        logger.debug(
-                            f"Added tool '{tool.name}' to capability '{capability.value}'"
-                        )
+                        logger.debug(f"Added tool '{tool.name}' to capability '{capability.value}'")
                 else:
                     # Create new capability definition
                     definition = CapabilityDefinition(
@@ -493,9 +485,7 @@ class CapabilityRegistry:
                         conflicts=[],
                     )
                     self._capabilities[capability] = definition
-                    logger.debug(
-                        f"Created capability '{capability.value}' for tool '{tool.name}'"
-                    )
+                    logger.debug(f"Created capability '{capability.value}' for tool '{tool.name}'")
             else:
                 # Log warning for unmapped tool
                 logger.warning(
@@ -600,9 +590,7 @@ class CapabilitySelector:
             return []
 
         # Resolve dependencies
-        resolved_capabilities = self._registry.resolve_dependencies(
-            required_capabilities
-        )
+        resolved_capabilities = self._registry.resolve_dependencies(required_capabilities)
 
         # Collect tools from all capabilities
         tool_set: Set[str] = set()
@@ -617,9 +605,7 @@ class CapabilitySelector:
         # Return as list for deterministic ordering
         return sorted(tool_set)
 
-    def recommend_capabilities(
-        self, task_description: str
-    ) -> List[ToolCapability]:
+    def recommend_capabilities(self, task_description: str) -> List[ToolCapability]:
         """Recommend capabilities for a task description.
 
         Analyzes task description and recommends relevant capabilities.
@@ -644,18 +630,14 @@ class CapabilitySelector:
 
         # File operation keywords
         if any(
-            kw in description_lower
-            for kw in ["read", "file", "open", "view", "cat", "display"]
+            kw in description_lower for kw in ["read", "file", "open", "view", "cat", "display"]
         ):
             recommendations.append(ToolCapability.FILE_READ)
 
         if any(kw in description_lower for kw in ["write", "edit", "save", "create"]):
             recommendations.append(ToolCapability.FILE_WRITE)
 
-        if any(
-            kw in description_lower
-            for kw in ["copy", "move", "delete", "remove", "manage"]
-        ):
+        if any(kw in description_lower for kw in ["copy", "move", "delete", "remove", "manage"]):
             recommendations.append(ToolCapability.FILE_MANAGEMENT)
 
         # Code operation keywords
@@ -665,15 +647,10 @@ class CapabilitySelector:
         ):
             recommendations.append(ToolCapability.CODE_ANALYSIS)
 
-        if any(
-            kw in description_lower for kw in ["search", "find", "grep", "lookup"]
-        ):
+        if any(kw in description_lower for kw in ["search", "find", "grep", "lookup"]):
             recommendations.append(ToolCapability.CODE_SEARCH)
 
-        if any(
-            kw in description_lower
-            for kw in ["review", "quality", "improv", "refactor"]
-        ):
+        if any(kw in description_lower for kw in ["review", "quality", "improv", "refactor"]):
             recommendations.append(ToolCapability.CODE_REVIEW)
             recommendations.append(ToolCapability.CODE_ANALYSIS)
 
@@ -686,9 +663,7 @@ class CapabilitySelector:
             recommendations.append(ToolCapability.WEB_SEARCH)
 
         # Version control keywords
-        if any(
-            kw in description_lower for kw in ["git", "commit", "branch", "merge"]
-        ):
+        if any(kw in description_lower for kw in ["git", "commit", "branch", "merge"]):
             recommendations.append(ToolCapability.VERSION_CONTROL)
 
         # Testing keywords
@@ -701,16 +676,12 @@ class CapabilitySelector:
 
         # Docker/container keywords
         if any(
-            kw in description_lower
-            for kw in ["docker", "container", "kubernetes", "k8s", "deploy"]
+            kw in description_lower for kw in ["docker", "container", "kubernetes", "k8s", "deploy"]
         ):
             recommendations.append(ToolCapability.CONTAINERIZATION)
 
         # CI/CD keywords
-        if any(
-            kw in description_lower
-            for kw in ["pipeline", "ci/cd", "cicd", "build", "release"]
-        ):
+        if any(kw in description_lower for kw in ["pipeline", "ci/cd", "cicd", "build", "release"]):
             recommendations.append(ToolCapability.CI_CD)
 
         # Bash/shell keywords

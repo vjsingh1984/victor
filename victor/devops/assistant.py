@@ -232,6 +232,7 @@ When creating configurations:
         Returns:
             Tool dependency provider
         """
+
         def _create():
             from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
 

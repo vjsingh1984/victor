@@ -218,10 +218,7 @@ class TeamTemplate:
         # Validate formation
         valid_formations = [f.value for f in TeamFormation]
         if self.formation not in valid_formations:
-            raise ValueError(
-                f"Invalid formation '{self.formation}'. "
-                f"Valid: {valid_formations}"
-            )
+            raise ValueError(f"Invalid formation '{self.formation}'. " f"Valid: {valid_formations}")
 
         # Validate hierarchical has exactly one manager
         if self.formation == "hierarchical":
@@ -357,9 +354,7 @@ class TeamTemplate:
         Returns:
             TeamTemplate instance
         """
-        members = [
-            TeamMemberSpec.from_dict(m_data) for m_data in data.get("members", [])
-        ]
+        members = [TeamMemberSpec.from_dict(m_data) for m_data in data.get("members", [])]
 
         return cls(
             name=data["name"],
@@ -702,9 +697,7 @@ class TeamTemplateRegistry:
         # Validate formation
         valid_formations = [f.value for f in TeamFormation]
         if template.formation not in valid_formations:
-            errors.append(
-                f"Invalid formation '{template.formation}'. Valid: {valid_formations}"
-            )
+            errors.append(f"Invalid formation '{template.formation}'. Valid: {valid_formations}")
 
         # Validate members
         member_ids = set()
@@ -720,8 +713,7 @@ class TeamTemplateRegistry:
             valid_roles = [r.value for r in SubAgentRole]
             if member.role not in valid_roles:
                 errors.append(
-                    f"Member {member.id}: invalid role '{member.role}'. "
-                    f"Valid: {valid_roles}"
+                    f"Member {member.id}: invalid role '{member.role}'. " f"Valid: {valid_roles}"
                 )
 
         # Validate hierarchical formation

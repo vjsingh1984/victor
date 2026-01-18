@@ -79,10 +79,7 @@ def orchestrator() -> AgentOrchestrator:
 async def test_keyword_selection_returns_core_tools(orchestrator: AgentOrchestrator) -> None:
     """Test that keyword selection includes core tools even for generic queries."""
     # Generic query that doesn't match specific keywords
-    context = ToolSelectionContext(
-        task_description="zzz",
-        conversation_stage="initial"
-    )
+    context = ToolSelectionContext(task_description="zzz", conversation_stage="initial")
 
     tools = await orchestrator.tool_selector.select_tools("zzz", context)
 
@@ -97,8 +94,7 @@ async def test_keyword_selection_limits_tool_count(orchestrator: AgentOrchestrat
     """Test that keyword selection doesn't return excessive tools."""
     # Query that could potentially match many tools
     context = ToolSelectionContext(
-        task_description="analyze everything",
-        conversation_stage="initial"
+        task_description="analyze everything", conversation_stage="initial"
     )
 
     tools = await orchestrator.tool_selector.select_tools("analyze everything", context)
@@ -108,12 +104,13 @@ async def test_keyword_selection_limits_tool_count(orchestrator: AgentOrchestrat
 
 
 @pytest.mark.asyncio
-async def test_keyword_selection_includes_stage_relevant_tools(orchestrator: AgentOrchestrator) -> None:
+async def test_keyword_selection_includes_stage_relevant_tools(
+    orchestrator: AgentOrchestrator,
+) -> None:
     """Test that keyword selection considers conversation stage."""
     # Execution stage query
     context = ToolSelectionContext(
-        task_description="modify the file",
-        conversation_stage="execution"
+        task_description="modify the file", conversation_stage="execution"
     )
 
     tools = await orchestrator.tool_selector.select_tools("modify the file", context)

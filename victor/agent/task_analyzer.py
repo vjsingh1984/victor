@@ -257,19 +257,31 @@ class TaskAnalyzer:
             task_type_dict = None
             if analysis.task_type:
                 task_type_dict = {
-                    "type": analysis.task_type.value if hasattr(analysis.task_type, 'value') else str(analysis.task_type),
+                    "type": (
+                        analysis.task_type.value
+                        if hasattr(analysis.task_type, "value")
+                        else str(analysis.task_type)
+                    ),
                     "confidence": analysis.task_type_confidence,
                 }
 
             intent_type_dict = None
             if analysis.intent_type:
                 intent_type_dict = {
-                    "type": analysis.intent_type.value if hasattr(analysis.intent_type, 'value') else str(analysis.intent_type),
+                    "type": (
+                        analysis.intent_type.value
+                        if hasattr(analysis.intent_type, "value")
+                        else str(analysis.intent_type)
+                    ),
                     "confidence": analysis.analysis_details.get("intent_confidence", 0.0),
                 }
 
             complexity_dict = {
-                "level": analysis.complexity.value if hasattr(analysis.complexity, 'value') else str(analysis.complexity),
+                "level": (
+                    analysis.complexity.value
+                    if hasattr(analysis.complexity, "value")
+                    else str(analysis.complexity)
+                ),
                 "confidence": analysis.complexity_confidence,
                 "tool_budget": analysis.tool_budget,
             }
@@ -280,7 +292,11 @@ class TaskAnalyzer:
                 task_type=task_type_dict or {},
                 intent_type=intent_type_dict,
                 complexity=complexity_dict,
-                unified_type=analysis.unified_task_type.value if hasattr(analysis.unified_task_type, 'value') else str(analysis.unified_task_type),
+                unified_type=(
+                    analysis.unified_task_type.value
+                    if hasattr(analysis.unified_task_type, "value")
+                    else str(analysis.unified_task_type)
+                ),
                 confidence=analysis.unified_confidence,
                 tool_budget=analysis.tool_budget,
                 requires_confirmation=analysis.requires_confirmation,

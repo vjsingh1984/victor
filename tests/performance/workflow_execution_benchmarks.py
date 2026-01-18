@@ -159,10 +159,12 @@ class WorkflowNode:
             )
 
         # Update context
-        context.update_state({
-            f"{self.id}_output": f"Result from {self.id}",
-            f"{self.id}_timestamp": time.time(),
-        })
+        context.update_state(
+            {
+                f"{self.id}_output": f"Result from {self.id}",
+                f"{self.id}_timestamp": time.time(),
+            }
+        )
 
         exec_time = time.perf_counter() - start_time
 
@@ -326,7 +328,9 @@ def create_linear_workflow(node_count: int, execution_delay: float = 0.01) -> Wo
     return graph
 
 
-def create_parallel_workflow(branches: int, nodes_per_branch: int, execution_delay: float = 0.01) -> WorkflowGraph:
+def create_parallel_workflow(
+    branches: int, nodes_per_branch: int, execution_delay: float = 0.01
+) -> WorkflowGraph:
     """Create a parallel workflow graph."""
     graph = WorkflowGraph("parallel_workflow")
 
@@ -354,7 +358,9 @@ def create_parallel_workflow(branches: int, nodes_per_branch: int, execution_del
     return graph
 
 
-def create_conditional_workflow(branches: int, nodes_per_branch: int, execution_delay: float = 0.01) -> WorkflowGraph:
+def create_conditional_workflow(
+    branches: int, nodes_per_branch: int, execution_delay: float = 0.01
+) -> WorkflowGraph:
     """Create a conditional workflow graph."""
     graph = WorkflowGraph("conditional_workflow")
 
@@ -399,7 +405,9 @@ def create_conditional_workflow(branches: int, nodes_per_branch: int, execution_
     return graph
 
 
-def create_nested_workflow(depth: int, nodes_per_level: int, execution_delay: float = 0.01) -> WorkflowGraph:
+def create_nested_workflow(
+    depth: int, nodes_per_level: int, execution_delay: float = 0.01
+) -> WorkflowGraph:
     """Create a nested workflow graph for recursion testing."""
     graph = WorkflowGraph("nested_workflow")
 
@@ -495,22 +503,27 @@ def test_linear_workflow_execution(benchmark, node_count):
     target_ms = {5: 100, 10: 200, 20: 400, 50: 1000}.get(node_count, 2000)
     actual_ms = result["total_time"] * 1000
 
-    print(f"\nLinear Execution | Nodes: {node_count:2} | "
-          f"Time: {actual_ms:6.2f}ms | "
-          f"Tool Calls: {result['total_tool_calls']:3}")
-
-    assert actual_ms < target_ms, (
-        f"Execution time {actual_ms:.2f}ms exceeds target {target_ms}ms for {node_count} nodes"
+    print(
+        f"\nLinear Execution | Nodes: {node_count:2} | "
+        f"Time: {actual_ms:6.2f}ms | "
+        f"Tool Calls: {result['total_tool_calls']:3}"
     )
+
+    assert (
+        actual_ms < target_ms
+    ), f"Execution time {actual_ms:.2f}ms exceeds target {target_ms}ms for {node_count} nodes"
 
 
 @pytest.mark.benchmark
-@pytest.mark.parametrize("branches,nodes_per_branch", [
-    (2, 5),
-    (3, 5),
-    (5, 5),
-    (3, 10),
-])
+@pytest.mark.parametrize(
+    "branches,nodes_per_branch",
+    [
+        (2, 5),
+        (3, 5),
+        (5, 5),
+        (3, 10),
+    ],
+)
 def test_parallel_workflow_execution(benchmark, branches, nodes_per_branch):
     """Benchmark parallel workflow execution time.
 
@@ -535,9 +548,11 @@ def test_parallel_workflow_execution(benchmark, branches, nodes_per_branch):
     assert result["success"]
 
     total_nodes = 1 + branches * nodes_per_branch
-    print(f"\nParallel Execution | Branches: {branches} | Nodes/branch: {nodes_per_branch} | "
-          f"Time: {result['total_time']*1000:6.2f}ms | "
-          f"Nodes: {total_nodes}")
+    print(
+        f"\nParallel Execution | Branches: {branches} | Nodes/branch: {nodes_per_branch} | "
+        f"Time: {result['total_time']*1000:6.2f}ms | "
+        f"Nodes: {total_nodes}"
+    )
 
 
 # =============================================================================
@@ -571,9 +586,11 @@ def test_node_throughput(benchmark, duration_seconds):
 
     result = benchmark(execute_for_duration)
 
-    print(f"\nThroughput | Duration: {duration_seconds}s | "
-          f"Nodes: {result['nodes_executed']} | "
-          f"Throughput: {result['throughput']:.1f} nodes/s")
+    print(
+        f"\nThroughput | Duration: {duration_seconds}s | "
+        f"Nodes: {result['nodes_executed']} | "
+        f"Throughput: {result['throughput']:.1f} nodes/s"
+    )
 
     # Target: >100 nodes/second
     assert result["throughput"] > 100, f"Throughput {result['throughput']:.1f} nodes/s below target"
@@ -604,12 +621,16 @@ def test_recursion_depth_impact(benchmark, depth):
 
     # Calculate expected time (sequential execution)
     expected_time = result["executed_nodes"] * 0.005
-    overhead = (result["total_time"] - expected_time) / expected_time * 100 if expected_time > 0 else 0
+    overhead = (
+        (result["total_time"] - expected_time) / expected_time * 100 if expected_time > 0 else 0
+    )
 
-    print(f"\nRecursion Depth | Depth: {depth} | "
-          f"Nodes: {result['executed_nodes']} | "
-          f"Time: {result['total_time']*1000:6.2f}ms | "
-          f"Overhead: {overhead:.1f}%")
+    print(
+        f"\nRecursion Depth | Depth: {depth} | "
+        f"Nodes: {result['executed_nodes']} | "
+        f"Time: {result['total_time']*1000:6.2f}ms | "
+        f"Overhead: {overhead:.1f}%"
+    )
 
 
 # =============================================================================
@@ -642,11 +663,15 @@ def test_tool_execution_overhead(benchmark, tool_calls_per_node):
     assert result["success"]
 
     total_tool_calls = result["total_tool_calls"]
-    time_per_tool_call = (result["total_time"] / total_tool_calls * 1000) if total_tool_calls > 0 else 0
+    time_per_tool_call = (
+        (result["total_time"] / total_tool_calls * 1000) if total_tool_calls > 0 else 0
+    )
 
-    print(f"\nTool Execution | Tool calls/node: {tool_calls_per_node:2} | "
-          f"Total: {result['total_time']*1000:6.2f}ms | "
-          f"Per-call: {time_per_tool_call:5.3f}ms")
+    print(
+        f"\nTool Execution | Tool calls/node: {tool_calls_per_node:2} | "
+        f"Total: {result['total_time']*1000:6.2f}ms | "
+        f"Per-call: {time_per_tool_call:5.3f}ms"
+    )
 
     # Target: <5ms per tool call
     if tool_calls_per_node > 0:
@@ -673,8 +698,10 @@ def test_conditional_branching_performance(benchmark):
 
     assert result["success"]
 
-    print(f"\nConditional Branching | Time: {result['total_time']*1000:6.2f}ms | "
-          f"Nodes: {result['executed_nodes']}")
+    print(
+        f"\nConditional Branching | Time: {result['total_time']*1000:6.2f}ms | "
+        f"Nodes: {result['executed_nodes']}"
+    )
 
     # Conditional should execute only one branch
     # Expected: entry + condition + 5 nodes = 7 nodes
@@ -700,14 +727,17 @@ def test_state_management_overhead(benchmark, state_updates_per_node):
 
     async def execute_with_state_updates(self, context):
         for i in range(state_updates_per_node):
-            context.update_state({
-                f"key_{i}": f"value_{i}" * 10,  # ~70 bytes per key
-            })
+            context.update_state(
+                {
+                    f"key_{i}": f"value_{i}" * 10,  # ~70 bytes per key
+                }
+            )
         return await original_execute(self, context)
 
     WorkflowNode.execute = execute_with_state_updates
 
     try:
+
         def execute_workflow():
             return asyncio.run(workflow.execute())
 
@@ -717,9 +747,11 @@ def test_state_management_overhead(benchmark, state_updates_per_node):
 
         state_size_kb = len(str(result["context"].state)) / 1024
 
-        print(f"\nState Management | Updates/node: {state_updates_per_node:2} | "
-              f"Time: {result['total_time']*1000:6.2f}ms | "
-              f"State size: {state_size_kb:.1f}KB")
+        print(
+            f"\nState Management | Updates/node: {state_updates_per_node:2} | "
+            f"Time: {result['total_time']*1000:6.2f}ms | "
+            f"State size: {state_size_kb:.1f}KB"
+        )
 
     finally:
         # Restore original method
@@ -746,6 +778,7 @@ def test_caching_effectiveness(benchmark):
             if not workflow._execution_cache:
                 workflow._execution_cache.clear()
             return await workflow.execute()
+
         return asyncio.run(_run())
 
     result = benchmark(run_with_cache)
@@ -756,9 +789,11 @@ def test_caching_effectiveness(benchmark):
     cache_hits = sum(1 for k in workflow._execution_cache.keys() if k in workflow.nodes)
     total_nodes = len(workflow.nodes)
 
-    print(f"\nCaching Effectiveness | Time: {result['total_time']*1000:.2f}ms | "
-          f"Cache hits: {cache_hits}/{total_nodes} | "
-          f"Caching enabled: {workflow.enable_caching}")
+    print(
+        f"\nCaching Effectiveness | Time: {result['total_time']*1000:.2f}ms | "
+        f"Cache hits: {cache_hits}/{total_nodes} | "
+        f"Caching enabled: {workflow.enable_caching}"
+    )
 
 
 # =============================================================================
@@ -786,6 +821,7 @@ def test_memory_workflow_execution(benchmark, node_count):
             result = await workflow.execute()
             current, peak = tracemalloc.get_traced_memory()
             return {"result": result, "peak_memory": peak}
+
         return asyncio.run(_execute_and_measure())
 
     output = benchmark(execute_and_measure)
@@ -797,8 +833,10 @@ def test_memory_workflow_execution(benchmark, node_count):
 
     target_mb = {20: 10, 50: 25, 100: 50}.get(node_count, 100)
 
-    print(f"\nMemory Usage | Nodes: {node_count:3} | "
-          f"Peak: {peak_mb:5.1f}MB | Per-node: {memory_per_node_kb:5.1f}KB")
+    print(
+        f"\nMemory Usage | Nodes: {node_count:3} | "
+        f"Peak: {peak_mb:5.1f}MB | Per-node: {memory_per_node_kb:5.1f}KB"
+    )
 
     assert peak_mb < target_mb, f"Memory usage {peak_mb:.1f}MB exceeds target {target_mb}MB"
 
@@ -853,9 +891,11 @@ def test_real_world_workflow_scenario(benchmark):
 
     assert result["success"]
 
-    print(f"\nReal-world Workflow | Time: {result['total_time']*1000:.2f}ms | "
-          f"Nodes: {result['executed_nodes']} | "
-          f"Tool calls: {result['total_tool_calls']}")
+    print(
+        f"\nReal-world Workflow | Time: {result['total_time']*1000:.2f}ms | "
+        f"Nodes: {result['executed_nodes']} | "
+        f"Tool calls: {result['total_tool_calls']}"
+    )
 
 
 # =============================================================================
@@ -904,7 +944,9 @@ def test_workflow_execution_performance_summary():
     print("\n2. Parallel Workflow Execution")
     print("-" * 60)
     for branches in [2, 3, 5]:
-        workflow = create_parallel_workflow(branches=branches, nodes_per_branch=5, execution_delay=0.01)
+        workflow = create_parallel_workflow(
+            branches=branches, nodes_per_branch=5, execution_delay=0.01
+        )
 
         async def run_parallel():
             return await workflow.execute()
@@ -982,7 +1024,9 @@ def test_workflow_execution_performance_summary():
         result = asyncio.run(run_tools())
         elapsed = time.time() - start
 
-        time_per_call = (elapsed / result["total_tool_calls"] * 1000) if result["total_tool_calls"] > 0 else 0
+        time_per_call = (
+            (elapsed / result["total_tool_calls"] * 1000) if result["total_tool_calls"] > 0 else 0
+        )
 
         results["tools"][tool_calls] = {
             "time_ms": elapsed * 1000,
@@ -990,7 +1034,9 @@ def test_workflow_execution_performance_summary():
         }
 
         status = "✓" if time_per_call < 5 or tool_calls == 0 else "✗"
-        print(f"  {tool_calls:2} calls/node {status}  {elapsed*1000:6.2f}ms  ({time_per_call:.3f}ms/call)")
+        print(
+            f"  {tool_calls:2} calls/node {status}  {elapsed*1000:6.2f}ms  ({time_per_call:.3f}ms/call)"
+        )
 
     # Test memory
     print("\n6. Memory Usage")

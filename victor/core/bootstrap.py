@@ -272,7 +272,7 @@ def _register_registry_services(container: ServiceContainer, settings: Settings)
         lambda c: UniversalRegistry.get_registry(
             "default",
             cache_strategy=getattr(settings, "registry_cache_strategy", CacheStrategy.LRU),
-            max_size=getattr(settings, "registry_max_size", 1000)
+            max_size=getattr(settings, "registry_max_size", 1000),
         ),
         ServiceLifetime.SINGLETON,
     )

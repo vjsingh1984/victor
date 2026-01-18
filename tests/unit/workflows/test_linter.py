@@ -83,9 +83,14 @@ class TestNodeIDFormatRule:
                 "test_workflow": {
                     "description": "Test workflow",
                     "nodes": [
-                        {"id": "start_node", "type": "agent", "role": "researcher", "goal": "Test goal"},
+                        {
+                            "id": "start_node",
+                            "type": "agent",
+                            "role": "researcher",
+                            "goal": "Test goal",
+                        },
                         {"id": "end_node", "type": "agent", "role": "writer", "goal": "End goal"},
-                    ]
+                    ],
                 }
             }
         }
@@ -197,7 +202,7 @@ class TestConnectionReferencesRule:
                     "nodes": [
                         {"id": "node1", "type": "agent", "role": "researcher", "goal": "Test"},
                         {"id": "node2", "type": "agent", "role": "writer", "goal": "Test"},
-                    ]
+                    ],
                 }
             }
         }
@@ -282,7 +287,7 @@ class TestCircularDependencyRule:
                             "goal": "Test",
                             "next": ["node1"],  # Creates cycle
                         },
-                    ]
+                    ],
                 }
             }
         }
@@ -311,7 +316,7 @@ class TestCircularDependencyRule:
                             "role": "writer",
                             "goal": "Test",
                         },
-                    ]
+                    ],
                 }
             }
         }
@@ -547,7 +552,7 @@ class TestDisconnectedNodesRule:
                             "role": "analyst",
                             "goal": "Test",
                         },  # Disconnected
-                    ]
+                    ],
                 }
             }
         }
@@ -572,7 +577,7 @@ class TestDisconnectedNodesRule:
                             "next": ["node2"],
                         },
                         {"id": "node2", "type": "agent", "role": "writer", "goal": "Test"},
-                    ]
+                    ],
                 }
             }
         }
@@ -594,7 +599,7 @@ class TestDuplicateNodeIDsRule:
                         {"id": "node1", "type": "agent", "role": "researcher", "goal": "Test"},
                         {"id": "node1", "type": "agent", "role": "writer", "goal": "Test"},
                         {"id": "node2", "type": "agent", "role": "analyst", "goal": "Test"},
-                    ]
+                    ],
                 }
             }
         }
@@ -624,7 +629,7 @@ class TestComplexityAnalysisRule:
                             "next": ["node2"],
                         },
                         {"id": "node2", "type": "agent", "role": "writer", "goal": "Test"},
-                    ]
+                    ],
                 }
             }
         }
@@ -692,7 +697,7 @@ class TestWorkflowLinter:
                             "goal": "Write detailed report on findings",
                             "tool_budget": 15,
                         },
-                    ]
+                    ],
                 }
             }
         }
@@ -725,7 +730,7 @@ class TestWorkflowLinter:
                             "goal": "test",
                             "next": ["nonexistent"],  # Invalid reference
                         },
-                    ]
+                    ],
                 }
             }
         }
@@ -782,6 +787,7 @@ class TestWorkflowLinter:
 
     def test_add_custom_rule(self, valid_workflow):
         """Test adding custom rule."""
+
         class CustomRule(ValidationRule):
             def __init__(self):
                 super().__init__(

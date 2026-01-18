@@ -253,7 +253,9 @@ class TestExecutionReplayer:
         recorder.record_workflow_start({"input": "test"})
         recorder.record_node_start("node1", {"data": "value"}, node_type="agent")
         recorder.record_node_complete("node1", {"result": "success"}, 1.0)
-        recorder.record_state_snapshot({"result": "success"}, node_id="node1", execution_stack=["workflow:sample"])
+        recorder.record_state_snapshot(
+            {"result": "success"}, node_id="node1", execution_stack=["workflow:sample"]
+        )
         recorder.record_node_start("node2", {"previous": "success"}, node_type="compute")
         recorder.record_node_complete("node2", {"final": "done"}, 0.5)
         recorder.record_workflow_complete({"final": "done"}, success=True)
@@ -268,7 +270,9 @@ class TestExecutionReplayer:
         replayer = ExecutionReplayer.load(sample_recording)
 
         assert replayer.metadata.workflow_name == "sample_workflow"
-        assert len(replayer.events) == 7  # workflow_start, node_start, node_complete, state_snapshot, node_start, node_complete, workflow_complete
+        assert (
+            len(replayer.events) == 7
+        )  # workflow_start, node_start, node_complete, state_snapshot, node_start, node_complete, workflow_complete
         assert len(replayer.snapshots) == 1
 
     def test_step_forward(self, sample_recording):
@@ -323,7 +327,9 @@ class TestExecutionReplayer:
 
         # Jump to node2 completion (node2 has NODE_START and NODE_COMPLETE events)
         node2_events = replayer.get_node_events("node2")
-        node2_complete = [e for e in node2_events if e.event_type == RecordingEventType.NODE_COMPLETE][0]
+        node2_complete = [
+            e for e in node2_events if e.event_type == RecordingEventType.NODE_COMPLETE
+        ][0]
         success = replayer.jump_to_event(node2_complete.event_id)
 
         assert success is True
@@ -612,7 +618,9 @@ class TestEndToEndRecording:
 
         # Get state at node1 completion
         node1_events = replayer.get_node_events("node1")
-        complete_event = [e for e in node1_events if e.event_type == RecordingEventType.NODE_COMPLETE][0]
+        complete_event = [
+            e for e in node1_events if e.event_type == RecordingEventType.NODE_COMPLETE
+        ][0]
 
         state = replayer.get_state_at_event(complete_event.event_id)
         assert state is not None

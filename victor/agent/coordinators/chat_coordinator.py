@@ -56,6 +56,7 @@ if TYPE_CHECKING:
     from victor.agent.streaming.continuation import ContinuationHandler
     from victor.agent.streaming.tool_execution import ToolExecutionHandler
     from victor.agent.streaming import apply_tracking_state_updates, create_tracking_state
+
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
     from victor.protocols.agent import IAgentOrchestrator
 
@@ -166,7 +167,11 @@ class ChatCoordinator:
 
                 context = ToolSelectionContext(
                     task_description=user_message,
-                    conversation_stage=orch.conversation_state.state.stage.value if orch.conversation_state.state.stage else None,
+                    conversation_stage=(
+                        orch.conversation_state.state.stage.value
+                        if orch.conversation_state.state.stage
+                        else None
+                    ),
                     previous_tools=[],
                 )
 
@@ -711,7 +716,10 @@ class ChatCoordinator:
                         )
 
                     # Import create_tracking_state for intent classification
-                    from victor.agent.streaming.intent_classification import create_tracking_state, apply_tracking_state_updates
+                    from victor.agent.streaming.intent_classification import (
+                        create_tracking_state,
+                        apply_tracking_state_updates,
+                    )
 
                     # Ensure tracking variables are initialized
                     if not hasattr(orch, "_continuation_prompts"):
@@ -1204,8 +1212,7 @@ class ChatCoordinator:
                 await orch.ensure_tool_selector_initialized()
             except Exception as e:
                 logger.warning(
-                    f"Health check recovery failed: {e}. "
-                    "Attempting fallback initialization..."
+                    f"Health check recovery failed: {e}. " "Attempting fallback initialization..."
                 )
                 # Fallback: Try direct initialization
                 if hasattr(orch.tool_selector, "initialize_tool_embeddings"):
@@ -1233,7 +1240,11 @@ class ChatCoordinator:
 
         context = ToolSelectionContext(
             task_description=context_msg,
-            conversation_stage=orch.conversation_state.state.stage.value if orch.conversation_state.state.stage else None,
+            conversation_stage=(
+                orch.conversation_state.state.stage.value
+                if orch.conversation_state.state.stage
+                else None
+            ),
             previous_tools=[],
             planned_tools=planned_tools if planned_tools else [],
         )
@@ -1726,9 +1737,21 @@ class ChatCoordinator:
             provider_name=orch.provider_name,
             model=orch.model,
             temperature=getattr(orch, "temperature", 0.7),
-            unified_task_type=getattr(orch._task_tracker, "current_task_type", None) if hasattr(orch, "_task_tracker") else None,
-            is_analysis_task=getattr(orch._task_tracker, "is_analysis_task", False) if hasattr(orch, "_task_tracker") else False,
-            is_action_task=getattr(orch._task_tracker, "is_action_task", False) if hasattr(orch, "_task_tracker") else False,
+            unified_task_type=(
+                getattr(orch._task_tracker, "current_task_type", None)
+                if hasattr(orch, "_task_tracker")
+                else None
+            ),
+            is_analysis_task=(
+                getattr(orch._task_tracker, "is_analysis_task", False)
+                if hasattr(orch, "_task_tracker")
+                else False
+            ),
+            is_action_task=(
+                getattr(orch._task_tracker, "is_action_task", False)
+                if hasattr(orch, "_task_tracker")
+                else False
+            ),
         )
 
     async def _execute_extracted_tool_call(
@@ -1767,6 +1790,7 @@ class ChatCoordinator:
 
         # Generate tool start chunk
         from victor.agent.orchestrator_utils import get_tool_status_message
+
         status_msg = get_tool_status_message(
             extracted_call.tool_name,
             extracted_call.arguments,
@@ -1883,9 +1907,7 @@ class ChatCoordinator:
         # Generate force final response message
         yield StreamChunk(
             chunk_type="system_message",
-            content=(
-                "\n\n[Force Final Response: Generating summary and concluding session]"
-            ),
+            content=("\n\n[Force Final Response: Generating summary and concluding session]"),
             metadata={
                 "force_final_response": True,
             },
@@ -1923,9 +1945,21 @@ class ChatCoordinator:
             max_iterations=stream_ctx.max_total_iterations,
             current_temperature=getattr(orch, "temperature", 0.7),
             quality_score=stream_ctx.last_quality_score,
-            task_type=getattr(orch._task_tracker, "current_task_type", "general") if hasattr(orch, "_task_tracker") else "general",
-            is_analysis_task=getattr(orch._task_tracker, "is_analysis_task", False) if hasattr(orch, "_task_tracker") else False,
-            is_action_task=getattr(orch._task_tracker, "is_action_task", False) if hasattr(orch, "_task_tracker") else False,
+            task_type=(
+                getattr(orch._task_tracker, "current_task_type", "general")
+                if hasattr(orch, "_task_tracker")
+                else "general"
+            ),
+            is_analysis_task=(
+                getattr(orch._task_tracker, "is_analysis_task", False)
+                if hasattr(orch, "_task_tracker")
+                else False
+            ),
+            is_action_task=(
+                getattr(orch._task_tracker, "is_action_task", False)
+                if hasattr(orch, "_task_tracker")
+                else False
+            ),
             context_utilization=None,
         )
 
@@ -1946,8 +1980,7 @@ class ChatCoordinator:
         if recovery_action.action == "force_summary":
             stream_ctx.force_completion = True
             return orch._chunk_generator.generate_content_chunk(
-                "Providing summary based on information gathered so far.",
-                is_final=True
+                "Providing summary based on information gathered so far.", is_final=True
             )
         elif recovery_action.action == "retry":
             orch.add_message("system", recovery_action.message or "Please try again.")
@@ -2049,15 +2082,10 @@ class ChatCoordinator:
         # Check if cancellation was requested
         if orch._check_cancellation():
             # Return a final chunk to signal cancellation
-            return StreamChunk(
-                content="\n\n[Request cancelled by user]",
-                is_final=True
-            )
+            return StreamChunk(content="\n\n[Request cancelled by user]", is_final=True)
         return None
 
-    def _check_time_limit_with_handler(
-        self, ctx: "StreamingChatContext"
-    ) -> Optional[StreamChunk]:
+    def _check_time_limit_with_handler(self, ctx: "StreamingChatContext") -> Optional[StreamChunk]:
         """Check if time limit has been exceeded.
 
         Args:
@@ -2077,10 +2105,7 @@ class ChatCoordinator:
         result = orch._streaming_handler.check_time_limit(ctx)
         if result:
             # Check if result indicates we should stop (break or force completion)
-            should_stop = (
-                result.should_break
-                or result.action == IterationAction.FORCE_COMPLETION
-            )
+            should_stop = result.should_break or result.action == IterationAction.FORCE_COMPLETION
             if should_stop:
                 # Convert IterationResult to StreamChunk
                 # If result has chunks, use the first one; otherwise create from content
@@ -2112,7 +2137,7 @@ class ChatCoordinator:
                 tool_budget=ctx.tool_budget,
                 max_iterations=ctx.max_total_iterations,
                 session_start_time=ctx.start_time,
-                last_quality_score=getattr(ctx, 'last_quality_score', 0.5),
+                last_quality_score=getattr(ctx, "last_quality_score", 0.5),
                 streaming_context=ctx,
                 provider_name=orch.provider_name,
                 model=orch.model,

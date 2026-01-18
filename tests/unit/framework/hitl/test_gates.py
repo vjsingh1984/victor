@@ -268,6 +268,7 @@ class TestApprovalGate:
     @pytest.mark.asyncio
     async def test_execute_with_handler_uses_response(self):
         """Execute with handler should use handler response."""
+
         async def mock_handler(**kwargs):
             return type(
                 "MockResponse",
@@ -415,6 +416,7 @@ class TestChoiceInputGate:
     @pytest.mark.asyncio
     async def test_execute_with_handler(self):
         """Execute with handler should use selected value."""
+
         async def mock_handler(**kwargs):
             return type("MockResponse", (), {"value": "c"})()
 
@@ -432,6 +434,7 @@ class TestChoiceInputGate:
     @pytest.mark.asyncio
     async def test_invalid_choice_rejected(self):
         """Invalid choice should be rejected."""
+
         async def mock_handler(**kwargs):
             return type("MockResponse", (), {"value": "invalid"})()
 
@@ -535,6 +538,7 @@ class TestReviewGate:
     @pytest.mark.asyncio
     async def test_execute_with_modifications(self):
         """Execute with handler should support modifications."""
+
         async def mock_handler(**kwargs):
             return type(
                 "MockResponse",

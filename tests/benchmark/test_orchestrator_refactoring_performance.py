@@ -146,6 +146,7 @@ def mock_settings():
 @pytest.fixture
 def sample_tools():
     """Create sample tools for testing."""
+
     @tool
     def read_file(path: str) -> str:
         """Read a file."""
@@ -200,7 +201,7 @@ async def test_orchestrator_initialization_time(mock_provider, mock_settings, sa
     current, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
 
-    print(f"\n=== Initialization Performance ===")
+    print("\n=== Initialization Performance ===")
     print(f"Initialization time: {init_time*1000:.2f}ms")
     print(f"Current memory: {current / 1024:.2f}KB")
     print(f"Peak memory: {peak / 1024:.2f}KB")
@@ -271,7 +272,7 @@ async def test_chat_latency(mock_provider, mock_settings):
 
     time_to_first_token = first_token_time - start_time if first_token_time else total_time
 
-    print(f"\n=== Chat Latency Performance ===")
+    print("\n=== Chat Latency Performance ===")
     print(f"Time to first token: {time_to_first_token*1000:.2f}ms")
     print(f"Total streaming time: {total_time*1000:.2f}ms")
     print(f"Chunks received: {chunk_count}")
@@ -307,13 +308,15 @@ async def test_total_response_time(mock_provider, mock_settings):
     response = await orchestrator.chat("Simple message")
     simple_time = time.perf_counter() - start_time
 
-    print(f"\n=== Total Response Time Performance ===")
+    print("\n=== Total Response Time Performance ===")
     print(f"Simple chat time: {simple_time*1000:.2f}ms")
     print(f"Response length: {len(response.content)}")
 
     # Assertions
     max_total = float(os.getenv("VICTOR_BENCHMARK_CHAT_TOTAL_S", "1.0"))
-    assert simple_time < max_total, f"Simple chat took {simple_time:.2f}s, expected < {max_total:.1f}s"
+    assert (
+        simple_time < max_total
+    ), f"Simple chat took {simple_time:.2f}s, expected < {max_total:.1f}s"
     assert response.content is not None
 
 
@@ -348,7 +351,7 @@ async def test_coordinator_overhead(mock_provider, mock_settings, sample_tools):
 
     avg_time = total_time / iterations
 
-    print(f"\n=== Coordinator Overhead Performance ===")
+    print("\n=== Coordinator Overhead Performance ===")
     print(f"Average chat time over {iterations} iterations: {avg_time*1000:.2f}ms")
     print(f"Total time: {total_time*1000:.2f}ms")
 
@@ -391,7 +394,7 @@ async def test_memory_usage_during_operations(mock_provider, mock_settings):
 
     memory_increase = post_ops - baseline
 
-    print(f"\n=== Memory Usage Performance ===")
+    print("\n=== Memory Usage Performance ===")
     print(f"Baseline memory: {baseline / 1024:.2f}KB")
     print(f"Post-operations memory: {post_ops / 1024:.2f}KB")
     print(f"Memory increase: {memory_increase / 1024:.2f}KB")
@@ -429,7 +432,7 @@ async def test_coordinator_scaling(mock_provider, mock_settings):
     total_time = time.perf_counter() - start_time
     avg_time = total_time / operations
 
-    print(f"\n=== Coordinator Scaling Performance ===")
+    print("\n=== Coordinator Scaling Performance ===")
     print(f"Total time for {operations} operations: {total_time*1000:.2f}ms")
     print(f"Average time per operation: {avg_time*1000:.2f}ms")
 
@@ -456,8 +459,7 @@ async def test_line_count_comparison():
 
         with open(filepath, "r") as f:
             lines = [
-                line for line in f.readlines()
-                if line.strip() and not line.strip().startswith("#")
+                line for line in f.readlines() if line.strip() and not line.strip().startswith("#")
             ]
         return len(lines)
 
@@ -477,7 +479,7 @@ async def test_line_count_comparison():
 
     total_refactored_lines = orchestrator_lines + coordinator_lines
 
-    print(f"\n=== Line Count Comparison ===")
+    print("\n=== Line Count Comparison ===")
     print(f"Original orchestrator lines: {orchestrator_lines}")
     print(f"Refactored orchestrator lines: {orchestrator_lines}")
     print(f"Coordinator lines: {coordinator_lines}")

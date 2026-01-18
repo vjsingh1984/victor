@@ -151,9 +151,7 @@ class TruncationCompactionStrategy(CompactionStrategy):
             protected_messages.extend([m for m in messages if m.get("role") == "system"])
 
         if self.preserve_pinned:
-            protected_messages.extend(
-                [m for m in messages if self._is_pinned_message(m)]
-            )
+            protected_messages.extend([m for m in messages if self._is_pinned_message(m)])
 
         # Add protected messages to result
         for msg in protected_messages:
@@ -302,7 +300,11 @@ class LLMCompactionStrategy(CompactionStrategy):
         regular = [m for m in messages if m not in protected]
 
         # Keep recent messages verbatim
-        recent = regular[-self.preserve_recent_count:] if len(regular) > self.preserve_recent_count else []
+        recent = (
+            regular[-self.preserve_recent_count :]
+            if len(regular) > self.preserve_recent_count
+            else []
+        )
         to_summarize = regular[: len(regular) - len(recent)]
 
         # Build result
@@ -315,10 +317,12 @@ class LLMCompactionStrategy(CompactionStrategy):
         if to_summarize:
             summary = await self._get_or_create_summary(to_summarize)
             if summary:
-                result.append({
-                    "role": "system",
-                    "content": f"[Previous conversation summary]\\n{summary}",
-                })
+                result.append(
+                    {
+                        "role": "system",
+                        "content": f"[Previous conversation summary]\\n{summary}",
+                    }
+                )
 
         # Add recent messages
         result.extend(recent)
@@ -394,8 +398,7 @@ class LLMCompactionStrategy(CompactionStrategy):
         """
         # Create a string representation
         content_str = "\\n".join(
-            f"{m.get('role', '')}: {m.get('content', '')[:100]}"
-            for m in messages
+            f"{m.get('role', '')}: {m.get('content', '')[:100]}" for m in messages
         )
 
         # Hash it
@@ -505,10 +508,7 @@ class HybridCompactionStrategy(CompactionStrategy):
             Compacted list of messages
         """
         # Estimate current token count
-        estimated_tokens = sum(
-            len(m.get("content", "")) // 3
-            for m in messages
-        )
+        estimated_tokens = sum(len(m.get("content", "")) // 3 for m in messages)
 
         # Calculate complexity score
         complexity = self._calculate_complexity(messages)

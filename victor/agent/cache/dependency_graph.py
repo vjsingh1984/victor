@@ -298,12 +298,8 @@ class ToolDependencyGraph:
         return {
             "tools": len(all_tools),
             "files": len(self._file_dependents),
-            "tool_dependencies": sum(
-                len(deps) for deps in self._tool_dependencies.values()
-            ),
-            "file_dependencies": sum(
-                len(deps) for deps in self._file_dependencies.values()
-            ),
+            "tool_dependencies": sum(len(deps) for deps in self._tool_dependencies.values()),
+            "file_dependencies": sum(len(deps) for deps in self._file_dependencies.values()),
         }
 
 

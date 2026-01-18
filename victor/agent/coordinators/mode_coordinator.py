@@ -216,9 +216,7 @@ class ModeCoordinator:
             return ToolNames.SHELL
 
         # Fall back to shell_readonly if enabled
-        if self._tool_registry and self._tool_registry.is_tool_enabled(
-            ToolNames.SHELL_READONLY
-        ):
+        if self._tool_registry and self._tool_registry.is_tool_enabled(ToolNames.SHELL_READONLY):
             logger.debug(f"Resolved '{tool_name}' to 'shell_readonly' (readonly mode)")
             return ToolNames.SHELL_READONLY
 
@@ -226,9 +224,7 @@ class ModeCoordinator:
         from victor.tools.tool_names import get_canonical_name
 
         canonical = get_canonical_name(tool_name)
-        logger.debug(
-            f"No shell variant enabled for '{tool_name}', using canonical '{canonical}'"
-        )
+        logger.debug(f"No shell variant enabled for '{tool_name}', using canonical '{canonical}'")
         return canonical
 
     # ========================================================================

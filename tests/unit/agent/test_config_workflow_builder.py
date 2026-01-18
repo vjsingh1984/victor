@@ -42,20 +42,22 @@ def test_config_workflow_builder_wires_components():
     orchestrator.provider_name = "provider"
     orchestrator.model = "model"
 
-    with patch(
-        "victor.agent.builders.config_workflow_builder.create_configuration_manager",
-        return_value="config-manager",
-    ), patch(
-        "victor.agent.builders.config_workflow_builder.create_memory_manager",
-        return_value="memory-wrapper",
-    ), patch(
-        "victor.agent.builders.config_workflow_builder.create_session_recovery_manager",
-        return_value="session-recovery",
-    ), patch(
-        "victor.agent.builders.config_workflow_builder.ProgressMetrics"
-    ) as progress_cls, patch(
-        "victor.config.config_loaders.get_provider_limits"
-    ) as get_provider_limits:
+    with (
+        patch(
+            "victor.agent.builders.config_workflow_builder.create_configuration_manager",
+            return_value="config-manager",
+        ),
+        patch(
+            "victor.agent.builders.config_workflow_builder.create_memory_manager",
+            return_value="memory-wrapper",
+        ),
+        patch(
+            "victor.agent.builders.config_workflow_builder.create_session_recovery_manager",
+            return_value="session-recovery",
+        ),
+        patch("victor.agent.builders.config_workflow_builder.ProgressMetrics") as progress_cls,
+        patch("victor.config.config_loaders.get_provider_limits") as get_provider_limits,
+    ):
         progress_instance = MagicMock()
         progress_cls.return_value = progress_instance
         limits = MagicMock()

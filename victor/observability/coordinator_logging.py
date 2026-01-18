@@ -214,12 +214,12 @@ class TextFormatter(logging.Formatter):
 
     # ANSI color codes
     COLORS = {
-        "DEBUG": "\033[36m",      # Cyan
-        "INFO": "\033[32m",       # Green
-        "WARNING": "\033[33m",    # Yellow
-        "ERROR": "\033[31m",      # Red
-        "CRITICAL": "\033[35m",   # Magenta
-        "RESET": "\033[0m",       # Reset
+        "DEBUG": "\033[36m",  # Cyan
+        "INFO": "\033[32m",  # Green
+        "WARNING": "\033[33m",  # Yellow
+        "ERROR": "\033[31m",  # Red
+        "CRITICAL": "\033[35m",  # Magenta
+        "RESET": "\033[0m",  # Reset
     }
 
     def __init__(self, use_colors: bool = True) -> None:
@@ -241,7 +241,9 @@ class TextFormatter(logging.Formatter):
             Formatted string.
         """
         # Base format
-        timestamp = datetime.fromtimestamp(record.created, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.fromtimestamp(record.created, tz=timezone.utc).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
         level = record.levelname
         logger = record.name
 
@@ -605,6 +607,7 @@ def log_execution(
             # Method is automatically logged
             return result
     """
+
     def decorator(func):
         def wrapper(*args, **kwargs):
             # Get logger
@@ -653,4 +656,5 @@ def log_execution(
                 raise
 
         return wrapper
+
     return decorator

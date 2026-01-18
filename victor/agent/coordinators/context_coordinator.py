@@ -131,9 +131,7 @@ class ContextCoordinator:
                     self._record_compaction(result)
                     return result
             except Exception as e:
-                logger.warning(
-                    f"Compaction strategy {strategy.__class__.__name__} failed: {e}"
-                )
+                logger.warning(f"Compaction strategy {strategy.__class__.__name__} failed: {e}")
                 continue
 
         # No strategy found
@@ -297,6 +295,7 @@ class ContextCompactionError(Exception):
 
 
 # Built-in compaction strategies
+
 
 class BaseCompactionStrategy(ICompactionStrategy):
     """Base class for compaction strategies.
@@ -719,16 +718,12 @@ class HybridCompactionStrategy(BaseCompactionStrategy):
         self._reserve_messages = reserve_messages
         self._summarize_threshold = summarize_threshold
         # Initialize sub-strategies
-        self._semantic_strategy = SemanticCompactionStrategy(
-            reserve_messages=reserve_messages + 2
-        )
+        self._semantic_strategy = SemanticCompactionStrategy(reserve_messages=reserve_messages + 2)
         self._summarization_strategy = SummarizationCompactionStrategy(
             reserve_messages=reserve_messages,
             summarize_threshold=summarize_threshold,
         )
-        self._truncation_strategy = TruncationCompactionStrategy(
-            reserve_messages=reserve_messages
-        )
+        self._truncation_strategy = TruncationCompactionStrategy(reserve_messages=reserve_messages)
 
     async def can_apply(
         self,
@@ -783,9 +778,7 @@ class HybridCompactionStrategy(BaseCompactionStrategy):
         context_after_semantic = result.compacted_context
 
         # Step 2: Try summarization
-        result = await self._summarization_strategy.compact(
-            context_after_semantic, budget
-        )
+        result = await self._summarization_strategy.compact(context_after_semantic, budget)
 
         if result.compacted_context.get("token_count", 0) <= max_tokens:
             result.strategy_used = f"{self._name}_summarization"
@@ -794,9 +787,7 @@ class HybridCompactionStrategy(BaseCompactionStrategy):
         context_after_summarization = result.compacted_context
 
         # Step 3: Fall back to truncation
-        result = await self._truncation_strategy.compact(
-            context_after_summarization, budget
-        )
+        result = await self._truncation_strategy.compact(context_after_summarization, budget)
 
         result.strategy_used = f"{self._name}_truncation"
 

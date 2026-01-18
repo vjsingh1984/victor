@@ -60,6 +60,7 @@ def mock_embedding_service(monkeypatch):
     ):
         yield
 
+
 # Reuse a single event loop per test to avoid asyncio.run overhead in benchmarks.
 @pytest.fixture
 def run_async():
@@ -70,6 +71,7 @@ def run_async():
     finally:
         loop.close()
         asyncio.set_event_loop(None)
+
 
 # Configure logging to reduce noise during benchmarks
 logging.basicConfig(level=logging.ERROR)
@@ -235,21 +237,17 @@ BENCHMARK_QUERIES = [
     "read the file",
     "write to file",
     "search for code",
-
     # Complex queries
     "find all classes that inherit from BaseController and list their methods",
     "analyze the codebase for security vulnerabilities and generate a report",
     "create a new REST API endpoint for user authentication with JWT tokens",
-
     # Multi-step queries
     "read the config file, update the database url, and restart the server",
     "run tests, if they pass deploy to staging and run integration tests",
-
     # Vague queries
     "fix it",
     "make it work",
     "help me",
-
     # Edge cases
     "",  # Empty
     "x" * 500,  # Very long query
@@ -374,7 +372,7 @@ def test_baseline_keyword_selection(benchmark, keyword_selector, run_async):
                 prompt="read the file and search for errors",
                 context=ToolSelectionContext(
                     task_description="read the file and search for errors",
-                    metadata={'available_tools': {t.name for t in registry.list_tools()}},
+                    metadata={"available_tools": {t.name for t in registry.list_tools()}},
                 ),
             )
         )
@@ -385,10 +383,10 @@ def test_baseline_keyword_selection(benchmark, keyword_selector, run_async):
 
 
 @pytest.mark.benchmark(group="tool_selection_baseline")
-@pytest.mark.skip(reason="HybridToolSelector has API incompatibility with new SemanticToolSelector.select_tools() signature")
-def test_baseline_hybrid_selection(
-    benchmark, hybrid_selector, run_async
-):
+@pytest.mark.skip(
+    reason="HybridToolSelector has API incompatibility with new SemanticToolSelector.select_tools() signature"
+)
+def test_baseline_hybrid_selection(benchmark, hybrid_selector, run_async):
     """Benchmark hybrid tool selection (baseline).
 
     Hybrid selection combines semantic + keyword approaches.
@@ -409,7 +407,7 @@ def test_baseline_hybrid_selection(
                 prompt="read the file and search for errors",
                 context=ToolSelectionContext(
                     task_description="read the file and search for errors",
-                    metadata={'available_tools': {t.name for t in semantic_registry.list_tools()}},
+                    metadata={"available_tools": {t.name for t in semantic_registry.list_tools()}},
                 ),
             )
         )
@@ -465,9 +463,7 @@ def test_uncached_query_embedding(benchmark, semantic_selector, run_async):
         query = queries[query_idx % len(queries)]
         return run_async(semantic_selector._get_embedding(query))
 
-    result = benchmark.pedantic(
-        get_uncached_embedding, args=(0,), iterations=50, rounds=10
-    )
+    result = benchmark.pedantic(get_uncached_embedding, args=(0,), iterations=50, rounds=10)
     embedding = result
 
     assert isinstance(embedding, np.ndarray)
@@ -510,9 +506,7 @@ def test_cache_hit_rate(benchmark, mock_tool_registry, semantic_selector, run_as
             )
         )
 
-    result = benchmark.pedantic(
-        select_with_cache_hits, args=(0,), iterations=20, rounds=10
-    )
+    result = benchmark.pedantic(select_with_cache_hits, args=(0,), iterations=20, rounds=10)
     selected_tools = result
 
     assert len(selected_tools) > 0
@@ -559,9 +553,7 @@ def test_batch_embedding_47_items(benchmark, semantic_selector, run_async):
 
 
 @pytest.mark.benchmark(group="batch_embeddings")
-def test_tool_embedding_initialization(
-    benchmark, mock_tool_registry, semantic_selector, run_async
-):
+def test_tool_embedding_initialization(benchmark, mock_tool_registry, semantic_selector, run_async):
     """Benchmark one-time tool embedding initialization.
 
     This is the startup cost of initializing tool embeddings.
@@ -594,9 +586,7 @@ def test_tool_embedding_initialization(
 
 
 @pytest.mark.benchmark(group="category_filtering")
-def test_category_filtering_impact(
-    benchmark, mock_tool_registry, semantic_selector, run_async
-):
+def test_category_filtering_impact(benchmark, mock_tool_registry, semantic_selector, run_async):
     """Benchmark the impact of category filtering on selection time.
 
     Compares selection with and without category pre-filtering.
@@ -632,9 +622,7 @@ def test_category_filtering_impact(
 
 
 @pytest.mark.benchmark(group="category_filtering")
-def test_mandatory_tool_overhead(
-    benchmark, mock_tool_registry, semantic_selector, run_async
-):
+def test_mandatory_tool_overhead(benchmark, mock_tool_registry, semantic_selector, run_async):
     """Benchmark overhead of mandatory keyword detection.
 
     Measures the additional cost of checking for mandatory tools
@@ -667,9 +655,7 @@ def test_mandatory_tool_overhead(
 
 
 @pytest.mark.benchmark(group="cache_warming")
-def test_cold_cache(
-    benchmark, mock_tool_registry, tmp_path, run_async
-):
+def test_cold_cache(benchmark, mock_tool_registry, tmp_path, run_async):
     """Benchmark cold cache selection (first selection after initialization).
 
     This measures performance with uncached embeddings.
@@ -707,9 +693,7 @@ def test_cold_cache(
 
 
 @pytest.mark.benchmark(group="cache_warming")
-def test_warm_cache(
-    benchmark, mock_tool_registry, tmp_path, run_async
-):
+def test_warm_cache(benchmark, mock_tool_registry, tmp_path, run_async):
     """Benchmark warm cache selection (subsequent selections with cached embeddings).
 
     This measures performance with pre-warmed embeddings.
@@ -811,9 +795,9 @@ def test_memory_per_tool_embedding(mock_tool_registry, semantic_selector, run_as
     avg_size_per_tool = total_embedding_size / len(semantic_selector._tool_embedding_cache)
 
     # Expected: ~1.5KB per embedding
-    assert 1000 < avg_size_per_tool < 2000, (
-        f"Expected ~1.5KB per embedding, got {avg_size_per_tool:.0f} bytes"
-    )
+    assert (
+        1000 < avg_size_per_tool < 2000
+    ), f"Expected ~1.5KB per embedding, got {avg_size_per_tool:.0f} bytes"
 
     logger.info(
         f"Memory usage: {total_embedding_size / 1024:.2f}KB total, "

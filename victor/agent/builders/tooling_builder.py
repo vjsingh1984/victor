@@ -153,9 +153,7 @@ class ToolingBuilder(FactoryAwareBuilder):
             mode_coordinator=orchestrator._mode_coordinator,
             tool_registry=orchestrator.tools,
         )
-        components["tool_access_config_coordinator"] = (
-            orchestrator._tool_access_config_coordinator
-        )
+        components["tool_access_config_coordinator"] = orchestrator._tool_access_config_coordinator
 
         # Initialize BudgetManager for unified budget tracking (via factory)
         orchestrator._budget_manager = factory.create_budget_manager()

@@ -153,12 +153,14 @@ class StateSerializer:
         """
         serialized = []
         for msg in messages:
-            serialized.append({
-                "role": msg.role,
-                "content": msg.content,
-                "tool_calls": getattr(msg, "tool_calls", None),
-                "tool_call_id": getattr(msg, "tool_call_id", None),
-            })
+            serialized.append(
+                {
+                    "role": msg.role,
+                    "content": msg.content,
+                    "tool_calls": getattr(msg, "tool_calls", None),
+                    "tool_call_id": getattr(msg, "tool_call_id", None),
+                }
+            )
         return serialized
 
     @staticmethod
@@ -270,12 +272,8 @@ class SQLiteCheckpointBackend:
             )
 
             # Indexes for common queries
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_session_id ON checkpoints(session_id)"
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_timestamp ON checkpoints(timestamp DESC)"
-            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_session_id ON checkpoints(session_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON checkpoints(timestamp DESC)")
             conn.commit()
 
     def save_checkpoint(
@@ -378,14 +376,16 @@ class SQLiteCheckpointBackend:
 
             checkpoints = []
             for row in cursor.fetchall():
-                checkpoints.append({
-                    "id": row[0],
-                    "session_id": row[1],
-                    "timestamp": row[2],
-                    "description": row[3],
-                    "size_bytes": row[4],
-                    "git_checkpoint_id": row[5],
-                })
+                checkpoints.append(
+                    {
+                        "id": row[0],
+                        "session_id": row[1],
+                        "timestamp": row[2],
+                        "description": row[3],
+                        "size_bytes": row[4],
+                        "git_checkpoint_id": row[5],
+                    }
+                )
 
             return checkpoints
 
@@ -581,13 +581,15 @@ class EnhancedCheckpointManager:
             for git_cp in git_checkpoints:
                 # Check if already in list
                 if not any(cp.get("git_checkpoint_id") == git_cp.id for cp in checkpoints):
-                    checkpoints.append({
-                        "id": git_cp.id,
-                        "session_id": "N/A",
-                        "timestamp": git_cp.timestamp.isoformat(),
-                        "description": git_cp.description,
-                        "git_only": True,
-                    })
+                    checkpoints.append(
+                        {
+                            "id": git_cp.id,
+                            "session_id": "N/A",
+                            "timestamp": git_cp.timestamp.isoformat(),
+                            "description": git_cp.description,
+                            "git_only": True,
+                        }
+                    )
 
         return checkpoints
 

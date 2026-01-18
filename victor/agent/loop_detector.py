@@ -145,7 +145,9 @@ class LoopSignature:
                 base_sig += f"|purpose:{context.purpose.value}"
             if context.stage:
                 # Handle both enum and string stages
-                stage_val = context.stage.value if hasattr(context.stage, "value") else str(context.stage)
+                stage_val = (
+                    context.stage.value if hasattr(context.stage, "value") else str(context.stage)
+                )
                 base_sig += f"|stage:{stage_val}"
 
         # Hash for compact signature (but keep first part readable for debugging)

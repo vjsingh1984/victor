@@ -322,7 +322,7 @@ class FileWatcher(IFileWatcher):
                 # Remove the watch using observer's unschedule method
                 for emitter in self._observer.emitters.copy():
                     try:
-                        if hasattr(emitter, 'watch'):
+                        if hasattr(emitter, "watch"):
                             watch_path = str(emitter.watch.path)
                             if watch_path == dir_str:
                                 self._observer.unschedule(emitter.watch)

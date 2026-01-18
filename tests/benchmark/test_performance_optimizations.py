@@ -138,13 +138,15 @@ async def test_batch_tool_execution_performance():
     # Calculate improvement
     improvement = ((sequential_time - batch_time) / sequential_time) * 100
 
-    print(f"\nBatch Tool Execution Benchmark:")
+    print("\nBatch Tool Execution Benchmark:")
     print(f"  Sequential time: {sequential_time:.4f}s")
     print(f"  Batch time: {batch_time:.4f}s")
     print(f"  Improvement: {improvement:.1f}%")
 
     # Assertions
-    assert len(batch_results) == len(sequential_results), "Batch should return same number of results"
+    assert len(batch_results) == len(
+        sequential_results
+    ), "Batch should return same number of results"
     assert all(r.success for r in batch_results), "All batch executions should succeed"
     assert batch_time < sequential_time, "Batch execution should be faster than sequential"
 
@@ -189,7 +191,7 @@ async def test_batch_execution_with_different_speeds():
 
     improvement = ((sequential_time - batch_time) / sequential_time) * 100
 
-    print(f"\nMixed Speed Batch Execution Benchmark:")
+    print("\nMixed Speed Batch Execution Benchmark:")
     print(f"  Sequential time: {sequential_time:.4f}s")
     print(f"  Batch time: {batch_time:.4f}s")
     print(f"  Improvement: {improvement:.1f}%")
@@ -212,10 +214,12 @@ async def test_llm_based_compaction_performance():
     # Create large context
     large_context = []
     for i in range(50):
-        large_context.append({
-            "role": "user" if i % 2 == 0 else "assistant",
-            "content": f"Message {i}: " + "x" * 500,  # 500 chars per message
-        })
+        large_context.append(
+            {
+                "role": "user" if i % 2 == 0 else "assistant",
+                "content": f"Message {i}: " + "x" * 500,  # 500 chars per message
+            }
+        )
 
     # Mock controller
     mock_controller = MagicMock()
@@ -250,7 +254,7 @@ async def test_llm_based_compaction_performance():
     truncation_chars = sum(len(m.get("content", "")) for m in truncation_result)
     llm_chars = sum(len(m.get("content", "")) for m in llm_result)
 
-    print(f"\nContext Compaction Benchmark:")
+    print("\nContext Compaction Benchmark:")
     print(f"  Truncation time: {truncation_time:.4f}s")
     print(f"  LLM-based time: {llm_time:.4f}s")
     print(f"  Truncation preserved: {truncation_chars} chars")
@@ -297,9 +301,9 @@ def test_compaction_summary_caching():
     summary2 = asyncio.run(strategy._get_or_create_summary(messages))
     second_time = time.perf_counter() - start
 
-    speedup = (first_time / second_time) if second_time > 0 else float('inf')
+    speedup = (first_time / second_time) if second_time > 0 else float("inf")
 
-    print(f"\nSummary Caching Benchmark:")
+    print("\nSummary Caching Benchmark:")
     print(f"  First call (cache miss): {first_time:.6f}s")
     print(f"  Second call (cache hit): {second_time:.6f}s")
     print(f"  Speedup: {speedup:.1f}x")
@@ -319,6 +323,7 @@ async def test_prompt_building_cache_performance():
 
     Target: 90% faster on cache hit
     """
+
     class TestContributor(BasePromptContributor):
         async def contribute(self, context: PromptContext) -> str:
             # Simulate expensive computation
@@ -340,10 +345,10 @@ async def test_prompt_building_cache_performance():
     prompt2 = await coordinator.build_system_prompt(context)
     second_time = time.perf_counter() - start
 
-    speedup = (first_time / second_time) if second_time > 0 else float('inf')
+    speedup = (first_time / second_time) if second_time > 0 else float("inf")
     improvement = ((first_time - second_time) / first_time) * 100
 
-    print(f"\nPrompt Building Cache Benchmark:")
+    print("\nPrompt Building Cache Benchmark:")
     print(f"  First build (cache miss): {first_time:.4f}s")
     print(f"  Second build (cache hit): {second_time:.6f}s")
     print(f"  Speedup: {speedup:.1f}x")
@@ -381,7 +386,7 @@ async def test_prompt_cache_invalidation():
 
     cache_size_after = len(coordinator._prompt_cache)
 
-    print(f"\nCache Invalidation Benchmark:")
+    print("\nCache Invalidation Benchmark:")
     print(f"  Cache size before: {cache_size_before}")
     print(f"  Cache size after: {cache_size_after}")
     print(f"  Invalidation time: {invalidation_time:.6f}s")
@@ -418,10 +423,7 @@ async def test_overall_performance_improvement():
     )
 
     # Create test scenario
-    tool_calls = [
-        ("slow_tool", {"value": f"task{i}", "delay": 0.02})
-        for i in range(10)
-    ]
+    tool_calls = [("slow_tool", {"value": f"task{i}", "delay": 0.02}) for i in range(10)]
 
     # Baseline: Sequential execution, no cache
     start = time.perf_counter()
@@ -445,7 +447,7 @@ async def test_overall_performance_improvement():
 
     improvement = ((baseline_time - optimized_time) / baseline_time) * 100
 
-    print(f"\nOverall Performance Improvement:")
+    print("\nOverall Performance Improvement:")
     print(f"  Baseline time (sequential, no cache): {baseline_time:.4f}s")
     print(f"  Optimized time (batch, cached): {optimized_time:.4f}s")
     print(f"  Improvement: {improvement:.1f}%")
@@ -497,7 +499,7 @@ async def test_memory_efficiency():
     memory_delta_kb = optimized_memory - baseline_memory
     memory_increase = (memory_delta_kb / baseline_memory) * 100 if baseline_memory else 0.0
 
-    print(f"\nMemory Efficiency Benchmark:")
+    print("\nMemory Efficiency Benchmark:")
     print(f"  Baseline memory: {baseline_memory:.1f} KB")
     print(f"  Optimized memory: {optimized_memory:.1f} KB")
     print(f"  Memory increase: {memory_increase:.1f}%")
@@ -507,9 +509,7 @@ async def test_memory_efficiency():
 
     max_increase_pct = float(os.getenv("VICTOR_BENCHMARK_MEMORY_INCREASE_PCT", "200"))
     max_delta_kb = float(os.getenv("VICTOR_BENCHMARK_MEMORY_DELTA_KB", "512"))
-    assert (
-        memory_increase < max_increase_pct or memory_delta_kb < max_delta_kb
-    ), (
+    assert memory_increase < max_increase_pct or memory_delta_kb < max_delta_kb, (
         f"Memory increase {memory_increase:.1f}% (delta {memory_delta_kb:.1f} KB) "
         f"exceeds limits: {max_increase_pct:.0f}% or {max_delta_kb:.0f} KB"
     )

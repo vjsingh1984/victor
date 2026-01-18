@@ -76,6 +76,7 @@ class TestToolAliasResolver:
     @pytest.fixture
     def access_check_readonly(self) -> Mock:
         """Create access check that only grants readonly shell access."""
+
         def check_fn(tool_name: str) -> bool:
             return tool_name == ToolNames.SHELL_READONLY
 
@@ -88,16 +89,12 @@ class TestToolAliasResolver:
         return ToolAliasResolver()
 
     @pytest.fixture
-    def resolver_with_registry(
-        self, mock_registry: Mock
-    ) -> ToolAliasResolver:
+    def resolver_with_registry(self, mock_registry: Mock) -> ToolAliasResolver:
         """Create resolver with tool registry."""
         return ToolAliasResolver(tool_registry=mock_registry)
 
     @pytest.fixture
-    def resolver_with_access(
-        self, access_check_enabled: Mock
-    ) -> ToolAliasResolver:
+    def resolver_with_access(self, access_check_enabled: Mock) -> ToolAliasResolver:
         """Create resolver with access check."""
         return ToolAliasResolver(access_check=access_check_enabled)
 
@@ -111,9 +108,7 @@ class TestToolAliasResolver:
     # Direct Name Resolution Tests
     # ========================================================================
 
-    def test_resolve_canonical_name_direct(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_resolve_canonical_name_direct(self, resolver: ToolAliasResolver):
         """Test that canonical names resolve directly without modification."""
         # Test various canonical names
         canonical_names = [
@@ -133,9 +128,7 @@ class TestToolAliasResolver:
             result = resolver.resolve(name)
             assert result == name, f"Canonical name '{name}' should resolve to itself"
 
-    def test_resolve_with_result_for_canonical_name(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_resolve_with_result_for_canonical_name(self, resolver: ToolAliasResolver):
         """Test ResolutionResult for canonical names."""
         result = resolver.resolve_with_result("read")
 
@@ -144,18 +137,14 @@ class TestToolAliasResolver:
         assert result.method == "direct"
         assert result.is_legacy is False
 
-    def test_resolve_unknown_tool_returns_itself(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_resolve_unknown_tool_returns_itself(self, resolver: ToolAliasResolver):
         """Test that unknown tool names are returned as-is."""
         unknown_tool = "unknown_tool_xyz"
         result = resolver.resolve(unknown_tool)
 
         assert result == unknown_tool
 
-    def test_resolve_with_result_for_unknown_tool(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_resolve_with_result_for_unknown_tool(self, resolver: ToolAliasResolver):
         """Test ResolutionResult for unknown tools."""
         result = resolver.resolve_with_result("unknown_tool_xyz")
 
@@ -168,9 +157,7 @@ class TestToolAliasResolver:
     # Legacy Name Mapping Tests
     # ========================================================================
 
-    def test_resolve_legacy_file_operation_names(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_resolve_legacy_file_operation_names(self, resolver: ToolAliasResolver):
         """Test legacy file operation name mappings."""
         legacy_mappings = {
             "read_file": "read",
@@ -183,9 +170,7 @@ class TestToolAliasResolver:
             result = resolver.resolve(legacy)
             assert result == canonical, f"Legacy '{legacy}' should map to '{canonical}'"
 
-    def test_resolve_legacy_search_names(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_resolve_legacy_search_names(self, resolver: ToolAliasResolver):
         """Test legacy search tool name mappings."""
         # Already canonical - should stay same
         result = resolver.resolve("code_search")
@@ -194,9 +179,7 @@ class TestToolAliasResolver:
         result = resolver.resolve("semantic_search")
         assert result == "semantic_search"
 
-    def test_resolve_legacy_web_names(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_resolve_legacy_web_names(self, resolver: ToolAliasResolver):
         """Test legacy web tool name mappings."""
         # Already canonical
         result = resolver.resolve("web_search")
@@ -206,9 +189,7 @@ class TestToolAliasResolver:
         result = resolver.resolve("fetch_url")
         assert result == "web_fetch"
 
-    def test_resolve_legacy_execution_names(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_resolve_legacy_execution_names(self, resolver: ToolAliasResolver):
         """Test legacy execution tool name mappings."""
         legacy_mappings = {
             "execute_command": "shell",
@@ -219,16 +200,12 @@ class TestToolAliasResolver:
             result = resolver.resolve(legacy)
             assert result == canonical, f"Legacy '{legacy}' should map to '{canonical}'"
 
-    def test_resolve_legacy_git_names(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_resolve_legacy_git_names(self, resolver: ToolAliasResolver):
         """Test legacy git tool name mappings."""
         result = resolver.resolve("git_command")
         assert result == "git"
 
-    def test_resolve_with_result_for_legacy_name(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_resolve_with_result_for_legacy_name(self, resolver: ToolAliasResolver):
         """Test ResolutionResult for legacy names."""
         result = resolver.resolve_with_result("read_file")
 
@@ -237,9 +214,7 @@ class TestToolAliasResolver:
         assert result.method == "legacy"
         assert result.is_legacy is True
 
-    def test_all_legacy_mappings_are_valid(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_all_legacy_mappings_are_valid(self, resolver: ToolAliasResolver):
         """Test that all defined legacy mappings resolve correctly."""
         from victor.agent.coordinators.tool_alias_resolver import ToolAliasResolver
 
@@ -346,18 +321,14 @@ class TestToolAliasResolver:
         assert result.method == "shell_variant"
         assert result.is_legacy is False
 
-    def test_resolve_shell_to_readonly_when_full_disabled(
-        self, access_check_readonly: Mock
-    ):
+    def test_resolve_shell_to_readonly_when_full_disabled(self, access_check_readonly: Mock):
         """Test that shell resolves to readonly when full shell is disabled."""
         resolver = ToolAliasResolver(access_check=access_check_readonly)
 
         result = resolver.resolve("bash")
         assert result == ToolNames.SHELL_READONLY
 
-    def test_resolve_shell_with_result_for_readonly(
-        self, access_check_readonly: Mock
-    ):
+    def test_resolve_shell_with_result_for_readonly(self, access_check_readonly: Mock):
         """Test ResolutionResult for shell alias with readonly shell."""
         resolver = ToolAliasResolver(access_check=access_check_readonly)
 
@@ -368,18 +339,14 @@ class TestToolAliasResolver:
         assert result.method == "shell_variant"
         assert result.is_legacy is False
 
-    def test_resolve_shell_when_both_disabled(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_resolve_shell_when_both_disabled(self, resolver: ToolAliasResolver):
         """Test that shell aliases fall back to canonical when both disabled."""
         # No access check or registry - should use canonical
         result = resolver.resolve("bash")
         # Falls back to canonical name from tool_names
         assert result == "shell" or result == "bash"
 
-    def test_resolve_shell_readonly_directly(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_resolve_shell_readonly_directly(self, resolver: ToolAliasResolver):
         """Test that shell_readonly resolves directly."""
         result = resolver.resolve("shell_readonly")
         assert result == "shell_readonly"
@@ -405,6 +372,7 @@ class TestToolAliasResolver:
         self, resolver_with_registry: ToolAliasResolver, mock_registry: Mock
     ):
         """Test that resolver checks readonly when full shell is disabled."""
+
         # Full shell disabled, readonly enabled
         def check_fn(tool_name: str) -> bool:
             return tool_name == ToolNames.SHELL_READONLY
@@ -433,9 +401,7 @@ class TestToolAliasResolver:
     # Configuration Tests
     # ========================================================================
 
-    def test_set_access_check_updates_resolver(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_set_access_check_updates_resolver(self, resolver: ToolAliasResolver):
         """Test that set_access_check updates the access check function."""
         new_check = Mock(return_value=True)
         resolver.set_access_check(new_check)
@@ -444,17 +410,13 @@ class TestToolAliasResolver:
         result = resolver.resolve("bash")
         assert result == ToolNames.SHELL
 
-    def test_set_prefer_readonly_updates_config(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_set_prefer_readonly_updates_config(self, resolver: ToolAliasResolver):
         """Test that set_prefer_readonly updates configuration."""
         resolver.set_prefer_readonly(True)
 
         assert resolver._config.prefer_readonly_shell is True
 
-    def test_set_prefer_readonly_false(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_set_prefer_readonly_false(self, resolver: ToolAliasResolver):
         """Test setting prefer_readonly to False."""
         resolver.set_prefer_readonly(False)
 
@@ -471,18 +433,14 @@ class TestToolAliasResolver:
     # Custom Legacy Mapping Tests
     # ========================================================================
 
-    def test_add_legacy_mapping(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_add_legacy_mapping(self, resolver: ToolAliasResolver):
         """Test adding custom legacy name mapping."""
         resolver.add_legacy_mapping("old_tool", "new_tool")
 
         result = resolver.resolve("old_tool")
         assert result == "new_tool"
 
-    def test_add_legacy_mapping_updates_class(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_add_legacy_mapping_updates_class(self, resolver: ToolAliasResolver):
         """Test that add_legacy_mapping updates the class-level mapping."""
         resolver.add_legacy_mapping("custom_legacy", "custom_canonical")
 
@@ -490,9 +448,7 @@ class TestToolAliasResolver:
         assert "custom_legacy" in resolver.LEGACY_MAPPINGS
         assert resolver.LEGACY_MAPPINGS["custom_legacy"] == "custom_canonical"
 
-    def test_add_legacy_mapping_with_existing_key(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_add_legacy_mapping_with_existing_key(self, resolver: ToolAliasResolver):
         """Test adding legacy mapping for existing key overwrites it."""
         resolver.add_legacy_mapping("test_tool", "first_target")
         resolver.add_legacy_mapping("test_tool", "second_target")
@@ -518,19 +474,13 @@ class TestToolAliasResolver:
 
         assert resolver._config.prefer_readonly_shell is True
 
-    def test_create_tool_alias_resolver_with_access_check(
-        self, access_check_enabled: Mock
-    ):
+    def test_create_tool_alias_resolver_with_access_check(self, access_check_enabled: Mock):
         """Test factory function with access check."""
-        resolver = create_tool_alias_resolver(
-            access_check=access_check_enabled
-        )
+        resolver = create_tool_alias_resolver(access_check=access_check_enabled)
 
         assert resolver._access_check == access_check_enabled
 
-    def test_create_tool_alias_resolver_with_registry(
-        self, mock_registry: Mock
-    ):
+    def test_create_tool_alias_resolver_with_registry(self, mock_registry: Mock):
         """Test factory function with tool registry."""
         resolver = create_tool_alias_resolver(tool_registry=mock_registry)
 
@@ -554,9 +504,7 @@ class TestToolAliasResolver:
     # Canonical Name Helper Tests
     # ========================================================================
 
-    def test_get_canonical_name_for_known_tool(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_get_canonical_name_for_known_tool(self, resolver: ToolAliasResolver):
         """Test _get_canonical_name for known tools."""
         # Patch to mock tool_names.get_canonical_name
         with patch("victor.tools.tool_names.get_canonical_name") as mock_get:
@@ -567,9 +515,7 @@ class TestToolAliasResolver:
             assert result == "canonical_tool"
             mock_get.assert_called_once_with("some_tool")
 
-    def test_get_canonical_name_fallback_on_exception(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_get_canonical_name_fallback_on_exception(self, resolver: ToolAliasResolver):
         """Test _get_canonical_name falls back to original on exception."""
         with patch("victor.tools.tool_names.get_canonical_name") as mock_get:
             mock_get.side_effect = Exception("Canonicalization failed")
@@ -599,9 +545,7 @@ class TestToolAliasResolver:
         result3 = resolver_with_access.resolve("write")
         assert result3 == "write"
 
-    def test_resolution_with_result_contains_all_fields(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_resolution_with_result_contains_all_fields(self, resolver: ToolAliasResolver):
         """Test that ResolutionResult contains all expected fields."""
         result = resolver.resolve_with_result("read_file")
 
@@ -633,9 +577,7 @@ class TestToolAliasResolver:
         result2 = resolver2.resolve("custom")
         assert result2 == "target1"
 
-    def test_resolver_with_custom_config(
-        self, mock_registry: Mock
-    ):
+    def test_resolver_with_custom_config(self, mock_registry: Mock):
         """Test resolver with custom configuration."""
         config = ToolAliasConfig(
             prefer_readonly_shell=True,
@@ -670,9 +612,7 @@ class TestToolAliasResolverEdgeCases:
         result = resolver.resolve("")
         assert result == ""
 
-    def test_resolve_with_special_characters(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_resolve_with_special_characters(self, resolver: ToolAliasResolver):
         """Test resolving names with special characters."""
         # Should handle gracefully
         result = resolver.resolve("tool-with-dashes")
@@ -689,9 +629,7 @@ class TestToolAliasResolverEdgeCases:
         # Either returns as-is or gets canonicalized
         assert result_upper in ["Read", "read"]
 
-    def test_resolve_unicode_tool_name(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_resolve_unicode_tool_name(self, resolver: ToolAliasResolver):
         """Test resolving tool names with unicode characters."""
         unicode_name = "工具"
         result = resolver.resolve(unicode_name)
@@ -705,9 +643,7 @@ class TestToolAliasResolverEdgeCases:
         """Test is_legacy_name with empty string."""
         assert not resolver.is_legacy_name("")
 
-    def test_add_legacy_mapping_empty_strings(
-        self, resolver: ToolAliasResolver
-    ):
+    def test_add_legacy_mapping_empty_strings(self, resolver: ToolAliasResolver):
         """Test adding legacy mapping with empty strings."""
         # Should allow it (validation happens elsewhere)
         resolver.add_legacy_mapping("", "")

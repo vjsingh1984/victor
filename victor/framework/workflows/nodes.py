@@ -35,7 +35,7 @@ Key Features:
 Example:
     from victor.framework.workflows.nodes import TeamNode
     from victor.teams import TeamFormation, TeamMember, TeamConfig
-    from victor.agent.subagents import SubAgentRole
+    from victor.core.teams import SubAgentRole
 
     # Define team members
     members = [
@@ -504,7 +504,7 @@ class TeamNode:
         Returns:
             TeamNode instance
         """
-        from victor.agent.subagents import SubAgentRole
+        from victor.core.teams import SubAgentRole
 
         # Deserialize members
         members = []

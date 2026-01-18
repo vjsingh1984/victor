@@ -104,6 +104,7 @@ from victor.teams.types import (
     TeamResult,
 )
 
+
 # Protocols - use lazy loading to avoid circular import with victor.protocols.team
 # The canonical location is victor.protocols.team
 def __getattr__(name: str):
@@ -127,6 +128,7 @@ def __getattr__(name: str):
         return globals()[name]
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 # Coordinator
 from victor.teams.unified_coordinator import UnifiedTeamCoordinator

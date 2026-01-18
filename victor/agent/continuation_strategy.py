@@ -378,9 +378,7 @@ class ContinuationStrategy:
 
         # DeepSeek models respond well to step-by-step breakdown
         if "deepseek" in model_lower:
-            return self._get_deepseek_continuation_prompt(
-                is_analysis_task, is_action_task
-            )
+            return self._get_deepseek_continuation_prompt(is_analysis_task, is_action_task)
 
         # Default prompts for other models
         if is_analysis_task:
@@ -507,7 +505,9 @@ class ContinuationStrategy:
         unified_tracker_config: Dict[str, Any],
         task_completion_signals: Optional[Dict[str, Any]] = None,
         progress_metrics: Optional[Any] = None,  # ProgressMetrics instance
-        task_complexity: Optional[str] = None,  # Task complexity level (simple/medium/complex/generation)
+        task_complexity: Optional[
+            str
+        ] = None,  # Task complexity level (simple/medium/complex/generation)
     ) -> Dict[str, Any]:
         """Determine what continuation action to take when model doesn't call tools.
 
@@ -553,9 +553,7 @@ class ContinuationStrategy:
         max_interventions = self._get_complexity_threshold(
             settings, task_complexity, "max_interventions"
         )
-        max_iterations = self._get_complexity_threshold(
-            settings, task_complexity, "max_iterations"
-        )
+        max_iterations = self._get_complexity_threshold(settings, task_complexity, "max_iterations")
 
         logger.debug(
             f"Continuation action decision: complexity={task_complexity}, "
@@ -636,9 +634,11 @@ class ContinuationStrategy:
         )
 
         # Force synthesis if hybrid score is very low OR stuck loop detected
-        if (hybrid_result["recommendation"] == "force_synthesis" or
-            hybrid_result["score"] < 0.2 or
-            (progress_metrics and progress_metrics.is_stuck_loop)):
+        if (
+            hybrid_result["recommendation"] == "force_synthesis"
+            or hybrid_result["score"] < 0.2
+            or (progress_metrics and progress_metrics.is_stuck_loop)
+        ):
             # Build detailed reason from hybrid result
             reason_parts = []
             if progress_metrics and progress_metrics.is_stuck_loop:
@@ -785,9 +785,9 @@ class ContinuationStrategy:
                 # 2. High interventions (>=max_interventions) regardless of progress
                 # 3. Low progress (revisit_ratio > 0.5) AND >5 interventions
                 should_nudge = (
-                    is_stuck_loop or
-                    cumulative_interventions >= max_interventions or
-                    (revisit_ratio > 0.5 and cumulative_interventions >= 5)
+                    is_stuck_loop
+                    or cumulative_interventions >= max_interventions
+                    or (revisit_ratio > 0.5 and cumulative_interventions >= 5)
                 )
 
                 if cumulative_interventions >= 5 and is_analysis_task and should_nudge:

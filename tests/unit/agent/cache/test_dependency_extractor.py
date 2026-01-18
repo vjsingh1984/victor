@@ -45,6 +45,7 @@ from victor.protocols import IDependencyExtractor
 # Common Argument Pattern Tests
 # =============================================================================
 
+
 class TestCommonArgumentPatterns:
     """Test extraction from common argument patterns."""
 
@@ -132,6 +133,7 @@ class TestCommonArgumentPatterns:
 # Mixed Arguments Tests
 # =============================================================================
 
+
 class TestMixedArguments:
     """Test extraction from arguments with multiple file-related keys."""
 
@@ -179,6 +181,7 @@ class TestMixedArguments:
 # =============================================================================
 # Edge Cases Tests
 # =============================================================================
+
 
 class TestEdgeCases:
     """Test edge cases and error conditions."""
@@ -245,6 +248,7 @@ class TestEdgeCases:
 # =============================================================================
 # Tool-Specific Tests
 # =============================================================================
+
 
 class TestToolSpecificExtraction:
     """Test extraction for specific tool types."""
@@ -315,6 +319,7 @@ class TestToolSpecificExtraction:
 # Advanced Scenarios Tests
 # =============================================================================
 
+
 class TestAdvancedScenarios:
     """Test advanced extraction scenarios."""
 
@@ -382,6 +387,7 @@ class TestAdvancedScenarios:
 # Performance Tests
 # =============================================================================
 
+
 class TestPerformance:
     """Test performance characteristics."""
 
@@ -401,10 +407,7 @@ class TestPerformance:
 
     def test_many_arguments(self, dependency_extractor: IDependencyExtractor) -> None:
         """Test extraction with many arguments."""
-        arguments = {
-            f"file_{i}": f"/path/{i}.txt"
-            for i in range(100)
-        }
+        arguments = {f"file_{i}": f"/path/{i}.txt" for i in range(100)}
         arguments["other"] = "value"
 
         deps = dependency_extractor.extract_file_dependencies("multi_tool", arguments)

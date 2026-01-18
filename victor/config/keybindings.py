@@ -21,27 +21,22 @@ DEFAULT_KEYBINDINGS: Dict[str, str] = {
     "scroll_down": "ctrl+down",
     "scroll_top": "ctrl+home",
     "scroll_bottom": "ctrl+end",
-
     # Panels
     "toggle_thinking": "ctrl+t",
     "toggle_tools": "ctrl+y",
     "toggle_details": "ctrl+d",
-
     # Actions
     "cancel_stream": "ctrl+x",
     "show_help": "ctrl+slash",
-
     # Sessions
     "resume_any_session": "ctrl+g",
     "resume_project_session": "ctrl+p",
     "resume_session": "ctrl+r",
     "save_session": "ctrl+s",
     "export_session": "ctrl+e",
-
     # Themes
     "next_theme": "ctrl+right",
     "prev_theme": "ctrl+left",
-
     # Input (not remappable)
     "submit": "enter",
     "newline": "shift+enter",
@@ -76,6 +71,7 @@ EMACS_PRESET: Dict[str, str] = {
 # =============================================================================
 # KEYBINDING CONFIG CLASS
 # =============================================================================
+
 
 @dataclass
 class KeybindingConfig:
@@ -127,7 +123,9 @@ class KeybindingConfig:
         return self.bindings.copy()
 
     @classmethod
-    def from_dict(cls, bindings: Dict[str, str], preset_name: Optional[str] = None) -> "KeybindingConfig":
+    def from_dict(
+        cls, bindings: Dict[str, str], preset_name: Optional[str] = None
+    ) -> "KeybindingConfig":
         """Create from dictionary.
 
         Args:
@@ -164,7 +162,9 @@ def get_preset(name: str) -> Dict[str, str]:
         KeyError: If preset not found
     """
     if name not in KEYBINDING_PRESETS:
-        raise KeyError(f"Keybinding preset '{name}' not found. Available: {list(KEYBINDING_PRESETS.keys())}")
+        raise KeyError(
+            f"Keybinding preset '{name}' not found. Available: {list(KEYBINDING_PRESETS.keys())}"
+        )
     return KEYBINDING_PRESETS[name].copy()
 
 
@@ -204,6 +204,7 @@ def register_preset(name: str, bindings: Dict[str, str]) -> None:
 # VALIDATION
 # =============================================================================
 
+
 def validate_binding(binding: str) -> bool:
     """Validate a keybinding string.
 
@@ -227,13 +228,73 @@ def validate_binding(binding: str) -> bool:
     # Validate each part
     modifiers = {"ctrl", "shift", "alt", "meta"}
     valid_keys = {
-        "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m",
-        "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
-        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
-        "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12",
-        "home", "end", "up", "down", "left", "right",
-        "pageup", "pagedown", "space", "tab", "enter", "escape", "esc",
-        "slash", "backslash", "comma", "period", "semicolon", "quote",
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f",
+        "g",
+        "h",
+        "i",
+        "j",
+        "k",
+        "l",
+        "m",
+        "n",
+        "o",
+        "p",
+        "q",
+        "r",
+        "s",
+        "t",
+        "u",
+        "v",
+        "w",
+        "x",
+        "y",
+        "z",
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "f1",
+        "f2",
+        "f3",
+        "f4",
+        "f5",
+        "f6",
+        "f7",
+        "f8",
+        "f9",
+        "f10",
+        "f11",
+        "f12",
+        "home",
+        "end",
+        "up",
+        "down",
+        "left",
+        "right",
+        "pageup",
+        "pagedown",
+        "space",
+        "tab",
+        "enter",
+        "escape",
+        "esc",
+        "slash",
+        "backslash",
+        "comma",
+        "period",
+        "semicolon",
+        "quote",
     }
 
     # All parts except the last must be modifiers

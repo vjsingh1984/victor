@@ -255,6 +255,7 @@ class TestToolExecutionFlow:
         - Error message returned
         - No crash
         """
+
         # Make tool fail
         async def failing_execute(**kwargs):
             raise ValueError("Tool execution failed")
@@ -450,9 +451,7 @@ class TestContextManagement:
         - Messages removed
         """
         # Create large context (using dict as expected by mock)
-        large_messages = [
-            {"role": "user", "content": f"Message {i}" * 100} for i in range(50)
-        ]
+        large_messages = [{"role": "user", "content": f"Message {i}" * 100} for i in range(50)]
         context = {"messages": large_messages, "token_count": 10000}
         budget = {"max_tokens": 4096, "reserve_tokens": 500}
 
@@ -557,9 +556,7 @@ class TestCoordinatorInteractions:
     """
 
     @pytest.mark.asyncio
-    async def test_chat_and_tool_coordinator_interaction(
-        self, mock_tool, test_container
-    ):
+    async def test_chat_and_tool_coordinator_interaction(self, mock_tool, test_container):
         """Test ChatCoordinator and ToolCoordinator interaction.
 
         Scenario:
@@ -623,9 +620,7 @@ class TestCoordinatorInteractions:
         assert len(results) == len(test_analytics_events)
 
         # Query specific type
-        tool_call_query = AnalyticsQuery(
-            session_id="test_session", event_types=["tool_call"]
-        )
+        tool_call_query = AnalyticsQuery(session_id="test_session", event_types=["tool_call"])
         tool_results = await mock_analytics_coordinator.query_analytics(tool_call_query)
 
         assert len(tool_results) == 2  # Two tool_call events
@@ -681,9 +676,7 @@ class TestCoordinatorInteractions:
             "tools": ["read_file", "search"],
         }
 
-        system_prompt = await mock_prompt_coordinator.build_system_prompt(
-            prompt_context
-        )
+        system_prompt = await mock_prompt_coordinator.build_system_prompt(prompt_context)
 
         # Verify
         assert isinstance(system_prompt, str)
@@ -726,6 +719,7 @@ class TestErrorHandlingAcrossCoordinators:
         - Error logged appropriately
         - User not impacted
         """
+
         # Make analytics fail
         async def failing_track(event):
             raise RuntimeError("Analytics service unavailable")
@@ -740,9 +734,7 @@ class TestErrorHandlingAcrossCoordinators:
         assert response.content == "Test response from LLM"
 
     @pytest.mark.asyncio
-    async def test_context_coordinator_failure_graceful_degradation(
-        self, mock_context_coordinator
-    ):
+    async def test_context_coordinator_failure_graceful_degradation(self, mock_context_coordinator):
         """Test context coordinator failure graceful degradation.
 
         Scenario:
@@ -755,6 +747,7 @@ class TestErrorHandlingAcrossCoordinators:
         - Fallback behavior triggered
         - Conversation continues
         """
+
         # Make compaction fail
         async def failing_compact(context, budget):
             raise RuntimeError("Compaction service unavailable")
@@ -862,9 +855,7 @@ class TestFeatureFlagPaths:
         - Conversation continues
         """
         # Chat with first provider
-        response1 = await test_provider.chat(
-            messages=[{"role": "user", "content": "Hello"}]
-        )
+        response1 = await test_provider.chat(messages=[{"role": "user", "content": "Hello"}])
         assert response1 is not None
 
         # Switch provider (simulate)
@@ -1102,6 +1093,7 @@ class TestStreamingScenarios:
         - Partial content returned
         - Clear error message
         """
+
         # Simulate stream that fails partway
         async def failing_stream(messages, **kwargs):
             yield MagicMock(content="Hello", delta="Hello", usage=None)

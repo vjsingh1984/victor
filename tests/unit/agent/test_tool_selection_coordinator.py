@@ -104,9 +104,7 @@ class TestToolSelectionCoordinator:
         # Should recommend web search for external information
         assert result in ["web_search", "web", None]
 
-    def test_get_recommended_search_tool_returns_none_for_empty_query(
-        self, coordinator
-    ):
+    def test_get_recommended_search_tool_returns_none_for_empty_query(self, coordinator):
         """Test that empty queries return None."""
         result = coordinator.get_recommended_search_tool("")
         assert result is None

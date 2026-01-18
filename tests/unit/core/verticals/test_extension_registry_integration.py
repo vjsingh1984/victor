@@ -191,9 +191,7 @@ class TestDynamicExtensionRegistration:
         assert real_extension_registry.unregister_extension("sample", "test_ext") is True
         assert real_extension_registry.has_extension("sample", "test_ext") is False
 
-    def test_unregister_nonexistent_extension_returns_false(
-        self, real_extension_registry
-    ):
+    def test_unregister_nonexistent_extension_returns_false(self, real_extension_registry):
         """Test that unregistering nonexistent extension returns False."""
         assert real_extension_registry.unregister_extension("sample", "nonexistent") is False
 
@@ -208,9 +206,7 @@ class TestDynamicExtensionRegistration:
         assert retrieved.name == "test_ext"
         assert retrieved.config == {"key": "value"}
 
-    def test_get_nonexistent_extension_returns_none(
-        self, real_extension_registry
-    ):
+    def test_get_nonexistent_extension_returns_none(self, real_extension_registry):
         """Test that getting nonexistent extension returns None."""
         assert real_extension_registry.get_extension("sample", "nonexistent") is None
 
@@ -230,9 +226,7 @@ class TestDynamicExtensionRegistration:
         names = {ext.name for ext in extensions}
         assert names == {"ext1", "ext2", "ext3"}
 
-    def test_get_extensions_by_nonexistent_type_returns_empty_list(
-        self, real_extension_registry
-    ):
+    def test_get_extensions_by_nonexistent_type_returns_empty_list(self, real_extension_registry):
         """Test getting extensions of nonexistent type returns empty list."""
         assert real_extension_registry.get_extensions_by_type("nonexistent") == []
 
@@ -428,9 +422,7 @@ class TestExtensionTypeDiscovery:
     ):
         """Test discovering multiple extension types."""
         sample_ext = sample_extension(name="sample_ext", config={})
-        analytics_ext = custom_extension_type(
-            name="analytics_ext", api_key="key123"
-        )
+        analytics_ext = custom_extension_type(name="analytics_ext", api_key="key123")
 
         real_extension_registry.register_extension(sample_ext)
         real_extension_registry.register_extension(analytics_ext)
@@ -526,9 +518,7 @@ class TestOCPCompliance:
         assert valid_ext.validate() is True
         assert invalid_ext.validate() is False
 
-    def test_custom_extension_type_metadata(
-        self, real_extension_registry, custom_extension_type
-    ):
+    def test_custom_extension_type_metadata(self, real_extension_registry, custom_extension_type):
         """Test that custom extension type provides metadata."""
         custom_ext = custom_extension_type(
             name="custom_analytics",
@@ -615,15 +605,11 @@ class TestConcurrentExtensionRegistration:
     Tests that the registry handles concurrent registration safely.
     """
 
-    def test_concurrent_registration_same_type(
-        self, real_extension_registry, sample_extension
-    ):
+    def test_concurrent_registration_same_type(self, real_extension_registry, sample_extension):
         """Test concurrent registration of extensions of same type."""
         import threading
 
-        extensions = [
-            sample_extension(name=f"ext_{i}", config={"index": i}) for i in range(10)
-        ]
+        extensions = [sample_extension(name=f"ext_{i}", config={"index": i}) for i in range(10)]
 
         def register_ext(ext):
             real_extension_registry.register_extension(ext)
@@ -645,12 +631,9 @@ class TestConcurrentExtensionRegistration:
         """Test concurrent registration of different extension types."""
         import threading
 
-        sample_exts = [
-            sample_extension(name=f"sample_{i}", config={}) for i in range(5)
-        ]
+        sample_exts = [sample_extension(name=f"sample_{i}", config={}) for i in range(5)]
         analytics_exts = [
-            custom_extension_type(name=f"analytics_{i}", api_key=f"key{i}")
-            for i in range(5)
+            custom_extension_type(name=f"analytics_{i}", api_key=f"key{i}") for i in range(5)
         ]
 
         def register_sample(ext):
@@ -663,8 +646,7 @@ class TestConcurrentExtensionRegistration:
             threading.Thread(target=register_sample, args=(ext,)) for ext in sample_exts
         ]
         analytics_threads = [
-            threading.Thread(target=register_analytics, args=(ext,))
-            for ext in analytics_exts
+            threading.Thread(target=register_analytics, args=(ext,)) for ext in analytics_exts
         ]
 
         all_threads = sample_threads + analytics_threads
@@ -750,9 +732,7 @@ class TestCacheInvalidation:
         assert extensions1 is not None
         assert extensions2 is not None
 
-    def test_invalidate_specific_extension_key(
-        self, reset_extension_cache, mock_vertical
-    ):
+    def test_invalidate_specific_extension_key(self, reset_extension_cache, mock_vertical):
         """Test invalidating a specific extension key."""
         # Cache some extensions
         mock_vertical.get_middleware()
@@ -780,9 +760,7 @@ class TestCacheInvalidation:
         # Should have invalidated all cached extensions
         assert invalidated >= 0
 
-    def test_update_extension_version_invalidates_cache(
-        self, reset_extension_cache, mock_vertical
-    ):
+    def test_update_extension_version_invalidates_cache(self, reset_extension_cache, mock_vertical):
         """Test that updating extension version invalidates cache."""
         # Cache an extension
         mock_vertical.get_middleware()
@@ -793,9 +771,7 @@ class TestCacheInvalidation:
         # Cache should be invalidated on next access
         # (This would be verified by checking cache miss on next access)
 
-    def test_clear_extension_cache_removes_all_entries(
-        self, reset_extension_cache, mock_vertical
-    ):
+    def test_clear_extension_cache_removes_all_entries(self, reset_extension_cache, mock_vertical):
         """Test that clear_extension_cache removes all cache entries."""
         # Cache some extensions
         mock_vertical.get_middleware()
@@ -807,9 +783,7 @@ class TestCacheInvalidation:
         # Cache should be empty
         assert len(VerticalExtensionLoader._extensions_cache) == 0
 
-    def test_cache_invalidation_across_verticals(
-        self, reset_extension_cache, mock_vertical
-    ):
+    def test_cache_invalidation_across_verticals(self, reset_extension_cache, mock_vertical):
         """Test cache invalidation doesn't affect other verticals."""
 
         class AnotherVertical(mock_vertical):
@@ -828,17 +802,17 @@ class TestCacheInvalidation:
 
         # AnotherVertical's cache should still exist
         another_keys = [
-            k for k in VerticalExtensionLoader._extensions_cache.keys()
+            k
+            for k in VerticalExtensionLoader._extensions_cache.keys()
             if k.startswith("AnotherVertical:")
         ]
 
         # Should still have cache entries for AnotherVertical
         assert len(another_keys) >= 0
 
-    def test_cache_stats_after_invalidation(
-        self, reset_extension_cache, mock_vertical
-    ):
+    def test_cache_stats_after_invalidation(self, reset_extension_cache, mock_vertical):
         """Test that cache stats are accurate after invalidation."""
+
         # Create a caching mock vertical
         class CachingMockVertical(mock_vertical):
             """Mock vertical that caches extensions."""
@@ -846,15 +820,19 @@ class TestCacheInvalidation:
             @classmethod
             def get_middleware(cls):
                 """Cache middleware using _get_cached_extension."""
+
                 def _create():
                     return [{"name": "test_middleware"}]
+
                 return cls._get_cached_extension("middleware", _create)
 
             @classmethod
             def get_safety_extension(cls):
                 """Cache safety extension using _get_cached_extension."""
+
                 def _create():
                     return {"name": "test_safety"}
+
                 return cls._get_cached_extension("safety_extension", _create)
 
         # Cache some extensions
@@ -901,9 +879,7 @@ class TestVerticalBaseIntegration:
 
         assert real_extension_registry.has_extension("sample", "vertical_ext")
 
-    def test_vertical_get_extensions_with_registry(
-        self, real_extension_registry, mock_vertical
-    ):
+    def test_vertical_get_extensions_with_registry(self, real_extension_registry, mock_vertical):
         """Test that get_extensions() works with registry extensions."""
         extensions = mock_vertical.get_extensions()
 
@@ -912,9 +888,7 @@ class TestVerticalBaseIntegration:
         assert hasattr(extensions, "middleware")
         assert hasattr(extensions, "safety_extensions")
 
-    def test_vertical_config_includes_extensions(
-        self, real_extension_registry, mock_vertical
-    ):
+    def test_vertical_config_includes_extensions(self, real_extension_registry, mock_vertical):
         """Test that VerticalConfig includes extension information."""
         config = mock_vertical.get_config()
 
@@ -948,9 +922,7 @@ class TestVerticalBaseIntegration:
         assert "tool_a1" in [t for t in config_a.tools.tools]
         assert "tool_b1" in [t for t in config_b.tools.tools]
 
-    def test_extension_loading_modes_strict(
-        self, real_extension_registry, mock_vertical
-    ):
+    def test_extension_loading_modes_strict(self, real_extension_registry, mock_vertical):
         """Test strict extension loading mode."""
 
         class StrictVertical(mock_vertical):
@@ -961,9 +933,7 @@ class TestVerticalBaseIntegration:
 
         assert extensions is not None
 
-    def test_extension_loading_modes_non_strict(
-        self, real_extension_registry, mock_vertical
-    ):
+    def test_extension_loading_modes_non_strict(self, real_extension_registry, mock_vertical):
         """Test non-strict extension loading mode."""
         extensions = mock_vertical.get_extensions(strict=False)
 
@@ -991,13 +961,12 @@ class TestVerticalBaseIntegration:
 class TestErrorHandling:
     """Tests for error handling in extension registry integration."""
 
-    def test_register_invalid_extension_raises_error(
-        self, real_extension_registry
-    ):
+    def test_register_invalid_extension_raises_error(self, real_extension_registry):
         """Test that registering invalid extension raises TypeError."""
 
         class InvalidExtension:
             """Doesn't implement IExtension protocol."""
+
             pass
 
         ext = InvalidExtension()
@@ -1019,9 +988,7 @@ class TestErrorHandling:
         assert extensions is not None
         assert extensions.middleware == []
 
-    def test_strict_mode_raises_on_extension_failure(
-        self, reset_extension_cache, mock_vertical
-    ):
+    def test_strict_mode_raises_on_extension_failure(self, reset_extension_cache, mock_vertical):
         """Test that strict mode raises on extension failure."""
 
         class FailingVertical(mock_vertical):

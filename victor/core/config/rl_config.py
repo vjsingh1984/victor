@@ -168,7 +168,9 @@ class RLConfigRegistry:
                     self._config_dir = Path(__file__).parent.parent.parent / "config" / "rl"
                     self._cache: Dict[str, RLConfig] = {}
                     self._initialized = True
-                    logger.debug(f"RLConfigRegistry initialized with config dir: {self._config_dir}")
+                    logger.debug(
+                        f"RLConfigRegistry initialized with config dir: {self._config_dir}"
+                    )
 
     @classmethod
     def get_instance(cls) -> "RLConfigRegistry":
@@ -247,10 +249,7 @@ class RLConfigRegistry:
                 "default_patience",
                 "exploration_bonus",
             }
-            extensions = {
-                k: v for k, v in data.items()
-                if k not in standard_fields
-            }
+            extensions = {k: v for k, v in data.items() if k not in standard_fields}
 
             config = RLConfig(
                 vertical_name=vertical,

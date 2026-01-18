@@ -315,7 +315,9 @@ class SharedEncoder:
         # Pad to TASK_DIM
         while len(category_scores) < self.TASK_DIM:
             # Add hash-based features for unknown task types
-            hash_val = int(hashlib.md5(task_type.encode(), usedforsecurity=False).hexdigest()[:8], 16)
+            hash_val = int(
+                hashlib.md5(task_type.encode(), usedforsecurity=False).hexdigest()[:8], 16
+            )
             feature = (hash_val % 1000) / 1000.0
             category_scores.append(feature)
             hash_val //= 1000

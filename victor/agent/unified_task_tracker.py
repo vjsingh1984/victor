@@ -1404,8 +1404,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
             # Infer purpose from tool and stage
             purpose = LoopSignature.infer_purpose(tool_name, arguments, self._progress.stage)
             context = LoopContext.from_stage(
-                self._progress.stage,
-                milestones={m.value for m in self._progress.milestones}
+                self._progress.stage, milestones={m.value for m in self._progress.milestones}
             )
 
         # Use enhanced LoopSignature class

@@ -67,12 +67,14 @@ logger = __import__("logging").getLogger(__name__)
 def _get_validation_result() -> type:
     """Get ValidationResult at runtime to avoid circular import."""
     from victor.framework.validation.pipeline import ValidationResult
+
     return ValidationResult
 
 
 def _get_validation_context() -> type:
     """Get ValidationContext at runtime to avoid circular import."""
     from victor.framework.validation.pipeline import ValidationContext
+
     return ValidationContext
 
 

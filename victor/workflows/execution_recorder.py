@@ -349,7 +349,11 @@ class ExecutionRecorder:
 
         event = RecordingEvent(
             event_id=uuid.uuid4().hex,
-            event_type=RecordingEventType.WORKFLOW_COMPLETE if success else RecordingEventType.WORKFLOW_ERROR,
+            event_type=(
+                RecordingEventType.WORKFLOW_COMPLETE
+                if success
+                else RecordingEventType.WORKFLOW_ERROR
+            ),
             timestamp=self.metadata.completed_at,
             workflow_id=self.workflow_id,
             data={
@@ -408,7 +412,9 @@ class ExecutionRecorder:
 
         event = RecordingEvent(
             event_id=uuid.uuid4().hex,
-            event_type=RecordingEventType.NODE_COMPLETE if not error else RecordingEventType.NODE_ERROR,
+            event_type=(
+                RecordingEventType.NODE_COMPLETE if not error else RecordingEventType.NODE_ERROR
+            ),
             timestamp=time.time(),
             workflow_id=self.workflow_id,
             node_id=node_id,
@@ -472,7 +478,9 @@ class ExecutionRecorder:
         """
         event = RecordingEvent(
             event_id=uuid.uuid4().hex,
-            event_type=RecordingEventType.TEAM_COMPLETE if success else RecordingEventType.TEAM_COMPLETE,
+            event_type=(
+                RecordingEventType.TEAM_COMPLETE if success else RecordingEventType.TEAM_COMPLETE
+            ),
             timestamp=time.time(),
             workflow_id=self.workflow_id,
             node_id=team_id,
@@ -939,7 +947,8 @@ class ExecutionReplayer:
         """
         # Compare metadata
         metadata_diff = {
-            "duration_diff": (self.metadata.duration_seconds or 0) - (other.metadata.duration_seconds or 0),
+            "duration_diff": (self.metadata.duration_seconds or 0)
+            - (other.metadata.duration_seconds or 0),
             "node_count_diff": self.metadata.node_count - other.metadata.node_count,
             "team_count_diff": self.metadata.team_count - other.metadata.team_count,
             "event_count_diff": self.metadata.event_count - other.metadata.event_count,
@@ -989,7 +998,7 @@ class ExecutionReplayer:
         Returns:
             Visualization string (DOT format for Graphviz)
         """
-        lines = ["digraph workflow_execution {", '  rankdir=TD;', '  node [shape=box];']
+        lines = ["digraph workflow_execution {", "  rankdir=TD;", "  node [shape=box];"]
 
         # Add nodes
         for node_id in self._node_events.keys():

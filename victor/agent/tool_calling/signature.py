@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 # Try to import victor_native, fallback to Python implementation
 try:
     from victor import victor_native
+
     RUST_AVAILABLE = True
 except ImportError:
     RUST_AVAILABLE = False
@@ -102,7 +103,7 @@ class ToolCallSignatureManager:
             sorted_args = json.dumps(arguments, sort_keys=True)
             combined = f"{tool_name}:{sorted_args}"
             hash_bytes = hashlib.sha256(combined.encode()).digest()[:8]
-            return int.from_bytes(hash_bytes, byteorder='big')
+            return int.from_bytes(hash_bytes, byteorder="big")
         except Exception as e:
             logger.error(f"Python signature computation failed: {e}")
             raise ValueError(f"Failed to compute signature: {e}") from e
@@ -229,9 +230,7 @@ class ToolCallSignatureManager:
 
         # Find signatures that exceed threshold
         looped_tools = [
-            signature_to_tool[sig]
-            for sig, count in signature_counts.items()
-            if count >= threshold
+            signature_to_tool[sig] for sig, count in signature_counts.items() if count >= threshold
         ]
 
         return list(set(looped_tools))

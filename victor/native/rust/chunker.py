@@ -30,6 +30,7 @@ from typing import List, Optional
 
 try:
     import victor_native
+
     RUST_AVAILABLE = True
 except ImportError:
     RUST_AVAILABLE = False

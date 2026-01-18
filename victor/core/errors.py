@@ -334,7 +334,9 @@ class ProviderInitializationError(ProviderError):
         # Generate recovery hint if not provided
         if recovery_hint is None:
             if config_key:
-                recovery_hint = f"Set {config_key} environment variable or check your configuration."
+                recovery_hint = (
+                    f"Set {config_key} environment variable or check your configuration."
+                )
             else:
                 recovery_hint = "Check your API credentials and configuration."
 
@@ -395,7 +397,9 @@ class ToolError(VictorError):
 class ToolNotFoundError(ToolError):
     """Tool not found in registry."""
 
-    def __init__(self, message: Optional[str] = None, tool_name: Optional[str] = None, **kwargs: Any):
+    def __init__(
+        self, message: Optional[str] = None, tool_name: Optional[str] = None, **kwargs: Any
+    ):
         # Support both positional and keyword arguments
         # If called with positional arg, it's the tool_name
         # If called with keyword arg, it's tool_name
@@ -512,7 +516,9 @@ class ConfigurationError(VictorError):
         # Add recovery hint if not provided
         if kwargs.get("recovery_hint") is None:
             if config_key:
-                kwargs["recovery_hint"] = f"Check configuration for '{config_key}'. Set the correct value in config or environment variables."
+                kwargs["recovery_hint"] = (
+                    f"Check configuration for '{config_key}'. Set the correct value in config or environment variables."
+                )
             else:
                 kwargs["recovery_hint"] = "Check your configuration file and environment variables."
 
@@ -575,12 +581,18 @@ class ConfigurationValidationError(ConfigurationError):
 
         # Build recovery hint if not provided
         if kwargs.get("recovery_hint") is None:
-            if config_key and config_key.endswith('.yaml'):
-                kwargs["recovery_hint"] = f"Fix validation errors in '{config_key}'. Use 'victor workflow validate <path>' to check."
+            if config_key and config_key.endswith(".yaml"):
+                kwargs["recovery_hint"] = (
+                    f"Fix validation errors in '{config_key}'. Use 'victor workflow validate <path>' to check."
+                )
             elif config_key:
-                kwargs["recovery_hint"] = f"Fix validation errors in '{config_key}'. Check configuration format and required fields."
+                kwargs["recovery_hint"] = (
+                    f"Fix validation errors in '{config_key}'. Check configuration format and required fields."
+                )
             else:
-                kwargs["recovery_hint"] = "Fix validation errors. Check configuration format and required fields."
+                kwargs["recovery_hint"] = (
+                    "Fix validation errors. Check configuration format and required fields."
+                )
 
         # Initialize parent ConfigurationError
         super().__init__(
@@ -647,9 +659,13 @@ class ValidationError(VictorError):
         # Add recovery hint if not provided
         if kwargs.get("recovery_hint") is None:
             if field:
-                kwargs["recovery_hint"] = f"Check the value for '{field}'. Ensure it matches the expected format and type."
+                kwargs["recovery_hint"] = (
+                    f"Check the value for '{field}'. Ensure it matches the expected format and type."
+                )
             else:
-                kwargs["recovery_hint"] = "Check your input values and ensure they match the expected format."
+                kwargs["recovery_hint"] = (
+                    "Check your input values and ensure they match the expected format."
+                )
 
         super().__init__(
             message,

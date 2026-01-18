@@ -500,9 +500,7 @@ class TestWorkflowToGraphAdapterExecution:
         )
 
         mock_executor = MagicMock()
-        mock_executor.execute_node = AsyncMock(
-            side_effect=Exception("Execution failed")
-        )
+        mock_executor.execute_node = AsyncMock(side_effect=Exception("Execution failed"))
 
         adapter = WorkflowToGraphAdapter()
         handler = adapter._create_execution_handler(node, mock_executor)

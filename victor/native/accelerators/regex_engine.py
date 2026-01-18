@@ -81,7 +81,9 @@ class MatchResult:
         return self.end - self.start
 
     def __repr__(self) -> str:
-        return f"MatchResult({self.pattern_name}, lines={self.line_number}, text={self.text[:30]}...)"
+        return (
+            f"MatchResult({self.pattern_name}, lines={self.line_number}, text={self.text[:30]}...)"
+        )
 
 
 @dataclass
@@ -143,18 +145,12 @@ class RegexStats:
     @property
     def avg_duration_ms(self) -> float:
         """Average operation duration in milliseconds."""
-        return (
-            self.total_duration_ms / self.total_matches if self.total_matches > 0 else 0.0
-        )
+        return self.total_duration_ms / self.total_matches if self.total_matches > 0 else 0.0
 
     @property
     def cache_hit_rate(self) -> float:
         """Cache hit rate as a percentage."""
-        return (
-            (self.cache_hits / self.total_matches * 100)
-            if self.total_matches > 0
-            else 0.0
-        )
+        return (self.cache_hits / self.total_matches * 100) if self.total_matches > 0 else 0.0
 
     def to_dict(self) -> Dict[str, float]:
         """Convert to dictionary for serialization."""
@@ -376,15 +372,11 @@ class RegexEngineAccelerator:
         duration_ms = (time.time() - start_time) * 1000
         self._stats.record_operation(duration_ms, cache_hit=False)
 
-        logger.info(
-            f"Compiled {len(patterns)} patterns for {language} in {duration_ms:.2f}ms"
-        )
+        logger.info(f"Compiled {len(patterns)} patterns for {language} in {duration_ms:.2f}ms")
 
         return compiled
 
-    def _rust_compile_patterns(
-        self, language: str, patterns: Dict[str, str]
-    ) -> Any:
+    def _rust_compile_patterns(self, language: str, patterns: Dict[str, str]) -> Any:
         """Compile patterns using Rust regex engine."""
         try:
             # Convert to list of (name, pattern) tuples
@@ -505,6 +497,7 @@ class RegexEngineAccelerator:
         for result in results:
             # Find line number using binary search
             import bisect
+
             line_num = bisect.bisect_right(line_starts, result.start) if line_starts else 1
             result.line_number = line_num
 
@@ -554,17 +547,13 @@ class RegexEngineAccelerator:
         results = self.match_all(source_code, compiled_set)
         return [r for r in results if r.pattern_name == pattern_name]
 
-    def _get_patterns(
-        self, language: str, pattern_types: Optional[List[str]]
-    ) -> Dict[str, str]:
+    def _get_patterns(self, language: str, pattern_types: Optional[List[str]]) -> Dict[str, str]:
         """Get regex patterns for a language."""
         lang_patterns = self._PATTERNS.get(language.lower(), {})
 
         if pattern_types:
             # Filter by pattern types
-            return {
-                k: v for k, v in lang_patterns.items() if k in pattern_types
-            }
+            return {k: v for k, v in lang_patterns.items() if k in pattern_types}
         else:
             return lang_patterns
 

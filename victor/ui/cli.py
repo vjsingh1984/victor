@@ -106,6 +106,7 @@ vertical_lazy = LazyTyper("victor.ui.commands.vertical:vertical_app")
 app.add_typer(vertical_lazy)
 app.add_typer(LazyTyper("victor.ui.commands.workflow:workflow_app"))
 
+
 # Add scaffold as subcommand of vertical
 # We need to import it and add it to the vertical app
 # This is deferred until vertical is actually loaded
@@ -139,6 +140,7 @@ vertical_lazy._load = lambda: _load_with_scaffold(vertical_lazy)
 def _get_default_interactive():
     """Lazy load the default interactive function."""
     from victor.ui.commands.chat import _run_default_interactive
+
     return _run_default_interactive
 
 

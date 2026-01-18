@@ -47,7 +47,7 @@ CI_UPPER_BOUND_INDEX = 1  # Upper bound of confidence interval
 # =============================================================================
 
 PROVIDER_PART_INDEX = 0  # When splitting provider:model string
-MODEL_PART_INDEX = 1     # When splitting provider:model string
+MODEL_PART_INDEX = 1  # When splitting provider:model string
 
 # =============================================================================
 # Session ID Format Indices

@@ -406,7 +406,7 @@ class GraphToWorkflowAdapter:
 
         return WorkflowDefinition(
             name=name,
-            description=f"Adapted from StateGraph",
+            description="Adapted from StateGraph",
             nodes=workflow_nodes,
         )
 

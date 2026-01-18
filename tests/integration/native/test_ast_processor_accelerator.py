@@ -64,7 +64,7 @@ async def async_function():
 @pytest.fixture
 def javascript_source():
     """Sample JavaScript source code for testing."""
-    return '''
+    return """
 function helloWorld() {
     console.log("Hello, world!");
 }
@@ -83,7 +83,7 @@ async function asyncFunction() {
     await Promise.resolve();
     return "done";
 }
-'''
+"""
 
 
 @pytest.fixture
@@ -92,33 +92,33 @@ def multiple_sources():
     return [
         (
             "python",
-            '''
+            """
 def func1():
     return 1
 
 class Class1:
     pass
-''',
+""",
         ),
         (
             "python",
-            '''
+            """
 def func2():
     return 2
 
 class Class2:
     pass
-''',
+""",
         ),
         (
             "javascript",
-            '''
+            """
 function func3() {
     return 3;
 }
 
 class Class3 {}
-''',
+""",
         ),
     ]
 
@@ -238,9 +238,7 @@ class TestQueryExecution:
         """Test querying function definitions."""
         ast = processor.parse_to_ast(python_source, "python")
 
-        results = processor.execute_query(
-            ast, "(function_definition name: (identifier) @name)"
-        )
+        results = processor.execute_query(ast, "(function_definition name: (identifier) @name)")
 
         assert results is not None
         assert results.matches >= 3  # hello_world, add, multiply
@@ -250,9 +248,7 @@ class TestQueryExecution:
         """Test querying class definitions."""
         ast = processor.parse_to_ast(python_source, "python")
 
-        results = processor.execute_query(
-            ast, "(class_definition name: (identifier) @name)"
-        )
+        results = processor.execute_query(ast, "(class_definition name: (identifier) @name)")
 
         assert results is not None
         assert results.matches >= 1  # Calculator class
@@ -304,9 +300,7 @@ class TestSymbolExtraction:
         """Test extracting multiple symbol types."""
         ast = processor.parse_to_ast(python_source, "python")
 
-        symbols = processor.extract_symbols(
-            ast, ["function_definition", "class_definition"]
-        )
+        symbols = processor.extract_symbols(ast, ["function_definition", "class_definition"])
 
         assert isinstance(symbols, list)
         assert len(symbols) >= 4  # 3 functions + 1 class
@@ -349,9 +343,7 @@ class TestParallelProcessing:
         results = processor.extract_symbols_parallel([])
         assert results == {}
 
-    def test_extract_symbols_parallel_with_mixed_languages(
-        self, processor, multiple_sources
-    ):
+    def test_extract_symbols_parallel_with_mixed_languages(self, processor, multiple_sources):
         """Test parallel extraction with mixed languages."""
         results = processor.extract_symbols_parallel(multiple_sources)
 
@@ -548,9 +540,7 @@ class TestIntegration:
         assert ast is not None
 
         # Query
-        results = processor.execute_query(
-            ast, "(function_definition name: (identifier) @name)"
-        )
+        results = processor.execute_query(ast, "(function_definition name: (identifier) @name)")
         assert results.matches >= 3
 
         # Extract symbols
@@ -561,9 +551,7 @@ class TestIntegration:
         stats = processor.parse_stats
         assert stats["total_parses"] >= 1
 
-    def test_multi_language_workflow(
-        self, processor, python_source, javascript_source
-    ):
+    def test_multi_language_workflow(self, processor, python_source, javascript_source):
         """Test workflow with multiple languages."""
         # Parse Python
         py_ast = processor.parse_to_ast(python_source, "python", "multi.py")

@@ -62,6 +62,7 @@ def temp_file(temp_dir: Path) -> Path:
 # Helper Functions for Event Synchronization
 # =============================================================================
 
+
 async def wait_for_events(
     watcher: IFileWatcher,
     min_count: int = 1,
@@ -125,6 +126,7 @@ async def flush_events(watcher: IFileWatcher, delay: float = 0.3) -> None:
 # Startup and Shutdown Tests
 # =============================================================================
 
+
 class TestStartupShutdown:
     """Test file watcher startup and shutdown behavior."""
 
@@ -167,6 +169,7 @@ class TestStartupShutdown:
 # =============================================================================
 # Single File Watching Tests
 # =============================================================================
+
 
 class TestSingleFileWatching:
     """Test watching individual files."""
@@ -267,6 +270,7 @@ class TestSingleFileWatching:
 # Directory Watching Tests
 # =============================================================================
 
+
 class TestDirectoryWatching:
     """Test watching directories."""
 
@@ -345,10 +349,7 @@ class TestDirectoryWatching:
         assert len(changes) > 0
 
         # Find the nested file event
-        nested_events = [
-            c for c in changes
-            if str(subdir.absolute()) in c.file_path
-        ]
+        nested_events = [c for c in changes if str(subdir.absolute()) in c.file_path]
         assert len(nested_events) > 0
 
         await file_watcher.stop()
@@ -390,6 +391,7 @@ class TestDirectoryWatching:
 # File Change Event Tests
 # =============================================================================
 
+
 class TestFileChangeEvents:
     """Test different types of file change events."""
 
@@ -414,10 +416,7 @@ class TestFileChangeEvents:
         changes = await wait_for_events(file_watcher, min_count=1, timeout=5.0)
 
         # Should have at least one CREATED event
-        created_events = [
-            c for c in changes
-            if c.change_type == FileChangeType.CREATED
-        ]
+        created_events = [c for c in changes if c.change_type == FileChangeType.CREATED]
 
         assert len(created_events) > 0
 
@@ -443,10 +442,7 @@ class TestFileChangeEvents:
         changes = await wait_for_events(file_watcher, min_count=1, timeout=5.0)
 
         # Should have at least one DELETED event
-        deleted_events = [
-            c for c in changes
-            if c.change_type == FileChangeType.DELETED
-        ]
+        deleted_events = [c for c in changes if c.change_type == FileChangeType.DELETED]
 
         assert len(deleted_events) > 0
 
@@ -477,10 +473,7 @@ class TestFileChangeEvents:
         changes = await wait_for_events(file_watcher, min_count=1, timeout=5.0)
 
         # Should detect a move (either as MOVED or DELETED + CREATED)
-        moved_events = [
-            c for c in changes
-            if c.change_type == FileChangeType.MOVED
-        ]
+        moved_events = [c for c in changes if c.change_type == FileChangeType.MOVED]
 
         # If no explicit MOVED event, should have both DELETED and CREATED
         if len(moved_events) == 0:
@@ -496,6 +489,7 @@ class TestFileChangeEvents:
 # =============================================================================
 # Event Retrieval Tests
 # =============================================================================
+
 
 class TestEventRetrieval:
     """Test retrieving file change events."""
@@ -569,6 +563,7 @@ class TestEventRetrieval:
 # Thread Safety Tests
 # =============================================================================
 
+
 class TestThreadSafety:
     """Test thread-safety of file watcher operations."""
 
@@ -586,10 +581,7 @@ class TestThreadSafety:
         for f in files:
             f.write_text("content")
 
-        tasks = [
-            file_watcher.watch_file(str(f.absolute()))
-            for f in files
-        ]
+        tasks = [file_watcher.watch_file(str(f.absolute())) for f in files]
         await asyncio.gather(*tasks)
 
         # Should not raise
@@ -631,6 +623,7 @@ class TestThreadSafety:
 # =============================================================================
 # Error Handling Tests
 # =============================================================================
+
 
 class TestErrorHandling:
     """Test error handling in file watcher."""

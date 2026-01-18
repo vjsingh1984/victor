@@ -25,6 +25,7 @@ from typing import List, Optional, Tuple
 
 try:
     import victor_native
+
     RUST_AVAILABLE = True
 except ImportError:
     RUST_AVAILABLE = False

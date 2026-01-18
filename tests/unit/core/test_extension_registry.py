@@ -253,6 +253,7 @@ class TestExtensionRegistry:
     def registry(self):
         """Create an ExtensionRegistry instance for testing."""
         from victor.core.verticals.extension_registry import ExtensionRegistry
+
         return ExtensionRegistry()
 
     def test_registry_implements_protocol(self, registry):
@@ -476,6 +477,7 @@ class TestOCPCompliance:
     def registry(self):
         """Create an ExtensionRegistry instance."""
         from victor.core.verticals.extension_registry import ExtensionRegistry
+
         return ExtensionRegistry()
 
     def test_custom_extension_type_without_core_modifications(self, registry):
@@ -485,6 +487,7 @@ class TestOCPCompliance:
         define a completely new extension type without modifying
         ExtensionRegistry or any core code.
         """
+
         # Define a custom extension type NOT in StandardExtensionTypes
         @dataclass
         class AnalyticsExtension(IExtension):
@@ -508,9 +511,7 @@ class TestOCPCompliance:
 
         # Register it without any core modifications
         ext = AnalyticsExtension(
-            _extension_type="analytics",
-            _name="google_analytics",
-            api_key="key123"
+            _extension_type="analytics", _name="google_analytics", api_key="key123"
         )
         registry.register_extension(ext)
 
@@ -521,6 +522,7 @@ class TestOCPCompliance:
 
     def test_multiple_custom_types(self, registry):
         """Test multiple custom extension types."""
+
         @dataclass
         class CacheExtension(IExtension):
             _extension_type: str
@@ -561,15 +563,9 @@ class TestOCPCompliance:
             def get_metadata(self) -> Dict[str, Any]:
                 return {}
 
-        cache_ext = CacheExtension(
-            _extension_type="cache",
-            _name="redis",
-            size_mb=100
-        )
+        cache_ext = CacheExtension(_extension_type="cache", _name="redis", size_mb=100)
         monitor_ext = MonitoringExtension(
-            _extension_type="monitoring",
-            _name="prometheus",
-            endpoint="http://localhost:9090"
+            _extension_type="monitoring", _name="prometheus", endpoint="http://localhost:9090"
         )
 
         registry.register_extension(cache_ext)

@@ -331,7 +331,9 @@ class TestSharedTeamContext:
         await context.set("findings", {"bugs": ["bug1"]}, member_id="member1")
 
         # Merge additional findings
-        success = await context.merge("findings", {"bugs": ["bug2"], "performance": ["slow_query"]}, member_id="member2")
+        success = await context.merge(
+            "findings", {"bugs": ["bug2"], "performance": ["slow_query"]}, member_id="member2"
+        )
 
         assert success is True
 
@@ -667,7 +669,9 @@ class TestCollaborationIntegration:
 
         # Analysts share findings
         await context.set("findings", {"bugs": ["bug1"]}, member_id="analyst1")
-        await context.merge("findings", {"bugs": ["bug2"], "performance": ["slow_query"]}, member_id="analyst2")
+        await context.merge(
+            "findings", {"bugs": ["bug2"], "performance": ["slow_query"]}, member_id="analyst2"
+        )
 
         findings = await context.get("findings")
         assert len(findings["bugs"]) == 2

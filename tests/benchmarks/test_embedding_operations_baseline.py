@@ -15,6 +15,7 @@ from typing import List, Tuple, Optional
 # Cache Implementation for Benchmarking
 # =============================================================================
 
+
 class LRUCache:
     """Simple LRU cache implementation for benchmarking."""
 
@@ -44,6 +45,7 @@ class LRUCache:
 # =============================================================================
 # Cosine Similarity Benchmarks
 # =============================================================================
+
 
 @pytest.mark.benchmark
 def test_cosine_similarity_small_batch(benchmark):
@@ -137,6 +139,7 @@ def test_cosine_similarity_pre_normalized(benchmark):
 # =============================================================================
 # Top-K Selection Benchmarks
 # =============================================================================
+
 
 @pytest.mark.benchmark
 def test_topk_selection_sorting_small(benchmark):
@@ -247,6 +250,7 @@ def test_topk_with_scores(benchmark):
 # Cache Operation Benchmarks
 # =============================================================================
 
+
 @pytest.mark.benchmark
 def test_cache_hit_small(benchmark):
     """Benchmark cache hit operation with small cache."""
@@ -342,6 +346,7 @@ def test_cache_hit_rate(benchmark):
 # =============================================================================
 # Matrix Operation Benchmarks
 # =============================================================================
+
 
 @pytest.mark.benchmark
 def test_similarity_matrix_small(benchmark):
@@ -443,6 +448,7 @@ def test_matrix_multiplication_efficient(benchmark):
 # =============================================================================
 # Combined Operation Benchmarks
 # =============================================================================
+
 
 @pytest.mark.benchmark
 def test_full_search_pipeline(benchmark):
@@ -556,6 +562,7 @@ def test_cached_search_pipeline(benchmark):
 # Performance Comparison Tests
 # =============================================================================
 
+
 @pytest.mark.benchmark
 def test_algorithm_comparison_sorting(benchmark):
     """
@@ -637,6 +644,7 @@ def test_vectorization_comparison_vectorized(benchmark):
 # =============================================================================
 # Helper Functions
 # =============================================================================
+
 
 def generate_benchmark_report() -> str:
     """

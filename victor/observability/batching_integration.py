@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 
 class BatchStrategy(str, Enum):
     """Batching strategies for event emission."""
+
     TIME = "time"
     SIZE = "size"
     HYBRID = "hybrid"
@@ -45,6 +46,7 @@ class BatchStrategy(str, Enum):
 @dataclass
 class BatchConfig:
     """Configuration for batched observability."""
+
     strategy: BatchStrategy = BatchStrategy.HYBRID
     max_batch_size: int = 100
     max_wait_time: float = 0.5  # 500ms
@@ -57,6 +59,7 @@ class BatchConfig:
 @dataclass
 class BatchStats:
     """Statistics for batched observability."""
+
     events_queued: int = 0
     events_flushed: int = 0
     events_dropped: int = 0
@@ -71,11 +74,11 @@ class BatchStats:
         self.batches_flushed += 1
         self.events_flushed += batch_size
         self.avg_batch_size = (
-            (self.avg_batch_size * (self.batches_flushed - 1) + batch_size) / self.batches_flushed
-        )
+            self.avg_batch_size * (self.batches_flushed - 1) + batch_size
+        ) / self.batches_flushed
         self.avg_wait_time_ms = (
-            (self.avg_wait_time_ms * (self.batches_flushed - 1) + wait_time_ms) / self.batches_flushed
-        )
+            self.avg_wait_time_ms * (self.batches_flushed - 1) + wait_time_ms
+        ) / self.batches_flushed
         self.last_flush_time = time.time()
         self.current_queue_size = 0
 
@@ -114,10 +117,7 @@ class BatchedObservabilityIntegration:
         self._queue_lock = threading.Lock()
         self._flush_event = asyncio.Event()
 
-    def set_emitter(
-        self,
-        emitter: Callable[[List[Dict[str, Any]]], Awaitable[None]]
-    ) -> None:
+    def set_emitter(self, emitter: Callable[[List[Dict[str, Any]]], Awaitable[None]]) -> None:
         """Set the event emitter backend."""
         self._emitter = emitter
 
@@ -132,10 +132,7 @@ class BatchedObservabilityIntegration:
             return
 
         with self._queue_lock:
-            if (
-                self._config.max_queue_size > 0
-                and len(self._queue) >= self._config.max_queue_size
-            ):
+            if self._config.max_queue_size > 0 and len(self._queue) >= self._config.max_queue_size:
                 self._stats.events_dropped += 1
                 if self._config.drop_handler:
                     try:
@@ -165,10 +162,7 @@ class BatchedObservabilityIntegration:
         if self._config.strategy == BatchStrategy.SIZE:
             should_flush = queue_size >= self._config.max_batch_size
         elif self._config.strategy == BatchStrategy.HYBRID:
-            should_flush = (
-                queue_size >= self._config.max_batch_size
-                or self._should_flush_by_time()
-            )
+            should_flush = queue_size >= self._config.max_batch_size or self._should_flush_by_time()
 
         if should_flush:
             await self.flush()

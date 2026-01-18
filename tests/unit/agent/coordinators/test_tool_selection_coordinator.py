@@ -50,7 +50,9 @@ class TestToolSelectionCoordinatorInit:
         """Create coordinator with mock registry."""
         return ToolSelectionCoordinator(tool_registry=mock_tool_registry)
 
-    def test_init_with_tool_registry(self, coordinator: ToolSelectionCoordinator, mock_tool_registry: Mock):
+    def test_init_with_tool_registry(
+        self, coordinator: ToolSelectionCoordinator, mock_tool_registry: Mock
+    ):
         """Test that coordinator initializes with tool registry."""
         # Assert
         assert coordinator._tool_registry == mock_tool_registry
@@ -129,7 +131,9 @@ class TestGetRecommendedSearchTool:
     def test_semantic_search_indicators(self, coordinator: ToolSelectionCoordinator):
         """Test that semantic search queries recommend semantic_search."""
         # Execute & Assert
-        assert coordinator.get_recommended_search_tool("Find similar functions") == "semantic_search"
+        assert (
+            coordinator.get_recommended_search_tool("Find similar functions") == "semantic_search"
+        )
         assert coordinator.get_recommended_search_tool("Show related code") == "semantic_search"
         assert coordinator.get_recommended_search_tool("Files like this one") == "semantic_search"
         assert coordinator.get_recommended_search_tool("Analogous patterns") == "semantic_search"
@@ -216,7 +220,9 @@ class TestRouteSearchQuery:
         # Assert
         assert result == "web_search"
 
-    def test_falls_back_to_grep_if_recommended_unavailable(self, coordinator: ToolSelectionCoordinator):
+    def test_falls_back_to_grep_if_recommended_unavailable(
+        self, coordinator: ToolSelectionCoordinator
+    ):
         """Test fallback to grep when recommended tool unavailable."""
         # Setup
         available_tools = {"grep", "ls"}  # No web_search
@@ -238,7 +244,9 @@ class TestRouteSearchQuery:
         # Assert
         assert result == "ls"
 
-    def test_returns_first_available_tool_as_last_resort(self, coordinator: ToolSelectionCoordinator):
+    def test_returns_first_available_tool_as_last_resort(
+        self, coordinator: ToolSelectionCoordinator
+    ):
         """Test that first available tool is used as ultimate fallback."""
         # Setup
         available_tools = {"custom_tool"}  # Neither grep nor ls
@@ -249,7 +257,9 @@ class TestRouteSearchQuery:
         # Assert
         assert result == "custom_tool"
 
-    def test_returns_grep_as_default_when_no_tools_available(self, coordinator: ToolSelectionCoordinator):
+    def test_returns_grep_as_default_when_no_tools_available(
+        self, coordinator: ToolSelectionCoordinator
+    ):
         """Test that grep is returned as default when no tools available."""
         # Setup
         available_tools = set()
@@ -413,8 +423,7 @@ class TestDetectMentionedTools:
 
         # Execute
         result = coordinator.detect_mentioned_tools(
-            "Use grep and bash",
-            available_tools=available_tools
+            "Use grep and bash", available_tools=available_tools
         )
 
         # Assert - should only return grep (bash not in available)
@@ -425,10 +434,7 @@ class TestDetectMentionedTools:
     def test_no_filtering_when_available_tools_none(self, coordinator: ToolSelectionCoordinator):
         """Test that no filtering occurs when available_tools is None."""
         # Execute
-        result = coordinator.detect_mentioned_tools(
-            "Use grep and bash",
-            available_tools=None
-        )
+        result = coordinator.detect_mentioned_tools("Use grep and bash", available_tools=None)
 
         # Assert - should return both
         assert "grep" in result
@@ -505,9 +511,14 @@ class TestClassifyTaskKeywords:
         # Execute & Assert
         # "Create" is both creation and action (implement), so with just one keyword each it defaults to analysis
         # Need stronger creation signals
-        assert coordinator.classify_task_keywords("Create a new file and generate docs") == "creation"
+        assert (
+            coordinator.classify_task_keywords("Create a new file and generate docs") == "creation"
+        )
         assert coordinator.classify_task_keywords("Build and generate new components") == "creation"
-        assert coordinator.classify_task_keywords("Write new documentation and create files") == "creation"
+        assert (
+            coordinator.classify_task_keywords("Write new documentation and create files")
+            == "creation"
+        )
         # Note: "design" is not in ACTION_KEYWORDS, so pure creation works
         assert coordinator.classify_task_keywords("Design a new system") == "creation"
 
@@ -575,7 +586,9 @@ class TestClassifyTaskWithContext:
         """Create coordinator."""
         return ToolSelectionCoordinator(tool_registry=mock_tool_registry)
 
-    def test_without_context_delegates_to_keyword_classification(self, coordinator: ToolSelectionCoordinator):
+    def test_without_context_delegates_to_keyword_classification(
+        self, coordinator: ToolSelectionCoordinator
+    ):
         """Test that None context uses keyword classification."""
         # Execute
         result = coordinator.classify_task_with_context("Fix the bug", context=None)
@@ -616,7 +629,9 @@ class TestClassifyTaskWithContext:
         # Assert - should remain analysis
         assert result == "analysis"
 
-    def test_analysis_task_not_affected_by_recent_tools(self, coordinator: ToolSelectionCoordinator):
+    def test_analysis_task_not_affected_by_recent_tools(
+        self, coordinator: ToolSelectionCoordinator
+    ):
         """Test that analysis tasks stay analysis even with recent write tools."""
         # Setup
         context = AgentToolSelectionContext(recent_tools=["write"])
@@ -712,7 +727,9 @@ class TestShouldUseTools:
         assert coordinator.should_use_tools("List all files") is True
         assert coordinator.should_use_tools("Check the status") is True
 
-    def test_question_without_tool_keywords_returns_false(self, coordinator: ToolSelectionCoordinator):
+    def test_question_without_tool_keywords_returns_false(
+        self, coordinator: ToolSelectionCoordinator
+    ):
         """Test that simple questions without tool keywords return False."""
         # Execute & Assert
         assert coordinator.should_use_tools("What is this?") is False
@@ -742,7 +759,9 @@ class TestShouldUseTools:
         result2 = coordinator.should_use_tools("Use grep", model_supports_tools=False)
         assert result2 is True  # Still true based on content
 
-    def test_generic_message_without_keywords_returns_false(self, coordinator: ToolSelectionCoordinator):
+    def test_generic_message_without_keywords_returns_false(
+        self, coordinator: ToolSelectionCoordinator
+    ):
         """Test that generic messages without keywords return False."""
         # Execute & Assert
         assert coordinator.should_use_tools("Hello world") is False
@@ -762,8 +781,12 @@ class TestShouldUseTools:
         # Execute & Assert
         # Note: "show", "display", "get" are not in tool_keywords list, so these return False
         # Only keywords in the list trigger True
-        assert coordinator.should_use_tools("Read me the file") is True  # "read" is in tool_keywords
-        assert coordinator.should_use_tools("List the contents") is True  # "list" is in tool_keywords
+        assert (
+            coordinator.should_use_tools("Read me the file") is True
+        )  # "read" is in tool_keywords
+        assert (
+            coordinator.should_use_tools("List the contents") is True
+        )  # "list" is in tool_keywords
         assert coordinator.should_use_tools("Check the data") is True  # "check" is in tool_keywords
 
 
@@ -857,7 +880,7 @@ class TestExtractRequiredFiles:
     def test_quoted_file_paths(self, coordinator: ToolSelectionCoordinator):
         """Test extraction of quoted file paths."""
         # Execute
-        result = coordinator.extract_required_files('Edit "myfile.py" and \'yourfile.txt\'')
+        result = coordinator.extract_required_files("Edit \"myfile.py\" and 'yourfile.txt'")
 
         # Assert
         assert "myfile.py" in result or ".py" in str(result)
@@ -876,9 +899,7 @@ class TestExtractRequiredFiles:
     def test_files_with_directories(self, coordinator: ToolSelectionCoordinator):
         """Test extraction of files with directory paths."""
         # Execute
-        result = coordinator.extract_required_files(
-            "Edit src/victor/agent/coordinator.py"
-        )
+        result = coordinator.extract_required_files("Edit src/victor/agent/coordinator.py")
 
         # Assert
         assert "coordinator.py" in result or ".py" in str(result)
@@ -992,9 +1013,7 @@ class TestExtractRequiredOutputs:
     def test_multiple_outputs_in_prompt(self, coordinator: ToolSelectionCoordinator):
         """Test extraction of multiple outputs from single prompt."""
         # Execute
-        result = coordinator.extract_required_outputs(
-            "Save to output.txt and write to log.md"
-        )
+        result = coordinator.extract_required_outputs("Save to output.txt and write to log.md")
 
         # Assert
         assert "output.txt" in result
@@ -1031,9 +1050,7 @@ class TestToolSelectionCoordinatorIntegration:
         """Create coordinator."""
         return ToolSelectionCoordinator(tool_registry=mock_tool_registry)
 
-    def test_complete_tool_selection_workflow(
-        self, coordinator: ToolSelectionCoordinator
-    ):
+    def test_complete_tool_selection_workflow(self, coordinator: ToolSelectionCoordinator):
         """Test complete workflow: classify -> route -> detect."""
         # Setup
         task = "Use grep to find all bugs in the authentication code"
@@ -1051,9 +1068,7 @@ class TestToolSelectionCoordinatorIntegration:
         assert len(mentioned_tools) >= 1  # grep is detected
         assert "grep" in mentioned_tools
 
-    def test_context_aware_selection(
-        self, coordinator: ToolSelectionCoordinator
-    ):
+    def test_context_aware_selection(self, coordinator: ToolSelectionCoordinator):
         """Test selection with full context."""
         # Setup
         context = AgentToolSelectionContext(
@@ -1069,17 +1084,14 @@ class TestToolSelectionCoordinatorIntegration:
         # Assert
         assert task_type == "action"  # EXECUTING stage + recent write tools
 
-    def test_search_and_extraction_workflow(
-        self, coordinator: ToolSelectionCoordinator
-    ):
+    def test_search_and_extraction_workflow(self, coordinator: ToolSelectionCoordinator):
         """Test workflow combining search and file extraction."""
         # Setup
         prompt = "Use grep to find 'TODO' in src/main.py and save to results.txt"
 
         # Execute
         search_tool = coordinator.route_search_query(
-            "find in files",
-            available_tools={"grep", "ls", "web_search"}
+            "find in files", available_tools={"grep", "ls", "web_search"}
         )
         mentioned = coordinator.detect_mentioned_tools(prompt)
         files = coordinator.extract_required_files(prompt)
@@ -1116,7 +1128,9 @@ class TestToolSelectionCoordinatorEdgeCases:
     def test_special_characters_in_file_paths(self, coordinator: ToolSelectionCoordinator):
         """Test handling of special characters in file paths."""
         # Execute
-        result = coordinator.extract_required_files("Edit file-with-dashes.py and file_with_underscores.js")
+        result = coordinator.extract_required_files(
+            "Edit file-with-dashes.py and file_with_underscores.js"
+        )
 
         # Assert
         assert "file-with-dashes.py" in result or ".py" in str(result)
@@ -1148,9 +1162,7 @@ class TestToolSelectionCoordinatorEdgeCases:
     def test_nested_keywords(self, coordinator: ToolSelectionCoordinator):
         """Test handling of nested keyword patterns."""
         # Execute
-        result = coordinator.classify_task_keywords(
-            "Create a new implementation to fix the issue"
-        )
+        result = coordinator.classify_task_keywords("Create a new implementation to fix the issue")
 
         # Assert - has both create (creation) and implement/fix (action)
         # Should pick the dominant one

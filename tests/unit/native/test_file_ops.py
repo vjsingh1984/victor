@@ -192,9 +192,7 @@ class TestWalkDirectory:
         (tmp_path / "test.py").write_text("content")
         (tmp_path / "test.pyc").write_text("compiled")
 
-        files = walk_directory(
-            str(tmp_path), patterns=["*"], ignore_patterns=["*.pyc"]
-        )
+        files = walk_directory(str(tmp_path), patterns=["*"], ignore_patterns=["*.pyc"])
 
         # Should include .py but not .pyc
         paths = [f.path for f in files]
@@ -301,7 +299,7 @@ class TestFilterByExtension:
         files = []
         for ext in ["py", "rs", "txt", "java"]:
             test_file = tmp_path / f"test.{ext}"
-            test_file.write_text(f"content")
+            test_file.write_text("content")
             files.append(
                 FileInfo(
                     path=str(test_file),

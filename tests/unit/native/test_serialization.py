@@ -48,6 +48,7 @@ try:
         query_json,
         SerializationError,
     )
+
     SERIALIZATION_AVAILABLE = True
 except ImportError:
     SERIALIZATION_AVAILABLE = False
@@ -72,7 +73,7 @@ class TestJSONOperations:
 
     def test_load_json_array(self):
         """Test JSON array parsing."""
-        json_str = '[1, 2, 3, 4, 5]'
+        json_str = "[1, 2, 3, 4, 5]"
         result = load_json(json_str)
         assert result == [1, 2, 3, 4, 5]
 
@@ -115,14 +116,14 @@ class TestJSONOperations:
     def test_is_valid_json_true(self):
         """Test JSON validation with valid JSON."""
         assert is_valid_json('{"key": "value"}')
-        assert is_valid_json('[1, 2, 3]')
+        assert is_valid_json("[1, 2, 3]")
         assert is_valid_json('"string"')
 
     def test_is_valid_json_false(self):
         """Test JSON validation with invalid JSON."""
         assert not is_valid_json('{"key": invalid}')
-        assert not is_valid_json('{unclosed brace')
-        assert not is_valid_json('')
+        assert not is_valid_json("{unclosed brace")
+        assert not is_valid_json("")
 
     def test_is_valid_json_batch(self):
         """Test batch JSON validation."""

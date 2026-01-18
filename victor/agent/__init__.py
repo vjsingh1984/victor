@@ -68,7 +68,10 @@ def __getattr__(name: str) -> Any:
         "ToolExecutor": ("victor.agent.tool_executor", "ToolExecutor"),
         "ToolExecutionResult": ("victor.agent.tool_executor", "ToolExecutionResult"),
         # Conversation control
-        "ConversationController": ("victor.agent.conversation_controller", "ConversationController"),
+        "ConversationController": (
+            "victor.agent.conversation_controller",
+            "ConversationController",
+        ),
         "ConversationConfig": ("victor.agent.conversation_controller", "ConversationConfig"),
         "ContextMetrics": ("victor.agent.conversation_controller", "ContextMetrics"),
         # Tool pipeline
@@ -78,7 +81,10 @@ def __getattr__(name: str) -> Any:
         "PipelineExecutionResult": ("victor.agent.tool_pipeline", "PipelineExecutionResult"),
         # Streaming controller
         "StreamingController": ("victor.agent.streaming_controller", "StreamingController"),
-        "StreamingControllerConfig": ("victor.agent.streaming_controller", "StreamingControllerConfig"),
+        "StreamingControllerConfig": (
+            "victor.agent.streaming_controller",
+            "StreamingControllerConfig",
+        ),
         "StreamingSession": ("victor.agent.streaming_controller", "StreamingSession"),
         # Task analyzer
         "TaskAnalyzer": ("victor.agent.task_analyzer", "TaskAnalyzer"),
@@ -87,14 +93,26 @@ def __getattr__(name: str) -> Any:
         "reset_task_analyzer": ("victor.agent.task_analyzer", "reset_task_analyzer"),
         # Configuration manager
         "ConfigurationManager": ("victor.agent.configuration_manager", "ConfigurationManager"),
-        "create_configuration_manager": ("victor.agent.configuration_manager", "create_configuration_manager"),
-        "get_configuration_manager": ("victor.agent.configuration_manager", "get_configuration_manager"),
-        "reset_configuration_manager": ("victor.agent.configuration_manager", "reset_configuration_manager"),
+        "create_configuration_manager": (
+            "victor.agent.configuration_manager",
+            "create_configuration_manager",
+        ),
+        "get_configuration_manager": (
+            "victor.agent.configuration_manager",
+            "get_configuration_manager",
+        ),
+        "reset_configuration_manager": (
+            "victor.agent.configuration_manager",
+            "reset_configuration_manager",
+        ),
         # Memory manager
         "MemoryManager": ("victor.agent.memory_manager", "MemoryManager"),
         "SessionRecoveryManager": ("victor.agent.memory_manager", "SessionRecoveryManager"),
         "create_memory_manager": ("victor.agent.memory_manager", "create_memory_manager"),
-        "create_session_recovery_manager": ("victor.agent.memory_manager", "create_session_recovery_manager"),
+        "create_session_recovery_manager": (
+            "victor.agent.memory_manager",
+            "create_session_recovery_manager",
+        ),
         # Search router
         "SearchRouter": ("victor.agent.search_router", "SearchRouter"),
         "SearchRoute": ("victor.agent.search_router", "SearchRoute"),
@@ -104,14 +122,20 @@ def __getattr__(name: str) -> Any:
         "is_keyword_query": ("victor.agent.search_router", "is_keyword_query"),
         "is_semantic_query": ("victor.agent.search_router", "is_semantic_query"),
         # Intelligent pipeline
-        "IntelligentAgentPipeline": ("victor.agent.intelligent_pipeline", "IntelligentAgentPipeline"),
+        "IntelligentAgentPipeline": (
+            "victor.agent.intelligent_pipeline",
+            "IntelligentAgentPipeline",
+        ),
         "RequestContext": ("victor.agent.intelligent_pipeline", "RequestContext"),
         "ResponseResult": ("victor.agent.intelligent_pipeline", "ResponseResult"),
         "PipelineStats": ("victor.agent.intelligent_pipeline", "PipelineStats"),
         "get_pipeline": ("victor.agent.intelligent_pipeline", "get_pipeline"),
         "clear_pipeline_cache": ("victor.agent.intelligent_pipeline", "clear_pipeline_cache"),
         # Orchestrator integration
-        "OrchestratorIntegration": ("victor.agent.orchestrator_integration", "OrchestratorIntegration"),
+        "OrchestratorIntegration": (
+            "victor.agent.orchestrator_integration",
+            "OrchestratorIntegration",
+        ),
         "IntegrationConfig": ("victor.agent.orchestrator_integration", "IntegrationConfig"),
         "IntegrationMetrics": ("victor.agent.orchestrator_integration", "IntegrationMetrics"),
         "enhance_orchestrator": ("victor.agent.orchestrator_integration", "enhance_orchestrator"),

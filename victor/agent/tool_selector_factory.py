@@ -212,12 +212,12 @@ def _create_semantic_selector(
 
     # Extract embedding model from the embedding service
     # The embedding_service has model_name attribute that we can use
-    embedding_model = getattr(embedding_service, 'model_name', 'all-MiniLM-L6-v2')
+    embedding_model = getattr(embedding_service, "model_name", "all-MiniLM-L6-v2")
 
     # IMPORTANT: Always use sentence-transformers for semantic search regardless of LLM provider
     # This ensures consistency in context retrieval quality across all providers (ollama, openai, etc.)
     # Using different embedding models per provider would break parity and cause inconsistent behavior
-    embedding_provider = 'sentence-transformers'
+    embedding_provider = "sentence-transformers"
 
     return SemanticToolSelector(
         embedding_model=embedding_model,

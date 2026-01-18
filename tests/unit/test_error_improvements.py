@@ -411,4 +411,3 @@ class TestConfigurationValidationErrors:
         assert error.recovery_hint is not None
         assert "config.json" in error.recovery_hint
         assert "victor workflow validate" not in error.recovery_hint
-

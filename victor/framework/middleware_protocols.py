@@ -137,9 +137,7 @@ class IMiddleware(Protocol):
     """
 
     @abstractmethod
-    async def before_tool_call(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
         """Called before a tool is executed.
 
         This is the primary interception point for middleware. Use it to:

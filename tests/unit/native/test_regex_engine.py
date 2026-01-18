@@ -21,6 +21,7 @@ import pytest
 # Check if native module is available
 try:
     from victor.native.rust.regex_engine import compile_language_patterns
+
     NATIVE_AVAILABLE = compile_language_patterns is not None
 except ImportError:
     NATIVE_AVAILABLE = False
@@ -39,6 +40,7 @@ def test_import_regex_engine():
         CompiledRegexSet,
         MatchResult,
     )
+
     assert compile_language_patterns is not None
     assert list_supported_languages is not None
     assert get_language_categories is not None

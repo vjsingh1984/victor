@@ -342,6 +342,7 @@ class MiddlewareBuilder:
         Returns:
             Self for fluent chaining
         """
+
         def factory() -> MiddlewareProtocol:
             from victor.framework.middleware import LoggingMiddleware
 
@@ -364,6 +365,7 @@ class MiddlewareBuilder:
         Returns:
             Self for fluent chaining
         """
+
         def factory() -> MiddlewareProtocol:
             from victor.framework.middleware import GitSafetyMiddleware
 
@@ -384,6 +386,7 @@ class MiddlewareBuilder:
         Returns:
             Self for fluent chaining
         """
+
         def factory() -> MiddlewareProtocol:
             from victor.framework.middleware import SecretMaskingMiddleware
 
@@ -401,6 +404,7 @@ class MiddlewareBuilder:
         Returns:
             Self for fluent chaining
         """
+
         def factory() -> MiddlewareProtocol:
             from victor.framework.middleware import MetricsMiddleware
 
@@ -423,6 +427,7 @@ class MiddlewareBuilder:
         Returns:
             Self for fluent chaining
         """
+
         def factory() -> MiddlewareProtocol:
             from victor.framework.middleware import ValidationMiddleware
 
@@ -448,6 +453,7 @@ class MiddlewareBuilder:
         Returns:
             Self for fluent chaining
         """
+
         def factory() -> MiddlewareProtocol:
             from victor.framework.middleware import CacheMiddleware
 
@@ -470,6 +476,7 @@ class MiddlewareBuilder:
         Returns:
             Self for fluent chaining
         """
+
         def factory() -> MiddlewareProtocol:
             from victor.framework.middleware import RateLimitMiddleware
 
@@ -546,12 +553,7 @@ class MiddlewareBuilder:
         Returns:
             Builder configured with standard middleware
         """
-        return (
-            cls()
-            .with_logging()
-            .with_git_safety(block_dangerous=False)
-            .with_secret_masking()
-        )
+        return cls().with_logging().with_git_safety(block_dangerous=False).with_secret_masking()
 
     @classmethod
     def safe(cls) -> "MiddlewareBuilder":
@@ -591,11 +593,7 @@ class MiddlewareBuilder:
         Returns:
             Builder configured with performance middleware
         """
-        return (
-            cls()
-            .with_cache(ttl=600, max_size=2000)
-            .with_rate_limit(max_calls=200, window=60)
-        )
+        return cls().with_cache(ttl=600, max_size=2000).with_rate_limit(max_calls=200, window=60)
 
 
 __all__ = [

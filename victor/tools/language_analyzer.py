@@ -66,6 +66,7 @@ from typing import Any, Dict, List, Optional, Protocol, Set, Tuple, Type, runtim
 # Import Rust-accelerated regex engine for 10-20x faster pattern matching
 try:
     from victor.native.accelerators import get_regex_engine_accelerator
+
     _REGEX_ACCELERATOR_AVAILABLE = True
 except ImportError:
     _REGEX_ACCELERATOR_AVAILABLE = False

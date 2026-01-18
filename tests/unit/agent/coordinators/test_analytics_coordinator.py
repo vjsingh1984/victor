@@ -75,6 +75,7 @@ class TestBaseAnalyticsExporter:
         exporter = BaseAnalyticsExporter(exporter_type="test")
 
         import asyncio
+
         with pytest.raises(NotImplementedError):
             asyncio.run(exporter.export({}))
 
@@ -367,9 +368,7 @@ class TestAnalyticsCoordinator:
     def test_init_with_exporters(self):
         """Test initialization with exporters."""
         exporter = MockAnalyticsExporter()
-        coordinator = AnalyticsCoordinator(
-            exporters=[exporter], enable_memory_storage=False
-        )
+        coordinator = AnalyticsCoordinator(exporters=[exporter], enable_memory_storage=False)
 
         assert len(coordinator._exporters) == 1
         assert coordinator._enable_memory_storage is False
@@ -402,13 +401,13 @@ class TestAnalyticsCoordinator:
                 event_type="tool_call",
                 timestamp="2025-01-01T00:00:00",
                 session_id="session123",
-                data={}
+                data={},
             ),
             AnalyticsEvent(
                 event_type="llm_request",
                 timestamp="2025-01-01T00:01:00",
                 session_id="session123",
-                data={}
+                data={},
             ),
         ]
 
@@ -435,11 +434,8 @@ class TestAnalyticsCoordinator:
         await coordinator.track_event(
             "session123",
             AnalyticsEvent(
-                event_type="test",
-                timestamp="2025-01-01T00:00:00",
-                session_id="session123",
-                data={}
-            )
+                event_type="test", timestamp="2025-01-01T00:00:00", session_id="session123", data={}
+            ),
         )
 
         result = await coordinator.export_analytics("session123")
@@ -459,8 +455,8 @@ class TestAnalyticsCoordinator:
                 event_type="tool_call",
                 timestamp="2025-01-01T00:00:00",
                 session_id="session123",
-                data={}
-            )
+                data={},
+            ),
         )
         await coordinator_with_exporters.track_event(
             "session123",
@@ -468,8 +464,8 @@ class TestAnalyticsCoordinator:
                 event_type="llm_request",
                 timestamp="2025-01-01T00:01:00",
                 session_id="session123",
-                data={}
-            )
+                data={},
+            ),
         )
 
         result = await coordinator_with_exporters.export_analytics("session123")
@@ -486,11 +482,8 @@ class TestAnalyticsCoordinator:
         await coordinator_with_exporters.track_event(
             "session123",
             AnalyticsEvent(
-                event_type="test",
-                timestamp="2025-01-01T00:00:00",
-                session_id="session123",
-                data={}
-            )
+                event_type="test", timestamp="2025-01-01T00:00:00", session_id="session123", data={}
+            ),
         )
 
         # Export to first exporter only
@@ -513,11 +506,8 @@ class TestAnalyticsCoordinator:
         await coordinator.track_event(
             "session123",
             AnalyticsEvent(
-                event_type="test",
-                timestamp="2025-01-01T00:00:00",
-                session_id="session123",
-                data={}
-            )
+                event_type="test", timestamp="2025-01-01T00:00:00", session_id="session123", data={}
+            ),
         )
 
         result = await coordinator.export_analytics("session123")
@@ -537,8 +527,8 @@ class TestAnalyticsCoordinator:
                 event_type="tool_call",
                 timestamp="2025-01-01T00:00:00",
                 session_id="session1",
-                data={}
-            )
+                data={},
+            ),
         )
         await coordinator.track_event(
             "session2",
@@ -546,8 +536,8 @@ class TestAnalyticsCoordinator:
                 event_type="llm_request",
                 timestamp="2025-01-01T00:01:00",
                 session_id="session2",
-                data={}
-            )
+                data={},
+            ),
         )
 
         result = await coordinator.query_analytics(AnalyticsQuery())
@@ -566,8 +556,8 @@ class TestAnalyticsCoordinator:
                 event_type="tool_call",
                 timestamp="2025-01-01T00:00:00",
                 session_id="session1",
-                data={}
-            )
+                data={},
+            ),
         )
         await coordinator.track_event(
             "session2",
@@ -575,8 +565,8 @@ class TestAnalyticsCoordinator:
                 event_type="llm_request",
                 timestamp="2025-01-01T00:01:00",
                 session_id="session2",
-                data={}
-            )
+                data={},
+            ),
         )
 
         result = await coordinator.query_analytics(AnalyticsQuery(session_id="session1"))
@@ -595,8 +585,8 @@ class TestAnalyticsCoordinator:
                 event_type="tool_call",
                 timestamp="2025-01-01T00:00:00",
                 session_id="session1",
-                data={}
-            )
+                data={},
+            ),
         )
         await coordinator.track_event(
             "session1",
@@ -604,8 +594,8 @@ class TestAnalyticsCoordinator:
                 event_type="llm_request",
                 timestamp="2025-01-01T00:01:00",
                 session_id="session1",
-                data={}
-            )
+                data={},
+            ),
         )
 
         result = await coordinator.query_analytics(AnalyticsQuery(event_types=["tool_call"]))
@@ -625,8 +615,8 @@ class TestAnalyticsCoordinator:
                     event_type=f"event_{i}",
                     timestamp="2025-01-01T00:00:00",
                     session_id="session1",
-                    data={}
-                )
+                    data={},
+                ),
             )
 
         result = await coordinator.query_analytics(AnalyticsQuery(limit=5))
@@ -652,8 +642,8 @@ class TestAnalyticsCoordinator:
                 event_type="tool_call",
                 timestamp="2025-01-01T00:00:00",
                 session_id="session123",
-                data={}
-            )
+                data={},
+            ),
         )
         await coordinator.track_event(
             "session123",
@@ -661,8 +651,8 @@ class TestAnalyticsCoordinator:
                 event_type="tool_call",
                 timestamp="2025-01-01T00:01:00",
                 session_id="session123",
-                data={}
-            )
+                data={},
+            ),
         )
         await coordinator.track_event(
             "session123",
@@ -670,8 +660,8 @@ class TestAnalyticsCoordinator:
                 event_type="llm_request",
                 timestamp="2025-01-01T00:02:00",
                 session_id="session123",
-                data={}
-            )
+                data={},
+            ),
         )
 
         stats = await coordinator.get_session_stats("session123")
@@ -723,11 +713,8 @@ class TestAnalyticsCoordinator:
         await coordinator_with_exporters.track_event(
             "session123",
             AnalyticsEvent(
-                event_type="test",
-                timestamp="2025-01-01T00:00:00",
-                session_id="session123",
-                data={}
-            )
+                event_type="test", timestamp="2025-01-01T00:00:00", session_id="session123", data={}
+            ),
         )
 
         coordinator_with_exporters.clear_session("session123")
@@ -742,20 +729,14 @@ class TestAnalyticsCoordinator:
         await coordinator_with_exporters.track_event(
             "session1",
             AnalyticsEvent(
-                event_type="test",
-                timestamp="2025-01-01T00:00:00",
-                session_id="session1",
-                data={}
-            )
+                event_type="test", timestamp="2025-01-01T00:00:00", session_id="session1", data={}
+            ),
         )
         await coordinator_with_exporters.track_event(
             "session2",
             AnalyticsEvent(
-                event_type="test",
-                timestamp="2025-01-01T00:00:00",
-                session_id="session2",
-                data={}
-            )
+                event_type="test", timestamp="2025-01-01T00:00:00", session_id="session2", data={}
+            ),
         )
 
         coordinator_with_exporters.clear_all_sessions()
@@ -771,11 +752,8 @@ class TestAnalyticsCoordinator:
         await coordinator.track_event(
             "session123",
             AnalyticsEvent(
-                event_type="test",
-                timestamp="2025-01-01T00:00:00",
-                session_id="session123",
-                data={}
-            )
+                event_type="test", timestamp="2025-01-01T00:00:00", session_id="session123", data={}
+            ),
         )
         first_timestamp = coordinator._session_analytics["session123"].updated_at
 
@@ -787,8 +765,8 @@ class TestAnalyticsCoordinator:
                 event_type="test2",
                 timestamp="2025-01-01T00:00:01",
                 session_id="session123",
-                data={}
-            )
+                data={},
+            ),
         )
 
         second_timestamp = coordinator._session_analytics["session123"].updated_at
@@ -808,11 +786,8 @@ class TestAnalyticsCoordinator:
         await coordinator.track_event(
             "session123",
             AnalyticsEvent(
-                event_type="test",
-                timestamp="2025-01-01T00:00:00",
-                session_id="session123",
-                data={}
-            )
+                event_type="test", timestamp="2025-01-01T00:00:00", session_id="session123", data={}
+            ),
         )
 
         result = await coordinator.export_analytics("session123")
@@ -829,29 +804,20 @@ class TestAnalyticsCoordinator:
         await coordinator.track_event(
             "session1",
             AnalyticsEvent(
-                event_type="test",
-                timestamp="2025-01-01T00:00:00",
-                session_id="session1",
-                data={}
-            )
+                event_type="test", timestamp="2025-01-01T00:00:00", session_id="session1", data={}
+            ),
         )
         await coordinator.track_event(
             "session1",
             AnalyticsEvent(
-                event_type="test",
-                timestamp="2025-01-02T00:00:00",
-                session_id="session1",
-                data={}
-            )
+                event_type="test", timestamp="2025-01-02T00:00:00", session_id="session1", data={}
+            ),
         )
         await coordinator.track_event(
             "session1",
             AnalyticsEvent(
-                event_type="test",
-                timestamp="2025-01-03T00:00:00",
-                session_id="session1",
-                data={}
-            )
+                event_type="test", timestamp="2025-01-03T00:00:00", session_id="session1", data={}
+            ),
         )
 
         result = await coordinator.query_analytics(
@@ -863,4 +829,3 @@ class TestAnalyticsCoordinator:
 
         assert len(result.events) == 1
         assert result.events[0].timestamp == "2025-01-02T00:00:00"
-
