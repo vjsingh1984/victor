@@ -105,6 +105,7 @@ class CompilerConfig:
         preserve_state_type: Whether to preserve typed state or use dict.
         emitter: Optional ObservabilityEmitter for streaming events (Phase 5).
         enable_observability: Whether to emit observability events during execution.
+        max_recursion_depth: Maximum recursion depth for nested execution (default: 3).
     """
 
     use_node_runners: bool = False
@@ -113,6 +114,7 @@ class CompilerConfig:
     preserve_state_type: bool = False
     emitter: Optional[Any] = None  # ObservabilityEmitter, use Any to avoid circular import
     enable_observability: bool = False
+    max_recursion_depth: int = 3
 
 
 # =============================================================================

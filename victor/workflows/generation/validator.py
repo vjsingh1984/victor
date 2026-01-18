@@ -583,7 +583,7 @@ class GraphStructureValidator:
         Returns:
             List of validation errors
         """
-        errors = []
+        errors: List[WorkflowValidationError] = []
 
         nodes = workflow.get("nodes", [])
         edges = workflow.get("edges", [])
@@ -613,7 +613,7 @@ class GraphStructureValidator:
         self, nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]
     ) -> Dict[str, List[str]]:
         """Build adjacency list representation."""
-        graph = {node.get("id"): [] for node in nodes if "id" in node}
+        graph: Dict[str, List[str]] = {node.get("id"): [] for node in nodes if "id" in node}
 
         for edge in edges:
             source = edge.get("source")
@@ -632,7 +632,7 @@ class GraphStructureValidator:
         self, graph: Dict[str, List[str]], entry_point: str, nodes: List[Dict[str, Any]]
     ) -> List[WorkflowValidationError]:
         """Check all nodes are reachable from entry point."""
-        errors = []
+        errors: List[WorkflowValidationError] = []
 
         if entry_point not in graph:
             return errors  # Schema validation will catch this

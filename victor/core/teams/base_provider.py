@@ -41,6 +41,7 @@ class TeamFormationType(str):
         HIERARCHICAL: Manager-worker pattern
         CONSENSUS: Vote-based decision making
     """
+
     PIPELINE = "pipeline"
     PARALLEL = "parallel"
     SEQUENTIAL = "sequential"
@@ -62,6 +63,7 @@ class AgentRole:
         capabilities: Specific capabilities this role has
         config: Additional role configuration
     """
+
     name: str
     display_name: str
     description: str
@@ -89,6 +91,7 @@ class TeamSpecification:
         voting_strategy: Voting mechanism for consensus (optional)
         max_iterations: Maximum iterations before stopping
     """
+
     name: str
     display_name: str
     description: str

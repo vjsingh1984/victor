@@ -287,16 +287,9 @@ class ToolSelectionCache:
             self._record_miss(namespace)
             return None
 
-        # Check if expired (double-check since registry handles TTL)
-        if entry.is_expired():
-            registry.invalidate(key=key)
-            self._record_miss(namespace)
-            return None
-
-        # Record hit
+        # Record hit (registry already handles TTL validation)
         entry.record_hit()
         self._record_hit(namespace)
-        self._update_entry_count(namespace)
 
         logger.debug(f"Cache hit: namespace={namespace}, key={key[:8]}...")
         return entry
@@ -342,8 +335,6 @@ class ToolSelectionCache:
 
         # Store in registry
         registry.register(key, cached, ttl=ttl)
-
-        self._update_entry_count(namespace)
         logger.debug(f"Cache put: namespace={namespace}, key={key[:8]}..., tools={len(value)}")
 
     # ========================================================================
@@ -466,7 +457,6 @@ class ToolSelectionCache:
             registry = self._get_registry(namespace)
             if registry:
                 count = registry.invalidate(key=key)
-                self._update_entry_count(namespace)
                 logger.info(f"Invalidated {count} entries in namespace '{namespace}'")
                 return count
         else:
@@ -476,7 +466,6 @@ class ToolSelectionCache:
                 registry = self._get_registry(ns)
                 if registry:
                     total += registry.invalidate()
-            self._update_all_entry_counts()
             logger.info(f"Invalidated all {total} cache entries")
             return total
 
@@ -508,11 +497,22 @@ class ToolSelectionCache:
         """
         with self._metrics_lock:
             if namespace:
-                return self._metrics.get(namespace, CacheMetrics())
+                # Update entry count on-demand
+                metrics = self._metrics.get(namespace, CacheMetrics())
+                registry = self._get_registry(namespace)
+                if registry:
+                    stats = registry.get_stats()
+                    metrics.total_entries = stats.get("total_entries", 0)
+                return metrics
 
             # Combine metrics from all namespaces
             combined = CacheMetrics()
-            for metrics in self._metrics.values():
+            for ns in [self.NAMESPACE_QUERY, self.NAMESPACE_CONTEXT, self.NAMESPACE_RL]:
+                metrics = self._metrics.get(ns, CacheMetrics())
+                registry = self._get_registry(ns)
+                if registry:
+                    stats = registry.get_stats()
+                    metrics.total_entries = stats.get("total_entries", 0)
                 combined.hits += metrics.hits
                 combined.misses += metrics.misses
                 combined.evictions += metrics.evictions
@@ -647,23 +647,6 @@ class ToolSelectionCache:
         with self._metrics_lock:
             if namespace in self._metrics:
                 self._metrics[namespace].record_miss()
-
-    def _update_entry_count(self, namespace: str) -> None:
-        """Update entry count for namespace.
-
-        Args:
-            namespace: Cache namespace
-        """
-        with self._metrics_lock:
-            registry = self._get_registry(namespace)
-            if registry and namespace in self._metrics:
-                stats = registry.get_stats()
-                self._metrics[namespace].total_entries = stats.get("total_entries", 0)
-
-    def _update_all_entry_counts(self) -> None:
-        """Update entry counts for all namespaces."""
-        for ns in [self.NAMESPACE_QUERY, self.NAMESPACE_CONTEXT, self.NAMESPACE_RL]:
-            self._update_entry_count(ns)
 
 
 # Global singleton instance

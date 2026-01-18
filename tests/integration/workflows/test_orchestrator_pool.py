@@ -45,21 +45,21 @@ def mock_settings():
     profiles = {
         "default": ProfileConfig(
             provider="ollama",
-            model="qwen3-coder:30b",
+            model_name="qwen3-coder:30b",
             temperature=0.7,
             max_tokens=4096,
             description="Default profile",
         ),
         "anthropic": ProfileConfig(
             provider="anthropic",
-            model="claude-sonnet-4-5",
+            model_name="claude-sonnet-4-5",
             temperature=0.7,
             max_tokens=8192,
             description="Anthropic profile",
         ),
         "openai": ProfileConfig(
             provider="openai",
-            model="gpt-4",
+            model_name="gpt-4",
             temperature=0.5,
             max_tokens=4096,
             description="OpenAI profile",

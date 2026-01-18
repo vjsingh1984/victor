@@ -170,6 +170,7 @@ def create_coordinator(
     lightweight: bool = False,
     with_observability: bool = True,
     with_rl: bool = True,
+    recursion_context: Optional[Any] = None,
 ) -> ITeamCoordinator:
     """Factory function for creating team coordinators.
 
@@ -181,6 +182,7 @@ def create_coordinator(
         lightweight: Use lightweight mode (disables mixins, for testing)
         with_observability: Enable EventBus integration (default: True)
         with_rl: Enable RL integration (default: True)
+        recursion_context: Optional RecursionContext for tracking nested execution
 
     Returns:
         ITeamCoordinator implementation (UnifiedTeamCoordinator)
@@ -202,6 +204,11 @@ def create_coordinator(
             with_rl=False,
         )
 
+        # With shared recursion context (for nested workflow/team execution)
+        from victor.workflows.recursion import RecursionContext
+        ctx = RecursionContext(max_depth=3)
+        coordinator = create_coordinator(orchestrator, recursion_context=ctx)
+
     See Also:
         MIGRATION_GUIDE.md: Complete migration instructions
         UnifiedTeamCoordinator: Direct coordinator class
@@ -213,6 +220,7 @@ def create_coordinator(
         enable_observability=with_observability if not lightweight else False,
         enable_rl=with_rl if not lightweight else False,
         lightweight_mode=lightweight,
+        recursion_context=recursion_context,
     )
 
 

@@ -52,6 +52,8 @@ Example (YAML):
             goal: "Analyze data patterns"
 """
 
+from typing import Optional
+
 from victor.workflows.base import BaseWorkflow
 from victor.workflows.definition import (
     WorkflowNodeType,
@@ -108,13 +110,79 @@ from victor.workflows.yaml_loader import (
     load_and_validate,
 )
 from victor.workflows.cache import (
-    WorkflowCacheConfig,
+    WorkflowCacheConfig as _LegacyWorkflowCacheConfig,
     WorkflowNodeCacheEntry,
-    WorkflowCache,
-    WorkflowCacheManager,
-    get_workflow_cache_manager,
-    configure_workflow_cache,
+    WorkflowCache as _LegacyWorkflowCache,
+    WorkflowCacheManager as _LegacyWorkflowCacheManager,
+    get_workflow_cache_manager as _get_workflow_cache_manager,
+    configure_workflow_cache as _configure_workflow_cache,
 )
+
+
+class WorkflowCacheConfig(_LegacyWorkflowCacheConfig):
+    """Package-level defaults with cache disabled unless explicitly enabled."""
+
+    def __init__(
+        self,
+        enabled: bool = False,
+        ttl_seconds: int = 3600,
+        max_entries: int = 500,
+        **kwargs: object,
+    ) -> None:
+        if "max_size" in kwargs and "max_entries" not in kwargs:
+            max_entries = kwargs.pop("max_size")
+        super().__init__(
+            enabled=enabled,
+            ttl_seconds=ttl_seconds,
+            max_entries=max_entries,
+            **kwargs,
+        )
+
+
+class WorkflowCache(_LegacyWorkflowCache):
+    """WorkflowCache with package-level defaults."""
+
+    def __init__(self, config: Optional[_LegacyWorkflowCacheConfig] = None) -> None:
+        super().__init__(config or WorkflowCacheConfig())
+
+
+class WorkflowCacheManager(_LegacyWorkflowCacheManager):
+    """WorkflowCacheManager with package-level defaults."""
+
+    def __init__(self, default_config: Optional[_LegacyWorkflowCacheConfig] = None) -> None:
+        super().__init__(default_config or WorkflowCacheConfig())
+
+    def get_cache(
+        self,
+        workflow_name: str,
+        config: Optional[_LegacyWorkflowCacheConfig] = None,
+    ) -> Optional[WorkflowCache]:
+        """Get or create cache for a workflow (package-level behavior)."""
+        with self._lock:
+            cache = self._caches.get(workflow_name)
+            if cache is None:
+                cache_config = config or self._default_config
+                cache = WorkflowCache(cache_config)
+                self._caches[workflow_name] = cache
+            return cache
+
+
+_package_workflow_cache_manager: Optional[WorkflowCacheManager] = None
+
+
+def get_workflow_cache_manager() -> WorkflowCacheManager:
+    """Get the package-level workflow cache manager."""
+    global _package_workflow_cache_manager
+    if _package_workflow_cache_manager is None:
+        _package_workflow_cache_manager = WorkflowCacheManager()
+    return _package_workflow_cache_manager
+
+
+def configure_workflow_cache(config: WorkflowCacheConfig) -> None:
+    """Configure the package-level workflow cache manager."""
+    global _package_workflow_cache_manager
+    _configure_workflow_cache(config)
+    _package_workflow_cache_manager = WorkflowCacheManager(config)
 from victor.workflows.graph_dsl import (
     State,
     WorkflowGraph,  # Typed workflow graph DSL (compiles to WorkflowDefinition)

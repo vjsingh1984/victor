@@ -205,7 +205,7 @@ workflows:
       - id: finalize
         type: agent
         name: "Result Finalizer"
-        role: writer
+        role: reviewer
         goal: |
           Prepare final report based on results:
           {% if single_agent %}{{result}}{% endif %}

@@ -99,7 +99,7 @@ class OrchestratorPool:
         factory = create_orchestrator_factory(
             settings=self._settings,
             provider=provider,
-            model=profile_config.model,
+            model=profile_config.model_name,
         )
 
         # Create orchestrator from factory
@@ -108,7 +108,7 @@ class OrchestratorPool:
             self._orchestrators[profile] = orchestrator
             logger.info(
                 f"OrchestratorPool: Created new orchestrator for profile '{profile}' "
-                f"(provider={profile_config.provider}, model={profile_config.model})"
+                f"(provider={profile_config.provider}, model={profile_config.model_name})"
             )
             return orchestrator
         except Exception as e:

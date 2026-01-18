@@ -27,7 +27,7 @@ import asyncio
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 class EmbeddingModelConfig(BaseModel):
@@ -35,13 +35,39 @@ class EmbeddingModelConfig(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    embedding_type: str = Field(default="sentence-transformers", description="Embedding provider type (sentence-transformers, openai, cohere, ollama, etc.)")
-    embedding_model: str = Field(default="BAAI/bge-small-en-v1.5", description="Specific model name")
+    embedding_type: str = Field(
+        default="sentence-transformers",
+        description="Embedding provider type (sentence-transformers, openai, cohere, ollama, etc.)",
+        validation_alias=AliasChoices("embedding_type", "model_type"),
+    )
+    embedding_model: str = Field(
+        default="BAAI/bge-small-en-v1.5",
+        description="Specific model name",
+        validation_alias=AliasChoices("embedding_model", "model_name"),
+    )
     dimension: int = Field(
         default=384, description="Embedding dimension (auto-detected if possible)"
     )
     api_key: Optional[str] = Field(default=None, description="API key for cloud providers")
     batch_size: int = Field(default=32, description="Batch size for embedding generation")
+
+    @property
+    def model_type(self) -> str:
+        """Backwards-compatible alias for embedding_type."""
+        return self.embedding_type
+
+    @model_type.setter
+    def model_type(self, value: str) -> None:
+        self.embedding_type = value
+
+    @property
+    def model_name(self) -> str:
+        """Backwards-compatible alias for embedding_model."""
+        return self.embedding_model
+
+    @model_name.setter
+    def model_name(self, value: str) -> None:
+        self.embedding_model = value
 
 
 class BaseEmbeddingModel(ABC):

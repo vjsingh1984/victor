@@ -43,7 +43,7 @@ import hashlib
 import json
 import logging
 import time
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 from victor.protocols import IPromptContributor, PromptContext
 

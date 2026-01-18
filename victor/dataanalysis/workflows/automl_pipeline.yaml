@@ -437,7 +437,7 @@ workflows:
       - id: generate_report
         type: agent
         name: "Generate AutoML Report"
-        role: writer
+        role: reviewer
         goal: |
           Generate a comprehensive AutoML report including:
           1. Executive summary

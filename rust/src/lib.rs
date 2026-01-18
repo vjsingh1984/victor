@@ -38,24 +38,41 @@
 //! - `yaml_loader`: Fast YAML parsing for workflow definitions (v0.4.0)
 //! - `ast_indexer`: Fast stdlib detection and identifier extraction (v0.4.0)
 //! - `arg_normalizer`: Fast JSON repair and type coercion (v0.4.0)
+//! - `tool_selector`: High-performance tool selection with caching (v0.5.0)
+//! - `ast_processor`: High-performance tree-sitter AST parsing with caching (v0.5.1)
+//! - `embedding_ops`: High-performance embedding operations with SIMD (v0.5.1)
+//! - `signature`: Fast tool call signature computation for deduplication (v0.5.1)
+//! - `file_ops`: High-performance parallel file system operations (v0.5.1)
+//! - `batch_processor`: High-performance batch processing coordinator (v0.5.1)
+//! - `graph_algorithms`: High-performance graph algorithms for code analysis (v0.5.1)
+//! - `serialization`: High-performance JSON/YAML parsing and serialization (v0.5.1)
 
 use pyo3::prelude::*;
 
 mod arg_normalizer;
 mod ast_indexer;
+mod ast_processor;
+mod batch_processor;
 mod chunking;
 mod classifier;
 mod dedup;
 mod embeddings;
+mod embedding_ops;
 mod extractor;
+mod file_ops;
+mod graph_algorithms;
 mod hashing;
 mod json_repair;
 mod pattern_match;
+// mod regex_engine;  // TODO: Fix compilation errors in regex_engine.rs
 mod sanitizer;
+// mod serialization;  // TODO: Fix compilation errors in serialization.rs
 mod secrets;
+// mod signature;
 mod similarity;
 mod streaming_filter;
 mod thinking;
+mod tool_selector;
 mod yaml_loader;
 
 /// Victor Native Extensions Module
@@ -227,5 +244,79 @@ fn victor_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(arg_normalizer::is_valid_json, m)?)?;
     m.add_function(wrap_pyfunction!(arg_normalizer::get_json_type, m)?)?;
 
+    // Tool selector functions (v0.5.0 - high-performance tool selection)
+    m.add_function(wrap_pyfunction!(tool_selector::cosine_similarity_batch, m)?)?;
+    m.add_function(wrap_pyfunction!(tool_selector::topk_indices, m)?)?;
+    m.add_function(wrap_pyfunction!(tool_selector::filter_by_category, m)?)?;
+    m.add_function(wrap_pyfunction!(tool_selector::topk_tools_by_similarity, m)?)?;
+    m.add_function(wrap_pyfunction!(tool_selector::filter_by_similarity_threshold, m)?)?;
+
+    // AST processor classes and functions (v0.5.1 - tree-sitter acceleration)
+    m.add_class::<ast_processor::PyAstProcessor>()?;
+    m.add_class::<ast_processor::PyAstTree>()?;
+    m.add_class::<ast_processor::PyNodeMatch>()?;
+    m.add_class::<ast_processor::PyExtractedSymbol>()?;
+    m.add_function(wrap_pyfunction!(ast_processor::parse_to_ast, m)?)?;
+    m.add_function(wrap_pyfunction!(ast_processor::parse_to_ast_batch, m)?)?;
+    m.add_function(wrap_pyfunction!(ast_processor::execute_query, m)?)?;
+    m.add_function(wrap_pyfunction!(ast_processor::extract_symbols, m)?)?;
+    m.add_function(wrap_pyfunction!(ast_processor::extract_symbols_batch, m)?)?;
+
+    // Embedding operations (v0.5.1 - SIMD-optimized embedding operations)
+    m.add_function(wrap_pyfunction!(embedding_ops::batch_cosine_similarity_simd, m)?)?;
+    m.add_function(wrap_pyfunction!(embedding_ops::topk_indices_partial, m)?)?;
+    m.add_function(wrap_pyfunction!(embedding_ops::similarity_matrix, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        embedding_ops::batch_cosine_similarity_parallel,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(embedding_ops::batch_top_k_similar, m)?)?;
+    m.add_class::<embedding_ops::EmbeddingCache>()?;
+
+    // Signature computation (v0.5.1 - fast tool call deduplication)
+//     m.add_function(wrap_pyfunction!(signature::compute_tool_call_signature, m)?)?;
+//     m.add_function(wrap_pyfunction!(
+//         signature::batch_compute_tool_call_signatures,
+//         m
+//     )?)?;
+//     m.add_class::<signature::ToolCallData>()?;
+//     m.add_function(wrap_pyfunction!(signature::deduplicate_tool_calls, m)?)?;
+//     m.add_function(wrap_pyfunction!(signature::deduplicate_tool_calls_dict, m)?)?;
+// 
+//     // Regex engine (v0.5.1 - high-performance code pattern matching)
+// //     m.add_class::<regex_engine::CompiledRegexSet>()?;
+// //     m.add_class::<regex_engine::MatchResult>()?;
+// //     m.add_function(wrap_pyfunction!(regex_engine::compile_language_patterns, m)?)?;
+// //     m.add_function(wrap_pyfunction!(regex_engine::list_supported_languages, m)?)?;
+// //     m.add_function(wrap_pyfunction!(regex_engine::get_language_categories, m)?)?;
+
+    // File operations (v0.5.1 - high-performance parallel file system operations)
+    m.add_class::<file_ops::FileInfo>()?;
+    m.add_class::<file_ops::FileMetadata>()?;
+    m.add_function(wrap_pyfunction!(file_ops::walk_directory_parallel, m)?)?;
+    m.add_function(wrap_pyfunction!(file_ops::collect_metadata, m)?)?;
+    m.add_function(wrap_pyfunction!(file_ops::filter_by_extension, m)?)?;
+    m.add_function(wrap_pyfunction!(file_ops::filter_by_size, m)?)?;
+    m.add_function(wrap_pyfunction!(file_ops::get_directory_stats, m)?)?;
+    m.add_function(wrap_pyfunction!(file_ops::group_by_directory, m)?)?;
+    m.add_function(wrap_pyfunction!(file_ops::filter_by_modified_time, m)?)?;
+
+    // Graph algorithms (v0.5.1 - high-performance graph algorithms for code analysis)
+    m.add_class::<graph_algorithms::Graph>()?;
+    m.add_function(wrap_pyfunction!(graph_algorithms::graph_from_edge_list, m)?)?;
+    m.add_function(wrap_pyfunction!(graph_algorithms::graph_from_adjacency_matrix, m)?)?;
+
+    // Batch processor (v0.5.1 - high-performance parallel task coordination)
+    m.add_class::<batch_processor::BatchTask>()?;
+    m.add_class::<batch_processor::BatchResult>()?;
+    m.add_class::<batch_processor::BatchProcessor>()?;
+    m.add_class::<batch_processor::BatchProcessSummary>()?;
+    m.add_class::<batch_processor::BatchProgress>()?;
+    m.add_function(wrap_pyfunction!(batch_processor::create_task_batches, m)?)?;
+    m.add_function(wrap_pyfunction!(batch_processor::merge_batch_summaries, m)?)?;
+    m.add_function(wrap_pyfunction!(batch_processor::calculate_optimal_batch_size, m)?)?;
+    m.add_function(wrap_pyfunction!(batch_processor::estimate_batch_duration, m)?)?;
+
+    // Serialization (v0.5.1 - high-performance JSON/YAML parsing and serialization)
     Ok(())
 }

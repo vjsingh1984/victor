@@ -370,7 +370,7 @@ workflows:
       - id: document_changes
         type: agent
         name: "Document Changes"
-        role: writer
+        role: reviewer
         goal: |
           Create comprehensive documentation of the cleaning process:
 
@@ -468,7 +468,7 @@ workflows:
       - id: quick_summary
         type: agent
         name: "Quick Summary"
-        role: writer
+        role: reviewer
         goal: "Write a 3-sentence summary of what was cleaned."
         tool_budget: 5
         llm_config:

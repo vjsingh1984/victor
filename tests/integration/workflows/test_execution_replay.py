@@ -311,20 +311,24 @@ class TestExecutionReplayer:
 
         node1_events = replayer.get_node_events("node1")
 
-        assert len(node1_events) == 2
+        # node1 has NODE_START, NODE_COMPLETE, and STATE_SNAPSHOT events
+        assert len(node1_events) == 3
         assert node1_events[0].event_type == RecordingEventType.NODE_START
         assert node1_events[1].event_type == RecordingEventType.NODE_COMPLETE
+        assert node1_events[2].event_type == RecordingEventType.STATE_SNAPSHOT
 
     def test_jump_to_event(self, sample_recording):
         """Test jumping to a specific event."""
         replayer = ExecutionReplayer.load(sample_recording)
 
-        # Jump to node2 completion
-        node2_event = replayer.get_node_events("node2")[1]
-        success = replayer.jump_to_event(node2_event.event_id)
+        # Jump to node2 completion (node2 has NODE_START and NODE_COMPLETE events)
+        node2_events = replayer.get_node_events("node2")
+        node2_complete = [e for e in node2_events if e.event_type == RecordingEventType.NODE_COMPLETE][0]
+        success = replayer.jump_to_event(node2_complete.event_id)
 
         assert success is True
-        assert replayer.current_position == 5
+        # Position should be at the index of node2 completion event
+        assert replayer.current_position == replayer.events.index(node2_complete)
 
     @pytest.mark.asyncio
     async def test_compare_recordings(self, tmp_path, sample_recording):
@@ -584,6 +588,7 @@ class TestEndToEndRecording:
         recorder = ExecutionRecorder(
             workflow_name="state_test",
             record_state_snapshots=True,
+            compress=False,  # Disable compression for simpler file handling
         )
 
         recorder.record_workflow_start({"input": "data"})

@@ -410,7 +410,7 @@ workflows:
       - id: generate_answer
         type: agent
         name: "Generate Answer with Citations"
-        role: writer
+        role: reviewer
         goal: |
           Generate a comprehensive answer using the retrieved context.
 
@@ -603,7 +603,7 @@ workflows:
       - id: generate
         type: agent
         name: "Generate Contextual Answer"
-        role: writer
+        role: reviewer
         goal: |
           Generate answer considering conversation context.
 
@@ -716,7 +716,7 @@ workflows:
       - id: generate_response
         type: agent
         name: "Generate Final Response"
-        role: writer
+        role: reviewer
         goal: |
           Generate comprehensive response from synthesis.
 

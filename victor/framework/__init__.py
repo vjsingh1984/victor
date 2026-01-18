@@ -96,6 +96,58 @@ from victor.framework.state import Stage, State, StateHooks, StateObserver
 from victor.framework.task import FrameworkTaskType, Task, TaskResult
 from victor.framework.shim import FrameworkShim, get_vertical, list_verticals
 from victor.framework.tools import ToolCategory, Tools, ToolSet, ToolsInput
+from victor.framework.prompt_builder import (
+    PromptBuilder,
+    PromptSection,
+    ToolHint,
+    create_coding_prompt_builder,
+    create_data_analysis_prompt_builder,
+    create_devops_prompt_builder,
+    create_research_prompt_builder,
+)
+from victor.framework.prompt_sections import (
+    # Grounding rules
+    GROUNDING_RULES_MINIMAL,
+    GROUNDING_RULES_EXTENDED,
+    PARALLEL_READ_GUIDANCE,
+    # Coding sections
+    CODING_IDENTITY,
+    CODING_GUIDELINES,
+    CODING_TOOL_USAGE,
+    # DevOps sections
+    DEVOPS_IDENTITY,
+    DEVOPS_SECURITY_CHECKLIST,
+    DEVOPS_COMMON_PITFALLS,
+    DEVOPS_GROUNDING,
+    # Research sections
+    RESEARCH_IDENTITY,
+    RESEARCH_QUALITY_CHECKLIST,
+    RESEARCH_SOURCE_HIERARCHY,
+    RESEARCH_GROUNDING,
+    # Data Analysis sections
+    DATA_ANALYSIS_IDENTITY,
+    DATA_ANALYSIS_LIBRARIES,
+    DATA_ANALYSIS_OPERATIONS,
+    DATA_ANALYSIS_GROUNDING,
+    # Task hints
+    TASK_HINT_CODE_GENERATION,
+    TASK_HINT_CREATE_SIMPLE,
+    TASK_HINT_CREATE,
+    TASK_HINT_EDIT,
+    TASK_HINT_SEARCH,
+    TASK_HINT_ACTION,
+    TASK_HINT_ANALYSIS_DEEP,
+    TASK_HINT_ANALYZE,
+    TASK_HINT_DESIGN,
+    TASK_HINT_GENERAL,
+    TASK_HINT_REFACTOR,
+    TASK_HINT_DEBUG,
+    TASK_HINT_TEST,
+    # Provider-specific guidance
+    DEEPSEEK_TOOL_EFFICIENCY,
+    XAI_GROK_GUIDANCE,
+    OLLAMA_STRICT_GUIDANCE,
+)
 
 # Lazy-loaded optional subsystems
 # These 81 subsystems are only loaded when accessed via __getattr__
@@ -360,6 +412,25 @@ _LAZY_MODULES = {
     "register_devops_task_types": "victor.framework.task_types",
     "register_research_task_types": "victor.framework.task_types",
     "setup_vertical_task_types": "victor.framework.task_types",
+    # Vertical Templates
+    "VerticalTemplate": "victor.framework.vertical_template",
+    "VerticalMetadata": "victor.framework.vertical_template",
+    "ExtensionSpecs": "victor.framework.vertical_template",
+    "MiddlewareSpec": "victor.framework.vertical_template",
+    "SafetyPatternSpec": "victor.framework.vertical_template",
+    "PromptHintSpec": "victor.framework.vertical_template",
+    "WorkflowSpec": "victor.framework.vertical_template",
+    "TeamSpec": "victor.framework.vertical_template",
+    "TeamRoleSpec": "victor.framework.vertical_template",
+    "CapabilitySpec": "victor.framework.vertical_template",
+    "VerticalTemplateRegistry": "victor.framework.vertical_template_registry",
+    "get_template_registry": "victor.framework.vertical_template_registry",
+    "register_template": "victor.framework.vertical_template_registry",
+    "get_template": "victor.framework.vertical_template_registry",
+    "list_templates": "victor.framework.vertical_template_registry",
+    "VerticalExtractor": "victor.framework.vertical_extractor",
+    "VerticalGenerator": "victor.framework.vertical_extractor",
+    "migrate_vertical_to_template": "victor.framework.vertical_extractor",
 }
 
 __all__ = (
@@ -383,6 +454,14 @@ __all__ = (
         "Stage",
         "StateHooks",
         "StateObserver",
+        # Prompt Builder
+        "PromptBuilder",
+        "PromptSection",
+        "ToolHint",
+        "create_coding_prompt_builder",
+        "create_data_analysis_prompt_builder",
+        "create_devops_prompt_builder",
+        "create_research_prompt_builder",
         # Protocols (Phase 7 - Framework-Orchestrator Interface)
         "OrchestratorProtocol",
         "ConversationStateProtocol",
@@ -421,6 +500,60 @@ __all__ = (
         "BudgetExhaustedError",
         "CancellationError",
         "StateTransitionError",
+        # Prompt Sections
+        "GROUNDING_RULES_MINIMAL",
+        "GROUNDING_RULES_EXTENDED",
+        "PARALLEL_READ_GUIDANCE",
+        "CODING_IDENTITY",
+        "CODING_GUIDELINES",
+        "CODING_TOOL_USAGE",
+        "DEVOPS_IDENTITY",
+        "DEVOPS_SECURITY_CHECKLIST",
+        "DEVOPS_COMMON_PITFALLS",
+        "DEVOPS_GROUNDING",
+        "RESEARCH_IDENTITY",
+        "RESEARCH_QUALITY_CHECKLIST",
+        "RESEARCH_SOURCE_HIERARCHY",
+        "RESEARCH_GROUNDING",
+        "DATA_ANALYSIS_IDENTITY",
+        "DATA_ANALYSIS_LIBRARIES",
+        "DATA_ANALYSIS_OPERATIONS",
+        "DATA_ANALYSIS_GROUNDING",
+        "TASK_HINT_CODE_GENERATION",
+        "TASK_HINT_CREATE_SIMPLE",
+        "TASK_HINT_CREATE",
+        "TASK_HINT_EDIT",
+        "TASK_HINT_SEARCH",
+        "TASK_HINT_ACTION",
+        "TASK_HINT_ANALYSIS_DEEP",
+        "TASK_HINT_ANALYZE",
+        "TASK_HINT_DESIGN",
+        "TASK_HINT_GENERAL",
+        "TASK_HINT_REFACTOR",
+        "TASK_HINT_DEBUG",
+        "TASK_HINT_TEST",
+        "DEEPSEEK_TOOL_EFFICIENCY",
+        "XAI_GROK_GUIDANCE",
+        "OLLAMA_STRICT_GUIDANCE",
+        # Vertical Templates
+        "VerticalTemplate",
+        "VerticalMetadata",
+        "ExtensionSpecs",
+        "MiddlewareSpec",
+        "SafetyPatternSpec",
+        "PromptHintSpec",
+        "WorkflowSpec",
+        "TeamSpec",
+        "TeamRoleSpec",
+        "CapabilitySpec",
+        "VerticalTemplateRegistry",
+        "get_template_registry",
+        "register_template",
+        "get_template",
+        "list_templates",
+        "VerticalExtractor",
+        "VerticalGenerator",
+        "migrate_vertical_to_template",
     ]
     + list(_LAZY_MODULES.keys())  # All lazy-loaded exports
     + ["discover"]  # Capability discovery function
@@ -499,7 +632,7 @@ def __getattr__(name: str):
         import sys
 
         this_module = sys.modules[__name__]
-        setattr(this_module, "discover", discover)
+        this_module.discover = discover
 
         return discover
 

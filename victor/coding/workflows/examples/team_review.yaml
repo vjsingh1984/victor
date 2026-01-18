@@ -226,7 +226,7 @@ workflows:
       - id: synthesize_review
         type: agent
         name: "Review Synthesizer"
-        role: writer
+        role: reviewer
         goal: |
           Synthesize the parallel review findings into a comprehensive report:
           {{review_findings}}
@@ -337,7 +337,7 @@ workflows:
       - id: log_suggestions
         type: agent
         name: "Suggestion Logger"
-        role: writer
+        role: reviewer
         goal: |
           Log the suggestions for later incorporation:
           {{review_report}}
@@ -357,7 +357,7 @@ workflows:
       - id: request_fixes
         type: agent
         name: "Fix Request Handler"
-        role: writer
+        role: reviewer
         goal: |
           Create detailed fix request based on review:
           {{review_report}}

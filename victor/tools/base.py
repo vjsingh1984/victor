@@ -101,6 +101,16 @@ class ToolResult(BaseModel):
     error: Optional[str] = Field(default=None, description="Error message if failed")
     metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
 
+    @classmethod
+    def create_success(cls, output: Any, metadata: Optional[Dict[str, Any]] = None) -> "ToolResult":
+        """Create a successful tool result."""
+        return cls(success=True, output=output, error=None, metadata=metadata)
+
+    @classmethod
+    def create_failure(cls, error: str, output: Any = None, metadata: Optional[Dict[str, Any]] = None) -> "ToolResult":
+        """Create a failed tool result."""
+        return cls(success=False, output=output, error=error, metadata=metadata)
+
 
 class ToolConfig:
     """Configuration container for tools.

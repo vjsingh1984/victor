@@ -323,7 +323,7 @@ class PerformanceAnalyzer:
         Returns:
             List of performance insights
         """
-        insights = []
+        insights: List[PerformanceInsight] = []
 
         if not self.metrics_history:
             logger.warning("No metrics history available for analysis")
@@ -361,7 +361,7 @@ class PerformanceAnalyzer:
         Returns:
             List of duration-related insights
         """
-        insights = []
+        insights: List[PerformanceInsight] = []
 
         durations = [m.get("duration_seconds", 0) for m in metrics if m.get("duration_seconds")]
         if not durations:
@@ -450,7 +450,7 @@ class PerformanceAnalyzer:
         Returns:
             List of tool-usage-related insights
         """
-        insights = []
+        insights: List[PerformanceInsight] = []
 
         tool_calls = [m.get("total_tool_calls", 0) for m in metrics if m.get("total_tool_calls")]
         if not tool_calls:

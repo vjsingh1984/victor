@@ -467,19 +467,23 @@ class SmartCardCredentials:
 
     Attributes:
         card_type: Type of smart card
+        slot: PKCS#11 slot identifier (string or integer)
+        certificate: PEM-encoded certificate (if available)
+        pin_secret: PIN or reference to a PIN secret
         certificate_subject: X.509 certificate subject (CN)
         certificate_issuer: Certificate issuer
         serial_number: Card/certificate serial number
-        slot: PKCS#11 slot number
         pin_required: Whether PIN is required
         middleware: PKCS#11 middleware path
     """
 
     card_type: SmartCardType
+    slot: Union[str, int] = "0"
+    certificate: Optional[str] = None
+    pin_secret: Optional[str] = None
     certificate_subject: Optional[str] = None
     certificate_issuer: Optional[str] = None
     serial_number: Optional[str] = None
-    slot: int = 0
     pin_required: bool = True
     middleware: Optional[str] = None  # Path to PKCS#11 library
 
@@ -673,10 +677,12 @@ class SmartCardCredentials:
         return {
             "type": "smartcard",
             "card_type": self.card_type.value,
+            "slot": self.slot,
+            "certificate": self.certificate,
+            "pin_secret": self.pin_secret,
             "certificate_subject": self.certificate_subject,
             "certificate_issuer": self.certificate_issuer,
             "serial_number": self.serial_number,
-            "slot": self.slot,
             "pin_required": self.pin_required,
             "middleware": self.middleware,
         }
@@ -685,10 +691,12 @@ class SmartCardCredentials:
     def from_dict(cls, data: Dict[str, Any]) -> "SmartCardCredentials":
         return cls(
             card_type=SmartCardType(data.get("card_type", "piv")),
+            slot=data.get("slot", "0"),
+            certificate=data.get("certificate"),
+            pin_secret=data.get("pin_secret"),
             certificate_subject=data.get("certificate_subject"),
             certificate_issuer=data.get("certificate_issuer"),
             serial_number=data.get("serial_number"),
-            slot=data.get("slot", 0),
             pin_required=data.get("pin_required", True),
             middleware=data.get("middleware"),
         )
@@ -722,25 +730,40 @@ class SSOConfig:
 
     Attributes:
         provider: SSO provider type
-        issuer_url: OIDC issuer URL
+        domain: SSO domain/host (e.g., company.okta.com)
         client_id: OAuth client ID
         client_secret: OAuth client secret (optional for PKCE)
         redirect_uri: OAuth redirect URI
         scopes: OAuth scopes to request
+        tenant_id: Azure AD tenant ID (if applicable)
+        issuer_url: OIDC issuer URL (computed if not provided)
         audience: API audience (for JWT validation)
         organization_id: Okta organization ID
         use_pkce: Use PKCE flow (recommended)
     """
 
     provider: SSOProvider
-    issuer_url: str
-    client_id: str
+    domain: str
+    client_id: Optional[str] = None
     client_secret: Optional[str] = None
-    redirect_uri: str = "http://localhost:8400/callback"
+    redirect_uri: str = "http://localhost:8080/callback"
     scopes: List[str] = field(default_factory=lambda: ["openid", "profile", "email"])
+    tenant_id: Optional[str] = None
+    issuer_url: Optional[str] = None
     audience: Optional[str] = None
     organization_id: Optional[str] = None  # Okta org ID
     use_pkce: bool = True
+
+    def __post_init__(self) -> None:
+        if self.issuer_url:
+            return
+        base = self.domain
+        if not base.startswith("http"):
+            base = f"https://{base}"
+        if self.provider == SSOProvider.AZURE_AD and self.tenant_id:
+            self.issuer_url = f"{base}/{self.tenant_id}/v2.0"
+        else:
+            self.issuer_url = base
 
     @classmethod
     def for_okta(
@@ -758,7 +781,7 @@ class SSOConfig:
         """
         return cls(
             provider=SSOProvider.OKTA,
-            issuer_url=f"https://{domain}",
+            domain=domain,
             client_id=client_id,
             client_secret=client_secret,
             scopes=["openid", "profile", "email", "groups"],
@@ -774,7 +797,8 @@ class SSOConfig:
         """Create Azure AD SSO configuration."""
         return cls(
             provider=SSOProvider.AZURE_AD,
-            issuer_url=f"https://login.microsoftonline.com/{tenant_id}/v2.0",
+            domain="login.microsoftonline.com",
+            tenant_id=tenant_id,
             client_id=client_id,
             client_secret=client_secret,
         )
@@ -784,7 +808,7 @@ class SSOConfig:
         """Create Google SSO configuration."""
         return cls(
             provider=SSOProvider.GOOGLE,
-            issuer_url="https://accounts.google.com",
+            domain="accounts.google.com",
             client_id=client_id,
             client_secret=client_secret,
         )
@@ -792,6 +816,8 @@ class SSOConfig:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "provider": self.provider.value,
+            "domain": self.domain,
+            "tenant_id": self.tenant_id,
             "issuer_url": self.issuer_url,
             "client_id": self.client_id,
             "client_secret": self.client_secret,
@@ -804,12 +830,20 @@ class SSOConfig:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SSOConfig":
+        domain = data.get("domain")
+        if not domain and data.get("issuer_url"):
+            import urllib.parse
+
+            parsed = urllib.parse.urlparse(data["issuer_url"])
+            domain = parsed.netloc or data["issuer_url"]
         return cls(
             provider=SSOProvider(data["provider"]),
-            issuer_url=data["issuer_url"],
-            client_id=data["client_id"],
+            domain=domain or "",
+            tenant_id=data.get("tenant_id"),
+            issuer_url=data.get("issuer_url"),
+            client_id=data.get("client_id"),
             client_secret=data.get("client_secret"),
-            redirect_uri=data.get("redirect_uri", "http://localhost:8400/callback"),
+            redirect_uri=data.get("redirect_uri", "http://localhost:8080/callback"),
             scopes=data.get("scopes", ["openid", "profile", "email"]),
             audience=data.get("audience"),
             organization_id=data.get("organization_id"),
@@ -879,6 +913,26 @@ class SSOAuthenticator:
     def __init__(self, config: SSOConfig):
         self.config = config
         self._server: Optional[Any] = None
+
+    def get_authorization_url(self, state: str = "state") -> str:
+        """Build the OAuth authorization URL."""
+        import urllib.parse
+
+        auth_params = {
+            "client_id": self.config.client_id,
+            "response_type": "code",
+            "redirect_uri": self.config.redirect_uri,
+            "scope": " ".join(self.config.scopes),
+            "state": state,
+        }
+
+        base = self.config.issuer_url or ""
+        if self.config.provider == SSOProvider.OKTA:
+            auth_base = f"{base}/oauth2/v1/authorize"
+        else:
+            auth_base = f"{base}/authorize"
+
+        return f"{auth_base}?{urllib.parse.urlencode(auth_params)}"
 
     async def login(self, timeout: int = 120) -> SSOTokens:
         """Perform SSO login via browser.
@@ -1111,6 +1165,8 @@ class SystemAuthType(Enum):
 
     PAM = "pam"  # Linux PAM
     KERBEROS = "kerberos"  # Kerberos/GSSAPI
+    LDAP = "ldap"  # LDAP directory auth
+    OIDC = "oidc"  # System OIDC/SAML broker
     NTLM = "ntlm"  # Windows NTLM
     ACTIVE_DIRECTORY = "ad"  # Windows Active Directory
 
@@ -1129,17 +1185,23 @@ class SystemAuthConfig:
 
     Attributes:
         auth_type: Type of system authentication
-        service_name: PAM service name (default: 'login')
+        service_name: PAM service name (default: 'victor')
         realm: Kerberos realm (e.g., 'CORP.EXAMPLE.COM')
+        kdc: Kerberos KDC hostname
         domain: AD domain (e.g., 'corp.example.com')
+        ldap_server: LDAP server URL
+        base_dn: LDAP base DN
         use_current_user: Use current logged-in user
         principal: Kerberos principal or AD username
     """
 
     auth_type: SystemAuthType
-    service_name: str = "login"  # PAM service
+    service_name: str = "victor"  # PAM service
     realm: Optional[str] = None  # Kerberos realm
+    kdc: Optional[str] = None  # Kerberos KDC
     domain: Optional[str] = None  # AD domain
+    ldap_server: Optional[str] = None  # LDAP server URL
+    base_dn: Optional[str] = None  # LDAP base DN
     use_current_user: bool = True
     principal: Optional[str] = None
 
@@ -1148,7 +1210,10 @@ class SystemAuthConfig:
             "auth_type": self.auth_type.value,
             "service_name": self.service_name,
             "realm": self.realm,
+            "kdc": self.kdc,
             "domain": self.domain,
+            "ldap_server": self.ldap_server,
+            "base_dn": self.base_dn,
             "use_current_user": self.use_current_user,
             "principal": self.principal,
         }
@@ -1157,9 +1222,12 @@ class SystemAuthConfig:
     def from_dict(cls, data: Dict[str, Any]) -> "SystemAuthConfig":
         return cls(
             auth_type=SystemAuthType(data["auth_type"]),
-            service_name=data.get("service_name", "login"),
+            service_name=data.get("service_name", "victor"),
             realm=data.get("realm"),
+            kdc=data.get("kdc"),
             domain=data.get("domain"),
+            ldap_server=data.get("ldap_server"),
+            base_dn=data.get("base_dn"),
             use_current_user=data.get("use_current_user", True),
             principal=data.get("principal"),
         )
@@ -1855,7 +1923,8 @@ class AWSCredentials:
                 region_name=self.region,
             )
         except ImportError:
-            raise ImportError("boto3 not installed. Run: pip install boto3")
+            logger.debug("boto3 not installed; returning None from to_boto3_session")
+            return None
 
 
 @dataclass
@@ -1993,6 +2062,8 @@ class KubernetesCredentials:
     """Kubernetes credentials."""
 
     context: str
+    cluster: Optional[str] = None
+    namespace: Optional[str] = None
     kubeconfig_path: Optional[str] = None
     kubeconfig_content: Optional[str] = None  # Base64 encoded
     token: Optional[str] = None  # Service account token
@@ -2003,6 +2074,8 @@ class KubernetesCredentials:
         return {
             "type": "kubernetes",
             "context": self.context,
+            "cluster": self.cluster,
+            "namespace": self.namespace,
             "kubeconfig_path": self.kubeconfig_path,
             "kubeconfig_content": self.kubeconfig_content,
             "token": self.token,
@@ -2014,6 +2087,8 @@ class KubernetesCredentials:
     def from_dict(cls, data: Dict[str, Any]) -> "KubernetesCredentials":
         return cls(
             context=data["context"],
+            cluster=data.get("cluster") or data.get("context"),
+            namespace=data.get("namespace"),
             kubeconfig_path=data.get("kubeconfig_path"),
             kubeconfig_content=data.get("kubeconfig_content"),
             token=data.get("token"),
@@ -2039,48 +2114,67 @@ class DatabaseCredentials:
     """Database connection credentials."""
 
     alias: str
-    driver: Literal["postgresql", "mysql", "mongodb", "redis", "sqlite"]
     host: str
-    port: int
     database: str
     username: str
     password: str
+    db_type: Optional[Literal["postgresql", "mysql", "mongodb", "redis", "sqlite"]] = None
+    driver: Optional[Literal["postgresql", "mysql", "mongodb", "redis", "sqlite"]] = None
+    port: Optional[int] = None
     ssl_mode: Optional[str] = None
     extra_params: Dict[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.db_type and self.driver:
+            self.db_type = self.driver
+        if not self.driver and self.db_type:
+            self.driver = self.db_type
+        if not self.db_type:
+            raise ValueError("db_type or driver is required")
+        if self.port is None:
+            default_ports = {
+                "postgresql": 5432,
+                "mysql": 3306,
+                "mongodb": 27017,
+                "redis": 6379,
+            }
+            self.port = default_ports.get(self.db_type, 0)
 
     @property
     def connection_string(self) -> str:
         """Generate connection string."""
-        if self.driver == "postgresql":
+        driver = self.db_type or self.driver
+        if driver == "postgresql":
             base = f"postgresql://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
             if self.ssl_mode:
                 base += f"?sslmode={self.ssl_mode}"
             return base
 
-        elif self.driver == "mysql":
+        elif driver == "mysql":
             return (
                 f"mysql://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
             )
 
-        elif self.driver == "mongodb":
+        elif driver == "mongodb":
             return (
                 f"mongodb://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
             )
 
-        elif self.driver == "redis":
+        elif driver == "redis":
             if self.password:
                 return f"redis://:{self.password}@{self.host}:{self.port}/0"
             return f"redis://{self.host}:{self.port}/0"
 
-        elif self.driver == "sqlite":
+        elif driver == "sqlite":
             return f"sqlite:///{self.database}"
 
-        raise ValueError(f"Unknown driver: {self.driver}")
+        raise ValueError(f"Unknown driver: {driver}")
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "type": "database",
             "alias": self.alias,
+            "db_type": self.db_type,
             "driver": self.driver,
             "host": self.host,
             "port": self.port,
@@ -2095,12 +2189,13 @@ class DatabaseCredentials:
     def from_dict(cls, data: Dict[str, Any]) -> "DatabaseCredentials":
         return cls(
             alias=data["alias"],
-            driver=data["driver"],
             host=data["host"],
-            port=data["port"],
+            port=data.get("port"),
             database=data["database"],
             username=data["username"],
             password=data["password"],
+            db_type=data.get("db_type") or data.get("driver"),
+            driver=data.get("driver"),
             ssl_mode=data.get("ssl_mode"),
             extra_params=data.get("extra_params", {}),
         )
@@ -2111,16 +2206,24 @@ class APIKeyCredentials:
     """Generic API key credentials."""
 
     name: str
-    key: str
+    api_key: str
     secret: Optional[str] = None
     endpoint: Optional[str] = None
     headers: Dict[str, str] = field(default_factory=dict)
+
+    @property
+    def key(self) -> str:
+        return self.api_key
+
+    @key.setter
+    def key(self, value: str) -> None:
+        self.api_key = value
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "type": "api_key",
             "name": self.name,
-            "key": self.key,
+            "api_key": self.api_key,
             "secret": self.secret,
             "endpoint": self.endpoint,
             "headers": self.headers,
@@ -2130,7 +2233,7 @@ class APIKeyCredentials:
     def from_dict(cls, data: Dict[str, Any]) -> "APIKeyCredentials":
         return cls(
             name=data["name"],
-            key=data["key"],
+            api_key=data.get("api_key") or data.get("key"),
             secret=data.get("secret"),
             endpoint=data.get("endpoint"),
             headers=data.get("headers", {}),
@@ -2198,13 +2301,17 @@ class EnvironmentBackend(CredentialBackend):
             creds = GCPCredentials.from_environment()
             return creds.to_dict() if creds else None
 
+        env_key = f"VICTOR_{key.upper().replace('/', '_')}"
+        if env_key in os.environ:
+            return {"value": os.environ.get(env_key), "source": "environment"}
+
         return None
 
     def set(self, key: str, value: Dict[str, Any]) -> None:
-        raise NotImplementedError("Environment backend is read-only")
+        return None
 
     def delete(self, key: str) -> bool:
-        raise NotImplementedError("Environment backend is read-only")
+        return False
 
     def list_keys(self) -> List[str]:
         keys = []
@@ -2271,8 +2378,14 @@ class KeyringBackend(CredentialBackend):
 class FileBackend(CredentialBackend):
     """Encrypted file backend (~/.victor/credentials)."""
 
-    def __init__(self, path: Optional[Path] = None, master_key: Optional[str] = None):
-        self.path = path or Path.home() / ".victor" / "credentials"
+    def __init__(
+        self,
+        config_path: Optional[Path] = None,
+        master_key: Optional[str] = None,
+        path: Optional[Path] = None,
+    ):
+        self._config_path = config_path or path or Path.home() / ".victor" / "credentials.json"
+        self.path = self._config_path
         self._master_key = master_key
         self._cipher: Optional[Any] = None
 
@@ -2294,11 +2407,11 @@ class FileBackend(CredentialBackend):
 
     def _load(self) -> Dict[str, Any]:
         """Load credentials from file."""
-        if not self.path.exists():
+        if not self._config_path.exists():
             return {}
 
         try:
-            content = self.path.read_bytes()
+            content = self._config_path.read_bytes()
 
             if self._cipher:
                 content = self._cipher.decrypt(content)
@@ -2310,14 +2423,14 @@ class FileBackend(CredentialBackend):
 
     def _save(self, data: Dict[str, Any]) -> None:
         """Save credentials to file."""
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._config_path.parent.mkdir(parents=True, exist_ok=True)
 
         content = json.dumps(data, indent=2).encode()
 
         if self._cipher:
             content = self._cipher.encrypt(content)
 
-        self.path.write_bytes(content)
+        self._config_path.write_bytes(content)
         # Set restrictive permissions
         self.path.chmod(0o600)
 

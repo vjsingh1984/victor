@@ -280,7 +280,7 @@ workflows:
       - id: generate_report
         type: agent
         name: "Generate Statistical Report"
-        role: writer
+        role: reviewer
         goal: |
           Generate a professional statistical report in markdown:
 

@@ -417,6 +417,8 @@ class TestCosineSimilarity:
         """Test batch cosine similarity calculation."""
         from victor.storage.embeddings.service import EmbeddingService
 
+        service = EmbeddingService()
+
         query = np.array([1.0, 0.0, 0.0])
         corpus = np.array(
             [
@@ -426,7 +428,7 @@ class TestCosineSimilarity:
             ]
         )
 
-        similarities = EmbeddingService.cosine_similarity_matrix(query, corpus)
+        similarities = service.cosine_similarity_matrix(query, corpus)
 
         assert similarities.shape == (3,)
         assert similarities[0] == pytest.approx(1.0)
@@ -437,10 +439,12 @@ class TestCosineSimilarity:
         """Test batch similarity with empty corpus."""
         from victor.storage.embeddings.service import EmbeddingService
 
+        service = EmbeddingService()
+
         query = np.array([1.0, 0.0, 0.0])
         corpus = np.array([]).reshape(0, 3)
 
-        similarities = EmbeddingService.cosine_similarity_matrix(query, corpus)
+        similarities = service.cosine_similarity_matrix(query, corpus)
 
         assert similarities.shape == (0,)
 

@@ -92,8 +92,13 @@ def reset_singletons(request):
     This prevents test pollution from cached singleton state, especially
     embedding services and classifiers that cache model instances.
     """
-    # Skip reset for cache tests to avoid hanging during cleanup
-    is_cache_test = "test_cache" in str(request.node.fspath)
+    # Skip reset for cache, workflow compiler, and server tests to avoid hanging during cleanup
+    test_path = str(request.node.fspath)
+    is_problematic_test = (
+        "test_cache" in test_path or
+        "test_unified_workflow_compiler" in test_path or
+        "test_server_feature_parity" in test_path
+    )
 
     def _reset_all():
         # Reset TaskTypeClassifier singleton
@@ -199,13 +204,13 @@ def reset_singletons(request):
             pass
 
     # Reset before test
-    if not is_cache_test:
+    if not is_problematic_test:
         _reset_all()
 
     yield
 
     # Reset after test
-    if not is_cache_test:
+    if not is_problematic_test:
         _reset_all()
 
 

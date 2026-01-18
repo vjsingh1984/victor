@@ -72,7 +72,7 @@ class DataAnalysisToolDependencyProvider(YAMLToolDependencyProvider):
         # Deprecated (backward compatible):
         >>> provider = DataAnalysisToolDependencyProvider()
         >>> provider.vertical
-        'data_analysis'
+        'dataanalysis'
         >>> provider.get_required_tools()
         {'read', 'write', 'shell'}
     """

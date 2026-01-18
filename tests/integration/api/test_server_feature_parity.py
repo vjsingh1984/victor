@@ -62,16 +62,47 @@ async def canonical_server_app():
 async def legacy_http_client(legacy_server_app):
     """Create HTTP client for legacy server."""
     transport = ASGITransport(app=legacy_server_app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    async with AsyncClient(transport=transport, base_url="http://test", timeout=30.0) as client:
         yield client
 
 
 @pytest.fixture
-async def canonical_http_client(canonical_server_app):
-    """Create HTTP client for canonical server."""
-    transport = ASGITransport(app=canonical_server_app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        yield client
+async def canonical_http_client(canonical_server_app, mocker):
+    """Create HTTP client for canonical server with mocked orchestrator."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    # Mock the orchestrator to avoid real LLM calls
+    mock_orchestrator = MagicMock()
+    mock_orchestrator.chat = AsyncMock(return_value=MagicMock(content="Test response", tool_calls=None))
+
+    # Make stream_chat return an async generator
+    async def mock_stream_gen(prompt):
+        """Async generator that yields mock stream chunks."""
+        yield MagicMock(content="Test", tool_calls=None)
+        yield MagicMock(content=" response", tool_calls=None)
+
+    mock_orchestrator.stream_chat = mock_stream_gen
+    mock_orchestrator.provider = MagicMock(name="test_provider", model="test_model")
+    mock_orchestrator.adaptive_controller = None
+
+    # Patch the _get_orchestrator method in the server
+    # The server is created in the fixture, so we need to patch it at the module level
+    import victor.integrations.api.fastapi_server as fastapi_module
+
+    async def mock_get_orch(self):
+        return mock_orchestrator
+
+    # Apply the mock to all VictorFastAPIServer instances
+    original_get_orch = fastapi_module.VictorFastAPIServer._get_orchestrator
+    fastapi_module.VictorFastAPIServer._get_orchestrator = mock_get_orch
+
+    try:
+        transport = ASGITransport(app=canonical_server_app)
+        async with AsyncClient(transport=transport, base_url="http://test", timeout=5.0) as client:
+            yield client
+    finally:
+        # Restore original method
+        fastapi_module.VictorFastAPIServer._get_orchestrator = original_get_orch
 
 
 # =============================================================================
@@ -84,13 +115,19 @@ def get_fastapi_routes(app) -> Dict[str, List[str]]:
 
     Returns:
         Dict with route paths as keys and list of methods as values.
+        WebSocket routes are marked with ["WS"].
     """
     routes = {}
     for route in app.routes:
-        if hasattr(route, "path") and hasattr(route, "methods"):
+        if hasattr(route, "path"):
             path = route.path
-            methods = list(route.methods or [])
-            routes[path] = methods
+            # Check if it's a WebSocket route by type name
+            route_type = type(route).__name__
+            if "WebSocket" in route_type:
+                routes[path] = ["WS"]  # Mark as WebSocket route
+            elif hasattr(route, "methods"):
+                methods = list(route.methods or [])
+                routes[path] = methods
     return routes
 
 

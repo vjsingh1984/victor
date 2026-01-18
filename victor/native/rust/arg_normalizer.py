@@ -29,7 +29,12 @@ from __future__ import annotations
 import json
 from typing import Any, Optional, Tuple
 
-import victor_native
+try:
+    import victor_native
+    RUST_AVAILABLE = True
+except ImportError:
+    RUST_AVAILABLE = False
+    victor_native = None
 
 from victor.native.observability import InstrumentedAccelerator
 from victor.native.protocols import CoercedType, CoercedValue

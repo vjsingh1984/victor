@@ -277,8 +277,8 @@ def run_benchmark(
             profiles = settings.load_profiles()
             profile_config = profiles.get(profile)
             if profile_config:
-                # ProfileConfig is a Pydantic model with .model attribute
-                effective_model = profile_config.model
+                # ProfileConfig is a Pydantic model with .model_name attribute
+                effective_model = profile_config.model_name
                 effective_provider = profile_config.provider
             else:
                 console.print(

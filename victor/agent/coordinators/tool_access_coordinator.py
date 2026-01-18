@@ -237,7 +237,7 @@ class ToolAccessCoordinator:
                 return AccessDecision(
                     tool_name=tool_name,
                     allowed=False,
-                    reason=f"Tool disallowed by current mode",
+                    reason="Tool disallowed by current mode",
                     layer="mode",
                 )
             if config.allow_all_tools and tool_name in self.get_available_tools():
@@ -253,7 +253,7 @@ class ToolAccessCoordinator:
                 return AccessDecision(
                     tool_name=tool_name,
                     allowed=False,
-                    reason=f"Tool not in session-enabled set",
+                    reason="Tool not in session-enabled set",
                     layer="session",
                 )
 
@@ -270,7 +270,7 @@ class ToolAccessCoordinator:
             return AccessDecision(
                 tool_name=tool_name,
                 allowed=False,
-                reason=f"Unknown tool and strict mode enabled",
+                reason="Unknown tool and strict mode enabled",
                 layer="strict",
             )
 
@@ -285,7 +285,7 @@ class ToolAccessCoordinator:
         return AccessDecision(
             tool_name=tool_name,
             allowed=False,
-            reason=f"Tool not found and default_allow_all is False",
+            reason="Tool not found and default_allow_all is False",
             layer="default",
         )
 

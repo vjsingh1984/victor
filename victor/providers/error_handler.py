@@ -111,7 +111,6 @@ class HTTPErrorHandlerMixin(ABC):
         """
         # Known provider name mappings
         name_mappings = {
-            "openai": "OpenAI",
             "anthropic": "Anthropic",
             "google": "Google",
             "vertex": "Vertex AI",
@@ -127,6 +126,16 @@ class HTTPErrorHandlerMixin(ABC):
             "zai": "Z AI",
         }
         return name_mappings.get(provider_name, provider_name.capitalize())
+
+    @staticmethod
+    def _append_status_code(message: str, status_code: Optional[int]) -> str:
+        """Append HTTP status code to message when available."""
+        if status_code is None:
+            return message
+        status_str = str(status_code)
+        if status_str in message:
+            return message
+        return f"{message} (HTTP {status_code})"
 
     def _handle_http_error(
         self,
@@ -192,8 +201,12 @@ class HTTPErrorHandlerMixin(ABC):
         # Categorize by status code first (more reliable)
         if status_code:
             if status_code in AUTH_STATUS_CODES:
+                message = self._append_status_code(
+                    f"Authentication failed for {display_name}: {error_body or error}",
+                    status_code,
+                )
                 return ProviderAuthError(
-                    message=f"Authentication failed for {display_name}: {error_body or error}",
+                    message=message,
                     provider=provider_name,
                     status_code=status_code,
                     raw_error=error,
@@ -202,8 +215,12 @@ class HTTPErrorHandlerMixin(ABC):
             if status_code in RATE_LIMIT_STATUS_CODES:
                 # Try to extract retry_after from response
                 retry_after = self._extract_retry_after(error)
+                message = self._append_status_code(
+                    f"Rate limit exceeded for {display_name}: {error_body or error}",
+                    status_code,
+                )
                 return ProviderRateLimitError(
-                    message=f"Rate limit exceeded for {display_name}: {error_body or error}",
+                    message=message,
                     provider=provider_name,
                     status_code=status_code,
                     retry_after=retry_after,
@@ -212,8 +229,12 @@ class HTTPErrorHandlerMixin(ABC):
 
             if status_code in TIMEOUT_STATUS_CODES:
                 timeout = self._extract_timeout_value(error)
+                message = self._append_status_code(
+                    f"Request timed out for {display_name}: {error_body or error}",
+                    status_code,
+                )
                 return ProviderTimeoutError(
-                    message=f"Request timed out for {display_name}: {error_body or error}",
+                    message=message,
                     provider=provider_name,
                     status_code=status_code,
                     timeout=timeout,
@@ -221,8 +242,12 @@ class HTTPErrorHandlerMixin(ABC):
                 )
 
             if status_code in CONNECTION_STATUS_CODES:
+                message = self._append_status_code(
+                    f"Connection error for {display_name}: {error_body or error}",
+                    status_code,
+                )
                 return ProviderConnectionError(
-                    message=f"Connection error for {display_name}: {error_body or error}",
+                    message=message,
                     provider=provider_name,
                     status_code=status_code,
                     raw_error=error,
@@ -232,8 +257,12 @@ class HTTPErrorHandlerMixin(ABC):
         combined_msg = f"{error_msg} {error_body}".lower()
 
         if self._matches_any_pattern(combined_msg, AUTH_PATTERNS):
+            message = self._append_status_code(
+                f"Authentication failed for {display_name}: {error_body or error}",
+                status_code,
+            )
             return ProviderAuthError(
-                message=f"Authentication failed for {display_name}: {error_body or error}",
+                message=message,
                 provider=provider_name,
                 status_code=status_code,
                 raw_error=error,
@@ -241,8 +270,12 @@ class HTTPErrorHandlerMixin(ABC):
 
         if self._matches_any_pattern(combined_msg, RATE_LIMIT_PATTERNS):
             retry_after = self._extract_retry_after(error)
+            message = self._append_status_code(
+                f"Rate limit exceeded for {display_name}: {error_body or error}",
+                status_code,
+            )
             return ProviderRateLimitError(
-                message=f"Rate limit exceeded for {display_name}: {error_body or error}",
+                message=message,
                 provider=provider_name,
                 status_code=status_code,
                 retry_after=retry_after,
@@ -251,8 +284,12 @@ class HTTPErrorHandlerMixin(ABC):
 
         if self._matches_any_pattern(combined_msg, TIMEOUT_PATTERNS):
             timeout = self._extract_timeout_value(error)
+            message = self._append_status_code(
+                f"Request timed out for {display_name}: {error_body or error}",
+                status_code,
+            )
             return ProviderTimeoutError(
-                message=f"Request timed out for {display_name}: {error_body or error}",
+                message=message,
                 provider=provider_name,
                 status_code=status_code,
                 timeout=timeout,
@@ -260,16 +297,24 @@ class HTTPErrorHandlerMixin(ABC):
             )
 
         if self._matches_any_pattern(combined_msg, CONNECTION_PATTERNS):
+            message = self._append_status_code(
+                f"Connection error for {display_name}: {error_body or error}",
+                status_code,
+            )
             return ProviderConnectionError(
-                message=f"Connection error for {display_name}: {error_body or error}",
+                message=message,
                 provider=provider_name,
                 status_code=status_code,
                 raw_error=error,
             )
 
         # Generic provider error
+        message = self._append_status_code(
+            f"{display_name} API error: {error_body or error}",
+            status_code,
+        )
         return ProviderError(
-            message=f"{display_name} API error: {error_body or error}",
+            message=message,
             provider=provider_name,
             status_code=status_code,
             raw_error=error,
@@ -318,8 +363,12 @@ class HTTPErrorHandlerMixin(ABC):
 
         # Check for rate limit
         if self._matches_any_pattern(error_msg, RATE_LIMIT_PATTERNS):
+            message = self._append_status_code(
+                f"Rate limit exceeded for {display_name}: {error}",
+                429,
+            )
             return ProviderRateLimitError(
-                message=f"Rate limit exceeded for {display_name}: {error}",
+                message=message,
                 provider=provider_name,
                 status_code=429,
                 raw_error=error,
@@ -334,8 +383,12 @@ class HTTPErrorHandlerMixin(ABC):
             )
 
         # Generic provider error
+        message = self._append_status_code(
+            f"{display_name} API error: {error}",
+            None,
+        )
         return ProviderError(
-            message=f"{display_name} API error: {error}",
+            message=message,
             provider=provider_name,
             raw_error=error,
         )

@@ -21,8 +21,7 @@ Part of CRITICAL-001: Monolithic Orchestrator decomposition.
 
 Usage:
     factory = OrchestratorFactory(settings, provider, model)
-    components = factory.create_all_components()
-    orchestrator = AgentOrchestrator._from_components(components)
+    orchestrator = factory.create_orchestrator()
 
 Or use individual creation methods for testing:
     factory = OrchestratorFactory(settings, provider, model)
@@ -36,6 +35,8 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
+
+from rich.console import Console
 
 # Mode-aware mixin for consistent mode controller access
 from victor.protocols.mode_aware import ModeAwareMixin
@@ -228,6 +229,8 @@ class OrchestratorComponents:
     coordinators: CoordinatorComponents = field(
         default_factory=CoordinatorComponents
     )
+    # Raw attribute snapshot (Phase 1 compatibility bridge)
+    attributes: Dict[str, Any] = field(default_factory=dict)
 
 
 class OrchestratorFactory(ModeAwareMixin):
@@ -261,6 +264,7 @@ class OrchestratorFactory(ModeAwareMixin):
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
+        console: Optional["Console"] = None,
         provider_name: Optional[str] = None,
         profile_name: Optional[str] = None,
         tool_selection: Optional[Dict[str, Any]] = None,
@@ -274,6 +278,7 @@ class OrchestratorFactory(ModeAwareMixin):
             model: Model identifier
             temperature: Sampling temperature
             max_tokens: Maximum tokens to generate
+            console: Optional rich console for output
             provider_name: Provider label (for OpenAI-compatible disambiguation)
             profile_name: Profile name for session tracking
             tool_selection: Tool selection configuration
@@ -284,6 +289,7 @@ class OrchestratorFactory(ModeAwareMixin):
         self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.console = console
         self.provider_name = provider_name
         self.profile_name = profile_name
         self.tool_selection = tool_selection or {}
@@ -291,6 +297,177 @@ class OrchestratorFactory(ModeAwareMixin):
 
         # Lazy-initialized container
         self._container = None
+
+    def _builder_sequence(self) -> List[type]:
+        """Return the ordered builder sequence for orchestrator initialization."""
+        from victor.agent.builders.provider_layer_builder import ProviderLayerBuilder
+        from victor.agent.builders.prompting_builder import PromptingBuilder
+        from victor.agent.builders.session_services_builder import SessionServicesBuilder
+        from victor.agent.builders.metrics_logging_builder import MetricsLoggingBuilder
+        from victor.agent.builders.workflow_memory_builder import WorkflowMemoryBuilder
+        from victor.agent.builders.intelligent_integration_builder import (
+            IntelligentIntegrationBuilder,
+        )
+        from victor.agent.builders.tooling_builder import ToolingBuilder
+        from victor.agent.builders.conversation_pipeline_builder import (
+            ConversationPipelineBuilder,
+        )
+        from victor.agent.builders.context_intelligence_builder import (
+            ContextIntelligenceBuilder,
+        )
+        from victor.agent.builders.recovery_observability_builder import (
+            RecoveryObservabilityBuilder,
+        )
+        from victor.agent.builders.config_workflow_builder import ConfigWorkflowBuilder
+        from victor.agent.builders.finalization_builder import FinalizationBuilder
+
+        return [
+            ProviderLayerBuilder,
+            PromptingBuilder,
+            SessionServicesBuilder,
+            MetricsLoggingBuilder,
+            WorkflowMemoryBuilder,
+            IntelligentIntegrationBuilder,
+            ToolingBuilder,
+            ConversationPipelineBuilder,
+            ContextIntelligenceBuilder,
+            RecoveryObservabilityBuilder,
+            ConfigWorkflowBuilder,
+            FinalizationBuilder,
+        ]
+
+    def initialize_orchestrator(self, orchestrator: "AgentOrchestrator") -> None:
+        """Initialize an orchestrator instance using the factory."""
+        settings = self.settings
+        provider = self.provider
+        model = self.model
+        temperature = self.temperature
+        max_tokens = self.max_tokens
+        console = self.console
+        tool_selection = self.tool_selection
+        thinking = self.thinking
+        provider_name = self.provider_name
+        profile_name = self.profile_name
+
+        # Store profile name for session tracking
+        orchestrator._profile_name = profile_name
+        # Track active session ID for parallel session support
+        orchestrator.active_session_id: Optional[str] = None
+        # Bootstrap DI container - ensures all services are available
+        # This is idempotent and will only bootstrap if not already done
+        orchestrator._container = self.container
+        # Share factory on orchestrator for compatibility
+        orchestrator._factory = self
+
+        orchestrator.settings = settings
+        orchestrator.temperature = temperature
+        orchestrator.max_tokens = max_tokens
+        orchestrator.console = console or Console()
+        orchestrator.tool_selection = tool_selection or {}
+        orchestrator.thinking = thinking
+
+        builder_context = {
+            "provider": provider,
+            "model": model,
+            "provider_name": provider_name,
+            "profile_name": profile_name,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "console": console,
+            "tool_selection": tool_selection,
+            "thinking": thinking,
+        }
+
+        for builder_cls in self._builder_sequence():
+            builder = builder_cls(settings=settings, factory=self)
+            builder.build(orchestrator, **builder_context)
+
+    def create_orchestrator(self) -> "AgentOrchestrator":
+        """Create a fully initialized AgentOrchestrator.
+
+        This centralizes orchestration creation in a single composition root.
+        Initialization is performed via initialize_orchestrator() to avoid
+        double factory creation when AgentOrchestrator.__init__ is bypassed.
+        """
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orchestrator = AgentOrchestrator.__new__(AgentOrchestrator)
+        self.initialize_orchestrator(orchestrator)
+        return orchestrator
+
+    def create_all_components(self) -> OrchestratorComponents:
+        """Create all orchestrator components.
+
+        Phase 1 builds a fully initialized orchestrator, then extracts
+        grouped components plus a raw attribute snapshot for compatibility.
+        """
+        orchestrator = self.create_orchestrator()
+
+        provider_components = ProviderComponents(
+            provider=orchestrator.provider,
+            model=orchestrator.model,
+            provider_name=orchestrator.provider_name or "",
+            tool_adapter=orchestrator.tool_adapter,
+            tool_calling_caps=orchestrator._tool_calling_caps_internal,
+        )
+        core_services = CoreServices(
+            sanitizer=orchestrator.sanitizer,
+            prompt_builder=orchestrator.prompt_builder,
+            project_context=orchestrator.project_context,
+            complexity_classifier=orchestrator.task_classifier,
+            action_authorizer=orchestrator.intent_detector,
+            search_router=orchestrator.search_router,
+        )
+        conversation_components = ConversationComponents(
+            conversation_controller=orchestrator._conversation_controller,
+            memory_manager=orchestrator.memory_manager,
+            memory_session_id=orchestrator._memory_session_id,
+            conversation_state=orchestrator.conversation_state,
+        )
+        tool_components = ToolComponents(
+            tool_registry=orchestrator.tools,
+            tool_registrar=orchestrator.tool_registrar,
+            tool_executor=orchestrator.tool_executor,
+            tool_cache=orchestrator.tool_cache,
+            tool_graph=orchestrator.tool_graph,
+            plugin_manager=orchestrator.plugin_manager,
+        )
+        streaming_components = StreamingComponents(
+            streaming_controller=orchestrator._streaming_controller,
+            streaming_handler=orchestrator._streaming_handler,
+            metrics_collector=orchestrator._metrics_collector,
+            streaming_metrics_collector=orchestrator.streaming_metrics_collector,
+        )
+        analytics_components = AnalyticsComponents(
+            usage_analytics=orchestrator._usage_analytics,
+            sequence_tracker=orchestrator._sequence_tracker,
+            unified_tracker=orchestrator.unified_tracker,
+        )
+        recovery_components = RecoveryComponents(
+            recovery_handler=orchestrator._recovery_handler,
+            recovery_integration=orchestrator._recovery_integration,
+            context_compactor=orchestrator._context_compactor,
+        )
+        coordinator_components = CoordinatorComponents(
+            response_coordinator=orchestrator._response_coordinator,
+            tool_access_config_coordinator=orchestrator._tool_access_config_coordinator,
+            state_coordinator=orchestrator._state_coordinator,
+        )
+
+        return OrchestratorComponents(
+            provider=provider_components,
+            services=core_services,
+            conversation=conversation_components,
+            tools=tool_components,
+            streaming=streaming_components,
+            analytics=analytics_components,
+            recovery=recovery_components,
+            observability=orchestrator._observability,
+            tool_output_formatter=orchestrator._tool_output_formatter,
+            workflow_optimization=orchestrator._workflow_optimization,
+            coordinators=coordinator_components,
+            attributes=dict(orchestrator.__dict__),
+        )
 
     @property
     def container(self):

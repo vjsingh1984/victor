@@ -275,6 +275,9 @@ class DynamicFormation(BaseFormationStrategy):
 
         Returns:
             Formation instance
+
+        Raises:
+            ValueError: If formation name is unknown
         """
         # Lazy import to avoid circular dependencies
         formations = {
@@ -289,9 +292,8 @@ class DynamicFormation(BaseFormationStrategy):
         if creator:
             return creator()
 
-        # Fallback to sequential
-        logger.warning(f"Unknown formation '{formation_name}', using sequential")
-        return formations["sequential"]()
+        # Raise error for unknown formations
+        raise ValueError(f"Unknown formation '{formation_name}'. Valid formations: {list(formations.keys())}")
 
     def _import_and_create(self, module_path: str, class_name: str) -> BaseFormationStrategy:
         """Import and create a formation instance.
@@ -956,6 +958,9 @@ class AdaptiveFormation(BaseFormationStrategy):
 
         Returns:
             Formation instance
+
+        Raises:
+            ValueError: If formation name is unknown
         """
         import importlib
 
@@ -973,10 +978,8 @@ class AdaptiveFormation(BaseFormationStrategy):
             formation_class = getattr(module, class_name)
             return formation_class()
 
-        # Fallback
-        logger.warning(f"Unknown formation '{formation_name}', using sequential")
-        module = importlib.import_module("victor.coordination.formations.sequential")
-        return module.SequentialFormation()
+        # Raise error for unknown formations
+        raise ValueError(f"Unknown formation '{formation_name}'. Valid formations: {list(formations.keys())}")
 
     def _enhance_results(
         self,
@@ -1241,6 +1244,9 @@ class HybridFormation(BaseFormationStrategy):
 
         Returns:
             Formation instance
+
+        Raises:
+            ValueError: If formation name is unknown
         """
         import importlib
 
@@ -1258,10 +1264,8 @@ class HybridFormation(BaseFormationStrategy):
             formation_class = getattr(module, class_name)
             return formation_class()
 
-        # Fallback
-        logger.warning(f"Unknown formation '{formation_name}', using sequential")
-        module = importlib.import_module("victor.coordination.formations.sequential")
-        return module.SequentialFormation()
+        # Raise error for unknown formations
+        raise ValueError(f"Unknown formation '{formation_name}'. Valid formations: {list(formations.keys())}")
 
     def _create_phase_task(self, original_task: AgentMessage, phase: HybridPhase, phase_index: int) -> AgentMessage:
         """Create a phase-specific task message.

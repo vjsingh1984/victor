@@ -115,7 +115,7 @@ members:
 
   # Review Synthesizer
   - id: "review_synthesizer"
-    role: "writer"
+    role: "reviewer"
     name: "Review Synthesizer"
     goal: |
       Synthesize analyzed sources into a comprehensive literature review.

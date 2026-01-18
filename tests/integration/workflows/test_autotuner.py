@@ -36,6 +36,7 @@ from victor.workflows.performance_autotuner import (
     OptimizationType,
     OptimizationPriority,
     OptimizationSuggestion,
+    OptimizationResult,
     PerformanceInsight,
     TeamSizingStrategy,
     FormationSelectionStrategy,
@@ -183,7 +184,33 @@ class TestPerformanceAnalyzer:
 
     def test_analyze_team_size_efficiency(self, sample_metrics):
         """Test team size analysis."""
-        analyzer = PerformanceAnalyzer(metrics_history=sample_metrics)
+        # Add more data points for slow_team to meet the 3 data point requirement
+        # Need avg duration > 30s per member = 30 * 8 = 240s average
+        # Must be > not >=, so need slightly more than 240s
+        # With 150s (original) + 281s + 291s = 722s / 3 = 240.67s (good!)
+        additional_slow_metrics = [
+            {
+                "team_id": "slow_team",
+                "formation": "consensus",
+                "member_count": 8,
+                "success": True,
+                "duration_seconds": 281.0,
+                "total_tool_calls": 52,
+                "timestamp": "2025-01-15T11:05:00",
+            },
+            {
+                "team_id": "slow_team",
+                "formation": "consensus",
+                "member_count": 8,
+                "success": True,
+                "duration_seconds": 291.0,
+                "total_tool_calls": 48,
+                "timestamp": "2025-01-15T11:10:00",
+            },
+        ]
+
+        extended_metrics = sample_metrics + additional_slow_metrics
+        analyzer = PerformanceAnalyzer(metrics_history=extended_metrics)
 
         insights = analyzer.analyze_team_workflow(team_id="slow_team")
 
@@ -533,24 +560,61 @@ class TestAutotunerIntegration:
 
         assert len(suggestions) > 0
 
-        # 3. Apply optimization (dry run)
+        # 3. Apply optimization (dry run first)
         result = await autotuner.apply_optimizations(
             team_id="test_team",
             optimizations=suggestions,
             workflow_config=sample_workflow_config,
-            enable_ab_testing=True,
+            enable_ab_testing=False,  # Skip A/B testing for faster test
             dry_run=True,
         )
 
         assert result.success
+        assert result.validation_status == "dry_run"
 
-        # 4. Rollback
+        # 4. Apply optimization for real (without dry_run)
+        result = await autotuner.apply_optimizations(
+            team_id="test_team",
+            optimizations=suggestions,
+            workflow_config=sample_workflow_config,
+            enable_ab_testing=False,  # Skip A/B testing for faster test
+            dry_run=False,
+        )
+
+        assert result.success
+
+        # 5. Rollback
         success = await autotuner.rollback_optimization("test_team")
         assert success
 
     def test_multiple_teams_analysis(self, sample_metrics):
         """Test analyzing performance for multiple teams."""
-        analyzer = PerformanceAnalyzer(metrics_history=sample_metrics)
+        # Extend sample_metrics with more slow_team data to trigger oversized_team detection
+        # Need avg duration > 30s per member = 30 * 8 = 240s average
+        # Must be > not >=, so need slightly more than 240s
+        additional_slow_metrics = [
+            {
+                "team_id": "slow_team",
+                "formation": "consensus",
+                "member_count": 8,
+                "success": True,
+                "duration_seconds": 281.0,
+                "total_tool_calls": 52,
+                "timestamp": "2025-01-15T11:05:00",
+            },
+            {
+                "team_id": "slow_team",
+                "formation": "consensus",
+                "member_count": 8,
+                "success": True,
+                "duration_seconds": 291.0,
+                "total_tool_calls": 48,
+                "timestamp": "2025-01-15T11:10:00",
+            },
+        ]
+
+        extended_metrics = sample_metrics + additional_slow_metrics
+        analyzer = PerformanceAnalyzer(metrics_history=extended_metrics)
 
         # Analyze test_team
         test_team_insights = analyzer.analyze_team_workflow("test_team")

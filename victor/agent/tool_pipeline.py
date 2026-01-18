@@ -68,10 +68,17 @@ from victor.config.tool_selection_defaults import (
     IdempotentTools,
 )
 
-# Import native compute_signature for 10-20x faster signature generation
+# Import signature accelerator for 10-20x faster signature generation and deduplication
+try:
+    from victor.native.accelerators import get_signature_accelerator
+    _SIGNATURE_ACCELERATOR_AVAILABLE = True
+except ImportError:
+    _SIGNATURE_ACCELERATOR_AVAILABLE = False
+    get_signature_accelerator = None  # type: ignore
+
+# Legacy import for backward compatibility
 try:
     from victor.processing.native import compute_signature as native_compute_signature
-
     _NATIVE_SIGNATURE_AVAILABLE = True
 except ImportError:
     _NATIVE_SIGNATURE_AVAILABLE = False
@@ -805,6 +812,17 @@ class ToolPipeline:
         # Prevents re-reading identical files within TTL window
         self._read_file_timestamps: Dict[str, float] = {}
 
+        # Initialize signature accelerator for 10x faster deduplication
+        if _SIGNATURE_ACCELERATOR_AVAILABLE and get_signature_accelerator is not None:
+            self._signature_accelerator = get_signature_accelerator()
+            if self._signature_accelerator.rust_available:
+                logger.info(
+                    "Tool pipeline: Using Rust signature accelerator "
+                    "(10x faster deduplication)"
+                )
+        else:
+            self._signature_accelerator = None
+
     @property
     def calls_used(self) -> int:
         """Number of tool calls used."""
@@ -944,17 +962,25 @@ class ToolPipeline:
     def _get_call_signature(self, tool_name: str, args: Dict[str, Any]) -> str:
         """Generate signature for deduplication.
 
-        Uses native xxHash3-based signature computation when available for
-        10-20x speedup over JSON serialization + MD5.
+        Uses signature accelerator with xxHash3-based computation when available
+        for 10x speedup over JSON serialization + MD5.
 
         Args:
             tool_name: Tool name
             args: Tool arguments
 
         Returns:
-            Hashable signature string (16-char hex with native, or tool:args with fallback)
+            Hashable signature string (16-char hex with accelerator, or tool:args with fallback)
         """
-        # Use native signature computation if available (10-20x faster)
+        # Use signature accelerator if available (10x faster)
+        if self._signature_accelerator is not None:
+            try:
+                return self._signature_accelerator.compute_signature(tool_name, args)
+            except Exception as e:
+                logger.debug(f"Signature accelerator failed: {e}, using fallback")
+                pass  # Fall through to legacy/native implementation
+
+        # Try legacy native signature computation
         if _NATIVE_SIGNATURE_AVAILABLE and native_compute_signature is not None:
             try:
                 return native_compute_signature(tool_name, args)

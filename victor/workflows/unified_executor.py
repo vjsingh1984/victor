@@ -255,6 +255,13 @@ class StateGraphExecutor:
 
         Returns:
             ExecutorResult with execution outcome
+
+        Recursion Context Flow:
+            If recursion_context is not provided, a new one is created with
+            max_depth from ExecutorConfig. The context is added to the workflow
+            state as "_recursion_context" and is automatically tracked when
+            team nodes spawn nested workflows. The context is properly exited
+            in a finally block to ensure cleanup.
         """
         start_time = time.time()
 
@@ -349,6 +356,13 @@ class StateGraphExecutor:
 
         Yields:
             Tuple of (node_id, current_state) after each node execution
+
+        Recursion Context Flow:
+            If recursion_context is not provided, a new one is created with
+            max_depth from ExecutorConfig. The context is added to the workflow
+            state as "_recursion_context" and is automatically tracked when
+            team nodes spawn nested workflows. The context is properly exited
+            in a finally block to ensure cleanup.
         """
         from victor.workflows.yaml_to_graph_compiler import WorkflowState
 

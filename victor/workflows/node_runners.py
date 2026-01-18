@@ -25,6 +25,7 @@ Each runner is responsible for executing a specific node type:
 - HITLNodeRunner: Human-in-the-loop approval/review
 - ConditionNodeRunner: Conditional branching
 - ParallelNodeRunner: Parallel execution orchestration
+- TeamNodeRunner: Multi-agent team execution (via victor.workflows.team_node_runner)
 
 Example:
     from victor.workflows.node_runners import (
@@ -806,6 +807,7 @@ class NodeRunnerRegistry:
         sub_agents: Optional["SubAgentManager"] = None,
         tool_registry: Optional["ToolRegistry"] = None,
         hitl_executor: Optional["HITLExecutor"] = None,
+        orchestrator: Optional["AgentOrchestrator"] = None,
     ) -> "NodeRunnerRegistry":
         """Create a registry with default runners.
 
@@ -813,10 +815,13 @@ class NodeRunnerRegistry:
             sub_agents: SubAgentManager for agent nodes.
             tool_registry: ToolRegistry for compute nodes.
             hitl_executor: HITLExecutor for HITL nodes.
+            orchestrator: AgentOrchestrator for team nodes.
 
         Returns:
             Registry configured with standard runners.
         """
+        from victor.workflows.team_node_runner import TeamNodeRunner
+
         registry = cls()
 
         agent_runner = AgentNodeRunner(sub_agents)
@@ -826,10 +831,22 @@ class NodeRunnerRegistry:
         condition_runner = ConditionNodeRunner()
         parallel_runner = ParallelNodeRunner()
 
+        # Create team runner if orchestrator is provided
+        team_runner = None
+        if orchestrator:
+            team_runner = TeamNodeRunner(
+                orchestrator=orchestrator,
+                tool_registry=tool_registry,
+                enable_observability=True,
+                enable_metrics=True,
+            )
+
         # Register child runners for parallel execution
         parallel_runner.register_runner("agent", agent_runner)
         parallel_runner.register_runner("compute", compute_runner)
         parallel_runner.register_runner("transform", transform_runner)
+        if team_runner:
+            parallel_runner.register_runner("team", team_runner)
 
         registry.register(agent_runner)
         registry.register(compute_runner)
@@ -837,6 +854,8 @@ class NodeRunnerRegistry:
         registry.register(hitl_runner)
         registry.register(condition_runner)
         registry.register(parallel_runner)
+        if team_runner:
+            registry.register(team_runner)
 
         return registry
 
@@ -855,6 +874,7 @@ __all__ = [
     "HITLNodeRunner",
     "ConditionNodeRunner",
     "ParallelNodeRunner",
+    # Note: TeamNodeRunner is in victor.workflows.team_node_runner
     # Registry
     "NodeRunnerRegistry",
 ]

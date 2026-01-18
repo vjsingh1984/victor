@@ -295,7 +295,10 @@ class CoverageReport:
                     other_line = other_coverage.lines.get(line_num)
 
                     if self_line is None:
-                        merged_lines[line_num] = other_line  # type: ignore
+                        # other_line is guaranteed to be LineCoverage (not None) here
+                        # because line_num came from the union of both line sets
+                        if other_line is not None:
+                            merged_lines[line_num] = other_line
                     elif other_line is None:
                         merged_lines[line_num] = self_line
                     else:

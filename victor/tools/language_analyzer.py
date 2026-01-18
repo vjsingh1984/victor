@@ -63,6 +63,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol, Set, Tuple, Type, runtime_checkable
 
+# Import Rust-accelerated regex engine for 10-20x faster pattern matching
+try:
+    from victor.native.accelerators import get_regex_engine_accelerator
+    _REGEX_ACCELERATOR_AVAILABLE = True
+except ImportError:
+    _REGEX_ACCELERATOR_AVAILABLE = False
+    get_regex_engine_accelerator = None  # type: ignore
+
 logger = logging.getLogger(__name__)
 
 
@@ -1538,6 +1546,17 @@ class BaseLanguageAnalyzer(ABC):
         self._parser = None
         self._language_obj = None
 
+        # Initialize regex accelerator for 10-20x faster pattern matching
+        if _REGEX_ACCELERATOR_AVAILABLE and get_regex_engine_accelerator is not None:
+            self._regex_accelerator = get_regex_engine_accelerator()
+            if self._regex_accelerator.rust_available:
+                logger.info(
+                    f"Language analyzer ({self.__class__.__name__}): Using Rust accelerator "
+                    "(10-20x faster pattern matching)"
+                )
+        else:
+            self._regex_accelerator = None
+
     @property
     @abstractmethod
     def language(self) -> str:
@@ -1899,6 +1918,101 @@ class BaseLanguageAnalyzer(ABC):
             logger.warning(f"Documentation check failed for {file_path}: {e}")
 
         return issues
+
+    def analyze_code_accelerated(
+        self,
+        source_code: str,
+        language: str,
+        patterns: Optional[List[str]] = None,
+    ) -> List["PatternMatch"]:
+        """Analyze code using Rust-accelerated regex engine.
+
+        Provides 10-20x faster pattern matching than Python re module.
+
+        Args:
+            source_code: Source code to analyze
+            language: Programming language name
+            patterns: Optional list of regex patterns (uses defaults if None)
+
+        Returns:
+            List of PatternMatch objects
+
+        Example:
+            >>> analyzer = get_analyzer("python")
+            >>> matches = analyzer.analyze_code_accelerated(code, "python")
+            >>> for match in matches:
+            ...     print(f"Line {match.line}: {match.pattern}")
+        """
+        if self._regex_accelerator is None:
+            # Fallback to Python implementation
+            logger.debug("Regex accelerator unavailable, using Python re")
+            return self._analyze_code_python(source_code, language, patterns)
+
+        try:
+            # Compile patterns for this language
+            compiled_set = self._regex_accelerator.compile_patterns(language, patterns)
+
+            # Match all patterns against source code
+            matches = self._regex_accelerator.match_all(source_code, compiled_set)
+
+            logger.debug(
+                f"Accelerated analysis found {len(matches)} matches "
+                f"(cache hit rate: {self._regex_accelerator.cache_stats.cache_hit_rate:.1f}%)"
+            )
+
+            return matches
+        except Exception as e:
+            logger.warning(f"Accelerated pattern matching failed: {e}, using Python fallback")
+            return self._analyze_code_python(source_code, language, patterns)
+
+    def _analyze_code_python(
+        self,
+        source_code: str,
+        language: str,
+        patterns: Optional[List[str]] = None,
+    ) -> List["PatternMatch"]:
+        """Python fallback for code analysis.
+
+        Args:
+            source_code: Source code to analyze
+            language: Programming language name
+            patterns: Optional list of regex patterns
+
+        Returns:
+            List of PatternMatch objects
+        """
+        # Import PatternMatch locally to avoid circular import
+        from victor.native.accelerators.regex_engine import PatternMatch
+
+        matches = []
+        lines = source_code.split("\n")
+
+        # Use language-specific patterns if none provided
+        if patterns is None:
+            security_patterns = self._get_security_patterns()
+            smell_patterns = self._get_smell_patterns()
+            patterns = [p.pattern for p in security_patterns + smell_patterns]
+
+        # Compile and match patterns
+        for pattern_str in patterns:
+            try:
+                pattern = re.compile(pattern_str, re.IGNORECASE)
+                for line_num, line in enumerate(lines, 1):
+                    match = pattern.search(line)
+                    if match:
+                        matches.append(
+                            PatternMatch(
+                                pattern=pattern_str,
+                                line=line_num,
+                                column=match.start() + 1,
+                                matched_text=match.group(0),
+                                context=line.strip(),
+                            )
+                        )
+            except re.error as e:
+                logger.warning(f"Invalid regex pattern '{pattern_str}': {e}")
+
+        return matches
 
     def analyze(self, content: str, file_path: Path, aspects: List[str]) -> AnalysisResult:
         """Run full analysis on content.

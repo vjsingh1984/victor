@@ -65,7 +65,7 @@ from typing import (
     Union,
 )
 
-from victor.agent.subagents.base import SubAgentRole
+from victor.core.teams import SubAgentRole
 from victor.agent.teams.coordinator import TeamCoordinator
 from victor.teams.types import (
     MemoryConfig,

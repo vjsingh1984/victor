@@ -316,7 +316,7 @@ workflows:
       - id: update_docs
         type: agent
         name: "Update Documentation"
-        role: writer
+        role: reviewer
         goal: |
           Update documentation for the new feature:
           - Add/update docstrings

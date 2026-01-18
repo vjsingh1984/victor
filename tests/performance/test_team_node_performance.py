@@ -55,6 +55,16 @@ import pytest
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
 
+@pytest.fixture
+def run_async():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        yield loop.run_until_complete
+    finally:
+        loop.close()
+        asyncio.set_event_loop(None)
+
 
 # =============================================================================
 # Mock Team Members for Benchmarking
@@ -181,7 +191,7 @@ def recursion_context():
 
 @pytest.mark.benchmark(group="team_formations")
 @pytest.mark.parametrize("formation", ["sequential", "parallel", "pipeline", "hierarchical", "consensus"])
-def test_formation_performance(benchmark, team_coordinator, small_team, formation):
+def test_formation_performance(benchmark, team_coordinator, small_team, formation, run_async):
     """Benchmark performance of different team formations.
 
     Measures:
@@ -210,13 +220,13 @@ def test_formation_performance(benchmark, team_coordinator, small_team, formatio
             context={"team_name": f"benchmark_{formation}"},
         )
 
-    result = benchmark(asyncio.run, run_team())
+    result = benchmark(lambda: run_async(run_team()))
     assert result["success"]
 
 
 @pytest.mark.benchmark(group="team_size")
 @pytest.mark.parametrize("team_size", [2, 5, 10])
-def test_team_size_scaling(benchmark, team_coordinator, team_size):
+def test_team_size_scaling(benchmark, team_coordinator, team_size, run_async):
     """Benchmark performance scaling with team size.
 
     Expected behavior:
@@ -243,13 +253,13 @@ def test_team_size_scaling(benchmark, team_coordinator, team_size):
             task="Process large dataset", context={"team_name": f"size_{team_size}"}
         )
 
-    result = benchmark(asyncio.run, run_team())
+    result = benchmark(lambda: run_async(run_team()))
     assert result["success"]
 
 
 @pytest.mark.benchmark(group="tool_budget")
 @pytest.mark.parametrize("budget", [5, 25, 50, 100])
-def test_tool_budget_impact(benchmark, team_coordinator, budget):
+def test_tool_budget_impact(benchmark, team_coordinator, budget, run_async):
     """Benchmark impact of tool budget on performance.
 
     Tool budget affects:
@@ -284,7 +294,7 @@ def test_tool_budget_impact(benchmark, team_coordinator, budget):
             },
         )
 
-    result = benchmark(asyncio.run, run_team())
+    result = benchmark(lambda: run_async(run_team()))
     assert result["success"]
 
 
@@ -295,7 +305,7 @@ def test_tool_budget_impact(benchmark, team_coordinator, budget):
 
 @pytest.mark.benchmark(group="recursion")
 @pytest.mark.parametrize("depth", [1, 2, 3, 4])
-def test_recursion_depth_overhead(benchmark, mock_orchestrator, depth):
+def test_recursion_depth_overhead(benchmark, mock_orchestrator, depth, run_async):
     """Benchmark overhead of recursion depth tracking.
 
     Measures the performance impact of RecursionGuard when teams
@@ -326,7 +336,7 @@ def test_recursion_depth_overhead(benchmark, mock_orchestrator, depth):
                     task=f"Level {i} task", context={"team_name": f"nested_{i}"}
                 )
 
-    benchmark(asyncio.run, run_nested_team())
+    benchmark(lambda: run_async(run_nested_team()))
 
 
 # =============================================================================
@@ -336,7 +346,7 @@ def test_recursion_depth_overhead(benchmark, mock_orchestrator, depth):
 
 @pytest.mark.benchmark(group="timeout")
 @pytest.mark.parametrize("timeout", [1, 5, 10])
-def test_timeout_performance(benchmark, team_coordinator, timeout):
+def test_timeout_performance(benchmark, team_coordinator, timeout, run_async):
     """Benchmark timeout handling performance.
 
     Measures overhead of timeout enforcement and graceful degradation.
@@ -369,7 +379,7 @@ def test_timeout_performance(benchmark, team_coordinator, timeout):
         except asyncio.TimeoutError:
             return {"success": False, "error": "timeout"}
 
-    result = benchmark(asyncio.run, run_with_timeout())
+    result = benchmark(lambda: run_async(run_with_timeout()))
     assert result is not None
 
 
@@ -380,7 +390,7 @@ def test_timeout_performance(benchmark, team_coordinator, timeout):
 
 @pytest.mark.benchmark(group="memory")
 @pytest.mark.parametrize("team_size", [2, 5, 10])
-def test_memory_per_member(benchmark, team_coordinator, team_size):
+def test_memory_per_member(benchmark, team_coordinator, team_size, run_async):
     """Benchmark memory usage per team member.
 
     Measures:
@@ -413,7 +423,7 @@ def test_memory_per_member(benchmark, team_coordinator, team_size):
         tracemalloc.stop()
         return {"result": result, "memory": peak}
 
-    output = benchmark(asyncio.run, run_team())
+    output = benchmark(lambda: run_async(run_team()))
     assert output["result"]["success"]
     # Memory should be reasonable (< 1MB for 10 members)
     assert output["memory"] < 1_000_000
@@ -425,7 +435,7 @@ def test_memory_per_member(benchmark, team_coordinator, team_size):
 
 
 @pytest.mark.benchmark(group="scenarios")
-def test_simple_task_scenario(benchmark, team_coordinator):
+def test_simple_task_scenario(benchmark, team_coordinator, run_async):
     """Benchmark simple single-tool task scenario.
 
     Scenario: Quick task with minimal coordination overhead.
@@ -450,12 +460,12 @@ def test_simple_task_scenario(benchmark, team_coordinator):
             context={"team_name": "simple_task"},
         )
 
-    result = benchmark(asyncio.run, run_simple())
+    result = benchmark(lambda: run_async(run_simple()))
     assert result["success"]
 
 
 @pytest.mark.benchmark(group="scenarios")
-def test_complex_task_scenario(benchmark, team_coordinator):
+def test_complex_task_scenario(benchmark, team_coordinator, run_async):
     """Benchmark complex multi-tool task scenario.
 
     Scenario: Complex task requiring multiple tools and coordination.
@@ -485,12 +495,12 @@ def test_complex_task_scenario(benchmark, team_coordinator):
             },
         )
 
-    result = benchmark(asyncio.run, run_complex())
+    result = benchmark(lambda: run_async(run_complex()))
     assert result["success"]
 
 
 @pytest.mark.benchmark(group="scenarios")
-def test_large_context_scenario(benchmark, team_coordinator):
+def test_large_context_scenario(benchmark, team_coordinator, run_async):
     """Benchmark with large context (10+ KB state).
 
     Scenario: Team coordination with large shared context.
@@ -521,7 +531,7 @@ def test_large_context_scenario(benchmark, team_coordinator):
             task="Process large context", context=large_context
         )
 
-    result = benchmark(asyncio.run, run_with_large_context())
+    result = benchmark(lambda: run_async(run_with_large_context()))
     assert result["success"]
 
 
@@ -532,7 +542,9 @@ def test_large_context_scenario(benchmark, team_coordinator):
 
 @pytest.mark.benchmark(group="consensus")
 @pytest.mark.parametrize("members,rounds", [(3, 2), (5, 3), (7, 4)])
-def test_consensus_formation_performance(benchmark, team_coordinator, members, rounds):
+def test_consensus_formation_performance(
+    benchmark, team_coordinator, members, rounds, run_async
+):
     """Benchmark consensus formation with varying team sizes and rounds.
 
     Consensus formation requires multiple rounds until all members agree.
@@ -565,7 +577,7 @@ def test_consensus_formation_performance(benchmark, team_coordinator, members, r
             },
         )
 
-    result = benchmark(asyncio.run, run_consensus())
+    result = benchmark(lambda: run_async(run_consensus()))
     assert result["success"]
 
 

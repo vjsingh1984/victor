@@ -208,7 +208,21 @@ class UniversalRegistry(Generic[T]):
                     registry_type, cache_strategy, max_size
                 )
                 logger.info(f"UniversalRegistry: Created new registry '{registry_type}'")
-            return cls._instances[registry_type]
+            registry = cls._instances[registry_type]
+            if (
+                registry._cache_strategy != cache_strategy
+                or registry._max_size != max_size
+            ):
+                registry._cache_strategy = cache_strategy
+                registry._max_size = max_size
+                registry.invalidate()
+                logger.info(
+                    "UniversalRegistry: Updated registry '%s' (strategy=%s, max_size=%s)",
+                    registry_type,
+                    cache_strategy.value,
+                    max_size,
+                )
+            return registry
 
     def register(
         self,

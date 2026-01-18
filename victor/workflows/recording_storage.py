@@ -318,7 +318,7 @@ class FileRecordingStorage(RecordingStorage):
         """Initialize file-based storage.
 
         Args:
-            base_path: Base directory for storage
+            base_path: Base directory for storage (will contain recordings/ subdirectory)
             compress: Whether to compress recordings
             auto_create_dir: Whether to create directories automatically
         """
@@ -326,8 +326,14 @@ class FileRecordingStorage(RecordingStorage):
         self.compress = compress
         self.auto_create_dir = auto_create_dir
 
-        self.recordings_dir = self.base_path / "recordings"
-        self.index_file = self.base_path / "index.json"
+        # recordings_dir is where actual recording files are stored
+        # If base_path already ends with "recordings", use it directly
+        if self.base_path.name == "recordings":
+            self.recordings_dir = self.base_path
+            self.index_file = self.base_path.parent / "index.json"
+        else:
+            self.recordings_dir = self.base_path / "recordings"
+            self.index_file = self.base_path / "index.json"
 
         if self.auto_create_dir:
             self.base_path.mkdir(parents=True, exist_ok=True)
@@ -390,10 +396,18 @@ class FileRecordingStorage(RecordingStorage):
             recording_path = filepath
         else:
             metadata = recorder.finalize()
+            # Get path with extension from _get_recording_path
             recording_path = self._get_recording_path(metadata.recording_id)
 
         # Save recording
-        await recorder.save(recording_path)
+        # Note: recorder.save() will add .gz if compress=True in recorder config,
+        # so we need to pass the path without extension to avoid double extension
+        if self.compress and str(recording_path).endswith(".json.gz"):
+            # Remove .gz extension since recorder.save() will add it
+            recording_path_no_gz = recording_path.with_suffix("")
+            await recorder.save(recording_path_no_gz)
+        else:
+            await recorder.save(recording_path)
 
         # Update index
         index = await self._load_index()
@@ -604,7 +618,7 @@ class InMemoryRecordingStorage(RecordingStorage):
         metadata = recorder.finalize()
 
         # Serialize recording
-        from victor.workflows.execution_recorder import ExecutionEvent, StateSnapshot
+        from victor.workflows.execution_recorder import RecordingEvent, StateSnapshot
 
         recording_data = {
             "metadata": metadata.to_dict(),

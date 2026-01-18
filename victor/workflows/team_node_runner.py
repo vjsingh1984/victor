@@ -195,10 +195,11 @@ class TeamNodeRunner:
                         recursion_depth=recursion_ctx.current_depth,
                     )
 
-                # Create team coordinator
+                # Create team coordinator with shared recursion context
                 coordinator = self._create_coordinator(
                     orchestrator=self._orchestrator,
                     with_observability=self._enable_observability,
+                    recursion_context=recursion_ctx,
                 )
 
                 # Add members from configuration

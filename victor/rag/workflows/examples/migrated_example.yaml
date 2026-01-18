@@ -740,7 +740,7 @@ workflows:
       - id: generate_answer
         type: agent
         name: "Generate Answer with Citations"
-        role: writer
+        role: reviewer
         goal: |
           Generate a comprehensive answer:
           1. Answer the specific question

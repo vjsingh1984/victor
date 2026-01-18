@@ -72,7 +72,15 @@ from typing import (
     Union,
 )
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 
 # =============================================================================
@@ -468,7 +476,13 @@ class ModelConfigSchema(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    model_name: str = Field(..., min_length=1, description="Model identifier")
+    model_name: str = Field(
+        ...,
+        min_length=1,
+        description="Model identifier",
+        validation_alias=AliasChoices("model_name", "model"),
+        serialization_alias="model",
+    )
     temperature: float = Field(0.7, ge=0.0, le=2.0, description="Sampling temperature")
     max_tokens: int = Field(4096, ge=1, le=200000, description="Maximum tokens")
     top_p: float = Field(1.0, ge=0.0, le=1.0, description="Nucleus sampling")
@@ -484,6 +498,15 @@ class ModelConfigSchema(BaseModel):
         if not valid_pattern.match(v):
             raise ValueError("Model name contains invalid characters")
         return v
+
+    @property
+    def model(self) -> str:
+        """Backward compatible alias for model_name."""
+        return self.model_name
+
+    @model.setter
+    def model(self, value: str) -> None:
+        self.model_name = value
 
 
 class ToolConfigSchema(BaseModel):

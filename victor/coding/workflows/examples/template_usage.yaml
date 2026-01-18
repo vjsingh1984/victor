@@ -114,7 +114,7 @@ workflows:
       - id: synthesize_report
         type: agent
         name: "Report Synthesizer"
-        role: writer
+        role: reviewer
         goal: |
           Synthesize review findings into comprehensive report:
           {{review_results}}
@@ -272,7 +272,7 @@ workflows:
       - id: finalize
         type: agent
         name: "Finalizer"
-        role: writer
+        role: reviewer
         goal: |
           Create final summary with:
           {{research_findings}}

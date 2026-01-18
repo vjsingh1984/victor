@@ -765,8 +765,8 @@ class TestErrorHandlingAcrossCoordinators:
         # (In real implementation, would fall back to simple truncation)
         with pytest.raises(RuntimeError, match="Compaction service unavailable"):
             await mock_context_coordinator.compact_context(
-                CompactionContext(messages=[], token_count=10000),
-                ContextBudget(max_tokens=4096),
+                {"messages": [], "token_count": 10000},  # CompactionContext as dict
+                {"max_tokens": 4096},  # ContextBudget as dict
             )
 
     @pytest.mark.asyncio

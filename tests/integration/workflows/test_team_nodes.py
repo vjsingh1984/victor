@@ -256,7 +256,14 @@ class TestTeamFormations:
             "id": "seq_team",
             "type": "team",
             "team_formation": "sequential",
-            "members": [],
+            "members": [
+                {
+                    "id": "member1",
+                    "role": "executor",
+                    "goal": "Execute task",
+                    "tool_budget": 10,
+                }
+            ],
         }
 
         node = _parse_team_node(node_data)
@@ -270,7 +277,14 @@ class TestTeamFormations:
             "id": "par_team",
             "type": "team",
             "team_formation": "parallel",
-            "members": [],
+            "members": [
+                {
+                    "id": "member1",
+                    "role": "executor",
+                    "goal": "Execute task",
+                    "tool_budget": 10,
+                }
+            ],
         }
 
         node = _parse_team_node(node_data)
@@ -284,7 +298,14 @@ class TestTeamFormations:
             "id": "pipeline_team",
             "type": "team",
             "team_formation": "pipeline",
-            "members": [],
+            "members": [
+                {
+                    "id": "member1",
+                    "role": "executor",
+                    "goal": "Execute task",
+                    "tool_budget": 10,
+                }
+            ],
         }
 
         node = _parse_team_node(node_data)
@@ -298,7 +319,14 @@ class TestTeamFormations:
             "id": "hierarchy_team",
             "type": "team",
             "team_formation": "hierarchical",
-            "members": [],
+            "members": [
+                {
+                    "id": "member1",
+                    "role": "executor",
+                    "goal": "Execute task",
+                    "tool_budget": 10,
+                }
+            ],
         }
 
         node = _parse_team_node(node_data)
@@ -312,7 +340,14 @@ class TestTeamFormations:
             "id": "consensus_team",
             "type": "team",
             "team_formation": "consensus",
-            "members": [],
+            "members": [
+                {
+                    "id": "member1",
+                    "role": "executor",
+                    "goal": "Execute task",
+                    "tool_budget": 10,
+                }
+            ],
         }
 
         node = _parse_team_node(node_data)
@@ -391,7 +426,14 @@ class TestTeamNodeMembers:
             "continue_on_error": False,
             "max_iterations": 25,
             "total_tool_budget": 50,
-            "members": [],
+            "members": [
+                {
+                    "id": "member1",
+                    "role": "executor",
+                    "goal": "Execute task",
+                    "tool_budget": 10,
+                }
+            ],
         }
 
         node = _parse_team_node(node_data)
@@ -583,7 +625,14 @@ class TestTeamNodeErrorHandling:
         node_data = {
             "type": "team",
             "team_formation": "sequential",
-            "members": [],
+            "members": [
+                {
+                    "id": "member1",
+                    "role": "executor",
+                    "goal": "Execute task",
+                    "tool_budget": 10,
+                }
+            ],
         }
 
         with pytest.raises(YAMLWorkflowError, match="missing required 'id' field"):
@@ -596,7 +645,14 @@ class TestTeamNodeErrorHandling:
         node_data = {
             "id": "default_team",
             "type": "team",
-            "members": [],
+            "members": [
+                {
+                    "id": "member1",
+                    "role": "executor",
+                    "goal": "Execute task",
+                    "tool_budget": 10,
+                }
+            ],
         }
 
         node = _parse_team_node(node_data)

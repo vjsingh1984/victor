@@ -86,7 +86,7 @@ members:
 
   # Documentation Writer
   - id: "doc_writer"
-    role: "writer"
+    role: "reviewer"
     name: "Documentation Writer"
     goal: |
       Draft clear, comprehensive documentation based on research. Write

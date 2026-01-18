@@ -1,0 +1,40 @@
+# pytest-benchmark configuration for embedding operations benchmarks
+# Add this section to your pyproject.toml or pytest.ini
+
+[tool.pytest-benchmark]
+# Benchmark configuration
+min_rounds = 5
+max_time = 1.0  # Maximum time per benchmark in seconds
+timer = time.perf_counter  # High-resolution timer
+
+# Sorting and grouping
+benchmark_sort = name
+benchmark_sort_warning = true
+
+# Output options
+save_data = true
+json_file = .benchmarks/embedding_operations.json
+
+# Histogram settings
+histogram = true
+benchmark_columns = min, max, mean, stddev, median, ops, rounds, iterations
+
+# Warning thresholds (percentage)
+warning_min_rounds = 5
+warning_max_time = 1.0
+
+# Disable garbage collection during benchmarks (more consistent results)
+disable_gc = true
+
+# Use process isolation for benchmarks (more reliable)
+# fork = true  # Unix only
+
+# Performance calibration
+warmup = true  # Run warmup iterations before benchmarking
+warmup_iterations = 1
+
+# Calibration
+calibrate = true  # Automatically calibrate number of iterations
+
+# Precision
+min_time = 0.005  # Minimum time per benchmark in seconds

@@ -91,7 +91,7 @@ class TestTaskClassifierMedium:
         assert result.tool_budget == 15
 
     def test_find_classes_simple(self):
-        """Test that 'find classes' is classified as SIMPLE (search task)."""
+        """Test that 'find classes' is classified as MEDIUM (requires codebase search)."""
         from victor.framework.task import (
             TaskComplexityService as ComplexityClassifier,
             TaskComplexity,
@@ -100,11 +100,12 @@ class TestTaskClassifierMedium:
         classifier = ComplexityClassifier()
         result = classifier.classify("Find all classes that inherit from BaseTool")
 
-        # Search tasks are now correctly classified as SIMPLE
-        assert result.complexity == TaskComplexity.SIMPLE
+        # Finding all classes with inheritance is MEDIUM complexity
+        # (requires AST parsing and codebase search)
+        assert result.complexity == TaskComplexity.MEDIUM
 
     def test_where_is_simple(self):
-        """Test that 'where is' is classified as SIMPLE (search task)."""
+        """Test that 'where is' is classified as MEDIUM (requires search)."""
         from victor.framework.task import (
             TaskComplexityService as ComplexityClassifier,
             TaskComplexity,
@@ -113,8 +114,8 @@ class TestTaskClassifierMedium:
         classifier = ComplexityClassifier()
         result = classifier.classify("Where is the error handling implemented?")
 
-        # Search/location tasks are now correctly classified as SIMPLE
-        assert result.complexity == TaskComplexity.SIMPLE
+        # Location search tasks are MEDIUM (require searching codebase)
+        assert result.complexity == TaskComplexity.MEDIUM
 
     def test_how_does_work_medium(self):
         """Test that 'how does X work' is classified as MEDIUM."""
@@ -365,9 +366,9 @@ class TestEdgeCases:
         classifier = ComplexityClassifier()
         result = classifier.classify("")
 
-        # Empty messages default to SIMPLE (fallback semantic classification)
-        # since there's no pattern match or clear task type
-        assert result.complexity == TaskComplexity.SIMPLE
+        # Empty messages default to MEDIUM (conservative fallback)
+        # when there's no pattern match or clear task type
+        assert result.complexity == TaskComplexity.MEDIUM
 
     def test_unrecognized_message(self):
         """Test classification of unrecognized message."""

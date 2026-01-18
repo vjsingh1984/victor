@@ -1,0 +1,26 @@
+{
+  "eager": {
+    "mode": "eager",
+    "core_import_ms": 1804.8215410672128,
+    "first_access_ms": 0.004541012458503246,
+    "total_startup_ms": 1804.8215410672128
+  },
+  "lazy": {
+    "mode": "lazy",
+    "core_import_ms": 175.74233398772776,
+    "first_access_ms": 29.607292031869292,
+    "total_startup_ms": 205.34962601959705
+  },
+  "scenarios": {
+    "use_one_vertical": {
+      "lazy_ms": 162.71504294127226,
+      "eager_ms": 332.6914160279557,
+      "improvement_percent": 51.091301096990286
+    },
+    "list_verticals_only": {
+      "lazy_ms": 132.99308402929455,
+      "eager_ms": 343.05625001434237,
+      "improvement_percent": 61.23286369983511
+    }
+  }
+}

@@ -456,6 +456,7 @@ class TeamTemplateRegistry:
             template_dir = Path(__file__).parent / "templates"
         self._template_dir = Path(template_dir)
         self._templates: Dict[str, TeamTemplate] = {}
+        self._manually_registered: Set[str] = set()
         self._loaded = False
 
     @classmethod
@@ -478,10 +479,19 @@ class TeamTemplateRegistry:
         if self._loaded and not force_reload:
             return
 
+        # Preserve manually registered templates
+        manual_templates = {
+            name: template
+            for name, template in self._templates.items()
+            if name in self._manually_registered
+        }
+
         self._templates.clear()
 
         if not self._template_dir.exists():
             logger.warning(f"Template directory not found: {self._template_dir}")
+            # Restore manually registered templates
+            self._templates.update(manual_templates)
             self._loaded = True
             return
 
@@ -492,6 +502,9 @@ class TeamTemplateRegistry:
                 self.register(template, silent=True)
             except Exception as e:
                 logger.warning(f"Failed to load template from {yaml_file}: {e}")
+
+        # Restore manually registered templates (they override YAML templates)
+        self._templates.update(manual_templates)
 
         self._loaded = True
         logger.info(f"Loaded {len(self._templates)} templates from {self._template_dir}")
@@ -507,6 +520,9 @@ class TeamTemplateRegistry:
             if not silent:
                 logger.warning(f"Template '{template.name}' already registered, overwriting")
         self._templates[template.name] = template
+        # Track manually registered templates (not from YAML files)
+        if not silent:
+            self._manually_registered.add(template.name)
         if not silent:
             logger.info(f"Registered template '{template.name}'")
 
@@ -726,6 +742,7 @@ class TeamTemplateRegistry:
         """
         self._loaded = False
         self._templates.clear()
+        self._manually_registered.clear()
 
 
 # Global registry instance

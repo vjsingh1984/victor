@@ -442,3 +442,446 @@ class TestOrchestratorConfig:
         assert config.profile_name == "fast"
         assert config.tool_selection == {"base_threshold": 0.3}
         assert config.metadata == {"custom": "value"}
+
+
+class TestProfileConfigProvider:
+    """Tests for ProfileConfigProvider."""
+
+    @pytest.fixture
+    def mock_settings_with_profiles(self):
+        """Create mock settings with profiles."""
+        class MockProfile:
+            def __init__(self, provider, model, temperature=0.7, max_tokens=4096, tool_selection=None):
+                self.provider = provider
+                self.model = model
+                self.temperature = temperature
+                self.max_tokens = max_tokens
+                self.tool_selection = tool_selection
+                self.__pydantic_extra__ = None
+
+        class MockSettings:
+            def __init__(self):
+                self._profiles = {
+                    "default": MockProfile("anthropic", "claude-sonnet-4-5"),
+                    "fast": MockProfile("openai", "gpt-4", temperature=0.5, max_tokens=2048),
+                    "local": MockProfile("ollama", "llama3", temperature=0.8),
+                }
+
+            def load_profiles(self):
+                return self._profiles
+
+        return MockSettings()
+
+    @pytest.mark.asyncio
+    async def test_get_config_from_profile(self, mock_settings_with_profiles):
+        """Test getting config from profile."""
+        from victor.agent.coordinators.config_coordinator import ProfileConfigProvider
+
+        provider = ProfileConfigProvider(mock_settings_with_profiles, profile_name="fast")
+        config = await provider.get_config("session123")
+
+        assert config["provider"] == "openai"
+        assert config["model"] == "gpt-4"
+        assert config["temperature"] == 0.5
+        assert config["max_tokens"] == 2048
+        assert config["profile_name"] == "fast"
+
+    @pytest.mark.asyncio
+    async def test_get_config_profile_not_found(self, mock_settings_with_profiles):
+        """Test error when profile not found."""
+        from victor.agent.coordinators.config_coordinator import ProfileConfigProvider
+
+        provider = ProfileConfigProvider(mock_settings_with_profiles, profile_name="nonexistent")
+
+        with pytest.raises(ValueError, match="Profile not found: 'nonexistent'"):
+            await provider.get_config("session123")
+
+    @pytest.mark.asyncio
+    async def test_get_config_profile_not_found_with_suggestions(
+        self, mock_settings_with_profiles
+    ):
+        """Test error message includes profile suggestions."""
+        from victor.agent.coordinators.config_coordinator import ProfileConfigProvider
+
+        provider = ProfileConfigProvider(mock_settings_with_profiles, profile_name="fst")
+
+        with pytest.raises(ValueError, match="Profile not found: 'fst'") as exc_info:
+            await provider.get_config("session123")
+
+        error_msg = str(exc_info.value)
+        assert "Did you mean" in error_msg
+        assert "Available profiles" in error_msg
+
+    def test_priority(self):
+        """Test provider priority."""
+        from victor.agent.coordinators.config_coordinator import ProfileConfigProvider
+
+        provider = ProfileConfigProvider(MockSettings(), priority=200)
+        assert provider.priority() == 200
+
+
+class TestConfigCoordinatorErrorHandling:
+    """Tests for ConfigCoordinator error handling."""
+
+    @pytest.mark.asyncio
+    async def test_load_config_provider_error(self):
+        """Test error handling when provider fails."""
+        from victor.agent.coordinators.config_coordinator import ConfigCoordinator
+
+        class FailingProvider:
+            async def get_config(self, session_id):
+                raise RuntimeError("Provider failure")
+
+            def priority(self):
+                return 50
+
+        coordinator = ConfigCoordinator(providers=[FailingProvider()])
+
+        with pytest.raises(ValueError, match="Configuration loading failed"):
+            await coordinator.load_config("session123")
+
+    @pytest.mark.asyncio
+    async def test_load_config_no_providers_returns_empty(self):
+        """Test that no providers returns empty config."""
+        from victor.agent.coordinators.config_coordinator import ConfigCoordinator
+
+        coordinator = ConfigCoordinator(providers=[], enable_cache=False)
+
+        config = await coordinator.load_config("session123")
+        assert config == {}
+
+    @pytest.mark.asyncio
+    async def test_load_config_with_failing_and_working_providers(self):
+        """Test that working providers are used even when some fail."""
+        from victor.agent.coordinators.config_coordinator import ConfigCoordinator
+
+        class FailingProvider:
+            async def get_config(self, session_id):
+                raise RuntimeError("Provider failure")
+
+            def priority(self):
+                return 10
+
+        class WorkingProvider:
+            async def get_config(self, session_id):
+                return {"temperature": 0.5, "max_tokens": 2048}
+
+            def priority(self):
+                return 50
+
+        coordinator = ConfigCoordinator(
+            providers=[FailingProvider(), WorkingProvider()]
+        )
+
+        config = await coordinator.load_config("session123")
+        assert config["temperature"] == 0.5
+        assert config["max_tokens"] == 2048
+
+
+class TestConfigCoordinatorCreateProvider:
+    """Tests for ConfigCoordinator.create_provider_from_config."""
+
+    @pytest.mark.asyncio
+    async def test_create_provider_missing_provider_field(self):
+        """Test error when provider field is missing."""
+        from victor.agent.coordinators.config_coordinator import ConfigCoordinator
+
+        coordinator = ConfigCoordinator(providers=[])
+
+        with pytest.raises(ValueError, match="Configuration missing 'provider' field"):
+            await coordinator.create_provider_from_config(
+                config={}, settings=MockSettings()
+            )
+
+    @pytest.mark.asyncio
+    async def test_create_provider_with_mock_registry(self):
+        """Test provider creation with mock registry."""
+        from victor.agent.coordinators.config_coordinator import ConfigCoordinator
+        from unittest.mock import MagicMock, Mock
+
+        coordinator = ConfigCoordinator(providers=[])
+
+        # Create mock provider registry
+        mock_registry = Mock()
+        mock_provider = MagicMock()
+        mock_registry.create.return_value = mock_provider
+
+        # Create mock settings with provider settings
+        mock_settings = Mock()
+        mock_settings.get_provider_settings.return_value = {
+            "api_key": "test-key",
+            "timeout": 300,
+        }
+
+        config = {
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-5",
+        }
+
+        provider = await coordinator.create_provider_from_config(
+            config=config,
+            settings=mock_settings,
+            provider_registry=mock_registry,
+        )
+
+        assert provider == mock_provider
+        mock_registry.create.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_create_provider_with_profile_overrides(self):
+        """Test provider creation with profile overrides."""
+        from victor.agent.coordinators.config_coordinator import ConfigCoordinator
+        from unittest.mock import Mock
+
+        coordinator = ConfigCoordinator(providers=[])
+
+        # Create mock provider registry
+        mock_registry = Mock()
+        mock_provider = Mock()
+        mock_registry.create.return_value = mock_provider
+
+        # Create mock settings
+        mock_settings = Mock()
+        mock_settings.get_provider_settings.return_value = {"api_key": "test-key"}
+
+        config = {
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-5",
+            "profile_overrides": {"timeout": 600, "custom_param": "value"},
+        }
+
+        provider = await coordinator.create_provider_from_config(
+            config=config,
+            settings=mock_settings,
+            provider_registry=mock_registry,
+        )
+
+        # Verify that profile overrides were applied
+        call_kwargs = mock_registry.create.call_args[1]
+        assert "timeout" in call_kwargs
+        assert "custom_param" in call_kwargs
+
+
+class TestToolAccessConfigCoordinator:
+    """Tests for ToolAccessConfigCoordinator."""
+
+    @pytest.fixture
+    def mock_tool_access_controller(self):
+        """Create mock tool access controller."""
+        from unittest.mock import Mock
+
+        controller = Mock()
+        controller.get_allowed_tools.return_value = {"bash", "read_file", "write_file"}
+        controller.check_access.return_value = Mock(allowed=True)
+        return controller
+
+    @pytest.fixture
+    def mock_mode_coordinator(self):
+        """Create mock mode coordinator."""
+        from unittest.mock import Mock
+
+        coordinator = Mock()
+        coordinator.current_mode_name = "build"
+        coordinator.get_mode_config.return_value = Mock(
+            allow_all_tools=False, disallowed_tools=set()
+        )
+        coordinator.is_tool_allowed.return_value = True
+        return coordinator
+
+    @pytest.fixture
+    def mock_tool_registry(self):
+        """Create mock tool registry."""
+        from unittest.mock import Mock
+
+        registry = Mock()
+        registry.list_tools.return_value = ["bash", "read_file", "write_file", "search"]
+        return registry
+
+    @pytest.fixture
+    def tool_access_coordinator(
+        self, mock_tool_access_controller, mock_mode_coordinator, mock_tool_registry
+    ):
+        """Create ToolAccessConfigCoordinator with mocks."""
+        from victor.agent.coordinators.config_coordinator import ToolAccessConfigCoordinator
+
+        return ToolAccessConfigCoordinator(
+            tool_access_controller=mock_tool_access_controller,
+            mode_coordinator=mock_mode_coordinator,
+            tool_registry=mock_tool_registry,
+        )
+
+    def test_init(self, tool_access_coordinator):
+        """Test initialization."""
+        assert tool_access_coordinator._tool_access_controller is not None
+        assert tool_access_coordinator._mode_coordinator is not None
+        assert tool_access_coordinator._tool_registry is not None
+
+    def test_init_with_none_components(self):
+        """Test initialization with None components."""
+        from victor.agent.coordinators.config_coordinator import ToolAccessConfigCoordinator
+
+        coordinator = ToolAccessConfigCoordinator(
+            tool_access_controller=None, mode_coordinator=None, tool_registry=None
+        )
+
+        assert coordinator._tool_access_controller is None
+        assert coordinator._mode_coordinator is None
+        assert coordinator._tool_registry is None
+
+    def test_build_tool_access_context(self, tool_access_coordinator):
+        """Test building tool access context."""
+        context = tool_access_coordinator.build_tool_access_context(
+            session_enabled_tools={"bash", "read_file"}, current_mode="plan"
+        )
+
+        assert context.session_enabled_tools == {"bash", "read_file"}
+        assert context.current_mode == "plan"
+
+    def test_build_tool_access_context_defaults(self, tool_access_coordinator):
+        """Test building context with default values."""
+        context = tool_access_coordinator.build_tool_access_context()
+
+        assert context.session_enabled_tools is None
+        assert context.current_mode == "build"  # From mock
+
+    def test_get_enabled_tools_with_controller(self, tool_access_coordinator):
+        """Test getting enabled tools via controller."""
+        tools = tool_access_coordinator.get_enabled_tools()
+
+        assert tools == {"bash", "read_file", "write_file"}
+        tool_access_coordinator._tool_access_controller.get_allowed_tools.assert_called_once()
+
+    def test_get_enabled_tools_without_controller(self, mock_tool_registry):
+        """Test getting enabled tools without controller."""
+        from victor.agent.coordinators.config_coordinator import ToolAccessConfigCoordinator
+
+        coordinator = ToolAccessConfigCoordinator(
+            tool_access_controller=None,
+            mode_coordinator=None,
+            tool_registry=mock_tool_registry,
+        )
+
+        tools = coordinator.get_enabled_tools()
+        assert tools == {"bash", "read_file", "write_file", "search"}
+
+    def test_is_tool_enabled_with_controller(self, tool_access_coordinator):
+        """Test checking if tool is enabled via controller."""
+        result = tool_access_coordinator.is_tool_enabled("bash")
+
+        assert result is True
+        tool_access_coordinator._tool_access_controller.check_access.assert_called_once()
+
+    def test_is_tool_enabled_without_controller(self, mock_tool_registry):
+        """Test checking if tool is enabled without controller."""
+        from victor.agent.coordinators.config_coordinator import ToolAccessConfigCoordinator
+
+        coordinator = ToolAccessConfigCoordinator(
+            tool_access_controller=None,
+            mode_coordinator=None,
+            tool_registry=mock_tool_registry,
+        )
+
+        result = coordinator.is_tool_enabled("bash")
+        assert result is True
+
+    def test_set_enabled_tools(self, tool_access_coordinator):
+        """Test setting enabled tools."""
+        from unittest.mock import Mock
+
+        mock_selector = Mock()
+        session_tools = set()
+
+        tool_access_coordinator.set_enabled_tools(
+            tools={"bash", "read_file"},
+            session_enabled_tools_attr=session_tools,
+            tool_selector=mock_selector,
+        )
+
+        assert session_tools == {"bash", "read_file"}
+        mock_selector.set_enabled_tools.assert_called_once_with({"bash", "read_file"})
+
+    def test_set_enabled_tools_with_vertical_context(self, tool_access_coordinator):
+        """Test setting enabled tools with vertical context."""
+        from unittest.mock import Mock
+
+        mock_selector = Mock()
+        mock_vertical_context = Mock()
+        session_tools = set()
+
+        tool_access_coordinator.set_enabled_tools(
+            tools={"bash", "read_file"},
+            session_enabled_tools_attr=session_tools,
+            tool_selector=mock_selector,
+            vertical_context=mock_vertical_context,
+        )
+
+        assert mock_vertical_context.enabled_tools == {"bash", "read_file"}
+
+    def test_get_available_tools(self, tool_access_coordinator):
+        """Test getting available tools."""
+        tools = tool_access_coordinator.get_available_tools()
+
+        assert tools == {"bash", "read_file", "write_file", "search"}
+
+    def test_get_available_tools_no_registry(self):
+        """Test getting available tools without registry."""
+        from victor.agent.coordinators.config_coordinator import ToolAccessConfigCoordinator
+
+        coordinator = ToolAccessConfigCoordinator(tool_registry=None)
+        tools = coordinator.get_available_tools()
+
+        assert tools == set()
+
+    def test_detect_config_changes(self, tool_access_coordinator):
+        """Test detecting configuration changes."""
+        old_config = {"temperature": 0.7, "max_tokens": 4096}
+        new_config = {"temperature": 0.5, "max_tokens": 4096, "thinking": True}
+
+        changes = tool_access_coordinator.detect_config_changes(old_config, new_config)
+
+        assert "temperature" in changes
+        assert changes["temperature"] == (0.7, 0.5)
+        assert "max_tokens" not in changes
+        assert "thinking" in changes
+
+    def test_detect_config_changes_no_changes(self, tool_access_coordinator):
+        """Test detecting changes when none exist."""
+        config = {"temperature": 0.7, "max_tokens": 4096}
+
+        changes = tool_access_coordinator.detect_config_changes(config, config)
+
+        assert changes == {}
+
+    def test_validate_mode_transition_safe(self, tool_access_coordinator):
+        """Test validating safe mode transition."""
+        result = tool_access_coordinator.validate_mode_transition(
+            from_mode="plan", to_mode="build", current_tools={"bash", "read_file"}
+        )
+
+        assert result.valid is True
+        assert len(result.errors) == 0
+
+    def test_validate_mode_transition_restrictive_with_warnings(
+        self, tool_access_coordinator
+    ):
+        """Test validating transition to restrictive mode with write tools."""
+        result = tool_access_coordinator.validate_mode_transition(
+            from_mode="build",
+            to_mode="plan",
+            current_tools={"bash", "write_file", "read_file"},
+        )
+
+        assert result.valid is True
+        assert len(result.warnings) > 0
+        assert "write" in str(result.warnings).lower()
+
+    def test_validate_mode_transition_restrictive_no_write_tools(
+        self, tool_access_coordinator
+    ):
+        """Test validating transition to restrictive mode without write tools."""
+        result = tool_access_coordinator.validate_mode_transition(
+            from_mode="build", to_mode="explore", current_tools={"read_file", "search"}
+        )
+
+        assert result.valid is True
+        assert len(result.warnings) == 0

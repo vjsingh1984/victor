@@ -18,6 +18,7 @@ Part of CRITICAL-001: Monolithic Orchestrator decomposition.
 """
 
 import pytest
+from rich.console import Console
 from unittest.mock import MagicMock, patch
 
 # Suppress deprecation warnings for complexity_classifier shim during migration
@@ -362,6 +363,82 @@ class TestCreateOrchestratorFactory:
         assert factory.settings == mock_settings
         assert factory.provider == mock_provider
         assert factory.model == "test-model"
+
+
+class TestInitializeOrchestrator:
+    """Tests for orchestrator initialization sequencing."""
+
+    def test_builder_sequence_returns_expected_order(self, factory):
+        """_builder_sequence returns the expected builder ordering."""
+        sequence = factory._builder_sequence()
+
+        assert [builder.__name__ for builder in sequence] == [
+            "ProviderLayerBuilder",
+            "PromptingBuilder",
+            "SessionServicesBuilder",
+            "MetricsLoggingBuilder",
+            "WorkflowMemoryBuilder",
+            "IntelligentIntegrationBuilder",
+            "ToolingBuilder",
+            "ConversationPipelineBuilder",
+            "ContextIntelligenceBuilder",
+            "RecoveryObservabilityBuilder",
+            "ConfigWorkflowBuilder",
+            "FinalizationBuilder",
+        ]
+
+    def test_initialize_orchestrator_calls_steps_in_order(self, factory):
+        """initialize_orchestrator calls helper methods in order."""
+        orchestrator = MagicMock()
+        call_order = []
+
+        def make_builder(name):
+            class _Builder:
+                def __init__(self, settings, factory=None):
+                    self._name = name
+
+                def build(self, orchestrator, **_kwargs):
+                    call_order.append(self._name)
+
+            return _Builder
+
+        expected = [
+            "ProviderLayerBuilder",
+            "PromptingBuilder",
+            "SessionServicesBuilder",
+            "MetricsLoggingBuilder",
+            "WorkflowMemoryBuilder",
+            "IntelligentIntegrationBuilder",
+            "ToolingBuilder",
+            "ConversationPipelineBuilder",
+            "ContextIntelligenceBuilder",
+            "RecoveryObservabilityBuilder",
+            "ConfigWorkflowBuilder",
+            "FinalizationBuilder",
+        ]
+
+        builders = [make_builder(name) for name in expected]
+
+        with patch.object(factory, "_builder_sequence", return_value=builders):
+            factory.initialize_orchestrator(orchestrator)
+
+        assert call_order == expected
+
+    def test_initialize_orchestrator_sets_core_fields(self, factory):
+        """initialize_orchestrator sets core orchestrator fields."""
+        orchestrator = MagicMock()
+
+        with patch.object(factory, "_builder_sequence", return_value=[]):
+            factory.initialize_orchestrator(orchestrator)
+
+        assert orchestrator.settings == factory.settings
+        assert orchestrator.temperature == factory.temperature
+        assert orchestrator.max_tokens == factory.max_tokens
+        assert orchestrator.tool_selection == factory.tool_selection
+        assert orchestrator.thinking == factory.thinking
+        assert orchestrator._factory == factory
+        assert orchestrator._container == factory._container
+        assert isinstance(orchestrator.console, Console)
 
 
 class TestDataClasses:
@@ -1097,4 +1174,3 @@ class TestOrchestratorComponentsWithCoordinators:
         assert components.coordinators.response_coordinator is not None
         assert components.coordinators.tool_access_config_coordinator is not None
         assert components.coordinators.state_coordinator is not None
-

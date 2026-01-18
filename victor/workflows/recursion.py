@@ -41,6 +41,7 @@ Example:
 from __future__ import annotations
 
 import logging
+import threading
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -51,16 +52,20 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class RecursionContext:
-    """Tracks recursion depth for nested execution.
+    """Tracks recursion depth for nested execution with thread safety.
 
     This class provides unified recursion depth tracking across all nested
     execution types (workflows and teams). It maintains a stack trace
     for debugging and clear error messages when limits are exceeded.
 
+    Thread-safe for concurrent access via reentrant locks, allowing safe
+    use in multi-threaded environments where workflows may execute in parallel.
+
     Attributes:
         current_depth: Current nesting level (0 = top-level)
         max_depth: Maximum allowed nesting level (default: 3)
         execution_stack: Stack trace of execution entries
+        _lock: Thread lock for concurrent access (reentrant for same-thread nesting)
 
     Example:
         >>> ctx = RecursionContext(max_depth=3)
@@ -79,9 +84,10 @@ class RecursionContext:
     current_depth: int = 0
     max_depth: int = 3
     execution_stack: List[str] = field(default_factory=list)
+    _lock: threading.RLock = field(default_factory=threading.RLock)
 
     def enter(self, operation_type: str, identifier: str) -> None:
-        """Enter a nested execution level.
+        """Enter a nested execution level with thread-safe locking.
 
         Args:
             operation_type: Type of operation ("workflow" or "team")
@@ -97,26 +103,26 @@ class RecursionContext:
             >>> ctx.enter("workflow", "nested_workflow")
             >>> ctx.enter("team", "inner_team")  # Raises RecursionDepthError
         """
-        if self.current_depth >= self.max_depth:
-            stack_str = " → ".join(self.execution_stack)
-            raise RecursionDepthError(
-                message=f"Maximum recursion depth ({self.max_depth}) exceeded. "
-                f"Attempting to enter {operation_type}:{identifier}",
-                current_depth=self.current_depth,
-                max_depth=self.max_depth,
-                execution_stack=self.execution_stack.copy()
+        with self._lock:
+            if self.current_depth >= self.max_depth:
+                raise RecursionDepthError(
+                    message=f"Maximum recursion depth ({self.max_depth}) exceeded. "
+                    f"Attempting to enter {operation_type}:{identifier}",
+                    current_depth=self.current_depth,
+                    max_depth=self.max_depth,
+                    execution_stack=self.execution_stack.copy(),
+                )
+
+            self.current_depth += 1
+            self.execution_stack.append(f"{operation_type}:{identifier}")
+
+            logger.debug(
+                f"Entered recursion level {self.current_depth}/{self.max_depth}: "
+                f"{operation_type}:{identifier}"
             )
 
-        self.current_depth += 1
-        self.execution_stack.append(f"{operation_type}:{identifier}")
-
-        logger.debug(
-            f"Entered recursion level {self.current_depth}/{self.max_depth}: "
-            f"{operation_type}:{identifier}"
-        )
-
     def exit(self) -> None:
-        """Exit a nested execution level.
+        """Exit a nested execution level with thread-safe locking.
 
         Decrements the current depth and removes the last entry from the
         execution stack. Safe to call when already at depth 0.
@@ -128,14 +134,15 @@ class RecursionContext:
             >>> print(ctx.current_depth)
             0
         """
-        if self.execution_stack:
-            exited = self.execution_stack.pop()
-            logger.debug(f"Exited recursion level: {exited}")
+        with self._lock:
+            if self.execution_stack:
+                exited = self.execution_stack.pop()
+                logger.debug(f"Exited recursion level: {exited}")
 
-        self.current_depth = max(0, self.current_depth - 1)
+            self.current_depth = max(0, self.current_depth - 1)
 
     def can_nest(self, levels: int = 1) -> bool:
-        """Check if nesting is possible without exceeding max_depth.
+        """Check if nesting is possible without exceeding max_depth (thread-safe).
 
         Args:
             levels: Number of levels to check (default: 1)
@@ -153,10 +160,11 @@ class RecursionContext:
             >>> ctx.can_nest(3)  # Would exceed max_depth
             False
         """
-        return (self.current_depth + levels) <= self.max_depth
+        with self._lock:
+            return (self.current_depth + levels) <= self.max_depth
 
     def get_depth_info(self) -> dict:
-        """Get current recursion depth information.
+        """Get current recursion depth information (thread-safe).
 
         Returns:
             Dictionary with current_depth, max_depth, remaining_depth,
@@ -171,12 +179,13 @@ class RecursionContext:
             >>> print(info['remaining_depth'])
             4
         """
-        return {
-            "current_depth": self.current_depth,
-            "max_depth": self.max_depth,
-            "remaining_depth": self.max_depth - self.current_depth,
-            "execution_stack": self.execution_stack.copy(),
-        }
+        with self._lock:
+            return {
+                "current_depth": self.current_depth,
+                "max_depth": self.max_depth,
+                "remaining_depth": self.max_depth - self.current_depth,
+                "execution_stack": self.execution_stack.copy(),
+            }
 
     def __enter__(self) -> "RecursionContext":
         """Context manager entry - for automatic cleanup.
@@ -190,15 +199,54 @@ class RecursionContext:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        """Context manager exit - reset state."""
-        self.current_depth = 0
-        self.execution_stack.clear()
+        """Context manager exit - reset state (thread-safe)."""
+        with self._lock:
+            self.current_depth = 0
+            self.execution_stack.clear()
 
     def __repr__(self) -> str:
-        return (
-            f"RecursionContext(depth={self.current_depth}/{self.max_depth}, "
-            f"stack={self.execution_stack})"
-        )
+        """String representation (thread-safe)."""
+        with self._lock:
+            return (
+                f"RecursionContext(depth={self.current_depth}/{self.max_depth}, "
+                f"stack={self.execution_stack})"
+            )
+
+    def __deepcopy__(self, memo):
+        """Custom deepcopy to support checkpointing.
+
+        When checkpointing creates a deep copy of workflow state, we need to
+        handle the _lock field properly. Locks cannot be pickled/deepcopied,
+        so we create a new lock for the copied instance.
+
+        The execution_stack and depth tracking are copied to preserve the
+        current recursion state.
+
+        Args:
+            memo: Memoization dictionary for tracking already-copied objects
+
+        Returns:
+            New RecursionContext with copied state and fresh lock
+        """
+        # Avoid infinite recursion
+        if id(self) in memo:
+            return memo[id(self)]
+
+        # Create a new instance with the same class
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+
+        # Copy non-lock fields (need lock for thread-safe access)
+        with self._lock:
+            result.current_depth = self.current_depth
+            result.max_depth = self.max_depth
+            result.execution_stack = self.execution_stack.copy()
+
+        # Create a fresh lock for the new instance
+        result._lock = threading.RLock()
+
+        return result
 
 
 class RecursionGuard:

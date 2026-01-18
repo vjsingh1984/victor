@@ -28,7 +28,12 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-import victor_native
+try:
+    import victor_native
+    RUST_AVAILABLE = True
+except ImportError:
+    RUST_AVAILABLE = False
+    victor_native = None
 
 from victor.native.observability import InstrumentedAccelerator
 from victor.native.protocols import ChunkInfo

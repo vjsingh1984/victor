@@ -52,7 +52,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING, Union
 
 from cachetools import TTLCache  # type: ignore[import-untyped]
 
@@ -229,19 +229,46 @@ class CascadingInvalidator:
         invalidator = CascadingInvalidator(graph)
 
         # When node 'A' output changes
-        count = invalidator.invalidate_cascade(cache, 'A')
+        count = invalidator.invalidate_cascade(cache, "A")
         # Invalidates A and all downstream dependents
     """
 
-    def __init__(self, graph: DependencyGraph, cache: Optional["WorkflowCache"] = None):
+    def __init__(
+        self,
+        cache_or_graph: Optional[object] = None,
+        graph: Optional[DependencyGraph] = None,
+    ):
         """Initialize cascading invalidator.
 
+        Supports both call styles:
+            CascadingInvalidator(graph)
+            CascadingInvalidator(cache, graph)
+            CascadingInvalidator(graph, cache)
+
         Args:
-            graph: Dependency graph for cascade calculation
-            cache: Optional workflow cache (for backward compatibility)
+            cache_or_graph: WorkflowCache or DependencyGraph
+            graph: DependencyGraph (when cache provided first)
         """
-        self.dependency_graph = graph
-        self.cache = cache  # Keep for backward compatibility
+        cache: Optional["WorkflowCache"] = None
+        dep_graph: Optional[DependencyGraph] = None
+
+        if isinstance(cache_or_graph, DependencyGraph):
+            dep_graph = cache_or_graph
+            if graph is not None and not isinstance(graph, DependencyGraph):
+                cache = graph
+        elif isinstance(graph, DependencyGraph):
+            dep_graph = graph
+            cache = cache_or_graph
+        elif cache_or_graph is None and isinstance(graph, DependencyGraph):
+            dep_graph = graph
+        else:
+            raise TypeError("CascadingInvalidator requires a DependencyGraph and optional cache")
+
+        if dep_graph is None:
+            dep_graph = DependencyGraph()
+
+        self.dependency_graph = dep_graph
+        self.cache = cache  # Optional cache for convenience methods
 
     def invalidate_cascade(self, cache: "WorkflowCache", node_id: str) -> int:
         """Invalidate node and all dependent nodes.
@@ -273,6 +300,38 @@ class CascadingInvalidator:
 
         return total
 
+    def invalidate_with_cascade(self, node_id: str, cache: Optional["WorkflowCache"] = None) -> int:
+        """Invalidate node and all dependents using stored or provided cache."""
+        target_cache = cache or self.cache
+        if target_cache is None:
+            logger.debug("No cache provided for cascade invalidation")
+            return 0
+        return self.invalidate_cascade(target_cache, node_id)
+
+    def invalidate_upstream(self, node_id: str, cache: Optional["WorkflowCache"] = None) -> int:
+        """Invalidate all upstream dependencies for a node."""
+        target_cache = cache or self.cache
+        if target_cache is None:
+            logger.debug("No cache provided for upstream invalidation")
+            return 0
+
+        to_invalidate = set(self.dependency_graph.get_all_upstream(node_id))
+        to_invalidate.add(node_id)
+        total = 0
+
+        for nid in to_invalidate:
+            count = target_cache.invalidate(nid)
+            if isinstance(count, int):
+                total += count
+
+        if total > 0:
+            logger.info(
+                f"Upstream invalidation from '{node_id}': "
+                f"{len(to_invalidate)} nodes, {total} entries"
+            )
+
+        return total
+
     def invalidate_node(self, cache: "WorkflowCache", node_id: str) -> int:
         """Invalidate a single node.
 
@@ -296,6 +355,7 @@ class WorkflowCacheConfig:
         enabled: Whether caching is enabled (default: True)
         ttl_seconds: Time-to-live for cache entries in seconds
         max_size: Maximum number of entries in memory cache
+        max_entries: Alias for max_size (for compatibility)
         persist_to_disk: Whether to persist cache to disk
         disk_cache_path: Path to disk cache directory
         cacheable_node_types: Node types that can be cached
@@ -305,12 +365,20 @@ class WorkflowCacheConfig:
     enabled: bool = True
     ttl_seconds: int = 3600  # 1 hour default
     max_size: int = 1000
+    max_entries: Optional[int] = None
     persist_to_disk: bool = False
     disk_cache_path: Optional[str] = None
     cacheable_node_types: Set[str] = field(default_factory=lambda: {"transform", "condition"})
     excluded_context_keys: Set[str] = field(
         default_factory=lambda: {"_internal", "_debug", "_timestamps"}
     )
+
+    def __post_init__(self) -> None:
+        """Normalize max_entries/max_size for compatibility."""
+        if self.max_entries is not None:
+            self.max_size = self.max_entries
+        else:
+            self.max_entries = self.max_size
 
 
 @dataclass
@@ -463,6 +531,17 @@ class WorkflowCache:
         Returns:
             True if successfully cached
         """
+        # Support both node.id and node.name for flexibility
+        # Handle MagicMock objects that return MagicMock for any attribute
+        node_id = getattr(node, "id", None)
+        if not node_id or not isinstance(node_id, str):
+            node_id = getattr(node, "name", None)
+        # Handle MagicMock's _mock_name attribute
+        if (not node_id or not isinstance(node_id, str)) and hasattr(node, "_mock_name"):
+            node_id = node._mock_name
+        if not node_id or not isinstance(node_id, str):
+            node_id = "unknown"
+
         if not self.config.enabled or self._cache is None:
             return False
 
@@ -481,17 +560,6 @@ class WorkflowCache:
             return False
 
         cache_key = self._make_cache_key(node, context)
-
-        # Support both node.id and node.name for flexibility
-        # Handle MagicMock objects that return MagicMock for any attribute
-        node_id = getattr(node, "id", None)
-        if not node_id or not isinstance(node_id, str):
-            node_id = getattr(node, "name", None)
-        # Handle MagicMock's _mock_name attribute
-        if (not node_id or not isinstance(node_id, str)) and hasattr(node, "_mock_name"):
-            node_id = node._mock_name
-        if not node_id or not isinstance(node_id, str):
-            node_id = "unknown"
 
         with self._lock:
             entry = WorkflowNodeCacheEntry(
@@ -986,6 +1054,11 @@ class WorkflowDefinitionCache:
         # Statistics
         self._stats = {"hits": 0, "misses": 0, "invalidations": 0}
 
+    @property
+    def config(self) -> DefinitionCacheConfig:
+        """Expose cache configuration for tests and introspection."""
+        return self._config
+
     def _make_key(
         self,
         path: Path,
@@ -1122,63 +1195,54 @@ class WorkflowDefinitionCache:
             stats["enabled"] = self._config.enabled
             return stats
 
-    # Simplified API for backward compatibility with tests
-    def get(self, key: str) -> Optional["WorkflowDefinition"]:
-        """Get cached definition by key.
+    # Simplified API for backward compatibility with tests and legacy callers
+    def get(self, *args: Any) -> Optional["WorkflowDefinition"]:
+        """Get cached definition by key or by path signature."""
+        if len(args) == 1:
+            key = args[0]
+            if not self._config.enabled or self._cache is None:
+                return None
+            with self._lock:
+                result = self._cache.get(str(key))
+                if result is not None:
+                    self._stats["hits"] += 1
+                    return result
+                self._stats["misses"] += 1
+                return None
+        if len(args) == 3:
+            path, workflow_name, config_hash = args
+            return self.get_by_path(Path(path), workflow_name, config_hash)
+        raise TypeError("get() expects key or (path, workflow_name, config_hash)")
 
-        Args:
-            key: Cache key
+    def set(self, *args: Any) -> bool:
+        """Cache a definition by key or by path signature."""
+        if len(args) == 2:
+            key, definition = args
+            if not self._config.enabled or self._cache is None:
+                return False
+            with self._lock:
+                self._cache[str(key)] = definition
+                logger.debug(f"Definition cached with key: {key}")
+                return True
+        if len(args) == 4:
+            path, workflow_name, config_hash, definition = args
+            return self.put_by_path(Path(path), workflow_name, config_hash, definition)
+        raise TypeError("set() expects (key, definition) or (path, workflow_name, config_hash, definition)")
 
-        Returns:
-            Cached definition or None
-        """
-        if not self._config.enabled or self._cache is None:
-            return None
+    def invalidate(self, key: Union[str, Path]) -> int:
+        """Invalidate cached definition by key or file path."""
+        if isinstance(key, Path):
+            return self.invalidate_by_path(key)
 
-        with self._lock:
-            result = self._cache.get(key)
-            if result is not None:
-                self._stats["hits"] += 1
-                return result
-
-            self._stats["misses"] += 1
-            return None
-
-    def set(self, key: str, definition: "WorkflowDefinition") -> bool:
-        """Cache a definition by key.
-
-        Args:
-            key: Cache key
-            definition: Definition to cache
-
-        Returns:
-            True if cached successfully
-        """
-        if not self._config.enabled or self._cache is None:
-            return False
-
-        with self._lock:
-            self._cache[key] = definition
-            logger.debug(f"Definition cached with key: {key}")
-            return True
-
-    def invalidate(self, key: str) -> int:
-        """Invalidate cached definition by key.
-
-        Args:
-            key: Cache key to invalidate
-
-        Returns:
-            Number of entries invalidated (0 or 1)
-        """
         if not self._config.enabled or self._cache is None:
             return 0
 
         with self._lock:
-            if key in self._cache:
-                del self._cache[key]
+            key_str = str(key)
+            if key_str in self._cache:
+                del self._cache[key_str]
                 self._stats["invalidations"] += 1
-                logger.debug(f"Invalidated definition cache entry: {key}")
+                logger.debug(f"Invalidated definition cache entry: {key_str}")
                 return 1
             return 0
 

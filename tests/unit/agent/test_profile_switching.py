@@ -37,13 +37,13 @@ class TestProfileConfig:
         """Test creating a profile configuration."""
         profile = ProfileConfig(
             provider="anthropic",
-            model="claude-3-sonnet",
+            model_name="claude-3-sonnet",
             temperature=0.7,
             max_tokens=4096,
         )
 
         assert profile.provider == "anthropic"
-        assert profile.model == "claude-3-sonnet"
+        assert profile.model_name == "claude-3-sonnet"
         assert profile.temperature == 0.7
         assert profile.max_tokens == 4096
 
@@ -51,7 +51,7 @@ class TestProfileConfig:
         """Test creating a profile with description."""
         profile = ProfileConfig(
             provider="ollama",
-            model="llama3:8b",
+            model_name="llama3:8b",
             temperature=0.5,
             max_tokens=2048,
             description="Fast local model for testing",
@@ -63,7 +63,7 @@ class TestProfileConfig:
         """Test creating a profile with tool selection config."""
         profile = ProfileConfig(
             provider="openai",
-            model="gpt-4",
+            model_name="gpt-4",
             tool_selection={"max_cost_threshold": 0.5},
         )
 
@@ -79,13 +79,13 @@ class TestProfileLoading:
         profiles_data = {
             "fast": {
                 "provider": "ollama",
-                "model": "llama3:8b",
+                "model_name": "llama3:8b",
                 "temperature": 0.5,
                 "max_tokens": 2048,
             },
             "smart": {
                 "provider": "anthropic",
-                "model": "claude-3-opus",
+                "model_name": "claude-3-opus",
                 "temperature": 0.8,
                 "max_tokens": 8192,
             },
@@ -96,7 +96,7 @@ class TestProfileLoading:
         assert len(profiles) == 2
         assert "fast" in profiles
         assert "smart" in profiles
-        assert profiles["fast"].model == "llama3:8b"
+        assert profiles["fast"].model_name == "llama3:8b"
         assert profiles["smart"].provider == "anthropic"
 
     @pytest.fixture
@@ -106,14 +106,14 @@ class TestProfileLoading:
             "profiles": {
                 "local": {
                     "provider": "ollama",
-                    "model": "llama3:8b",
+                    "model_name": "llama3:8b",
                     "temperature": 0.5,
                     "max_tokens": 2048,
                     "description": "Fast local model",
                 },
                 "cloud": {
                     "provider": "anthropic",
-                    "model": "claude-3-sonnet",
+                    "model_name": "claude-3-sonnet",
                     "temperature": 0.7,
                     "max_tokens": 4096,
                     "description": "Balanced cloud model",
@@ -154,7 +154,7 @@ class TestProfileSwitching:
         """Create a mock orchestrator for testing."""
         orchestrator = MagicMock(spec=AgentOrchestrator)
         orchestrator.provider_name = "anthropic"
-        orchestrator.model = "claude-3-sonnet"
+        orchestrator.model_name = "claude-3-sonnet"
         orchestrator.switch_provider = MagicMock(return_value=True)
         orchestrator.switch_model = MagicMock(return_value=True)
         return orchestrator
@@ -164,7 +164,7 @@ class TestProfileSwitching:
         profiles = {
             "fast": ProfileConfig(
                 provider="ollama",
-                model="llama3:8b",
+                model_name="llama3:8b",
                 temperature=0.5,
                 max_tokens=2048,
             )
@@ -172,7 +172,7 @@ class TestProfileSwitching:
 
         # Simulate profile switch
         profile = profiles["fast"]
-        success = mock_orchestrator.switch_provider(profile.provider, profile.model)
+        success = mock_orchestrator.switch_provider(profile.provider, profile.model_name)
 
         assert success is True
         mock_orchestrator.switch_provider.assert_called_once_with("ollama", "llama3:8b")
@@ -181,13 +181,13 @@ class TestProfileSwitching:
         """Test switching to a profile with custom temperature."""
         profile = ProfileConfig(
             provider="openai",
-            model="gpt-4",
+            model_name="gpt-4",
             temperature=0.9,
             max_tokens=8192,
         )
 
         # Profile switch should update temperature
-        success = mock_orchestrator.switch_provider(profile.provider, profile.model)
+        success = mock_orchestrator.switch_provider(profile.provider, profile.model_name)
 
         assert success is True
         # Note: temperature would need to be set separately in actual implementation
@@ -197,19 +197,19 @@ class TestProfileSwitching:
         profiles = {
             "profile1": ProfileConfig(
                 provider="anthropic",
-                model="claude-3-sonnet",
+                model_name="claude-3-sonnet",
                 temperature=0.7,
                 max_tokens=4096,
             ),
             "profile2": ProfileConfig(
                 provider="ollama",
-                model="llama3:8b",
+                model_name="llama3:8b",
                 temperature=0.5,
                 max_tokens=2048,
             ),
             "profile3": ProfileConfig(
                 provider="openai",
-                model="gpt-4",
+                model_name="gpt-4",
                 temperature=0.8,
                 max_tokens=8192,
             ),
@@ -217,7 +217,7 @@ class TestProfileSwitching:
 
         # Switch through profiles
         for profile_name, profile in profiles.items():
-            success = mock_orchestrator.switch_provider(profile.provider, profile.model)
+            success = mock_orchestrator.switch_provider(profile.provider, profile.model_name)
             assert success is True
 
         assert mock_orchestrator.switch_provider.call_count == 3
@@ -227,12 +227,12 @@ class TestProfileSwitching:
         # In actual implementation, conversation should be preserved
         profile = ProfileConfig(
             provider="ollama",
-            model="llama3:8b",
+            model_name="llama3:8b",
             temperature=0.5,
             max_tokens=2048,
         )
 
-        success = mock_orchestrator.switch_provider(profile.provider, profile.model)
+        success = mock_orchestrator.switch_provider(profile.provider, profile.model_name)
 
         assert success is True
         # Verify orchestrator still has conversation state
@@ -245,24 +245,24 @@ class TestProfileValidation:
     def test_validate_profile_provider(self):
         """Test validating profile provider."""
         # Valid provider
-        profile = ProfileConfig(provider="anthropic", model="claude-3")
+        profile = ProfileConfig(provider="anthropic", model_name="claude-3")
         assert profile.provider in ["anthropic", "openai", "google", "ollama"]
 
     def test_validate_profile_temperature_range(self):
         """Test validating profile temperature is in valid range."""
         # Valid temperature
-        profile = ProfileConfig(temperature=0.7, provider="test", model="test")
+        profile = ProfileConfig(temperature=0.7, provider="test", model_name="test")
         assert 0.0 <= profile.temperature <= 2.0
 
     def test_validate_profile_max_tokens_positive(self):
         """Test validating profile max_tokens is positive."""
-        profile = ProfileConfig(max_tokens=4096, provider="test", model="test")
+        profile = ProfileConfig(max_tokens=4096, provider="test", model_name="test")
         assert profile.max_tokens > 0
 
     def test_invalid_temperature_raises_error(self):
         """Test that invalid temperature raises validation error."""
         with pytest.raises(ValueError):
-            ProfileConfig(temperature=3.0, provider="test", model="test")  # Invalid: > 2.0
+            ProfileConfig(temperature=3.0, provider="test", model_name="test")  # Invalid: > 2.0
 
 
 class TestProfileMetadata:
@@ -272,7 +272,7 @@ class TestProfileMetadata:
         """Test that profile description is preserved."""
         profile = ProfileConfig(
             provider="anthropic",
-            model="claude-3",
+            model_name="claude-3",
             description="Best for code generation",
         )
 
@@ -286,7 +286,7 @@ class TestProfileMetadata:
             "complexity_threshold": 0.7,
         }
 
-        profile = ProfileConfig(provider="openai", model="gpt-4", tool_selection=tool_config)
+        profile = ProfileConfig(provider="openai", model_name="gpt-4", tool_selection=tool_config)
 
         assert profile.tool_selection == tool_config
         assert profile.tool_selection["enable_adaptive"] is True

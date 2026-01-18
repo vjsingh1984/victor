@@ -363,10 +363,8 @@ class TaskComplexityService:
             matcher = get_pattern_matcher()
             pattern = matcher.match(message)
             if pattern and pattern.confidence >= 0.9:
-                # Map TaskType to TaskComplexity using classification module's mapping
-                complexity = CLASSIFICATION_TASK_TYPE_TO_COMPLEXITY.get(
-                    pattern.task_type, TaskComplexity.MEDIUM
-                )
+                # Use pattern's complexity directly (Single Source of Truth from pattern registry)
+                complexity = pattern.complexity
                 return TaskClassification(
                     complexity=complexity,
                     tool_budget=self.budgets[complexity],
@@ -486,11 +484,27 @@ class TaskComplexityService:
 
         try:
             result = classifier.classify_sync(message)
-            # Use CLASSIFICATION_TASK_TYPE_TO_COMPLEXITY from classification module
-            # This uses TaskType enum keys directly (Single Source of Truth)
-            complexity = CLASSIFICATION_TASK_TYPE_TO_COMPLEXITY.get(
-                result.task_type, TaskComplexity.MEDIUM
-            )
+            # If a nudge rule was applied, use the pattern's complexity directly
+            if result.nudge_applied:
+                try:
+                    from victor.classification import PATTERNS
+                    if result.nudge_applied in PATTERNS:
+                        complexity = PATTERNS[result.nudge_applied].complexity
+                    else:
+                        # Fallback to task type mapping if pattern not found
+                        complexity = CLASSIFICATION_TASK_TYPE_TO_COMPLEXITY.get(
+                            result.task_type, TaskComplexity.MEDIUM
+                        )
+                except ImportError:
+                    complexity = CLASSIFICATION_TASK_TYPE_TO_COMPLEXITY.get(
+                        result.task_type, TaskComplexity.MEDIUM
+                    )
+            else:
+                # Use CLASSIFICATION_TASK_TYPE_TO_COMPLEXITY from classification module
+                # This uses TaskType enum keys directly (Single Source of Truth)
+                complexity = CLASSIFICATION_TASK_TYPE_TO_COMPLEXITY.get(
+                    result.task_type, TaskComplexity.MEDIUM
+                )
             if result.confidence >= self.semantic_threshold:
                 return TaskClassification(
                     complexity=complexity,
@@ -512,6 +526,15 @@ class TaskComplexityService:
         Returns:
             TaskClassification with complexity, budget, and metadata
         """
+        # Handle empty/whitespace-only messages early (conservative fallback)
+        if not message or not message.strip():
+            return TaskClassification(
+                complexity=TaskComplexity.MEDIUM,
+                tool_budget=self.budgets[TaskComplexity.MEDIUM],
+                confidence=0.3,
+                matched_patterns=[],
+            )
+
         # Try custom classifiers first
         for classifier in self.custom_classifiers:
             result = classifier(message)

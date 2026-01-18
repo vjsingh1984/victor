@@ -226,9 +226,16 @@ class NodeExecutorFactory:
         Uses selective copying strategy:
         - Shallow copy for most keys (user data assumed immutable)
         - Deep copy only for internal mutable tracking structures
+        - Shared references for recursion context (all branches track same depth)
 
         This is significantly faster than full deepcopy while maintaining
         isolation for parallel node execution.
+
+        Note on RecursionContext:
+            The _recursion_context is intentionally shared (not deep copied) across
+            all parallel branches. This ensures that all parallel executions contribute
+            to the same recursion depth tracking, preventing excessive nesting when
+            multiple branches spawn sub-workflows concurrently.
 
         Args:
             state: Current workflow state
@@ -236,10 +243,10 @@ class NodeExecutorFactory:
         Returns:
             Isolated state copy for child node execution
         """
-        # Start with shallow copy
+        # Start with shallow copy (preserves _recursion_context reference)
         child_state = dict(state)
 
-        # Deep copy only mutable internal structures
+        # Deep copy only mutable internal structures that need isolation
         for key in self._mutable_state_keys:
             if key in child_state:
                 child_state[key] = copy.deepcopy(child_state[key])
@@ -296,6 +303,11 @@ class NodeExecutorFactory:
 
         If the node has a timeout_seconds configured, the execution will
         be cancelled if it exceeds the timeout.
+
+        Recursion Context:
+            This executor preserves the _recursion_context key in the state
+            but does not actively use it. Agent nodes do not spawn nested
+            workflows, so they don't need to track recursion depth.
         """
         orchestrator = self.orchestrator
         emitter = self._emitter
@@ -351,7 +363,7 @@ class NodeExecutorFactory:
                         "planner": SubAgentRole.PLANNER,
                         "executor": SubAgentRole.EXECUTOR,
                         "reviewer": SubAgentRole.REVIEWER,
-                        "writer": SubAgentRole.WRITER,
+                        "writer": SubAgentRole.EXECUTOR,
                         "analyst": SubAgentRole.RESEARCHER,  # Alias
                     }
                     role = role_map.get(node.role.lower(), SubAgentRole.EXECUTOR)
@@ -577,6 +589,11 @@ class NodeExecutorFactory:
 
         If the node has a retry_policy configured, the execution will
         automatically retry on failure with exponential backoff.
+
+        Recursion Context:
+            This executor preserves the _recursion_context key in the state
+            but does not actively use it. Compute nodes execute tools directly
+            and do not spawn nested workflows.
         """
         tool_registry = self.tool_registry
         emitter = self._emitter
@@ -801,6 +818,11 @@ class NodeExecutorFactory:
 
         The router evaluates the condition and returns the state unchanged.
         Routing is handled by conditional edges in the graph.
+
+        Recursion Context:
+            This executor preserves the _recursion_context key in the state
+            but does not actively use it. Condition nodes only route flow
+            control and do not spawn nested workflows.
         """
 
         async def condition_exec(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -825,6 +847,12 @@ class NodeExecutorFactory:
 
         Executes child nodes in true parallel using asyncio.gather().
         Each parallel branch gets an independent state copy.
+
+        Recursion Context:
+            The _recursion_context is shared across all parallel branches
+            (via shallow copy in _copy_state_for_parallel). This ensures
+            that all branches contribute to the same recursion depth tracking,
+            preventing excessive nesting when multiple branches spawn workflows.
 
         Args:
             node: The ParallelNode definition
@@ -974,6 +1002,11 @@ class NodeExecutorFactory:
         """Create executor for a TransformNode.
 
         Applies a transformation function to the workflow state.
+
+        Recursion Context:
+            This executor preserves the _recursion_context key in the state
+            but does not actively use it. Transform nodes apply simple
+            transformations and do not spawn nested workflows.
         """
         emitter = self._emitter
 
@@ -1628,7 +1661,7 @@ class UnifiedWorkflowCompiler:
         # Check definition cache
         if self._config.enable_caching:
             cache = self._get_definition_cache()
-            cached_def = cache.get(path, name, config_hash)
+            cached_def = cache.get(cache_key)
             if cached_def is not None:
                 self._compile_stats["cache_hits"] += 1
                 logger.debug(f"Definition cache hit for {path}:{workflow_name}")
@@ -1674,7 +1707,7 @@ class UnifiedWorkflowCompiler:
         # Cache the definition if enabled
         if self._config.enable_caching:
             cache = self._get_definition_cache()
-            cache.put(path, name, config_hash, workflow_def)
+            cache.set(cache_key, workflow_def)
             logger.debug(f"Cached workflow definition: {name} from {path}")
 
         self._compile_stats["yaml_compiles"] += 1

@@ -400,7 +400,7 @@ workflows:
       - id: generate_report
         type: agent
         name: "Report Generator"
-        role: writer
+        role: reviewer
         goal: |
           Generate comprehensive analysis report from team findings:
           {{analysis_results}}

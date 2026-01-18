@@ -19,14 +19,50 @@ native functions, adding observability hooks and maintaining compatibility
 with the Python fallback implementations.
 """
 
-from victor.native.rust.arg_normalizer import RustArgumentNormalizer
-from victor.native.rust.ast_indexer import RustAstIndexer
-from victor.native.rust.chunker import RustTextChunker
-from victor.native.rust.similarity import RustSimilarityComputer
+try:
+    from victor.native.rust.arg_normalizer import RustArgumentNormalizer
+    from victor.native.rust.ast_indexer import RustAstIndexer
+    from victor.native.rust.chunker import RustTextChunker
+    from victor.native.rust.similarity import RustSimilarityComputer
+    from victor.native.rust.tool_selector import (
+        ToolSelectorAccelerator,
+        get_tool_selector_accelerator,
+        reset_tool_selector_accelerator,
+    )
+
+    RUST_AVAILABLE = True
+except ImportError:
+    RUST_AVAILABLE = False
+
+    # Create stub classes for when Rust is not available
+    class RustArgumentNormalizer:  # type: ignore
+        pass
+
+    class RustAstIndexer:  # type: ignore
+        pass
+
+    class RustTextChunker:  # type: ignore
+        pass
+
+    class RustSimilarityComputer:  # type: ignore
+        pass
+
+    class ToolSelectorAccelerator:  # type: ignore
+        pass
+
+    def get_tool_selector_accelerator(*args, **kwargs):  # type: ignore
+        return None
+
+    def reset_tool_selector_accelerator(*args, **kwargs):  # type: ignore
+        pass
 
 __all__ = [
     "RustArgumentNormalizer",
     "RustAstIndexer",
     "RustSimilarityComputer",
     "RustTextChunker",
+    "ToolSelectorAccelerator",
+    "get_tool_selector_accelerator",
+    "reset_tool_selector_accelerator",
+    "RUST_AVAILABLE",
 ]

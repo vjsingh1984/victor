@@ -14,6 +14,41 @@
 
 """Step handlers for the vertical integration pipeline.
 
+**PRIMARY EXTENSION SURFACE**: This module provides the primary extension
+mechanism for vertical development in Victor. Custom integration logic should
+be implemented as step handlers (BaseStepHandler subclasses), not by modifying
+VerticalIntegrationPipeline or its methods.
+
+**Creating Custom Handlers:**
+```python
+from victor.framework.step_handlers import BaseStepHandler
+
+class CustomToolsHandler(BaseStepHandler):
+    @property
+    def name(self) -> str:
+        return "custom_tools"
+
+    @property
+    def order(self) -> int:
+        return 15  # After default tools (10)
+
+    def _do_apply(self, orchestrator, vertical, context, result):
+        tools = vertical.get_tools()
+        context.apply_enabled_tools(tools)
+        result.add_info(f"Applied {len(tools)} tools")
+
+# Register and use
+from victor.framework.step_handlers import StepHandlerRegistry
+registry = StepHandlerRegistry.default()
+registry.add_handler(CustomToolsHandler())
+```
+
+**Documentation:**
+- Complete Guide: docs/extensions/step_handler_guide.md
+- Migration Guide: docs/extensions/step_handler_migration.md
+- Examples: docs/extensions/step_handler_examples.md
+- Quick Reference: docs/extensions/step_handler_quick_reference.md
+
 This module provides focused step handler classes that implement
 individual integration steps. Each handler follows the Single
 Responsibility Principle, handling one specific concern.
@@ -121,7 +156,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.vertical_context import VerticalContext
+    from victor.core.verticals import VerticalContext
     from victor.framework.vertical_integration import IntegrationResult
     from victor.core.verticals.base import VerticalBase
     from victor.core.verticals.protocols import (

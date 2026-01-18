@@ -73,23 +73,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class SubAgentRole(Enum):
-    """Role specialization for sub-agents.
-
-    Each role has specific capabilities and constraints:
-
-    - RESEARCHER: Read-only exploration (read, search, code_search, web_search)
-    - PLANNER: Task breakdown and planning (read, ls, search, plan_files)
-    - EXECUTOR: Code changes and execution (read, write, edit, shell, test, git)
-    - REVIEWER: Quality checks and testing (read, search, test, git_diff, shell)
-    - TESTER: Test writing and running (read, write to tests/, test, shell)
-    """
-
-    RESEARCHER = "researcher"
-    PLANNER = "planner"
-    EXECUTOR = "executor"
-    REVIEWER = "reviewer"
-    TESTER = "tester"
+# Import canonical SubAgentRole from victor.core.teams (single source of truth)
+# This import enforces layer boundaries - Framework should not depend on Agent
+from victor.core.teams import SubAgentRole
 
 
 @dataclass

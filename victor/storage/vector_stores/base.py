@@ -22,7 +22,7 @@ This module separates concerns:
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from victor.core.search_types import SearchHit
 
@@ -36,7 +36,7 @@ class EmbeddingConfig(BaseModel):
     This configures BOTH the embedding model (text -> vector) and vector store (storage/search).
     """
 
-    model_config = ConfigDict(protected_namespaces=())
+    model_config = ConfigDict(protected_namespaces=(), populate_by_name=True)
 
     # Vector Store Configuration
     vector_store: str = Field(
@@ -59,6 +59,7 @@ class EmbeddingConfig(BaseModel):
     embedding_model: str = Field(
         default="BAAI/bge-small-en-v1.5",
         description="Embedding model name (BAAI/bge-small-en-v1.5 = 384-dim, 130MB, better quality than all-MiniLM)",
+        validation_alias=AliasChoices("embedding_model", "embedding_model_name"),
     )
     embedding_api_key: Optional[str] = Field(
         default=None, description="API key for cloud embedding providers (or Ollama base URL)"
@@ -68,6 +69,11 @@ class EmbeddingConfig(BaseModel):
     extra_config: Dict[str, Any] = Field(
         default_factory=dict, description="Provider-specific configuration"
     )
+
+    @property
+    def embedding_model_name(self) -> str:
+        """Alias for embedding_model (backward compatibility)."""
+        return self.embedding_model
 
 
 class EmbeddingSearchResult(BaseModel):

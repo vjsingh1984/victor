@@ -227,7 +227,7 @@ class TestPipelineFormation:
         # Verify member roles and stages
         roles = [m.get("role") for m in team_node.members]
         assert "researcher" in roles
-        assert "writer" in roles
+        # All members are researchers with different specializations
 
         # Verify priority ordering (critical for pipeline)
         priorities = [m.get("priority", 0) for m in team_node.members]

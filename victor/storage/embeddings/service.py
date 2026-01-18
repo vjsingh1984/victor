@@ -35,10 +35,8 @@ import numpy as np
 # Import TRACE level from debug_logger (initializes the level on import)
 from victor.agent.debug_logger import TRACE
 
-# Note: Similarity operations use NumPy+BLAS directly (not Rust).
-# Benchmarks show NumPy is 10x faster due to BLAS optimization and
-# avoiding Python→list→Rust→list→Python FFI overhead.
-# See tests/benchmark/test_native_performance.py for details.
+# Import Rust-accelerated embedding operations (optional, with NumPy fallback)
+from victor.native.accelerators.embedding_ops import get_embedding_accelerator
 
 # Disable tokenizers parallelism BEFORE importing sentence_transformers
 # This prevents "bad value(s) in fds_to_keep" errors in async contexts
@@ -86,6 +84,8 @@ class EmbeddingService:
         self,
         model_name: str = DEFAULT_EMBEDDING_MODEL,
         device: Optional[str] = None,
+        use_rust_embeddings: Optional[bool] = None,
+        rust_embedding_batch_threshold: Optional[int] = None,
     ):
         """Initialize embedding service.
 
@@ -97,12 +97,48 @@ class EmbeddingService:
                 - "all-MiniLM-L12-v2" (120MB, MTEB 59.8, legacy)
                 - "all-MiniLM-L6-v2" (80MB, MTEB 58.8, fastest)
             device: Device to use ('cpu', 'cuda', 'mps'). Auto-detected if None.
+            use_rust_embeddings: Enable Rust-accelerated similarity operations (default: from settings)
+            rust_embedding_batch_threshold: Minimum batch size for Rust (default: from settings)
         """
         self.model_name = model_name
         self.device = device
         self._model: Any = None  # SentenceTransformer, lazy loaded
         self._model_lock = threading.Lock()
         self._dimension: Optional[int] = None
+
+        # Initialize Rust accelerator for similarity operations
+        # Note: Embedding generation still uses sentence-transformers (Python)
+        # Only similarity computation uses the accelerator
+        try:
+            # Get configuration from settings if not provided
+            if use_rust_embeddings is None or rust_embedding_batch_threshold is None:
+                from victor.config.settings import load_settings
+
+                settings = load_settings()
+                if use_rust_embeddings is None:
+                    use_rust_embeddings = getattr(settings, "use_rust_embedding_ops", True)
+                if rust_embedding_batch_threshold is None:
+                    rust_embedding_batch_threshold = getattr(
+                        settings, "rust_embedding_batch_threshold", 10
+                    )
+
+            self._embedding_accelerator = get_embedding_accelerator(
+                force_numpy=not use_rust_embeddings,
+                enable_cache=True,
+            )
+
+            if self._embedding_accelerator.is_using_rust:
+                logger.info(
+                    f"[EmbeddingService] Rust-accelerated similarity enabled "
+                    f"(threshold={rust_embedding_batch_threshold} vectors)"
+                )
+            else:
+                logger.info("[EmbeddingService] Using NumPy for similarity operations")
+        except Exception as e:
+            logger.warning(f"[EmbeddingService] Failed to initialize accelerator: {e}")
+            self._embedding_accelerator = get_embedding_accelerator(force_numpy=True)
+
+        self._rust_batch_threshold = rust_embedding_batch_threshold or 10
 
         # In-memory embedding cache for repeated texts (e.g., tool descriptions)
         # Uses OrderedDict for LRU eviction order
@@ -126,12 +162,16 @@ class EmbeddingService:
         cls,
         model_name: str = DEFAULT_EMBEDDING_MODEL,
         device: Optional[str] = None,
+        use_rust_embeddings: Optional[bool] = None,
+        rust_embedding_batch_threshold: Optional[int] = None,
     ) -> "EmbeddingService":
         """Get or create the singleton embedding service instance.
 
         Args:
             model_name: Model name (only used on first call)
             device: Device (only used on first call)
+            use_rust_embeddings: Enable Rust-accelerated similarity (only used on first call)
+            rust_embedding_batch_threshold: Batch size threshold for Rust (only used on first call)
 
         Returns:
             The singleton EmbeddingService instance
@@ -140,7 +180,12 @@ class EmbeddingService:
             with cls._lock:
                 # Double-checked locking
                 if cls._instance is None:
-                    cls._instance = cls(model_name=model_name, device=device)
+                    cls._instance = cls(
+                        model_name=model_name,
+                        device=device,
+                        use_rust_embeddings=use_rust_embeddings,
+                        rust_embedding_batch_threshold=rust_embedding_batch_threshold,
+                    )
                     logger.info(f"Created EmbeddingService singleton with model: {model_name}")
         return cls._instance
 
@@ -521,16 +566,19 @@ class EmbeddingService:
 
         return float(dot_product / (norm_a * norm_b))
 
-    @staticmethod
     def cosine_similarity_matrix(
+        self,
         query: np.ndarray,
         corpus: np.ndarray,
     ) -> np.ndarray:
         """Calculate cosine similarity between query and all corpus vectors.
 
-        Uses NumPy which is already SIMD-optimized via BLAS/LAPACK.
-        Benchmarks show NumPy is 10x faster than Rust for batch operations
-        due to FFI overhead from numpy→list→rust→list→numpy conversion.
+        Uses Rust accelerator for large batches, NumPy for small batches.
+        Automatically selects backend based on batch size threshold.
+
+        Performance:
+            - Small batches (< threshold): NumPy (BLAS-optimized, no FFI overhead)
+            - Large batches (>= threshold): Rust (SIMD + parallelization)
 
         Args:
             query: Query vector (shape: [dimension])
@@ -542,18 +590,106 @@ class EmbeddingService:
         if corpus.size == 0:
             return np.array([])
 
-        # NumPy with BLAS is faster than Rust for vectorized operations
-        query_norm = query / (np.linalg.norm(query) + 1e-9)
-        corpus_norms = corpus / (np.linalg.norm(corpus, axis=1, keepdims=True) + 1e-9)
+        # Choose backend based on batch size
+        batch_size = len(corpus)
 
-        # Dot product
-        similarities = np.dot(corpus_norms, query_norm)
-        return np.asarray(similarities)
+        if batch_size >= self._rust_batch_threshold and self._embedding_accelerator.is_using_rust:
+            # Use Rust accelerator for large batches
+            query_list = query.tolist()
+            corpus_list = corpus.tolist()
+
+            similarities = self._embedding_accelerator.batch_cosine_similarity(
+                query=query_list,
+                embeddings=corpus_list,
+            )
+
+            return np.array(similarities, dtype=np.float32)
+        else:
+            # Use NumPy for small batches (BLAS-optimized)
+            query_norm = query / (np.linalg.norm(query) + 1e-9)
+            corpus_norms = corpus / (np.linalg.norm(corpus, axis=1, keepdims=True) + 1e-9)
+
+            # Dot product
+            similarities = np.dot(corpus_norms, query_norm)
+            return np.asarray(similarities)
+
+    def get_top_k_similar(
+        self,
+        query_embedding: np.ndarray,
+        corpus_embeddings: np.ndarray,
+        k: int = 10,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Get top-k most similar embeddings using Rust partial sort.
+
+        Combines cosine similarity computation with efficient top-k selection.
+
+        Args:
+            query_embedding: Query vector (shape: [dimension])
+            corpus_embeddings: Corpus matrix (shape: [n_items, dimension])
+            k: Number of top results to return
+
+        Returns:
+            Tuple of (top_k_similarities, top_k_indices)
+                - top_k_similarities: Similarity scores (shape: [k])
+                - top_k_indices: Indices in corpus (shape: [k])
+        """
+        # Compute similarities
+        similarities = self.cosine_similarity_matrix(query_embedding, corpus_embeddings)
+
+        # Use Rust accelerator for top-k selection if available
+        if self._embedding_accelerator.is_using_rust:
+            similarities_list = similarities.tolist()
+            top_k_indices = self._embedding_accelerator.topk_indices(similarities_list, k)
+            top_k_similarities = np.array([similarities[i] for i in top_k_indices], dtype=np.float32)
+        else:
+            # NumPy argpartition (O(n))
+            if k >= len(similarities):
+                top_k_indices = np.arange(len(similarities))
+                top_k_similarities = similarities
+            else:
+                top_k_unsorted = np.argpartition(-similarities, k)[:k]
+                top_k = top_k_unsorted[np.argsort(-similarities[top_k_unsorted])]
+                top_k_similarities = similarities[top_k]
+                top_k_indices = top_k
+
+        return top_k_similarities, top_k_indices
+
+    def embed_with_timing(
+        self,
+        text: str,
+        use_cache: bool = True,
+    ) -> Tuple[np.ndarray, float]:
+        """Embed text and return timing information.
+
+        Useful for performance monitoring and benchmarking.
+
+        Args:
+            text: Text to embed
+            use_cache: Whether to use embedding cache
+
+        Returns:
+            Tuple of (embedding, elapsed_seconds)
+        """
+        import time
+
+        start = time.perf_counter()
+        embedding = self.embed_text_sync(text, use_cache=use_cache)
+        elapsed = time.perf_counter() - start
+
+        backend = "Rust" if self._embedding_accelerator.is_using_rust else "NumPy"
+        logger.debug(
+            f"[EmbeddingService] Embedded {len(text)} chars in {elapsed*1000:.2f}ms "
+            f"(similarity backend: {backend})"
+        )
+
+        return embedding, elapsed
 
 
 def get_embedding_service(
     model_name: str = DEFAULT_EMBEDDING_MODEL,
     device: Optional[str] = None,
+    use_rust_embeddings: Optional[bool] = None,
+    rust_embedding_batch_threshold: Optional[int] = None,
 ) -> EmbeddingService:
     """Convenience function to get the singleton embedding service instance.
 
@@ -563,6 +699,8 @@ def get_embedding_service(
     Args:
         model_name: Model name (only used on first call)
         device: Device (only used on first call)
+        use_rust_embeddings: Enable Rust-accelerated similarity (only used on first call)
+        rust_embedding_batch_threshold: Batch size threshold for Rust (only used on first call)
 
     Returns:
         The singleton EmbeddingService instance
@@ -573,4 +711,9 @@ def get_embedding_service(
         service = get_embedding_service()
         embedding = await service.embed_text("Hello world")
     """
-    return EmbeddingService.get_instance(model_name=model_name, device=device)
+    return EmbeddingService.get_instance(
+        model_name=model_name,
+        device=device,
+        use_rust_embeddings=use_rust_embeddings,
+        rust_embedding_batch_threshold=rust_embedding_batch_threshold,
+    )

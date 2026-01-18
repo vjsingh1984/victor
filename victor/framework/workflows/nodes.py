@@ -47,7 +47,7 @@ Example:
         ),
         TeamMember(
             id="writer",
-            role=SubAgentRole.WRITER,
+            role=SubAgentRole.EXECUTOR,
             name="Writer",
             goal="Write report",
         ),

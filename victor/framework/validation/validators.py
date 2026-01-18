@@ -575,7 +575,7 @@ class PresenceValidator(BaseValidator):
 
 
 class PatternValidator(BaseValidator):
-    """Validate that a string matches a regex pattern.
+    r"""Validate that a string matches a regex pattern.
 
     Supports both regex patterns and common patterns like email, URL, etc.
 
@@ -1105,7 +1105,7 @@ class CompositeValidator(BaseValidator):
             result = ValidationResult()
             result.add_error(
                 self._field or "",
-                f"Validation passed but should have failed (none logic)",
+                "Validation passed but should have failed (none logic)",
             )
             return result
 

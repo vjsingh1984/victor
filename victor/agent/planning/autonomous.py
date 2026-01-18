@@ -491,6 +491,7 @@ class AutonomousPlanner:
             "executor": SubAgentRole.EXECUTOR,
             "reviewer": SubAgentRole.REVIEWER,
             "tester": SubAgentRole.TESTER,
+            "writer": SubAgentRole.EXECUTOR,
         }
         return mapping.get(role_str or "", SubAgentRole.EXECUTOR)
 

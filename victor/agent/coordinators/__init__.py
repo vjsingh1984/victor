@@ -254,6 +254,20 @@ from victor.agent.coordinators.tool_alias_resolver import (
     ResolutionResult,
     create_tool_alias_resolver,
 )
+from victor.agent.coordinators.conversation_coordinator import (
+    ConversationCoordinator,
+)
+from victor.agent.coordinators.search_coordinator import (
+    SearchCoordinator,
+)
+from victor.agent.coordinators.team_coordinator import (
+    TeamCoordinator,
+)
+from victor.agent.coordinators.new_coordinators_protocol import (
+    IConversationCoordinator,
+    ISearchCoordinator,
+    ITeamCoordinator,
+)
 
 __all__ = [
     # Base configuration
@@ -360,4 +374,11 @@ __all__ = [
     "ToolAliasConfig",
     "ResolutionResult",
     "create_tool_alias_resolver",
+    # New Coordinators (Track 4)
+    "ConversationCoordinator",
+    "SearchCoordinator",
+    "TeamCoordinator",
+    "IConversationCoordinator",
+    "ISearchCoordinator",
+    "ITeamCoordinator",
 ]

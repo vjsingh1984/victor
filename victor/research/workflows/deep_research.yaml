@@ -315,7 +315,7 @@ workflows:
       - id: generate_report
         type: agent
         name: "Generate Research Report"
-        role: writer
+        role: reviewer
         goal: |
           Generate a comprehensive research report:
 
@@ -383,7 +383,7 @@ workflows:
       - id: quick_summary
         type: agent
         name: "Generate Summary"
-        role: writer
+        role: reviewer
         goal: "Summarize the research findings in 2-3 paragraphs."
         tool_budget: 5
         llm_config:

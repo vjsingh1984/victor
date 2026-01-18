@@ -3451,8 +3451,25 @@ Respond with just the command to run."""
 
         config = uvicorn.Config(self.app, host=self.host, port=self.port, log_level="info")
         self._server = uvicorn.Server(config)
-        asyncio.create_task(self._server.serve())
-        logger.info(f"Victor FastAPI server running on {self.host}:{self.port}")
+
+        # Start the server in a task
+        task = asyncio.create_task(self._server.serve())
+
+        # Wait for the server to actually start serving
+        # The server is started when the serve() task begins execution
+        await asyncio.sleep(0.2)
+
+        # Verify the task is still running (no startup errors)
+        if not task.done():
+            logger.info(f"Victor FastAPI server running on {self.host}:{self.port}")
+        else:
+            # If the task completed already, it likely failed
+            try:
+                task.result()  # This will raise the exception if one occurred
+            except Exception as e:
+                logger.error(f"Failed to start server: {e}")
+                raise
+
         return self
 
     async def shutdown(self) -> None:

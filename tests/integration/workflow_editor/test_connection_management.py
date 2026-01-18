@@ -86,7 +86,7 @@ workflows:
         connections = self._build_connection_map(workflow_def)
 
         # Find condition node
-        condition_nodes = [n for n in workflow_def.nodes if isinstance(n, ConditionNode)]
+        condition_nodes = [n for n in workflow_def.nodes.values() if isinstance(n, ConditionNode)]
         assert len(condition_nodes) > 0
 
         condition = condition_nodes[0]
@@ -151,12 +151,12 @@ workflows:
         connections = self._build_connection_map(workflow_def)
 
         # Find team nodes
-        team_nodes = [n for n in workflow_def.nodes if isinstance(n, TeamNodeWorkflow)]
+        team_nodes = [n for n in workflow_def.nodes.values() if isinstance(n, TeamNodeWorkflow)]
 
         for team_node in team_nodes:
             assert team_node.id in connections
             # Team should have outgoing connections
-            if team_node.next:
+            if team_node.next_nodes:
                 assert len(connections[team_node.id]) > 0
 
     def _build_connection_map(self, workflow_def: WorkflowDefinition) -> Dict[str, List[str]]:
@@ -203,7 +203,7 @@ class TestConnectionValidation:
 
         for node in workflow_def.nodes.values():  # Fixed: iterate over values
             if hasattr(node, "next_nodes") and node.next_nodes:
-                assert node.id not in node.next, f"Self-loop detected: {node.id}"
+                assert node.id not in node.next_nodes, f"Self-loop detected: {node.id}"
 
             if hasattr(node, "branches") and node.branches:
                 for target_id in node.branches.values():
@@ -231,7 +231,7 @@ class TestConnectionValidation:
 
         all_node_ids = set(workflow_def.nodes.keys())  # Fixed: use keys() for IDs
 
-        parallel_nodes = [n for n in workflow_def.nodes if isinstance(n, ParallelNode)]
+        parallel_nodes = [n for n in workflow_def.nodes.values() if isinstance(n, ParallelNode)]
 
         for parallel in parallel_nodes:
             assert hasattr(parallel, "parallel_nodes")
@@ -276,7 +276,7 @@ class TestConnectionTransformation:
         workflow_def = workflows["team_node_demo"]
 
         # Find condition node
-        condition_nodes = [n for n in workflow_def.nodes if isinstance(n, ConditionNode)]
+        condition_nodes = [n for n in workflow_def.nodes.values() if isinstance(n, ConditionNode)]
         assert len(condition_nodes) > 0
 
         condition = condition_nodes[0]
@@ -450,8 +450,8 @@ class TestConnectionPaths:
         connections = self._build_connection_map_with_branches(workflow_def)
 
         # Find all paths from start to end
-        start_nodes = [n for n in workflow_def.nodes if not self._has_incoming(n, workflow_def)]
-        end_nodes = [n for n in workflow_def.nodes if not hasattr(n, "next") or not n.next]
+        start_nodes = [n for n in workflow_def.nodes.values() if not self._has_incoming(n, workflow_def)]
+        end_nodes = [n for n in workflow_def.nodes.values() if not hasattr(n, "next_nodes") or not n.next_nodes]
 
         if start_nodes and end_nodes:
             paths = self._find_all_paths(
@@ -636,7 +636,7 @@ workflows:
 
         for node in workflow_def.nodes.values():  # Fixed: iterate over values
             if hasattr(node, "next_nodes") and node.next_nodes:
-                if len(node.next) > 1:
+                if len(node.next_nodes) > 1:
                     # Splitting node - place at top
                     layout_hints[node.id] = {"rank": "top"}
                 elif len(node.next_nodes) == 1:

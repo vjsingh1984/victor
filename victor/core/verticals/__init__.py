@@ -83,6 +83,13 @@ from victor.core.verticals.vertical_loader import (
     get_active_vertical,
     get_vertical_extensions,
 )
+# Layer boundary enforcement: moved from victor.agent.vertical_context
+from victor.core.verticals.context import (
+    VerticalContext,
+    VerticalContextProtocol,
+    MutableVerticalContextProtocol,
+    create_vertical_context,
+)
 
 __all__ = [
     # Base classes
@@ -132,52 +139,82 @@ __all__ = [
     # Helper functions
     "get_vertical",
     "list_verticals",
+    # Layer boundary enforcement: moved from victor.agent.vertical_context
+    "VerticalContext",
+    "VerticalContextProtocol",
+    "MutableVerticalContextProtocol",
+    "create_vertical_context",
 ]
 
 
 def _register_builtin_verticals() -> None:
-    """Register all built-in verticals with the registry."""
-    try:
-        from victor.coding import CodingAssistant
+    """Register all built-in verticals with the registry using lazy loading.
 
-        VerticalRegistry.register(CodingAssistant)
-    except ImportError:
-        pass
+    Lazy loading defers the actual import of vertical classes until they are
+    first accessed, significantly improving startup time.
 
-    try:
-        from victor.research import ResearchAssistant
+    To disable lazy loading and load all verticals eagerly, set the environment
+    variable: VICTOR_LAZY_LOADING=false
+    """
+    import os
+    from victor.core.verticals.naming import normalize_vertical_name
 
-        VerticalRegistry.register(ResearchAssistant)
-    except ImportError:
-        pass
+    # Check if lazy loading is enabled (default: true)
+    lazy_loading_enabled = os.getenv("VICTOR_LAZY_LOADING", "true").lower() == "true"
 
-    try:
-        from victor.devops import DevOpsAssistant
+    if lazy_loading_enabled:
+        # Register lazy imports - verticals will be loaded on first access
+        VerticalRegistry.register_lazy_import("coding", "victor.coding:CodingAssistant")
+        VerticalRegistry.register_lazy_import("research", "victor.research:ResearchAssistant")
+        VerticalRegistry.register_lazy_import("devops", "victor.devops:DevOpsAssistant")
+        VerticalRegistry.register_lazy_import(
+            "dataanalysis", "victor.dataanalysis:DataAnalysisAssistant"
+        )
+        VerticalRegistry.register_lazy_import("rag", "victor.rag:RAGAssistant")
+        VerticalRegistry.register_lazy_import("benchmark", "victor.benchmark:BenchmarkVertical")
+    else:
+        # Eager loading - import all verticals immediately (legacy behavior)
+        try:
+            from victor.coding import CodingAssistant
 
-        VerticalRegistry.register(DevOpsAssistant)
-    except ImportError:
-        pass
+            VerticalRegistry.register(CodingAssistant)
+        except ImportError:
+            pass
 
-    try:
-        from victor.dataanalysis import DataAnalysisAssistant
+        try:
+            from victor.research import ResearchAssistant
 
-        VerticalRegistry.register(DataAnalysisAssistant)
-    except ImportError:
-        pass
+            VerticalRegistry.register(ResearchAssistant)
+        except ImportError:
+            pass
 
-    try:
-        from victor.rag import RAGAssistant
+        try:
+            from victor.devops import DevOpsAssistant
 
-        VerticalRegistry.register(RAGAssistant)
-    except ImportError:
-        pass
+            VerticalRegistry.register(DevOpsAssistant)
+        except ImportError:
+            pass
 
-    try:
-        from victor.benchmark import BenchmarkVertical
+        try:
+            from victor.dataanalysis import DataAnalysisAssistant
 
-        VerticalRegistry.register(BenchmarkVertical)
-    except ImportError:
-        pass
+            VerticalRegistry.register(DataAnalysisAssistant)
+        except ImportError:
+            pass
+
+        try:
+            from victor.rag import RAGAssistant
+
+            VerticalRegistry.register(RAGAssistant)
+        except ImportError:
+            pass
+
+        try:
+            from victor.benchmark import BenchmarkVertical
+
+            VerticalRegistry.register(BenchmarkVertical)
+        except ImportError:
+            pass
 
 
 def _discover_external_verticals() -> None:

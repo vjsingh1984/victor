@@ -5,11 +5,11 @@
       <stop offset="0%" style="stop-color:#E3F2FD;stop-opacity:1" />
       <stop offset="100%" style="stop-color:#BBDEFB;stop-opacity:1" />
     </linearGradient>
-    <linearGradient id="loaderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="registryGradient" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#F3E5F5;stop-opacity:1" />
       <stop offset="100%" style="stop-color:#E1BEE7;stop-opacity:1" />
     </linearGradient>
-    <linearGradient id="validatorGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="yamlGradient" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#E8F5E9;stop-opacity:1" />
       <stop offset="100%" style="stop-color:#C8E6C9;stop-opacity:1" />
     </linearGradient>
@@ -30,180 +30,181 @@
   <rect width="1400" height="900" fill="#ffffff"/>
 
   <!-- Title -->
-  <text x="700" y="40" text-anchor="middle" font-size="28" font-weight="bold" fill="#333">Configuration System</text>
+  <text x="700" y="30" text-anchor="middle" font-size="24" font-weight="bold" fill="#333">Configuration System (Updated 2025-01-18)</text>
+  <text x="700" y="55" text-anchor="middle" font-size="14" fill="#666">YAML-First Configuration with Universal Registry System</text>
 
   <!-- CONFIGURATION SOURCES -->
   <g transform="translate(50, 80)">
-    <rect x="0" y="0" width="1300" height="150" rx="10" fill="url(#sourceGradient)" stroke="#1976D2" stroke-width="2" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="1300" height="120" rx="10" fill="url(#sourceGradient)" stroke="#1976D2" stroke-width="2" filter="url(#shadow)"/>
     <text x="20" y="30" font-size="14" font-weight="bold" fill="#1976D2">CONFIGURATION SOURCES</text>
 
     <!-- Environment Variables -->
-    <g transform="translate(30, 50)">
-      <rect x="0" y="0" width="280" height="80" rx="5" fill="#ffffff" stroke="#1976D2" stroke-width="1.5"/>
-      <text x="140" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Environment Variables</text>
-      <text x="140" y="45" text-anchor="middle" font-size="10" fill="#666">ANTHROPIC_API_KEY</text>
-      <text x="140" y="60" text-anchor="middle" font-size="10" fill="#666">OPENAI_API_KEY</text>
-      <text x="140" y="75" text-anchor="middle" font-size="10" fill="#666">VICTOR_LOG_LEVEL</text>
+    <g transform="translate(30, 45)">
+      <rect x="0" y="0" width="280" height="60" rx="5" fill="#ffffff" stroke="#1976D2" stroke-width="1.5"/>
+      <text x="140" y="20" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">Environment Variables</text>
+      <text x="140" y="38" text-anchor="middle" font-size="9" fill="#666">ANTHROPIC_API_KEY</text>
+      <text x="140" y="50" text-anchor="middle" font-size="9" fill="#666">VICTOR_LOG_LEVEL</text>
     </g>
 
     <!-- YAML Files -->
-    <g transform="translate(340, 50)">
-      <rect x="0" y="0" width="280" height="80" rx="5" fill="#ffffff" stroke="#1976D2" stroke-width="1.5"/>
-      <text x="140" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">YAML Files</text>
-      <text x="140" y="45" text-anchor="middle" font-size="10" fill="#666">~/.victor/profiles.yaml</text>
-      <text x="140" y="60" text-anchor="middle" font-size="10" fill="#666">~/.victor/config.yaml</text>
-      <text x="140" y="75" text-anchor="middle" font-size="10" fill="#666">~/.victor/mcp.yaml</text>
+    <g transform="translate(340, 45)">
+      <rect x="0" y="0" width="280" height="60" rx="5" fill="#ffffff" stroke="#1976D2" stroke-width="1.5"/>
+      <text x="140" y="20" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">YAML Files</text>
+      <text x="140" y="38" text-anchor="middle" font-size="9" fill="#666">~/.victor/profiles.yaml</text>
+      <text x="140" y="50" text-anchor="middle" font-size="9" fill="#666">~/.victor/config.yaml</text>
     </g>
 
     <!-- Project Context -->
-    <g transform="translate(650, 50)">
-      <rect x="0" y="0" width="280" height="80" rx="5" fill="#ffffff" stroke="#1976D2" stroke-width="1.5"/>
-      <text x="140" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Project Context</text>
-      <text x="140" y="45" text-anchor="middle" font-size="10" fill="#666">.victor.md</text>
-      <text x="140" y="60" text-anchor="middle" font-size="10" fill="#666">CLAUDE.md</text>
-      <text x="140" y="75" text-anchor="middle" font-size="10" fill="#666">Project-specific settings</text>
+    <g transform="translate(650, 45)">
+      <rect x="0" y="0" width="280" height="60" rx="5" fill="#ffffff" stroke="#1976D2" stroke-width="1.5"/>
+      <text x="140" y="20" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">Project Context</text>
+      <text x="140" y="38" text-anchor="middle" font-size="9" fill="#666">.victor.md</text>
+      <text x="140" y="50" text-anchor="middle" font-size="9" fill="#666">CLAUDE.md</text>
     </g>
 
     <!-- Defaults -->
-    <g transform="translate(960, 50)">
-      <rect x="0" y="0" width="280" height="80" rx="5" fill="#ffffff" stroke="#1976D2" stroke-width="1.5"/>
-      <text x="140" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Default Values</text>
-      <text x="140" y="45" text-anchor="middle" font-size="10" fill="#666">Built-in constants</text>
-      <text x="140" y="60" text-anchor="middle" font-size="10" fill="#666">Fallback options</text>
-      <text x="140" y="75" text-anchor="middle" font-size="10" fill="#666">Sensible defaults</text>
+    <g transform="translate(960, 45)">
+      <rect x="0" y="0" width="280" height="60" rx="5" fill="#ffffff" stroke="#1976D2" stroke-width="1.5"/>
+      <text x="140" y="20" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">Default Values</text>
+      <text x="140" y="38" text-anchor="middle" font-size="9" fill="#666">Built-in constants</text>
+      <text x="140" y="50" text-anchor="middle" font-size="9" fill="#666">Sensible defaults</text>
     </g>
   </g>
 
   <!-- Arrow -->
-  <line x1="700" y1="230" x2="700" y2="270" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="700" y1="200" x2="700" y2="230" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
 
-  <!-- CONFIG LOADER -->
-  <g transform="translate(300, 270)">
-    <rect x="0" y="0" width="800" height="150" rx="10" fill="url(#loaderGradient)" stroke="#7B1FA2" stroke-width="2" filter="url(#shadow)"/>
-    <text x="400" y="30" text-anchor="middle" font-size="14" font-weight="bold" fill="#7B1FA2">CONFIG LOADER</text>
+  <!-- YAML-FIRST REGISTRY SYSTEM -->
+  <g transform="translate(50, 230)">
+    <rect x="0" y="0" width="1300" height="200" rx="10" fill="url(#registryGradient)" stroke="#7B1FA2" stroke-width="2" filter="url(#shadow)"/>
+    <text x="650" y="30" text-anchor="middle" font-size="14" font-weight="bold" fill="#7B1FA2">YAML-FIRST REGISTRY SYSTEM</text>
 
-    <g transform="translate(50, 50)">
-      <rect x="0" y="0" width="300" height="70" rx="5" fill="#ffffff" stroke="#7B1FA2" stroke-width="1.5"/>
-      <text x="150" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">load()</text>
-      <text x="150" y="45" text-anchor="middle" font-size="10" fill="#666">Load from all sources</text>
-      <text x="150" y="60" text-anchor="middle" font-size="10" fill="#666">Parse YAML, read env vars</text>
+    <!-- ModeConfigRegistry -->
+    <g transform="translate(30, 50)">
+      <rect x="0" y="0" width="300" height="130" rx="5" fill="#ffffff" stroke="#7B1FA2" stroke-width="1.5"/>
+      <text x="150" y="20" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">ModeConfigRegistry</text>
+      <text x="150" y="40" text-anchor="middle" font-size="10" fill="#666">YAML: config/modes/*_modes.yaml</text>
+      <text x="150" y="60" text-anchor="middle" font-size="9" fill="#888">• build, plan, explore modes</text>
+      <text x="150" y="75" text-screen-size="9" fill="#888">• Exploration multipliers</text>
+      <text x="150" y="90" font-size="9" fill="#888">• Tool budgets</text>
+      <text x="150" y="105" font-size="9" fill="#888">• Max iterations</text>
+      <text x="150" y="120" text-anchor="middle" font-size="9" fill="#666">RegistryBasedModeConfigProvider</text>
     </g>
 
-    <g transform="translate(400, 50)">
-      <rect x="0" y="0" width="350" height="70" rx="5" fill="#ffffff" stroke="#7B1FA2" stroke-width="1.5"/>
-      <text x="175" y="20" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">Priority Resolution</text>
-      <text x="175" y="40" text-anchor="middle" font-size="9" fill="#666">1. Defaults</text>
-      <text x="175" y="52" text-anchor="middle" font-size="9" fill="#666">2. Global Config → Profile Config → Project Context</text>
-      <text x="175" y="64" text-anchor="middle" font-size="9" fill="#666">3. Environment Vars → CLI Flags (highest)</text>
-    </g>
-  </g>
-
-  <!-- Arrow -->
-  <line x1="700" y1="420" x2="700" y2="460" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
-
-  <!-- CONFIG VALIDATOR -->
-  <g transform="translate(200, 460)">
-    <rect x="0" y="0" width="1000" height="150" rx="10" fill="url(#validatorGradient)" stroke="#388E3C" stroke-width="2" filter="url(#shadow)"/>
-    <text x="500" y="30" text-anchor="middle" font-size="14" font-weight="bold" fill="#388E3C">CONFIG VALIDATOR</text>
-
-    <g transform="translate(50, 50)">
-      <rect x="0" y="0" width="200" height="70" rx="5" fill="#ffffff" stroke="#388E3C" stroke-width="1.5"/>
-      <text x="100" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">validate()</text>
-      <text x="100" y="45" text-anchor="middle" font-size="10" fill="#666">YAML syntax check</text>
-      <text x="100" y="60" text-anchor="middle" font-size="10" fill="#666">Required fields</text>
+    <!-- CapabilityLoader -->
+    <g transform="translate(360, 50)">
+      <rect x="0" y="0" width="300" height="130" rx="5" fill="#ffffff" stroke="#7B1FA2" stroke-width="1.5"/>
+      <text x="150" y="20" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">CapabilityLoader</text>
+      <text x="150" y="40" text-anchor="middle" font-size="10" fill="#666">YAML: config/capabilities/*.yaml</text>
+      <text x="150" y="60" text-anchor="middle" font-size="9" fill="#888">• tool, workflow capabilities</text>
+      <text x="150" y="75" font-size="9" fill="#888">• middleware, validators</text>
+      <text x="150" y="90" font-size="9" fill="#888">• observers</text>
+      <text x="150" y="105" font-size="9" fill="#888">• 5 capability types</text>
+      <text x="150" y="120" text-anchor="middle" font-size="9" fill="#666">CapabilitySet with handlers</text>
     </g>
 
-    <g transform="translate(280, 50)">
-      <rect x="0" y="0" width="250" height="70" rx="5" fill="#ffffff" stroke="#388E3C" stroke-width="1.5"/>
-      <text x="125" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Schema Validation</text>
-      <text x="125" y="45" text-anchor="middle" font-size="10" fill="#666">Type checking</text>
-      <text x="125" y="60" text-anchor="middle" font-size="10" fill="#666">Value constraints</text>
+    <!-- BaseYAMLTeamProvider -->
+    <g transform="translate(690, 50)">
+      <rect x="0" y="0" width="300" height="130" rx="5" fill="#ffffff" stroke="#7B1FA2" stroke-width="1.5"/>
+      <text x="150" y="20" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">BaseYAMLTeamProvider</text>
+      <text x="150" y="40" text-anchor="middle" font-size="10" fill="#666">YAML: config/teams/*.yaml</text>
+      <text x="150" y="60" text-anchor="middle" font-size="9" fill="#888">• 5 team formations</text>
+      <text x="150" y="75" font-size="9" fill="#888">• Team specifications</text>
+      <text x="150" y="90" font-size="9" fill="#888">• Role definitions</text>
+      <text x="150" y="105" font-size="9" fill="#888">• Communication styles</text>
+      <text x="150" y="120" text-anchor="middle" font-size="9" fill="#666">TeamSpecification objects</text>
     </g>
 
-    <g transform="translate(560, 50)">
-      <rect x="0" y="0" width="200" height="70" rx="5" fill="#ffffff" stroke="#388E3C" stroke-width="1.5"/>
-      <text x="100" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Merge Configs</text>
-      <text x="100" y="45" text-anchor="middle" font-size="10" fill="#666">Combine sources</text>
-      <text x="100" y="60" text-anchor="middle" font-size="10" fill="#666">Resolve conflicts</text>
-    </g>
-
-    <g transform="translate(790, 50)">
-      <rect x="0" y="0" width="160" height="70" rx="5" fill="#ffffff" stroke="#388E3C" stroke-width="1.5"/>
-      <text x="80" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Apply Overrides</text>
-      <text x="80" y="45" text-anchor="middle" font-size="10" fill="#666">Env vars take</text>
-      <text x="80" y="60" text-anchor="middle" font-size="10" fill="#666">precedence</text>
+    <!-- UniversalRegistry -->
+    <g transform="translate(1020, 50)">
+      <rect x="0" y="0" width="250" height="130" rx="5" fill="#ffffff" stroke="#7B1FA2" stroke-width="1.5"/>
+      <text x="125" y="20" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">UniversalRegistry</text>
+      <text x="125" y="40" text-anchor="middle" font-size="10" fill="#666">Type-Safe Registry</text>
+      <text x="125" y="60" text-anchor="middle" font-size="9" fill="#888">• 7 registry types</text>
+      <text x="125" y="75" font-size="9" fill="#888">• Cache strategies</text>
+      <text x="125" y="90" font-size="9" fill="#888">• TTL, LRU, Manual</text>
+      <text x="125" y="105" font-size="9" fill="#888">• Thread-safe</text>
+      <text x="125" y="120" text-anchor="middle" font-size="9" fill="#666">Namespace isolation</text>
     </g>
   </g>
 
   <!-- Arrow -->
-  <line x1="700" y1="610" x2="700" y2="650" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="700" y1="430" x2="700" y2="460" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
 
   <!-- SETTINGS OBJECT -->
-  <g transform="translate(100, 650)">
-    <rect x="0" y="0" width="1200" height="120" rx="10" fill="url(#settingsGradient)" stroke="#F57C00" stroke-width="2" filter="url(#shadow)"/>
-    <text x="600" y="30" text-anchor="middle" font-size="14" font-weight="bold" fill="#F57C00">SETTINGS OBJECT</text>
+  <g transform="translate(100, 460)">
+    <rect x="0" y="0" width="1200" height="100" rx="10" fill="url(#settingsGradient)" stroke="#F57C00" stroke-width="2" filter="url(#shadow)"/>
+    <text x="600" y="25" text-anchor="middle" font-size="14" font-weight="bold" fill="#F57C00">SETTINGS OBJECT (Priority Resolution)</text>
 
-    <g transform="translate(30, 45)">
-      <rect x="0" y="0" width="180" height="55" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
-      <text x="90" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">ProviderSettings</text>
-      <text x="90" y="38" text-anchor="middle" font-size="9" fill="#666">name, model, api_key</text>
+    <g transform="translate(30, 35)">
+      <rect x="0" y="0" width="160" height="50" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="80" y="18" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">ProviderSettings</text>
+      <text x="80" y="35" text-anchor="middle" font-size="9" fill="#666">name, model, api_key</text>
     </g>
 
-    <g transform="translate(225, 45)">
-      <rect x="0" y="0" width="180" height="55" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
-      <text x="90" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">ToolSettings</text>
-      <text x="90" y="38" text-anchor="middle" font-size="9" fill="#666">lazy_load, timeout</text>
+    <g transform="translate(205, 35)">
+      <rect x="0" y="0" width="160" height="50" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="80" y="18" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">ToolSettings</text>
+      <text x="80" y="35" text-anchor="middle" font-size="9" fill="#666">lazy_load, timeout</text>
     </g>
 
-    <g transform="translate(420, 45)">
-      <rect x="0" y="0" width="180" height="55" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
-      <text x="90" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">LoggingSettings</text>
-      <text x="90" y="38" text-anchor="middle" font-size="9" fill="#666">level, format, file</text>
+    <g transform="translate(380, 35)">
+      <rect x="0" y="0" width="160" height="50" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="80" y="18" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">LoggingSettings</text>
+      <text x="80" y="35" text-anchor="middle" font-size="9" fill="#666">level, format, file</text>
     </g>
 
-    <g transform="translate(615, 45)">
-      <rect x="0" y="0" width="180" height="55" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
-      <text x="90" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">CacheSettings</text>
-      <text x="90" y="38" text-anchor="middle" font-size="9" fill="#666">enabled, ttl, backend</text>
+    <g transform="translate(555, 35)">
+      <rect x="0" y="0" width="160" height="50" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="80" y="18" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">CacheSettings</text>
+      <text x="80" y="35" text-anchor="middle" font-size="9" fill="#666">enabled, ttl, backend</text>
     </g>
 
-    <g transform="translate(810, 45)">
-      <rect x="0" y="0" width="180" height="55" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
-      <text x="90" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">UISettings</text>
-      <text x="90" y="38" text-anchor="middle" font-size="9" fill="#666">theme, editor, pager</text>
+    <g transform="translate(730, 35)">
+      <rect x="0" y="0" width="160" height="50" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="80" y="18" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">UISettings</text>
+      <text x="80" y="35" text-anchor="middle" font-size="9" fill="#666">theme, editor, pager</text>
     </g>
 
-    <g transform="translate(1005, 45)">
-      <rect x="0" y="0" width="165" height="55" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
-      <text x="82" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">WorkflowSettings</text>
-      <text x="82" y="38" text-anchor="middle" font-size="9" fill="#666">scheduling, etc.</text>
+    <g transform="translate(905, 35)">
+      <rect x="0" y="0" width="160" height="50" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="80" y="18" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">WorkflowSettings</text>
+      <text x="80" y="35" text-anchor="middle" font-size="9" fill="#666">scheduling, etc.</text>
+    </g>
+
+    <g transform="translate(1080, 35)">
+      <rect x="0" y="0" width="90" height="50" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="45" y="18" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">+10 more</text>
+      <text x="45" y="35" text-anchor="middle" font-size="9" fill="#666">settings</text>
     </g>
   </g>
 
   <!-- Arrow -->
-  <line x1="700" y1="770" x2="700" y2="810" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="700" y1="560" x2="700" y2="590" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
 
   <!-- CONFIG CONSUMERS -->
-  <g transform="translate(50, 810)">
-    <rect x="0" y="0" width="1300" height="70" rx="10" fill="url(#consumerGradient)" stroke="#C2185B" stroke-width="2" filter="url(#shadow)"/>
+  <g transform="translate(50, 590)">
+    <rect x="0" y="0" width="1300" height="80" rx="10" fill="url(#consumerGradient)" stroke="#C2185B" stroke-width="2" filter="url(#shadow)"/>
     <text x="650" y="25" text-anchor="middle" font-size="14" font-weight="bold" fill="#C2185B">CONFIG CONSUMERS</text>
 
     <g transform="translate(50, 35)">
-      <text x="60" y="15" text-anchor="middle" font-size="11" fill="#333">Agent Orchestrator</text>
-      <text x="180" y="15" text-anchor="middle" font-size="11" fill="#333">Provider Manager</text>
-      <text x="320" y="15" text-anchor="middle" font-size="11" fill="#333">Tool Pipeline</text>
-      <text x="450" y="15" text-anchor="middle" font-size="11" fill="#333">Workflow Executor</text>
-      <text x="600" y="15" text-anchor="middle" font-size="11" fill="#333">HTTP/MCP Server</text>
-      <text x="760" y="15" text-anchor="middle" font-size="11" fill="#333">Verticals</text>
-      <text x="860" y="15" text-anchor="middle" font-size="11" fill="#333">All Components</text>
+      <text x="60" y="15" text-anchor="middle" font-size="11" fill="#333">OrchestratorFactory</text>
+      <text x="180" y="15" text-anchor="middle" font-size="11" fill="#333">Coordinators</text>
+      <text x="300" y="15" text-anchor="middle" font-size="11" fill="#333">Verticals</text>
+      <text x="400" y="15" text-anchor="middle" font-size="11" fill="#333">Providers</text>
+      <text x="500" y="15" text-anchor="middle" font-size="11" fill="#333">Tools</text>
+      <text x="600" y="15" text-anchor="middle" font-size="11" fill="#333">Workflows</text>
+      <text x="720" y="15" text-anchor="middle" font-size="11" fill="#333">Teams</text>
+      <text x="820" y="15" text-anchor="middle" font-size="11" fill="#333">ServiceContainer</text>
+      <text x="980" y="15" text-anchor="middle" font-size="11" fill="#333">All Components</text>
     </g>
   </g>
 
-  <!-- Priority Legend -->
-  <g transform="translate(1050, 80)">
-    <rect x="0" y="0" width="300" height="200" rx="10" fill="#f5f5f5" stroke="#999" stroke-width="1"/>
-    <text x="150" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Priority Order</text>
-    <text x="150" y="45" text-anchor="middle" font-size="10" fill="#666">(Low → High)</text>
+  <!-- PRIORITY LEGEND -->
+  <g transform="translate(50, 700)">
+    <rect x="0" y="0" width="400" height="170" rx="10" fill="#f5f5f5" stroke="#999" stroke-width="1"/>
+    <text x="200" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Priority Order</text>
+    <text x="200" y="45" text-anchor="middle" font-size="10" fill="#666">(Low → High)</text>
 
     <g transform="translate(20, 60)">
       <text x="0" y="0" font-size="11" fill="#555">6. CLI Flags</text>
@@ -223,6 +224,32 @@
 
       <text x="0" y="125" font-size="11" fill="#555">1. Defaults</text>
       <rect x="200" y="117" width="15" height="15" fill="#BBDEFB"/>
+    </g>
+  </g>
+
+  <!-- YAML CONFIG EXAMPLES -->
+  <g transform="translate(500, 700)">
+    <rect x="0" y="0" width="850" height="170" rx="10" fill="url(#yamlGradient)" stroke="#388E3C" stroke-width="1"/>
+    <text x="425" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">YAML Configuration Examples</text>
+
+    <g transform="translate(20, 40)">
+      <rect x="0" y="0" width="380" height="110" rx="5" fill="#ffffff" stroke="#388E3C" stroke-width="1"/>
+      <text x="10" y="15" font-size="10" font-weight="bold" fill="#333">config/modes/coding_modes.yaml</text>
+      <text x="10" y="35" font-size="9" fill="#555" font-family="monospace">vertical_name: coding</text>
+      <text x="10" y="50" font-size="9" fill="#555" font-family="monospace">default_mode: build</text>
+      <text x="10" y="65" font-size="9" fill="#555" font-family="monospace">modes:</text>
+      <text x="10" y="80" font-size="9" fill="#555" font-family="monospace">  build:</text>
+      <text x="10" y="95" font-size="9" fill="#555" font-family="monospace">    exploration: standard</text>
+    </g>
+
+    <g transform="translate(420, 40)">
+      <rect x="0" y="0" width="410" height="110" rx="5" fill="#ffffff" stroke="#388E3C" stroke-width="1"/>
+      <text x="10" y="15" font-size="10" font-weight="bold" fill="#333">config/teams/coding_teams.yaml</text>
+      <text x="10" y="35" font-size="9" fill="#555" font-family="monospace">teams:</text>
+      <text x="10" y="50" font-size="9" fill="#555" font-family="monospace">  - name: code_review_team</text>
+      <text x="10" y="65" font-size="9" fill="#555" font-family="monospace">    formation: parallel</text>
+      <text x="10" y="80" font-size="9" fill="#555" font-family="monospace">    roles:</text>
+      <text x="10" y="95" font-size="9" fill="#555" font-family="monospace">      - name: security_reviewer</text>
     </g>
   </g>
 

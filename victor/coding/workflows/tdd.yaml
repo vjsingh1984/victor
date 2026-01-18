@@ -344,7 +344,7 @@ workflows:
       - id: generate_report
         type: agent
         name: "Generate TDD Report"
-        role: writer
+        role: reviewer
         goal: |
           Generate a TDD session report:
           - Tests written and passed

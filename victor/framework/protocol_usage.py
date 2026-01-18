@@ -66,7 +66,7 @@ Protocol Selection Guide:
    When: Accessing vertical-specific state and configuration
 
    Example:
-        from victor.agent.vertical_context import VerticalContext
+        from victor.core.verticals import VerticalContext
 
         def apply_config(context: VerticalContext, config: dict):
             context.set_capability_config("rag_config", config)
@@ -139,7 +139,7 @@ from typing import Any, Dict
 
 # Import all protocols for easy access
 from victor.agent.subagents.protocols import SubAgentContext
-from victor.agent.vertical_context import VerticalContext, VerticalContextProtocol
+from victor.core.verticals import VerticalContext, VerticalContextProtocol
 from victor.core.protocols import OrchestratorProtocol as CoreOrchestratorProtocol
 from victor.framework.protocols import (
     CapabilityRegistryProtocol,

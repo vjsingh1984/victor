@@ -32,7 +32,7 @@ def ollama_config():
     """Create Ollama embedding config."""
     return EmbeddingModelConfig(
         model_type="ollama",
-        model_name="qwen3-embedding:8b",
+        embedding_model="qwen3-embedding:8b",
         dimension=4096,
         api_key="http://localhost:11434",
         batch_size=8,
@@ -44,7 +44,7 @@ def sentence_transformer_config():
     """Create sentence-transformers config."""
     return EmbeddingModelConfig(
         model_type="sentence-transformers",
-        model_name="all-MiniLM-L6-v2",
+        embedding_model="all-MiniLM-L6-v2",
         dimension=384,
         batch_size=32,
     )
@@ -54,8 +54,8 @@ def sentence_transformer_config():
 def openai_config():
     """Create OpenAI config."""
     return EmbeddingModelConfig(
-        model_type="openai",
-        model_name="text-embedding-3-small",
+        embedding_type="openai",
+        embedding_model="text-embedding-3-small",
         dimension=1536,
         api_key="test-api-key",
         batch_size=100,
@@ -187,7 +187,7 @@ class TestOllamaEmbeddingModel:
         """Test dimension getter for other models."""
         config = EmbeddingModelConfig(
             model_type="ollama",
-            model_name="nomic-embed-text",
+            embedding_model="nomic-embed-text",
             dimension=768,
         )
         model = OllamaEmbeddingModel(config)
@@ -195,7 +195,7 @@ class TestOllamaEmbeddingModel:
 
         config2 = EmbeddingModelConfig(
             model_type="ollama",
-            model_name="snowflake-arctic-embed2",
+            embedding_model="snowflake-arctic-embed2",
             dimension=1024,
         )
         model2 = OllamaEmbeddingModel(config2)
@@ -330,8 +330,8 @@ class TestOpenAIEmbeddingModel:
     async def test_initialize_missing_api_key(self):
         """Test initialization without API key."""
         config = EmbeddingModelConfig(
-            model_type="openai",
-            model_name="text-embedding-3-small",
+            embedding_type="openai",
+            embedding_model="text-embedding-3-small",
             dimension=1536,
         )
         model = OpenAIEmbeddingModel(config)
@@ -376,8 +376,8 @@ class TestOpenAIEmbeddingModel:
 
         for model_name, expected_dim in configs:
             config = EmbeddingModelConfig(
-                model_type="openai",
-                model_name=model_name,
+                embedding_type="openai",
+                embedding_model=model_name,
                 api_key="test",
             )
             model = OpenAIEmbeddingModel(config)
@@ -391,8 +391,8 @@ class TestCohereEmbeddingModel:
     async def test_initialization(self):
         """Test model initialization."""
         config = EmbeddingModelConfig(
-            model_type="cohere",
-            model_name="embed-english-v3.0",
+            embedding_type="cohere",
+            embedding_model="embed-english-v3.0",
             api_key="test-key",
         )
         model = CohereEmbeddingModel(config)
@@ -412,8 +412,8 @@ class TestCohereEmbeddingModel:
 
         for model_name, expected_dim in configs:
             config = EmbeddingModelConfig(
-                model_type="cohere",
-                model_name=model_name,
+                embedding_type="cohere",
+                embedding_model=model_name,
                 api_key="test",
             )
             model = CohereEmbeddingModel(config)
@@ -445,7 +445,7 @@ class TestEmbeddingModelFactory:
         """Test creating model with unknown type."""
         config = EmbeddingModelConfig(
             model_type="unknown",
-            model_name="test",
+            embedding_model="test",
         )
 
         with pytest.raises(ValueError, match="Unknown embedding model type"):

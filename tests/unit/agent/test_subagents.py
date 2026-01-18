@@ -539,16 +539,19 @@ class TestOrchestratorSubAgentIntegration:
         assert hasattr(AgentOrchestrator, "subagent_orchestrator")
 
     def test_orchestrator_subagent_fields_exist(self):
-        """Test that AgentOrchestrator has subagent-related fields in __init__."""
+        """Test that AgentOrchestrator has subagent-related fields."""
         # This tests that the fields were added correctly by checking the
         # class structure without needing to instantiate it (which requires many deps)
         import inspect
         from victor.agent.orchestrator import AgentOrchestrator
 
-        source = inspect.getsource(AgentOrchestrator.__init__)
+        # Check that subagent_orchestrator property exists and uses lazy initialization
+        source = inspect.getsource(AgentOrchestrator.subagent_orchestrator.fget)
         assert "_subagent_orchestrator" in source
         assert "_subagent_orchestration_enabled" in source
-        assert "subagent_orchestration_enabled" in source
+
+        # Verify the property is defined
+        assert hasattr(AgentOrchestrator, "subagent_orchestrator")
 
     def test_subagent_orchestrator_property_is_lazy(self):
         """Test that intelligent_integration property follows lazy init pattern."""

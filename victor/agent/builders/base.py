@@ -124,8 +124,7 @@ class FactoryAwareBuilder(ComponentBuilder):
     """Base class for builders that use OrchestratorFactory.
 
     This class extends ComponentBuilder to provide factory management
-    capabilities, eliminating duplication across ToolBuilder, ProviderBuilder,
-    and ServiceBuilder.
+    capabilities, eliminating duplication across factory-aware builders.
 
     Attributes:
         settings: Application settings
@@ -156,7 +155,7 @@ class FactoryAwareBuilder(ComponentBuilder):
         """Ensure factory exists, creating it if necessary.
 
         This method implements the factory creation logic that was previously
-        duplicated across ToolBuilder, ProviderBuilder, and ServiceBuilder.
+        duplicated across factory-aware builders.
 
         Args:
             provider: LLM provider instance

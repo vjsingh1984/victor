@@ -681,3 +681,21 @@ modules = [
 ]
 min_coverage = 80.0
 fail_under = true
+
+# =============================================================================
+# Maturin Configuration for Rust Extensions
+# =============================================================================
+[tool.maturin]
+features = ["pyo3/extension-module"]
+module-name = "victor_native"
+python-source = "victor"
+rustc-flags = ["-C", "target-cpu=native"]
+
+# Profile for development builds
+[profile.dev]
+opt-level = 0
+
+# Profile for release builds with debugging symbols
+[profile.release-with-debug]
+inherits = "release"
+debug = true

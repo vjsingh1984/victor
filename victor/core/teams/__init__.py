@@ -12,30 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Centralized team specification system for verticals.
+"""Core team types.
 
-This module provides a consolidated, YAML-based configuration system for
-multi-agent team formations across verticals.
-
-Example:
-    from victor.core.teams import BaseYAMLTeamProvider
-
-    # Load team specifications
-    provider = BaseYAMLTeamProvider("coding")
-    teams = provider.list_teams()
-    review_team = provider.get_team("code_review_team")
+This module provides canonical team role types used across the Victor codebase.
+Moved from victor.agent.subagents.base to victor.core.teams to enforce proper
+layer boundaries (Framework should not depend on Agent).
 """
 
-from victor.core.teams.base_provider import (
-    AgentRole,
-    BaseYAMLTeamProvider,
-    TeamFormationType,
-    TeamSpecification,
-)
+from victor.core.teams.roles import SubAgentRole
 
-__all__ = [
-    "AgentRole",
-    "BaseYAMLTeamProvider",
-    "TeamFormationType",
-    "TeamSpecification",
-]
+__all__ = ["SubAgentRole"]

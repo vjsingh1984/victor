@@ -238,15 +238,17 @@ class MigrationStep:
             Migrated state
         """
         if self.type == MigrationType.RENAME_FIELD:
-            if self.old_value in state:
-                state[self.new_value] = state.pop(self.old_value)
+            if self.old_value is not None and self.old_value in state:
+                if self.new_value is not None:
+                    state[self.new_value] = state.pop(self.old_value)
 
         elif self.type == MigrationType.ADD_FIELD:
-            if self.node_id not in state:
+            if self.node_id is not None and self.node_id not in state:
                 state[self.node_id] = self.new_value
 
         elif self.type == MigrationType.REMOVE_FIELD:
-            state.pop(self.node_id, None)
+            if self.node_id is not None:
+                state.pop(self.node_id, None)
 
         elif self.type == MigrationType.CUSTOM and self.custom_handler:
             state = self.custom_handler(state)
@@ -567,7 +569,7 @@ class WorkflowVersionRegistry:
             # (BFS for shortest path)
             migrations = self._migrations[name]
             visited = {str(from_version)}
-            queue = [(from_version, [])]
+            queue: list[tuple[Any, list[Any]]] = [(from_version, [])]
 
             while queue:
                 current, path = queue.pop(0)

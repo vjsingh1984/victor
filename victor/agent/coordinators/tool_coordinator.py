@@ -824,7 +824,7 @@ class ToolCoordinator:
                         "name": tool_name,
                         "success": False,
                         "result": None,
-                        "error": f"Tool budget reached. No more tool calls allowed.",
+                        "error": "Tool budget reached. No more tool calls allowed.",
                     }
                 )
                 break
@@ -1009,13 +1009,15 @@ class ToolCoordinator:
         Returns:
             Dict with execution counts and budget usage
         """
+        budget_used = self.budget_used
+        budget_total = self.budget
         return {
             "total_executions": self._execution_count,
-            "budget_used": self._budget_used,
-            "budget_total": self._total_budget,
+            "budget_used": budget_used,
+            "budget_total": budget_total,
             "budget_remaining": self.get_remaining_budget(),
             "budget_utilization": (
-                self._budget_used / self._total_budget if self._total_budget > 0 else 0
+                budget_used / budget_total if budget_total > 0 else 0
             ),
             "executed_tools": list(self._executed_tools),
             "failed_signatures_count": len(self._failed_tool_signatures),
@@ -1035,8 +1037,8 @@ class ToolCoordinator:
             "selection": self.get_selection_stats(),
             "execution": self.get_execution_stats(),
             "budget": {
-                "total": self._total_budget,
-                "used": self._budget_used,
+                "total": self.budget,
+                "used": self.budget_used,
                 "remaining": self.get_remaining_budget(),
             },
         }

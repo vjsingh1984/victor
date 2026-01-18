@@ -230,7 +230,7 @@ class VerticalRegistryManager:
         "coding",
         "devops",
         "rag",
-        "dataanalysis",
+        "data_analysis",
         "research",
         "benchmark",
     ]

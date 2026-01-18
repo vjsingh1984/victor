@@ -1263,6 +1263,7 @@ __all__ = [
     "ConditionNode",
     "ParallelNode",
     "TransformNode",
+    "TeamNodeWorkflow",
     # Constraints (extensible protocol + standard implementations)
     "ConstraintsProtocol",
     "TaskConstraints",

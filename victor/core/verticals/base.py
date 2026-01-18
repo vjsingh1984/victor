@@ -1029,8 +1029,23 @@ class VerticalRegistry:
     """
 
     _registry: Dict[str, Type[VerticalBase]] = {}
+    _lazy_imports: Dict[str, str] = {}  # Map of vertical_name -> import_path
     _external_discovered: bool = False
     ENTRY_POINT_GROUP: str = "victor.verticals"
+
+    @classmethod
+    def register_lazy_import(cls, name: str, import_path: str) -> None:
+        """Register a lazy import hook for a vertical.
+
+        The vertical will be imported on-demand when first accessed via get().
+
+        Args:
+            name: Vertical name (e.g., "coding", "rag")
+            import_path: Import path in format "module.path:ClassName"
+        """
+        from victor.core.verticals.naming import normalize_vertical_name
+
+        cls._lazy_imports[normalize_vertical_name(name)] = import_path
 
     @classmethod
     def register(cls, vertical: Type[VerticalBase]) -> None:
@@ -1044,7 +1059,9 @@ class VerticalRegistry:
         """
         if not vertical.name:
             raise ValueError(f"Vertical {vertical.__name__} has no name defined")
-        cls._registry[vertical.name] = vertical
+        from victor.core.verticals.naming import normalize_vertical_name
+
+        cls._registry[normalize_vertical_name(vertical.name)] = vertical
 
     @classmethod
     def unregister(cls, name: str) -> None:
@@ -1053,8 +1070,11 @@ class VerticalRegistry:
         Args:
             name: Vertical name to unregister.
         """
-        if name in cls._registry:
-            del cls._registry[name]
+        from victor.core.verticals.naming import normalize_vertical_name
+
+        normalized = normalize_vertical_name(name)
+        if normalized in cls._registry:
+            del cls._registry[normalized]
 
     @classmethod
     def get(cls, name: str) -> Optional[Type[VerticalBase]]:
@@ -1066,7 +1086,37 @@ class VerticalRegistry:
         Returns:
             Vertical class or None if not found.
         """
-        return cls._registry.get(name)
+        from victor.core.verticals.naming import normalize_vertical_name
+
+        name = normalize_vertical_name(name)
+        # Check if already registered
+        if name in cls._registry:
+            return cls._registry[name]
+
+        # Check if there's a lazy import hook
+        if name in cls._lazy_imports:
+            import_path = cls._lazy_imports[name]
+            try:
+                module_path, class_name = import_path.split(":")
+                from importlib import import_module
+
+                module = import_module(module_path)
+                vertical_class = getattr(module, class_name)
+
+                # Register it now that it's loaded
+                cls.register(vertical_class)
+
+                return vertical_class
+            except Exception as e:
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to load lazy vertical '{name}': {e}")
+                # Remove failed lazy import to avoid repeated attempts
+                del cls._lazy_imports[name]
+                return None
+
+        return None
 
     @classmethod
     def list_all(cls) -> List[tuple[str, Type[VerticalBase]]]:
@@ -1075,6 +1125,9 @@ class VerticalRegistry:
         Returns:
             List of (name, vertical_class) tuples.
         """
+        for name in list(cls._lazy_imports.keys()):
+            if name not in cls._registry:
+                cls.get(name)
         return list(cls._registry.items())
 
     @classmethod
@@ -1084,7 +1137,9 @@ class VerticalRegistry:
         Returns:
             List of vertical names.
         """
-        return list(cls._registry.keys())
+        names = set(cls._registry.keys())
+        names.update(cls._lazy_imports.keys())
+        return list(names)
 
     @classmethod
     def clear(cls, *, reregister_builtins: bool = True) -> None:
@@ -1096,6 +1151,7 @@ class VerticalRegistry:
                 test affects other tests that expect built-ins to be available.
         """
         cls._registry.clear()
+        cls._lazy_imports.clear()
         cls._external_discovered = False
 
         if reregister_builtins:

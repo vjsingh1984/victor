@@ -38,7 +38,7 @@ Usage:
 """
 
 from dataclasses import dataclass
-from typing import Final
+from typing import Any, Final
 
 
 # =============================================================================
@@ -267,7 +267,7 @@ class WorkflowDefaults:
 # =============================================================================
 
 
-def get_default(settings: object, attr: str, default_class: type, attr_name: str) -> any:
+def get_default(settings: object, attr: str, default_class: type, attr_name: str) -> Any:
     """Get a configuration value with fallback to defaults.
 
     This helper function provides a clean way to access settings with

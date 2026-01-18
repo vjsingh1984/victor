@@ -145,7 +145,7 @@ from typing import (
     runtime_checkable,
 )
 
-from victor.agent.vertical_context import VerticalContext, create_vertical_context
+from victor.core.verticals import VerticalContext, create_vertical_context
 
 if TYPE_CHECKING:
     from victor.framework.step_handlers import StepHandlerRegistry
@@ -909,6 +909,51 @@ class OrchestratorVerticalProtocol(Protocol):
 class VerticalIntegrationPipeline:
     """Reusable pipeline for vertical extension application.
 
+    **PRIMARY EXTENSION MECHANISM**: StepHandlerRegistry
+
+    This pipeline uses StepHandlerRegistry as its primary extension mechanism.
+    Custom integration logic should be implemented as step handlers, not by
+    modifying this class or its methods. See examples below.
+
+    **Why Step Handlers?**
+    - Testable: Each handler can be unit tested independently
+    - Reusable: Share handlers across verticals
+    - Maintainable: Clear separation of concerns
+    - Extensible: Add handlers without modifying existing code
+    - Observable: Per-step status tracking
+
+    **Creating Custom Handlers:**
+    ```python
+    from victor.framework.step_handlers import BaseStepHandler, StepHandlerRegistry
+
+    class CustomToolsHandler(BaseStepHandler):
+        @property
+        def name(self) -> str:
+            return "custom_tools"
+
+        @property
+        def order(self) -> int:
+            return 15  # After default tools (10)
+
+        def _do_apply(self, orchestrator, vertical, context, result):
+            # Your custom logic here
+            tools = vertical.get_tools()
+            context.apply_enabled_tools(tools)
+            result.add_info(f"Applied {len(tools)} tools")
+
+    # Register and use
+    registry = StepHandlerRegistry.default()
+    registry.add_handler(CustomToolsHandler())
+    pipeline = VerticalIntegrationPipeline(step_registry=registry)
+    ```
+
+    See docs/extensions/step_handler_guide.md for complete guide.
+
+    **Legacy Patterns Deprecated:**
+    - Direct vertical method overrides (use step handlers instead)
+    - Private attribute access (use capability registry)
+    - Monolithic apply_to_orchestrator() (use focused handlers)
+
     This pipeline encapsulates all vertical integration logic that was
     previously spread across FrameworkShim._apply_vertical() and
     related methods. It provides:
@@ -916,8 +961,8 @@ class VerticalIntegrationPipeline:
     1. **Unified Integration**: Same logic for CLI and SDK paths
     2. **Protocol Compliance**: Uses proper methods, not private attrs
     3. **Error Handling**: Graceful degradation with detailed errors
-    4. **Extensibility**: Hook points for custom integration steps
-    5. **Step Handlers**: Focused classes for each integration concern (Phase 3.1)
+    4. **Extensibility**: Step handlers for custom integration logic
+    5. **Observability**: Per-step status tracking and metrics
 
     The pipeline now uses a registry of step handlers that can be customized.
     Each step handler implements a single concern (Single Responsibility Principle).

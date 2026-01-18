@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
@@ -32,7 +33,7 @@ from victor.coding.languages.base import TreeSitterQueries
 from victor.coding.languages.registry import LanguageRegistry, get_language_registry
 
 if TYPE_CHECKING:
-    from tree_sitter import Node, Parser, Tree
+    from tree_sitter import Language, Node, Parser, Tree
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +105,7 @@ class TreeSitterExtractor:
         if auto_discover and not self.registry._plugins:
             self.registry.discover_plugins()
         self._parsers: Dict[str, "Parser"] = {}
+        self._query_cache: Dict[Tuple[str, str], Query] = {}
 
     def _get_parser(self, language: str) -> Optional["Parser"]:
         """Get tree-sitter parser for a language.
@@ -139,7 +141,14 @@ class TreeSitterExtractor:
             Dictionary mapping capture names to lists of matching nodes
         """
         try:
-            query = Query(parser.language, query_src)
+            # Cache query objects to avoid recompilation
+            query_key = (str(parser.language), query_src)
+            query = self._query_cache.get(query_key)
+
+            if query is None:
+                query = Query(parser.language, query_src)
+                self._query_cache[query_key] = query
+
             cursor = QueryCursor(query)
             return cursor.captures(tree.root_node)
         except Exception as e:
@@ -204,35 +213,56 @@ class TreeSitterExtractor:
             name_nodes = captures.get("name", [])
             def_nodes = captures.get("def", [])
 
-            # Build a map of line -> def node for end_line lookup
-            # This handles queries that capture both @name and @def
-            def_by_start_line = {}
-            for def_node in def_nodes:
-                def_by_start_line[def_node.start_point[0]] = def_node
-
-            for node in name_nodes:
-                text = self._safe_decode_node_text(node)
-                if text:
-                    # Look up corresponding def node for end_line
-                    # The def node contains the name node, so they share the same start area
-                    end_line = node.end_point[0] + 1  # Default: name's end line
-                    name_line = node.start_point[0]
-
-                    # Search for def node that contains this name
-                    for def_start, def_node in def_by_start_line.items():
-                        if def_start <= name_line and def_node.end_point[0] >= name_line:
-                            end_line = def_node.end_point[0] + 1
-                            break
-
-                    symbols.append(
-                        ExtractedSymbol(
-                            name=text,
-                            type=pattern.symbol_type,
-                            file_path=relative_path,
-                            line_number=node.start_point[0] + 1,
-                            end_line=end_line,
+            # Optimization: Skip end_line lookup if no def nodes
+            if not def_nodes:
+                # Fast path: no end_line calculation needed
+                for node in name_nodes:
+                    text = self._safe_decode_node_text(node)
+                    if text:
+                        symbols.append(
+                            ExtractedSymbol(
+                                name=text,
+                                type=pattern.symbol_type,
+                                file_path=relative_path,
+                                line_number=node.start_point[0] + 1,
+                                end_line=node.end_point[0] + 1,
+                            )
                         )
-                    )
+            else:
+                # Optimization: Build name->def mapping by position
+                # Since queries capture both @name and @def in the same pattern,
+                # we can match them by position (i-th name corresponds to i-th def)
+                min_len = min(len(name_nodes), len(def_nodes))
+                for i in range(min_len):
+                    name_node = name_nodes[i]
+                    def_node = def_nodes[i]
+
+                    text = self._safe_decode_node_text(name_node)
+                    if text:
+                        symbols.append(
+                            ExtractedSymbol(
+                                name=text,
+                                type=pattern.symbol_type,
+                                file_path=relative_path,
+                                line_number=name_node.start_point[0] + 1,
+                                end_line=def_node.end_point[0] + 1,
+                            )
+                        )
+
+                # Handle any extra names without defs
+                for i in range(min_len, len(name_nodes)):
+                    name_node = name_nodes[i]
+                    text = self._safe_decode_node_text(name_node)
+                    if text:
+                        symbols.append(
+                            ExtractedSymbol(
+                                name=text,
+                                type=pattern.symbol_type,
+                                file_path=relative_path,
+                                line_number=name_node.start_point[0] + 1,
+                                end_line=name_node.end_point[0] + 1,
+                            )
+                        )
 
         return symbols
 
@@ -553,6 +583,7 @@ class TreeSitterExtractor:
         """Extract all symbols and edges from a file.
 
         This is the main entry point for comprehensive file analysis.
+        Optimized to parse the file only once and reuse the parsed tree.
 
         Args:
             file_path: Path to the source file
@@ -567,13 +598,165 @@ class TreeSitterExtractor:
             if language is None:
                 return [], []
 
-        symbols = self.extract_symbols(file_path, language)
+        try:
+            plugin = self.registry.get(language)
+        except KeyError:
+            return [], []
 
+        queries = plugin.tree_sitter_queries
+        parser = self._get_parser(language)
+        if parser is None:
+            return [], []
+
+        # Parse file once
+        try:
+            content = file_path.read_bytes()
+            tree = parser.parse(content)
+        except Exception as e:
+            logger.debug(f"Failed to parse {file_path}: {e}")
+            return [], []
+
+        relative_path = str(file_path)
+        symbols: List[ExtractedSymbol] = []
         edges: List[ExtractedEdge] = []
-        edges.extend(self.extract_call_edges(file_path, language))
-        edges.extend(self.extract_inheritance_edges(file_path, language))
-        edges.extend(self.extract_implements_edges(file_path, language))
-        edges.extend(self.extract_composition_edges(file_path, language))
+
+        # Extract symbols using cached tree
+        if queries.symbols:
+            for pattern in queries.symbols:
+                captures = self._run_query(tree, pattern.query, parser)
+                name_nodes = captures.get("name", [])
+                def_nodes = captures.get("def", [])
+
+                # Optimization: Skip end_line lookup if no def nodes
+                if not def_nodes:
+                    for node in name_nodes:
+                        text = self._safe_decode_node_text(node)
+                        if text:
+                            symbols.append(
+                                ExtractedSymbol(
+                                    name=text,
+                                    type=pattern.symbol_type,
+                                    file_path=relative_path,
+                                    line_number=node.start_point[0] + 1,
+                                    end_line=node.end_point[0] + 1,
+                                )
+                            )
+                else:
+                    # Optimization: Match names and defs by position
+                    min_len = min(len(name_nodes), len(def_nodes))
+                    for i in range(min_len):
+                        name_node = name_nodes[i]
+                        def_node = def_nodes[i]
+
+                        text = self._safe_decode_node_text(name_node)
+                        if text:
+                            symbols.append(
+                                ExtractedSymbol(
+                                    name=text,
+                                    type=pattern.symbol_type,
+                                    file_path=relative_path,
+                                    line_number=name_node.start_point[0] + 1,
+                                    end_line=def_node.end_point[0] + 1,
+                                )
+                            )
+
+                    # Handle extra names without defs
+                    for i in range(min_len, len(name_nodes)):
+                        name_node = name_nodes[i]
+                        text = self._safe_decode_node_text(name_node)
+                        if text:
+                            symbols.append(
+                                ExtractedSymbol(
+                                    name=text,
+                                    type=pattern.symbol_type,
+                                    file_path=relative_path,
+                                    line_number=name_node.start_point[0] + 1,
+                                    end_line=name_node.end_point[0] + 1,
+                                )
+                            )
+
+        # Extract call edges using cached tree
+        if queries.calls:
+            captures = self._run_query(tree, queries.calls, parser)
+            for capture_name, nodes in captures.items():
+                if capture_name == "callee":
+                    for node in nodes:
+                        callee = self._safe_decode_node_text(node)
+                        if callee:
+                            caller = self._find_enclosing_symbol(node, queries.enclosing_scopes)
+                            if caller:
+                                edges.append(
+                                    ExtractedEdge(
+                                        source=caller,
+                                        target=callee,
+                                        edge_type="CALLS",
+                                        file_path=relative_path,
+                                        line_number=node.start_point[0] + 1,
+                                    )
+                                )
+
+        # Extract inheritance edges using cached tree
+        if queries.inheritance:
+            captures = self._run_query(tree, queries.inheritance, parser)
+            child_nodes = captures.get("child", [])
+            base_nodes = captures.get("base", [])
+
+            for i, child_node in enumerate(child_nodes):
+                child = self._safe_decode_node_text(child_node)
+                if i < len(base_nodes):
+                    base = self._safe_decode_node_text(base_nodes[i])
+                    if child and base:
+                        edges.append(
+                            ExtractedEdge(
+                                source=child,
+                                target=base,
+                                edge_type="INHERITS",
+                                file_path=relative_path,
+                                line_number=child_node.start_point[0] + 1,
+                            )
+                        )
+
+        # Extract implements edges using cached tree
+        if queries.implements:
+            captures = self._run_query(tree, queries.implements, parser)
+            child_nodes = captures.get("child", [])
+            interface_nodes = captures.get("interface", []) or captures.get("base", [])
+
+            for i, child_node in enumerate(child_nodes):
+                child = self._safe_decode_node_text(child_node)
+                if i < len(interface_nodes):
+                    interface = self._safe_decode_node_text(interface_nodes[i])
+                    if child and interface:
+                        edges.append(
+                            ExtractedEdge(
+                                source=child,
+                                target=interface,
+                                edge_type="IMPLEMENTS",
+                                file_path=relative_path,
+                                line_number=child_node.start_point[0] + 1,
+                            )
+                        )
+
+        # Extract composition edges using cached tree
+        if queries.composition:
+            captures = self._run_query(tree, queries.composition, parser)
+            owner_nodes = captures.get("owner", [])
+            type_nodes = captures.get("type", [])
+
+            for i, owner_node in enumerate(owner_nodes):
+                owner = self._safe_decode_node_text(owner_node)
+                if i < len(type_nodes):
+                    member_type = self._safe_decode_node_text(type_nodes[i])
+                    if owner and member_type:
+                        edges.append(
+                            ExtractedEdge(
+                                source=owner,
+                                target=member_type,
+                                edge_type="COMPOSITION",
+                                file_path=relative_path,
+                                line_number=owner_node.start_point[0] + 1,
+                            )
+                        )
 
         return symbols, edges
 

@@ -56,7 +56,7 @@ class DataAnalysisSafetyExtension(SafetyExtensionProtocol):
                 pattern=p,
                 description=d,
                 risk_level=r,
-                category="data_analysis",
+                category="dataanalysis",
             )
             for p, d, r in _DATA_ANALYSIS_SAFETY_TUPLES
         ]

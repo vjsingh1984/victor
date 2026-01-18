@@ -564,7 +564,7 @@ class VictorAgentAdapter:
 
         # Get provider settings (ProfileConfig is a Pydantic model, use attribute access)
         provider_name = profile_config.provider
-        model = model_override or profile_config.model
+        model = model_override or profile_config.model_name
 
         # Handle base URL override
         if base_url:

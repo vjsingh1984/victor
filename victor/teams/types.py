@@ -48,7 +48,6 @@ class TeamFormation(str, Enum):
     Unified superset combining:
     - Framework formations: SEQUENTIAL, PARALLEL, HIERARCHICAL, PIPELINE, CONSENSUS
     - Agent/teams formations: SEQUENTIAL, PARALLEL, HIERARCHICAL, PIPELINE
-    - Advanced formations: DYNAMIC, ADAPTIVE, HYBRID
 
     Basic Formations:
         SEQUENTIAL: Execute members one after another, context chaining
@@ -56,11 +55,6 @@ class TeamFormation(str, Enum):
         HIERARCHICAL: Manager delegates to workers, synthesizes results
         PIPELINE: Output of one member feeds into the next
         CONSENSUS: All members must agree (multiple rounds if needed)
-
-    Advanced Formations:
-        DYNAMIC: Automatically switches formation based on execution progress
-        ADAPTIVE: AI-powered formation selection based on task characteristics
-        HYBRID: Multi-phase execution combining multiple formations
     """
 
     # Basic formations
@@ -69,11 +63,6 @@ class TeamFormation(str, Enum):
     HIERARCHICAL = "hierarchical"
     PIPELINE = "pipeline"
     CONSENSUS = "consensus"
-
-    # Advanced formations
-    DYNAMIC = "dynamic"
-    ADAPTIVE = "adaptive"
-    HYBRID = "hybrid"
 
 
 class MessageType(str, Enum):

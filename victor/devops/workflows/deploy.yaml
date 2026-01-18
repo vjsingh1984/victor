@@ -301,7 +301,7 @@ workflows:
       - id: notify_rollback
         type: agent
         name: "Generate Rollback Report"
-        role: writer
+        role: reviewer
         goal: |
           Generate a rollback incident report:
           - What was being deployed
@@ -354,7 +354,7 @@ workflows:
       - id: update_docs
         type: agent
         name: "Update Deployment Docs"
-        role: writer
+        role: reviewer
         goal: "Update deployment documentation with new version info."
         tool_budget: 10
         tools: [write]

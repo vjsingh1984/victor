@@ -959,7 +959,7 @@ class ExecutionReplayer:
         self_path = [e.node_id for e in self.events if e.node_id]
         other_path = [e.node_id for e in other.events if e.node_id]
 
-        path_diff = {
+        path_diff: Dict[str, Any] = {
             "self_path": self_path,
             "other_path": other_path,
             "first_difference": None,

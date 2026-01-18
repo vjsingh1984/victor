@@ -243,7 +243,9 @@ class VerticalExtensionLoader(ABC):
                     def _getter(subcls):
                         """Auto-generated getter method."""
                         # Build import path from vertical name
-                        vertical_name = subcls.name.lower()
+                        from victor.core.verticals.naming import get_vertical_module_name
+
+                        vertical_name = get_vertical_module_name(subcls.name)
 
                         # Skip if vertical name is empty (abstract base class)
                         if not vertical_name:
@@ -274,7 +276,9 @@ class VerticalExtensionLoader(ABC):
                     def _getter(subcls):
                         """Auto-generated cached getter method."""
                         # Skip if vertical name is empty (abstract base class)
-                        vertical_name = subcls.name.lower()
+                        from victor.core.verticals.naming import get_vertical_module_name
+
+                        vertical_name = get_vertical_module_name(subcls.name)
                         if not vertical_name:
                             # Return default value for abstract base class
                             return [] if ext_type == "middleware" else None

@@ -184,6 +184,7 @@ class TestEmbeddingServiceCosineSimilarity:
 
     def test_cosine_similarity_matrix(self):
         """Test cosine similarity matrix calculation."""
+        service = EmbeddingService.get_instance()
         query = np.array([1.0, 0.0, 0.0])
         corpus = np.array(
             [
@@ -192,7 +193,7 @@ class TestEmbeddingServiceCosineSimilarity:
                 [0.5, 0.5, 0.0],  # Partially similar
             ]
         )
-        results = EmbeddingService.cosine_similarity_matrix(query, corpus)
+        results = service.cosine_similarity_matrix(query, corpus)
 
         assert len(results) == 3
         assert abs(results[0] - 1.0) < 1e-6  # Identical
@@ -416,6 +417,19 @@ class TestIntentClassifier:
 
         mock.embed_batch_sync.side_effect = mock_embed_batch
         mock.embed_text_sync.side_effect = lambda t: mock_embed_batch([t])[0]
+
+        # Mock cosine_similarity_matrix to actually calculate similarities
+        def mock_cosine_similarity_matrix(query, corpus):
+            """Calculate cosine similarity between query and corpus."""
+            if corpus.size == 0:
+                return np.array([])
+
+            query_norm = query / (np.linalg.norm(query) + 1e-9)
+            corpus_norms = corpus / (np.linalg.norm(corpus, axis=1, keepdims=True) + 1e-9)
+            similarities = np.dot(corpus_norms, query_norm)
+            return np.asarray(similarities)
+
+        mock.cosine_similarity_matrix.side_effect = mock_cosine_similarity_matrix
 
         return mock
 

@@ -237,7 +237,7 @@ workflows:
           # --------------------------------------------------------------------
           # Fourth stage: Synthesize into actionable insights
           - id: research_synthesizer
-            role: writer
+            role: reviewer
             name: "Research Synthesizer"
             goal: |
               Synthesize all research into comprehensive, actionable report:
@@ -332,7 +332,7 @@ workflows:
       - id: finalize_report
         type: agent
         name: "Report Finalizer"
-        role: writer
+        role: reviewer
         goal: |
           Prepare final research report:
           {{research_findings}}
@@ -414,7 +414,7 @@ workflows:
             priority: 0
 
           - id: summarizer
-            role: writer
+            role: reviewer
             name: "Summary Writer"
             goal: "Summarize findings: {{web_searcher.output}}"
             tool_budget: 25

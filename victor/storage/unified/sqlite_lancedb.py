@@ -79,6 +79,10 @@ class SqliteLanceDBStore:
             embedding_model_type: Embedding model type (sentence-transformers, ollama, openai)
             embedding_model: Model name (default: all-MiniLM-L12-v2)
         """
+        embedding_model_name = kwargs.pop("embedding_model_name", None)
+        if embedding_model_name:
+            embedding_model = embedding_model_name
+
         self.repo_root = repo_root.resolve()
         self.persist_directory = persist_directory or (self.repo_root / ".victor")
         self.embedding_model_type = embedding_model_type
@@ -89,6 +93,11 @@ class SqliteLanceDBStore:
         self._vector_store = None
         self._embedding_model = None
         self._initialized = False
+
+    @property
+    def embedding_model_name(self) -> str:
+        """Backward-compatible alias for embedding_model."""
+        return self.embedding_model
 
     # =========================================================================
     # Initialization

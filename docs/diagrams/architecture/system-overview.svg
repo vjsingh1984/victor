@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 900" font-family="Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 1000" font-family="Arial, sans-serif">
   <defs>
     <!-- Gradients -->
     <linearGradient id="clientGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -27,219 +27,251 @@
   </defs>
 
   <!-- Background -->
-  <rect width="1400" height="900" fill="#ffffff"/>
+  <rect width="1400" height="1000" fill="#ffffff"/>
 
   <!-- Title -->
-  <text x="700" y="40" text-anchor="middle" font-size="28" font-weight="bold" fill="#333">Victor System Architecture</text>
+  <text x="700" y="30" text-anchor="middle" font-size="24" font-weight="bold" fill="#333">Victor System Architecture (Updated 2025-01-18)</text>
+  <text x="700" y="55" text-anchor="middle" font-size="14" fill="#666">Coordinator-Based Factory Pattern with Dependency Injection</text>
 
   <!-- CLIENT LAYER -->
   <g transform="translate(50, 80)">
-    <rect x="0" y="0" width="1300" height="120" rx="10" fill="url(#clientGradient)" stroke="#1976D2" stroke-width="2" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="1300" height="100" rx="10" fill="url(#clientGradient)" stroke="#1976D2" stroke-width="2" filter="url(#shadow)"/>
     <text x="20" y="30" font-size="14" font-weight="bold" fill="#1976D2">CLIENT LAYER</text>
 
     <!-- CLI/TUI -->
-    <g transform="translate(50, 50)">
-      <rect x="0" y="0" width="180" height="50" rx="5" fill="url(#componentGradient)" stroke="#1976D2" stroke-width="1.5"/>
-      <text x="90" y="22" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">CLI/TUI</text>
-      <text x="90" y="40" text-anchor="middle" font-size="11" fill="#666">victor chat</text>
+    <g transform="translate(50, 45)">
+      <rect x="0" y="0" width="180" height="40" rx="5" fill="url(#componentGradient)" stroke="#1976D2" stroke-width="1.5"/>
+      <text x="90" y="18" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">CLI/TUI</text>
+      <text x="90" y="32" text-anchor="middle" font-size="10" fill="#666">victor chat</text>
     </g>
 
     <!-- HTTP API -->
-    <g transform="translate(300, 50)">
-      <rect x="0" y="0" width="180" height="50" rx="5" fill="url(#componentGradient)" stroke="#1976D2" stroke-width="1.5"/>
-      <text x="90" y="22" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">HTTP API</text>
-      <text x="90" y="40" text-anchor="middle" font-size="11" fill="#666">victor serve</text>
+    <g transform="translate(280, 45)">
+      <rect x="0" y="0" width="180" height="40" rx="5" fill="url(#componentGradient)" stroke="#1976D2" stroke-width="1.5"/>
+      <text x="90" y="18" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">HTTP API</text>
+      <text x="90" y="32" text-anchor="middle" font-size="10" fill="#666">victor serve</text>
     </g>
 
     <!-- MCP Server -->
-    <g transform="translate(550, 50)">
-      <rect x="0" y="0" width="180" height="50" rx="5" fill="url(#componentGradient)" stroke="#1976D2" stroke-width="1.5"/>
-      <text x="90" y="22" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">MCP Server</text>
-      <text x="90" y="40" text-anchor="middle" font-size="11" fill="#666">victor mcp</text>
+    <g transform="translate(510, 45)">
+      <rect x="0" y="0" width="180" height="40" rx="5" fill="url(#componentGradient)" stroke="#1976D2" stroke-width="1.5"/>
+      <text x="90" y="18" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">MCP Server</text>
+      <text x="90" y="32" text-anchor="middle" font-size="10" fill="#666">victor mcp</text>
     </g>
 
     <!-- VS Code -->
-    <g transform="translate(800, 50)">
-      <rect x="0" y="0" width="180" height="50" rx="5" fill="url(#componentGradient)" stroke="#1976D2" stroke-width="1.5"/>
-      <text x="90" y="22" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">VS Code</text>
-      <text x="90" y="40" text-anchor="middle" font-size="11" fill="#666">Extension</text>
+    <g transform="translate(740, 45)">
+      <rect x="0" y="0" width="180" height="40" rx="5" fill="url(#componentGradient)" stroke="#1976D2" stroke-width="1.5"/>
+      <text x="90" y="18" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">VS Code</text>
+      <text x="90" y="32" text-anchor="middle" font-size="10" fill="#666">Extension</text>
     </g>
 
     <!-- API Server -->
-    <g transform="translate(1050, 50)">
-      <rect x="0" y="0" width="180" height="50" rx="5" fill="url(#componentGradient)" stroke="#1976D2" stroke-width="1.5"/>
-      <text x="90" y="22" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">API Server</text>
-      <text x="90" y="40" text-anchor="middle" font-size="11" fill="#666">FastAPI/Uvicorn</text>
+    <g transform="translate(970, 45)">
+      <rect x="0" y="0" width="180" height="40" rx="5" fill="url(#componentGradient)" stroke="#1976D2" stroke-width="1.5"/>
+      <text x="90" y="18" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">API Server</text>
+      <text x="90" y="32" text-anchor="middle" font-size="10" fill="#666">FastAPI</text>
     </g>
   </g>
 
-  <!-- Arrows from Client to Orchestration -->
-  <g transform="translate(50, 200)">
-    <line x1="140" y1="0" x2="140" y2="40" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
-    <line x1="390" y1="0" x2="390" y2="40" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
-    <line x1="640" y1="0" x2="640" y2="40" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
-    <line x1="890" y1="0" x2="890" y2="40" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
-    <line x1="1140" y1="0" x2="1140" y2="40" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
-  </g>
+  <!-- Arrow -->
+  <line x1="700" y1="180" x2="700" y2="210" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
 
   <!-- ORCHESTRATION LAYER -->
-  <g transform="translate(50, 240)">
-    <rect x="0" y="0" width="1300" height="160" rx="10" fill="url(#orchestrationGradient)" stroke="#7B1FA2" stroke-width="2" filter="url(#shadow)"/>
-    <text x="20" y="30" font-size="14" font-weight="bold" fill="#7B1FA2">ORCHESTRATION LAYER (Facade Pattern)</text>
+  <g transform="translate(50, 210)">
+    <rect x="0" y="0" width="1300" height="180" rx="10" fill="url(#orchestrationGradient)" stroke="#7B1FA2" stroke-width="2" filter="url(#shadow)"/>
+    <text x="20" y="30" font-size="14" font-weight="bold" fill="#7B1FA2">ORCHESTRATION LAYER (Coordinator-Based Architecture)</text>
 
-    <!-- Agent Orchestrator -->
-    <g transform="translate(50, 50)">
-      <rect x="0" y="0" width="200" height="80" rx="5" fill="url(#componentGradient)" stroke="#7B1FA2" stroke-width="2"/>
-      <text x="100" y="30" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">Agent Orchestrator</text>
-      <text x="100" y="50" text-anchor="middle" font-size="11" fill="#666">Main Facade</text>
-      <text x="100" y="68" text-anchor="middle" font-size="10" fill="#888">Coordinates all components</text>
+    <!-- OrchestratorFactory -->
+    <g transform="translate(30, 50)">
+      <rect x="0" y="0" width="200" height="100" rx="5" fill="url(#componentGradient)" stroke="#7B1FA2" stroke-width="2"/>
+      <text x="100" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">OrchestratorFactory</text>
+      <text x="100" y="45" text-anchor="middle" font-size="11" fill="#666">Composition Root</text>
+      <text x="100" y="65" text-anchor="middle" font-size="9" fill="#888">12 Builders</text>
+      <text x="100" y="80" text-anchor="middle" font-size="9" fill="#888">create_orchestrator()</text>
+      <text x="100" y="93" text-anchor="middle" font-size="9" fill="#888">create_agent()</text>
     </g>
 
-    <!-- Conversation Controller -->
-    <g transform="translate(300, 50)">
-      <rect x="0" y="0" width="200" height="80" rx="5" fill="url(#componentGradient)" stroke="#7B1FA2" stroke-width="1.5"/>
-      <text x="100" y="30" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Conversation Controller</text>
-      <text x="100" y="50" text-anchor="middle" font-size="11" fill="#666">History &amp; Context</text>
-      <text x="100" y="68" text-anchor="middle" font-size="10" fill="#888">Provider-independent</text>
-    </g>
+    <!-- Coordinators -->
+    <g transform="translate(260, 50)">
+      <rect x="0" y="0" width="980" height="100" rx="5" fill="#ffffff" stroke="#7B1FA2" stroke-width="1.5"/>
+      <text x="490" y="20" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">15 Coordinators (Protocol-Based)</text>
 
-    <!-- Tool Pipeline -->
-    <g transform="translate(550, 50)">
-      <rect x="0" y="0" width="200" height="80" rx="5" fill="url(#componentGradient)" stroke="#7B1FA2" stroke-width="1.5"/>
-      <text x="100" y="30" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Tool Pipeline</text>
-      <text x="100" y="50" text-anchor="middle" font-size="11" fill="#666">Validation &amp; Execution</text>
-      <text x="100" y="68" text-anchor="middle" font-size="10" fill="#888">Tool calling adapters</text>
-    </g>
+      <!-- Column 1 -->
+      <g transform="translate(20, 30)">
+        <text x="0" y="0" font-size="9" fill="#333">• AnalyticsCoordinator</text>
+        <text x="0" y="15" font-size="9" fill="#333">• CheckpointCoordinator</text>
+        <text x="0" y="30" font-size="9" fill="#333">• ConfigCoordinator</text>
+        <text x="0" y="45" font-size="9" fill="#333">• ContextCoordinator</text>
+        <text x="0" y="60" font-size="9" fill="#333">• ConversationCoordinator</text>
+      </g>
 
-    <!-- Streaming Controller -->
-    <g transform="translate(800, 50)">
-      <rect x="0" y="0" width="200" height="80" rx="5" fill="url(#componentGradient)" stroke="#7B1FA2" stroke-width="1.5"/>
-      <text x="100" y="30" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Streaming Controller</text>
-      <text x="100" y="50" text-anchor="middle" font-size="11" fill="#666">Async Coordination</text>
-      <text x="100" y="68" text-anchor="middle" font-size="10" fill="#888">Real-time streaming</text>
-    </g>
+      <!-- Column 2 -->
+      <g transform="translate(200, 30)">
+        <text x="0" y="0" font-size="9" fill="#333">• EvaluationCoordinator</text>
+        <text x="0" y="15" font-size="9" fill="#333">• MetricsCoordinator</text>
+        <text x="0" y="30" font-size="9" fill="#333">• ModeCoordinator</text>
+        <text x="0" y="45" font-size="9" fill="#333">• PromptCoordinator</text>
+        <text x="0" y="60" font-size="9" fill="#333">• ProviderCoordinator</text>
+      </g>
 
-    <!-- Provider Manager -->
-    <g transform="translate(1050, 50)">
-      <rect x="0" y="0" width="200" height="80" rx="5" fill="url(#componentGradient)" stroke="#7B1FA2" stroke-width="1.5"/>
-      <text x="100" y="30" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Provider Manager</text>
-      <text x="100" y="50" text-anchor="middle" font-size="11" fill="#666">Switching &amp; Health</text>
-      <text x="100" y="68" text-anchor="middle" font-size="10" fill="#888">Circuit breaker</text>
+      <!-- Column 3 -->
+      <g transform="translate(380, 30)">
+        <text x="0" y="0" font-size="9" fill="#333">• ResponseCoordinator</text>
+        <text x="0" y="15" font-size="9" fill="#333">• SearchCoordinator</text>
+        <text x="0" y="30" font-size="9" fill="#333">• SessionCoordinator</text>
+        <text x="0" y="45" font-size="9" fill="#333">• StateCoordinator</text>
+        <text x="0" y="60" font-size="9" fill="#333">• TeamCoordinator</text>
+      </g>
+
+      <!-- Column 4 -->
+      <g transform="translate(560, 30)">
+        <text x="0" y="0" font-size="10" font-weight="bold" fill="#7B1FA2">Extracted Components:</text>
+        <text x="0" y="15" font-size="9" fill="#333">• ConversationController</text>
+        <text x="0" y="30" font-size="9" fill="#333">• ToolPipeline</text>
+        <text x="0" y="45" font-size="9" fill="#333">• StreamingController</text>
+        <text x="0" y="60" font-size="9" fill="#333">• ToolSelector/Registrar</text>
+      </g>
+
+      <!-- Column 5 -->
+      <g transform="translate(750, 30)">
+        <text x="0" y="0" font-size="10" font-weight="bold" fill="#7B1FA2">Manager Components:</text>
+        <text x="0" y="15" font-size="9" fill="#333">• ProviderManager</text>
+        <text x="0" y="30" font-size="9" fill="#333">• LifecycleManager</text>
+        <text x="0" y="45" font-size="9" fill="#333">• StreamingCoordinator</text>
+        <text x="0" y="60" font-size="9" fill="#333">• ProviderSwitchCoordinator</text>
+      </g>
     </g>
   </g>
 
-  <!-- Arrows from Orchestration to Core -->
-  <g transform="translate(50, 400)">
-    <line x1="150" y1="0" x2="300" y2="40" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
-    <line x1="400" y1="0" x2="550" y2="40" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
-    <line x1="650" y1="0" x2="800" y2="40" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
-    <line x1="900" y1="0" x2="1050" y2="40" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
-    <line x1="1150" y1="0" x2="1200" y2="40" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
-  </g>
+  <!-- Arrow -->
+  <line x1="700" y1="390" x2="700" y2="420" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
 
   <!-- CORE LAYER -->
-  <g transform="translate(50, 440)">
+  <g transform="translate(50, 420)">
     <rect x="0" y="0" width="1300" height="180" rx="10" fill="url(#coreGradient)" stroke="#388E3C" stroke-width="2" filter="url(#shadow)"/>
     <text x="20" y="30" font-size="14" font-weight="bold" fill="#388E3C">CORE LAYER</text>
 
     <!-- Providers -->
     <g transform="translate(50, 50)">
       <rect x="0" y="0" width="250" height="100" rx="5" fill="url(#componentGradient)" stroke="#388E3C" stroke-width="2"/>
-      <text x="125" y="30" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">Providers</text>
-      <text x="125" y="50" text-anchor="middle" font-size="12" fill="#666">21 LLM Providers</text>
-      <text x="125" y="70" text-anchor="middle" font-size="10" fill="#888">Anthropic, OpenAI, Google,</text>
-      <text x="125" y="85" text-anchor="middle" font-size="10" fill="#888">Ollama, vLLM, DeepSeek...</text>
+      <text x="125" y="25" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">Providers</text>
+      <text x="125" y="45" text-anchor="middle" font-size="12" fill="#666">21 LLM Providers</text>
+      <text x="125" y="65" text-anchor="middle" font-size="10" fill="#888">Anthropic, OpenAI, Google,</text>
+      <text x="125" y="80" text-anchor="middle" font-size="10" fill="#888">Ollama, vLLM, DeepSeek...</text>
+      <text x="125" y="93" text-anchor="middle" font-size="9" fill="#666">BaseProvider inheritance</text>
     </g>
 
     <!-- Tools -->
     <g transform="translate(350, 50)">
       <rect x="0" y="0" width="250" height="100" rx="5" fill="url(#componentGradient)" stroke="#388E3C" stroke-width="2"/>
-      <text x="125" y="30" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">Tools</text>
-      <text x="125" y="50" text-anchor="middle" font-size="12" fill="#666">55+ Specialized Tools</text>
-      <text x="125" y="70" text-anchor="middle" font-size="10" fill="#888">File, Git, Testing, Search,</text>
-      <text x="125" y="85" text-anchor="middle" font-size="10" fill="#888">Web Scraping, Code Editing...</text>
+      <text x="125" y="25" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">Tools</text>
+      <text x="125" y="45" text-anchor="middle" font-size="12" fill="#666">55+ Specialized Tools</text>
+      <text x="125" y="65" text-anchor="middle" font-size="10" fill="#888">File, Git, Testing, Search,</text>
+      <text x="125" y="80" text-anchor="middle" font-size="10" fill="#888">Web Scraping, Code Editing...</text>
+      <text x="125" y="93" text-anchor="middle" font-size="9" fill="#666">BaseTool + CostTier</text>
     </g>
 
     <!-- Workflows -->
     <g transform="translate(650, 50)">
       <rect x="0" y="0" width="250" height="100" rx="5" fill="url(#componentGradient)" stroke="#388E3C" stroke-width="2"/>
-      <text x="125" y="30" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">Workflows</text>
-      <text x="125" y="50" text-anchor="middle" font-size="12" fill="#666">YAML DSL + Executor</text>
-      <text x="125" y="70" text-anchor="middle" font-size="10" fill="#888">StateGraph, UnifiedCompiler,</text>
-      <text x="125" y="85" text-anchor="middle" font-size="10" fill="#888">Scheduler, Checkpointing</text>
+      <text x="125" y="25" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">Workflows</text>
+      <text x="125" y="45" text-anchor="middle" font-size="12" fill="#666">YAML DSL + Compiler</text>
+      <text x="125" y="65" text-anchor="middle" font-size="10" fill="#888">StateGraph, UnifiedCompiler,</text>
+      <text x="125" y="80" text-anchor="middle" font-size="10" fill="#888">Scheduler, Checkpointing</text>
+      <text x="125" y="93" text-anchor="middle" font-size="9" fill="#666">2-level caching</text>
     </g>
 
     <!-- Verticals -->
     <g transform="translate(950, 50)">
       <rect x="0" y="0" width="250" height="100" rx="5" fill="url(#componentGradient)" stroke="#388E3C" stroke-width="2"/>
-      <text x="125" y="30" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">Verticals</text>
-      <text x="125" y="50" text-anchor="middle" font-size="12" fill="#666">5 Domain Verticals</text>
-      <text x="125" y="70" text-anchor="middle" font-size="10" fill="#888">Coding, DevOps, RAG,</text>
-      <text x="125" y="85" text-anchor="middle" font-size="10" fill="#888">Data Analysis, Research</text>
+      <text x="125" y="25" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">Verticals</text>
+      <text x="125" y="45" text-anchor="middle" font-size="12" fill="#666">5 Domain Verticals</text>
+      <text x="125" y="65" text-anchor="middle" font-size="10" fill="#888">Coding, DevOps, RAG,</text>
+      <text x="125" y="80" text-anchor="middle" font-size="10" fill="#888">Data Analysis, Research</text>
+      <text x="125" y="93" text-anchor="middle" font-size="9" fill="#666">VerticalBase inheritance</text>
     </g>
   </g>
 
-  <!-- Arrows from Core to Infrastructure -->
-  <g transform="translate(50, 620)">
-    <line x1="175" y1="0" x2="300" y2="40" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
-    <line x1="475" y1="0" x2="500" y2="40" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
-    <line x1="775" y1="0" x2="700" y2="40" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
-    <line x1="1075" y1="0" x2="900" y2="40" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
-  </g>
+  <!-- Arrow -->
+  <line x1="700" y1="600" x2="700" y2="630" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
 
   <!-- INFRASTRUCTURE LAYER -->
-  <g transform="translate(50, 660)">
-    <rect x="0" y="0" width="1300" height="200" rx="10" fill="url(#infraGradient)" stroke="#F57C00" stroke-width="2" filter="url(#shadow)"/>
+  <g transform="translate(50, 630)">
+    <rect x="0" y="0" width="1300" height="180" rx="10" fill="url(#infraGradient)" stroke="#F57C00" stroke-width="2" filter="url(#shadow)"/>
     <text x="20" y="30" font-size="14" font-weight="bold" fill="#F57C00">INFRASTRUCTURE LAYER</text>
 
-    <!-- DI Container -->
+    <!-- Service Container -->
     <g transform="translate(50, 50)">
-      <rect x="0" y="0" width="200" height="120" rx="5" fill="url(#componentGradient)" stroke="#F57C00" stroke-width="1.5"/>
-      <text x="100" y="30" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">DI Container</text>
-      <text x="100" y="50" text-anchor="middle" font-size="11" fill="#666">ServiceProvider</text>
-      <text x="100" y="70" text-anchor="middle" font-size="10" fill="#888">Service Resolution</text>
-      <text x="100" y="90" text-anchor="middle" font-size="10" fill="#888">Dependency Injection</text>
-      <text x="100" y="108" text-anchor="middle" font-size="10" fill="#888">Bootstrap</text>
+      <rect x="0" y="0" width="200" height="100" rx="5" fill="url(#componentGradient)" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="100" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Service Container</text>
+      <text x="100" y="45" text-anchor="middle" font-size="11" fill="#666">Dependency Injection</text>
+      <text x="100" y="65" text-anchor="middle" font-size="10" fill="#888">55+ Services</text>
+      <text x="100" y="80" text-anchor="middle" font-size="10" fill="#888">Protocol-based</text>
+      <text x="100" y="93" text-anchor="middle" font-size="9" fill="#666">Singleton/Scoped/Transient</text>
     </g>
 
     <!-- Event Bus -->
-    <g transform="translate(300, 50)">
-      <rect x="0" y="0" width="200" height="120" rx="5" fill="url(#componentGradient)" stroke="#F57C00" stroke-width="1.5"/>
-      <text x="100" y="30" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Event Bus</text>
-      <text x="100" y="50" text-anchor="middle" font-size="11" fill="#666">Event-Driven</text>
-      <text x="100" y="70" text-anchor="middle" font-size="10" fill="#888">Event Sourcing</text>
-      <text x="100" y="90" text-anchor="middle" font-size="10" fill="#888">Pub/Sub</text>
-      <text x="100" y="108" text-anchor="middle" font-size="10" fill="#888">Observability</text>
+    <g transform="translate(280, 50)">
+      <rect x="0" y="0" width="200" height="100" rx="5" fill="url(#componentGradient)" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="100" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Event Bus</text>
+      <text x="100" y="45" text-anchor="middle" font-size="11" fill="#666">Event-Driven</text>
+      <text x="100" y="65" text-anchor="middle" font-size="10" fill="#888">Pub/Sub</text>
+      <text x="100" y="80" text-anchor="middle" font-size="10" fill="#888">5 Backends</text>
+      <text x="100" y="93" text-anchor="middle" font-size="9" fill="#666">Kafka, SQS, Redis...</text>
     </g>
 
     <!-- Configuration -->
-    <g transform="translate(550, 50)">
-      <rect x="0" y="0" width="200" height="120" rx="5" fill="url(#componentGradient)" stroke="#F57C00" stroke-width="1.5"/>
-      <text x="100" y="30" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Configuration</text>
-      <text x="100" y="50" text-anchor="middle" font-size="11" fill="#666">Settings &amp; Profiles</text>
-      <text x="100" y="70" text-anchor="middle" font-size="10" fill="#888">YAML Config</text>
-      <text x="100" y="90" text-anchor="middle" font-size="10" fill="#888">Environment Vars</text>
-      <text x="100" y="108" text-anchor="middle" font-size="10" fill="#888">Priority Resolution</text>
+    <g transform="translate(510, 50)">
+      <rect x="0" y="0" width="200" height="100" rx="5" fill="url(#componentGradient)" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="100" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Configuration</text>
+      <text x="100" y="45" text-anchor="middle" font-size="11" fill="#666">YAML-First System</text>
+      <text x="100" y="65" text-anchor="middle" font-size="10" fill="#888">ModeConfigRegistry</text>
+      <text x="100" y="80" text-anchor="middle" font-size="10" fill="#888">CapabilityLoader</text>
+      <text x="100" y="93" text-anchor="middle" font-size="9" fill="#666">BaseYAMLTeamProvider</text>
     </g>
 
     <!-- Storage -->
-    <g transform="translate(800, 50)">
-      <rect x="0" y="0" width="200" height="120" rx="5" fill="url(#componentGradient)" stroke="#F57C00" stroke-width="1.5"/>
-      <text x="100" y="30" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Storage</text>
-      <text x="100" y="50" text-anchor="middle" font-size="11" fill="#666">Persistence</text>
-      <text x="100" y="70" text-anchor="middle" font-size="10" fill="#888">Conversations</text>
-      <text x="100" y="90" text-anchor="middle" font-size="10" fill="#888">Cache (Redis/File)</text>
-      <text x="100" y="108" text-anchor="middle" font-size="10" fill="#888">Checkpoints</text>
+    <g transform="translate(740, 50)">
+      <rect x="0" y="0" width="200" height="100" rx="5" fill="url(#componentGradient)" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="100" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Storage</text>
+      <text x="100" y="45" text-anchor="middle" font-size="11" fill="#666">Persistence</text>
+      <text x="100" y="65" text-anchor="middle" font-size="10" fill="#888">Conversations</text>
+      <text x="100" y="80" text-anchor="middle" font-size="10" fill="#888">Cache (Redis/File)</text>
+      <text x="100" y="93" text-anchor="middle" font-size="10" fill="#888">Checkpoints</text>
     </g>
 
-    <!-- Bootstrap -->
-    <g transform="translate(1050, 50)">
-      <rect x="0" y="0" width="200" height="120" rx="5" fill="url(#componentGradient)" stroke="#F57C00" stroke-width="1.5"/>
-      <text x="100" y="30" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Bootstrap</text>
-      <text x="100" y="50" text-anchor="middle" font-size="11" fill="#666">Initialization</text>
-      <text x="100" y="70" text-anchor="middle" font-size="10" fill="#888">Component Wiring</text>
-      <text x="100" y="90" text-anchor="middle" font-size="10" fill="#888">Vertical Discovery</text>
-      <text x="100" y="108" text-anchor="middle" font-size="10" fill="#888">Provider Registration</text>
+    <!-- Registries -->
+    <g transform="translate(970, 50)">
+      <rect x="0" y="0" width="200" height="100" rx="5" fill="url(#componentGradient)" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="100" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Universal Registry</text>
+      <text x="100" y="45" text-anchor="middle" font-size="11" fill="#666">Type-Safe Registry</text>
+      <text x="100" y="65" text-anchor="middle" font-size="10" fill="#888">7 Registry Types</text>
+      <text x="100" y="80" text-anchor="middle" font-size="10" fill="#888">Cache Strategies</text>
+      <text x="100" y="93" text-anchor="middle" font-size="9" fill="#666">TTL/LRU/Manual/None</text>
+    </g>
+  </g>
+
+  <!-- ARCHITECTURE PRINCIPLES -->
+  <g transform="translate(50, 840)">
+    <rect x="0" y="0" width="1300" height="130" rx="10" fill="#E8F5E9" stroke="#388E3C" stroke-width="1" filter="url(#shadow)"/>
+    <text x="650" y="25" text-anchor="middle" font-size="16" font-weight="bold" fill="#333">Architecture Principles</text>
+
+    <g transform="translate(30, 40)">
+      <text x="0" y="0" font-size="12" font-weight="bold" fill="#1976D2">SOLID Compliance:</text>
+      <text x="0" y="18" font-size="11" fill="#555">• SRP: 15 coordinators with single responsibilities</text>
+      <text x="0" y="34" font-size="11" fill="#555">• ISP: 98 protocols for loose coupling</text>
+      <text x="0" y="50" font-size="11" fill="#555">• DIP: Protocol-first design throughout</text>
+
+      <text x="400" y="0" font-size="12" font-weight="bold" fill="#7B1FA2">Design Patterns:</text>
+      <text x="400" y="18" font-size="11" fill="#555">• Factory: OrchestratorFactory with 12 builders</text>
+      <text x="400" y="34" font-size="11" fill="#555">• Facade: AgentOrchestrator as coordinator facade</text>
+      <text x="400" y="50" font-size="11" fill="#555">• DI: ServiceContainer manages 55+ services</text>
+
+      <text x="800" y="0" font-size="12" font-weight="bold" fill="#F57C00">Key Features:</text>
+      <text x="800" y="18" font-size="11" fill="#555">• Protocol-based: All major interfaces use protocols</text>
+      <text x="800" y="34" font-size="11" fill="#555">• Event-driven: Pluggable event backends</text>
+      <text x="800" y="50" font-size="11" fill="#555">• Vertical architecture: 5 domain verticals</text>
     </g>
   </g>
 

@@ -431,7 +431,7 @@ workflows:
       - id: generate_review
         type: agent
         name: "Generate Literature Review"
-        role: writer
+        role: reviewer
         goal: |
           Generate a comprehensive literature review:
 

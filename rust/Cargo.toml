@@ -14,7 +14,7 @@
 
 [package]
 name = "victor_native"
-version = "0.1.0"
+version = "0.5.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "High-performance native extensions for Victor AI coding assistant"
@@ -32,6 +32,7 @@ pyo3 = { version = "0.22", features = ["extension-module"] }
 # Fast hashing
 ahash = "0.8"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
+seahash = "4.1"
 
 # SIMD operations (portable across architectures)
 wide = "0.7"
@@ -63,6 +64,30 @@ parking_lot = "0.12"
 
 # Regex for pattern compilation (optional fallback)
 regex = "1.10"
+
+# Tool selector dependencies (for future optimization)
+# ndarray = { version = "0.15", features = ["rayon"] }  # For array operations (future use)
+
+# AST parsing (tree-sitter for high-performance code analysis)
+tree-sitter = "0.22"
+tree-sitter-python = "0.21"
+tree-sitter-javascript = "0.21"
+tree-sitter-typescript = "0.21"
+tree-sitter-java = "0.21"
+tree-sitter-go = "0.21"
+tree-sitter-rust = "0.21"
+tree-sitter-cpp = "0.21"
+
+# File operations (v0.5.1 - high-performance parallel file system operations)
+walkdir = "2.5"
+ignore = "0.4"
+glob = "0.3"
+
+# Async runtime for batch processing (v0.5.1)
+tokio = { version = "1.40", features = ["sync", "rt", "time"] }
+
+# JSONPath querying for serialization module (v0.5.1)
+jsonpath_lib = "0.3"
 
 [profile.release]
 opt-level = 3

@@ -448,7 +448,10 @@ class EscapeHatchRegistry:
         Raises:
             ImportError: If the escape_hatches module cannot be imported
         """
-        module_path = f"victor.{vertical_name}.escape_hatches"
+        from victor.core.verticals.naming import get_vertical_module_name
+
+        module_name = get_vertical_module_name(vertical_name)
+        module_path = f"victor.{module_name}.escape_hatches"
 
         try:
             module = importlib.import_module(module_path)

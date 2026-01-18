@@ -27,7 +27,7 @@ Example:
     strategy = DataAnalysisEnrichmentStrategy()
 
     # Register with enrichment service
-    enrichment_service.register_strategy("data_analysis", strategy)
+    enrichment_service.register_strategy("dataanalysis", strategy)
 """
 
 from __future__ import annotations

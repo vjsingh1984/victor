@@ -247,7 +247,7 @@ class WorkflowExecutionHistory:
         Returns:
             List of execution records
         """
-        records = []
+        records: List[ExecutionRecord] = []
 
         for exec_id in reversed(self._record_order):
             if len(records) >= limit:

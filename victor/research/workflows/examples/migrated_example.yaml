@@ -696,7 +696,7 @@ workflows:
       - id: generate_report
         type: agent
         name: "Generate Research Report"
-        role: writer
+        role: reviewer
         goal: |
           Generate a comprehensive research report:
           1. Executive Summary

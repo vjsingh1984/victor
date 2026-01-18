@@ -49,6 +49,13 @@ class OpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
     # O-series reasoning models have different parameter requirements
     O_SERIES_MODELS = {"o1", "o1-pro", "o3", "o3-mini"}
 
+    @staticmethod
+    def _format_provider_name(provider_name: str) -> str:
+        """Override display name to preserve OpenAI capitalization."""
+        if provider_name.lower() == "openai":
+            return "OpenAI"
+        return HTTPErrorHandlerMixin._format_provider_name(provider_name)
+
     def __init__(
         self,
         api_key: Optional[str] = None,

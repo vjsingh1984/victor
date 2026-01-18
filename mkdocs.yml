@@ -52,7 +52,6 @@ theme:
 plugins:
   - search
   - git-revision-date-localized
-  # - minify  # Enable later if needed
 
 # Markdown Extensions
 markdown_extensions:
@@ -102,13 +101,6 @@ markdown_extensions:
 # Extra CSS and JS
 extra_css:
   # - assets/overrides.css  # Add custom overrides later
-  # - assets/colors.css  # Add custom colors later
-
-# Extra JavaScript (uncomment and add as needed)
-# extra_javascript:
-#   - assets/mathjax.js  # Add MathJax config later if needed
-#   - https://polyfill.io/v3/polyfill.min.js?features=es6
-#   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
 # Extra
 extra:
@@ -122,18 +114,6 @@ extra:
   version:
     provider: mike
     default: latest
-  # analytics:
-  #   feedback:
-  #     title: Was this page helpful?
-  #     ratings:
-  #       - icon: material/emoticon-happy-outline
-  #         name: This page was helpful
-  #         data: 1
-  #         note: Thanks for the feedback!
-  #       - icon: material/emoticon-sad-outline
-  #         name: This page could be improved
-  #         data: 0
-  #         note: Thanks for your feedback
 
 # Navigation Structure
 nav:
@@ -148,33 +128,36 @@ nav:
       - Configuration: getting-started/configuration.md
       - First Run: getting-started/first-run.md
       - Basic Usage: getting-started/basic-usage.md
+      - Advanced Quickstarts:
+          - Coordinator Mode: getting-started/coordinator_mode_quickstart.md
+          - Multi-Provider: getting-started/multi_provider_quickstart.md
+          - Plugin Development: getting-started/plugin_development_quickstart.md
 
   - User Guide:
       - user-guide/index.md
-      - CLI Mode: user-guide/cli-reference.md
+      - CLI Reference: user-guide/cli-reference.md
       - TUI Mode: user-guide/tui-mode.md
       - Providers: user-guide/providers.md
       - Tools: user-guide/tools.md
       - Workflows: user-guide/workflows.md
       - Session Management: user-guide/session-management.md
       - Troubleshooting: user-guide/troubleshooting.md
+      - FAQ: user-guide/faq.md
 
   - API Reference:
-      - Protocols: api-reference/protocols.md
-      - Providers: api-reference/providers.md
-      - Tools: api-reference/tools.md
-      - Workflows: api-reference/workflows.md
+      - api-reference/protocols.md
+      - api-reference/providers.md
+      - api-reference/tools.md
+      - api-reference/workflows.md
 
   - Tutorials:
       - Build Custom Tool: tutorials/build-custom-tool.md
       - Create Workflow: tutorials/create-workflow.md
       - Integrate Provider: tutorials/integrate-provider.md
-
-  - Reference:
-      - reference/index.md
-      - CLI Commands: reference/cli-commands.md
-      - Configuration Options: reference/configuration-options.md
-      - Environment Variables: reference/environment-variables.md
+      - Create Vertical: tutorials/vertical_creation_guide.md
+      - Coordinator Quickstart: tutorials/coordinator_quickstart.md
+      - Coordinator Recipes: tutorials/coordinator_recipes.md
+      - Batch Processor Quickstart: tutorials/batch-processor-quickstart.md
 
   - Verticals:
       - Coding: verticals/coding.md
@@ -183,8 +166,79 @@ nav:
       - Data Analysis: verticals/data-analysis.md
       - Research: verticals/research.md
 
-  - Development:
-      - development/index.md
-      - Setup: development/setup.md
-      - Code Style: development/code-style.md
-      - Testing: development/testing.md
+  - Reference:
+      - reference/index.md
+      - CLI Commands: reference/cli-commands.md
+      - Configuration Options: reference/configuration-options.md
+      - Environment Variables: reference/environment-variables.md
+      - Errors: reference/errors.md
+      - Embeddings: reference/embeddings.md
+      - Providers Comparison: reference/providers-comparison.md
+      - Quick Reference: reference/quick-reference.md
+      - Internal Documentation:
+          - Migration Guide: reference/internals/MIGRATION_GUIDE.md
+          - Framework API: reference/internals/FRAMEWORK_API.md
+          - Vertical Development Guide: reference/internals/VERTICAL_DEVELOPMENT_GUIDE.md
+          - External Vertical Guide: reference/internals/EXTERNAL_VERTICAL_DEVELOPER_GUIDE.md
+          - SOLID Compliance Audit: reference/internals/SOLID_COMPLIANCE_AUDIT.md
+          - Test Coverage Audit: reference/internals/TEST_COVERAGE_AUDIT.md
+          - Rust Migration Plan: reference/internals/RUST_MIGRATION_PLAN.md
+          - Release Notes: reference/internals/RELEASE_NOTES.md
+          - Architecture Improvements: reference/internals/CRITICAL_PHASE_COMPLETE.md
+          - Documentation Index: reference/internals/DOCUMENTATION_INDEX.md
+          - Native Accelerators: reference/internals/native_accelerators.md
+          - Orchestrator Refactoring: reference/internals/orchestrator_refactoring_analysis.md
+
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Refactoring Overview: architecture/REFACTORING_OVERVIEW.md
+      - Best Practices: architecture/BEST_PRACTICES.md
+      - Protocols Reference: architecture/PROTOCOLS_REFERENCE.md
+      - Migration Guides: architecture/MIGRATION_GUIDES.md
+      - Workflow Consolidation: architecture/WORKFLOW_CONSOLIDATION.md
+      - Framework Analysis: architecture/VICTOR_FRAMEWORK_ANALYSIS.md
+      - Architecture Decision Records:
+          - ADR-001 Coordinator Architecture: adr/ADR-001-coordinator-architecture.md
+          - ADR-002 YAML Vertical Config: adr/ADR-002-yaml-vertical-config.md
+          - ADR-003 Distributed Caching: adr/ADR-003-distributed-caching.md
+          - ADR-004 Protocol-Based Design: adr/ADR-004-protocol-based-design.md
+          - ADR-005 Performance Optimization: adr/ADR-005-performance-optimization.md
+
+  - Contributing:
+      - contributing/index.md
+      - Setup: contributing/setup.md
+      - Code Style: contributing/code-style.md
+      - Testing: contributing/testing.md
+      - FEP Process: contributing/FEP_PROCESS.md
+      - Pre-Commit Hooks: contributing/PRE_COMMIT_HOOKS.md
+      - Documentation Guide: contributing/documentation-guide.md
+      - Release Notes Template: contributing/RELEASE_NOTES_TEMPLATE.md
+      - Additional Documentation:
+          - Agent and Workflow Presets: contributing/AGENT_AND_WORKFLOW_PRESETS.md
+          - Architecture vs Workflow: contributing/ARCHITECTURE_ORCHESTRATOR_VS_WORKFLOW.md
+          - Cache Backends: contributing/cache_backends_implementation.md
+          - Checkpoints: contributing/CHECKPOINTS.md
+          - Entity Memory: contributing/ENTITY_MEMORY.md
+          - Tool Selection: contributing/TOOL_SELECTION.md
+          - Workflow Hooks: contributing/WORKFLOW_HOOKS_README.md
+
+  - Development Archive:
+      - contributing/development-old/index.md
+      - Architecture:
+          - contributing/development-old/architecture/overview.md
+          - contributing/development-old/architecture/components.md
+          - contributing/development-old/architecture/component-details.md
+          - contributing/development-old/architecture/data-flow.md
+          - contributing/development-old/architecture/deep-dive.md
+          - contributing/development-old/architecture/state-machine.md
+          - contributing/development-old/architecture/framework-vertical-integration.md
+          - contributing/development-old/architecture/appendix.md
+      - Extending:
+          - contributing/development-old/extending/plugins.md
+          - contributing/development-old/extending/verticals.md
+      - Performance:
+          - contributing/development-old/performance/registry-benchmarks.md
+      - Releasing:
+          - contributing/development-old/releasing/publishing.md
+      - Testing:
+          - contributing/development-old/testing/strategy.md

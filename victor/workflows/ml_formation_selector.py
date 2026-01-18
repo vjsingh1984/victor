@@ -463,6 +463,18 @@ class FeatureExtractor:
 
         return min(score, 1.0)
 
+    def extract_dependencies(self, content: str, context: Any) -> float:
+        """Public method to extract dependency score.
+
+        Args:
+            content: Task content
+            context: Execution context
+
+        Returns:
+            Dependency score (0-1)
+        """
+        return self._extract_dependencies(content, context)
+
     def _extract_dependencies(self, content: str, context: Any) -> float:
         """Extract dependency complexity score.
 
@@ -528,14 +540,17 @@ class FeatureExtractor:
         # Tool budget constraints
         if hasattr(context, "get"):
             tool_budget = context.get("tool_budget")
-            if tool_budget and tool_budget < 20:
-                score += 0.4
-            elif tool_budget and tool_budget < 50:
-                score += 0.2
+            # Ensure tool_budget is a number before comparison
+            if tool_budget and isinstance(tool_budget, (int, float)):
+                if tool_budget < 20:
+                    score += 0.4
+                elif tool_budget < 50:
+                    score += 0.2
 
             # Time constraints
             time_limit = context.get("time_limit")
-            if time_limit and time_limit < 300:  # 5 minutes
+            # Ensure time_limit is a number before comparison
+            if time_limit and isinstance(time_limit, (int, float)) and time_limit < 300:  # 5 minutes
                 score += 0.3
 
         return min(score, 1.0)
@@ -550,7 +565,10 @@ class FeatureExtractor:
             Node count
         """
         if hasattr(context, "metadata"):
-            return context.metadata.get("node_count", 0)
+            count = context.metadata.get("node_count", 0)
+            # Ensure we return an integer, not a MagicMock or other type
+            if isinstance(count, int):
+                return count
         return 0
 
     def _extract_deadline_proximity(self, content: str, context: Any) -> float:

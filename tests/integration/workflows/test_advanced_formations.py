@@ -52,14 +52,22 @@ from victor.workflows.advanced_formations_schema import (
 @pytest.fixture
 def mock_agents():
     """Create mock agents for testing."""
-
-    async def mock_execute(task: str, context: Dict[str, Any] = None) -> str:
-        return f"Executed: {task}"
+    from victor.teams.types import MemberResult
 
     agents = []
     for i in range(3):
         agent = MagicMock()
         agent.id = f"agent_{i}"
+
+        # Create closure to capture agent.id
+        async def mock_execute(task: AgentMessage, context: TeamContext, agent_id=agent.id) -> MemberResult:
+            return MemberResult(
+                member_id=agent_id,
+                success=True,
+                output=f"Executed: {task.content}",
+                metadata={"task": task.content}
+            )
+
         agent.execute = AsyncMock(side_effect=mock_execute)
         agents.append(agent)
 
@@ -347,19 +355,29 @@ class TestAdaptiveFormation:
     async def test_adaptive_formation_fallback_on_error(
         self, mock_agents, team_context, sample_task
     ):
-        """Test fallback formation when selection fails."""
-        # Create a formation that will fail
+        """Test fallback formation when formation creation fails."""
+        # Create a formation that will fail during creation
+        # by setting a very low threshold so invalid_formation is selected
         formation = AdaptiveFormation(
-            default_formation="invalid_formation",  # This will fail
+            criteria=["complexity", "deadline", "resource_availability"],
+            default_formation="invalid_formation",  # This will fail when creating
             fallback_formation="sequential",
         )
 
+        # Mock _score_formations to return low scores, triggering default_formation usage
+        def mock_score(characteristics):
+            # Return very low scores to trigger fallback to default_formation
+            return {"sequential": 0.1, "parallel": 0.1, "hierarchical": 0.1, "pipeline": 0.1, "consensus": 0.1}
+
+        formation._score_formations = mock_score
+
         results = await formation.execute(mock_agents, team_context, sample_task)
 
-        # Should fall back to sequential
+        # Should fall back to sequential when invalid_formation fails
         assert len(results) > 0
         metadata = results[0].metadata
         assert metadata.get("fallback_used") is True
+        assert metadata.get("selected_formation") == "sequential"
 
 
 # =============================================================================

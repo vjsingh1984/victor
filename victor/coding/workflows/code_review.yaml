@@ -434,7 +434,7 @@ workflows:
       - id: approve_with_comments
         type: agent
         name: "Generate Approval Summary"
-        role: writer
+        role: reviewer
         goal: |
           Generate a review approval with:
           - Summary of what was reviewed

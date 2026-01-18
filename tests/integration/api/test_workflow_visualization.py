@@ -65,6 +65,8 @@ async def fastapi_server():
         await server._workflow_event_bridge.start()
 
     yield server
+
+    # Gracefully shutdown the server
     await server.shutdown()
 
 

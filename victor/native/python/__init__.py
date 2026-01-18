@@ -27,6 +27,7 @@ from victor.native.python.arg_normalizer import PythonArgumentNormalizer
 from victor.native.python.similarity import PythonSimilarityComputer
 from victor.native.python.chunker import PythonTextChunker
 from victor.native.python.ast_indexer import PythonAstIndexer
+from victor.native.python import serialization
 
 __all__ = [
     "PythonSymbolExtractor",
@@ -34,4 +35,5 @@ __all__ = [
     "PythonSimilarityComputer",
     "PythonTextChunker",
     "PythonAstIndexer",
+    "serialization",
 ]

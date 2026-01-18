@@ -79,7 +79,7 @@ def _register_data_analysis_modes() -> None:
     """Register data analysis modes with the central registry."""
     registry = ModeConfigRegistry.get_instance()
     registry.register_vertical(
-        name="data_analysis",
+        name="dataanalysis",
         modes=_DATA_ANALYSIS_MODES,
         task_budgets=_DATA_ANALYSIS_TASK_BUDGETS,
         default_mode="standard",
@@ -110,7 +110,7 @@ class DataAnalysisModeConfigProvider(RegistryBasedModeConfigProvider):
         # Ensure registration (idempotent - handles singleton reset)
         _register_data_analysis_modes()
         super().__init__(
-            vertical="data_analysis",
+            vertical="dataanalysis",
             default_mode="standard",
             default_budget=25,
         )

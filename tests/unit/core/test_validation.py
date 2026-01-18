@@ -306,30 +306,30 @@ class TestModelConfigSchema:
     def test_valid_config(self):
         """Test valid model configuration."""
         config = ModelConfigSchema(
-            model="claude-3-sonnet-20240229",
+            model_name="claude-3-sonnet-20240229",
             temperature=0.7,
             max_tokens=4096,
         )
 
-        assert config.model == "claude-3-sonnet-20240229"
+        assert config.model_name == "claude-3-sonnet-20240229"
         assert config.temperature == 0.7
 
     def test_temperature_bounds(self):
         """Test temperature bounds validation."""
         with pytest.raises(Exception):
-            ModelConfigSchema(model="test", temperature=3.0)
+            ModelConfigSchema(model_name="test", temperature=3.0)
 
         with pytest.raises(Exception):
-            ModelConfigSchema(model="test", temperature=-1.0)
+            ModelConfigSchema(model_name="test", temperature=-1.0)
 
     def test_model_name_validation(self):
         """Test model name validation."""
         # Valid names
-        config = ModelConfigSchema(model="gpt-4")
-        assert config.model == "gpt-4"
+        config = ModelConfigSchema(model_name="gpt-4")
+        assert config.model_name == "gpt-4"
 
-        config = ModelConfigSchema(model="claude-3-opus/latest")
-        assert config.model == "claude-3-opus/latest"
+        config = ModelConfigSchema(model_name="claude-3-opus/latest")
+        assert config.model_name == "claude-3-opus/latest"
 
 
 class TestToolConfigSchema:
@@ -562,19 +562,19 @@ class TestAgentConfigSchema:
         """Test valid complete configuration."""
         config = AgentConfigSchema(
             provider=ProviderConfigSchema(name="anthropic"),
-            model=ModelConfigSchema(model="claude-3-sonnet"),
+            model=ModelConfigSchema(model_name="claude-3-sonnet"),
             tools=ToolConfigSchema(enabled=True),
             cache=CacheConfigSchema(enabled=True),
         )
 
         assert config.provider.name == "anthropic"
-        assert config.model.model == "claude-3-sonnet"
+        assert config.model.model_name == "claude-3-sonnet"
 
     def test_minimal_config(self):
         """Test minimal valid configuration."""
         config = AgentConfigSchema(
             provider=ProviderConfigSchema(name="test"),
-            model=ModelConfigSchema(model="test-model"),
+            model=ModelConfigSchema(model_name="test-model"),
         )
 
         assert config.tools is None

@@ -520,7 +520,7 @@ class CommandRegistry:
 
         for i, param in enumerate(command.parameters):
             if i < len(parts):
-                value = parts[i]
+                value: Any = parts[i]
                 # Type conversion
                 if param.type == ParameterType.NUMBER:
                     try:

@@ -155,6 +155,8 @@ def record_workflow(
     try:
         yield recorder
     finally:
+        # Finalize metadata before disabling
+        recorder.finalize()
         disable_workflow_recording()
 
 

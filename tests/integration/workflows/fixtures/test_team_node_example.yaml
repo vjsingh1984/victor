@@ -1,0 +1,275 @@
+# Test fixture YAML for comprehensive recursion depth tracking tests
+#
+# This file contains workflows that test various recursion scenarios:
+# 1. Workflow → Workflow recursion
+# 2. Workflow → Team recursion
+# 3. Team → Team recursion
+# 4. Team → Workflow recursion
+# 5. Depth limit enforcement
+# 6. All formation types
+#
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+
+workflows:
+  # Simple workflow without recursion
+  simple_workflow:
+    description: "Simple workflow for baseline testing"
+    metadata:
+      max_recursion_depth: 3
+    nodes:
+      - id: start
+        type: agent
+        role: researcher
+        goal: "Start task"
+        tool_budget: 5
+        next: []
+
+  # Workflow that spawns a team (tests workflow→team)
+  workflow_spawns_team:
+    description: "Workflow that spawns a team"
+    metadata:
+      max_recursion_depth: 3
+    nodes:
+      - id: start
+        type: agent
+        role: planner
+        goal: "Start workflow"
+        tool_budget: 5
+        next: [team_node]
+
+      - id: team_node
+        type: team
+        name: "Test Team"
+        goal: "Execute team task"
+        team_formation: sequential
+        total_tool_budget: 20
+        members:
+          - id: member1
+            role: executor
+            goal: "Execute task"
+            tool_budget: 10
+        next: [finalize]
+
+      - id: finalize
+        type: agent
+        role: writer
+        goal: "Finalize"
+        tool_budget: 5
+        next: []
+
+  # Team that spawns another team (tests team→team)
+  team_spawns_team:
+    description: "Team with nested team"
+    metadata:
+      max_recursion_depth: 4
+    nodes:
+      - id: start
+        type: team
+        name: "Outer Team"
+        goal: "Outer team task"
+        team_formation: sequential
+        total_tool_budget: 30
+        members:
+          - id: coordinator
+            role: planner
+            goal: "Coordinate nested teams"
+            tool_budget: 10
+        next: [finalize]
+
+      - id: finalize
+        type: agent
+        role: writer
+        goal: "Finalize"
+        tool_budget: 5
+        next: []
+
+  # Deep nesting that should exceed limit
+  deep_nesting_workflow:
+    description: "Workflow with deep nesting to test limit enforcement"
+    metadata:
+      max_recursion_depth: 2
+    nodes:
+      - id: level1
+        type: team
+        name: "Deep Team"
+        goal: "Level 1: team execution"
+        team_formation: sequential
+        total_tool_budget: 10
+        members:
+          - id: member1
+            role: executor
+            goal: "Execute at level 1"
+            tool_budget: 5
+        next: []
+
+  # Test all formation types
+  sequential_formation:
+    description: "Test sequential formation"
+    metadata:
+      max_recursion_depth: 3
+    nodes:
+      - id: team
+        type: team
+        name: "Sequential Team"
+        goal: "Test sequential formation"
+        team_formation: sequential
+        total_tool_budget: 20
+        members:
+          - id: m1
+            role: executor
+            goal: "Step 1"
+            tool_budget: 5
+          - id: m2
+            role: executor
+            goal: "Step 2"
+            tool_budget: 5
+        next: []
+
+  parallel_formation:
+    description: "Test parallel formation"
+    metadata:
+      max_recursion_depth: 3
+    nodes:
+      - id: team
+        type: team
+        name: "Parallel Team"
+        goal: "Test parallel formation"
+        team_formation: parallel
+        merge_strategy: dict
+        merge_mode: team_wins
+        total_tool_budget: 20
+        members:
+          - id: m1
+            role: researcher
+            goal: "Research task 1"
+            tool_budget: 5
+          - id: m2
+            role: researcher
+            goal: "Research task 2"
+            tool_budget: 5
+        next: []
+
+  pipeline_formation:
+    description: "Test pipeline formation"
+    metadata:
+      max_recursion_depth: 3
+    nodes:
+      - id: team
+        type: team
+        name: "Pipeline Team"
+        goal: "Test pipeline formation"
+        team_formation: pipeline
+        total_tool_budget: 30
+        members:
+          - id: planner
+            role: planner
+            goal: "Plan task"
+            tool_budget: 10
+          - id: executor
+            role: executor
+            goal: "Execute task"
+            tool_budget: 10
+          - id: reviewer
+            role: reviewer
+            goal: "Review task"
+            tool_budget: 10
+        next: []
+
+  hierarchical_formation:
+    description: "Test hierarchical formation"
+    metadata:
+      max_recursion_depth: 3
+    nodes:
+      - id: team
+        type: team
+        name: "Hierarchical Team"
+        goal: "Test hierarchical formation"
+        team_formation: hierarchical
+        total_tool_budget: 30
+        members:
+          - id: manager
+            role: planner
+            goal: "Manage team"
+            tool_budget: 15
+          - id: worker1
+            role: executor
+            goal: "Execute task 1"
+            tool_budget: 5
+          - id: worker2
+            role: executor
+            goal: "Execute task 2"
+            tool_budget: 5
+        next: []
+
+  consensus_formation:
+    description: "Test consensus formation"
+    metadata:
+      max_recursion_depth: 3
+    nodes:
+      - id: team
+        type: team
+        name: "Consensus Team"
+        goal: "Test consensus formation"
+        team_formation: consensus
+        merge_strategy: dict
+        merge_mode: consensus
+        total_tool_budget: 25
+        members:
+          - id: reviewer1
+            role: reviewer
+            goal: "Review and vote"
+            tool_budget: 10
+          - id: reviewer2
+            role: reviewer
+            goal: "Review and vote"
+            tool_budget: 10
+          - id: reviewer3
+            role: reviewer
+            goal: "Review and vote"
+            tool_budget: 10
+        next: []
+
+  # Complex multi-level recursion
+  complex_recursion:
+    description: "Complex workflow with multiple recursion levels"
+    metadata:
+      max_recursion_depth: 5
+    nodes:
+      - id: level1_team
+        type: team
+        name: "Level 1 Team"
+        goal: "Level 1: team execution"
+        team_formation: sequential
+        total_tool_budget: 20
+        members:
+          - id: coordinator
+            role: planner
+            goal: "Coordinate at level 1"
+            tool_budget: 10
+        next: [level2_team]
+
+      - id: level2_team
+        type: team
+        name: "Level 2 Team"
+        goal: "Level 2: team execution"
+        team_formation: sequential
+        total_tool_budget: 20
+        members:
+          - id: member
+            role: executor
+            goal: "Execute at level 2"
+            tool_budget: 10
+        next: []
+
+  # Custom recursion depth
+  custom_depth_workflow:
+    description: "Workflow with custom recursion depth"
+    metadata:
+      max_recursion_depth: 10
+    nodes:
+      - id: start
+        type: agent
+        role: researcher
+        goal: "Start with custom depth"
+        tool_budget: 5
+        next: []

@@ -322,7 +322,7 @@ workflows:
       - id: generate_report
         type: agent
         name: "Generate Fact-Check Report"
-        role: writer
+        role: reviewer
         goal: |
           Generate a comprehensive fact-check report:
 

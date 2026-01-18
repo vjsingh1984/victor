@@ -252,6 +252,32 @@ class LLMCompactionStrategy(CompactionStrategy):
         # Summary cache: hash -> summary
         self._summary_cache: Dict[str, str] = {}
 
+    def compact(
+        self,
+        messages: List[Dict[str, Any]],
+        target_tokens: int,
+        current_query: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Synchronous compact - not supported for LLM-based compaction.
+
+        LLM-based compaction requires async operations. Use compact_async() instead.
+
+        Args:
+            messages: List of messages to compact
+            target_tokens: Target token count
+            current_query: Optional current query for relevance
+
+        Returns:
+            Compacted list of messages
+
+        Raises:
+            NotImplementedError: Always, since LLM compaction is async-only
+        """
+        raise NotImplementedError(
+            "LLMCompactionStrategy requires async operations. "
+            "Use compact_async() instead of compact()."
+        )
+
     async def compact_async(
         self,
         messages: List[Dict[str, Any]],

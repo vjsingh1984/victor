@@ -366,6 +366,32 @@ def test_session_id():
 
 
 @pytest.fixture
+def sample_messages():
+    """Create sample messages for testing."""
+    return [
+        {"role": "user", "content": "Hello, can you help me?"},
+        {"role": "assistant", "content": "Of course! How can I assist you today?"},
+        {"role": "user", "content": "I need help with debugging my code."},
+    ]
+
+
+@pytest.fixture
+def mock_tools():
+    """Create multiple mock tools for testing."""
+    from victor.tools.base import CostTier
+
+    read_tool = MagicMock()
+    read_tool.name = "read_file"
+    read_tool.execute = AsyncMock(return_value={"content": "file content"})
+
+    search_tool = MagicMock()
+    search_tool.name = "search"
+    search_tool.execute = AsyncMock(return_value={"results": []})
+
+    return {"read_file": read_tool, "search": search_tool}
+
+
+@pytest.fixture
 def mock_tool():
     """Create a mock tool for testing.
 

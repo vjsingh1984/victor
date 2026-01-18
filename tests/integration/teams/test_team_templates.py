@@ -67,9 +67,10 @@ def sample_template():
 
 
 @pytest.fixture
-def registry():
+def registry(tmp_path):
     """Create a test registry."""
-    return TeamTemplateRegistry()
+    # Use a temporary directory to avoid loading YAML templates
+    return TeamTemplateRegistry(template_dir=tmp_path / "templates")
 
 
 class TestTeamMemberSpec:

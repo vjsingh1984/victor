@@ -509,7 +509,7 @@ workflows:
       - id: generate_docs
         type: agent
         name: "Generate Model Documentation"
-        role: writer
+        role: reviewer
         goal: |
           Generate model documentation including:
           - Model card (performance, limitations)

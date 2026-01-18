@@ -855,7 +855,7 @@ workflows:
       - id: log_incident
         type: agent
         name: "Log Incident"
-        role: writer
+        role: reviewer
         goal: |
           Create an incident log for the deployment issue:
           - What failed

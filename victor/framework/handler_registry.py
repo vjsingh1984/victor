@@ -323,7 +323,10 @@ class HandlerRegistry:
             count = registry.discover_from_vertical("coding")
             print(f"Registered {count} handlers")
         """
-        module_path = f"victor.{vertical_name}.handlers"
+        from victor.core.verticals.naming import get_vertical_module_name
+
+        module_name = get_vertical_module_name(vertical_name)
+        module_path = f"victor.{module_name}.handlers"
 
         try:
             module = importlib.import_module(module_path)

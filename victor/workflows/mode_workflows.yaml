@@ -61,7 +61,7 @@ workflows:
 
       - id: document_findings
         type: agent
-        role: writer
+        role: reviewer
         goal: "Document findings in sandbox notes without modifying codebase"
         tool_budget: 5
         allowed_tools:
@@ -143,7 +143,7 @@ workflows:
 
       - id: create_plan_doc
         type: agent
-        role: writer
+        role: reviewer
         goal: "Create a detailed plan document in sandbox"
         tool_budget: 5
         allowed_tools:

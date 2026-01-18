@@ -421,7 +421,7 @@ workflows:
       - id: generate_report
         type: agent
         name: "Generate Competitive Analysis Report"
-        role: writer
+        role: reviewer
         goal: |
           Generate a comprehensive competitive analysis report:
 
@@ -519,7 +519,7 @@ workflows:
       - id: quick_summary
         type: agent
         name: "Generate Quick Summary"
-        role: writer
+        role: reviewer
         goal: |
           Create a 1-page competitive summary:
           - Top 5 competitors with 1-sentence descriptions

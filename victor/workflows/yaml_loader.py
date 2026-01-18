@@ -1072,6 +1072,11 @@ def _parse_team_node(node_data: Dict[str, Any]) -> TeamNodeWorkflow:
     goal = node_data.get("goal", "")
     team_formation = node_data.get("team_formation", "sequential")
     members = node_data.get("members", [])
+
+    # Validate members
+    if not members:
+        raise YAMLWorkflowError(f"Team node '{node_id}' must have at least one member")
+
     timeout_seconds = node_data.get("timeout_seconds")
     total_tool_budget = node_data.get("total_tool_budget", 100)
     max_iterations = node_data.get("max_iterations", 50)

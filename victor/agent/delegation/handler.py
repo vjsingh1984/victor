@@ -66,6 +66,7 @@ ROLE_MAPPING: Dict[str, SubAgentRole] = {
     "review": SubAgentRole.REVIEWER,
     "tester": SubAgentRole.TESTER,
     "test": SubAgentRole.TESTER,
+    "writer": SubAgentRole.EXECUTOR,
 }
 
 

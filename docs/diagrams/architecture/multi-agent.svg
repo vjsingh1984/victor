@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1100" font-family="Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1200" font-family="Arial, sans-serif">
   <defs>
     <!-- Gradients -->
     <linearGradient id="formationGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -27,321 +27,319 @@
   </defs>
 
   <!-- Background -->
-  <rect width="1600" height="1100" fill="#ffffff"/>
+  <rect width="1600" height="1200" fill="#ffffff"/>
 
   <!-- Title -->
-  <text x="800" y="40" text-anchor="middle" font-size="28" font-weight="bold" fill="#333">Multi-Agent Coordination System</text>
+  <text x="800" y="30" text-anchor="middle" font-size="24" font-weight="bold" fill="#333">Multi-Agent Coordination System (Updated 2025-01-18)</text>
 
   <!-- TEAM FORMATIONS -->
-  <g transform="translate(50, 80)">
-    <rect x="0" y="0" width="500" height="280" rx="10" fill="url(#formationGradient)" stroke="#1976D2" stroke-width="2" filter="url(#shadow)"/>
-    <text x="250" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#1976D2">Team Formations</text>
+  <g transform="translate(50, 60)">
+    <rect x="0" y="0" width="500" height="260" rx="10" fill="url(#formationGradient)" stroke="#1976D2" stroke-width="2" filter="url(#shadow)"/>
+    <text x="250" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#1976D2">Team Formations (victor.teams)</text>
     <text x="250" y="50" text-anchor="middle" font-size="11" fill="#666">5 Coordination Patterns</text>
 
-    <!-- Hierarchical -->
+    <!-- Sequential -->
     <g transform="translate(20, 70)">
-      <rect x="0" y="0" width="140" height="45" rx="5" fill="#ffffff" stroke="#1976D2" stroke-width="1.5"/>
-      <text x="70" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">Hierarchical</text>
-      <text x="70" y="35" text-anchor="middle" font-size="9" fill="#666">Lead + Sub-agents</text>
+      <rect x="0" y="0" width="140" height="40" rx="5" fill="#ffffff" stroke="#1976D2" stroke-width="1.5"/>
+      <text x="70" y="18" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">SEQUENTIAL</text>
+      <text x="70" y="32" text-anchor="middle" font-size="9" fill="#666">Step-by-step</text>
     </g>
 
-    <!-- Flat -->
+    <!-- Parallel -->
     <g transform="translate(180, 70)">
-      <rect x="0" y="0" width="140" height="45" rx="5" fill="#ffffff" stroke="#1976D2" stroke-width="1.5"/>
-      <text x="70" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">Flat</text>
-      <text x="70" y="35" text-anchor="middle" font-size="9" fill="#666">Peers + Shared Memory</text>
+      <rect x="0" y="0" width="140" height="40" rx="5" fill="#ffffff" stroke="#1976D2" stroke-width="1.5"/>
+      <text x="70" y="18" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">PARALLEL</text>
+      <text x="70" y="32" text-anchor="middle" font-size="9" fill="#666">Concurrent execution</text>
+    </g>
+
+    <!-- Hierarchical -->
+    <g transform="translate(340, 70)">
+      <rect x="0" y="0" width="140" height="40" rx="5" fill="#ffffff" stroke="#1976D2" stroke-width="1.5"/>
+      <text x="70" y="18" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">HIERARCHICAL</text>
+      <text x="70" y="32" text-anchor="middle" font-size="9" fill="#666">Manager-worker</text>
     </g>
 
     <!-- Pipeline -->
-    <g transform="translate(340, 70)">
-      <rect x="0" y="0" width="140" height="45" rx="5" fill="#ffffff" stroke="#1976D2" stroke-width="1.5"/>
-      <text x="70" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">Pipeline</text>
-      <text x="70" y="35" text-anchor="middle" font-size="9" fill="#666">Sequential Processing</text>
+    <g transform="translate(20, 125)">
+      <rect x="0" y="0" width="140" height="40" rx="5" fill="#ffffff" stroke="#1976D2" stroke-width="1.5"/>
+      <text x="70" y="18" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">PIPELINE</text>
+      <text x="70" y="32" text-anchor="middle" font-size="9" fill="#666">Processing stages</text>
     </g>
 
     <!-- Consensus -->
-    <g transform="translate(20, 135)">
-      <rect x="0" y="0" width="140" height="45" rx="5" fill="#ffffff" stroke="#1976D2" stroke-width="1.5"/>
-      <text x="70" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">Consensus</text>
-      <text x="70" y="35" text-anchor="middle" font-size="9" fill="#666">Voting-based</text>
+    <g transform="translate(180, 125)">
+      <rect x="0" y="0" width="140" height="40" rx="5" fill="#ffffff" stroke="#1976D2" stroke-width="1.5"/>
+      <text x="70" y="18" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">CONSENSUS</text>
+      <text x="70" y="32" text-anchor="middle" font-size="9" fill="#666">Agreement building</text>
     </g>
 
-    <!-- Debate -->
-    <g transform="translate(180, 135)">
-      <rect x="0" y="0" width="140" height="45" rx="5" fill="#ffffff" stroke="#1976D2" stroke-width="1.5"/>
-      <text x="70" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">Debate</text>
-      <text x="70" y="35" text-anchor="middle" font-size="9" fill="#666">Discussion-based</text>
-    </g>
-
-    <!-- Formation Examples -->
-    <g transform="translate(20, 200)">
-      <text x="0" y="0" font-size="11" font-weight="bold" fill="#333">Usage:</text>
-      <text x="0" y="20" font-size="10" fill="#555">• Hierarchical: Complex projects with specialized roles</text>
-      <text x="0" y="40" font-size="10" fill="#555">• Flat: Collaborative problem-solving</text>
-      <text x="0" y="60" font-size="10" fill="#555">• Pipeline: Sequential workflows (dev → test → deploy)</text>
+    <!-- Factory Pattern -->
+    <g transform="translate(20, 185)">
+      <rect x="0" y="0" width="460" height="60" rx="5" fill="#ffffff" stroke="#1976D2" stroke-width="1.5"/>
+      <text x="230" y="20" text-anchor="middle" font-size="12" font-weight="bold" fill="#1976D2">create_coordinator()</text>
+      <text x="230" y="38" text-anchor="middle" font-size="10" fill="#666">Factory function from victor.teams</text>
+      <text x="230" y="52" text-anchor="middle" font-size="9" fill="#888">Returns UnifiedTeamCoordinator</text>
     </g>
   </g>
 
-  <!-- HIERARCHICAL TEAM EXAMPLE -->
-  <g transform="translate(600, 80)">
-    <rect x="0" y="0" width="450" height="280" rx="10" fill="url(#teamGradient)" stroke="#7B1FA2" stroke-width="2" filter="url(#shadow)"/>
-    <text x="225" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#7B1FA2">Hierarchical Team Example</text>
+  <!-- UNIFIED TEAM COORDINATOR -->
+  <g transform="translate(600, 60)">
+    <rect x="0" y="0" width="500" height="260" rx="10" fill="url(#teamGradient)" stroke="#7B1FA2" stroke-width="2" filter="url(#shadow)"/>
+    <text x="250" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#7B1FA2">UnifiedTeamCoordinator</text>
+    <text x="250" y="50" text-anchor="middle" font-size="11" fill="#666">Production coordinator with all features</text>
 
-    <!-- Lead Agent -->
-    <g transform="translate(175, 50)">
-      <rect x="0" y="0" width="100" height="50" rx="5" fill="url(#agentGradient)" stroke="#7B1FA2" stroke-width="2"/>
-      <text x="50" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">Lead Agent</text>
-      <text x="50" y="38" text-anchor="middle" font-size="9" fill="#666">Coordinator</text>
+    <!-- Core Features -->
+    <g transform="translate(20, 70)">
+      <rect x="0" y="0" width="220" height="60" rx="5" fill="#ffffff" stroke="#7B1FA2" stroke-width="1.5"/>
+      <text x="110" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">Protocol-Based Design</text>
+      <text x="110" y="38" text-anchor="middle" font-size="9" fill="#666">ITeamCoordinator</text>
+      <text x="110" y="50" text-anchor="middle" font-size="9" fill="#666">IEnhancedTeamCoordinator</text>
     </g>
 
-    <!-- Sub Agents -->
-    <g transform="translate(25, 130)">
-      <rect x="0" y="0" width="100" height="45" rx="5" fill="url(#agentGradient)" stroke="#7B1FA2" stroke-width="1.5"/>
-      <text x="50" y="18" text-anchor="middle" font-size="10" font-weight="bold" fill="#333">Frontend</text>
-      <text x="50" y="33" text-anchor="middle" font-size="9" fill="#666">React/TypeScript</text>
+    <g transform="translate(260, 70)">
+      <rect x="0" y="0" width="220" height="60" rx="5" fill="#ffffff" stroke="#7B1FA2" stroke-width="1.5"/>
+      <text x="110" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">Observability</text>
+      <text x="110" y="38" text-anchor="middle" font-size="9" fill="#666">Metrics collection</text>
+      <text x="110" y="50" text-anchor="middle" font-size="9" fill="#666">Event streaming</text>
     </g>
 
-    <g transform="translate(175, 130)">
-      <rect x="0" y="0" width="100" height="45" rx="5" fill="url(#agentGradient)" stroke="#7B1FA2" stroke-width="1.5"/>
-      <text x="50" y="18" text-anchor="middle" font-size="10" font-weight="bold" fill="#333">Backend</text>
-      <text x="50" y="33" text-anchor="middle" font-size="9" fill="#666">FastAPI/SQL</text>
+    <g transform="translate(20, 145)">
+      <rect x="0" y="0" width="220" height="60" rx="5" fill="#ffffff" stroke="#7B1FA2" stroke-width="1.5"/>
+      <text x="110" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">RL Integration</text>
+      <text x="110" y="38" text-anchor="middle" font-size="9" fill="#666">Team composition learning</text>
+      <text x="110" y="50" text-anchor="middle" font-size="9" fill="#666">Performance optimization</text>
     </g>
 
-    <g transform="translate(325, 130)">
-      <rect x="0" y="0" width="100" height="45" rx="5" fill="url(#agentGradient)" stroke="#7B1FA2" stroke-width="1.5"/>
-      <text x="50" y="18" text-anchor="middle" font-size="10" font-weight="bold" fill="#333">Testing</text>
-      <text x="50" y="33" text-anchor="middle" font-size="9" fill="#666">Pytest/CI</text>
+    <g transform="translate(260, 145)">
+      <rect x="0" y="0" width="220" height="60" rx="5" fill="#ffffff" stroke="#7B1FA2" stroke-width="1.5"/>
+      <text x="110" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">Message Types</text>
+      <text x="110" y="38" text-anchor="middle" font-size="9" fill="#666">TASK, RESULT, ERROR</text>
+      <text x="110" y="50" text-anchor="middle" font-size="9" fill="#666">QUERY, BROADCAST</text>
     </g>
-
-    <!-- Connection lines -->
-    <line x1="225" y1="100" x2="75" y2="130" stroke="#7B1FA2" stroke-width="1.5"/>
-    <line x1="225" y1="100" x2="225" y2="130" stroke="#7B1FA2" stroke-width="1.5"/>
-    <line x1="225" y1="100" x2="375" y2="130" stroke="#7B1FA2" stroke-width="1.5"/>
   </g>
 
-  <!-- PIPELINE TEAM EXAMPLE -->
-  <g transform="translate(1100, 80)">
-    <rect x="0" y="0" width="450" height="280" rx="10" fill="url(#teamGradient)" stroke="#7B1FA2" stroke-width="2" filter="url(#shadow)"/>
-    <text x="225" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#7B1FA2">Pipeline Team Example</text>
+  <!-- ORCHESTRATOR INTEGRATION -->
+  <g transform="translate(1120, 60)">
+    <rect x="0" y="0" width="430" height="260" rx="10" fill="url(#coordGradient)" stroke="#F57C00" stroke-width="2" filter="url(#shadow)"/>
+    <text x="215" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#F57C00">Orchestrator Integration</text>
 
-    <!-- Stage 1 -->
-    <g transform="translate(25, 60)">
-      <rect x="0" y="0" width="100" height="50" rx="5" fill="url(#agentGradient)" stroke="#7B1FA2" stroke-width="1.5"/>
-      <text x="50" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">Stage 1</text>
-      <text x="50" y="38" text-anchor="middle" font-size="9" fill="#666">Analyzer</text>
+    <!-- Factory Integration -->
+    <g transform="translate(20, 50)">
+      <rect x="0" y="0" width="390" height="50" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="195" y="20" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">OrchestratorFactory</text>
+      <text x="195" y="38" text-anchor="middle" font-size="10" fill="#666">create_agent(mode="team_member")</text>
     </g>
 
-    <!-- Arrow -->
-    <path d="M 125 85 L 155 85" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
-
-    <!-- Stage 2 -->
-    <g transform="translate(175, 60)">
-      <rect x="0" y="0" width="100" height="50" rx="5" fill="url(#agentGradient)" stroke="#7B1FA2" stroke-width="1.5"/>
-      <text x="50" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">Stage 2</text>
-      <text x="50" y="38" text-anchor="middle" font-size="9" fill="#666">Implementer</text>
+    <!-- DI Container -->
+    <g transform="translate(20, 115)">
+      <rect x="0" y="0" width="390" height="50" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="195" y="20" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">ServiceContainer</text>
+      <text x="195" y="38" text-anchor="middle" font-size="10" fill="#666">Protocol-based resolution</text>
     </g>
 
-    <!-- Arrow -->
-    <path d="M 275 85 L 305 85" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
-
-    <!-- Stage 3 -->
-    <g transform="translate(325, 60)">
-      <rect x="0" y="0" width="100" height="50" rx="5" fill="url(#agentGradient)" stroke="#7B1FA2" stroke-width="1.5"/>
-      <text x="50" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">Stage 3</text>
-      <text x="50" y="38" text-anchor="middle" font-size="9" fill="#666">Tester</text>
-    </g>
-
-    <!-- Pipeline Flow -->
-    <g transform="translate(25, 140)">
-      <rect x="0" y="0" width="400" height="120" rx="5" fill="#ffffff" stroke="#7B1FA2" stroke-width="1"/>
-      <text x="200" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">Sequential Flow</text>
-
-      <text x="20" y="45" font-size="9" fill="#555">1. Analyzer examines requirements</text>
-      <text x="20" y="65" font-size="9" fill="#555">2. Implementer builds solution</text>
-      <text x="20" y="85" font-size="9" fill="#555">3. Tester validates quality</text>
-      <text x="20" y="105" font-size="9" fill="#555">Each stage passes output to next</text>
+    <!-- Event Bus -->
+    <g transform="translate(20, 180)">
+      <rect x="0" y="0" width="390" height="50" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="195" y="20" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">Event Bus Integration</text>
+      <text x="195" y="38" text-anchor="middle" font-size="10" fill="#666">Publish/Subscribe messaging</text>
     </g>
   </g>
 
   <!-- COMMUNICATION SYSTEM -->
-  <g transform="translate(50, 400)">
+  <g transform="translate(50, 350)">
     <rect x="0" y="0" width="750" height="280" rx="10" fill="url(#commGradient)" stroke="#388E3C" stroke-width="2" filter="url(#shadow)"/>
-    <text x="375" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#388E3C">Team Communication</text>
+    <text x="375" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#388E3C">Communication System</text>
 
-    <!-- Message Bus -->
-    <g transform="translate(50, 60)">
-      <rect x="0" y="0" width="300" height="70" rx="5" fill="#ffffff" stroke="#388E3C" stroke-width="1.5"/>
-      <text x="150" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">TeamMessageBus</text>
-      <text x="150" y="45" text-anchor="middle" font-size="11" fill="#666">Event-based communication</text>
-      <text x="150" y="60" text-anchor="middle" font-size="9" fill="#888">Async messaging</text>
-    </g>
-
-    <!-- Pub/Sub -->
-    <g transform="translate(400, 60)">
-      <rect x="0" y="0" width="300" height="70" rx="5" fill="#ffffff" stroke="#388E3C" stroke-width="1.5"/>
-      <text x="150" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Publish/Subscribe</text>
-      <text x="150" y="45" text-anchor="middle" font-size="11" fill="#666">Decoupled messaging</text>
-      <text x="150" y="60" text-anchor="middle" font-size="9" fill="#888">Event-driven updates</text>
-    </g>
-
-    <!-- Broadcast -->
-    <g transform="translate(50, 150)">
-      <rect x="0" y="0" width="220" height="60" rx="5" fill="#ffffff" stroke="#388E3C" stroke-width="1.5"/>
-      <text x="110" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Broadcast</text>
-      <text x="110" y="45" text-anchor="middle" font-size="11" fill="#666">Send to all agents</text>
-    </g>
-
-    <!-- Direct Message -->
-    <g transform="translate(290, 150)">
-      <rect x="0" y="0" width="220" height="60" rx="5" fill="#ffffff" stroke="#388E3C" stroke-width="1.5"/>
-      <text x="110" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Direct Message</text>
-      <text x="110" y="45" text-anchor="middle" font-size="11" fill="#666">Point-to-point</text>
-    </g>
-
-    <!-- Shared Memory -->
-    <g transform="translate(530, 150)">
-      <rect x="0" y="0" width="170" height="60" rx="5" fill="#ffffff" stroke="#388E3C" stroke-width="1.5"/>
-      <text x="85" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Shared Memory</text>
-      <text x="85" y="45" text-anchor="middle" font-size="11" fill="#666">Common state</text>
+    <!-- AgentMessage Protocol -->
+    <g transform="translate(30, 50)">
+      <rect x="0" y="0" width="300" height="80" rx="5" fill="#ffffff" stroke="#388E3C" stroke-width="1.5"/>
+      <text x="150" y="20" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">AgentMessage Protocol</text>
+      <text x="150" y="40" text-anchor="middle" font-size="10" fill="#666">sender: AgentID</text>
+      <text x="150" y="55" text-anchor="middle" font-size="10" fill="#666">receiver: AgentID (or broadcast)</text>
+      <text x="150" y="70" text-anchor="middle" font-size="10" fill="#666">content: Any | message_type: MessageType</text>
     </g>
 
     <!-- Message Types -->
-    <g transform="translate(50, 230)">
-      <text x="0" y="0" font-size="11" font-weight="bold" fill="#333">AgentMessage Protocol:</text>
-      <text x="0" y="20" font-size="10" fill="#555">• sender: AgentID | receiver: AgentID (or broadcast)</text>
-      <text x="0" y="40" font-size="10" fill="#555">• content: Any | message_type: Task/Result/Error</text>
+    <g transform="translate(360, 50)">
+      <rect x="0" y="0" width="350" height="80" rx="5" fill="#ffffff" stroke="#388E3C" stroke-width="1.5"/>
+      <text x="175" y="20" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">Message Types (MessageType enum)</text>
+      <text x="175" y="40" text-anchor="middle" font-size="9" fill="#666">TASK - Assign work</text>
+      <text x="175" y="55" text-anchor="middle" font-size="9" fill="#666">RESULT - Return completion</text>
+      <text x="175" y="70" text-anchor="middle" font-size="9" fill="#666">ERROR - Report failures</text>
+    </g>
+
+    <!-- Routing Strategies -->
+    <g transform="translate(30, 145)">
+      <rect x="0" y="0" width="220" height="60" rx="5" fill="#ffffff" stroke="#388E3C" stroke-width="1.5"/>
+      <text x="110" y="25" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">Point-to-Point</text>
+      <text x="110" y="45" text-anchor="middle" font-size="10" fill="#666">Direct agent communication</text>
+    </g>
+
+    <g transform="translate(270, 145)">
+      <rect x="0" y="0" width="220" height="60" rx="5" fill="#ffffff" stroke="#388E3C" stroke-width="1.5"/>
+      <text x="110" y="25" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">Pub/Sub</text>
+      <text x="110" y="45" text-anchor="middle" font-size="10" fill="#666">Topic-based messaging</text>
+    </g>
+
+    <g transform="translate(510, 145)">
+      <rect x="0" y="0" width="200" height="60" rx="5" fill="#ffffff" stroke="#388E3C" stroke-width="1.5"/>
+      <text x="100" y="25" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">Broadcast</text>
+      <text x="100" y="45" text-anchor="middle" font-size="10" fill="#666">Send to all agents</text>
+    </g>
+
+    <!-- Shared Memory -->
+    <g transform="translate(30, 220)">
+      <rect x="0" y="0" width="220" height="40" rx="5" fill="#ffffff" stroke="#388E3C" stroke-width="1.5"/>
+      <text x="110" y="18" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">Shared Memory</text>
+      <text x="110" y="32" text-anchor="middle" font-size="10" fill="#666">Common state</text>
+    </g>
+
+    <g transform="translate(270, 220)">
+      <rect x="0" y="0" width="440" height="40" rx="5" fill="#ffffff" stroke="#388E3C" stroke-width="1.5"/>
+      <text x="220" y="18" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">Integration with Event Bus</text>
+      <text x="220" y="32" text-anchor="middle" font-size="10" fill="#666">Publish team.* events for observability</text>
     </g>
   </g>
 
   <!-- COORDINATION PATTERNS -->
-  <g transform="translate(850, 400)">
+  <g transform="translate(850, 350)">
     <rect x="0" y="0" width="700" height="280" rx="10" fill="url(#coordGradient)" stroke="#F57C00" stroke-width="2" filter="url(#shadow)"/>
-    <text x="350" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#F57C00">Coordination &amp; Lifecycle</text>
+    <text x="350" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#F57C00">Coordination Patterns</text>
 
-    <!-- Orchestrator -->
-    <g transform="translate(30, 60)">
-      <rect x="0" y="0" width="280" height="70" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
-      <text x="140" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Agent Orchestrator</text>
-      <text x="140" y="45" text-anchor="middle" font-size="11" fill="#666">Team Facilitator</text>
-      <text x="140" y="60" text-anchor="middle" font-size="9" fill="#888">Creates and manages teams</text>
+    <!-- Team Creation -->
+    <g transform="translate(30, 50)">
+      <rect x="0" y="0" width="300" height="70" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="150" y="25" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">Team Creation</text>
+      <text x="150" y="45" text-anchor="middle" font-size="10" fill="#666">create_coordinator(orchestrator)</text>
+      <text x="150" y="60" text-anchor="middle" font-size="9" fill="#888">Returns UnifiedTeamCoordinator</text>
     </g>
 
-    <!-- Team API -->
-    <g transform="translate(350, 60)">
-      <rect x="0" y="0" width="280" height="70" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
-      <text x="140" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">create_coordinator()</text>
-      <text x="140" y="45" text-anchor="middle" font-size="11" fill="#666">Unified Team API</text>
-      <text x="140" y="60" text-anchor="middle" font-size="9" fill="#888">Returns UnifiedTeamCoordinator</text>
+    <!-- Member Addition -->
+    <g transform="translate(370, 50)">
+      <rect x="0" y="0" width="300" height="70" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="150" y="25" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">Member Addition</text>
+      <text x="150" y="45" text-anchor="middle" font-size="10" fill="#666">coordinator.add_member(agent)</text>
+      <text x="150" y="60" text-anchor="middle" font-size="9" fill="#888">Fluent API for chaining</text>
     </g>
 
-    <!-- Lifecycle Manager -->
-    <g transform="translate(30, 150)">
-      <rect x="0" y="0" width="280" height="70" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
-      <text x="140" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Lifecycle Manager</text>
-      <text x="140" y="45" text-anchor="middle" font-size="11" fill="#666">start(), stop(), monitor()</text>
-      <text x="140" y="60" text-anchor="middle" font-size="9" fill="#888">Agent lifecycle control</text>
+    <!-- Formation Setting -->
+    <g transform="translate(30, 135)">
+      <rect x="0" y="0" width="300" height="70" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="150" y="25" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">Formation Setting</text>
+      <text x="150" y="45" text-anchor="middle" font-size="10" fill="#666">set_formation(TeamFormation.PIPELINE)</text>
+      <text x="150" y="60" text-anchor="middle" font-size="9" fill="#888">5 patterns available</text>
     </g>
 
-    <!-- Team State -->
-    <g transform="translate(350, 150)">
-      <rect x="0" y="0" width="280" height="70" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
-      <text x="140" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Team State</text>
-      <text x="140" y="45" text-anchor="middle" font-size="11" fill="#666">Shared &amp; Distributed</text>
-      <text x="140" y="60" text-anchor="middle" font-size="9" fill="#888">Common context + agent states</text>
+    <!-- Task Execution -->
+    <g transform="translate(370, 135)">
+      <rect x="0" y="0" width="300" height="70" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="150" y="25" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">Task Execution</text>
+      <text x="150" y="45" text-anchor="middle" font-size="10" fill="#666">result = await execute_task(task, ctx)</text>
+      <text x="150" y="60" text-anchor="middle" font-size="9" fill="#888">Async execution with timeout</text>
     </g>
 
-    <!-- API Usage -->
-    <g transform="translate(30, 240)">
-      <rect x="0" y="0" width="600" height="25" rx="3" fill="#ffffff" stroke="#F57C00" stroke-width="1"/>
-      <text x="300" y="17" text-anchor="middle" font-size="10" fill="#555">Usage: coordinator = create_coordinator(TeamFormation.HIERARCHICAL, agents=[...])</text>
+    <!-- Lightweight Testing -->
+    <g transform="translate(30, 220)">
+      <rect x="0" y="0" width="640" height="40" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="320" y="18" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">Testing: create_coordinator(lightweight=True)</text>
+      <text x="320" y="32" text-anchor="middle" font-size="10" fill="#666">Production: create_coordinator(orchestrator, enable_observability=True, enable_rl=True)</text>
     </g>
   </g>
 
-  <!-- KEY FEATURES -->
-  <g transform="translate(50, 720)">
-    <rect x="0" y="0" width="1500" height="350" rx="10" fill="#f5f5f5" stroke="#666" stroke-width="1" filter="url(#shadow)"/>
-    <text x="750" y="35" text-anchor="middle" font-size="18" font-weight="bold" fill="#333">Multi-Agent System Features</text>
+  <!-- INTEGRATION EXAMPLES -->
+  <g transform="translate(50, 670)">
+    <rect x="0" y="0" width="1500" height="250" rx="10" fill="#f5f5f5" stroke="#666" stroke-width="1" filter="url(#shadow)"/>
+    <text x="750" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#333">Integration Examples</text>
 
-    <!-- Column 1: Persona Traits -->
-    <g transform="translate(30, 60)">
-      <rect x="0" y="0" width="350" height="270" rx="5" fill="#ffffff" stroke="#333" stroke-width="1"/>
-      <text x="175" y="25" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">Persona Traits</text>
+    <!-- Example 1: Coding Vertical -->
+    <g transform="translate(30, 50)">
+      <rect x="0" y="0" width="350" height="180" rx="5" fill="#ffffff" stroke="#333" stroke-width="1"/>
+      <text x="175" y="25" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">Code Review Team</text>
+      <text x="175" y="45" text-anchor="middle" font-size="11" fill="#666">Coding Vertical Example</text>
 
-      <text x="20" y="50" font-size="11" font-weight="bold" fill="#1976D2">Customizable Agent Personalities:</text>
-      <text x="20" y="70" font-size="10" fill="#555">• Role: Senior Developer, Code Reviewer...</text>
-      <text x="20" y="90" font-size="10" fill="#555">• Description: Specialization, expertise</text>
-      <text x="20" y="110" font-size="10" fill="#555">• Communication Style: Formal, casual, terse</text>
-      <text x="20" y="130" font-size="10" fill="#555">• Tools: Specific tool access per agent</text>
-      <text x="20" y="150" font-size="10" fill="#555">• System Prompts: Custom instructions</text>
+      <text x="20" y="70" font-size="10" fill="#555">from victor.teams import create_coordinator, TeamFormation</text>
 
-      <text x="20" y="180" font-size="11" font-weight="bold" fill="#1976D2">Example:</text>
-      <g transform="translate(20, 195)">
-        <rect x="0" y="0" width="310" height="60" rx="3" fill="#f0f0f0" stroke="#999" stroke-width="0.5"/>
-        <text x="10" y="15" font-size="9" fill="#333" font-family="monospace">PersonaTraits(</text>
-        <text x="10" y="28" font-size="9" fill="#333" font-family="monospace">  role="Frontend Expert",</text>
-        <text x="10" y="41" font-size="9" fill="#333" font-family="monospace">  tools=["react", "typescript"]</text>
-        <text x="10" y="54" font-size="9" fill="#333" font-family="monospace">)</text>
-      </g>
+      <text x="20" y="90" font-size="10" fill="#555">coordinator = create_coordinator(orchestrator)</text>
+      <text x="20" y="105" font-size="10" fill="#555">coordinator</text>
+      <text x="20" y="120" font-size="10" fill="#555">  .add_member(security_reviewer)</text>
+      <text x="20" y="135" font-size="10" fill="#555">  .add_member(quality_reviewer)</text>
+      <text x="20" y="150" font-size="10" fill="#555">  .add_member(performance_reviewer)</text>
+      <text x="20" y="165" font-size="10" fill="#555">  .set_formation(TeamFormation.PARALLEL)</text>
     </g>
 
-    <!-- Column 2: Team Formations -->
-    <g transform="translate(400, 60)">
-      <rect x="0" y="0" width="350" height="270" rx="5" fill="#ffffff" stroke="#333" stroke-width="1"/>
-      <text x="175" y="25" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">Team Formations</text>
+    <!-- Example 2: Research Vertical -->
+    <g transform="translate(400, 50)">
+      <rect x="0" y="0" width="350" height="180" rx="5" fill="#ffffff" stroke="#333" stroke-width="1"/>
+      <text x="175" y="25" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">Research Pipeline</text>
+      <text x="175" y="45" text-anchor="middle" font-size="11" fill="#666">Research Vertical Example</text>
 
-      <text x="20" y="50" font-size="11" font-weight="bold" fill="#7B1FA2">Formation Types:</text>
-      <text x="20" y="70" font-size="10" fill="#555">• HIERARCHICAL: Lead agent delegates</text>
-      <text x="20" y="90" font-size="10" fill="#555">• FLAT: Peers with shared memory</text>
-      <text x="20" y="110" font-size="10" fill="#555">• PIPELINE: Sequential processing</text>
-      <text x="20" y="130" font-size="10" fill="#555">• CONSENSUS: Voting-based decisions</text>
-      <text x="20" y="150" font-size="10" fill="#555">• DEBATE: Discussion-based resolution</text>
+      <text x="20" y="70" font-size="10" fill="#555">from victor.teams import TeamFormation</text>
 
-      <text x="20" y="180" font-size="11" font-weight="bold" fill="#7B1FA2">Team Templates:</text>
-      <text x="20" y="200" font-size="10" fill="#555">Pre-configured teams for common tasks:</text>
-      <text x="20" y="220" font-size="10" fill="#555">• Full-Stack Dev Team</text>
-      <text x="20" y="240" font-size="10" fill="#555">• Code Review Team</text>
-      <text x="20" y="260" font-size="10" fill="#555">• Testing Team</text>
+      <text x="20" y="90" font-size="10" fill="#555">coordinator = create_coordinator(orchestrator)</text>
+      <text x="20" y="105" font-size="10" fill="#555">coordinator</text>
+      <text x="20" y="120" font-size="10" fill="#555">  .add_member(literature_searcher)</text>
+      <text x="20" y="135" font-size="10" fill="#555">  .add_member(analyzer)</text>
+      <text x="20" y="150" font-size="10" fill="#555">  .add_member(synthesizer)</text>
+      <text x="20" y="165" font-size="10" fill="#555">  .set_formation(TeamFormation.PIPELINE)</text>
     </g>
 
-    <!-- Column 3: Communication -->
-    <g transform="translate(770, 60)">
-      <rect x="0" y="0" width="350" height="270" rx="5" fill="#ffffff" stroke="#333" stroke-width="1"/>
-      <text x="175" y="25" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">Communication</text>
+    <!-- Example 3: DevOps Vertical -->
+    <g transform="translate(770, 50)">
+      <rect x="0" y="0" width="350" height="180" rx="5" fill="#ffffff" stroke="#333" stroke-width="1"/>
+      <text x="175" y="25" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">DevOps Team</text>
+      <text x="175" y="45" text-anchor="middle" font-size="11" fill="#666">DevOps Vertical Example</text>
 
-      <text x="20" y="50" font-size="11" font-weight="bold" fill="#388E3C">Message Types:</text>
-      <text x="20" y="70" font-size="10" fill="#555">• TASK: Assign work to agent</text>
-      <text x="20" y="90" font-size="10" fill="#555">• RESULT: Return completion status</text>
-      <text x="20" y="110" font-size="10" fill="#555">• ERROR: Report failures</text>
-      <text x="20" y="130" font-size="10" fill="#555">• QUERY: Request information</text>
-      <text x="20" y="150" font-size="10" fill="#555">• BROADCAST: Send to all</text>
+      <text x="20" y="70" font-size="10" fill="#555">from victor.teams import TeamFormation</text>
 
-      <text x="20" y="180" font-size="11" font-weight="bold" fill="#388E3C">Routing Strategies:</text>
-      <text x="20" y="200" font-size="10" fill="#555">• Point-to-point (direct)</text>
-      <text x="20" y="220" font-size="10" fill="#555">• Pub/Sub (topic-based)</text>
-      <text x="20" y="240" font-size="10" fill="#555">• Broadcast (all agents)</text>
-      <text x="20" y="260" font-size="10" fill="#555">• Shared memory (state sync)</text>
+      <text x="20" y="90" font-size="10" fill="#555">coordinator = create_coordinator(orchestrator)</text>
+      <text x="20" y="105" font-size="10" fill="#555">coordinator</text>
+      <text x="20" y="120" font-size="10" fill="#555">  .add_member(dev_lead)</text>
+      <text x="20" y="135" font-size="10" fill="#555">  .add_member(worker_1)</text>
+      <text x="20" y="150" font-size="10" fill="#555">  .add_member(worker_2)</text>
+      <text x="20" y="165" font-size="10" fill="#555">  .set_formation(TeamFormation.HIERARCHICAL)</text>
     </g>
 
-    <!-- Column 4: Integration -->
-    <g transform="translate(1140, 60)">
-      <rect x="0" y="0" width="330" height="270" rx="5" fill="#ffffff" stroke="#333" stroke-width="1"/>
-      <text x="165" y="25" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">Integration</text>
+    <!-- Example 4: Workflow Integration -->
+    <g transform="translate(1140, 50)">
+      <rect x="0" y="0" width="330" height="180" rx="5" fill="#ffffff" stroke="#333" stroke-width="1"/>
+      <text x="165" y="25" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">Workflow Integration</text>
+      <text x="165" y="45" text-anchor="middle" font-size="11" fill="#666">YAML Workflow Node</text>
 
-      <text x="20" y="50" font-size="11" font-weight="bold" fill="#F57C00">With Workflows:</text>
-      <text x="20" y="70" font-size="10" fill="#555">Multi-agent nodes in YAML workflows</text>
-      <text x="20" y="90" font-size="10" fill="#555">Coordinated task execution</text>
+      <text x="20" y="70" font-size="10" fill="#555">nodes:</text>
+      <text x="20" y="85" font-size="10" fill="#555">  - id: team_review</text>
+      <text x="20" y="100" font-size="10" fill="#555">    type: multi_agent</text>
+      <text x="20" y="115" font-size="10" fill="#555">    formation: parallel</text>
+      <text x="20" y="130" font-size="10" fill="#555">    agents:</text>
+      <text x="20" y="145" font-size="10" fill="#555">      - security</text>
+      <text x="20" y="160" font-size="10" fill="#555">      - quality</text>
+    </g>
+  </g>
 
-      <text x="20" y="120" font-size="11" font-weight="bold" fill="#F57C00">With Verticals:</text>
-      <text x="20" y="140" font-size="10" fill="#555">Vertical-specific agents</text>
-      <text x="20" y="160" font-size="10" fill="#555">Specialized tool access</text>
+  <!-- ARCHITECTURE NOTES -->
+  <g transform="translate(50, 960)">
+    <rect x="0" y="0" width="1500" height="200" rx="10" fill="#E8F5E9" stroke="#388E3C" stroke-width="1" filter="url(#shadow)"/>
+    <text x="750" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#333">Architecture Notes</text>
 
-      <text x="20" y="190" font-size="11" font-weight="bold" fill="#F57C00">API Entry Point:</text>
-      <g transform="translate(20, 205)">
-        <rect x="0" y="0" width="290" height="50" rx="3" fill="#f0f0f0" stroke="#999" stroke-width="0.5"/>
-        <text x="10" y="15" font-size="9" fill="#333" font-family="monospace">from victor.teams import create_coordinator</text>
-        <text x="10" y="28" font-size="9" fill="#333" font-family="monospace">coordinator = create_coordinator(</text>
-        <text x="10" y="41" font-size="9" fill="#333" font-family="monospace">  TeamFormation.HIERARCHICAL, agents</text>
-      </g>
+    <g transform="translate(30, 50)">
+      <text x="0" y="0" font-size="12" font-weight="bold" fill="#1976D2">Protocol-First Design:</text>
+      <text x="0" y="20" font-size="11" fill="#555">• All team components use protocols (ITeamCoordinator, ITeamMember, IObservableCoordinator)</text>
+      <text x="0" y="40" font-size="11" fill="#555">• Enables loose coupling and easy testing</text>
+      <text x="0" y="60" font-size="11" fill="#555">• Mixins for optional features (ObservabilityMixin, RLMixin)</text>
+
+      <text x="0" y="90" font-size="12" font-weight="bold" fill="#7B1FA2">Integration Points:</text>
+      <text x="0" y="110" font-size="11" fill="#555">• OrchestratorFactory: create_agent(mode="team_member")</text>
+      <text x="0" y="130" font-size="11" fill="#555">• ServiceContainer: Protocol-based resolution</text>
+      <text x="0" y="150" font-size="11" fill="#555">• Event Bus: Publish team.* events for observability</text>
+
+      <text x="800" y="0" font-size="12" font-weight="bold" fill="#F57C00">Factory Pattern:</text>
+      <text x="800" y="20" font-size="11" fill="#555">• create_coordinator() - Production coordinator</text>
+      <text x="800" y="40" font-size="11" fill="#555">• Lightweight mode for testing</text>
+      <text x="800" y="60" font-size="11" fill="#555">• Fluent API for configuration</text>
+
+      <text x="800" y="90" font-size="12" font-weight="bold" fill="#388E3C">YAML Configuration:</text>
+      <text x="800" y="110" font-size="11" fill="#555">• BaseYAMLTeamProvider for YAML team definitions</text>
+      <text x="800" y="130" font-size="11" fill="#555">• Team specifications in config/teams/</text>
+      <text x="800" y="150" font-size="11" fill="#555">• 5 formations: sequential, parallel, hierarchical, pipeline, consensus</text>
     </g>
   </g>
 

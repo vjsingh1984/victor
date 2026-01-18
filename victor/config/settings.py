@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Union, List
 
 import yaml
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict, PydanticBaseSettingsSource
 from victor.config.model_capabilities import _load_tool_capable_patterns_from_yaml
 from victor.config.orchestrator_constants import BUDGET_LIMITS, TOOL_SELECTION_PRESETS
@@ -313,16 +313,27 @@ class ProviderConfig(BaseSettings):
 class ProfileConfig(BaseSettings):
     """Configuration for a model profile."""
 
-    model_config = SettingsConfigDict(extra="allow", protected_namespaces=())
+    model_config = SettingsConfigDict(
+        extra="allow", protected_namespaces=(), populate_by_name=True
+    )
 
     provider: str = Field(..., description="Provider name (ollama, anthropic, openai, google)")
-    model_name: str = Field(..., description="Model identifier")
+    model_name: str = Field(
+        ...,
+        description="Model identifier",
+        validation_alias=AliasChoices("model", "model_name"),
+    )
     temperature: float = Field(0.7, ge=0.0, le=2.0)
     max_tokens: int = Field(4096, gt=0)
     description: Optional[str] = Field(None, description="Optional profile description")
     tool_selection: Optional[Dict[str, Any]] = Field(
         None, description="Tool selection configuration for adaptive thresholds"
     )
+
+    @property
+    def model(self) -> str:
+        """Alias for model_name (for backward compatibility)."""
+        return self.model_name
 
     # -------------------------------------------------------------------------
     # Provider Tuning Options (P3-1)
@@ -791,6 +802,127 @@ class Settings(BaseSettings):
     # Controls pre-execution JSON Schema validation of tool arguments
     # Options: "strict" (block on errors), "lenient" (warn only), "off" (disable)
     tool_validation_mode: str = "lenient"
+
+    # ==========================================================================
+    # Rust AST Processor Configuration (Performance Acceleration)
+    # ==========================================================================
+    # Controls the Rust-accelerated AST processor for 10x faster parsing.
+    # Automatically falls back to Python tree-sitter if Rust is unavailable.
+
+    use_rust_ast_processor: bool = Field(
+        default=True,
+        description="Enable Rust-accelerated AST processing (10x faster than Python)"
+    )
+    ast_cache_size: int = Field(
+        default=1000,
+        description="Number of ASTs to cache in Rust accelerator (reduces redundant parsing)"
+    )
+
+    # ==========================================================================
+    # Rust Embedding Operations Configuration (Performance Acceleration)
+    # ==========================================================================
+    # Controls the Rust-accelerated embedding similarity operations for 3-8x faster
+    # vector similarity computation. Automatically falls back to NumPy if unavailable.
+    #
+    # Performance Characteristics:
+    # - Small batches (< threshold): NumPy (BLAS-optimized, no FFI overhead)
+    # - Large batches (>= threshold): Rust (SIMD + parallelization)
+    # - Typical speedup: 3-8x for batches > 100 vectors
+    #
+    # Recommendation: Set threshold to 10-50 based on your typical corpus sizes
+
+    use_rust_embedding_ops: bool = Field(
+        default=True,
+        description="Enable Rust-accelerated embedding similarity operations (3-8x faster)"
+    )
+    rust_embedding_batch_threshold: int = Field(
+        default=10,
+        description="Minimum batch size to use Rust implementation (below this, NumPy is faster)"
+    )
+
+    # ==========================================================================
+    # Tier 2 Accelerators Configuration (Performance Acceleration)
+    # ==========================================================================
+    # Controls additional Rust-accelerated operations for high-frequency tasks.
+    # All automatically fall back to Python implementations if Rust is unavailable.
+
+    # Regex Engine Accelerator (10-20x faster pattern matching)
+    use_rust_regex_engine: bool = Field(
+        default=True,
+        description="Enable Rust-accelerated regex engine (10-20x faster pattern matching)"
+    )
+    regex_cache_size: int = Field(
+        default=100,
+        description="Number of compiled regex sets to cache per language"
+    )
+
+    # Signature Computation Accelerator (10x faster deduplication)
+    use_rust_signature: bool = Field(
+        default=True,
+        description="Enable Rust-accelerated signature computation (10x faster deduplication)"
+    )
+    signature_cache_size: int = Field(
+        default=10000,
+        description="Number of signatures to cache for tool call deduplication"
+    )
+
+    # File Operations Accelerator (2-3x faster directory traversal)
+    use_rust_file_ops: bool = Field(
+        default=True,
+        description="Enable Rust-accelerated file operations (2-3x faster directory traversal)"
+    )
+    file_ops_max_depth: int = Field(
+        default=100,
+        description="Maximum depth for parallel directory traversal"
+    )
+
+    # ==========================================================================
+    # Tier 3 Accelerators Configuration (Performance Acceleration)
+    # ==========================================================================
+    # Controls additional Rust-accelerated operations for medium-frequency tasks.
+    # All automatically fall back to Python implementations if Rust is unavailable.
+
+    # Graph Algorithms Accelerator (3-6x faster graph metrics)
+    use_rust_graph_algorithms: bool = Field(
+        default=True,
+        description="Enable Rust-accelerated graph algorithms (3-6x faster PageRank, centrality)"
+    )
+    graph_cache_size: int = Field(
+        default=100,
+        description="Number of graphs to cache for metrics computation"
+    )
+
+    # Batch Processing Accelerator (20-40% faster parallel execution)
+    use_rust_batch_processor: bool = Field(
+        default=True,
+        description="Enable Rust-accelerated batch processing (20-40% faster parallel execution)"
+    )
+    batch_max_concurrent: int = Field(
+        default=10,
+        description="Maximum concurrent tasks in batch operations"
+    )
+    batch_timeout_ms: int = Field(
+        default=30000,
+        description="Default timeout for batch tasks (milliseconds)"
+    )
+    batch_retry_policy: str = Field(
+        default="exponential",
+        description="Retry policy: exponential, linear, fixed, none"
+    )
+
+    # Serialization Accelerator (5-10x faster JSON/YAML parsing)
+    use_rust_serialization: bool = Field(
+        default=True,
+        description="Enable Rust-accelerated JSON/YAML parsing (5-10x faster config loading)"
+    )
+    config_cache_size: int = Field(
+        default=100,
+        description="Number of config files to cache"
+    )
+    config_cache_ttl_seconds: int = Field(
+        default=300,
+        description="Config cache TTL (5 minutes)"
+    )
 
     # Context Compaction Settings
     # Controls how conversation history is managed when context grows too large

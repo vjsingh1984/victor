@@ -698,7 +698,7 @@ async def run_interactive(
                     "vertical": vertical,
                     "thinking": thinking,
                     "provider": profile_config.provider,
-                    "model": profile_config.model,
+                    "model": profile_config.model_name,
                 }
             )
 
@@ -724,7 +724,7 @@ async def run_interactive(
                 tui_app = VictorTUI(
                     agent=agent,
                     provider=profile_config.provider,
-                    model=profile_config.model,
+                    model=profile_config.model_name,
                     stream=stream,
                     settings=settings,  # Pass settings for slash commands
                 )
@@ -793,7 +793,7 @@ async def _run_cli_repl(
     panel_content = (
         f"[bold blue]Victor[/] - Open-source AI coding assistant\n\n"
         f"[bold]Provider:[/ ] [cyan]{profile_config.provider}[/]  "
-        f"[bold]Model:[/ ] [cyan]{profile_config.model}[/]{vertical_display}\n\n"
+        f"[bold]Model:[/ ] [cyan]{profile_config.model_name}[/]{vertical_display}\n\n"
         f"Type [bold]/help[/] for commands, [bold]/exit[/] or [bold]Ctrl+D[/] to quit."
     )
 

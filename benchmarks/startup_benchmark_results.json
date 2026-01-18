@@ -1,0 +1,19 @@
+{
+  "import_core_verticals": 347.9806249961257,
+  "import_coding": 53.43341699335724,
+  "import_research": 10.206041974015534,
+  "import_devops": 15.075042028911412,
+  "import_dataanalysis": 1.29708310123533,
+  "import_rag": 1112.688917084597,
+  "import_benchmark": 74.00958298239857,
+  "avg_vertical_import": 211.11834736075252,
+  "total_vertical_import": 1266.7100841645151,
+  "list_verticals": 0.00400003045797348,
+  "coding_get_config": 5.958958994597197,
+  "coding_get_extensions": 195.08700002916157,
+  "import_victor_coding_assistant": 0.4510419676080346,
+  "import_victor_coding_middleware": 0.22854201961308718,
+  "import_victor_coding_safety": 0.1593329943716526,
+  "import_victor_coding_prompts": 0.12016703840345144,
+  "import_victor_coding_workflows": 0.08933304343372583
+}

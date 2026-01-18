@@ -678,7 +678,7 @@ workflows:
       - id: report
         type: agent
         name: "Generate Final Report"
-        role: writer
+        role: reviewer
         goal: |
           Generate a comprehensive EDA report including:
           1. Executive summary

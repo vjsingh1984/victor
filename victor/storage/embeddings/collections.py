@@ -389,7 +389,7 @@ class StaticEmbeddingCollection:
         query_embedding = await self.embedding_service.embed_text(query)
 
         # Calculate similarities
-        similarities = EmbeddingService.cosine_similarity_matrix(query_embedding, self._embeddings)
+        similarities = self.embedding_service.cosine_similarity_matrix(query_embedding, self._embeddings)
 
         # Get top-k indices
         top_indices = np.argsort(similarities)[::-1][:top_k]
@@ -429,7 +429,7 @@ class StaticEmbeddingCollection:
         query_embedding = self.embedding_service.embed_text_sync(query)
 
         # Calculate similarities
-        similarities = EmbeddingService.cosine_similarity_matrix(query_embedding, self._embeddings)
+        similarities = self.embedding_service.cosine_similarity_matrix(query_embedding, self._embeddings)
 
         # Get top-k indices
         top_indices = np.argsort(similarities)[::-1][:top_k]

@@ -48,9 +48,9 @@ class TestEmbeddingConfigDefaults:
         assert config.embedding_model_type == "sentence-transformers"
 
     def test_default_embedding_model_is_unified(self):
-        """Test that default model is all-MiniLM-L12-v2 (unified model)."""
+        """Test that default model is BAAI/bge-small-en-v1.5 (unified model)."""
         config = EmbeddingConfig()
-        assert config.embedding_model_name == "all-MiniLM-L12-v2"
+        assert config.embedding_model == "BAAI/bge-small-en-v1.5"
 
     def test_default_distance_metric_is_cosine(self):
         """Test that default distance metric is cosine."""
@@ -71,7 +71,7 @@ class TestUnifiedEmbeddingModel:
     def test_unified_model_dimensions(self):
         """Test that unified model has 384 dimensions."""
         config = EmbeddingModelConfig(
-            model_type="sentence-transformers", model_name="all-MiniLM-L12-v2", dimension=384
+            embedding_type="sentence-transformers", model_name="all-MiniLM-L12-v2", dimension=384
         )
         assert config.dimension == 384
 
@@ -89,7 +89,7 @@ class TestUnifiedEmbeddingModel:
         mock_service._ensure_model_loaded = MagicMock()
 
         config = EmbeddingModelConfig(
-            model_type="sentence-transformers", model_name="all-MiniLM-L12-v2", dimension=384
+            embedding_type="sentence-transformers", model_name="all-MiniLM-L12-v2", dimension=384
         )
 
         # Patch at the location where it's imported in the model's initialize() method
@@ -118,7 +118,7 @@ class TestUnifiedEmbeddingModel:
             MockST.return_value = mock_model
 
             config = EmbeddingModelConfig(
-                model_type="sentence-transformers", model_name="all-MiniLM-L12-v2", dimension=384
+                embedding_type="sentence-transformers", model_name="all-MiniLM-L12-v2", dimension=384
             )
 
             model = SentenceTransformerModel(config)
@@ -145,7 +145,7 @@ class TestUnifiedEmbeddingModel:
         mock_service.embed_batch = AsyncMock(return_value=mock_embeddings)
 
         config = EmbeddingModelConfig(
-            model_type="sentence-transformers",
+            embedding_type="sentence-transformers",
             model_name="all-MiniLM-L12-v2",
             dimension=384,
             batch_size=32,
@@ -180,8 +180,8 @@ class TestLanceDBProvider:
         """Test that LanceDB initializes without network."""
         config = EmbeddingConfig(
             vector_store="lancedb",
-            embedding_model_type="sentence-transformers",
-            embedding_model_name="all-MiniLM-L12-v2",
+            embedding_embedding_type="sentence-transformers",
+            embedding_model="all-MiniLM-L12-v2",
             persist_directory=str(temp_dir),
             extra_config={"table_name": "test", "dimension": 384},
         )
@@ -211,8 +211,8 @@ class TestLanceDBProvider:
         """Test indexing and searching documents with LanceDB."""
         config = EmbeddingConfig(
             vector_store="lancedb",
-            embedding_model_type="sentence-transformers",
-            embedding_model_name="all-MiniLM-L12-v2",
+            embedding_embedding_type="sentence-transformers",
+            embedding_model="all-MiniLM-L12-v2",
             persist_directory=str(temp_dir),
             extra_config={"table_name": "test", "dimension": 384},
         )
@@ -272,8 +272,8 @@ class TestChromaDBProvider:
         """Test that ChromaDB initializes without network."""
         config = EmbeddingConfig(
             vector_store="chromadb",
-            embedding_model_type="sentence-transformers",
-            embedding_model_name="all-MiniLM-L12-v2",
+            embedding_embedding_type="sentence-transformers",
+            embedding_model="all-MiniLM-L12-v2",
             persist_directory=str(temp_dir),
             extra_config={"collection_name": "test", "dimension": 384},
         )
@@ -306,26 +306,26 @@ class TestMemoryOptimization:
         # Expected: 120MB for all-MiniLM-L12-v2
         # This is 40% less than separate models (80MB + 120MB = 200MB)
         config = EmbeddingModelConfig(
-            model_type="sentence-transformers", model_name="all-MiniLM-L12-v2", dimension=384
+            embedding_type="sentence-transformers", model_name="all-MiniLM-L12-v2", dimension=384
         )
 
         # Model size is approximately 120MB
 
         # This test documents the expected memory footprint
         # Actual measurement would require loading the model
-        assert config.model_name == "all-MiniLM-L12-v2"
+        assert config.embedding_model == "all-MiniLM-L12-v2"
         assert config.dimension == 384
 
     def test_separate_models_would_use_more_memory(self):
         """Document that separate models would use 200MB vs 120MB."""
         # Tool selection model
         tool_model = EmbeddingModelConfig(
-            model_type="sentence-transformers", model_name="all-MiniLM-L6-v2", dimension=384  # 80MB
+            embedding_type="sentence-transformers", model_name="all-MiniLM-L6-v2", dimension=384  # 80MB
         )
 
         # Codebase search model
         codebase_model = EmbeddingModelConfig(
-            model_type="sentence-transformers",
+            embedding_type="sentence-transformers",
             model_name="all-MiniLM-L12-v2",  # 120MB
             dimension=384,
         )
@@ -334,7 +334,7 @@ class TestMemoryOptimization:
         # Unified model = 120MB
         # Savings = 80MB (40% reduction)
 
-        assert tool_model.model_name != codebase_model.model_name
+        assert tool_model.embedding_model != codebase_model.embedding_model
         # This test documents the memory benefit of unified model
 
 
@@ -349,8 +349,8 @@ class TestAirgappedDemo:
             vector_store="lancedb",
             persist_directory="~/.victor/embeddings/airgapped_demo",
             distance_metric="cosine",
-            embedding_model_type="sentence-transformers",
-            embedding_model_name="all-MiniLM-L12-v2",
+            embedding_embedding_type="sentence-transformers",
+            embedding_model="all-MiniLM-L12-v2",
             extra_config={
                 "table_name": "airgapped_codebase",
                 "dimension": 384,
@@ -371,8 +371,8 @@ class TestAirgappedDemo:
             config = EmbeddingConfig(
                 vector_store="lancedb",
                 persist_directory=tmpdir,
-                embedding_model_type="sentence-transformers",
-                embedding_model_name="all-MiniLM-L12-v2",
+                embedding_embedding_type="sentence-transformers",
+                embedding_model="all-MiniLM-L12-v2",
                 extra_config={"table_name": "test", "dimension": 384},
             )
 
@@ -434,11 +434,11 @@ class TestCacheOptimization:
         # - ~50% reduction in page cache pressure
 
         unified_config = EmbeddingModelConfig(
-            model_type="sentence-transformers", model_name="all-MiniLM-L12-v2"  # Shared
+            embedding_type="sentence-transformers", model_name="all-MiniLM-L12-v2"  # Shared
         )
 
         # Both use cases use same model = same page cache entry
-        assert unified_config.model_name == "all-MiniLM-L12-v2"
+        assert unified_config.embedding_model == "all-MiniLM-L12-v2"
 
     def test_cpu_cache_benefits(self):
         """Document CPU L2/L3 cache benefits."""
@@ -452,10 +452,10 @@ class TestCacheOptimization:
         # Actual measurement would require performance profiling
 
         unified_config = EmbeddingModelConfig(
-            model_type="sentence-transformers", model_name="all-MiniLM-L12-v2"
+            embedding_type="sentence-transformers", model_name="all-MiniLM-L12-v2"
         )
 
-        assert unified_config.model_name == "all-MiniLM-L12-v2"
+        assert unified_config.embedding_model == "all-MiniLM-L12-v2"
 
 
 if __name__ == "__main__":

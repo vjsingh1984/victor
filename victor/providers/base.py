@@ -17,7 +17,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Protocol, runtime_checkable
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from victor.providers.circuit_breaker import (
     CircuitBreaker,
@@ -188,18 +188,27 @@ class ToolDefinition(BaseModel):
 class CompletionResponse(BaseModel):
     """Standard completion response format."""
 
-    model_config = ConfigDict(protected_namespaces=())
+    model_config = ConfigDict(protected_namespaces=(), populate_by_name=True)
 
     content: str = Field(..., description="Generated content")
     role: str = Field(default="assistant", description="Response role")
     tool_calls: Optional[List[Dict[str, Any]]] = Field(None, description="Tool calls requested")
     stop_reason: Optional[str] = Field(None, description="Why generation stopped")
     usage: Optional[Dict[str, int]] = Field(None, description="Token usage stats")
-    model_name: Optional[str] = Field(None, description="Model used")
+    model: Optional[str] = Field(
+        None,
+        description="Model used",
+        validation_alias=AliasChoices("model", "model_name"),
+    )
     raw_response: Optional[Dict[str, Any]] = Field(None, description="Raw provider response")
     metadata: Optional[Dict[str, Any]] = Field(
         None, description="Additional metadata (e.g., reasoning_content)"
     )
+
+    @property
+    def model_name(self) -> Optional[str]:
+        """Backward-compatible alias for model."""
+        return self.model
 
 
 class StreamChunk(BaseModel):

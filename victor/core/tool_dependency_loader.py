@@ -634,7 +634,7 @@ _VERTICAL_CANONICALIZE_SETTINGS: Dict[str, bool] = {
     "devops": False,  # Preserves distinct 'grep' vs 'code_search'
     "research": False,  # Preserves original tool names from ToolNames constants
     "rag": True,
-    "dataanalysis": False,  # Preserves 'code_search' as distinct from 'grep'
+    "data_analysis": False,  # Preserves 'code_search' as distinct from 'grep'
 }
 
 
@@ -677,13 +677,20 @@ def create_vertical_tool_dependency_provider(
         The individual wrapper classes (e.g., CodingToolDependencyProvider) are
         maintained for backward compatibility but delegate to this factory internally.
     """
+    from victor.core.verticals.naming import get_vertical_module_name, normalize_vertical_name
+
+    vertical = normalize_vertical_name(vertical)
+
     # Map verticals to their tool dependency YAML files
+    module_name = get_vertical_module_name("data_analysis")
+    data_analysis_path = Path(__file__).parent.parent / module_name / "tool_dependencies.yaml"
     yaml_paths = {
         "coding": Path(__file__).parent.parent / "coding" / "tool_dependencies.yaml",
         "devops": Path(__file__).parent.parent / "devops" / "tool_dependencies.yaml",
         "research": Path(__file__).parent.parent / "research" / "tool_dependencies.yaml",
         "rag": Path(__file__).parent.parent / "rag" / "tool_dependencies.yaml",
-        "dataanalysis": Path(__file__).parent.parent / "dataanalysis" / "tool_dependencies.yaml",
+        "data_analysis": data_analysis_path,
+        "dataanalysis": data_analysis_path,
     }
 
     if vertical not in yaml_paths:

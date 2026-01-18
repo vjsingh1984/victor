@@ -360,6 +360,100 @@ Running all examples (approximate costs):
 
 **Pro tip:** Use Ollama for development and testing!
 
+### Native Extensions (Rust-Accelerated)
+
+These examples demonstrate Victor's high-performance Rust extensions for 2-10x speedup on CPU-intensive operations.
+
+#### `file_operations_demo.py` - Parallel File System Operations
+**Requirements:** `pip install victor-ai[native]`
+
+Demonstrates 2-3x faster directory traversal and 3-5x faster metadata collection:
+- Parallel directory walking with glob patterns
+- Efficient file filtering (extension, size, time)
+- Batch metadata collection
+- Directory statistics
+- Performance benchmarking (Rust vs Python)
+
+```bash
+# Install with native extensions
+pip install victor-ai[native]
+
+# Run demo
+python examples/file_operations_demo.py
+```
+
+**Performance gains:**
+- 2-3x faster directory traversal
+- 3-5x faster metadata collection
+- Near-instant file filtering
+
+#### `embedding_ops_demo.py` - SIMD-Optimized Embedding Operations
+**Requirements:** `pip install victor-ai[native]`
+
+Shows SIMD-accelerated embedding operations:
+- Batch cosine similarity with parallel processing
+- Top-K similarity search
+- Embedding caching for repeated queries
+- Performance benchmarking
+
+```bash
+python examples/embedding_ops_demo.py
+```
+
+**Performance gains:**
+- 5-10x faster batch similarity computation
+- 3-5x faster top-K search
+- Efficient caching reduces redundant computation
+
+#### `ast_processor_demo.py` - Tree-Sitter AST Parsing
+**Requirements:** `pip install victor-ai[native]`
+
+Demonstrates high-performance code analysis with tree-sitter:
+- AST parsing with caching
+- Symbol extraction
+- Code pattern matching
+- Query optimization
+
+```bash
+python examples/ast_processor_demo.py
+```
+
+**Performance gains:**
+- 10-20x faster AST parsing
+- Symbol extraction with positional information
+- Intelligent caching for repeated analysis
+
+#### `tool_selector_demo.py` - Accelerated Tool Selection
+**Requirements:** `pip install victor-ai[native]`
+
+Shows fast tool selection with parallel similarity computation:
+- Semantic similarity-based tool ranking
+- Category filtering
+- Caching for performance
+- Benchmarking vs pure Python
+
+```bash
+python examples/tool_selector_demo.py
+```
+
+**Performance gains:**
+- 3-5x faster tool selection
+- Parallel similarity computation
+- Reduced latency for tool-heavy workflows
+
+#### `embedding_benchmark_example.py` - Embedding Performance
+**Requirements:** `pip install victor-ai[native]`
+
+Comprehensive benchmarking of embedding operations:
+- Vector operations benchmark
+- Similarity search performance
+- Memory usage analysis
+- Comparison of quantized vs full precision
+
+```bash
+python examples/embedding_benchmark_example.py
+```
+
 ## Troubleshooting
 
 ### "Connection refused" errors

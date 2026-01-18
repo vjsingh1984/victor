@@ -571,7 +571,7 @@ class SQLiteServiceHandler(BaseService):
                     await cursor.fetchone()
                 return HealthCheckResult(
                     HealthStatus.HEALTHY,
-                    f"SQLite database connected",
+                    "SQLite database connected",
                 )
             except Exception as e:
                 return HealthCheckResult(
@@ -719,7 +719,7 @@ class DockerServiceHandler(BaseService):
                 if status == "running":
                     return HealthCheckResult(
                         HealthStatus.HEALTHY,
-                        f"Container running",
+                        "Container running",
                         {"container_id": self._container.id[:12]},
                     )
                 else:
@@ -834,7 +834,7 @@ class HTTPServiceHandler(BaseService):
         if self._client:
             return HealthCheckResult(
                 HealthStatus.HEALTHY,
-                f"HTTP client ready",
+                "HTTP client ready",
                 {"base_url": self._http_config.base_url},
             )
         return HealthCheckResult(
@@ -931,7 +931,7 @@ class ExternalServiceHandler(BaseService):
             # No health check configured, assume healthy
             return HealthCheckResult(
                 HealthStatus.UNKNOWN,
-                f"No health check configured for external service",
+                "No health check configured for external service",
             )
 
         try:
@@ -948,7 +948,7 @@ class ExternalServiceHandler(BaseService):
             if response.status_code == self._external_config.expected_status:
                 return HealthCheckResult(
                     HealthStatus.HEALTHY,
-                    f"External service responding",
+                    "External service responding",
                 )
             else:
                 return HealthCheckResult(

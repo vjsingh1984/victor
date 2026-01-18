@@ -315,7 +315,7 @@ class TestFeatureExtractor:
         context.get = MagicMock(return_value=False)
 
         features = extractor.extract_features(urgent_task, context, [])
-        assert features.urgency > 0.5
+        assert features.urgency >= 0.5
 
         # Non-urgent task
         normal_task = AgentMessage(

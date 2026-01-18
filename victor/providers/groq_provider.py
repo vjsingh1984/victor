@@ -47,6 +47,7 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
+    ProviderError,
     ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
@@ -177,6 +178,13 @@ class GroqProvider(BaseProvider, HTTPErrorHandlerMixin):
     def name(self) -> str:
         """Provider name."""
         return "groq"
+
+    def _handle_error(self, error: Exception, provider_name: str) -> ProviderError:
+        """Customize generic error messaging for Groq."""
+        handled = super()._handle_error(error, provider_name)
+        if type(handled) is ProviderError:
+            handled.message = f"Unexpected error from Groq: {error}"
+        return handled
 
     def supports_tools(self) -> bool:
         """Groq supports native tool calling."""

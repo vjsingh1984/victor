@@ -141,12 +141,12 @@ class ProfileCommand(BaseSlashCommand):
 
             ctx.console.print(
                 f"[dim]Switching to profile '{profile_name}' "
-                f"({profile_config.provider}:{profile_config.model})...[/]"
+                f"({profile_config.provider}:{profile_config.model_name})...[/]"
             )
 
             if ctx.agent.switch_provider(
                 provider_name=profile_config.provider,
-                model=profile_config.model,
+                model=profile_config.model_name,
             ):
                 info = ctx.agent.get_current_provider_info()
                 ctx.console.print(f"[green]Switched to profile:[/] [cyan]{profile_name}[/]")
