@@ -416,9 +416,19 @@ class ValidatorFactory:
         elif transform_type == "title":
             transform = str.title
         elif transform_type == "trim":
-            transform = lambda x: x.strip() if isinstance(x, str) else x
+
+            def _trim_transform(x: Any) -> Any:
+                """Strip whitespace from strings, pass through other types."""
+                return x.strip() if isinstance(x, str) else x
+
+            transform = _trim_transform
         else:
-            transform = lambda x: x
+
+            def _identity_transform(x: Any) -> Any:
+                """Pass through value unchanged."""
+                return x
+
+            transform = _identity_transform
 
         return TransformingValidator(
             validator=inner,

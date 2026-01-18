@@ -1,0 +1,614 @@
+# DevOps Vertical Template
+# Production template for infrastructure and deployment verticals
+# Based on Victor's DevOpsAssistant - competitive with Docker Desktop AI, Terraform Assistant
+
+metadata:
+  name: devops
+  description: "Infrastructure automation, container management, CI/CD, and deployment"
+  version: "1.0.0"
+  author: "Victor Team"
+  license: "Apache-2.0"
+  category: operations
+  tags:
+    - devops
+    - infrastructure
+    - docker
+    - kubernetes
+    - cicd
+    - deployment
+  provider_hints:
+    preferred_models:
+      - claude-sonnet-4-5
+      - gpt-4
+    min_context: 128000
+    supports_tools: true
+  evaluation_criteria:
+    - infrastructure_success
+    - deployment_success_rate
+    - configuration_validity
+    - security_compliance
+
+# Core tools for DevOps operations
+tools:
+  # Core filesystem
+  - read_file
+  - write_file
+  - edit_file
+  - ls
+
+  # Shell for infrastructure commands
+  - shell
+
+  # Git for version control
+  - git
+
+  # Container and infrastructure tools
+  - docker
+
+  # Run tests - essential for validation
+  - test
+
+  # Code search for configurations
+  - grep
+  - code_search
+  - overview
+
+  # Web for documentation
+  - web_search
+  - web_fetch
+
+# Main system prompt
+system_prompt: |
+  You are a DevOps engineer assistant specializing in infrastructure automation.
+
+  ## Core Capabilities
+
+  1. **Containerization**: Docker, Docker Compose, container best practices
+  2. **CI/CD**: GitHub Actions, GitLab CI, Jenkins, CircleCI
+  3. **Infrastructure as Code**: Terraform, Ansible, CloudFormation, Pulumi
+  4. **Orchestration**: Kubernetes, Helm, ArgoCD
+  5. **Monitoring**: Prometheus, Grafana, ELK, Datadog
+
+  ## Security-First Principles
+
+  1. **Never commit secrets**: Use environment variables, secrets managers
+  2. **Least privilege**: Minimize permissions in all configurations
+  3. **Encrypted at rest**: Enable encryption for data storage
+  4. **Network isolation**: Use proper network segmentation
+
+  ## DevOps Workflow
+
+  1. **ASSESS**: Understand current infrastructure state
+  2. **PLAN**: Design solution with security and scalability in mind
+  3. **IMPLEMENT**: Write declarative configurations
+  4. **VALIDATE**: Test in staging before production
+  5. **DEPLOY**: Use blue-green or canary deployments when possible
+  6. **MONITOR**: Set up metrics, logs, and alerts
+
+  ## Configuration Best Practices
+
+  - Always use multi-stage builds in Dockerfiles
+  - Pin versions in all dependencies
+  - Include health checks in container configs
+  - Use resource limits in Kubernetes
+  - Document all configuration decisions
+  - Keep infrastructure code DRY with modules/templates
+
+  ## Output Format
+
+  When creating configurations:
+  1. Provide complete, runnable configurations
+  2. Include inline comments explaining key decisions
+  3. Note any prerequisites or dependencies
+  4. Suggest validation commands to verify correctness
+
+# Stage definitions for DevOps workflow
+stages:
+  INITIAL:
+    name: INITIAL
+    description: "Understanding the infrastructure request"
+    tools:
+      - read_file
+      - ls
+      - overview
+    keywords:
+      - what
+      - how
+      - explain
+      - infrastructure
+      - setup
+    next_stages:
+      - ASSESSMENT
+      - PLANNING
+
+  ASSESSMENT:
+    name: ASSESSMENT
+    description: "Assessing current infrastructure state"
+    tools:
+      - read_file
+      - shell
+      - grep
+      - git
+    keywords:
+      - check
+      - status
+      - current
+      - existing
+      - review
+    next_stages:
+      - PLANNING
+      - IMPLEMENTATION
+
+  PLANNING:
+    name: PLANNING
+    description: "Planning infrastructure changes"
+    tools:
+      - read_file
+      - grep
+      - web_search
+      - web_fetch
+    keywords:
+      - plan
+      - design
+      - architecture
+      - strategy
+    next_stages:
+      - IMPLEMENTATION
+
+  IMPLEMENTATION:
+    name: IMPLEMENTATION
+    description: "Implementing infrastructure changes"
+    tools:
+      - write_file
+      - edit_file
+      - shell
+      - docker
+    keywords:
+      - create
+      - build
+      - configure
+      - implement
+      - deploy
+    next_stages:
+      - VALIDATION
+      - DEPLOYMENT
+
+  VALIDATION:
+    name: VALIDATION
+    description: "Validating configurations and testing"
+    tools:
+      - shell
+      - read_file
+      - test
+    keywords:
+      - test
+      - validate
+      - verify
+      - check
+    next_stages:
+      - DEPLOYMENT
+      - IMPLEMENTATION
+
+  DEPLOYMENT:
+    name: DEPLOYMENT
+    description: "Deploying to target environment"
+    tools:
+      - shell
+      - git
+      - docker
+    keywords:
+      - deploy
+      - push
+      - release
+      - launch
+    next_stages:
+      - MONITORING
+      - COMPLETION
+
+  MONITORING:
+    name: MONITORING
+    description: "Setting up monitoring and observability"
+    tools:
+      - write_file
+      - edit_file
+      - shell
+    keywords:
+      - monitor
+      - observe
+      - alert
+      - metrics
+    next_stages:
+      - COMPLETION
+
+  COMPLETION:
+    name: COMPLETION
+    description: "Documenting and finalizing"
+    tools:
+      - write_file
+      - git
+    keywords:
+      - done
+      - complete
+      - document
+      - finish
+    next_stages: []
+
+# Extension specifications
+extensions:
+  # Middleware for DevOps operations
+  middleware:
+    - name: git_safety
+      class_name: GitSafetyMiddleware
+      module: victor.framework.middleware
+      enabled: true
+      config:
+        block_dangerous: true
+        warn_on_risky: true
+        protected_branches:
+          - production
+          - staging
+          - main
+          - master
+
+    - name: secret_masking
+      class_name: SecretMaskingMiddleware
+      module: victor.framework.middleware
+      enabled: true
+      config:
+        replacement: "[REDACTED]"
+        mask_in_arguments: true
+
+    - name: audit_logging
+      class_name: LoggingMiddleware
+      module: victor.framework.middleware
+      enabled: true
+      config:
+        include_arguments: true
+        sanitize_arguments: true
+
+  # Safety patterns for dangerous DevOps operations
+  safety_patterns:
+    - name: production_deploy_without_review
+      pattern: "kubectl.*apply.*production"
+      description: "Direct production deployment without review"
+      severity: "critical"
+      category: "deployment"
+
+    - name: delete_all_pods
+      pattern: "kubectl.*delete.*pod.*--all"
+      description: "Delete all pods in namespace"
+      severity: "critical"
+      category: "kubernetes"
+
+    - name: force_delete_volumes
+      pattern: "docker.*volume.*rm.*-f"
+      description: "Force delete Docker volumes"
+      severity: "high"
+      category: "docker"
+
+    - name: terraform_destroy
+      pattern: "terraform.*destroy"
+      description: "Destroy all infrastructure"
+      severity: "critical"
+      category: "infrastructure"
+
+    - name: expose_secrets
+      pattern: "(echo|print).*password|secret|key"
+      description: "Potential secret exposure"
+      severity: "high"
+      category: "secrets"
+
+    - name: rm_logs
+      pattern: "rm.*/var/log"
+      description: "Delete system logs"
+      severity: "medium"
+      category: "system"
+
+  # Task-type-specific prompt hints
+  prompt_hints:
+    - task_type: container_setup
+      hint: "[CONTAINER] Create Dockerfile with multi-stage build, docker-compose for orchestration."
+      tool_budget: 8
+      priority_tools:
+        - write_file
+        - shell
+        - docker
+
+    - task_type: kubernetes_deploy
+      hint: "[K8S] Create manifests: Deployment, Service, ConfigMap, Secret. Use resource limits."
+      tool_budget: 12
+      priority_tools:
+        - write_file
+        - shell
+        - grep
+
+    - task_type: cicd_pipeline
+      hint: "[CI/CD] Create pipeline config with stages: build, test, deploy. Add secrets management."
+      tool_budget: 10
+      priority_tools:
+        - write_file
+        - read_file
+        - git
+
+    - task_type: infrastructure_as_code
+      hint: "[IaC] Write modular, reusable infrastructure code. Include state management."
+      tool_budget: 15
+      priority_tools:
+        - write_file
+        - shell
+        - web_search
+
+    - task_type: monitoring_setup
+      hint: "[MONITOR] Set up metrics collection, dashboards, and alerting rules."
+      tool_budget: 10
+      priority_tools:
+        - write_file
+        - shell
+        - edit_file
+
+    - task_type: diagnosis
+      hint: "[DIAGNOSE] Check logs, metrics, events. Identify root cause. Propose fix."
+      tool_budget: 12
+      priority_tools:
+        - shell
+        - read_file
+        - grep
+
+  # Workflow handlers for DevOps workflows
+  handlers:
+    container_setup:
+      description: "Set up containerized application with Docker"
+      handler: victor.devops.handlers:container_setup_handler
+
+    deploy:
+      description: "Deploy application to target environment"
+      handler: victor.devops.handlers:deploy_handler
+
+  # Agent personas for specialized DevOps tasks
+  personas:
+    docker_specialist:
+      name: "Docker Specialist"
+      description: "Expert in containerization and Docker best practices"
+      system_prompt_extension: |
+        You are a Docker specialist. Focus on:
+        - Multi-stage builds for image optimization
+        - Security scanning of images
+        - Proper volume and network configuration
+        - Health checks and resource limits
+        - Compose file best practices
+
+    kubernetes_expert:
+      name: "Kubernetes Expert"
+      description: "Specialist in Kubernetes orchestration and deployment"
+      system_prompt_extension: |
+        You are a Kubernetes expert. Focus on:
+        - Declarative configuration
+        - Resource limits and requests
+        - Probes (liveness, readiness, startup)
+        - ConfigMaps and Secrets
+        - RBAC and security contexts
+        - Helm charts for complex deployments
+
+    cicd_engineer:
+      name: "CI/CD Engineer"
+      description: "Expert in continuous integration and deployment pipelines"
+      system_prompt_extension: |
+        You are a CI/CD expert. Focus on:
+        - Pipeline as code
+        - Automated testing at each stage
+        - Secrets management
+        - Rollback strategies
+        - Deployment orchestration
+        - Build caching and optimization
+
+  # Composed middleware chains
+  composed_chains:
+    safe_deployment:
+      - git_safety
+      - secret_masking
+
+    infrastructure_audit:
+      - secret_masking
+      - audit_logging
+
+# Workflows - YAML workflow definitions
+workflows:
+  - name: container_setup
+    file: workflows/container_setup.yaml
+    description: "Set up containerized application with Docker and Docker Compose"
+
+  - name: deploy
+    file: workflows/deploy.yaml
+    description: "Deploy application with staging and production environments"
+
+# Teams - multi-agent team formations
+teams:
+  - name: infrastructure_team
+    display_name: Infrastructure Team
+    description: "Design and implement infrastructure with IaC best practices"
+    formation: pipeline
+    communication_style: structured
+    max_iterations: 8
+    roles:
+      - name: architect
+        display_name: Infrastructure Architect
+        description: Design scalable, secure infrastructure
+        persona: Cloud architect focused on reliability and security
+        tool_categories:
+          - web_search
+          - read_file
+          - grep
+        capabilities:
+          - architecture_design
+
+      - name: implementer
+        display_name: IaC Developer
+        description: Write infrastructure as code
+        persona: Automation engineer writing clean, reusable configs
+        tool_categories:
+          - write_file
+          - shell
+          - git
+        capabilities:
+          - terraform
+          - ansible
+
+      - name: validator
+        display_name: Configuration Validator
+        description: Validate and test infrastructure
+        persona: Quality-focused tester catching misconfigurations
+        tool_categories:
+          - shell
+          - test
+          - grep
+        capabilities:
+          - config_validation
+
+  - name: deployment_team
+    display_name: Deployment Team
+    description: "Plan and execute safe deployments to production"
+    formation: sequential
+    communication_style: structured
+    max_iterations: 5
+    roles:
+      - name: planner
+        display_name: Release Planner
+        description: Plan deployment strategy
+        persona: Risk-aware planner using blue-green or canary deployments
+        tool_categories:
+          - read_file
+          - grep
+        capabilities:
+          - deployment_planning
+
+      - name: executor
+        display_name: Deployment Executor
+        description: Execute deployment steps
+        persona: Methodical engineer following runbooks
+        tool_categories:
+          - shell
+          - docker
+          - git
+        capabilities:
+          - kubernetes
+          - docker
+
+      - name: monitor
+        display_name: Deployment Monitor
+        description: Monitor deployment health
+        persona: Observability expert watching metrics and logs
+        tool_categories:
+          - shell
+          - read_file
+        capabilities:
+          - monitoring
+
+# Capabilities - dynamic capability loading
+capabilities:
+  - name: container_management
+    type: tool
+    description: "Docker and container orchestration"
+    enabled: true
+
+  - name: kubernetes_deployment
+    type: workflow
+    description: "Kubernetes deployment and management"
+    enabled: true
+    handler: "victor.devops.workflows:KubernetesDeploymentWorkflow"
+
+  - name: cicd_orchestration
+    type: workflow
+    description: "CI/CD pipeline creation and management"
+    enabled: true
+    config:
+      supported_platforms:
+        - github
+        - gitlab
+        - jenkins
+
+# Custom configuration - DevOps-specific settings
+custom_config:
+  # Infrastructure support
+  supports_docker: true
+  supports_kubernetes: true
+  supports_terraform: true
+
+  # Deployment environments
+  environments:
+    - development
+    - staging
+    - production
+
+  # Protected branches and environments
+  protected_branches:
+    - production
+    - staging
+    - main
+
+  protected_environments:
+    - production
+
+  # Infrastructure as Code frameworks
+  iac_frameworks:
+    - terraform
+    - ansible
+    - cloudformation
+    - pulumi
+
+  # Container registries
+  container_registries:
+    - docker_hub
+    - github_container_registry
+    - aws_ecr
+    - gcp_artifact_registry
+
+  # CI/CD platforms
+  cicd_platforms:
+    - github_actions
+    - gitlab_ci
+    - jenkins
+    - circleci
+
+  # Monitoring stacks
+  monitoring_stacks:
+    - prometheus_grafana
+    - elk_stack
+    - datadog
+    - cloudwatch
+
+  # Grounding rules
+  grounding_rules: |
+    Never expose secrets in configurations. Use environment variables or secret managers.
+    Always validate configurations in staging before production.
+    Use declarative, idempotent infrastructure code.
+    Implement proper resource limits and health checks.
+    Document all infrastructure decisions.
+
+  # System prompt sections
+  system_prompt_section: |
+    Infrastructure as code is immutable and versioned.
+    All changes go through pull requests with reviews.
+    Automated testing required before deployment.
+    Monitor everything and set up alerting.
+
+# File templates - infrastructure scaffolding templates
+file_templates:
+  dockerfile:
+    template_path: templates/devops/dockerfile.j2
+    output_pattern: "Dockerfile"
+    description: "Multi-stage Dockerfile template"
+
+  docker_compose:
+    template_path: templates/devops/docker-compose.j2
+    output_pattern: "docker-compose.yml"
+    description: "Docker Compose orchestration template"
+
+  kubernetes_deployment:
+    template_path: templates/devops/k8s-deployment.j2
+    output_pattern: "{}-deployment.yaml"
+    description: "Kubernetes Deployment manifest"
+
+  github_actions:
+    template_path: templates/devops/github-actions.j2
+    output_pattern: ".github/workflows/{}.yml"
+    description: "GitHub Actions workflow template"

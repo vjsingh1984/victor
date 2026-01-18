@@ -1,0 +1,408 @@
+# RAG Vertical Template
+# Production template for Retrieval-Augmented Generation verticals
+# Based on Victor's RAGAssistant - complete RAG implementation with document ingestion
+
+metadata:
+  name: rag
+  description: "Retrieval-Augmented Generation assistant for document Q&A"
+  version: "1.0.0"
+  author: "Victor Team"
+  license: "Apache-2.0"
+  category: knowledge
+  tags:
+    - rag
+    - retrieval
+    - documents
+    - knowledge-base
+    - embeddings
+    - vector-search
+  provider_hints:
+    preferred_models:
+      - claude-sonnet-4-5
+      - gpt-4
+    min_context: 128000
+    supports_tools: true
+    embedding_models:
+      - text-embedding-3-small
+      - text-embedding-ada-002
+  evaluation_criteria:
+    - retrieval_accuracy
+    - answer_relevance
+    - citation_quality
+    - response_completeness
+
+# Core tools for RAG operations
+tools:
+  # RAG-specific tools
+  - rag_ingest
+  - rag_search
+  - rag_query
+  - rag_list
+  - rag_delete
+  - rag_stats
+
+  # Filesystem for document access (canonical names)
+  - read_file
+  - ls
+
+  # Web for fetching web content
+  - web_fetch
+
+  # Shell for document processing
+  - shell
+
+# Main system prompt
+system_prompt: |
+  You are Victor, a Retrieval-Augmented Generation (RAG) assistant.
+
+  Your capabilities:
+  - Ingest documents from files (PDF, Markdown, Text, Code)
+  - Index documents with semantic embeddings using LanceDB
+  - Search for relevant information using hybrid search
+  - Answer questions with source citations
+  - Manage the document knowledge base
+
+  Guidelines:
+  - Always search the knowledge base before answering questions
+  - Cite sources by referencing document names and page/section numbers
+  - If information isn't in the knowledge base, say so clearly
+  - Use rag_ingest to add new documents when requested
+  - Use rag_search for exploratory queries
+  - Use rag_query for direct Q&A with automatic context retrieval
+
+  Workflow:
+  1. For questions: Use rag_query to search and get relevant context
+  2. For exploration: Use rag_search to find related chunks
+  3. For adding docs: Use rag_ingest with file paths or URLs
+  4. Always cite your sources in answers
+
+  Example interaction:
+  User: "What does the documentation say about authentication?"
+  You: [Use rag_query tool with query="authentication"]
+       Then synthesize the results with citations.
+
+# Stage definitions for RAG workflow
+stages:
+  INITIAL:
+    name: INITIAL
+    description: "Ready to accept RAG queries"
+    tools:
+      - rag_search
+      - rag_query
+      - rag_list
+      - rag_stats
+    keywords:
+      - question
+      - query
+      - search
+      - what
+    next_stages:
+      - INGESTING
+      - SEARCHING
+      - QUERYING
+
+  INGESTING:
+    name: INGESTING
+    description: "Ingesting documents into knowledge base"
+    tools:
+      - rag_ingest
+      - read_file
+      - ls
+      - web_fetch
+    keywords:
+      - ingest
+      - add
+      - import
+      - load
+      - document
+    next_stages:
+      - INITIAL
+      - SEARCHING
+
+  SEARCHING:
+    name: SEARCHING
+    description: "Searching knowledge base"
+    tools:
+      - rag_search
+      - rag_query
+    keywords:
+      - search
+      - find
+      - look up
+      - explore
+    next_stages:
+      - INITIAL
+      - QUERYING
+      - SYNTHESIZING
+
+  QUERYING:
+    name: QUERYING
+    description: "Processing query with retrieved context"
+    tools:
+      - rag_query
+    keywords:
+      - query
+      - question
+      - answer
+      - tell me
+    next_stages:
+      - SYNTHESIZING
+      - SEARCHING
+
+  SYNTHESIZING:
+    name: SYNTHESIZING
+    description: "Synthesizing answer from retrieved context"
+    tools: []
+    keywords:
+      - synthesize
+      - combine
+      - summarize
+    next_stages:
+      - INITIAL
+
+# Extension specifications
+extensions:
+  # Middleware for RAG operations
+  middleware:
+    - name: document_validation
+      class_name: DocumentValidationMiddleware
+      module: victor.rag.middleware
+      enabled: true
+      config:
+        max_file_size: 10485760  # 10MB
+        supported_formats:
+          - pdf
+          - md
+          - txt
+          - py
+          - js
+          - ts
+
+    - name: citation_tracking
+      class_name: CitationTrackingMiddleware
+      module: victor.rag.middleware
+      enabled: true
+      config:
+        require_citations: true
+        citation_format: "source_page_section"
+
+  # Safety patterns for RAG operations
+  safety_patterns:
+    - name: delete_all_documents
+      pattern: "rag_delete.*all"
+      description: "Delete all documents from knowledge base"
+      severity: "critical"
+      category: "data_loss"
+
+    - name: malicious_document_ingest
+      pattern: "rag_ingest.*\\.exe|\\.sh|\\.bat"
+      description: "Ingesting executable files"
+      severity: "medium"
+      category: "security"
+
+  # Task-type-specific prompt hints
+  prompt_hints:
+    - task_type: question_answering
+      hint: "[QA] Use rag_query for direct questions. Context is automatically retrieved."
+      tool_budget: 3
+      priority_tools:
+        - rag_query
+
+    - task_type: exploratory_search
+      hint: "[EXPLORE] Use rag_search to find relevant chunks. Then summarize findings."
+      tool_budget: 5
+      priority_tools:
+        - rag_search
+
+    - task_type: document_ingestion
+      hint: "[INGEST] Use rag_ingest with file paths. Documents are chunked and indexed."
+      tool_budget: 8
+      priority_tools:
+        - rag_ingest
+        - ls
+        - read_file
+
+    - task_type: knowledge_management
+      hint: "[MANAGE] Use rag_list to see documents, rag_stats for stats, rag_delete to remove."
+      tool_budget: 5
+      priority_tools:
+        - rag_list
+        - rag_stats
+        - rag_delete
+
+  # Workflow handlers for RAG operations
+  handlers:
+    document_ingestion:
+      description: "Ingest and index documents"
+      handler: victor.rag.handlers:document_ingestion_handler
+
+    query_processing:
+      description: "Process queries with retrieval"
+      handler: victor.rag.handlers:query_processing_handler
+
+  # Agent personas for specialized RAG tasks
+  personas:
+    librarian:
+      name: "Digital Librarian"
+      description: "Expert in document organization and retrieval"
+      system_prompt_extension: |
+        You are a digital librarian. Focus on:
+        - Proper document categorization
+        - Accurate metadata extraction
+        - Efficient chunking strategies
+        - Source attribution and citation
+
+    research_assistant:
+      name: "Research Assistant"
+      description: "Specialist in information retrieval and synthesis"
+      system_prompt_extension: |
+        You are a research assistant. Focus on:
+        - Comprehensive search strategies
+        - Source verification
+        - Synthesizing information from multiple sources
+        - Proper citation formatting
+
+  # Composed middleware chains
+  composed_chains:
+    safe_ingestion:
+      - document_validation
+      - citation_tracking
+
+# Workflows - YAML workflow definitions
+workflows:
+  - name: bulk_ingestion
+    file: workflows/bulk_ingestion.yaml
+    description: "Ingest multiple documents into knowledge base"
+
+  - name: qa_pipeline
+    file: workflows/qa_pipeline.yaml
+    description: "Question-answering pipeline with retrieval"
+
+# Teams - multi-agent team formations
+teams:
+  - name: research_team
+    display_name: Document Research Team
+    description: "Research and synthesize information from multiple documents"
+    formation: parallel
+    communication_style: structured
+    max_iterations: 5
+    roles:
+      - name: retriever
+        display_name: Information Retriever
+        description: Search and retrieve relevant documents
+        persona: Efficient searcher with deep knowledge of the corpus
+        tool_categories:
+          - rag_search
+          - rag_query
+        capabilities:
+          - semantic_search
+
+      - name: analyzer
+        display_name: Document Analyzer
+        description: Analyze document content and structure
+        persona: Detail-oriented analyst extracting key information
+        tool_categories:
+          - rag_query
+          - read_file
+        capabilities:
+          - content_analysis
+
+      - name: synthesizer
+        display_name: Information Synthesizer
+        description: Synthesize findings into coherent answers
+        persona: Clear communicator combining multiple sources
+        tool_categories:
+          - rag_query
+        capabilities:
+          - information_synthesis
+
+# Capabilities - dynamic capability loading
+capabilities:
+  - name: document_ingestion
+    type: workflow
+    description: "Ingest documents from various formats"
+    enabled: true
+    handler: "victor.rag.workflows:DocumentIngestionWorkflow"
+    config:
+      chunk_size: 512
+      chunk_overlap: 50
+
+  - name: semantic_search
+    type: tool
+    description: "Semantic vector search with embeddings"
+    enabled: true
+
+  - name: hybrid_search
+    type: tool
+    description: "Hybrid vector + keyword search"
+    enabled: true
+
+  - name: citation_generation
+    type: tool
+    description: "Generate source citations"
+    enabled: true
+
+# Custom configuration - RAG-specific settings
+custom_config:
+  # Document store configuration
+  store_type: lancedb
+  store_path: ~/.victor/rag/store
+
+  # Embedding configuration
+  embedding_model: text-embedding-3-small
+  embedding_dimension: 1536
+
+  # Chunking configuration
+  chunk_size: 512
+  chunk_overlap: 50
+  max_chunks_per_document: 10000
+
+  # Search configuration
+  default_top_k: 5
+  max_top_k: 20
+  similarity_threshold: 0.7
+
+  # Supported document formats
+  supported_formats:
+    - pdf
+    - markdown
+    - txt
+    - python
+    - javascript
+    - typescript
+    - rust
+    - go
+    - java
+
+  # Maximum file size for ingestion (10MB)
+  max_file_size: 10485760
+
+  # Citation configuration
+  require_citations: true
+  citation_format: "source_page_section"
+
+  # Grounding rules
+  grounding_rules: |
+    Always base answers on retrieved document content.
+    Cite sources for all claims and information.
+    If information is not found, state clearly.
+    Never fabricate information not in documents.
+
+  # System prompt sections
+  system_prompt_section: |
+    Documents are your knowledge base. Search before answering.
+    Always provide citations with source, page, and section.
+    Synthesize information from multiple documents when relevant.
+    Be transparent about what you don't know.
+
+# File templates - RAG scaffolding templates
+file_templates:
+  document_index:
+    template_path: templates/rag/document_index.j2
+    output_pattern: "document_index.json"
+    description: "Document index metadata template"
+
+  citation_report:
+    template_path: templates/rag/citation_report.j2
+    output_pattern: "citations_{}.md"
+    description: "Citation report template"

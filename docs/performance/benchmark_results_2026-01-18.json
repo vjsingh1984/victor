@@ -1,0 +1,52 @@
+{
+  "timestamp": "2026-01-18T14:17:19.466391",
+  "tool_selection": {
+    "cold_cache": {
+      "avg_ms": 1.49,
+      "p95_ms": 3.24,
+      "hit_rate": 0.0
+    },
+    "warm_cache": {
+      "avg_ms": 0.95,
+      "p95_ms": 0.76,
+      "hit_rate": 100.0,
+      "speedup": 1.568421052631579,
+      "latency_reduction": 36.241610738255034
+    },
+    "mixed_cache": {
+      "avg_ms": 1.41,
+      "p95_ms": 4.0,
+      "hit_rate": 50.0,
+      "speedup": 1.0567375886524824,
+      "latency_reduction": 5.369127516778526
+    },
+    "context_cache": {
+      "avg_ms": 0.91,
+      "p95_ms": 2.67,
+      "hit_rate": 100.0,
+      "speedup": 1.6373626373626373,
+      "latency_reduction": 38.92617449664429
+    },
+    "rl_cache": {
+      "avg_ms": 0.61,
+      "p95_ms": 0.63,
+      "hit_rate": 100.0,
+      "speedup": 2.442622950819672,
+      "latency_reduction": 59.06040268456376
+    }
+  },
+  "startup": {},
+  "improvements": {
+    "tool_selection": {
+      "warm_cache_speedup": 1.568421052631579,
+      "warm_cache_latency_reduction": 36.241610738255034,
+      "context_cache_speedup": 1.6373626373626373,
+      "context_cache_latency_reduction": 38.92617449664429,
+      "rl_cache_speedup": 2.442622950819672,
+      "rl_cache_latency_reduction": 59.06040268456376
+    },
+    "startup": {
+      "vertical_load_times": {}
+    }
+  }
+}

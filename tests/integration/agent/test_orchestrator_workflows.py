@@ -194,11 +194,8 @@ class TestToolExecutionFlow:
         mock_tool.execute = AsyncMock(side_effect=failing_execute)
 
         # Execute tool and catch error
-        try:
+        with pytest.raises(ValueError, match="Tool execution failed"):
             await mock_tool.execute(path="/test/path")
-            assert False, "Expected ValueError"
-        except ValueError as e:
-            assert "Tool execution failed" in str(e)
 
 
 # =============================================================================
@@ -654,11 +651,8 @@ class TestErrorHandling:
         test_provider.chat = AsyncMock(side_effect=failing_chat)
 
         # Verify error raised
-        try:
+        with pytest.raises(RuntimeError, match="Provider unavailable"):
             await test_provider.chat(messages=[{"role": "user", "content": "Hello"}])
-            assert False, "Expected RuntimeError"
-        except RuntimeError as e:
-            assert "Provider unavailable" in str(e)
 
     @pytest.mark.asyncio
     async def test_analytics_coordinator_failure_graceful(self, test_provider):
@@ -715,17 +709,14 @@ class TestErrorHandling:
         mock_context_coordinator.compact_context = AsyncMock(side_effect=failing_compact)
 
         # Verify error raised
-        try:
-            context = {
-                "messages": [],
-                "token_count": 10000,
-            }
-            budget = {"max_tokens": 4096}
+        context = {
+            "messages": [],
+            "token_count": 10000,
+        }
+        budget = {"max_tokens": 4096}
 
+        with pytest.raises(RuntimeError, match="Compaction service unavailable"):
             await mock_context_coordinator.compact_context(context, budget)
-            assert False, "Expected RuntimeError"
-        except RuntimeError as e:
-            assert "Compaction service unavailable" in str(e)
 
 
 # =============================================================================

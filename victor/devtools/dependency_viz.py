@@ -192,7 +192,7 @@ class DependencyGraph:
     def _filter_imports(self, imports: Set[str]) -> Set[str]:
         """Filter out non-Victor imports."""
         # Standard library modules (partial list)
-        {
+        stdlib_modules = {
             "os",
             "sys",
             "re",
@@ -219,7 +219,7 @@ class DependencyGraph:
         }
 
         # Common third-party packages
-        {
+        third_party_packages = {
             "pytest",
             "click",
             "rich",
@@ -239,6 +239,9 @@ class DependencyGraph:
             # Keep imports that look like they might be victor modules
             # (without 'victor.' prefix for relative imports)
             elif any(m.name == imp for m in self.modules.values() if m.is_internal):
+                filtered.add(imp)
+            # Filter out standard library and third-party packages
+            elif imp not in stdlib_modules and imp not in third_party_packages:
                 filtered.add(imp)
 
         return filtered

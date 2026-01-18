@@ -23,6 +23,15 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from victor.core.verticals.base import StageDefinition, VerticalBase, VerticalConfig
 from victor.tools.tool_names import ToolNames
 
+# Import ISP-compliant provider protocols
+from victor.core.verticals.protocols.providers import (
+    HandlerProvider,
+    ModeConfigProvider,
+    TieredToolConfigProvider,
+    ToolProvider,
+    WorkflowProvider,
+)
+
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import ModeConfigProviderProtocol
     from victor.core.vertical_types import TieredToolConfig
@@ -38,6 +47,19 @@ class BenchmarkVertical(VerticalBase):
     - Benchmark-specific stages (UNDERSTANDING → ANALYSIS → IMPLEMENTATION → VERIFICATION)
     - Workflows for common benchmark patterns
     - Metrics collection through framework observability
+
+    ISP Compliance:
+        This vertical explicitly declares which protocols it implements through
+        protocol registration, rather than inheriting from all possible protocol
+        interfaces. This follows the Interface Segregation Principle (ISP) by
+        implementing only needed protocols.
+
+        Implemented Protocols:
+        - ToolProvider: Provides tools optimized for benchmark task execution
+        - WorkflowProvider: Provides YAML-based workflows (swe_bench, passk, etc.)
+        - ModeConfigProvider: Provides mode configurations (fast, default, thorough)
+        - HandlerProvider: Provides benchmark compute handlers
+        - TieredToolConfigProvider: Provides tiered tool configuration
     """
 
     name = "benchmark"
@@ -297,3 +319,16 @@ You are being evaluated on:
         except ImportError:
             # Handlers not yet implemented
             return {}
+
+
+# Register protocols at module level after class definition
+BenchmarkVertical.register_protocol(ToolProvider)
+BenchmarkVertical.register_protocol(WorkflowProvider)
+BenchmarkVertical.register_protocol(ModeConfigProvider)
+BenchmarkVertical.register_protocol(HandlerProvider)
+BenchmarkVertical.register_protocol(TieredToolConfigProvider)
+
+# ISP Compliance Note:
+# This vertical explicitly declares protocol conformance through registration
+# rather than inheriting from all protocol interfaces. The framework can check
+# capabilities via isinstance(vertical, ToolProvider).

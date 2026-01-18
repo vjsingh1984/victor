@@ -507,16 +507,19 @@ class ProviderErrorScenariosTest(ABC):
 
     @pytest.mark.asyncio
     @pytest.mark.integration
+    @abstractmethod
     async def test_network_error_recovery(self):
         """Test provider handles network errors gracefully."""
 
     @pytest.mark.asyncio
     @pytest.mark.integration
+    @abstractmethod
     async def test_malformed_response_handling(self):
         """Test provider handles malformed responses."""
 
     @pytest.mark.asyncio
     @pytest.mark.integration
+    @abstractmethod
     async def test_concurrent_request_handling(self):
         """Test provider handles concurrent requests."""
 
@@ -540,12 +543,14 @@ class ProviderPerformanceTest(ABC):
     @pytest.mark.asyncio
     @pytest.mark.integration
     @pytest.mark.slow
+    @abstractmethod
     async def test_response_latency(self):
         """Test provider response latency is acceptable."""
 
     @pytest.mark.asyncio
     @pytest.mark.integration
     @pytest.mark.slow
+    @abstractmethod
     async def test_throughput(self):
         """Test provider throughput under load."""
 

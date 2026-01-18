@@ -671,7 +671,7 @@ def python_filter_generator(
     Returns:
         Filtered list of tools
     """
-    return list(t for t in tools if categories.get(t) in available)
+    return [t for t in tools if categories.get(t) in available]
 
 
 def python_filter_set(tools: List[str], categories: Dict[str, str], available: set) -> List[str]:

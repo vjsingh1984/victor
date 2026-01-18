@@ -205,7 +205,6 @@ class AstProcessorAccelerator:
         "lua": "lua",
         "ocaml": "ocaml",
         "r": "r",
-        "swift": "swift",
         "zig": "zig",
     }
 

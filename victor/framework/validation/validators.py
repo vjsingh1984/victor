@@ -795,13 +795,13 @@ class TypeValidator(BaseValidator):
             Tuple of (success, coerced_value)
         """
         try:
-            if target_type == int:
+            if target_type is int:
                 return True, int(float(value)) if isinstance(value, str) else int(value)
-            if target_type == float:
+            if target_type is float:
                 return True, float(value)
-            if target_type == str:
+            if target_type is str:
                 return True, str(value)
-            if target_type == bool:
+            if target_type is bool:
                 if isinstance(value, str):
                     return True, value.lower() in ("true", "1", "yes", "on")
                 return True, bool(value)

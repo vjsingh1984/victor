@@ -886,7 +886,7 @@ def test_tool_iteration_bottleneck(benchmark, mock_tool_registry):
     registry = mock_tool_registry(num_tools=47)
 
     def iterate_tools():
-        return [tool for tool in registry.list_tools()]
+        return list(registry.list_tools())
 
     result = benchmark.pedantic(iterate_tools, iterations=1000, rounds=20)
     tools = result

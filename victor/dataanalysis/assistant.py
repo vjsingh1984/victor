@@ -17,11 +17,37 @@ from victor.core.verticals.protocols import (
 # Phase 3: Import framework capabilities
 from victor.framework.capabilities import FileOperationsCapability
 
+# Import ISP-compliant provider protocols
+from victor.core.verticals.protocols.providers import (
+    HandlerProvider,
+    ModeConfigProvider,
+    PromptContributorProvider,
+    SafetyProvider,
+    TieredToolConfigProvider,
+    ToolDependencyProvider,
+    ToolProvider,
+)
+
 
 class DataAnalysisAssistant(VerticalBase):
     """Data analysis assistant for exploration, visualization, and insights.
 
     Competitive with: ChatGPT Data Analysis, Claude Artifacts, Jupyter AI.
+
+    ISP Compliance:
+        This vertical explicitly declares which protocols it implements through
+        protocol registration, rather than inheriting from all possible protocol
+        interfaces. This follows the Interface Segregation Principle (ISP) by
+        implementing only needed protocols.
+
+        Implemented Protocols:
+        - ToolProvider: Provides tools optimized for data analysis tasks
+        - PromptContributorProvider: Provides data analysis-specific task hints
+        - ToolDependencyProvider: Provides tool dependency patterns
+        - HandlerProvider: Provides workflow compute handlers
+        - ModeConfigProvider: Provides mode configurations
+        - SafetyProvider: Provides data analysis safety patterns
+        - TieredToolConfigProvider: Provides tiered tool configuration
     """
 
     name = "data_analysis"
@@ -235,3 +261,18 @@ When presenting analysis:
     #
     # get_extensions() is inherited from VerticalBase with full caching support.
     # To clear all caches, use cls.clear_config_cache().
+
+
+# Register protocols at module level after class definition
+DataAnalysisAssistant.register_protocol(ToolProvider)
+DataAnalysisAssistant.register_protocol(PromptContributorProvider)
+DataAnalysisAssistant.register_protocol(ToolDependencyProvider)
+DataAnalysisAssistant.register_protocol(HandlerProvider)
+DataAnalysisAssistant.register_protocol(ModeConfigProvider)
+DataAnalysisAssistant.register_protocol(SafetyProvider)
+DataAnalysisAssistant.register_protocol(TieredToolConfigProvider)
+
+# ISP Compliance Note:
+# This vertical explicitly declares protocol conformance through registration
+# rather than inheriting from all protocol interfaces. The framework can check
+# capabilities via isinstance(vertical, ToolProvider).

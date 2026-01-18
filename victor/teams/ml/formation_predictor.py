@@ -184,7 +184,7 @@ class FormationPredictor:
         probs = self._model.predict_proba([feature_vector])[0]
 
         # Create probability dict
-        prob_dict = {formation: prob for formation, prob in zip(self._formations, probs)}
+        prob_dict = dict(zip(self._formations, probs))
 
         # Get best formation
         best_idx = int(np.argmax(probs))

@@ -1,0 +1,565 @@
+# Data Analysis Vertical Template
+# Production template for data exploration and analysis verticals
+# Based on Victor's DataAnalysisAssistant - competitive with ChatGPT Data Analysis, Jupyter AI
+
+metadata:
+  name: dataanalysis
+  description: "Data exploration, statistical analysis, visualization, and ML insights"
+  version: "1.0.0"
+  author: "Victor Team"
+  license: "Apache-2.0"
+  category: analytics
+  tags:
+    - data-analysis
+    - visualization
+    - statistics
+    - machine-learning
+    - pandas
+    - analytics
+  provider_hints:
+    preferred_models:
+      - claude-sonnet-4-5
+      - gpt-4
+    min_context: 128000
+    supports_tools: true
+    requires_python: true
+  evaluation_criteria:
+    - analysis_accuracy
+    - insight_quality
+    - visualization_clarity
+    - code_reproducibility
+
+# Core tools for data analysis
+tools:
+  # Framework file operations (Phase 3: reused from FileOperationsCapability)
+  - read_file
+  - write_file
+  - edit_file
+  - grep
+
+  # Directory listing for data file exploration
+  - ls
+
+  # Python/Shell execution for analysis
+  - shell
+
+  # Code generation and search
+  - code_search
+  - overview
+  - graph
+
+  # Web for datasets and documentation
+  - web_search
+  - web_fetch
+
+# Main system prompt
+system_prompt: |
+  You are a data analysis assistant specializing in exploration, statistics, and visualization.
+
+  ## Core Capabilities
+
+  1. **Data Loading**: CSV, Excel, JSON, Parquet, SQL databases
+  2. **Exploration**: Profiling, summary statistics, distribution analysis
+  3. **Cleaning**: Missing values, outliers, type conversion, normalization
+  4. **Analysis**: Correlation, regression, hypothesis testing, clustering
+  5. **Visualization**: matplotlib, seaborn, plotly for charts and dashboards
+  6. **ML**: scikit-learn for classification, regression, clustering
+
+  ## Analysis Workflow
+
+  1. **LOAD**: Read data, check structure, identify types
+  2. **EXPLORE**: Summary stats, distributions, missing values
+  3. **CLEAN**: Handle nulls, outliers, type issues
+  4. **ANALYZE**: Apply statistical methods, test hypotheses
+  5. **VISUALIZE**: Create informative charts
+  6. **REPORT**: Summarize insights with evidence
+
+  ## Code Standards
+
+  - Always use pandas for data manipulation
+  - Include comments explaining methodology
+  - Handle missing data explicitly
+  - Use descriptive variable names
+  - Save intermediate results for reproducibility
+
+  ## Output Format
+
+  When presenting analysis:
+  1. Start with data overview (shape, types, missing)
+  2. Show key statistics with context
+  3. Include visualizations with captions
+  4. State insights with supporting evidence
+  5. Note limitations and assumptions
+  6. Provide reproducible code
+
+  ## Privacy and Ethics
+
+  - Never expose personally identifiable information (PII)
+  - Anonymize sensitive columns before analysis
+  - Note potential biases in data
+  - Be transparent about limitations
+
+# Stage definitions for data analysis workflow
+stages:
+  INITIAL:
+    name: INITIAL
+    description: "Understanding the data and analysis goals"
+    tools:
+      - read_file
+      - ls
+      - overview
+    keywords:
+      - what
+      - data
+      - analyze
+      - understand
+      - explore
+    next_stages:
+      - DATA_LOADING
+      - EXPLORATION
+
+  DATA_LOADING:
+    name: DATA_LOADING
+    description: "Loading and validating data files"
+    tools:
+      - read_file
+      - shell
+      - write_file
+    keywords:
+      - load
+      - import
+      - read
+      - open
+      - fetch
+    next_stages:
+      - EXPLORATION
+      - CLEANING
+
+  EXPLORATION:
+    name: EXPLORATION
+    description: "Exploratory data analysis and profiling"
+    tools:
+      - shell
+      - read_file
+      - write_file
+    keywords:
+      - explore
+      - profile
+      - describe
+      - summary
+      - statistics
+    next_stages:
+      - CLEANING
+      - ANALYSIS
+
+  CLEANING:
+    name: CLEANING
+    description: "Data cleaning and transformation"
+    tools:
+      - shell
+      - write_file
+      - edit_file
+    keywords:
+      - clean
+      - transform
+      - fix
+      - handle
+      - remove
+    next_stages:
+      - ANALYSIS
+      - EXPLORATION
+
+  ANALYSIS:
+    name: ANALYSIS
+    description: "Statistical analysis and modeling"
+    tools:
+      - shell
+      - write_file
+      - read_file
+    keywords:
+      - analyze
+      - model
+      - correlate
+      - test
+      - predict
+    next_stages:
+      - VISUALIZATION
+      - REPORTING
+
+  VISUALIZATION:
+    name: VISUALIZATION
+    description: "Creating charts and visualizations"
+    tools:
+      - shell
+      - write_file
+    keywords:
+      - plot
+      - chart
+      - visualize
+      - graph
+      - figure
+    next_stages:
+      - REPORTING
+      - ANALYSIS
+
+  REPORTING:
+    name: REPORTING
+    description: "Generating insights and reports"
+    tools:
+      - write_file
+      - edit_file
+      - read_file
+    keywords:
+      - report
+      - summarize
+      - document
+      - present
+    next_stages:
+      - COMPLETION
+
+  COMPLETION:
+    name: COMPLETION
+    description: "Finalizing analysis deliverables"
+    tools:
+      - write_file
+      - read_file
+    keywords:
+      - done
+      - complete
+      - finish
+      - final
+    next_stages: []
+
+# Extension specifications
+extensions:
+  # Middleware for data analysis operations
+  middleware:
+    - name: privacy_protection
+      class_name: PrivacyProtectionMiddleware
+      module: victor.dataanalysis.middleware
+      enabled: true
+      config:
+        anonymize_pii: true
+        sensitive_columns:
+          - ssn
+          - credit_card
+          - email
+          - phone
+
+    - name: reproducibility_tracking
+      class_name: ReproducibilityTrackingMiddleware
+      module: victor.dataanalysis.middleware
+      enabled: true
+      config:
+        save_intermediate: true
+        log_random_seed: true
+
+  # Safety patterns for data analysis operations
+  safety_patterns:
+    - name: delete_original_data
+      pattern: "rm.*\\.csv|\\.xlsx|\\.parquet"
+      description: "Deleting original data files"
+      severity: "high"
+      category: "data_loss"
+
+    - name: expose_pii
+      pattern: "(print|display).*ssn|credit_card|password"
+      description: "Potential exposure of personally identifiable information"
+      severity: "critical"
+      category: "privacy"
+
+    - name: drop_without_backup
+      pattern: "df\\.drop.*inplace.*True"
+      description: "Dropping data without backup"
+      severity: "medium"
+      category: "data_loss"
+
+  # Task-type-specific prompt hints
+  prompt_hints:
+    - task_type: data_loading
+      hint: "[LOAD] Read data file. Show shape, types, first rows. Check for issues."
+      tool_budget: 5
+      priority_tools:
+        - shell
+        - read_file
+        - ls
+
+    - task_type: exploration
+      hint: "[EXPLORE] Summary statistics, distributions, missing values, correlations."
+      tool_budget: 10
+      priority_tools:
+        - shell
+        - write_file
+
+    - task_type: cleaning
+      hint: "[CLEAN] Handle missing values, outliers, type issues. Document changes."
+      tool_budget: 12
+      priority_tools:
+        - shell
+        - write_file
+        - edit_file
+
+    - task_type: statistical_analysis
+      hint: "[ANALYZE] Apply statistical tests. Report p-values, confidence intervals."
+      tool_budget: 15
+      priority_tools:
+        - shell
+        - write_file
+        - read_file
+
+    - task_type: visualization
+      hint: "[VISUALIZE] Create clear charts with labels and captions. Save images."
+      tool_budget: 10
+      priority_tools:
+        - shell
+        - write_file
+
+    - task_type: machine_learning
+      hint: "[ML] Split data, train model, evaluate metrics. Save predictions."
+      tool_budget: 20
+      priority_tools:
+        - shell
+        - write_file
+
+    - task_type: reporting
+      hint: "[REPORT] Summarize findings with evidence. Include code and visualizations."
+      tool_budget: 8
+      priority_tools:
+        - write_file
+        - edit_file
+        - read_file
+
+  # Workflow handlers for data analysis operations
+  handlers:
+    data_profiling:
+      description: "Generate comprehensive data profile"
+      handler: victor.dataanalysis.handlers:data_profiling_handler
+
+    statistical_analysis:
+      description: "Perform statistical analysis and tests"
+      handler: victor.dataanalysis.handlers:statistical_analysis_handler
+
+    visualization:
+      description: "Create data visualizations"
+      handler: victor.dataanalysis.handlers:visualization_handler
+
+  # Agent personas for specialized data analysis tasks
+  personas:
+    data_scientist:
+      name: "Data Scientist"
+      description: "Expert in statistical analysis and machine learning"
+      system_prompt_extension: |
+        You are a data scientist. Focus on:
+        - Proper statistical methods and tests
+        - Feature engineering and selection
+        - Model training and evaluation
+        - Cross-validation and preventing overfitting
+        - Interpretable results and insights
+
+    data_engineer:
+      name: "Data Engineer"
+      description: "Specialist in data cleaning and preprocessing"
+      system_prompt_extension: |
+        You are a data engineer. Focus on:
+        - Efficient data loading and processing
+        - Clean, reproducible code
+        - Handling missing data and outliers
+        - Data type optimization
+        - Pipeline automation
+
+    analyst:
+      name: "Business Analyst"
+      description: "Expert in deriving business insights from data"
+      system_prompt_extension: |
+        You are a business analyst. Focus on:
+        - Actionable business insights
+        - Clear communication of findings
+        - Relevant metrics and KPIs
+        - Practical recommendations
+        - Executive-friendly summaries
+
+  # Composed middleware chains
+  composed_chains:
+    safe_analysis:
+      - privacy_protection
+      - reproducibility_tracking
+
+# Workflows - YAML workflow definitions
+workflows:
+  - name: exploratory_analysis
+    file: workflows/exploratory_analysis.yaml
+    description: "Comprehensive exploratory data analysis workflow"
+
+  - name: statistical_modeling
+    file: workflows/statistical_modeling.yaml
+    description: "Statistical modeling and hypothesis testing"
+
+  - name: ml_pipeline
+    file: workflows/ml_pipeline.yaml
+    description: "End-to-end machine learning pipeline"
+
+# Teams - multi-agent team formations
+teams:
+  - name: analytics_team
+    display_name: Data Analytics Team
+    description: "Collaborative data analysis with multiple perspectives"
+    formation: parallel
+    communication_style: structured
+    max_iterations: 8
+    roles:
+      - name: profiler
+        display_name: Data Profiler
+        description: Profile data structure and quality
+        persona: Meticulous examiner finding data issues and patterns
+        tool_categories:
+          - shell
+          - read_file
+        capabilities:
+          - data_profiling
+
+      - name: statistician
+        display_name: Statistician
+        description: Perform statistical analysis
+        persona: Rigorous analyst applying proper statistical methods
+        tool_categories:
+          - shell
+          - write_file
+        capabilities:
+          - statistical_testing
+
+      - name: visualizer
+        display_name: Data Visualizer
+        description: Create insightful visualizations
+        persona: Creative designer making data understandable
+        tool_categories:
+          - shell
+          - write_file
+        capabilities:
+          - visualization
+
+      - name: storyteller
+        display_name: Insights Storyteller
+        description: Synthesize findings into insights
+        persona: Clear communicator translating data to insights
+        tool_categories:
+          - write_file
+          - edit_file
+        capabilities:
+          - reporting
+
+# Capabilities - dynamic capability loading
+capabilities:
+  - name: data_profiling
+    type: workflow
+    description: "Generate comprehensive data profile"
+    enabled: true
+    handler: "victor.dataanalysis.workflows:DataProfilingWorkflow"
+
+  - name: statistical_testing
+    type: workflow
+    description: "Perform statistical hypothesis tests"
+    enabled: true
+    config:
+      supported_tests:
+        - t_test
+        - chi_square
+        - anova
+        - correlation
+
+  - name: visualization
+    type: workflow
+    description: "Create data visualizations"
+    enabled: true
+    config:
+      libraries:
+        - matplotlib
+        - seaborn
+        - plotly
+
+  - name: machine_learning
+    type: workflow
+    description: "Train and evaluate ML models"
+    enabled: true
+    config:
+      frameworks:
+        - scikit-learn
+        - xgboost
+        - lightgbm
+
+# Custom configuration - Data Analysis-specific settings
+custom_config:
+  # Data processing configuration
+  max_file_size: 524288000  # 500MB
+  chunk_size: 10000
+
+  # Supported data formats
+  supported_formats:
+    - csv
+    - xlsx
+    - json
+    - parquet
+    - sql
+    - sqlite
+
+  # Python packages
+  required_packages:
+    - pandas
+    - numpy
+    - matplotlib
+    - seaborn
+    - plotly
+    - scikit-learn
+
+  # Statistical significance levels
+  default_alpha: 0.05
+  confidence_intervals:
+    - 0.90
+    - 0.95
+    - 0.99
+
+  # Visualization settings
+  default_figure_size: [10, 6]
+  default_dpi: 100
+  color_palette: "viridis"
+
+  # ML configuration
+  default_test_size: 0.2
+  default_random_state: 42
+  cross_validation_folds: 5
+
+  # Privacy settings
+  pii_detection_enabled: true
+  anonymization_method: "hash"
+
+  # Grounding rules
+  grounding_rules: |
+    Always inspect data before analysis.
+    Handle missing values explicitly.
+    Use appropriate statistical tests.
+    Visualize distributions before modeling.
+    Report limitations and assumptions.
+
+  # System prompt sections
+  system_prompt_section: |
+    Start with data overview: shape, types, summary statistics.
+    Always visualize key distributions and relationships.
+    Use appropriate statistical tests with significance levels.
+    Provide code for reproducibility.
+    Protect privacy by anonymizing sensitive data.
+
+# File templates - data analysis scaffolding templates
+file_templates:
+  analysis_notebook:
+    template_path: templates/dataanalysis/analysis_notebook.j2
+    output_pattern: "analysis_{}.ipynb"
+    description: "Jupyter notebook for data analysis"
+
+  profiling_report:
+    template_path: templates/dataanalysis/profiling_report.j2
+    output_pattern: "profiling_report_{}.html"
+    description: "Data profiling report template"
+
+  visualization_script:
+    template_path: templates/dataanalysis/visualization_script.j2
+    output_pattern: "visualize_{}.py"
+    description: "Python visualization script template"

@@ -281,3 +281,18 @@ You: [Use rag_query tool with query="authentication"]
     #
     # get_extensions() is inherited from VerticalBase with full caching support.
     # To clear all caches, use cls.clear_config_cache().
+
+
+# Register protocols at module level after class definition
+RAGAssistant.register_protocol(ToolProvider)
+RAGAssistant.register_protocol(PromptContributorProvider)
+RAGAssistant.register_protocol(ToolDependencyProvider)
+RAGAssistant.register_protocol(HandlerProvider)
+RAGAssistant.register_protocol(CapabilityProvider)
+RAGAssistant.register_protocol(TieredToolConfigProvider)
+RAGAssistant.register_protocol(WorkflowProvider)
+
+# ISP Compliance Note:
+# This vertical explicitly declares protocol conformance through registration
+# rather than inheriting from all protocol interfaces. The framework can check
+# capabilities via isinstance(vertical, ToolProvider).
