@@ -79,11 +79,13 @@ class TestAdaptedNode:
 
     def test_initialization(self):
         """Test AdaptedNode initialization."""
-        handler = lambda state: state
+        def _identity_handler(state):
+            return state
+
         node = AdaptedNode(
             name="test_node",
             node_type=WorkflowNodeType.AGENT,
-            handler=handler,
+            handler=_identity_handler,
             next_nodes=["node2", "node3"],
             tool_budget=20,
             allowed_tools=["tool1", "tool2"],
@@ -96,11 +98,13 @@ class TestAdaptedNode:
 
     def test_default_values(self):
         """Test AdaptedNode default values."""
-        handler = lambda state: state
+        def _identity_handler(state):
+            return state
+
         node = AdaptedNode(
             name="test_node",
             node_type=WorkflowNodeType.AGENT,
-            handler=handler,
+            handler=_identity_handler,
         )
         assert node.next_nodes == []
         assert node.conditional_edges == {}

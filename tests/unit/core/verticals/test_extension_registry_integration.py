@@ -359,7 +359,7 @@ class TestBackwardCompatibility:
 
         assert config is not None
         assert config.system_prompt == "You are a mock assistant."
-        assert "read" in [t for t in config.tools.tools]
+        assert "read" in list(config.tools.tools)
 
     def test_custom_vertical_with_extensions(self, mock_vertical):
         """Test that custom vertical can override extension methods."""
@@ -919,8 +919,8 @@ class TestVerticalBaseIntegration:
         config_a = VerticalA.get_config()
         config_b = VerticalB.get_config()
 
-        assert "tool_a1" in [t for t in config_a.tools.tools]
-        assert "tool_b1" in [t for t in config_b.tools.tools]
+        assert "tool_a1" in list(config_a.tools.tools)
+        assert "tool_b1" in list(config_b.tools.tools)
 
     def test_extension_loading_modes_strict(self, real_extension_registry, mock_vertical):
         """Test strict extension loading mode."""

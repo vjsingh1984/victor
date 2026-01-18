@@ -2455,7 +2455,7 @@ __all__ = [
     "ProviderManagerProtocol",
     # Tool protocols
     "ToolRegistryProtocol",
-    "ToolSelectorProtocol",
+    # "ToolSelectorProtocol",  # TODO: Not yet exported
     "ToolPipelineProtocol",
     "ToolExecutorProtocol",
     # Coordinator protocols
@@ -2513,7 +2513,7 @@ __all__ = [
     # Infrastructure service protocols
     "ToolDependencyGraphProtocol",
     "ToolPluginRegistryProtocol",
-    "SemanticToolSelectorProtocol",
+    # "SemanticToolSelectorProtocol",  # TODO: Not yet exported
     "ProviderRegistryProtocol",
     # Analytics & observability protocols
     "UsageLoggerProtocol",

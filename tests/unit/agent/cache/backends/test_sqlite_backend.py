@@ -459,12 +459,13 @@ class TestErrorHandling:
     async def test_unpickleable_value_raises_error(self, connected_backend):
         """Test that unpickleable value raises appropriate error."""
         # Lambda functions are not pickle-able
-        unpickleable = lambda x: x
+        def _unpickleable(x):
+            return x
 
         # pickle.dumps can raise AttributeError, PicklingError, or TypeError
         # depending on the object and Python version
         with pytest.raises((pickle.PicklingError, TypeError, AttributeError)):
-            await connected_backend.set("key1", unpickleable, "test_namespace")
+            await connected_backend.set("key1", _unpickleable, "test_namespace")
 
 
 # =============================================================================
