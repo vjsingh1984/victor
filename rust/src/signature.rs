@@ -59,13 +59,11 @@
 
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::Hasher;
 
 // Use SeaHash for fast hashing (faster than xxHash for small data)
 use seahash::SeaHasher;
-
-use std::collections::HashMap;
 
 /// Compute a signature hash for a single tool call.
 ///
@@ -216,6 +214,20 @@ pub struct ToolCallData {
     pub signature: Option<u64>,
 }
 
+// Implement Clone manually since PyObject doesn't support it natively
+impl Clone for ToolCallData {
+    fn clone(&self) -> Self {
+        // Clone using Python GIL to clone the PyObject reference
+        Python::with_gil(|py| {
+            ToolCallData {
+                tool_name: self.tool_name.clone(),
+                arguments: self.arguments.clone_ref(py),
+                signature: self.signature,
+            }
+        })
+    }
+}
+
 #[pymethods]
 impl ToolCallData {
     /// Create a new ToolCallData instance.
@@ -338,21 +350,42 @@ impl ToolCallData {
 #[pyfunction]
 pub fn deduplicate_tool_calls(
     py: Python,
-    calls: Vec<ToolCallData>,
-) -> PyResult<Vec<ToolCallData>> {
+    calls: &Bound<'_, PyList>,
+) -> PyResult<Vec<PyObject>> {
     let mut seen = HashSet::new();
     let mut unique_calls = Vec::with_capacity(calls.len());
 
-    for mut call in calls {
-        // Compute signature if not already present
-        let sig = call.compute_signature(py)?;
+    for call_item in calls.iter() {
+        // Try to extract as ToolCallData
+        let call_result: Result<ToolCallData, _> = call_item.extract();
+
+        let sig = if let Ok(call) = call_result {
+            // We have a ToolCallData - compute signature
+            if let Some(s) = call.signature {
+                s
+            } else {
+                // Compute signature from tool_name and arguments
+                let args_bound = call.arguments.bind(py);
+                let args_dict: &Bound<'_, PyDict> = args_bound.downcast()?;
+                let json_str = serialize_dict_sorted(args_dict)?;
+                let combined = format!("{}:{}", call.tool_name, json_str);
+                let mut hasher = SeaHasher::new();
+                hasher.write(combined.as_bytes());
+                hasher.finish()
+            }
+        } else {
+            // Not a ToolCallData object - generate unique signature from object
+            let repr = call_item.repr()?.to_string();
+            let mut hasher = SeaHasher::new();
+            hasher.write(repr.as_bytes());
+            hasher.finish()
+        };
 
         // Check if we've seen this signature before
         if seen.insert(sig) {
             // First occurrence - keep it
-            unique_calls.push(call);
+            unique_calls.push(call_item.clone().unbind());
         }
-        // Otherwise, it's a duplicate - skip it
     }
 
     Ok(unique_calls)
@@ -391,7 +424,7 @@ pub fn deduplicate_tool_calls(
 /// ```
 #[pyfunction]
 pub fn deduplicate_tool_calls_dict(
-    py: Python,
+    _py: Python,
     calls: &Bound<'_, PyList>,
 ) -> PyResult<Vec<PyObject>> {
     let mut seen = HashSet::new();
@@ -401,8 +434,23 @@ pub fn deduplicate_tool_calls_dict(
         let call_dict: &Bound<'_, PyDict> = call_item.downcast()?;
 
         // Extract tool_name and arguments
-        let tool_name: String = call_dict.get_item("tool_name")?.extract()?;
-        let arguments: &Bound<'_, PyDict> = call_dict.get_item("arguments")?.downcast()?;
+        let tool_name_opt = call_dict.get_item("tool_name")?;
+        let tool_name: String = if let Some(val) = tool_name_opt {
+            val.extract()?
+        } else {
+            return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                "Missing 'tool_name' key",
+            ));
+        };
+
+        let arguments_opt = call_dict.get_item("arguments")?;
+        let arguments: &Bound<'_, PyDict> = if let Some(ref val) = arguments_opt {
+            val.downcast()?
+        } else {
+            return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                "Missing 'arguments' key",
+            ));
+        };
 
         // Compute signature
         let json_str = serialize_dict_sorted(arguments)?;
@@ -442,8 +490,8 @@ pub fn deduplicate_tool_calls_dict(
 /// - Circular references are detected
 /// - Values cannot be converted to JSON-serializable types
 fn serialize_dict_sorted(dict: &Bound<'_, PyDict>) -> PyResult<String> {
-    // Convert to Rust HashMap for sorted serialization
-    let mut map: HashMap<String, serde_json::Value> = HashMap::new();
+    // Convert to Rust BTreeMap for sorted serialization
+    let mut map: BTreeMap<String, serde_json::Value> = BTreeMap::new();
 
     for (key, value) in dict.iter() {
         let key_str: String = key.extract()?;

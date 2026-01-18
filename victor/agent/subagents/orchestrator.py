@@ -55,6 +55,8 @@ from victor.agent.subagents.base import (
 
 if TYPE_CHECKING:
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
+
+    from victor.agent.orchestrator import AgentOrchestrator
     from victor.protocols.agent import IAgentOrchestrator
     from victor.agent.subagents.protocols import RoleToolProvider
     from victor.providers.base import StreamChunk

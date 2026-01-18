@@ -68,7 +68,7 @@ mod pattern_match;
 mod sanitizer;
 // mod serialization;  // TODO: Fix compilation errors in serialization.rs
 mod secrets;
-// mod signature;
+mod signature;
 mod similarity;
 mod streaming_filter;
 mod thinking;
@@ -274,21 +274,21 @@ fn victor_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<embedding_ops::EmbeddingCache>()?;
 
     // Signature computation (v0.5.1 - fast tool call deduplication)
-//     m.add_function(wrap_pyfunction!(signature::compute_tool_call_signature, m)?)?;
-//     m.add_function(wrap_pyfunction!(
-//         signature::batch_compute_tool_call_signatures,
-//         m
-//     )?)?;
-//     m.add_class::<signature::ToolCallData>()?;
-//     m.add_function(wrap_pyfunction!(signature::deduplicate_tool_calls, m)?)?;
-//     m.add_function(wrap_pyfunction!(signature::deduplicate_tool_calls_dict, m)?)?;
-// 
-//     // Regex engine (v0.5.1 - high-performance code pattern matching)
-// //     m.add_class::<regex_engine::CompiledRegexSet>()?;
-// //     m.add_class::<regex_engine::MatchResult>()?;
-// //     m.add_function(wrap_pyfunction!(regex_engine::compile_language_patterns, m)?)?;
-// //     m.add_function(wrap_pyfunction!(regex_engine::list_supported_languages, m)?)?;
-// //     m.add_function(wrap_pyfunction!(regex_engine::get_language_categories, m)?)?;
+    m.add_function(wrap_pyfunction!(signature::compute_tool_call_signature, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        signature::batch_compute_tool_call_signatures,
+        m
+    )?)?;
+    m.add_class::<signature::ToolCallData>()?;
+    m.add_function(wrap_pyfunction!(signature::deduplicate_tool_calls, m)?)?;
+    m.add_function(wrap_pyfunction!(signature::deduplicate_tool_calls_dict, m)?)?;
+
+    // Regex engine (v0.5.1 - high-performance code pattern matching)
+//     m.add_class::<regex_engine::CompiledRegexSet>()?;
+//     m.add_class::<regex_engine::MatchResult>()?;
+//     m.add_function(wrap_pyfunction!(regex_engine::compile_language_patterns, m)?)?;
+//     m.add_function(wrap_pyfunction!(regex_engine::list_supported_languages, m)?)?;
+//     m.add_function(wrap_pyfunction!(regex_engine::get_language_categories, m)?)?;
 
     // File operations (v0.5.1 - high-performance parallel file system operations)
     m.add_class::<file_ops::FileInfo>()?;

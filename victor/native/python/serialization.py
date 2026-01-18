@@ -670,26 +670,85 @@ def apply_json_patches(json_str: str, patches: List[Dict[str, Any]]) -> str:
         except Exception as e:
             raise SerializationError(f"Failed to apply JSON patches: {e}")
     else:
-        # Python fallback - simplified patch application
+        # Python fallback - simplified patch application with JSON Pointer support
         try:
             obj = json.loads(json_str)
 
             for patch in patches:
                 op = patch.get("op")
-                path = patch.get("path", "").lstrip("/")
+                path_str = patch.get("path", "")
+
+                # Parse JSON Pointer path (e.g., "/users/0/age")
+                path_components = [p for p in path_str.split("/") if p]
+
+                # Navigate to parent of target
+                current = obj
+                for i, component in enumerate(path_components[:-1]):
+                    if isinstance(current, dict):
+                        if component not in current:
+                            # Create intermediate dict if needed
+                            current[component] = {}
+                        current = current[component]
+                    elif isinstance(current, list):
+                        idx = int(component)
+                        if idx >= len(current):
+                            # Extend list if needed
+                            current.extend([{}] * (idx - len(current) + 1))
+                        current = current[idx]
+                    else:
+                        raise SerializationError(f"Cannot traverse into scalar value at path component {i}")
+
+                # Apply operation
+                last_component = path_components[-1] if path_components else None
 
                 if op == "add":
-                    if isinstance(obj, dict):
-                        obj[path] = patch.get("value")
+                    value = patch.get("value")
+                    if last_component is not None:
+                        if isinstance(current, dict):
+                            current[last_component] = value
+                        elif isinstance(current, list):
+                            idx = int(last_component)
+                            current.insert(idx, value)
+                        else:
+                            raise SerializationError("Cannot add to scalar value")
+                    else:
+                        # Replace root
+                        obj = value
+
                 elif op == "replace":
-                    if isinstance(obj, dict) and path in obj:
-                        obj[path] = patch.get("value")
+                    value = patch.get("value")
+                    if last_component is not None:
+                        if isinstance(current, dict) and last_component in current:
+                            current[last_component] = value
+                        elif isinstance(current, list):
+                            idx = int(last_component)
+                            if 0 <= idx < len(current):
+                                current[idx] = value
+                            else:
+                                raise SerializationError(f"Array index {idx} out of bounds")
+                        else:
+                            raise SerializationError(f"Path not found: {path_str}")
+                    else:
+                        # Replace root
+                        obj = value
+
                 elif op == "remove":
-                    if isinstance(obj, dict) and path in obj:
-                        del obj[path]
+                    if last_component is not None:
+                        if isinstance(current, dict) and last_component in current:
+                            del current[last_component]
+                        elif isinstance(current, list):
+                            idx = int(last_component)
+                            if 0 <= idx < len(current):
+                                current.pop(idx)
+                            else:
+                                raise SerializationError(f"Array index {idx} out of bounds")
+                        else:
+                            raise SerializationError(f"Path not found: {path_str}")
+                    else:
+                        raise SerializationError("Cannot remove root")
 
             return json.dumps(obj)
-        except (json.JSONDecodeError, TypeError) as e:
+        except (json.JSONDecodeError, TypeError, ValueError, IndexError) as e:
             raise SerializationError(f"Failed to apply JSON patches: {e}")
 
 
@@ -811,27 +870,42 @@ def deep_set_json(json_str: str, path: List[str], value: Any) -> str:
         except Exception as e:
             raise SerializationError(f"Failed to set nested value: {e}")
     else:
-        # Python fallback - simplified implementation
+        # Python fallback - with intermediate object creation
         try:
             obj = json.loads(json_str)
             current = obj
 
-            # Navigate to parent of target
+            # Navigate to parent of target, creating intermediate objects
             for component in path[:-1]:
                 if isinstance(current, dict):
+                    if component not in current:
+                        # Create intermediate dict
+                        current[component] = {}
                     current = current[component]
                 elif isinstance(current, list):
-                    current = current[int(component)]
+                    idx = int(component)
+                    if idx >= len(current):
+                        # Extend list
+                        current.extend([{}] * (idx - len(current) + 1))
+                    current = current[idx]
+                else:
+                    raise SerializationError(f"Cannot traverse into scalar value at component '{component}'")
 
             # Set value
             last_component = path[-1]
             if isinstance(current, dict):
                 current[last_component] = value
             elif isinstance(current, list):
-                current[int(last_component)] = value
+                idx = int(last_component)
+                if idx >= len(current):
+                    # Extend list if needed
+                    current.extend([None] * (idx - len(current) + 1))
+                current[idx] = value
+            else:
+                raise SerializationError(f"Cannot set value on scalar type at path '{path}'")
 
             return json.dumps(obj)
-        except (json.JSONDecodeError, KeyError, IndexError, TypeError) as e:
+        except (json.JSONDecodeError, KeyError, IndexError, TypeError, ValueError) as e:
             raise SerializationError(f"Failed to set nested value: {e}")
 
 

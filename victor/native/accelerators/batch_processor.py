@@ -362,7 +362,7 @@ class BatchProcessorAccelerator:
                         ),
                     )
 
-                duration_ms = (time.perf_counter() - task_start) * 1000
+                (time.perf_counter() - task_start) * 1000
 
                 if result.success:
                     successful += 1

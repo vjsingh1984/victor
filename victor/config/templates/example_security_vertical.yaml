@@ -1,0 +1,395 @@
+# Example Security Vertical Template
+# This template demonstrates how to define a complete vertical for security analysis
+
+metadata:
+  name: security
+  description: Security analysis, vulnerability scanning, and threat detection
+  version: "1.0.0"
+  author: "Victor Team"
+  license: "Apache-2.0"
+  category: security
+  tags:
+    - security
+    - vulnerability
+    - threat-detection
+    - compliance
+  provider_hints:
+    preferred_models:
+      - claude-sonnet-4-5
+      - gpt-4
+    min_context: 128000
+  evaluation_criteria:
+    - vulnerability_detection_accuracy
+    - false_positive_rate
+    - compliance_coverage
+
+# Core tools for security analysis
+tools:
+  # File operations (from framework)
+  - read_file
+  - write_file
+  - edit_file
+  - grep
+
+  # Security-specific tools
+  - vulnerability_scan
+  - security_audit
+  - dependency_check
+  - secret_scan
+  - compliance_check
+
+  # Code analysis tools
+  - code_search
+  - semantic_code_search
+  - lsp
+  - symbol
+
+  # Web tools for threat intelligence
+  - web_search
+  - web_fetch
+
+  # Shell for security scans
+  - execute_bash
+
+# Main system prompt
+system_prompt: |
+  You are Victor, an expert security analyst specializing in vulnerability detection, threat analysis, and security compliance.
+
+  Your capabilities:
+  - Static code analysis for security vulnerabilities (SQL injection, XSS, CSRF, etc.)
+  - Dependency vulnerability scanning (CVE checking)
+  - Secret and credential detection (API keys, passwords, tokens)
+  - Security compliance checking (OWASP, SOC2, PCI-DSS)
+  - Threat modeling and risk assessment
+  - Security best practices enforcement
+
+  Guidelines:
+  1. **Comprehensive scanning**: Always scan for multiple vulnerability types
+  2. **False positive handling**: Verify potential vulnerabilities before flagging
+  3. **Risk prioritization**: Focus on high-severity issues (critical > high > medium > low)
+  4. **Compliance alignment**: Map findings to compliance frameworks when relevant
+  5. **Remediation guidance**: Provide actionable fix recommendations
+  6. **Context awareness**: Consider the application's security context
+
+  When scanning code:
+  - Use vulnerability_scan for comprehensive security analysis
+  - Use secret_scan to detect exposed credentials
+  - Use dependency_check to identify vulnerable dependencies
+  - Use compliance_check to verify adherence to security standards
+
+  When analyzing vulnerabilities:
+  - Assess severity (CVSS score when available)
+  - Determine exploitability
+  - Estimate business impact
+  - Prioritize remediation efforts
+
+  You have access to specialized security tools. Use them efficiently to identify and mitigate security risks.
+
+# Stage definitions for security workflow
+stages:
+  INITIAL:
+    name: INITIAL
+    description: "Understanding the security request"
+    tools:
+      - read_file
+      - list_directory
+    keywords:
+      - what
+      - how
+      - explain
+      - where
+      - show
+    next_stages:
+      - SCANNING
+
+  SCANNING:
+    name: SCANNING
+    description: "Scanning for vulnerabilities and threats"
+    tools:
+      - vulnerability_scan
+      - secret_scan
+      - dependency_check
+      - grep
+    keywords:
+      - scan
+      - check
+      - analyze
+      - find
+    next_stages:
+      - ANALYSIS
+      - SCANNING
+
+  ANALYSIS:
+    name: ANALYSIS
+    description: "Analyzing scan results and assessing risk"
+    tools:
+      - web_search
+      - web_fetch
+      - read_file
+    keywords:
+      - analyze
+      - assess
+      - evaluate
+      - investigate
+    next_stages:
+      - REPORTING
+      - SCANNING
+
+  REPORTING:
+    name: REPORTING
+    description: "Generating security reports and recommendations"
+    tools:
+      - write_file
+      - edit_file
+    keywords:
+      - report
+      - document
+      - summarize
+      - recommend
+    next_stages:
+      - COMPLETION
+
+  COMPLETION:
+    name: COMPLETION
+    description: "Security analysis complete"
+    tools: []
+    keywords:
+      - done
+      - complete
+      - finished
+    next_stages: []
+
+# Extension specifications
+extensions:
+  # Middleware for security operations
+  middleware:
+    - name: security_validation
+      class_name: SecurityValidationMiddleware
+      module: victor.security.middleware
+      enabled: true
+      config:
+        block_secrets: true
+        require_compliance: true
+
+    - name: audit_logging
+      class_name: AuditLoggingMiddleware
+      module: victor.security.middleware
+      enabled: true
+      config:
+        log_level: "detailed"
+        include_timestamps: true
+
+  # Safety patterns for dangerous security operations
+  safety_patterns:
+    - name: destructive_scan
+      pattern: "rm.*-rf"
+      description: "Destructive file operations during scan"
+      severity: "high"
+      category: "file_operations"
+
+    - name: production_modification
+      pattern: "(prod|production).*deploy"
+      description: "Direct production modifications"
+      severity: "critical"
+      category: "deployment"
+
+    - name: credential_exposure
+      pattern: "(password|secret|key).*(print|echo|log)"
+      description: "Potential credential exposure"
+      severity: "high"
+      category: "secrets"
+
+  # Task type hints for different security tasks
+  prompt_hints:
+    - task_type: vulnerability_scan
+      hint: "[SCAN] Run comprehensive vulnerability scan. Check for OWASP Top 10, secrets, and dependency issues."
+      tool_budget: 20
+      priority_tools:
+        - vulnerability_scan
+        - secret_scan
+        - dependency_check
+
+    - task_type: secret_detection
+      hint: "[SECRETS] Scan for exposed credentials. Check code, configs, and environment files."
+      tool_budget: 15
+      priority_tools:
+        - secret_scan
+        - grep
+        - read_file
+
+    - task_type: compliance_check
+      hint: "[COMPLIANCE] Verify compliance with security standards. Map findings to OWASP/SOC2/PCI-DSS."
+      tool_budget: 25
+      priority_tools:
+        - compliance_check
+        - vulnerability_scan
+        - read_file
+
+    - task_type: threat_model
+      hint: "[THREAT] Analyze threat model and attack surface. Identify potential attack vectors."
+      tool_budget: 30
+      priority_tools:
+        - read_file
+        - code_search
+        - web_search
+
+  # Workflow handlers
+  handlers:
+    security_scan_handler: victor.security.handlers
+    compliance_checker: victor.security.handlers
+    threat_analyzer: victor.security.handlers
+
+  # Persona definitions for security teams
+  personas:
+    security_analyst:
+      name: "Security Analyst"
+      role: "analyst"
+      expertise: "Vulnerability assessment and penetration testing"
+      communication_style: "detailed"
+      decision_approach: "systematic"
+
+    compliance_auditor:
+      name: "Compliance Auditor"
+      role: "auditor"
+      expertise: "Security compliance and risk assessment"
+      communication_style: "formal"
+      decision_approach: "methodical"
+
+    threat_researcher:
+      name: "Threat Researcher"
+      role: "researcher"
+      expertise: "Threat intelligence and attack analysis"
+      communication_style: "investigative"
+      decision_approach: "analytical"
+
+# Workflow definitions
+workflows:
+  - name: comprehensive_security_scan
+    description: "Full security scan including vulnerabilities, secrets, and compliance"
+    yaml_path: victor/security/workflows/comprehensive_scan.yaml
+    handler_module: victor.security.handlers
+
+  - name: vulnerability_assessment
+    description: "Focused vulnerability assessment with remediation guidance"
+    yaml_path: victor/security/workflows/vulnerability_assessment.yaml
+    handler_module: victor.security.handlers
+
+  - name: compliance_audit
+    description: "Security compliance audit against standards"
+    yaml_path: victor/security/workflows/compliance_audit.yaml
+    handler_module: victor.security.handlers
+
+# Team formations for multi-agent security analysis
+teams:
+  - name: security_review_team
+    display_name: "Security Review Team"
+    description: "Multi-agent team for comprehensive security review"
+    formation: parallel
+    communication_style: structured
+    max_iterations: 5
+    roles:
+      - name: vulnerability_scanner
+        display_name: "Vulnerability Scanner"
+        description: "Scans for code vulnerabilities and security issues"
+        persona: "You are a vulnerability scanning expert..."
+        tool_categories:
+          - security
+          - analysis
+        capabilities:
+          - vulnerability_scan
+          - code_analysis
+
+      - name: secret_detector
+        display_name: "Secret Detector"
+        description: "Detects exposed credentials and secrets"
+        persona: "You are a secret detection expert..."
+        tool_categories:
+          - security
+          - secrets
+        capabilities:
+          - secret_scan
+          - pattern_matching
+
+      - name: compliance_auditor
+        display_name: "Compliance Auditor"
+        description: "Verifies security compliance standards"
+        persona: "You are a compliance auditing expert..."
+        tool_categories:
+          - security
+          - compliance
+        capabilities:
+          - compliance_check
+          - policy_validation
+
+# Capability specifications
+capabilities:
+  - name: vulnerability_detection
+    type: workflow
+    description: "Comprehensive vulnerability detection workflow"
+    enabled: true
+    handler: victor.security.workflows:VulnerabilityDetectionWorkflow
+    config:
+      scan_depth: deep
+      check_dependencies: true
+
+  - name: secret_scanning
+    type: tool
+    description: "Scan for exposed secrets and credentials"
+    enabled: true
+    config:
+      entropy_threshold: 3.5
+      scan_history: true
+
+  - name: compliance_validation
+    type: validator
+    description: "Validate against security compliance standards"
+    enabled: true
+    config:
+      frameworks:
+        - OWASP
+        - SOC2
+        - PCI-DSS
+      severity_level: medium
+
+# Custom vertical configuration
+custom_config:
+  # Security-specific metadata
+  cwe_mapping: true
+  cvss_scoring: true
+  false_positive_threshold: 0.7
+
+  # Default compliance frameworks
+  default_frameworks:
+    - OWASP_Top_10
+    - CWE_Top_25
+
+  # Severity weighting
+  severity_weights:
+    critical: 10.0
+    high: 7.5
+    medium: 5.0
+    low: 2.5
+
+  # Custom prompt sections
+  grounding_rules: |
+    GROUNDING: Base ALL security findings on actual scan results.
+    Never fabricate vulnerabilities. If a scan returns no results,
+    acknowledge this rather than inventing issues.
+
+    Verify potential vulnerabilities before flagging to minimize false positives.
+
+  system_prompt_section: |
+    Security Analysis Guidelines:
+    1. Prioritize by severity (CVSS score)
+    2. Provide remediation steps
+    3. Include compliance references
+    4. Document attack scenarios
+    5. Suggest security testing
+
+# File templates (custom generated files)
+file_templates:
+  assistant.py: |
+    """
+    Custom assistant.py template for security vertical.
+    This would override the default template if specified.
+    """

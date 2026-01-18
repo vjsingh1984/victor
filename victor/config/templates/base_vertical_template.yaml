@@ -1,0 +1,133 @@
+# Base Vertical Template
+# This is a minimal template that can be extended for creating new verticals
+# Use this as a starting point for simple verticals
+
+metadata:
+  name: base_vertical
+  description: "Base template for creating new verticals"
+  version: "1.0.0"
+  author: "Victor Team"
+  license: "Apache-2.0"
+  category: general
+  tags:
+    - base
+    - template
+  provider_hints: {}
+  evaluation_criteria: []
+
+# Core tools - most verticals will need these
+tools:
+  # Basic file operations
+  - read_file
+  - write_file
+  - edit_file
+  - grep
+  - list_directory
+
+  # Search tools
+  - code_search
+  - semantic_code_search
+
+  # Web tools (optional - remove for air-gapped verticals)
+  - web_search
+  - web_fetch
+
+  # Shell tool (optional - add if needed)
+  - execute_bash
+
+# System prompt - customize for your vertical
+system_prompt: |
+  You are Victor, an AI assistant specialized in {vertical_name} tasks.
+
+  Your capabilities:
+  - Task 1: Description
+  - Task 2: Description
+  - Task 3: Description
+
+  Guidelines:
+  1. Be specific and actionable
+  2. Provide clear explanations
+  3. Use appropriate tools efficiently
+  4. Verify results when possible
+
+# Stage definitions - customize workflow stages
+stages:
+  INITIAL:
+    name: INITIAL
+    description: "Understanding the request"
+    tools:
+      - read_file
+      - list_directory
+    keywords:
+      - what
+      - how
+      - explain
+    next_stages:
+      - EXECUTION
+
+  EXECUTION:
+    name: EXECUTION
+    description: "Performing the task"
+    tools:
+      - read_file
+      - write_file
+      - edit_file
+      - grep
+    keywords:
+      - do
+      - perform
+      - execute
+      - create
+      - modify
+    next_stages:
+      - COMPLETION
+
+  COMPLETION:
+    name: COMPLETION
+    description: "Task complete"
+    tools: []
+    keywords:
+      - done
+      - complete
+      - finished
+    next_stages: []
+
+# Extensions - add as needed
+extensions:
+  middleware: []
+  safety_patterns: []
+  prompt_hints:
+    - task_type: general
+      hint: "[GENERAL] Approach methodically and explain your reasoning."
+      tool_budget: 10
+      priority_tools:
+        - read_file
+        - grep
+  handlers: {}
+  personas: {}
+  composed_chains: {}
+
+# Workflows - add as needed
+workflows: []
+
+# Teams - add as needed
+teams: []
+
+# Capabilities - add as needed
+capabilities: []
+
+# Custom configuration - add vertical-specific settings
+custom_config:
+  # Add your custom settings here
+  example_setting: "value"
+
+  # Grounding rules
+  grounding_rules: |
+    Base all responses on tool output. Never fabricate information.
+
+  # System prompt sections
+  system_prompt_section: |
+    Follow best practices for this domain.
+
+# File templates - customize if needed
+file_templates: {}

@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 
 if TYPE_CHECKING:
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
+    from victor.agent.orchestrator import AgentOrchestrator
     from victor.protocols.agent import IAgentOrchestrator
 
 logger = logging.getLogger(__name__)

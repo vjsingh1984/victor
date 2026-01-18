@@ -467,14 +467,14 @@ class TestVerticalTemplateRegistry:
         assert "test_vertical" in stats["template_names"]
         assert stats["categories"]["testing"] == 1
 
-    def test_validate_registry(self):
+    def test_validate_registry(self, valid_template):
         """Test validating all templates in registry."""
         from victor.framework.vertical_template import VerticalTemplate, VerticalMetadata
 
         registry = VerticalTemplateRegistry()
 
         # Add valid template
-        registry.register(valid_template())
+        registry.register(valid_template)
 
         # Add invalid template
         invalid = VerticalTemplate(

@@ -92,7 +92,7 @@ import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, ClassVar, Dict, KeysView, List, Optional, Set, Type, TYPE_CHECKING, Union
+from typing import Any, ClassVar, Dict, KeysView, List, Optional, Protocol, Set, Type, TYPE_CHECKING, Union
 
 from victor.framework.tools import ToolSet
 
@@ -100,6 +100,9 @@ from victor.framework.tools import ToolSet
 from victor.core.verticals.metadata import VerticalMetadataProvider
 from victor.core.verticals.extension_loader import VerticalExtensionLoader
 from victor.core.verticals.workflow_provider import VerticalWorkflowProvider
+
+# Import protocol-based extension loader for ISP compliance
+from victor.core.verticals.protocol_loader import ProtocolBasedExtensionLoader
 
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import VerticalExtensions
@@ -667,6 +670,70 @@ class VerticalBase(
             cls._config_cache.pop(cache_key, None)
             # Clear extensions cache for this class too
             cls.clear_extension_cache(clear_all=False)
+
+    # =========================================================================
+    # ISP Compliance: Protocol Conformance Methods
+    # =========================================================================
+
+    @classmethod
+    def implements_protocol(cls, protocol_type: Type[Protocol]) -> bool:
+        """Check if this vertical implements a specific protocol.
+
+        This method provides ISP-compliant protocol checking, allowing verticals
+        to declare which protocols they implement without needing to inherit
+        from all possible protocol classes.
+
+        Args:
+            protocol_type: The protocol class to check (e.g., ToolProvider,
+                          PromptProviderProtocol, SafetyProvider)
+
+        Returns:
+            True if this vertical implements the protocol, False otherwise
+
+        Example:
+            from victor.core.verticals.protocols.providers import ToolProvider
+
+            if MyVertical.implements_protocol(ToolProvider):
+                print("MyVertical implements ToolProvider protocol")
+        """
+        return ProtocolBasedExtensionLoader.implements_protocol(cls, protocol_type)
+
+    @classmethod
+    def register_protocol(cls, protocol_type: Type[Protocol]) -> None:
+        """Register this vertical as implementing a protocol.
+
+        This method allows verticals to explicitly declare protocol conformance,
+        enabling isinstance() checks by the framework.
+
+        Args:
+            protocol_type: The protocol class to register (e.g., ToolProvider,
+                          PromptProviderProtocol)
+
+        Example:
+            from victor.core.verticals.protocols.providers import ToolProvider
+
+            class MyVertical(VerticalBase):
+                name = "my_vertical"
+
+                @classmethod
+                def __init_subclass__(cls, **kwargs):
+                    super().__init_subclass__(**kwargs)
+                    cls.register_protocol(ToolProvider)
+        """
+        ProtocolBasedExtensionLoader.register_protocol(protocol_type, cls)
+
+    @classmethod
+    def list_implemented_protocols(cls) -> List[Type[Protocol]]:
+        """List all protocols explicitly implemented by this vertical.
+
+        Returns:
+            List of protocol types implemented by this vertical
+
+        Example:
+            protocols = MyVertical.list_implemented_protocols()
+            # [ToolProvider, PromptProviderProtocol, ...]
+        """
+        return ProtocolBasedExtensionLoader.list_protocols(cls)
 
     # =========================================================================
     # Dynamic Extension Registry Integration (OCP-Compliant)

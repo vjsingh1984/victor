@@ -674,7 +674,7 @@ class TeamAnalytics:
         """
         try:
             with open(path, "r") as f:
-                data = json.load(f)
+                json.load(f)
 
             # Note: This is simplified - would need proper deserialization
             # for ExecutionRecord objects in production

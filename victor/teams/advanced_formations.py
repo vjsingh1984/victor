@@ -54,7 +54,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 
 if TYPE_CHECKING:
     from victor.coordination.formations.base import TeamContext
-    from victor.teams.types import AgentMessage, MemberResult, TeamFormation
+    from victor.teams.types import AgentMessage, MemberResult, TeamFormation, MessageType
 
 logger = logging.getLogger(__name__)
 
@@ -572,7 +572,7 @@ class NegotiationFormation:
             try:
                 import time
 
-                start = time.time()
+                time.time()
                 response = await asyncio.wait_for(
                     agent.execute(
                         AgentMessage(

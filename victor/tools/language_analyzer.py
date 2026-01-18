@@ -1925,7 +1925,7 @@ class BaseLanguageAnalyzer(ABC):
         source_code: str,
         language: str,
         patterns: Optional[List[str]] = None,
-    ) -> List["PatternMatch"]:
+    ) -> List[Dict[str, Any]]:
         """Analyze code using Rust-accelerated regex engine.
 
         Provides 10-20x faster pattern matching than Python re module.
@@ -1971,7 +1971,7 @@ class BaseLanguageAnalyzer(ABC):
         source_code: str,
         language: str,
         patterns: Optional[List[str]] = None,
-    ) -> List["PatternMatch"]:
+    ) -> List[Dict[str, Any]]:
         """Python fallback for code analysis.
 
         Args:

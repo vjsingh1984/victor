@@ -192,7 +192,7 @@ class DependencyGraph:
     def _filter_imports(self, imports: Set[str]) -> Set[str]:
         """Filter out non-Victor imports."""
         # Standard library modules (partial list)
-        stdlib = {
+        {
             "os",
             "sys",
             "re",
@@ -219,7 +219,7 @@ class DependencyGraph:
         }
 
         # Common third-party packages
-        third_party = {
+        {
             "pytest",
             "click",
             "rich",

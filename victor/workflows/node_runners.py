@@ -70,6 +70,7 @@ if TYPE_CHECKING:
     from victor.agent.subagents import SubAgentManager
     from victor.tools.registry import ToolRegistry
     from victor.workflows.hitl import HITLExecutor, HITLNode
+    from victor.agent.orchestrator import AgentOrchestrator
 
 logger = logging.getLogger(__name__)
 

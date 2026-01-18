@@ -29,6 +29,8 @@ import os
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+from victor.workflows.generation.validator import WorkflowValidator
+
 import pytest
 
 from victor.workflows import load_workflow_from_file
@@ -472,7 +474,7 @@ class TestNodeTypes:
                             # Normalize node type
                             normalized_type = type_mapping.get(node_type, node_type)
 
-                            if normalized_type not in VALID_NODE_TYPES:
+                            if normalized_type not in WorkflowValidator.VALID_NODE_TYPES:
                                 invalid_workflows.append(
                                     f"{workflow_path}:{workflow_name}:{node_id} has invalid type '{node_type}'"
                                 )

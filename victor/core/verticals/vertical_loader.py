@@ -22,6 +22,12 @@ Supports plugin discovery via entry points:
 - victor.verticals: Entry point group for vertical plugins
 - victor.tools: Entry point group for tool plugins
 
+Lazy Loading:
+    Supports lazy loading via vertical_loading_mode configuration:
+    - eager: Load all extensions immediately (default, backward compatible)
+    - lazy: Load metadata only, defer heavy modules until first access
+    - auto: Automatically choose based on environment (production=lazy, dev=eager)
+
 Usage:
     from victor.core.verticals.vertical_loader import VerticalLoader
 
@@ -43,7 +49,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Dict, List, Optional, Type
+from typing import TYPE_CHECKING, Dict, List, Optional, Type, Union
 
 from victor.framework.module_loader import get_entry_point_cache
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
@@ -81,6 +87,7 @@ class VerticalLoader:
         self._registered_services: bool = False
         self._discovered_verticals: Optional[Dict[str, Type[VerticalBase]]] = None
         self._discovered_tools: Optional[Dict[str, Type]] = None
+        self._lazy_mode: bool = False  # Track if lazy loading is enabled
 
     @property
     def active_vertical(self) -> Optional[Type[VerticalBase]]:
@@ -92,7 +99,31 @@ class VerticalLoader:
         """Get the name of the currently active vertical."""
         return self._active_vertical.name if self._active_vertical else None
 
-    def load(self, name: str) -> Type[VerticalBase]:
+    def configure_lazy_mode(self, settings: Optional["Settings"] = None) -> None:
+        """Configure lazy loading mode based on settings.
+
+        Args:
+            settings: Application settings (if None, tries to load from globals)
+        """
+        if settings is None:
+            try:
+                from victor.config.settings import get_settings
+
+                settings = get_settings()
+            except Exception:
+                logger.debug("Could not load settings, using eager mode")
+                self._lazy_mode = False
+                return
+
+        mode = getattr(settings, "vertical_loading_mode", "eager")
+        self._lazy_mode = mode in ("lazy", "on_demand")
+
+        if self._lazy_mode:
+            logger.info(f"Lazy loading enabled for verticals (mode: {mode})")
+        else:
+            logger.debug(f"Eager loading enabled for verticals (mode: {mode})")
+
+    def load(self, name: str, lazy: Optional[bool] = None) -> Union[Type[VerticalBase], any]:
         """Load and activate a vertical by name.
 
         Searches for verticals in this order:
@@ -101,13 +132,17 @@ class VerticalLoader:
 
         Args:
             name: Vertical name (e.g., "coding", "research")
+            lazy: Force lazy/eager loading. If None, uses configured mode.
 
         Returns:
-            Loaded vertical class
+            Loaded vertical class (or LazyVerticalProxy if lazy=True)
 
         Raises:
             ValueError: If vertical not found
         """
+        # Determine if lazy loading should be used
+        use_lazy = lazy if lazy is not None else self._lazy_mode
+
         # Query VerticalRegistry (includes built-ins registered on import)
         vertical = VerticalRegistry.get(name)
 
@@ -120,6 +155,19 @@ class VerticalLoader:
             available = self._get_available_names()
             raise ValueError(f"Vertical '{name}' not found. Available: {', '.join(available)}")
 
+        # Return lazy proxy if lazy mode enabled
+        if use_lazy:
+            from victor.core.verticals.lazy_loader import LazyVerticalProxy
+
+            def _load_vertical():
+                self._activate(vertical)
+                return vertical
+
+            proxy = LazyVerticalProxy(vertical_name=name, loader=_load_vertical)
+            logger.debug(f"Created lazy proxy for vertical: {name}")
+            return proxy
+
+        # Eager mode: activate immediately
         self._activate(vertical)
         return vertical
 
@@ -494,16 +542,17 @@ def get_vertical_loader() -> VerticalLoader:
     return _loader
 
 
-def load_vertical(name: str) -> Type[VerticalBase]:
+def load_vertical(name: str, lazy: Optional[bool] = None) -> Union[Type[VerticalBase], any]:
     """Load a vertical by name (convenience function).
 
     Args:
         name: Vertical name
+        lazy: Force lazy/eager loading. If None, uses configured mode.
 
     Returns:
-        Loaded vertical class
+        Loaded vertical class (or LazyVerticalProxy if lazy=True)
     """
-    return get_vertical_loader().load(name)
+    return get_vertical_loader().load(name, lazy=lazy)
 
 
 def get_active_vertical() -> Optional[Type[VerticalBase]]:

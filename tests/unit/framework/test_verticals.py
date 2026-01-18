@@ -462,8 +462,8 @@ class TestVerticalLoaderSwitch:
         loader.load("coding")
         assert loader.active_vertical_name == "coding"
 
-        loader.load("data_analysis")
-        assert loader.active_vertical_name == "data_analysis"
+        loader.load("research")
+        assert loader.active_vertical_name == "research"
 
     def test_loader_get_tools_per_vertical(self):
         """Each vertical should have distinct tool sets."""

@@ -1,6 +1,10 @@
 """Research Assistant - Complete vertical for web research and synthesis.
 
 Competitive positioning: Perplexity AI, Google Gemini Deep Research, ChatGPT Browse.
+
+This vertical demonstrates ISP-compliant protocol registration, where only the
+protocols actually implemented by the vertical are registered, rather than
+inheriting from all possible protocol interfaces.
 """
 
 from typing import Any, Dict, List, Optional
@@ -17,11 +21,31 @@ from victor.core.verticals.protocols import (
 # Phase 3: Import framework capabilities
 from victor.framework.capabilities import FileOperationsCapability
 
+# Import ISP-compliant provider protocols
+from victor.core.verticals.protocols.providers import (
+    HandlerProvider,
+    PromptContributorProvider,
+    ToolDependencyProvider,
+    ToolProvider,
+)
+
 
 class ResearchAssistant(VerticalBase):
     """Research assistant for web research, fact-checking, and synthesis.
 
     Competitive with: Perplexity AI, Google Gemini Deep Research.
+
+    ISP Compliance:
+        This vertical explicitly declares which protocols it implements through
+        protocol registration, rather than inheriting from all possible protocol
+        interfaces. This follows the Interface Segregation Principle (ISP) by
+        implementing only needed protocols.
+
+        Implemented Protocols:
+        - ToolProvider: Provides tool list for research tasks
+        - PromptContributorProvider: Provides research-specific task hints
+        - ToolDependencyProvider: Provides tool dependency patterns
+        - HandlerProvider: Provides workflow compute handlers
     """
 
     name = "research"
@@ -39,6 +63,8 @@ class ResearchAssistant(VerticalBase):
         to reduce code duplication and maintain consistency across verticals.
 
         Uses canonical tool names from victor.tools.tool_names.
+
+        This method is part of the ToolProvider protocol.
         """
         from victor.tools.tool_names import ToolNames
 
@@ -193,6 +219,8 @@ IMPORTANT: When asked about topics requiring external information (news, trends,
         Custom implementation using create_vertical_tool_dependency_provider.
         Auto-generated getter would try to import from victor.research.tool_dependencies.
 
+        This method is part of the ToolDependencyProvider protocol.
+
         Returns:
             Tool dependency provider
         """
@@ -210,6 +238,8 @@ IMPORTANT: When asked about topics requiring external information (news, trends,
 
         Returns handlers from victor.research.handlers for workflow execution.
         This replaces the previous import-side-effect registration pattern.
+
+        This method is part of the HandlerProvider protocol.
 
         Returns:
             Dict mapping handler names to handler instances
@@ -245,3 +275,16 @@ IMPORTANT: When asked about topics requiring external information (news, trends,
     #
     # get_extensions() is inherited from VerticalBase with full caching support.
     # To clear all caches, use cls.clear_config_cache().
+
+
+# Register protocols at module level after class definition
+# This ensures protocols are registered when the module is loaded
+ResearchAssistant.register_protocol(ToolProvider)
+ResearchAssistant.register_protocol(PromptContributorProvider)
+ResearchAssistant.register_protocol(ToolDependencyProvider)
+ResearchAssistant.register_protocol(HandlerProvider)
+
+# ISP Compliance Note:
+# This vertical explicitly declares protocol conformance through registration
+# rather than inheriting from all protocol interfaces. The framework can check
+# capabilities via isinstance(vertical, ToolProvider).

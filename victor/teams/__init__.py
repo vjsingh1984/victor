@@ -164,6 +164,7 @@ from victor.teams.ml import FormationPredictor, PerformancePredictor, TeamMember
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
+    from victor.protocols.team import ITeamCoordinator
 
 
 def create_coordinator(

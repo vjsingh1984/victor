@@ -385,7 +385,7 @@ class NOfMJoinStrategy:
         Returns:
             Tuple of (success, aggregated_result, errors)
         """
-        total_tasks = len(results) + len(errors)
+        len(results) + len(errors)
         successful_results = [r for r in results if r is not None]
         success_count = len(successful_results)
 

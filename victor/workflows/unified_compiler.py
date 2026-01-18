@@ -1647,7 +1647,7 @@ class UnifiedWorkflowCompiler:
             raise FileNotFoundError(f"YAML file not found: {path}")
 
         name = workflow_name or "default"
-        config_hash = self._compute_config_hash(condition_registry, transform_registry)
+        self._compute_config_hash(condition_registry, transform_registry)
 
         # Generate cache key
         cache_key = self._generate_yaml_cache_key(path, workflow_name)

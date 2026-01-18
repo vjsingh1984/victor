@@ -521,7 +521,7 @@ class CoordinatorMetricsCollector:
         lines = []
 
         for snapshot in self.get_all_snapshots():
-            name = snapshot.coordinator_name.replace(" ", "_").replace("-", "_").lower()
+            snapshot.coordinator_name.replace(" ", "_").replace("-", "_").lower()
 
             # Execution count
             lines.append(

@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
+    from victor.agent.orchestrator import AgentOrchestrator
     from victor.protocols.agent import IAgentOrchestrator
     from victor.config.settings import Settings
 

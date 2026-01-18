@@ -1,0 +1,183 @@
+# Example Documentation Vertical Template
+# A simple, working example demonstrating the template system
+
+metadata:
+  name: documentation
+  description: "Documentation generation and maintenance"
+  version: "1.0.0"
+  author: "Victor Team"
+  license: "Apache-2.0"
+  category: documentation
+  tags:
+    - documentation
+    - writing
+    - markdown
+
+tools:
+  # Core file operations
+  - read_file
+  - write_file
+  - edit_file
+  - grep
+  - list_directory
+
+  # Documentation-specific tools
+  - code_search
+  - semantic_code_search
+
+  # Web for reference
+  - web_search
+  - web_fetch
+
+system_prompt: |
+  You are Victor, a technical documentation specialist.
+
+  Your capabilities:
+  - Generate clear, concise documentation
+  - Explain complex code and concepts
+  - Create usage examples and tutorials
+  - Maintain consistency in documentation style
+
+  Guidelines:
+  1. **Clarity first**: Use simple, direct language
+  2. **Be specific**: Provide concrete examples
+  3. **Stay organized**: Use clear structure and headings
+  4. **Update regularly**: Keep docs in sync with code
+  5. **Know your audience**: Adjust depth accordingly
+
+  When writing documentation:
+  - Start with a brief overview
+  - Provide code examples
+  - Explain the "why" not just the "what"
+  - Include common use cases
+  - Add troubleshooting tips
+
+stages:
+  INITIAL:
+    name: INITIAL
+    description: "Understanding documentation needs"
+    tools:
+      - read_file
+      - list_directory
+    keywords:
+      - what
+      - how
+      - explain
+      - document
+    next_stages:
+      - ANALYSIS
+
+  ANALYSIS:
+    name: ANALYSIS
+    description: "Analyzing code structure"
+    tools:
+      - read_file
+      - code_search
+      - semantic_code_search
+    keywords:
+      - analyze
+      - understand
+      - explore
+    next_stages:
+      - WRITING
+
+  WRITING:
+    name: WRITING
+    description: "Creating documentation"
+    tools:
+      - write_file
+      - edit_file
+      - web_search
+    keywords:
+      - write
+      - create
+      - generate
+    next_stages:
+      - REVIEW
+
+  REVIEW:
+    name: REVIEW
+    description: "Reviewing and refining"
+    tools:
+      - read_file
+      - edit_file
+    keywords:
+      - review
+      - refine
+      - improve
+    next_stages:
+      - COMPLETION
+
+  COMPLETION:
+    name: COMPLETION
+    description: "Documentation complete"
+    tools: []
+    keywords:
+      - done
+      - complete
+    next_stages: []
+
+extensions:
+  # No middleware needed for simple documentation
+  middleware: []
+
+  # Safety patterns to prevent accidental deletion
+  safety_patterns:
+    - name: delete_docs
+      pattern: "rm.*README"
+      description: "Deleting README files"
+      severity: "high"
+      category: "files"
+
+  # Task type hints
+  prompt_hints:
+    - task_type: generate_docs
+      hint: "[DOCS] Generate comprehensive documentation with examples"
+      tool_budget: 15
+      priority_tools:
+        - read_file
+        - code_search
+        - write_file
+
+    - task_type: update_docs
+      hint: "[UPDATE] Update existing docs with new information"
+      tool_budget: 10
+      priority_tools:
+        - read_file
+        - edit_file
+        - grep
+
+  # No handlers needed for basic docs
+  handlers: {}
+
+  # No personas needed
+  personas: {}
+
+  # No composed chains
+  composed_chains: {}
+
+# No workflows defined for simple example
+workflows: []
+
+# No teams defined
+teams: []
+
+# No capabilities beyond basic
+capabilities: []
+
+# Custom configuration
+custom_config:
+  # Documentation style settings
+  style_guide: "google"
+  max_line_length: 80
+
+  # Prompt sections
+  grounding_rules: |
+    Base documentation on actual code. Never invent functionality.
+
+  system_prompt_section: |
+    Documentation Best Practices:
+    1. Start with WHY, then WHAT, then HOW
+    2. Provide concrete examples
+    3. Keep it concise but complete
+    4. Update when code changes

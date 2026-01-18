@@ -545,6 +545,13 @@ class Settings(BaseSettings):
     default_vertical: str = "coding"  # Default vertical when --vertical not specified
     auto_detect_vertical: bool = False  # Auto-detect vertical from project context (experimental)
 
+    # Vertical Loading Mode
+    # Controls when vertical extensions are loaded:
+    #   - "eager": Load all extensions immediately at startup (default, backward compatible)
+    #   - "lazy": Load metadata only, defer heavy modules until first access (faster startup)
+    #   - "auto": Automatically choose based on environment (production=lazy, dev=eager)
+    vertical_loading_mode: str = "eager"
+
     # ==========================================================================
     # Server Security (FastAPI/WebSocket layer)
     # When set, API key is required for HTTP + WebSocket requests (Authorization: Bearer <token>)
@@ -631,6 +638,25 @@ class Settings(BaseSettings):
             raise ValueError(f"tool_selection_strategy must be one of {allowed}, got '{v}'")
         return v
 
+    @field_validator("vertical_loading_mode")
+    @classmethod
+    def validate_vertical_loading_mode(cls, v: str) -> str:
+        """Validate vertical_loading_mode is a valid option.
+
+        Args:
+            v: Loading mode to validate
+
+        Returns:
+            Validated loading mode
+
+        Raises:
+            ValueError: If mode is not one of the allowed values
+        """
+        allowed = {"eager", "lazy", "auto"}
+        if v not in allowed:
+            raise ValueError(f"vertical_loading_mode must be one of {allowed}, got '{v}'")
+        return v
+
     def model_post_init(self, __context: Any) -> None:
         """Handle auto-migration from deprecated use_semantic_tool_selection setting.
 
@@ -645,7 +671,7 @@ class Settings(BaseSettings):
         # We detect this by checking if it's in the __pydantic_private__ fields
         # or if it was passed during initialization
         if hasattr(self, "__pydantic_private__"):
-            private_fields = getattr(self, "__pydantic_private__", {})
+            getattr(self, "__pydantic_private__", {})
             # Check if use_semantic_tool_selection was explicitly set (not using default)
             # by looking at __pydantic_fields_set__
             field_set = getattr(self, "__pydantic_fields_set__", set())

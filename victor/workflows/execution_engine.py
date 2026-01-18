@@ -50,6 +50,7 @@ from typing import (
     List,
     Optional,
     Set,
+    TYPE_CHECKING,
     Union,
 )
 

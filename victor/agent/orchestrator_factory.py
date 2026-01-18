@@ -42,6 +42,7 @@ from rich.console import Console
 from victor.protocols.mode_aware import ModeAwareMixin
 
 if TYPE_CHECKING:
+    from victor.agent.orchestrator import AgentOrchestrator
     from victor.config.settings import Settings
     from victor.providers.base import BaseProvider
     from victor.agent.tool_calling import BaseToolCallingAdapter, ToolCallingCapabilities

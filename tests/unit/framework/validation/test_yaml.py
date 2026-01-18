@@ -26,7 +26,7 @@ from victor.framework.validation.yaml import (
     create_pipeline_from_yaml,
     validate_from_yaml,
 )
-from victor.framework.validation.pipeline import ValidationAction, ValidationPipeline
+from victor.framework.validation.pipeline import ValidationAction, ValidationPipeline, ValidationResult
 
 
 # =============================================================================
@@ -254,9 +254,7 @@ class TestValidatorFactory:
             def name(self) -> str:
                 return "CustomValidator"
 
-            def validate(self, data: dict, context) -> "ValidationResult":
-                from victor.framework.validation.pipeline import ValidationResult
-
+            def validate(self, data: dict, context) -> ValidationResult:
                 return ValidationResult(is_valid=True)
 
         factory.register_validator("custom", CustomValidator)

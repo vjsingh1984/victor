@@ -221,9 +221,10 @@ class BatchProcessSummary:
 
     def success_rate(self) -> float:
         """Get success rate as percentage."""
-        if not self.results:
+        total_tasks = self.successful_count + self.failed_count
+        if total_tasks == 0:
             return 0.0
-        return (self.successful_count / len(self.results)) * 100.0
+        return (self.successful_count / total_tasks) * 100.0
 
     def avg_duration_ms(self) -> float:
         """Get average task duration."""
@@ -530,6 +531,20 @@ class BatchProcessor:
 
         results = []
         for task in tasks:
+            result = self._execute_task_with_retry(task, executor)
+            results.append(result)
+        return results
+
+    def _execute_task_with_retry(
+        self, task: BatchTask, executor: Callable[[dict], Any]
+    ) -> BatchResult:
+        """Execute a single task with retry logic (Python fallback)."""
+        import time
+
+        max_retries = self._get_max_retries()
+        current_retry = task.retry_count
+
+        while current_retry <= max_retries:
             start = time.time()
             try:
                 result = executor(
@@ -538,32 +553,61 @@ class BatchProcessor:
                         "task_data": task.task_data,
                         "priority": task.priority,
                         "timeout_ms": task.timeout_ms,
-                        "retry_count": task.retry_count,
+                        "retry_count": current_retry,
                         "dependencies": task.dependencies,
                     }
                 )
                 duration = (time.time() - start) * 1000.0
-                results.append(
-                    BatchResult(
-                        task_id=task.task_id,
-                        success=True,
-                        result=result,
-                        duration_ms=duration,
-                        retry_count=task.retry_count,
-                    )
+                return BatchResult(
+                    task_id=task.task_id,
+                    success=True,
+                    result=result,
+                    duration_ms=duration,
+                    retry_count=current_retry,
                 )
             except Exception as e:
                 duration = (time.time() - start) * 1000.0
-                results.append(
-                    BatchResult(
+                # If we haven't exhausted retries, try again
+                if current_retry < max_retries:
+                    current_retry += 1
+                    # Add small delay before retry
+                    time.sleep(0.001 * self._calculate_retry_delay(current_retry))
+                else:
+                    # Exhausted all retries
+                    return BatchResult(
                         task_id=task.task_id,
                         success=False,
                         error=str(e),
                         duration_ms=duration,
-                        retry_count=task.retry_count,
+                        retry_count=current_retry,
                     )
-                )
-        return results
+
+        # Should never reach here, but handle it
+        return BatchResult(
+            task_id=task.task_id,
+            success=False,
+            error="Unknown error during retry",
+            duration_ms=0.0,
+            retry_count=current_retry,
+        )
+
+    def _get_max_retries(self) -> int:
+        """Get maximum number of retries based on retry policy."""
+        if self.retry_policy == "none":
+            return 0
+        # Default to 3 retries for all other policies
+        return 3
+
+    def _calculate_retry_delay(self, retry_count: int) -> float:
+        """Calculate retry delay in milliseconds based on retry policy."""
+        if self.retry_policy == "fixed":
+            return 100.0  # Fixed 100ms delay
+        elif self.retry_policy == "linear":
+            return retry_count * 50.0  # Linear increase: 50ms, 100ms, 150ms...
+        elif self.retry_policy == "exponential":
+            return 50.0 * (2.0 ** (retry_count - 1))  # Exponential backoff
+        else:
+            return 0.0
 
 
 # Utility functions
@@ -600,7 +644,7 @@ def merge_batch_summaries_py(summaries: List[BatchProcessSummary]) -> BatchProce
         Merged BatchProcessSummary
     """
     if RUST_AVAILABLE and summaries:
-        rust_summaries = [s.to_rust() for s in summaries]  # Need to implement to_rust
+        [s.to_rust() for s in summaries]  # Need to implement to_rust
         # For now, use Python fallback
         pass
 

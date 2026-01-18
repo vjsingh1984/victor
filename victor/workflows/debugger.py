@@ -48,6 +48,7 @@ from typing import (
     Dict,
     List,
     Optional,
+    TYPE_CHECKING,
     Union,
 )
 
@@ -61,6 +62,7 @@ if TYPE_CHECKING:
         ExecutionTrace,
         NodeStatus,
     )
+    from victor.workflows.unified_compiler import CachedCompiledGraph
 
 logger = logging.getLogger(__name__)
 

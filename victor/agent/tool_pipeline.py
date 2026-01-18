@@ -87,6 +87,7 @@ except ImportError:
     native_compute_signature = None  # type: ignore
 
 if TYPE_CHECKING:
+    from victor.agent.orchestrator import AgentOrchestrator
     from victor.tools.base import ToolRegistry
     from victor.storage.cache.tool_cache import ToolCache
     from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
@@ -1945,7 +1946,7 @@ class ToolPipeline:
                     # Check if tool_cache is a ToolCacheManager
                     if isinstance(self.tool_cache, ToolCacheManager):
                         # Update the cached entry with file dependencies
-                        args_hash = self._get_call_signature(tool_name, normalized_args)
+                        self._get_call_signature(tool_name, normalized_args)
                         await self.tool_cache.set_tool_result(
                             tool_name=tool_name,
                             args=normalized_args,

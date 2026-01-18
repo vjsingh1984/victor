@@ -436,7 +436,6 @@ class LLMCompactionStrategy(CompactionStrategy):
 
         # Extract key topics (naive implementation)
         all_content = " ".join(m.get("content", "") for m in messages)
-        words = all_content.split()
         common_words = ["error", "file", "code", "test", "function", "fix"]
 
         topics = [w for w in common_words if w in all_content.lower()]

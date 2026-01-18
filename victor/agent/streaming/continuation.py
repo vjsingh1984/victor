@@ -64,6 +64,7 @@ from typing import (
     List,
     Optional,
     Protocol,
+    Set,
     TYPE_CHECKING,
 )
 
@@ -72,6 +73,7 @@ from victor.providers.base import StreamChunk
 
 if TYPE_CHECKING:
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
+    from victor.agent.orchestrator import AgentOrchestrator
     from victor.protocols.agent import IAgentOrchestrator
     from victor.agent.streaming.handler import StreamingChatHandler
     from victor.config.settings import Settings

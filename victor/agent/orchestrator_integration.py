@@ -73,6 +73,7 @@ from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
+    from victor.agent.orchestrator import AgentOrchestrator
     from victor.protocols.agent import IAgentOrchestrator
     from victor.agent.intelligent_pipeline import (
         IntelligentAgentPipeline,

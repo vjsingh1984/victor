@@ -26,6 +26,7 @@ from typing import Optional, Protocol, runtime_checkable
 
 from victor.coding.refactor.protocol import (
     RefactorRisk,
+    RefactorSymbol,
     RefactorSuggestion,
     RefactorType,
     SourceLocation,

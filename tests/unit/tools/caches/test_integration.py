@@ -52,7 +52,7 @@ class MockTool:
 
         return ToolMetadata(
             categories=["test"],
-            keywords=[name],
+            keywords=[self.name],
             use_cases=[],
             examples=[],
         )

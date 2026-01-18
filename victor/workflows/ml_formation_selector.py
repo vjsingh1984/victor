@@ -883,7 +883,7 @@ class ModelTrainer:
             # Return dummy model for testing without sklearn
             import warnings
 
-            warnings.warn("scikit-learn not installed, model will not work")
+            warnings.warn("scikit-learn not installed, model will not work", stacklevel=2)
 
             class DummyModel:
                 def fit(self, X, y):

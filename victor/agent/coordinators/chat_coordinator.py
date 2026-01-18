@@ -137,7 +137,6 @@ class ChatCoordinator:
             # Get tool definitions if provider supports them
             tools = None
             if orch.provider.supports_tools() and orch.tool_calls_used < orch.tool_budget:
-                conversation_depth = orch.conversation.message_count()
 
                 # Health check: Ensure tool selector is initialized
                 # CRITICAL: This prevents the critical bug where SemanticToolSelector was never initialized,
@@ -1234,7 +1233,6 @@ class ChatCoordinator:
             planned_tools = orch._tool_planner.plan_tools(goals, available_inputs)
             logger.info(f"available_inputs={available_inputs}")
 
-        conversation_depth = orch.conversation.message_count()
         # Use new IToolSelector API with ToolSelectionContext
         from victor.protocols import ToolSelectionContext
 
@@ -1289,7 +1287,7 @@ class ChatCoordinator:
         """
         from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
 
-        requirements = extract_prompt_requirements(user_message)
+        extract_prompt_requirements(user_message)
         # PromptRequirements only has counts, not file paths
         # Return empty list - file paths extracted elsewhere via patterns
         return []
@@ -1310,7 +1308,7 @@ class ChatCoordinator:
         """
         from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
 
-        requirements = extract_prompt_requirements(user_message)
+        extract_prompt_requirements(user_message)
         # PromptRequirements only has counts, not output paths
         return []
 
@@ -1863,8 +1861,6 @@ class ChatCoordinator:
             StreamChunk objects for budget exhausted response
         """
         from victor.providers.base import StreamChunk
-
-        orch = self._orchestrator
 
         # Log budget exhausted
         logger.warning(

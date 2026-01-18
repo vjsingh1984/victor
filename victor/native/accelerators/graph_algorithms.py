@@ -31,7 +31,8 @@ except ImportError:
     _NativeGraph = None
     warnings.warn(
         "Tier 3 Rust graph algorithms unavailable, using Python fallback. "
-        "For better performance, install with: pip install victor-ai[native]"
+        "For better performance, install with: pip install victor-ai[native]",
+        stacklevel=2,
     )
     _RUST_AVAILABLE = False
 

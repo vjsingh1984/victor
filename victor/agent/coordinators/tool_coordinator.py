@@ -851,7 +851,7 @@ class ToolCoordinator:
 
             # Apply adapter-based normalization
             if self._tool_adapter:
-                before_adapter = normalized_args.copy()
+                normalized_args.copy()
                 normalized_args = self._tool_adapter.normalize_arguments(normalized_args, tool_name)
 
             # Check for repeated failures

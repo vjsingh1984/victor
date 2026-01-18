@@ -67,6 +67,7 @@ if TYPE_CHECKING:
     from victor.teams.types import AgentMessage
 
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
+    from victor.agent.orchestrator import AgentOrchestrator
     from victor.protocols.agent import IAgentOrchestrator
     from victor.core.container import ServiceContainer
     from victor.providers.base import StreamChunk

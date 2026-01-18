@@ -817,52 +817,72 @@ impl BatchProcessor {
         python_executor: &Bound<'_, PyAny>,
     ) -> PyResult<Vec<BatchResult>> {
         use std::time::Instant;
+        use std::thread;
+        use std::time::Duration;
 
         // Execute tasks sequentially for now (safe with GIL)
         // TODO: Implement true parallel execution with proper GIL handling
         let mut results = Vec::new();
 
-        for task in tasks {
+        for mut task in tasks {
             let start = Instant::now();
+            let mut final_result: Option<BatchResult> = None;
 
-            // Execute task via Python callable
-            let result = Python::with_gil(|py| {
-                let task_obj = self.task_to_python(py, &task);
+            // Execute with retry logic
+            loop {
+                // Execute task via Python callable
+                let result = Python::with_gil(|py| {
+                    let task_obj = self.task_to_python(py, &task);
 
-                match python_executor.call1((task_obj,)) {
-                    Ok(result) => {
-                        let duration = start.elapsed().as_secs_f64() * 1000.0;
-                        Ok(BatchResult {
-                            task_id: task.task_id.clone(),
-                            success: true,
-                            result: Some(result.into()),
-                            error: None,
-                            duration_ms: duration,
-                            retry_count: task.retry_count,
-                        })
+                    match python_executor.call1((task_obj,)) {
+                        Ok(result) => {
+                            let duration = start.elapsed().as_secs_f64() * 1000.0;
+                            Ok(BatchResult {
+                                task_id: task.task_id.clone(),
+                                success: true,
+                                result: Some(result.into()),
+                                error: None,
+                                duration_ms: duration,
+                                retry_count: task.retry_count,
+                            })
+                        }
+                        Err(e) => {
+                            let duration = start.elapsed().as_secs_f64() * 1000.0;
+                            Ok(BatchResult {
+                                task_id: task.task_id.clone(),
+                                success: false,
+                                result: None,
+                                error: Some(e.to_string()),
+                                duration_ms: duration,
+                                retry_count: task.retry_count,
+                            })
+                        }
                     }
-                    Err(e) => {
-                        let duration = start.elapsed().as_secs_f64() * 1000.0;
-                        Ok(BatchResult {
-                            task_id: task.task_id.clone(),
-                            success: false,
-                            result: None,
-                            error: Some(e.to_string()),
-                            duration_ms: duration,
-                            retry_count: task.retry_count,
-                        })
-                    }
+                });
+
+                let result = result.unwrap_or_else(|e: PyErr| BatchResult {
+                    task_id: task.task_id.clone(),
+                    success: false,
+                    result: None,
+                    error: Some(e.to_string()),
+                    duration_ms: start.elapsed().as_secs_f64() * 1000.0,
+                    retry_count: task.retry_count,
+                });
+
+                // Check if we should retry
+                if self.should_retry(&result) {
+                    // Increment retry count and try again
+                    task.retry_count += 1;
+                    let delay_ms = self.calculate_retry_delay(task.retry_count);
+                    thread::sleep(Duration::from_millis(delay_ms));
+                } else {
+                    // Either succeeded or exhausted retries
+                    final_result = Some(result);
+                    break;
                 }
-            });
+            }
 
-            results.push(result.unwrap_or_else(|e: PyErr| BatchResult {
-                task_id: task.task_id.clone(),
-                success: false,
-                result: None,
-                error: Some(e.to_string()),
-                duration_ms: start.elapsed().as_secs_f64() * 1000.0,
-                retry_count: task.retry_count,
-            }));
+            results.push(final_result.unwrap());
         }
 
         Ok(results)

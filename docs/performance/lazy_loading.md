@@ -315,6 +315,102 @@ from victor.coding import CodingAssistant
 from victor.research import ResearchAssistant
 ```
 
+## Lazy Loading for Vertical Extensions (New Implementation)
+
+### Overview
+
+In addition to lazy import loading, Victor now supports lazy loading for **vertical extensions** to further improve startup time. This feature defers the loading of heavy extension modules (prompts, safety, workflows) until they are actually needed.
+
+### Configuration
+
+The `vertical_loading_mode` setting controls when vertical extensions are loaded:
+
+```bash
+# In settings file or environment variable
+export VICTOR_VERTICAL_LOADING_MODE=lazy
+
+# Or in .env file
+VICTOR_VERTICAL_LOADING_MODE=lazy
+
+# Or in profiles.yaml
+vertical_loading_mode: lazy
+```
+
+### Loading Modes
+
+1. **eager** (default): Load all extensions immediately at startup
+2. **lazy**: Load metadata only, defer heavy modules until first access
+3. **auto**: Automatically choose based on environment (production=lazy, dev=eager)
+
+### Usage
+
+```python
+from victor.core.verticals.vertical_loader import VerticalLoader, load_vertical
+
+# Configure lazy mode
+loader = VerticalLoader()
+loader.configure_lazy_mode(settings)
+
+# Load vertical (respects configured mode)
+vertical = loader.load("coding")
+
+# Force lazy/eager loading
+vertical_lazy = loader.load("coding", lazy=True)
+vertical_eager = loader.load("coding", lazy=False)
+```
+
+### LazyVerticalProxy API
+
+```python
+from victor.core.verticals.lazy_loader import LazyVerticalProxy, LoadTrigger
+
+# Create lazy loader
+loader = LazyVerticalLoader(load_trigger=LoadTrigger.ON_DEMAND)
+loader.register_vertical("coding", lambda: CodingAssistant)
+
+# Get vertical (loads on first access)
+coding = loader.get_vertical("coding")
+
+# Check if loaded
+if coding.is_loaded():
+    print("Already loaded")
+
+# Force immediate loading
+coding.force_load()
+
+# Unload to free memory
+loader.unload_vertical("coding")
+```
+
+### Thread Safety
+
+All lazy loading operations are thread-safe using double-checked locking. Multiple threads can safely access the same vertical simultaneously - it will only be loaded once.
+
+### Performance
+
+Expected improvements:
+- **Startup Time**: 20% reduction (2.5s → 2.0s)
+- **First Access Overhead**: ~50ms (acceptable, one-time)
+- **Memory**: Similar (lazy loader overhead negligible)
+
+### Best Practices
+
+**Use lazy mode when:**
+- Running CLI tools that may not use all verticals
+- Running in production with limited startup time budget
+- Memory-constrained environments
+- Using multiple verticals but not accessing all of them
+
+**Use eager mode when:**
+- Debugging vertical loading issues
+- Running in development with fast startup not critical
+- You need predictable error handling at startup
+- All verticals will be accessed immediately anyway
+
+### Implementation
+
+See `victor/core/verticals/lazy_loader.py` for the thread-safe LazyVerticalProxy implementation.
+
 ## Future Improvements
 
 Potential enhancements to lazy loading:

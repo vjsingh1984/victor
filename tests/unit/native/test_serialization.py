@@ -291,7 +291,10 @@ class TestIncrementalParsing:
         """Test resetting incremental parser."""
         parser = create_incremental_json_parser()
 
-        parser.feed('{"key": "value"}')
+        # Feed incomplete JSON to ensure buffer has content
+        result = parser.feed('{"key": "incomplete')
+
+        # Buffer should have content since JSON is incomplete
         assert parser.buffer_length > 0
 
         parser.reset()
