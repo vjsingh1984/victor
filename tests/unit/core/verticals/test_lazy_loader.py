@@ -166,9 +166,7 @@ class TestLazyVerticalProxy:
                 proxy.load()
                 return MagicMock()
 
-        proxy = LazyVerticalProxy(
-            vertical_name="bad", loader=BadLoader.recursive_loader
-        )
+        proxy = LazyVerticalProxy(vertical_name="bad", loader=BadLoader.recursive_loader)
 
         with pytest.raises(RuntimeError, match="Recursive loading"):
             proxy.load()

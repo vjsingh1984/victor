@@ -43,6 +43,20 @@ from victor.core.verticals.protocols import (
     VerticalExtensions,
 )
 
+# Import ISP-compliant provider protocols
+from victor.core.verticals.protocols.providers import (
+    CapabilityProvider,
+    HandlerProvider,
+    MiddlewareProvider,
+    ModeConfigProvider,
+    PromptContributorProvider,
+    ServiceProvider,
+    TieredToolConfigProvider,
+    ToolDependencyProvider,
+    ToolProvider,
+    WorkflowProvider,
+)
+
 # Phase 3: Import framework capabilities
 from victor.framework.capabilities import (
     FileOperationsCapability,
@@ -67,6 +81,24 @@ class CodingAssistant(VerticalBase):
     - Task-type-specific prompt hints
     - Mode configurations for different scenarios
     - Tool dependency graph for intelligent selection
+
+    ISP Compliance:
+        This vertical explicitly declares which protocols it implements through
+        protocol registration, rather than inheriting from all possible protocol
+        interfaces. This follows the Interface Segregation Principle (ISP) by
+        implementing only needed protocols.
+
+        Implemented Protocols:
+        - ToolProvider: Provides 45+ tools optimized for coding tasks
+        - PromptContributorProvider: Provides coding-specific task hints
+        - MiddlewareProvider: Provides code correction and git safety middleware
+        - ToolDependencyProvider: Provides tool dependency patterns
+        - HandlerProvider: Provides workflow compute handlers
+        - WorkflowProvider: Provides YAML-based workflows
+        - CapabilityProvider: Provides coding capability configurations
+        - ModeConfigProvider: Provides mode configurations (build, plan, explore)
+        - ServiceProvider: Provides coding-specific DI services
+        - TieredToolConfigProvider: Provides tiered tool configuration
 
     Example:
         from victor.coding import CodingAssistant
@@ -464,3 +496,22 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
 
 
 __all__ = ["CodingAssistant"]
+
+
+# Register protocols at module level after class definition
+# This ensures protocols are registered when the module is loaded
+CodingAssistant.register_protocol(ToolProvider)
+CodingAssistant.register_protocol(PromptContributorProvider)
+CodingAssistant.register_protocol(MiddlewareProvider)
+CodingAssistant.register_protocol(ToolDependencyProvider)
+CodingAssistant.register_protocol(HandlerProvider)
+CodingAssistant.register_protocol(WorkflowProvider)
+CodingAssistant.register_protocol(CapabilityProvider)
+CodingAssistant.register_protocol(ModeConfigProvider)
+CodingAssistant.register_protocol(ServiceProvider)
+CodingAssistant.register_protocol(TieredToolConfigProvider)
+
+# ISP Compliance Note:
+# This vertical explicitly declares protocol conformance through registration
+# rather than inheriting from all protocol interfaces. The framework can check
+# capabilities via isinstance(vertical, ToolProvider).

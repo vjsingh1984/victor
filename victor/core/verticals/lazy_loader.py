@@ -114,7 +114,9 @@ class LazyVerticalProxy:
 
             # Check for recursive loading
             if self._loading:
-                raise RuntimeError(f"Recursive loading detected for vertical '{self.vertical_name}'")
+                raise RuntimeError(
+                    f"Recursive loading detected for vertical '{self.vertical_name}'"
+                )
 
             try:
                 self._loading = True

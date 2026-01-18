@@ -41,6 +41,17 @@ from victor.core.verticals.protocols import (
 )
 from victor.framework.tool_naming import ToolNames
 
+# Import ISP-compliant provider protocols
+from victor.core.verticals.protocols.providers import (
+    CapabilityProvider,
+    HandlerProvider,
+    PromptContributorProvider,
+    TieredToolConfigProvider,
+    ToolDependencyProvider,
+    ToolProvider,
+    WorkflowProvider,
+)
+
 
 class RAGAssistant(VerticalBase):
     """Retrieval-Augmented Generation assistant vertical.
@@ -50,6 +61,21 @@ class RAGAssistant(VerticalBase):
     - Vector search with LanceDB
     - Query processing with context retrieval
     - Source attribution and citations
+
+    ISP Compliance:
+        This vertical explicitly declares which protocols it implements through
+        protocol registration, rather than inheriting from all possible protocol
+        interfaces. This follows the Interface Segregation Principle (ISP) by
+        implementing only needed protocols.
+
+        Implemented Protocols:
+        - ToolProvider: Provides RAG-specific tools (ingest, search, query)
+        - PromptContributorProvider: Provides RAG-specific task hints
+        - ToolDependencyProvider: Provides tool dependency patterns
+        - HandlerProvider: Provides workflow compute handlers
+        - CapabilityProvider: Provides RAG capability configurations
+        - TieredToolConfigProvider: Provides tiered tool configuration
+        - WorkflowProvider: Provides YAML-based workflows
 
     Example:
         from victor.rag import RAGAssistant

@@ -92,7 +92,19 @@ import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, ClassVar, Dict, KeysView, List, Optional, Protocol, Set, Type, TYPE_CHECKING, Union
+from typing import (
+    Any,
+    ClassVar,
+    Dict,
+    KeysView,
+    List,
+    Optional,
+    Protocol,
+    Set,
+    Type,
+    TYPE_CHECKING,
+    Union,
+)
 
 from victor.framework.tools import ToolSet
 

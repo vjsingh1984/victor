@@ -696,7 +696,9 @@ def apply_json_patches(json_str: str, patches: List[Dict[str, Any]]) -> str:
                             current.extend([{}] * (idx - len(current) + 1))
                         current = current[idx]
                     else:
-                        raise SerializationError(f"Cannot traverse into scalar value at path component {i}")
+                        raise SerializationError(
+                            f"Cannot traverse into scalar value at path component {i}"
+                        )
 
                 # Apply operation
                 last_component = path_components[-1] if path_components else None
@@ -889,7 +891,9 @@ def deep_set_json(json_str: str, path: List[str], value: Any) -> str:
                         current.extend([{}] * (idx - len(current) + 1))
                     current = current[idx]
                 else:
-                    raise SerializationError(f"Cannot traverse into scalar value at component '{component}'")
+                    raise SerializationError(
+                        f"Cannot traverse into scalar value at component '{component}'"
+                    )
 
             # Set value
             last_component = path[-1]

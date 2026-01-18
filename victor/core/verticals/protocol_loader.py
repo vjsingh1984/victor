@@ -74,7 +74,17 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Dict, List, Optional, Protocol, Type, TYPE_CHECKING, runtime_checkable
+from typing import (
+    Any,
+    ClassVar,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    Type,
+    TYPE_CHECKING,
+    runtime_checkable,
+)
 
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import VerticalExtensions
@@ -192,9 +202,7 @@ class ProtocolBasedExtensionLoader:
         """
         # Validate protocol_type is actually a Protocol
         if not getattr(protocol_type, "_is_protocol", False):
-            raise TypeError(
-                f"protocol_type must be a Protocol, got {type(protocol_type).__name__}"
-            )
+            raise TypeError(f"protocol_type must be a Protocol, got {type(protocol_type).__name__}")
 
         # Initialize protocol type registry if needed
         if protocol_type not in cls._protocol_registry:
@@ -423,9 +431,7 @@ class ProtocolBasedExtensionLoader:
         cls._protocol_cache.pop(cache_key, None)
         cls._conformance_cache.pop(cache_key, None)
 
-        logger.debug(
-            f"Unregistered {vertical_class.__name__} from {protocol_type.__name__}"
-        )
+        logger.debug(f"Unregistered {vertical_class.__name__} from {protocol_type.__name__}")
 
     @classmethod
     def clear_cache(

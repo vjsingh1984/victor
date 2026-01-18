@@ -193,8 +193,8 @@ async def test_orchestrator_initialization_time(mock_provider, mock_settings, sa
     _patch_fast_chat(orchestrator)
 
     # Register tools
-    for tool in sample_tools:
-        orchestrator.tools.register(tool)
+    for tool_instance in sample_tools:
+        orchestrator.tools.register(tool_instance)
 
     init_time = time.perf_counter() - start_time
 
@@ -337,8 +337,8 @@ async def test_coordinator_overhead(mock_provider, mock_settings, sample_tools):
     )
     _patch_fast_chat(orchestrator)
 
-    for tool in sample_tools:
-        orchestrator.tools.register(tool)
+    for tool_instance in sample_tools:
+        orchestrator.tools.register(tool_instance)
 
     # Measure chat through coordinators
     iterations = int(os.getenv("VICTOR_BENCHMARK_CHAT_ITERATIONS", "5"))

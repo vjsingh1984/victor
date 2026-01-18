@@ -1,0 +1,578 @@
+# Coding Vertical Template
+# Production template for software development verticals
+# Based on Victor's CodingAssistant - the primary vertical for software development
+
+metadata:
+  name: coding
+  description: "Software development assistant for code exploration, writing, and refactoring"
+  version: "2.0.0"
+  author: "Victor Team"
+  license: "Apache-2.0"
+  category: development
+  tags:
+    - coding
+    - development
+    - software
+    - refactoring
+    - testing
+    - git
+  provider_hints:
+    preferred_models:
+      - claude-sonnet-4-5
+      - gpt-4
+      - deepseek-coder
+    min_context: 128000
+    supports_tools: true
+  evaluation_criteria:
+    - code_quality
+    - test_success_rate
+    - compilation_success
+    - bug_fix_accuracy
+
+# Core tools for software development
+tools:
+  # Framework file operations (Phase 3: reused from FileOperationsCapability)
+  - read_file           # Read file contents
+  - write_file          # Write/create files
+  - edit_file           # Edit existing files
+  - grep                # Keyword search
+
+  # Core filesystem operations
+  - ls                  # List directory contents
+  - overview            # Get project overview
+
+  # Code search and navigation
+  - code_search         # Semantic code search
+  - plan                # Plan files for analysis
+
+  # Git operations
+  - git                 # Unified git tool (all git operations)
+
+  # Shell execution
+  - shell               # Execute bash commands
+
+  # Code intelligence (LSP-based)
+  - lsp                 # LSP operations (diagnostics, completion)
+  - symbol              # Find symbols
+  - refs                # Find references
+
+  # Refactoring tools
+  - rename              # Rename symbols
+  - extract             # Extract functions
+
+  # Testing
+  - test                # Run tests
+
+  # Docker (for containerized development)
+  - docker              # Docker operations
+
+  # Web tools (for documentation and research)
+  - web_search          # Web search
+  - web_fetch           # Fetch URL content
+
+# Main system prompt
+system_prompt: |
+  You are Victor, an expert software development assistant.
+
+  Your capabilities:
+  - Deep code understanding through semantic search and LSP integration
+  - Safe file operations with automatic backup and undo
+  - Git operations for version control
+  - Test execution and validation
+  - Multi-language support (Python, TypeScript, Rust, Go, and more)
+
+  Guidelines:
+  1. **Understand before modifying**: Always read and understand code before making changes
+  2. **Incremental changes**: Make small, focused changes rather than large rewrites
+  3. **Verify changes**: Run tests or validation after modifications
+  4. **Explain reasoning**: Briefly explain your approach when making non-trivial changes
+  5. **Preserve style**: Match existing code style and patterns
+  6. **Handle errors gracefully**: If something fails, diagnose and recover
+
+  When exploring code:
+  - Use semantic_code_search for conceptual queries ("authentication logic")
+  - Use code_search for exact patterns ("def authenticate")
+  - Use overview to understand file structure
+
+  When modifying code:
+  - Use edit for surgical changes to existing code
+  - Use write only for new files or complete rewrites
+  - Always verify changes compile/pass tests when possible
+
+  You have access to 45+ tools. Use them efficiently to accomplish tasks.
+
+# Stage definitions for coding workflow
+stages:
+  INITIAL:
+    name: INITIAL
+    description: "Understanding the coding request"
+    tools:
+      - read_file
+      - ls
+      - overview
+      - grep
+    keywords:
+      - what
+      - how
+      - explain
+      - where
+      - show me
+    next_stages:
+      - PLANNING
+      - READING
+
+  PLANNING:
+    name: PLANNING
+    description: "Planning the implementation approach"
+    tools:
+      - grep
+      - plan
+      - overview
+      - read_file
+    keywords:
+      - plan
+      - approach
+      - design
+      - architecture
+      - strategy
+    next_stages:
+      - READING
+      - EXECUTION
+
+  READING:
+    name: READING
+    description: "Reading code and gathering context"
+    tools:
+      - read_file
+      - code_search
+      - grep
+      - lsp
+      - symbol
+      - refs
+    keywords:
+      - read
+      - show
+      - find
+      - look
+      - check
+      - search
+    next_stages:
+      - ANALYSIS
+      - EXECUTION
+
+  ANALYSIS:
+    name: ANALYSIS
+    description: "Analyzing code structure and dependencies"
+    tools:
+      - lsp
+      - symbol
+      - refs
+      - overview
+    keywords:
+      - analyze
+      - review
+      - understand
+      - why
+      - how does
+    next_stages:
+      - EXECUTION
+      - PLANNING
+
+  EXECUTION:
+    name: EXECUTION
+    description: "Implementing changes"
+    tools:
+      - write_file
+      - edit_file
+      - shell
+      - git
+      - rename
+    keywords:
+      - change
+      - modify
+      - create
+      - add
+      - remove
+      - fix
+      - implement
+      - write
+      - update
+      - refactor
+    next_stages:
+      - VERIFICATION
+      - COMPLETION
+
+  VERIFICATION:
+    name: VERIFICATION
+    description: "Testing and validating changes"
+    tools:
+      - shell
+      - test
+      - git
+      - read_file
+    keywords:
+      - test
+      - verify
+      - check
+      - validate
+      - run
+      - build
+    next_stages:
+      - COMPLETION
+      - EXECUTION
+
+  COMPLETION:
+    name: COMPLETION
+    description: "Committing and summarizing"
+    tools:
+      - git
+    keywords:
+      - done
+      - finish
+      - complete
+      - commit
+      - summarize
+    next_stages: []
+
+# Extension specifications
+extensions:
+  # Middleware for coding operations
+  middleware:
+    - name: code_correction
+      class_name: CodeCorrectionMiddleware
+      module: victor.coding.middleware
+      enabled: true
+      config:
+        auto_fix_syntax: true
+        validate_imports: true
+
+    - name: git_safety
+      class_name: GitSafetyMiddleware
+      module: victor.coding.middleware
+      enabled: true
+      config:
+        require_confirmation: true
+        protected_branches:
+          - main
+          - master
+          - develop
+
+  # Safety patterns for dangerous coding operations
+  safety_patterns:
+    - name: git_force_push
+      pattern: "git.*push.*-f"
+      description: "Force push to remote"
+      severity: "high"
+      category: "git"
+
+    - name: git_branch_delete
+      pattern: "git.*branch.*-D"
+      description: "Delete git branch"
+      severity: "medium"
+      category: "git"
+
+    - name: rm_recursive
+      pattern: "rm.*-rf"
+      description: "Recursive file deletion"
+      severity: "high"
+      category: "file_operations"
+
+    - name: production_deploy
+      pattern: "(prod|production).*deploy"
+      description: "Direct production deployment"
+      severity: "critical"
+      category: "deployment"
+
+  # Task-type-specific prompt hints
+  prompt_hints:
+    - task_type: code_generation
+      hint: "[GENERATE] Write code directly. No exploration needed. Complete implementation."
+      tool_budget: 3
+      priority_tools:
+        - write_file
+
+    - task_type: create_simple
+      hint: "[CREATE] Write file immediately. Skip codebase exploration. One tool call max."
+      tool_budget: 2
+      priority_tools:
+        - write_file
+
+    - task_type: create
+      hint: "[CREATE+CONTEXT] Read 1-2 relevant files, then create. Follow existing patterns."
+      tool_budget: 5
+      priority_tools:
+        - read_file
+        - write_file
+
+    - task_type: edit
+      hint: "[EDIT] Read target file first, then modify. Focused changes only."
+      tool_budget: 5
+      priority_tools:
+        - read_file
+        - edit_file
+
+    - task_type: search
+      hint: "[SEARCH] Use grep/ls for exploration. Summarize after 2-4 calls."
+      tool_budget: 6
+      priority_tools:
+        - grep
+        - ls
+        - code_search
+
+    - task_type: action
+      hint: "[ACTION] Execute git/test/build operations. Multiple tool calls allowed. Continue until complete."
+      tool_budget: 15
+      priority_tools:
+        - shell
+        - git
+        - test
+
+    - task_type: analysis_deep
+      hint: "[ANALYSIS] Thorough codebase exploration. Read all relevant modules. Comprehensive output."
+      tool_budget: 25
+      priority_tools:
+        - read_file
+        - grep
+        - code_search
+        - ls
+
+    - task_type: analyze
+      hint: "[ANALYZE] Examine code carefully. Read related files. Structured findings."
+      tool_budget: 12
+      priority_tools:
+        - read_file
+        - grep
+        - symbol
+
+  # Workflow handlers (for YAML workflows)
+  handlers:
+    code_review:
+      description: "Review code for quality and security"
+      handler: victor.coding.workflows:code_review_handler
+
+    test_generation:
+      description: "Generate unit tests for code"
+      handler: victor.coding.workflows:test_generation_handler
+
+  # Agent personas for specialized tasks
+  personas:
+    code_reviewer:
+      name: "Code Reviewer"
+      description: "Expert code reviewer focusing on quality, security, and best practices"
+      system_prompt_extension: |
+        You are a meticulous code reviewer. Check for:
+        - Security vulnerabilities (SQL injection, XSS, etc.)
+        - Code quality and maintainability
+        - Performance issues
+        - Error handling
+        - Test coverage
+        - Documentation completeness
+
+    tester:
+      name: "Testing Expert"
+      description: "Specialist in test generation and quality assurance"
+      system_prompt_extension: |
+        You are a testing expert. Focus on:
+        - Unit test coverage
+        - Edge cases and boundary conditions
+        - Mock and stub usage
+        - Test organization and clarity
+        - Integration test scenarios
+
+  # Composed middleware chains
+  composed_chains:
+    safe_edit:
+      - code_correction
+      - git_safety
+
+    full_workflow:
+      - code_correction
+      - git_safety
+
+# Workflows - YAML workflow definitions
+workflows:
+  - name: code_review
+    file: workflows/code_review.yaml
+    description: "Comprehensive code review workflow"
+
+  - name: test_generation
+    file: workflows/test_generation.yaml
+    description: "Generate unit tests from code"
+
+# Teams - multi-agent team formations
+teams:
+  - name: code_review_team
+    display_name: Code Review Team
+    description: Comprehensive code review with parallel analysis
+    formation: parallel
+    communication_style: structured
+    max_iterations: 10
+    roles:
+      - name: security_reviewer
+        display_name: Security Reviewer
+        description: Review for security vulnerabilities
+        persona: Security-focused reviewer checking for injection attacks and auth flaws
+        tool_categories:
+          - code_search
+          - grep
+        capabilities:
+          - security_scan
+
+      - name: logic_reviewer
+        display_name: Logic Reviewer
+        description: Review for logic correctness
+        persona: Detail-oriented reviewer checking edge cases and error handling
+        tool_categories:
+          - read_file
+          - grep
+        capabilities:
+          - ast_analysis
+
+      - name: style_reviewer
+        display_name: Style Reviewer
+        description: Review for code style and conventions
+        persona: Consistency advocate ensuring readable, maintainable code
+        tool_categories:
+          - read_file
+        capabilities:
+          - complexity_analysis
+
+      - name: synthesizer
+        display_name: Review Synthesizer
+        description: Synthesize findings into actionable feedback
+        persona: Diplomatic communicator prioritizing issues by severity
+        tool_categories:
+          - read_file
+          - write_file
+
+  - name: feature_implementation_team
+    display_name: Feature Implementation Team
+    description: End-to-end feature implementation with research, planning, implementation, and review
+    formation: pipeline
+    communication_style: structured
+    max_iterations: 10
+    roles:
+      - name: researcher
+        display_name: Code Researcher
+        description: Analyze codebase for relevant patterns
+        persona: Meticulous code archaeologist with eye for patterns
+        tool_categories:
+          - code_search
+          - overview
+          - grep
+        capabilities:
+          - code_navigation
+
+      - name: planner
+        display_name: Implementation Planner
+        description: Design implementation approach
+        persona: Pragmatic architect valuing clean solutions
+        tool_categories:
+          - read_file
+          - plan
+
+      - name: implementer
+        display_name: Feature Implementer
+        description: Implement the feature
+        persona: Skilled craftsman writing clean code
+        tool_categories:
+          - write_file
+          - edit_file
+          - shell
+
+      - name: verifier
+        display_name: Code Reviewer
+        description: Review code and run tests
+        persona: Detail-oriented reviewer catching bugs
+        tool_categories:
+          - read_file
+          - test
+          - shell
+
+# Capabilities - dynamic capability loading
+capabilities:
+  - name: code_review
+    type: workflow
+    description: "Review code for quality, security, and best practices"
+    enabled: true
+    handler: "victor.coding.workflows:CodeReviewWorkflow"
+    config:
+      max_files: 50
+
+  - name: ast_analysis
+    type: tool
+    description: "Parse and analyze code structure using AST"
+    enabled: true
+
+  - name: complexity_analysis
+    type: validator
+    description: "Analyze code complexity metrics"
+    enabled: true
+    config:
+      max_cyclomatic: 10
+
+# Custom configuration - coding-specific settings
+custom_config:
+  # LSP support
+  supports_lsp: true
+  lsp_languages:
+    - python
+    - typescript
+    - javascript
+    - rust
+    - go
+    - java
+    - cpp
+
+  # Git support
+  supports_git: true
+  protected_branches:
+    - main
+    - master
+    - develop
+
+  # File handling
+  max_file_size: 1000000  # 1MB
+  binary_file_extensions:
+    - .png
+    - .jpg
+    - .jpeg
+    - .gif
+    - .pdf
+    - .zip
+    - .tar
+    - .gz
+
+  # Testing configuration
+  test_frameworks:
+    - pytest
+    - jest
+    - unittest
+    - cargo test
+
+  # Code quality
+  enable_syntax_checking: true
+  enable_import_validation: true
+  enable_linting_suggestions: true
+
+  # Grounding rules
+  grounding_rules: |
+    Always read existing code before modifying. Follow project conventions.
+    Test changes when possible. Never delete files without confirmation.
+
+  # System prompt sections
+  system_prompt_section: |
+    Focus on clean, maintainable code. Follow SOLID principles.
+    Write tests for new functionality. Document complex logic.
+
+# File templates - code scaffolding templates
+file_templates:
+  python_test:
+    template_path: templates/python_test.j2
+    output_pattern: "test_{}.py"
+    description: "Python unit test template"
+
+  typescript_interface:
+    template_path: templates/typescript_interface.j2
+    output_pattern: "{}.ts"
+    description: "TypeScript interface template"

@@ -15,11 +15,39 @@ from victor.core.verticals.protocols import (
     ToolDependencyProviderProtocol,
 )
 
+# Import ISP-compliant provider protocols
+from victor.core.verticals.protocols.providers import (
+    HandlerProvider,
+    MiddlewareProvider,
+    ModeConfigProvider,
+    PromptContributorProvider,
+    SafetyProvider,
+    TieredToolConfigProvider,
+    ToolDependencyProvider,
+    ToolProvider,
+)
+
 
 class DevOpsAssistant(VerticalBase):
     """DevOps assistant for infrastructure, deployment, and CI/CD automation.
 
-    Competitive with: Docker Desktop AI, Terraform Assistant, Pulumi AI.
+    Competitive with: Docker Desktop AI, Terraform Assistant, Pulumi AI, K8s GPT.
+
+    ISP Compliance:
+        This vertical explicitly declares which protocols it implements through
+        protocol registration, rather than inheriting from all possible protocol
+        interfaces. This follows the Interface Segregation Principle (ISP) by
+        implementing only needed protocols.
+
+        Implemented Protocols:
+        - ToolProvider: Provides tools optimized for DevOps tasks
+        - PromptContributorProvider: Provides DevOps-specific task hints
+        - MiddlewareProvider: Provides git safety, secret masking, and logging middleware
+        - ToolDependencyProvider: Provides tool dependency patterns
+        - HandlerProvider: Provides workflow compute handlers
+        - ModeConfigProvider: Provides mode configurations
+        - SafetyProvider: Provides DevOps safety patterns
+        - TieredToolConfigProvider: Provides tiered tool configuration
     """
 
     name = "devops"
@@ -267,3 +295,19 @@ When creating configurations:
     #
     # get_extensions() is inherited from VerticalBase with full caching support.
     # To clear all caches, use cls.clear_config_cache().
+
+
+# Register protocols at module level after class definition
+DevOpsAssistant.register_protocol(ToolProvider)
+DevOpsAssistant.register_protocol(PromptContributorProvider)
+DevOpsAssistant.register_protocol(MiddlewareProvider)
+DevOpsAssistant.register_protocol(ToolDependencyProvider)
+DevOpsAssistant.register_protocol(HandlerProvider)
+DevOpsAssistant.register_protocol(ModeConfigProvider)
+DevOpsAssistant.register_protocol(SafetyProvider)
+DevOpsAssistant.register_protocol(TieredToolConfigProvider)
+
+# ISP Compliance Note:
+# This vertical explicitly declares protocol conformance through registration
+# rather than inheriting from all protocol interfaces. The framework can check
+# capabilities via isinstance(vertical, ToolProvider).
