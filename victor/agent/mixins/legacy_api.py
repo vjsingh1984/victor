@@ -38,7 +38,7 @@ from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 from victor.agent.decorators import deprecated
 
 if TYPE_CHECKING:
-    from victor.config.conversation import ConversationStage
+    from victor.core.state import ConversationStage
     from victor.core.events.vertical_context import VerticalContext
 
 logger = logging.getLogger(__name__)
@@ -463,7 +463,7 @@ class LegacyAPIMixin:
         Returns:
             Current ConversationStage enum value
         """
-        from victor.config.conversation import ConversationStage
+        from victor.core.state import ConversationStage
 
         # StateCoordinator returns stage name, convert to enum
         stage_name = self._state_coordinator.get_stage()

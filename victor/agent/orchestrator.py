@@ -714,8 +714,7 @@ class AgentOrchestrator(
         self._send_rl_reward_signal(session)
 
     def _send_rl_reward_signal(self, session: StreamingSession) -> None:
-        """Send reward signal to RL model selector for Q-value updates.
-        """
+        """Send reward signal to RL model selector for Q-value updates."""
         self._coordinator_adapter.send_rl_reward_signal(session)
 
     def _extract_required_files_from_prompt(self, user_message: str) -> List[str]:
@@ -3159,19 +3158,23 @@ class AgentOrchestrator(
         if self._session_recovery_manager._lifecycle_manager is None:
             self._session_recovery_manager._lifecycle_manager = self._lifecycle_manager
 
-        # Delegate to SessionRecoveryManager
-        success = self._session_recovery_manager.recover_session(session_id)
+        # Delegate to SessionRecoveryManager with exception handling
+        try:
+            success = self._session_recovery_manager.recover_session(session_id)
 
-        if success:
-            # Update orchestrator-specific session tracking
-            self._memory_session_id = session_id
-            if self._memory_manager_wrapper is not None:
-                self._memory_manager_wrapper.session_id = session_id
-            logger.info(f"Recovered session {session_id[:8]}... ")
-        else:
-            logger.warning(f"Failed to recover session {session_id}")
+            if success:
+                # Update orchestrator-specific session tracking
+                self._memory_session_id = session_id
+                if self._memory_manager_wrapper is not None:
+                    self._memory_manager_wrapper.session_id = session_id
+                logger.info(f"Recovered session {session_id[:8]}... ")
+            else:
+                logger.warning(f"Failed to recover session {session_id}")
 
-        return success
+            return success
+        except Exception as e:
+            logger.warning(f"Failed to recover session {session_id}: {e}")
+            return False
 
     # =====================================================================
     # Delegation Methods for ChatCoordinator
@@ -3814,7 +3817,7 @@ class AgentOrchestrator(
         if not health["can_auto_recover"]:
             raise RuntimeError(f"Tool selector cannot be recovered: {health['message']}")
 
-        logger.warning(f"Tool selector not initialized, auto-recovering: {health['message']}")
+        logger.debug(f"Tool selector initialization pending, auto-recovering: {health['message']}")
 
         # Attempt initialization
         if hasattr(self.tool_selector, "initialize_tool_embeddings"):

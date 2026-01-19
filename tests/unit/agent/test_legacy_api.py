@@ -137,7 +137,7 @@ class TestLegacyAPIMixinWarnings:
 
     def test_get_conversation_stage_issues_warning(self):
         """Test get_conversation_stage issues deprecation warning."""
-        self.orchestrator._state_coordinator.get_stage.return_value = "BUILD"
+        self.orchestrator._state_coordinator.get_stage.return_value = "EXECUTION"
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
@@ -148,7 +148,7 @@ class TestLegacyAPIMixinWarnings:
 
             assert len(w) == 1
             assert "get_conversation_stage is deprecated" in str(w[0].message)
-            assert result == ConversationStage.BUILD
+            assert result == ConversationStage.EXECUTION
 
     def test_get_observed_files_issues_warning(self):
         """Test get_observed_files issues deprecation warning."""
@@ -311,7 +311,7 @@ class TestLegacyAPIMixinBackwardCompatibility:
 
     def test_get_messages_returns_correct_format(self):
         """Test get_messages returns correct format."""
-        from victor.agent.conversation_store import MessageRole
+        from victor.integrations.protocol.messages import MessageRole
 
         msg1 = MagicMock()
         msg1.role = MessageRole.USER
@@ -362,7 +362,7 @@ class TestLegacyAPIMixinCategories:
                 warnings.simplefilter("always")
                 method = getattr(self.orchestrator, method_name)
                 if method_name == "set_workspace":
-                    with patch("victor.agent.mixins.legacy_api.set_project_root"):
+                    with patch("victor.config.settings.set_project_root"):
                         method(*args)
                 else:
                     method(*args)
@@ -424,7 +424,7 @@ class TestLegacyAPIMixinCategories:
                 if method_name == "set_vertical_context":
                     method(MagicMock())
                 elif method_name == "get_conversation_stage":
-                    self.orchestrator._state_coordinator.get_stage.return_value = "BUILD"
+                    self.orchestrator._state_coordinator.get_stage.return_value = "EXECUTION"
                     method()
                 else:
                     method()

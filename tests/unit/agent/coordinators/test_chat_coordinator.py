@@ -1142,8 +1142,10 @@ class TestChatCoordinatorDelegationMethods:
 
         # Assert
         assert chunk is not None
-        assert chunk.is_final is True
+        # Changed: is_final is False because actual summary will follow
+        assert chunk.is_final is False
         assert "Research loop limit" in chunk.content
+        assert "generating comprehensive summary" in chunk.content
 
     def test_handle_force_completion_with_handler_action_task(self, coordinator: ChatCoordinator):
         """Test force completion message for action tasks."""
@@ -1158,8 +1160,10 @@ class TestChatCoordinatorDelegationMethods:
 
         # Assert
         assert chunk is not None
-        assert chunk.is_final is True
+        # Changed: is_final is False because actual summary will follow
+        assert chunk.is_final is False
         assert "Exploration limit" in chunk.content
+        assert "generating comprehensive summary" in chunk.content
 
     def test_handle_force_completion_not_triggered(self, coordinator: ChatCoordinator):
         """Test force completion when not triggered."""

@@ -1898,16 +1898,177 @@ class ChatCoordinator:
         from victor.providers.base import StreamChunk
 
         # Log force final response
-        logger.info("Forcing final response")
+        logger.info("Forcing final response - generating actual summary")
 
-        # Generate force final response message
+        # Generate notification message
         yield StreamChunk(
             chunk_type="system_message",
-            content=("\n\n[Force Final Response: Generating summary and concluding session]"),
+            content=(
+                "\n\n[Generating comprehensive final summary based on all information gathered...]\n"
+            ),
             metadata={
                 "force_final_response": True,
             },
         )
+
+        # Actually generate a final summary by calling the provider
+        orch = self._orchestrator
+
+        # Add a system message requesting comprehensive summary
+        task_type = "analysis" if stream_ctx.is_analysis_task else "general task"
+        summary_prompt = (
+            f"Please provide a comprehensive final summary for this {task_type}. "
+            f"Synthesize ALL the information you've gathered, all files you've read, "
+            f"and all analysis you've performed. Structure your response clearly with:\n"
+            f"1. Executive Summary (key findings)\n"
+            f"2. Detailed Analysis\n"
+            f"3. Actionable Recommendations\n"
+            f"4. Any Remaining Questions or Limitations\n\n"
+            f"Be thorough and specific - this is your final opportunity to provide complete value."
+        )
+        orch.add_message("system", summary_prompt)
+
+        # Call provider WITHOUT tools to get final summary
+        try:
+            response = await orch.provider.chat(
+                messages=orch.messages,
+                model=orch.model,
+                temperature=orch.temperature,
+                max_tokens=orch.max_tokens,
+                tools=None,  # No tools for final summary
+            )
+
+            if response and response.content:
+                # Sanitize and yield the actual summary
+                sanitized = orch.sanitizer.sanitize(response.content)
+                if sanitized:
+                    orch.add_message("assistant", sanitized)
+                    # Yield in chunks for better UX
+                    yield StreamChunk(
+                        chunk_type="content",
+                        content=sanitized,
+                        is_final=True,
+                    )
+                    logger.info(f"Generated final summary: {len(sanitized)} chars")
+                else:
+                    # Fallback if sanitization fails
+                    plain_text = orch.sanitizer.strip_markup(response.content)
+                    if plain_text:
+                        orch.add_message("assistant", plain_text)
+                        yield StreamChunk(
+                            chunk_type="content",
+                            content=plain_text,
+                            is_final=True,
+                        )
+                        logger.info(
+                            f"Generated final summary (plain text): {len(plain_text)} chars"
+                        )
+                    else:
+                        logger.warning("Failed to sanitize summary, yielding empty final chunk")
+                        yield StreamChunk(content="", is_final=True)
+            else:
+                # Provider returned empty - generate fallback summary from conversation
+                logger.warning(
+                    "Provider returned empty response for final summary, generating fallback"
+                )
+                fallback_summary = self._generate_fallback_summary(orch, stream_ctx)
+                yield StreamChunk(
+                    chunk_type="content",
+                    content=fallback_summary,
+                    is_final=True,
+                )
+        except Exception as e:
+            logger.error(f"Error generating final summary: {e}, generating fallback")
+            # Generate fallback summary on error
+            fallback_summary = self._generate_fallback_summary(orch, stream_ctx)
+            yield StreamChunk(
+                chunk_type="content",
+                content=fallback_summary,
+                is_final=True,
+            )
+
+    def _generate_fallback_summary(
+        self,
+        orch: "IAgentOrchestrator",
+        stream_ctx: "StreamingChatContext",
+    ) -> str:
+        """Generate fallback summary from conversation history when provider fails.
+
+        Args:
+            orch: The orchestrator instance
+            stream_ctx: The streaming context
+
+        Returns:
+            A structured fallback summary based on conversation history
+        """
+        from victor.agent.conversation_memory import MessageRole
+
+        # Collect information from conversation
+        messages = orch.messages
+        tool_calls_used = stream_ctx.tool_calls_used
+        iterations = stream_ctx.total_iterations
+        task_type = "analysis" if stream_ctx.is_analysis_task else "general task"
+
+        # Extract files read (if any)
+        files_read = set()
+        for msg in messages:
+            if msg.get("role") == "assistant":
+                content = msg.get("content", "")
+                # Try to extract file mentions
+                import re
+
+                file_pattern = r'[`"]?([\w\-./]+\.(?:py|md|yaml|yml|json|toml))[`"]?'
+                files = re.findall(file_pattern, content)
+                files_read.update(files[:20])  # Limit to 20 files
+
+        # Extract tool usage
+        tools_used = []
+        if hasattr(stream_ctx, "tools_used"):
+            tools_used = list(stream_ctx.tools_used)
+
+        # Build fallback summary
+        summary_parts = [
+            "## Session Summary (Auto-Generated)\n\n",
+            f"**Task Type**: {task_type}\n",
+            f"**Iterations**: {iterations}\n",
+            f"**Tool Calls**: {tool_calls_used}\n",
+        ]
+
+        if files_read:
+            summary_parts.append(f"**Files Examined**: {len(files_read)} files\n\n")
+            summary_parts.append("### Key Files Analyzed\n\n")
+            for f in list(files_read)[:15]:
+                summary_parts.append(f"- `{f}`\n")
+            summary_parts.append("\n")
+
+        if tools_used:
+            summary_parts.append("### Tools Used\n\n")
+            for tool in tools_used[:10]:
+                summary_parts.append(f"- `{tool}`\n")
+            summary_parts.append("\n")
+
+        summary_parts.extend(
+            [
+                "### Summary\n\n",
+                f"This {task_type} task completed after {iterations} iterations with {tool_calls_used} tool calls. ",
+                "The session reached the iteration limit and was automatically terminated to prevent infinite loops.\n\n",
+                "### What Was Accomplished\n\n",
+                "- Initial task analysis and planning\n",
+                "- File structure examination\n" if files_read else "",
+                "- Tool-based exploration and analysis\n" if tool_calls_used > 0 else "",
+                "- Progress tracking and iteration\n\n",
+                "### Limitations\n\n",
+                "**Note**: The AI provider did not generate a final summary, so this is an auto-generated ",
+                "summary based on conversation metadata. The full conversation history is available above ",
+                "for detailed analysis.\n\n",
+                "To get a more comprehensive summary, you can:\n",
+                "1. Review the conversation history above\n",
+                "2. Ask follow-up questions about specific aspects\n",
+                "3. Run the task again with a higher iteration limit if needed\n",
+            ]
+        )
+
+        return "".join(summary_parts)
 
     async def _handle_recovery_with_integration(
         self,
@@ -2170,14 +2331,9 @@ class ChatCoordinator:
 
         # Determine message based on task type
         if ctx.is_analysis_task:
-            message = (
-                "\n\n[Research loop limit reached - providing summary based on "
-                "information gathered so far]"
-            )
+            message = "\n\n[Research loop limit reached - generating comprehensive summary...]"
         else:
-            message = (
-                "\n\n[Exploration limit reached - providing summary based on "
-                "information gathered so far]"
-            )
+            message = "\n\n[Exploration limit reached - generating comprehensive summary...]"
 
-        return StreamChunk(content=message, is_final=True)
+        # Return non-final chunk - actual summary will follow
+        return StreamChunk(content=message, is_final=False)

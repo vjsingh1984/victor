@@ -27,6 +27,11 @@ Performance Targets:
 - Memory usage: <1GB for 100 concurrent sessions
 - Error rate: <1% under normal load
 - Graceful degradation above capacity limits
+
+Note:
+These tests require the locust package and use gevent for async load testing.
+They are excluded from normal test runs due to gevent/SSL monkey-patching conflicts.
+Run explicitly with: pytest -m load_test tests/load_test/
 """
 
 import asyncio
@@ -44,7 +49,7 @@ import pytest
 from victor.core.container import ServiceContainer
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import Settings
-from tests.load_test.load_test_framework import AsyncLoadTestFramework
+from .load_test_framework import AsyncLoadTestFramework
 
 
 # =============================================================================
