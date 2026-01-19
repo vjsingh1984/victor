@@ -33,13 +33,133 @@ def mock_settings():
 
     Creates a mock Settings with typical configuration values.
     """
-    settings = MagicMock()
-    settings.temperature = 0.7
-    settings.max_tokens = 4096
-    settings.thinking = False
-    settings.tool_selection = {"strategy": "hybrid"}
-    settings.provider = "anthropic"
-    settings.model = "claude-sonnet-4-5"
+    from victor.config.settings import Settings
+
+    # Try to use real settings, fall back to minimal mock
+    try:
+        settings = Settings()
+    except Exception:
+        settings = MagicMock()
+
+        # Core settings
+        settings.temperature = 0.7
+        settings.max_tokens = 4096
+        settings.thinking = False
+        settings.tool_selection = {"strategy": "hybrid"}
+        settings.tool_selection_strategy = "hybrid"
+        settings.provider = "anthropic"
+        settings.model = "claude-sonnet-4-5"
+        settings.default_vertical = "coding"
+
+        # Conversation settings
+        settings.max_conversation_history = 100000
+        settings.context_compaction_strategy = "tiered"
+        settings.context_min_messages_to_keep = 6
+        settings.context_tool_retention_weight = 1.5
+        settings.context_recency_weight = 2.0
+        settings.context_semantic_threshold = 0.3
+        settings.context_proactive_threshold = 0.90
+        settings.context_proactive_compaction = True
+        settings.context_min_messages_after_compact = 8
+
+        # Tool settings
+        settings.tool_cache_enabled = True
+        settings.tool_cache_ttl = 600
+        settings.tool_cache_allowlist = []
+        settings.max_tool_output_chars = 8192
+        settings.max_tool_output_lines = 200
+        settings.tool_truncation_strategy = "smart"
+        settings.tool_result_truncation = True
+        settings.enable_tool_deduplication = False
+        settings.tool_retry_max_attempts = 3
+        settings.tool_retry_base_delay = 1.0
+        settings.tool_validation_mode = "lenient"
+        settings.parallel_tool_execution = True
+        settings.max_concurrent_tools = 5
+
+        # Tool selection
+        settings.enable_tool_selection_rl = False
+        settings.tool_selection_rl_boost_weight = 0.3
+        settings.use_semantic_tool_selection = False
+
+        # Code correction
+        settings.code_correction_enabled = True
+        settings.code_correction_auto_fix = True
+        settings.code_correction_max_iterations = 1
+
+        # Analytics and observability
+        settings.analytics_enabled = True
+        settings.streaming_metrics_enabled = False
+        settings.enable_observability = True
+        settings.enable_tracing = True
+        settings.debug_logging = False
+
+        # Memory and context
+        settings.conversation_memory_enabled = True
+        settings.max_context_tokens = 100000
+        settings.response_token_reserve = 4096
+
+        # Session settings
+        settings.session_idle_timeout = 180.0
+        settings.subagent_orchestration_enabled = True
+
+        # Plugin settings
+        settings.plugin_enabled = True
+        settings.use_mcp_tools = False
+        settings.airgapped_mode = False
+        settings.plugin_dirs = []
+        settings.disabled_plugins = []
+        settings.plugin_packages = []
+
+        # Tool configuration
+        settings.max_complexity = 10
+        settings.web_fetch_top = 5
+        settings.web_fetch_pool = 3
+        settings.max_content_length = 5000
+        settings.batch_concurrency = 5
+        settings.batch_max_files = 100
+
+        # Provider settings
+        settings.provider_health_checks = True
+        settings.provider_auto_fallback = True
+        settings.fallback_providers = []
+
+        # Checkpoint settings
+        settings.checkpoint_enabled = True
+        settings.checkpoint_auto_interval = 5
+        settings.checkpoint_max_per_session = 50
+
+        # RL and learning
+        settings.enable_continuation_rl_learning = False
+
+        # Intelligent pipeline
+        settings.intelligent_pipeline_enabled = True
+        settings.intelligent_quality_scoring = True
+        settings.intelligent_mode_learning = True
+        settings.intelligent_prompt_optimization = True
+        settings.intelligent_min_quality_threshold = 0.5
+        settings.intelligent_grounding_threshold = 0.7
+
+        # Auto commit
+        settings.auto_commit_enabled = False
+
+        # Execution settings
+        settings.execution_timeout = None
+
+        # Cache settings
+        settings.read_cache_ttl = 300.0
+        settings.read_cache_max_entries = 100
+
+        # Thinking detection
+        settings.thinking_repetition_threshold = 3
+        settings.thinking_similarity_threshold = 0.65
+
+        # Budget settings
+        settings.tool_budget = 30
+        settings.max_iterations = 50
+        settings.max_exploration_iterations = 8
+        settings.max_action_iterations = 12
+
     return settings
 
 

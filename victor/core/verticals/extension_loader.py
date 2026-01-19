@@ -758,11 +758,22 @@ class VerticalExtensionLoader(ABC):
         *,
         use_cache: bool = True,
         strict: Optional[bool] = None,
+        use_lazy: Optional[bool] = None,
     ) -> "VerticalExtensions":
         """Get all extensions for this vertical with strict error handling.
 
         Aggregates all extension implementations for framework integration.
         Override for custom extension aggregation.
+
+        Lazy Loading (NEW):
+        When lazy loading is enabled (default), this returns a LazyVerticalExtensions
+        wrapper that defers actual extension loading until first access. This
+        significantly improves startup time by avoiding unnecessary imports.
+
+        Lazy loading is controlled by:
+        1. VICTOR_LAZY_EXTENSIONS environment variable (true/false/auto)
+        2. use_lazy parameter (overrides environment setting)
+        3. Defaults to ON_DEMAND (lazy) for better startup performance
 
         LSP Compliance: This method ALWAYS returns a valid VerticalExtensions
         object, never None. Even on exceptions (in non-strict mode), it returns
@@ -776,6 +787,67 @@ class VerticalExtensionLoader(ABC):
         Required Extensions:
         Even when strict=False, extensions listed in required_extensions will
         raise ExtensionLoadError if they fail to load.
+
+        Args:
+            use_cache: If True (default), return cached extensions if available.
+                       Set to False to force rebuild.
+            strict: Override the class-level strict_extension_loading setting.
+                    If None (default), uses cls.strict_extension_loading.
+            use_lazy: Override lazy loading setting. If None (default), uses
+                     VICTOR_LAZY_EXTENSIONS environment variable.
+
+        Returns:
+            VerticalExtensions containing all vertical extensions (never None)
+            May be a LazyVerticalExtensions wrapper if lazy loading enabled
+
+        Raises:
+            ExtensionLoadError: In strict mode or when a required extension fails
+        """
+        from victor.core.errors import ExtensionLoadError
+        from victor.core.verticals.protocols import VerticalExtensions
+
+        # Determine if we should use lazy loading
+        if use_lazy is None:
+            from victor.core.verticals.lazy_extensions import get_extension_load_trigger
+
+            trigger = get_extension_load_trigger()
+            use_lazy = trigger != "eager"
+
+        # If lazy loading enabled, return a lazy wrapper
+        if use_lazy:
+            from victor.core.verticals.lazy_extensions import (
+                create_lazy_extensions,
+                ExtensionLoadTrigger,
+            )
+
+            trigger = (
+                get_extension_load_trigger()
+                if use_lazy is None
+                else (ExtensionLoadTrigger.ON_DEMAND if use_lazy else ExtensionLoadTrigger.EAGER)
+            )
+
+            # Create lazy wrapper that defers loading
+            return create_lazy_extensions(
+                vertical_name=cls.name,
+                loader=lambda: cls._load_extensions_eager(use_cache=use_cache, strict=strict),
+                trigger=trigger,
+            )
+
+        # Eager loading path (legacy behavior)
+        return cls._load_extensions_eager(use_cache=use_cache, strict=strict)
+
+    @classmethod
+    def _load_extensions_eager(
+        cls,
+        *,
+        use_cache: bool = True,
+        strict: Optional[bool] = None,
+    ) -> "VerticalExtensions":
+        """Eagerly load all extensions for this vertical.
+
+        This is the internal implementation that actually loads extensions.
+        It's called by get_extensions() when lazy loading is disabled or when
+        the lazy wrapper triggers loading.
 
         Args:
             use_cache: If True (default), return cached extensions if available.

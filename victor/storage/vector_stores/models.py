@@ -317,7 +317,7 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
             return
 
         try:
-            import cohere
+            import cohere  # type: ignore
         except ImportError:
             raise ImportError("cohere not installed. Install with: pip install cohere")
 

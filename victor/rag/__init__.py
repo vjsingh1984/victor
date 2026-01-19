@@ -63,6 +63,13 @@ from victor.rag.tools import (
     RAGDeleteTool,
     RAGStatsTool,
 )
+from victor.rag.advanced_rag import (
+    AdvancedRAG,
+    RAGConfig,
+    SearchResult,
+    SearchStrategy,
+    RerankStrategy,
+)
 
 __all__ = [
     # Main vertical
@@ -87,4 +94,10 @@ __all__ = [
     "RAGListTool",
     "RAGDeleteTool",
     "RAGStatsTool",
+    # Advanced RAG
+    "AdvancedRAG",
+    "RAGConfig",
+    "SearchResult",
+    "SearchStrategy",
+    "RerankStrategy",
 ]

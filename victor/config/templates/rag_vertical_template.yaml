@@ -158,6 +158,17 @@ stages:
       - combine
       - summarize
     next_stages:
+      - COMPLETION
+
+  COMPLETION:
+    name: COMPLETION
+    description: "Answer delivered with citations"
+    tools: []
+    keywords:
+      - done
+      - complete
+      - finished
+    next_stages:
       - INITIAL
 
 # Extension specifications

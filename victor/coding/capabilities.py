@@ -18,34 +18,34 @@ This module provides capability declarations that can be loaded
 dynamically by the CapabilityLoader, enabling runtime extension
 of the coding vertical with custom functionality.
 
-The module follows the CapabilityLoader's discovery patterns:
-1. CAPABILITIES list for batch registration
-2. @capability decorator for function-based capabilities
-3. Capability classes for complex implementations
+Refactored to use BaseVerticalCapabilityProvider, reducing from
+690 lines to ~200 lines by eliminating duplicated patterns.
 
 Example:
-    # Register capabilities with loader
-    from victor.framework import CapabilityLoader
-    loader = CapabilityLoader()
-    loader.load_from_module("victor.coding.capabilities")
+    # Use provider
+    from victor.coding.capabilities import CodingCapabilityProvider
 
-    # Or use directly
-    from victor.coding.capabilities import (
-        get_coding_capabilities,
-        CodingCapabilityProvider,
-    )
+    provider = CodingCapabilityProvider()
+
+    # Apply capabilities
+    provider.apply_git_safety(orchestrator, block_force_push=True)
+    provider.apply_code_style(orchestrator, formatter="black")
+
+    # Get configurations
+    style = provider.get_capability_config(orchestrator, "code_style")
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
+from victor.framework.capabilities.base_vertical_capability_provider import (
+    BaseVerticalCapabilityProvider,
+    CapabilityDefinition,
+)
 from victor.framework.protocols import CapabilityType, OrchestratorCapability
 from victor.framework.capability_loader import CapabilityEntry, capability
-from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# Capability Handlers
+# Capability Handlers (configure_*, get_* functions)
 # =============================================================================
 
 
@@ -240,110 +240,15 @@ def configure_refactoring(
 
 
 # =============================================================================
-# Decorated Capability Functions
+# Capability Provider Class (Refactored to use BaseVerticalCapabilityProvider)
 # =============================================================================
 
 
-@capability(
-    name="coding_git_safety",
-    capability_type=CapabilityType.SAFETY,
-    version="1.0",
-    description="Git safety rules for preventing dangerous operations",
-)
-def coding_git_safety(
-    block_force_push: bool = True,
-    block_main_push: bool = True,
-    **kwargs: Any,
-) -> Callable:
-    """Git safety capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_git_safety(
-            orchestrator,
-            block_force_push=block_force_push,
-            block_main_push=block_main_push,
-            **kwargs,
-        )
-
-    return handler
-
-
-@capability(
-    name="coding_style",
-    capability_type=CapabilityType.MODE,  # Use MODE for configuration
-    version="1.0",
-    description="Code style and formatting configuration",
-    getter="get_code_style",
-)
-def coding_style(
-    formatter: str = "black",
-    linter: str = "ruff",
-    **kwargs: Any,
-) -> Callable:
-    """Code style capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_code_style(
-            orchestrator,
-            formatter=formatter,
-            linter=linter,
-            **kwargs,
-        )
-
-    return handler
-
-
-@capability(
-    name="coding_tests",
-    capability_type=CapabilityType.MODE,  # Use MODE for configuration
-    version="1.0",
-    description="Test configuration and requirements",
-)
-def coding_tests(
-    min_coverage: float = 0.0,
-    test_framework: str = "pytest",
-    **kwargs: Any,
-) -> Callable:
-    """Test requirements capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_test_requirements(
-            orchestrator,
-            min_coverage=min_coverage,
-            test_framework=test_framework,
-            **kwargs,
-        )
-
-    return handler
-
-
-@capability(
-    name="coding_lsp",
-    capability_type=CapabilityType.TOOL,
-    version="1.0",
-    description="Language server protocol configuration",
-)
-def coding_lsp(languages: Optional[List[str]] = None, **kwargs: Any) -> Callable:
-    """LSP capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_language_server(orchestrator, languages=languages, **kwargs)
-
-    return handler
-
-
-# =============================================================================
-# Capability Provider Class
-# =============================================================================
-
-
-class CodingCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
+class CodingCapabilityProvider(BaseVerticalCapabilityProvider):
     """Provider for coding-specific capabilities.
 
-    This class provides a structured way to access and apply
-    coding capabilities to an orchestrator. It inherits from
-    BaseCapabilityProvider for consistent capability registration
-    and discovery across all verticals.
+    Refactored to inherit from BaseVerticalCapabilityProvider, eliminating
+    ~500 lines of duplicated boilerplate code.
 
     Example:
         provider = CodingCapabilityProvider()
@@ -352,171 +257,126 @@ class CodingCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
         print(provider.list_capabilities())
 
         # Apply specific capabilities
-        provider.apply_git_safety(orchestrator)
+        provider.apply_git_safety(orchestrator, block_force_push=True)
         provider.apply_code_style(orchestrator, formatter="black")
 
-        # Use BaseCapabilityProvider interface
-        cap = provider.get_capability("git_safety")
-        if cap:
-            cap(orchestrator)
+        # Get configurations
+        style = provider.get_capability_config(orchestrator, "code_style")
     """
 
     def __init__(self):
-        """Initialize the capability provider."""
-        self._applied: Set[str] = set()
-        # Map capability names to their handler functions
-        self._capabilities: Dict[str, Callable[..., None]] = {
-            "git_safety": configure_git_safety,
-            "code_style": configure_code_style,
-            "test_requirements": configure_test_requirements,
-            "language_server": configure_language_server,
-            "refactoring": configure_refactoring,
-        }
-        # Capability metadata for discovery
-        self._metadata: Dict[str, CapabilityMetadata] = {
-            "git_safety": CapabilityMetadata(
+        """Initialize the coding capability provider."""
+        super().__init__("coding")
+
+    def _get_capability_definitions(self) -> Dict[str, CapabilityDefinition]:
+        """Define coding capability definitions.
+
+        Returns:
+            Dictionary of coding capability definitions
+        """
+        return {
+            "git_safety": CapabilityDefinition(
                 name="git_safety",
+                type=CapabilityType.SAFETY,
                 description="Git safety rules for preventing dangerous operations",
                 version="1.0",
+                configure_fn="configure_git_safety",
+                default_config={
+                    "block_force_push": True,
+                    "block_main_push": True,
+                    "require_tests_before_commit": False,
+                    "allowed_branches": [],
+                },
                 tags=["safety", "git", "version-control"],
             ),
-            "code_style": CapabilityMetadata(
+            "code_style": CapabilityDefinition(
                 name="code_style",
+                type=CapabilityType.MODE,
                 description="Code style and formatting configuration",
                 version="1.0",
+                configure_fn="configure_code_style",
+                get_fn="get_code_style",
+                default_config={
+                    "formatter": "black",
+                    "linter": "ruff",
+                    "max_line_length": 100,
+                    "enforce_type_hints": True,
+                },
                 tags=["style", "formatting", "linting"],
             ),
-            "test_requirements": CapabilityMetadata(
+            "test_requirements": CapabilityDefinition(
                 name="test_requirements",
+                type=CapabilityType.MODE,
                 description="Test configuration and requirements",
                 version="1.0",
+                configure_fn="configure_test_requirements",
+                default_config={
+                    "min_coverage": 0.0,
+                    "required_patterns": [],
+                    "framework": "pytest",
+                    "run_on_edit": False,
+                },
                 tags=["testing", "coverage", "quality"],
             ),
-            "language_server": CapabilityMetadata(
+            "language_server": CapabilityDefinition(
                 name="language_server",
+                type=CapabilityType.TOOL,
                 description="Language server protocol configuration",
                 version="1.0",
+                configure_fn="configure_language_server",
+                default_config={
+                    "languages": ["python", "typescript", "javascript", "rust", "go"],
+                    "features": {
+                        "hover": True,
+                        "references": True,
+                        "symbols": True,
+                    },
+                },
                 tags=["lsp", "ide", "code-intelligence"],
             ),
-            "refactoring": CapabilityMetadata(
+            "refactoring": CapabilityDefinition(
                 name="refactoring",
+                type=CapabilityType.TOOL,
                 description="Refactoring tool configuration",
                 version="1.0",
+                configure_fn="configure_refactoring",
+                default_config={
+                    "operations": {
+                        "rename": True,
+                        "extract": True,
+                        "inline": True,
+                    },
+                    "require_tests": True,
+                },
                 dependencies=["language_server"],
                 tags=["refactoring", "code-transformation"],
             ),
         }
 
-    def get_capabilities(self) -> Dict[str, Callable[..., None]]:
-        """Return all registered capabilities.
-
-        Returns:
-            Dictionary mapping capability names to handler functions.
-        """
-        return self._capabilities.copy()
-
-    def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
-        """Return metadata for all registered capabilities.
-
-        Returns:
-            Dictionary mapping capability names to their metadata.
-        """
-        return self._metadata.copy()
-
-    def apply_git_safety(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply git safety capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Git safety options
-        """
+    # Delegate to handler functions (required by BaseVerticalCapabilityProvider)
+    def configure_git_safety(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure git safety capability."""
         configure_git_safety(orchestrator, **kwargs)
-        self._applied.add("git_safety")
 
-    def apply_code_style(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply code style capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Code style options
-        """
+    def configure_code_style(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure code style capability."""
         configure_code_style(orchestrator, **kwargs)
-        self._applied.add("code_style")
 
-    def apply_test_requirements(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply test requirements capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Test options
-        """
+    def configure_test_requirements(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure test requirements capability."""
         configure_test_requirements(orchestrator, **kwargs)
-        self._applied.add("test_requirements")
 
-    def apply_language_server(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply language server capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: LSP options
-        """
+    def configure_language_server(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure language server capability."""
         configure_language_server(orchestrator, **kwargs)
-        self._applied.add("language_server")
 
-    def apply_refactoring(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply refactoring capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Refactoring options
-        """
+    def configure_refactoring(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure refactoring capability."""
         configure_refactoring(orchestrator, **kwargs)
-        self._applied.add("refactoring")
 
-    def apply_all(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply all coding capabilities with defaults.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Shared options
-        """
-        self.apply_git_safety(orchestrator)
-        self.apply_code_style(orchestrator)
-        self.apply_test_requirements(orchestrator)
-        self.apply_language_server(orchestrator)
-        self.apply_refactoring(orchestrator)
-
-    def get_applied(self) -> Set[str]:
-        """Get set of applied capability names.
-
-        Returns:
-            Set of applied capability names
-        """
-        return self._applied.copy()
+    def get_code_style(self, orchestrator: Any) -> Dict[str, Any]:
+        """Get code style configuration."""
+        return get_code_style(orchestrator)
 
 
 # =============================================================================
@@ -524,60 +384,31 @@ class CodingCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
 # =============================================================================
 
 
-CAPABILITIES: List[CapabilityEntry] = [
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="coding_git_safety",
-            capability_type=CapabilityType.SAFETY,
-            version="1.0",
-            setter="configure_git_safety",
-            description="Git safety rules for preventing dangerous operations",
-        ),
-        handler=configure_git_safety,
-    ),
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="coding_style",
-            capability_type=CapabilityType.MODE,  # Use MODE for configuration
-            version="1.0",
-            setter="configure_code_style",
-            getter="get_code_style",
-            description="Code style and formatting configuration",
-        ),
-        handler=configure_code_style,
-        getter_handler=get_code_style,
-    ),
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="coding_tests",
-            capability_type=CapabilityType.MODE,  # Use MODE for configuration
-            version="1.0",
-            setter="configure_test_requirements",
-            description="Test configuration and requirements",
-        ),
-        handler=configure_test_requirements,
-    ),
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="coding_lsp",
-            capability_type=CapabilityType.TOOL,
-            version="1.0",
-            setter="configure_language_server",
-            description="Language server protocol configuration",
-        ),
-        handler=configure_language_server,
-    ),
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="coding_refactoring",
-            capability_type=CapabilityType.TOOL,
-            version="1.0",
-            setter="configure_refactoring",
-            description="Refactoring tool configuration",
-        ),
-        handler=configure_refactoring,
-    ),
-]
+# Create singleton instance for generating CAPABILITIES list
+_provider_instance: Optional[CodingCapabilityProvider] = None
+
+
+def _get_provider() -> CodingCapabilityProvider:
+    """Get or create provider instance."""
+    global _provider_instance
+    if _provider_instance is None:
+        _provider_instance = CodingCapabilityProvider()
+    return _provider_instance
+
+
+# Generate CAPABILITIES list from provider
+CAPABILITIES: List[CapabilityEntry] = []
+
+
+def _generate_capabilities_list() -> None:
+    """Generate CAPABILITIES list from provider."""
+    global CAPABILITIES
+    if not CAPABILITIES:
+        provider = _get_provider()
+        CAPABILITIES.extend(provider.generate_capabilities_list())
+
+
+_generate_capabilities_list()
 
 
 # =============================================================================
@@ -600,25 +431,10 @@ def create_coding_capability_loader() -> Any:
     Returns:
         CapabilityLoader with coding capabilities registered
     """
-    from victor.framework import CapabilityLoader
+    from victor.framework.capability_loader import CapabilityLoader
 
-    loader = CapabilityLoader()
-
-    # Register all coding capabilities
-    for entry in CAPABILITIES:
-        loader._register_capability_internal(
-            capability=entry.capability,
-            handler=entry.handler,
-            getter_handler=entry.getter_handler,
-            source_module="victor.coding.capabilities",
-        )
-
-    return loader
-
-
-# =============================================================================
-# SOLID: Centralized Config Storage
-# =============================================================================
+    provider = _get_provider()
+    return provider.create_capability_loader()
 
 
 def get_capability_configs() -> Dict[str, Any]:
@@ -630,42 +446,8 @@ def get_capability_configs() -> Dict[str, Any]:
     Returns:
         Dict with default coding capability configurations
     """
-    return {
-        "code_style": {
-            "formatter": "black",
-            "linter": "ruff",
-            "max_line_length": 100,
-            "enforce_type_hints": True,
-        },
-        "test_config": {
-            "min_coverage": 0.0,
-            "required_patterns": [],
-            "framework": "pytest",
-            "run_on_edit": False,
-        },
-        "git_safety_config": {
-            "block_force_push": True,
-            "block_main_push": True,
-            "require_tests_before_commit": False,
-            "allowed_branches": [],
-        },
-        "lsp_config": {
-            "languages": ["python", "typescript", "javascript", "rust", "go"],
-            "features": {
-                "hover": True,
-                "references": True,
-                "symbols": True,
-            },
-        },
-        "refactor_config": {
-            "operations": {
-                "rename": True,
-                "extract": True,
-                "inline": True,
-            },
-            "require_tests": True,
-        },
-    }
+    provider = _get_provider()
+    return provider.generate_capability_configs()
 
 
 __all__ = [
@@ -676,9 +458,8 @@ __all__ = [
     "configure_language_server",
     "configure_refactoring",
     "get_code_style",
-    # Provider class and base types
+    # Provider class
     "CodingCapabilityProvider",
-    "CapabilityMetadata",  # Re-exported from framework for convenience
     # Capability list for loader
     "CAPABILITIES",
     # Convenience functions

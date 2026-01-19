@@ -27,7 +27,14 @@ Performance:
 import logging
 import re
 from enum import Enum
-from typing import Dict, List, NamedTuple, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, NamedTuple, Optional, Tuple
+
+if TYPE_CHECKING:
+    # Type stubs for native extensions (optional)
+    try:
+        import victor_native
+    except ImportError:
+        pass
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +43,7 @@ _NATIVE_AVAILABLE = False
 _PatternMatcher = None
 
 try:
-    import victor_native as _native
+    import victor_native as _native  # type: ignore
 
     _PatternMatcher = _native.PatternMatcher
     _NATIVE_AVAILABLE = True

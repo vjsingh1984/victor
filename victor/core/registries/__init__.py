@@ -15,12 +15,14 @@
 """Universal Registry System for Victor Framework.
 
 This package provides unified registry infrastructure for managing
-framework entities with configurable cache strategies.
+framework entities with configurable cache strategies and striped locks
+for linear scalability.
 
 Exports:
-    UniversalRegistry: Type-safe generic registry
+    UniversalRegistry: Type-safe generic registry with striped locks
     CacheStrategy: Cache invalidation strategies
     RegistryEntry: Registry entry with metadata
+    StripedLockManager: Striped lock manager for concurrent access
 
 Example:
     from victor.core.registries import UniversalRegistry, CacheStrategy
@@ -35,6 +37,12 @@ Example:
     config = mode_registry.get("build", namespace="coding")
 """
 
+from victor.core.registries.striped_locks import (
+    LockMetrics,
+    ReadWriteLock,
+    StripedLockManager,
+    StripedReadWriteLockManager,
+)
 from victor.core.registries.universal_registry import (
     CacheStrategy,
     RegistryEntry,
@@ -47,4 +55,8 @@ __all__ = [
     "CacheStrategy",
     "RegistryEntry",
     "create_universal_registry",
+    "StripedLockManager",
+    "ReadWriteLock",
+    "StripedReadWriteLockManager",
+    "LockMetrics",
 ]

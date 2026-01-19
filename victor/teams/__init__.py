@@ -162,6 +162,17 @@ from victor.teams.team_predictor import TeamPredictor
 # ML models
 from victor.teams.ml import FormationPredictor, PerformancePredictor, TeamMemberSelector
 
+# Swarming
+from victor.teams.swarming import (
+    AgentSwarm,
+    SwarmConfig,
+    ConsensusStrategy,
+    VotingStrategy,
+    ConflictResolution,
+    AgentVote,
+    ConsensusResult,
+)
+
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.protocols.team import ITeamCoordinator
@@ -270,4 +281,12 @@ __all__ = [
     "TeamMemberSelector",
     "FormationPredictor",
     "PerformancePredictor",
+    # Swarming
+    "AgentSwarm",
+    "SwarmConfig",
+    "ConsensusStrategy",
+    "VotingStrategy",
+    "ConflictResolution",
+    "AgentVote",
+    "ConsensusResult",
 ]

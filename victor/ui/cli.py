@@ -26,7 +26,7 @@ warnings.filterwarnings(
 
 import typer
 from rich.console import Console
-from typing import Optional, Any, Callable
+from typing import Optional, Any, Callable, cast
 import importlib
 
 from victor import __version__
@@ -47,14 +47,14 @@ class LazyTyper:
         """
         self.import_path = import_path
         self._module = None
-        self._typer_instance = None
+        self._typer_instance: Optional[typer.Typer] = None
 
     def _load(self) -> typer.Typer:
         """Load the actual Typer instance on first access."""
         if self._typer_instance is None:
             module_path, attr_name = self.import_path.split(":")
             module = importlib.import_module(module_path)
-            self._typer_instance = getattr(module, attr_name)
+            self._typer_instance = cast(typer.Typer, getattr(module, attr_name))
         return self._typer_instance
 
     def __getattr__(self, name: str) -> Any:
@@ -72,39 +72,53 @@ app = typer.Typer(
     add_completion=False,
 )
 
+
+def _add_lazy_typer(main_app: typer.Typer, lazy_typer: LazyTyper) -> None:
+    """Add a LazyTyper to a main Typer app.
+
+    This helper function works around mypy's inability to understand that
+    LazyTyper acts as a proxy to typer.Typer by using cast.
+
+    Args:
+        main_app: The main Typer application
+        lazy_typer: A LazyTyper instance to add
+    """
+    main_app.add_typer(cast(typer.Typer, lazy_typer))
+
+
 # Lazy load all commands to improve startup time
 # Commands are only imported when actually invoked
 # Format: LazyTyper("module.path:typer_instance")
-app.add_typer(LazyTyper("victor.ui.commands.benchmark:benchmark_app"))
-app.add_typer(LazyTyper("victor.ui.commands.capabilities:capabilities_app"))
-app.add_typer(LazyTyper("victor.ui.commands.chat:chat_app"))
-app.add_typer(LazyTyper("victor.ui.commands.checkpoint:checkpoint_app"))
-app.add_typer(LazyTyper("victor.ui.commands.config:config_app"))
-app.add_typer(LazyTyper("victor.ui.commands.dashboard:dashboard_app"))
-app.add_typer(LazyTyper("victor.ui.commands.docs:docs_app"))
-app.add_typer(LazyTyper("victor.ui.commands.embeddings:embeddings_app"))
-app.add_typer(LazyTyper("victor.ui.commands.errors:errors_app"))
-app.add_typer(LazyTyper("victor.ui.commands.examples:examples_app"))
-app.add_typer(LazyTyper("victor.ui.commands.experiments:experiment_app"))
-app.add_typer(LazyTyper("victor.ui.commands.fep:fep_app"))
-app.add_typer(LazyTyper("victor.ui.commands.index:index_app"))
-app.add_typer(LazyTyper("victor.ui.commands.init:init_app"))
-app.add_typer(LazyTyper("victor.ui.commands.keys:keys_app"))
-app.add_typer(LazyTyper("victor.ui.commands.mcp:mcp_app"))
-app.add_typer(LazyTyper("victor.ui.commands.memory:memory_app"))
-app.add_typer(LazyTyper("victor.ui.commands.models:models_app"))
-app.add_typer(LazyTyper("victor.ui.commands.profiles:profiles_app"))
-app.add_typer(LazyTyper("victor.ui.commands.providers:providers_app"))
-app.add_typer(LazyTyper("victor.ui.commands.rag:rag_app"))
-app.add_typer(LazyTyper("victor.ui.commands.security:security_app"))
-app.add_typer(LazyTyper("victor.ui.commands.serve:serve_app"))
-app.add_typer(LazyTyper("victor.ui.commands.test_provider:test_provider_app"))
-app.add_typer(LazyTyper("victor.ui.commands.tools:tools_app"))
-app.add_typer(LazyTyper("victor.ui.commands.scheduler:scheduler_app"))
-app.add_typer(LazyTyper("victor.ui.commands.sessions:sessions_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.benchmark:benchmark_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.capabilities:capabilities_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.chat:chat_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.checkpoint:checkpoint_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.config:config_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.dashboard:dashboard_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.docs:docs_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.embeddings:embeddings_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.errors:errors_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.examples:examples_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.experiments:experiment_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.fep:fep_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.index:index_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.init:init_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.keys:keys_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.mcp:mcp_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.memory:memory_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.models:models_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.profiles:profiles_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.providers:providers_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.rag:rag_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.security:security_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.serve:serve_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.test_provider:test_provider_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.tools:tools_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.scheduler:scheduler_app"))
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.sessions:sessions_app"))
 vertical_lazy = LazyTyper("victor.ui.commands.vertical:vertical_app")
-app.add_typer(vertical_lazy)
-app.add_typer(LazyTyper("victor.ui.commands.workflow:workflow_app"))
+_add_lazy_typer(app, vertical_lazy)
+_add_lazy_typer(app, LazyTyper("victor.ui.commands.workflow:workflow_app"))
 
 
 # Add scaffold as subcommand of vertical
@@ -124,17 +138,18 @@ def _ensure_scaffold_registered():
 
 
 # Monkey-patch LazyTyper to register scaffold on first load
-original_load = vertical_lazy._load
+_original_vertical_load = vertical_lazy._load
 
 
-def _load_with_scaffold(self):
+def _load_with_scaffold() -> typer.Typer:
     """Load vertical app and ensure scaffold is registered."""
-    result = original_load()
+    result = _original_vertical_load()
     _ensure_scaffold_registered()
     return result
 
 
-vertical_lazy._load = lambda: _load_with_scaffold(vertical_lazy)
+# Use object.__setattr__ to bypass mypy's method assignment check
+object.__setattr__(vertical_lazy, "_load", _load_with_scaffold)
 
 
 def _get_default_interactive():

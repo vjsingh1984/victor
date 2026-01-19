@@ -30,7 +30,10 @@ infrastructure and follow SOLID principles.
 from typing import Any, Dict, List, Optional, Protocol, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from langchain_core.runnables import Runnable
+    try:
+        from langchain_core.runnables import Runnable
+    except ImportError:
+        Runnable = object  # type: ignore
 
 
 # =============================================================================

@@ -79,6 +79,7 @@ class TestAdaptedNode:
 
     def test_initialization(self):
         """Test AdaptedNode initialization."""
+
         def _identity_handler(state):
             return state
 
@@ -98,6 +99,7 @@ class TestAdaptedNode:
 
     def test_default_values(self):
         """Test AdaptedNode default values."""
+
         def _identity_handler(state):
             return state
 

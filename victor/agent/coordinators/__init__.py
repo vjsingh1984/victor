@@ -268,6 +268,38 @@ from victor.agent.coordinators.new_coordinators_protocol import (
     ISearchCoordinator,
     ITeamCoordinator,
 )
+from victor.agent.coordinators.tool_retry_coordinator import (
+    ToolRetryCoordinator,
+    ToolRetryConfig,
+    ToolExecutionResult,
+    create_tool_retry_coordinator,
+)
+from victor.agent.coordinators.memory_coordinator import (
+    MemoryCoordinator,
+    MemoryStats,
+    SessionInfo as MemorySessionInfo,
+    create_memory_coordinator,
+)
+from victor.agent.coordinators.tool_capability_coordinator import (
+    ToolCapabilityCoordinator,
+    CapabilityCheckResult,
+    ModelCapabilityInfo,
+    create_tool_capability_coordinator,
+)
+
+# Phase 6 - Additional Coordinators
+from victor.agent.coordinators.file_context_coordinator import (
+    FileContextCoordinator,
+    create_file_context_coordinator,
+)
+from victor.agent.coordinators.middleware_coordinator import (
+    MiddlewareCoordinator,
+    create_middleware_coordinator,
+)
+from victor.agent.coordinators.intelligent_feature_coordinator import (
+    IntelligentFeatureCoordinator,
+    create_intelligent_feature_coordinator,
+)
 
 __all__ = [
     # Base configuration
@@ -381,4 +413,24 @@ __all__ = [
     "IConversationCoordinator",
     "ISearchCoordinator",
     "ITeamCoordinator",
+    # Phase 4 - Additional Coordinators
+    "ToolRetryCoordinator",
+    "ToolRetryConfig",
+    "ToolExecutionResult",
+    "create_tool_retry_coordinator",
+    "MemoryCoordinator",
+    "MemoryStats",
+    "MemorySessionInfo",
+    "create_memory_coordinator",
+    "ToolCapabilityCoordinator",
+    "CapabilityCheckResult",
+    "ModelCapabilityInfo",
+    "create_tool_capability_coordinator",
+    # Phase 6 - Additional Coordinators
+    "FileContextCoordinator",
+    "create_file_context_coordinator",
+    "MiddlewareCoordinator",
+    "create_middleware_coordinator",
+    "IntelligentFeatureCoordinator",
+    "create_intelligent_feature_coordinator",
 ]

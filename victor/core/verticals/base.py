@@ -512,6 +512,62 @@ class VerticalBase(
         return config
 
     # =========================================================================
+    # PromptBuilder Support (Phase 7)
+    # =========================================================================
+
+    @classmethod
+    def get_prompt_builder(cls):  # No type hint to avoid circular import
+        """Get configured PromptBuilder for this vertical.
+
+        Provides a PromptBuilder instance pre-configured with vertical-specific
+        content. Subclasses can override this to add custom sections while
+        maintaining backward compatibility with get_system_prompt().
+
+        Returns:
+            PromptBuilder instance with vertical-specific configuration
+
+        Example:
+            builder = MyVertical.get_prompt_builder()
+            builder.add_grounding("Project: {name}", name="MyProject")
+            prompt = builder.build()
+        """
+        from victor.framework.prompt_builder import PromptBuilder
+
+        builder = PromptBuilder()
+
+        # Add vertical-specific section
+        builder.add_vertical_section(
+            vertical=cls.name,
+            content=cls._get_vertical_prompt(),
+            priority=40,
+        )
+
+        return builder
+
+    @classmethod
+    def _get_vertical_prompt(cls) -> str:
+        """Get vertical-specific prompt content (override in subclasses).
+
+        This method provides the core vertical-specific content that will be
+        included in the prompt. Subclasses should override this to provide
+        their domain-specific content.
+
+        Returns:
+            Vertical-specific prompt content
+
+        Example:
+            @classmethod
+            def _get_vertical_prompt(cls):
+                return \"\"\"You are an expert {vertical} assistant.
+
+                Your capabilities:
+                - Capability 1
+                - Capability 2
+                \"\"\".format(vertical=cls.name)
+        """
+        return f"You are an expert {cls.name} assistant."
+
+    # =========================================================================
     # Template Method Implementation
     # =========================================================================
 

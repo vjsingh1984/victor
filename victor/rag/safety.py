@@ -443,6 +443,9 @@ def create_rag_deletion_safety_rules(
 ) -> None:
     """Register RAG deletion-specific safety rules.
 
+    This function now delegates to the framework-level common middleware
+    to avoid code duplication across verticals.
+
     Args:
         enforcer: SafetyEnforcer to register rules with
         block_bulk_delete: Block bulk deletion operations with wildcards
@@ -457,28 +460,15 @@ def create_rag_deletion_safety_rules(
             protected_collections=["production", "main"]
         )
     """
-    if block_bulk_delete:
-        enforcer.add_rule(
-            SafetyRule(
-                name="rag_block_bulk_delete",
-                description="Block bulk deletion with wildcards (rag_delete *)",
-                check_fn=lambda op: "rag_delete" in op
-                and ("*" in op or "--all" in op or "WHERE 1=1" in op),
-                level=SafetyLevel.HIGH,
-                allow_override=False,
-            )
-        )
+    from victor.framework.middleware import create_bulk_operation_safety_rules
 
-    if block_delete_all:
-        enforcer.add_rule(
-            SafetyRule(
-                name="rag_block_delete_all",
-                description="Block deleting all documents from knowledge base",
-                check_fn=lambda op: "rag_delete" in op and "--all" in op,
-                level=SafetyLevel.HIGH,
-                allow_override=True,
-            )
-        )
+    # Delegate to framework implementation
+    create_bulk_operation_safety_rules(
+        enforcer,
+        block_bulk_delete=block_bulk_delete,
+        block_delete_all=block_delete_all,
+        protected_collections=protected_collections,
+    )
 
 
 def create_rag_ingestion_safety_rules(
@@ -490,6 +480,9 @@ def create_rag_ingestion_safety_rules(
     warn_large_batches: bool = True,
 ) -> None:
     """Register RAG ingestion-specific safety rules.
+
+    This function now delegates to the framework-level common middleware
+    to avoid code duplication across verticals.
 
     Args:
         enforcer: SafetyEnforcer to register rules with
@@ -506,56 +499,16 @@ def create_rag_ingestion_safety_rules(
             require_https=True
         )
     """
-    if block_executable_files:
-        enforcer.add_rule(
-            SafetyRule(
-                name="rag_block_executable_ingestion",
-                description="Block ingestion of executable files",
-                check_fn=lambda op: "rag_ingest" in op
-                and any(
-                    ext in op.lower() for ext in [".exe", ".dll", ".bat", ".cmd", ".sh", ".ps1"]
-                ),
-                level=SafetyLevel.HIGH,
-                allow_override=False,
-            )
-        )
+    from victor.framework.middleware import create_ingestion_safety_rules
 
-    if block_system_files:
-        enforcer.add_rule(
-            SafetyRule(
-                name="rag_block_system_files",
-                description="Block ingestion of system files (/etc/, ~/.ssh/)",
-                check_fn=lambda op: "rag_ingest" in op
-                and any(path in op for path in ["/etc/", "/.ssh/", "~/.ssh/", "passwd", "shadow"]),
-                level=SafetyLevel.HIGH,
-                allow_override=True,
-            )
-        )
-
-    if require_https:
-        enforcer.add_rule(
-            SafetyRule(
-                name="rag_require_https",
-                description="Require HTTPS for remote ingestion (block http://)",
-                check_fn=lambda op: "rag_ingest" in op
-                and "http://" in op
-                and "https://" not in op
-                and "localhost" not in op,
-                level=SafetyLevel.MEDIUM,
-                allow_override=True,
-            )
-        )
-
-    if warn_large_batches:
-        enforcer.add_rule(
-            SafetyRule(
-                name="rag_warn_large_batches",
-                description="Warn for large batch ingestion (1000+ files)",
-                check_fn=lambda op: "rag_ingest" in op and "--batch" in op,
-                level=SafetyLevel.LOW,  # Warn only
-                allow_override=True,
-            )
-        )
+    # Delegate to framework implementation
+    create_ingestion_safety_rules(
+        enforcer,
+        block_executable_files=block_executable_files,
+        block_system_files=block_system_files,
+        require_https=require_https,
+        warn_large_batches=warn_large_batches,
+    )
 
 
 def create_all_rag_safety_rules(

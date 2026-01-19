@@ -570,9 +570,9 @@ class RegexEngineAccelerator:
             key_parts.extend(sorted(pattern_types))
 
         if custom_patterns:
-            # Hash custom patterns
+            # Hash custom patterns (non-cryptographic, used for cache key only)
             pattern_str = "|".join(sorted(custom_patterns.items()))
-            pattern_hash = hashlib.md5(pattern_str.encode()).hexdigest()
+            pattern_hash = hashlib.md5(pattern_str.encode(), usedforsecurity=False).hexdigest()
             key_parts.append(pattern_hash)
 
         return ":".join(key_parts)

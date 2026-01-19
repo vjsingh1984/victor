@@ -39,7 +39,8 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from victor.framework.graph import CompiledGraph, GraphConfig, GraphExecutionResult
+    from victor.framework.config import GraphConfig
+    from victor.framework.graph import CompiledGraph, GraphExecutionResult
     from victor.workflows.compiler_protocols import (
         ExecutionContextProtocol,
         ExecutionEventProtocol,

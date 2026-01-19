@@ -31,7 +31,14 @@ import re
 import textwrap
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    # Type stubs for native extensions (optional)
+    try:
+        import victor_native
+    except ImportError:
+        pass
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +47,7 @@ _NATIVE_AVAILABLE = False
 _native = None
 
 try:
-    import victor_native as _native
+    import victor_native as _native  # type: ignore
 
     _NATIVE_AVAILABLE = True
     logger.debug(f"Native streaming filter loaded (v{_native.__version__})")

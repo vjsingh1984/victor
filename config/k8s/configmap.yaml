@@ -1,0 +1,90 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: victor-config
+  namespace: victor
+  labels:
+    app: victor-api
+data:
+  # Victor Configuration
+  VICTOR_ENV: "production"
+  VICTOR_LOG_LEVEL: "INFO"
+  VICTOR_LOG_FORMAT: "json"
+  VICTOR_LOG_TO_FILE: "true"
+  VICTOR_LOG_FILE: "/var/log/victor/app.log"
+  VICTOR_MAX_LOG_SIZE: "10485760"
+  VICTOR_MAX_LOG_FILES: "10"
+
+  # Graph Store Configuration
+  VICTOR_GRAPH_STORE: "sqlite"
+  VICTOR_GRAPH_STORE_PATH: "/home/victor/.victor/data/graph.db"
+
+  # Cache Configuration
+  VICTOR_CACHE_DIR: "/home/victor/.victor/cache"
+  VICTOR_CACHE_TTL: "3600"
+  VICTOR_ENABLE_CACHE: "true"
+
+  # Tool Execution Configuration
+  VICTOR_MAX_CONCURRENT_TOOLS: "5"
+  VICTOR_TOOL_TIMEOUT: "300"
+  VICTOR_ENABLE_PARALLEL_EXECUTION: "true"
+  VICTOR_PARALLEL_EXECUTION_MAX_WORKERS: "5"
+
+  # Observability Configuration
+  VICTOR_ENABLE_OBSERVABILITY: "true"
+  VICTOR_ENABLE_PROMETHEUS_EXPORT: "true"
+  VICTOR_PROMETHEUS_PORT: "9090"
+  VICTOR_ENABLE_TRACING: "false"
+  VICTOR_TRACING_ENDPOINT: ""
+
+  # Semantic Search Configuration
+  VICTOR_ENABLE_SEMANTIC_SEARCH: "true"
+  VICTOR_EMBEDDING_MODEL: "BAAI/bge-small-en-v1.5"
+  VICTOR_EMBEDDING_PROVIDER: "sentence-transformers"
+  VICTOR_EMBEDDING_CACHE_ENABLED: "true"
+
+  # Vector Store Configuration
+  VICTOR_VECTOR_STORE: "lancedb"
+  VICTOR_VECTOR_STORE_PATH: "/home/victor/.victor/data/vectors"
+
+  # Event Bus Configuration
+  VICTOR_EVENT_BUS_BACKEND: "memory"
+  VICTOR_EVENT_BUS_ENABLED: "true"
+
+  # API Configuration
+  VICTOR_API_HOST: "0.0.0.0"
+  VICTOR_API_PORT: "8000"
+  VICTOR_API_WORKERS: "1"
+  VICTOR_API_RELOAD: "false"
+
+  # CORS Configuration
+  VICTOR_CORS_ENABLED: "true"
+  VICTOR_CORS_ORIGINS: "*"
+  VICTOR_CORS_ALLOW_CREDENTIALS: "true"
+  VICTOR_CORS_ALLOW_METHODS: "*"
+  VICTOR_CORS_ALLOW_HEADERS: "*"
+
+  # Rate Limiting Configuration
+  VICTOR_RATE_LIMIT_ENABLED: "true"
+  VICTOR_RATE_LIMIT_PER_MINUTE: "60"
+  VICTOR_RATE_LIMIT_BURST: "100"
+
+  # Security Configuration
+  VICTOR_ENABLE_SECURITY_HEADERS: "true"
+  VICTOR_MAX_REQUEST_SIZE: "104857600"
+  VICTOR_TIMEOUT: "300"

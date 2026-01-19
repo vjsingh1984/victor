@@ -143,6 +143,10 @@ dev = [
 
     # Scientific computing (for experiments/ab_testing)
     "scipy>=1.11.0",  # Statistical analysis for experiments
+
+    # Load Testing
+    "locust>=2.0",  # Load testing framework
+    "aiohttp>=3.9",  # Async HTTP client (already in core, but needed for load tests)
 ]
 
 docs = [
@@ -377,6 +381,14 @@ Issues = "https://github.com/vijayksingh/victor/issues"
 victor = "victor.ui.cli:app"
 vic = "victor.ui.cli:app"
 
+# Developer tools (Phase 4)
+victor-check-protocol = "scripts.check_protocol_conformance:main"
+victor-lint-vertical = "scripts.lint_vertical:main"
+victor-validate-config = "scripts.validate_config:main"
+victor-profile-coordinators = "scripts.profile_coordinators:main"
+victor-coverage-report = "scripts.coverage_report:main"
+victor-generate-docs = "scripts.generate_docs:main"
+
 # =============================================================================
 # External Vertical Registration (for third-party packages)
 # =============================================================================
@@ -414,46 +426,65 @@ vic = "victor.ui.cli:app"
 # Victor will automatically discover and register external verticals on import.
 # =============================================================================
 
+# =============================================================================
+# Dynamic Capability Registration (Open/Closed Principle)
+# =============================================================================
+# Third-party packages can register custom capabilities with Victor by defining
+# an entry point in the "victor.capabilities" group.
+#
+# Example in external package's pyproject.toml:
+#
+#   [project.entry-points."victor.capabilities"]
+#   my_capability = "my_package.capabilities:MyCapabilityClass"
+#
+# Requirements for external capabilities:
+#   1. Must inherit from victor.agent.capabilities.base.CapabilityBase
+#   2. Must implement get_spec() classmethod returning CapabilitySpec
+#
+# Example capability implementation:
+#
+#   from victor.agent.capabilities.base import CapabilityBase, CapabilitySpec
+#
+#   class MyCapabilityClass(CapabilityBase):
+#       @classmethod
+#       def get_spec(cls) -> CapabilitySpec:
+#           return CapabilitySpec(
+#               name="my_capability",
+#               method_name="set_my_capability",
+#               version="1.0",
+#               description="My custom capability"
+#           )
+#
+# Victor will automatically discover and register external capabilities on import.
+# =============================================================================
+
+[project.entry-points."victor.capabilities"]
+# Built-in capabilities (registered via entry points for OCP compliance)
+enabled_tools = "victor.agent.capabilities.builtin:EnabledToolsCapability"
+tool_dependencies = "victor.agent.capabilities.builtin:ToolDependenciesCapability"
+tool_sequences = "victor.agent.capabilities.builtin:ToolSequencesCapability"
+tiered_tool_config = "victor.agent.capabilities.builtin:TieredToolConfigCapability"
+vertical_middleware = "victor.agent.capabilities.builtin:VerticalMiddlewareCapability"
+vertical_safety_patterns = "victor.agent.capabilities.builtin:VerticalSafetyPatternsCapability"
+vertical_context = "victor.agent.capabilities.builtin:VerticalContextCapability"
+rl_hooks = "victor.agent.capabilities.builtin:RlHooksCapability"
+team_specs = "victor.agent.capabilities.builtin:TeamSpecsCapability"
+mode_configs = "victor.agent.capabilities.builtin:ModeConfigsCapability"
+default_budget = "victor.agent.capabilities.builtin:DefaultBudgetCapability"
+custom_prompt = "victor.agent.capabilities.builtin:CustomPromptCapability"
+prompt_section = "victor.agent.capabilities.builtin:PromptSectionCapability"
+task_type_hints = "victor.agent.capabilities.builtin:TaskTypeHintsCapability"
+safety_patterns = "victor.agent.capabilities.builtin:SafetyPatternsCapability"
+enrichment_strategy = "victor.agent.capabilities.builtin:EnrichmentStrategyCapability"
+
+
 [tool.setuptools.packages.find]
 include = ["victor*"]
 exclude = ["tests*", "docs*"]
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-addopts = [
-    "--strict-markers",
-    "--strict-config",
-    "--cov=victor",
-    "--cov-report=term-missing",
-    "--cov-report=html",
-]
-asyncio_mode = "auto"
-markers = [
-    "integration: marks tests as integration tests (require external services)",
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "unit: marks tests as unit tests",
-    "workflows: marks workflow-related tests",
-    "agents: marks multi-agent tests",
-    "hitl: marks human-in-the-loop tests",
-    "benchmark: marks performance benchmarks",
-    "summary: marks summary/report generation tests",
-    "regression: marks regression tests",
-    "smoke: marks smoke tests (quick sanity checks)",
-]
-filterwarnings = [
-    # Ignore PytestCollectionWarning for non-test classes in victor module
-    # These are data classes/enums that happen to start with "Test" (e.g., TestResult, TestRunner)
-    "ignore:cannot collect test class.*because it has a __init__ constructor:pytest.PytestCollectionWarning",
-    # Ignore semaphore leak warnings from multiprocessing (common in test cleanup)
-    # These come from dependencies like ChromaDB, sentence_transformers
-    "ignore:.*semaphore.*:ResourceWarning",
-    "ignore:.*leaked.*semaphore.*:UserWarning",
-    # Ignore multiprocessing resource tracker warnings
-    "ignore:.*resource_tracker.*:UserWarning",
-]
+# NOTE: Pytest configuration has been moved to pytest.ini to avoid duplication warnings
+# pytest.ini takes precedence over [tool.pytest.ini_options] in pyproject.toml
+# See pytest.ini for all pytest settings
 
 [tool.ruff]
 line-length = 100

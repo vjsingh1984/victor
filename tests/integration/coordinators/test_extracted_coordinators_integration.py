@@ -177,9 +177,7 @@ def search_coordinator(mock_search_router):
 
 
 @pytest.fixture
-def team_coordinator(
-    mock_orchestrator, mock_mode_coordinator, mock_mode_workflow_team_coordinator
-):
+def team_coordinator(mock_orchestrator, mock_mode_coordinator, mock_mode_workflow_team_coordinator):
     """Create TeamCoordinator with all dependencies."""
     return TeamCoordinator(
         orchestrator=mock_orchestrator,
@@ -189,9 +187,7 @@ def team_coordinator(
 
 
 @pytest.fixture
-def all_coordinators(
-    conversation_coordinator, search_coordinator, team_coordinator
-):
+def all_coordinators(conversation_coordinator, search_coordinator, team_coordinator):
     """Provide all three coordinators for combined testing."""
     return {
         "conversation": conversation_coordinator,
@@ -208,9 +204,7 @@ def all_coordinators(
 class TestConversationSearchIntegration:
     """Test ConversationCoordinator and SearchCoordinator working together."""
 
-    def test_search_during_conversation(
-        self, conversation_coordinator, search_coordinator
-    ):
+    def test_search_during_conversation(self, conversation_coordinator, search_coordinator):
         """Test that search queries can be routed within a conversation context.
 
         Scenario:
@@ -338,17 +332,13 @@ class TestConversationTeamIntegration:
         conversation_coordinator.add_message(
             "user", "I need to refactor the entire tool execution pipeline"
         )
-        conversation_coordinator.add_message(
-            "assistant", "That sounds like a complex task"
-        )
+        conversation_coordinator.add_message("assistant", "That sounds like a complex task")
         conversation_coordinator.add_message(
             "user", "Yes, it involves multiple components and high risk"
         )
 
         # Get team suggestion for complex refactor
-        suggestion = team_coordinator.get_team_suggestions(
-            task_type="refactor", complexity="high"
-        )
+        suggestion = team_coordinator.get_team_suggestions(task_type="refactor", complexity="high")
 
         # Verify team suggested
         assert suggestion is not None
@@ -367,14 +357,10 @@ class TestConversationTeamIntegration:
         4. Conversation continues with team context
         """
         # User request
-        conversation_coordinator.add_message(
-            "user", "I need a comprehensive code review"
-        )
+        conversation_coordinator.add_message("user", "I need a comprehensive code review")
 
         # Get team suggestion
-        suggestion = team_coordinator.get_team_suggestions(
-            task_type="review", complexity="medium"
-        )
+        suggestion = team_coordinator.get_team_suggestions(task_type="review", complexity="medium")
 
         # Set team specs
         team_specs = {suggestion.recommended_team: MagicMock()}
@@ -387,9 +373,7 @@ class TestConversationTeamIntegration:
         conversation_coordinator.add_message("assistant", "I'll set up the review team")
         assert len(conversation_coordinator.messages) > 0
 
-    def test_team_coordination_with_message_flow(
-        self, conversation_coordinator, team_coordinator
-    ):
+    def test_team_coordination_with_message_flow(self, conversation_coordinator, team_coordinator):
         """Test team coordination integrated with conversation message flow.
 
         Scenario:
@@ -458,9 +442,7 @@ class TestConversationTeamIntegration:
 class TestSearchTeamIntegration:
     """Test SearchCoordinator and TeamCoordinator working together."""
 
-    def test_search_tools_in_team_formation(
-        self, search_coordinator, team_coordinator
-    ):
+    def test_search_tools_in_team_formation(self, search_coordinator, team_coordinator):
         """Test search tool recommendations considered for team formation.
 
         Scenario:
@@ -484,9 +466,7 @@ class TestSearchTeamIntegration:
         # Verify team suggestion considers task type
         assert hasattr(suggestion, "recommended_team")
 
-    def test_team_suggestions_for_search_tasks(
-        self, search_coordinator, team_coordinator
-    ):
+    def test_team_suggestions_for_search_tasks(self, search_coordinator, team_coordinator):
         """Test team suggestions for different types of search tasks.
 
         Scenario:
@@ -590,9 +570,7 @@ class TestSearchTeamIntegration:
 class TestAllCoordinatorsIntegration:
     """Test all three coordinators working together in realistic scenarios."""
 
-    def test_full_workflow_conversation_search_team(
-        self, all_coordinators
-    ):
+    def test_full_workflow_conversation_search_team(self, all_coordinators):
         """Test complete workflow: conversation -> search -> team.
 
         Scenario:
@@ -620,9 +598,7 @@ class TestAllCoordinatorsIntegration:
         # Verify conversation captured all interactions
         assert len(conv_coord.messages) >= 1
 
-    def test_coordinator_state_sharing(
-        self, all_coordinators, mock_orchestrator
-    ):
+    def test_coordinator_state_sharing(self, all_coordinators, mock_orchestrator):
         """Test that coordinators can share state through orchestrator.
 
         Scenario:
@@ -655,9 +631,7 @@ class TestAllCoordinatorsIntegration:
         # Verify states isolated (coordinators don't interfere)
         assert len(conv_coord.messages) == 1  # Only one message added
 
-    def test_error_handling_across_coordinators(
-        self, all_coordinators, mock_search_router
-    ):
+    def test_error_handling_across_coordinators(self, all_coordinators, mock_search_router):
         """Test error handling when coordinators interact.
 
         Scenario:
@@ -721,9 +695,7 @@ class TestAllCoordinatorsIntegration:
         assert len(team_coord.get_team_specs()) == 1
         assert "search_team" in team_coord.get_team_specs()
 
-    def test_concurrent_coordinator_operations(
-        self, all_coordinators
-    ):
+    def test_concurrent_coordinator_operations(self, all_coordinators):
         """Test thread safety when coordinators used concurrently.
 
         Scenario:
@@ -776,12 +748,8 @@ class TestAllCoordinatorsIntegration:
         team_coord = all_coordinators["team"]
 
         # Phase 1: Initial problem description
-        conv_coord.add_message(
-            "user", "I need to refactor the tool execution pipeline"
-        )
-        conv_coord.add_message(
-            "assistant", "I'll help you with that complex refactoring"
-        )
+        conv_coord.add_message("user", "I need to refactor the tool execution pipeline")
+        conv_coord.add_message("assistant", "I'll help you with that complex refactoring")
 
         # Phase 2: Search for relevant code
         search_queries = [
@@ -800,9 +768,7 @@ class TestAllCoordinatorsIntegration:
         team_coord.set_team_specs({team_suggestion.recommended_team: MagicMock()})
 
         # Phase 4: Continue conversation with recommendations
-        conv_coord.add_message(
-            "assistant", f"I recommend using {team_suggestion.recommended_team}"
-        )
+        conv_coord.add_message("assistant", f"I recommend using {team_suggestion.recommended_team}")
         conv_coord.add_message("user", "That sounds good, proceed")
 
         # Verify state consistency
@@ -829,9 +795,7 @@ class TestAllCoordinatorsIntegration:
 class TestCoordinatorEdgeCases:
     """Test edge cases and error scenarios in coordinator integration."""
 
-    def test_empty_conversation_with_search(
-        self, conversation_coordinator, search_coordinator
-    ):
+    def test_empty_conversation_with_search(self, conversation_coordinator, search_coordinator):
         """Test search operations with empty conversation context."""
         # No conversation yet
         assert len(conversation_coordinator.messages) == 0
@@ -841,9 +805,7 @@ class TestCoordinatorEdgeCases:
         assert result is not None
         assert "recommended_tool" in result
 
-    def test_search_special_characters(
-        self, conversation_coordinator, search_coordinator
-    ):
+    def test_search_special_characters(self, conversation_coordinator, search_coordinator):
         """Test search queries with special characters."""
         # Add message with special characters
         special_query = "Find patterns like $%^&*() in code"
@@ -853,9 +815,7 @@ class TestCoordinatorEdgeCases:
         result = search_coordinator.route_search_query(special_query)
         assert result is not None
 
-    def test_team_coordinator_with_no_specs(
-        self, conversation_coordinator, team_coordinator
-    ):
+    def test_team_coordinator_with_no_specs(self, conversation_coordinator, team_coordinator):
         """Test team coordinator when no team specs configured."""
         # No specs set
         specs = team_coordinator.get_team_specs()
@@ -865,9 +825,7 @@ class TestCoordinatorEdgeCases:
         suggestion = team_coordinator.get_team_suggestions("feature", "low")
         assert suggestion is not None
 
-    def test_conversation_with_unicode(
-        self, conversation_coordinator, search_coordinator
-    ):
+    def test_conversation_with_unicode(self, conversation_coordinator, search_coordinator):
         """Test conversation and search with unicode content."""
         # Unicode message
         unicode_msg = "Search for 日本語 characters in code"
@@ -894,9 +852,7 @@ class TestCoordinatorEdgeCases:
         conv_coord.add_message("user", "test")
         assert conv_coord._conversation.add_message.called
 
-    def test_search_confidence_boundary_conditions(
-        self, search_coordinator, mock_search_router
-    ):
+    def test_search_confidence_boundary_conditions(self, search_coordinator, mock_search_router):
         """Test search confidence at boundary values."""
         # Mock extreme confidence values
         mock_search_router.route.side_effect = [

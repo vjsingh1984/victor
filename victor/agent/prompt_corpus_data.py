@@ -1394,7 +1394,7 @@ def load_humaneval_prompts() -> List[Tuple[str, str, str]]:
         ImportError: If datasets library is not installed
     """
     try:
-        from datasets import load_dataset
+        from datasets import load_dataset  # type: ignore
 
         dataset = load_dataset("openai/openai_humaneval", split="test")
         prompts = []
@@ -1424,7 +1424,7 @@ def load_mbpp_prompts() -> List[Tuple[str, str, str]]:
         ImportError: If datasets library is not installed
     """
     try:
-        from datasets import load_dataset
+        from datasets import load_dataset  # type: ignore
 
         dataset = load_dataset("google-research-datasets/mbpp", split="test")
         prompts = []

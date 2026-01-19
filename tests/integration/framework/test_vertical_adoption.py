@@ -85,18 +85,18 @@ class TestResearchCapabilityProviderAdoption:
             assert isinstance(meta.tags, list)
 
     def test_research_capability_provider_apply_methods(self):
-        """ResearchCapabilityProvider has apply_* methods for each capability."""
+        """ResearchCapabilityProvider has configure_* methods for each capability."""
         from victor.research.capabilities import ResearchCapabilityProvider
 
         provider = ResearchCapabilityProvider()
 
-        # Verify apply methods exist
-        assert hasattr(provider, "apply_source_verification")
-        assert hasattr(provider, "apply_citation_management")
-        assert hasattr(provider, "apply_research_quality")
-        assert hasattr(provider, "apply_literature_analysis")
-        assert hasattr(provider, "apply_fact_checking")
-        assert hasattr(provider, "apply_all")
+        # Verify configure methods exist
+        assert hasattr(provider, "configure_source_verification")
+        assert hasattr(provider, "configure_citation_management")
+        assert hasattr(provider, "configure_research_quality")
+        assert hasattr(provider, "configure_literature_analysis")
+        assert hasattr(provider, "configure_fact_checking")
+        assert hasattr(provider, "configure_all")
 
     def test_research_capability_provider_base_class_compliance(self):
         """ResearchCapabilityProvider complies with BaseCapabilityProvider interface."""
@@ -116,7 +116,7 @@ class TestResearchCapabilityProviderAdoption:
         assert callable(provider.has_capability)
 
     def test_research_capability_provider_capability_application(self):
-        """ResearchCapabilityProvider can apply capabilities to orchestrator."""
+        """ResearchCapabilityProvider can configure capabilities to orchestrator."""
         from victor.research.capabilities import ResearchCapabilityProvider
 
         provider = ResearchCapabilityProvider()
@@ -124,26 +124,26 @@ class TestResearchCapabilityProviderAdoption:
         # Create mock orchestrator
         mock_orchestrator = MagicMock()
 
-        # Apply a capability
-        provider.apply_source_verification(mock_orchestrator, min_credibility=0.8)
+        # Configure a capability
+        provider.configure_source_verification(mock_orchestrator, min_credibility=0.8)
 
         # Verify orchestrator was configured
         assert hasattr(mock_orchestrator, "source_verification_config")
         assert mock_orchestrator.source_verification_config["min_credibility"] == 0.8
 
     def test_research_capability_provider_applied_tracking(self):
-        """ResearchCapabilityProvider tracks which capabilities have been applied."""
+        """ResearchCapabilityProvider tracks which capabilities have been configured."""
         from victor.research.capabilities import ResearchCapabilityProvider
 
         provider = ResearchCapabilityProvider()
         mock_orchestrator = MagicMock()
 
-        # Initially no capabilities applied
+        # Initially no capabilities configured
         assert len(provider.get_applied()) == 0
 
-        # Apply capabilities
-        provider.apply_source_verification(mock_orchestrator)
-        provider.apply_citation_management(mock_orchestrator)
+        # Configure capabilities
+        provider.configure_source_verification(mock_orchestrator)
+        provider.configure_citation_management(mock_orchestrator)
 
         # Verify tracking
         applied = provider.get_applied()

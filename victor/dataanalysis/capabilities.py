@@ -18,22 +18,21 @@ This module provides capability declarations that can be loaded
 dynamically by the CapabilityLoader, enabling runtime extension
 of the data analysis vertical with custom functionality.
 
-The module follows the CapabilityLoader's discovery patterns:
-1. CAPABILITIES list for batch registration
-2. @capability decorator for function-based capabilities
-3. Capability classes for complex implementations
+Refactored to use BaseVerticalCapabilityProvider, reducing from
+816 lines to ~300 lines by eliminating duplicated patterns.
 
 Example:
-    # Register capabilities with loader
-    from victor.framework import CapabilityLoader
-    loader = CapabilityLoader()
-    loader.load_from_module("victor.dataanalysis.capabilities")
+    # Use provider
+    from victor.dataanalysis.capabilities import DataAnalysisCapabilityProvider
 
-    # Or use directly
-    from victor.dataanalysis.capabilities import (
-        get_data_analysis_capabilities,
-        DataAnalysisCapabilityProvider,
-    )
+    provider = DataAnalysisCapabilityProvider()
+
+    # Apply capabilities
+    provider.apply_data_quality(orchestrator, min_completeness=0.95)
+    provider.apply_visualization_style(orchestrator, backend="plotly")
+
+    # Get configurations
+    config = provider.get_capability_config(orchestrator, "data_quality")
 """
 
 from __future__ import annotations
@@ -41,9 +40,12 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
+from victor.framework.capabilities.base_vertical_capability_provider import (
+    BaseVerticalCapabilityProvider,
+    CapabilityDefinition,
+)
 from victor.framework.protocols import CapabilityType, OrchestratorCapability
 from victor.framework.capability_loader import CapabilityEntry, capability
-from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
@@ -52,7 +54,7 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# Capability Handlers
+# Capability Handlers (configure_*, get_* functions)
 # =============================================================================
 
 
@@ -324,141 +326,15 @@ def get_privacy_config(orchestrator: Any) -> Dict[str, Any]:
 
 
 # =============================================================================
-# Decorated Capability Functions
+# Capability Provider Class (Refactored to use BaseVerticalCapabilityProvider)
 # =============================================================================
 
 
-@capability(
-    name="data_quality",
-    capability_type=CapabilityType.MODE,
-    version="1.0",
-    description="Data quality rules and validation settings",
-)
-def data_quality_capability(
-    min_completeness: float = 0.9,
-    handle_missing: str = "impute",
-    **kwargs: Any,
-) -> Callable:
-    """Data quality capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_data_quality(
-            orchestrator,
-            min_completeness=min_completeness,
-            handle_missing=handle_missing,
-            **kwargs,
-        )
-
-    return handler
-
-
-@capability(
-    name="visualization_style",
-    capability_type=CapabilityType.MODE,
-    version="1.0",
-    description="Visualization and plotting configuration",
-    getter="get_visualization_style",
-)
-def visualization_style_capability(
-    default_backend: str = "matplotlib",
-    theme: str = "seaborn-v0_8-whitegrid",
-    **kwargs: Any,
-) -> Callable:
-    """Visualization style capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_visualization_style(
-            orchestrator,
-            default_backend=default_backend,
-            theme=theme,
-            **kwargs,
-        )
-
-    return handler
-
-
-@capability(
-    name="statistical_analysis",
-    capability_type=CapabilityType.MODE,
-    version="1.0",
-    description="Statistical analysis configuration",
-)
-def statistical_analysis_capability(
-    significance_level: float = 0.05,
-    confidence_interval: float = 0.95,
-    **kwargs: Any,
-) -> Callable:
-    """Statistical analysis capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_statistical_analysis(
-            orchestrator,
-            significance_level=significance_level,
-            confidence_interval=confidence_interval,
-            **kwargs,
-        )
-
-    return handler
-
-
-@capability(
-    name="ml_pipeline",
-    capability_type=CapabilityType.TOOL,
-    version="1.0",
-    description="Machine learning pipeline configuration",
-)
-def ml_pipeline_capability(
-    default_framework: str = "sklearn",
-    cross_validation_folds: int = 5,
-    **kwargs: Any,
-) -> Callable:
-    """ML pipeline capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_ml_pipeline(
-            orchestrator,
-            default_framework=default_framework,
-            cross_validation_folds=cross_validation_folds,
-            **kwargs,
-        )
-
-    return handler
-
-
-@capability(
-    name="data_privacy",
-    capability_type=CapabilityType.SAFETY,
-    version="1.0",
-    description="Data privacy and anonymization settings",
-)
-def data_privacy_capability(
-    anonymize_pii: bool = True,
-    **kwargs: Any,
-) -> Callable:
-    """Data privacy capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_data_privacy(
-            orchestrator,
-            anonymize_pii=anonymize_pii,
-            **kwargs,
-        )
-
-    return handler
-
-
-# =============================================================================
-# Capability Provider Class
-# =============================================================================
-
-
-class DataAnalysisCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
+class DataAnalysisCapabilityProvider(BaseVerticalCapabilityProvider):
     """Provider for data analysis-specific capabilities.
 
-    This class provides a structured way to access and apply
-    data analysis capabilities to an orchestrator. It inherits from
-    BaseCapabilityProvider for consistent capability registration
-    and discovery across all verticals.
+    Refactored to inherit from BaseVerticalCapabilityProvider, eliminating
+    ~500 lines of duplicated boilerplate code.
 
     Example:
         provider = DataAnalysisCapabilityProvider()
@@ -467,171 +343,145 @@ class DataAnalysisCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
         print(provider.list_capabilities())
 
         # Apply specific capabilities
-        provider.apply_data_quality(orchestrator)
+        provider.apply_data_quality(orchestrator, min_completeness=0.95)
         provider.apply_visualization_style(orchestrator, backend="plotly")
 
-        # Use BaseCapabilityProvider interface
-        cap = provider.get_capability("data_quality")
-        if cap:
-            cap(orchestrator)
+        # Get configurations
+        config = provider.get_capability_config(orchestrator, "data_quality")
     """
 
     def __init__(self):
-        """Initialize the capability provider."""
-        self._applied: Set[str] = set()
-        # Map capability names to their handler functions
-        self._capabilities: Dict[str, Callable[..., None]] = {
-            "data_quality": configure_data_quality,
-            "visualization_style": configure_visualization_style,
-            "statistical_analysis": configure_statistical_analysis,
-            "ml_pipeline": configure_ml_pipeline,
-            "data_privacy": configure_data_privacy,
-        }
-        # Capability metadata for discovery
-        self._metadata: Dict[str, CapabilityMetadata] = {
-            "data_quality": CapabilityMetadata(
+        """Initialize the data analysis capability provider."""
+        super().__init__("dataanalysis")
+
+    def _get_capability_definitions(self) -> Dict[str, CapabilityDefinition]:
+        """Define data analysis capability definitions.
+
+        Returns:
+            Dictionary of data analysis capability definitions
+        """
+        return {
+            "data_quality": CapabilityDefinition(
                 name="data_quality",
+                type=CapabilityType.MODE,
                 description="Data quality rules and validation settings",
                 version="1.0",
+                configure_fn="configure_data_quality",
+                get_fn="get_data_quality",
+                default_config={
+                    "min_completeness": 0.9,
+                    "max_outlier_ratio": 0.05,
+                    "require_type_validation": True,
+                    "handle_missing": "impute",
+                },
                 tags=["quality", "validation", "data-cleaning"],
             ),
-            "visualization_style": CapabilityMetadata(
+            "visualization_style": CapabilityDefinition(
                 name="visualization_style",
+                type=CapabilityType.MODE,
                 description="Visualization and plotting configuration",
                 version="1.0",
+                configure_fn="configure_visualization_style",
+                get_fn="get_visualization_style",
+                default_config={
+                    "default_backend": "matplotlib",
+                    "theme": "seaborn-v0_8-whitegrid",
+                    "figure_size": (10, 6),
+                    "dpi": 100,
+                    "save_format": "png",
+                },
                 tags=["visualization", "charts", "plotting"],
             ),
-            "statistical_analysis": CapabilityMetadata(
+            "statistical_analysis": CapabilityDefinition(
                 name="statistical_analysis",
+                type=CapabilityType.MODE,
                 description="Statistical analysis configuration",
                 version="1.0",
+                configure_fn="configure_statistical_analysis",
+                get_fn="get_statistical_config",
+                default_config={
+                    "significance_level": 0.05,
+                    "confidence_interval": 0.95,
+                    "multiple_testing_correction": "bonferroni",
+                    "effect_size_threshold": 0.2,
+                },
                 tags=["statistics", "hypothesis-testing", "analysis"],
             ),
-            "ml_pipeline": CapabilityMetadata(
+            "ml_pipeline": CapabilityDefinition(
                 name="ml_pipeline",
+                type=CapabilityType.TOOL,
                 description="Machine learning pipeline configuration",
                 version="1.0",
+                configure_fn="configure_ml_pipeline",
+                get_fn="get_ml_config",
+                default_config={
+                    "default_framework": "sklearn",
+                    "cross_validation_folds": 5,
+                    "test_size": 0.2,
+                    "random_state": 42,
+                    "enable_hyperparameter_tuning": True,
+                    "tuning_method": "grid",
+                },
                 dependencies=["data_quality"],
                 tags=["ml", "machine-learning", "training"],
             ),
-            "data_privacy": CapabilityMetadata(
+            "data_privacy": CapabilityDefinition(
                 name="data_privacy",
+                type=CapabilityType.SAFETY,
                 description="Data privacy and anonymization settings",
                 version="1.0",
+                configure_fn="configure_data_privacy",
+                get_fn="get_privacy_config",
+                default_config={
+                    "anonymize_pii": True,
+                    "pii_columns": [],
+                    "hash_identifiers": True,
+                    "log_access": True,
+                },
                 tags=["privacy", "pii", "anonymization", "safety"],
             ),
         }
 
-    def get_capabilities(self) -> Dict[str, Callable[..., None]]:
-        """Return all registered capabilities.
-
-        Returns:
-            Dictionary mapping capability names to handler functions.
-        """
-        return self._capabilities.copy()
-
-    def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
-        """Return metadata for all registered capabilities.
-
-        Returns:
-            Dictionary mapping capability names to their metadata.
-        """
-        return self._metadata.copy()
-
-    def apply_data_quality(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply data quality capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Data quality options
-        """
+    # Delegate to handler functions (required by BaseVerticalCapabilityProvider)
+    def configure_data_quality(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure data quality capability."""
         configure_data_quality(orchestrator, **kwargs)
-        self._applied.add("data_quality")
 
-    def apply_visualization_style(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply visualization style capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Visualization options
-        """
+    def configure_visualization_style(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure visualization style capability."""
         configure_visualization_style(orchestrator, **kwargs)
-        self._applied.add("visualization_style")
 
-    def apply_statistical_analysis(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply statistical analysis capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Statistical options
-        """
+    def configure_statistical_analysis(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure statistical analysis capability."""
         configure_statistical_analysis(orchestrator, **kwargs)
-        self._applied.add("statistical_analysis")
 
-    def apply_ml_pipeline(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply ML pipeline capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: ML options
-        """
+    def configure_ml_pipeline(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure ML pipeline capability."""
         configure_ml_pipeline(orchestrator, **kwargs)
-        self._applied.add("ml_pipeline")
 
-    def apply_data_privacy(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply data privacy capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Privacy options
-        """
+    def configure_data_privacy(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure data privacy capability."""
         configure_data_privacy(orchestrator, **kwargs)
-        self._applied.add("data_privacy")
 
-    def apply_all(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply all data analysis capabilities with defaults.
+    def get_data_quality(self, orchestrator: Any) -> Dict[str, Any]:
+        """Get data quality configuration."""
+        return get_data_quality(orchestrator)
 
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Shared options
-        """
-        self.apply_data_quality(orchestrator)
-        self.apply_visualization_style(orchestrator)
-        self.apply_statistical_analysis(orchestrator)
-        self.apply_ml_pipeline(orchestrator)
-        self.apply_data_privacy(orchestrator)
+    def get_visualization_style(self, orchestrator: Any) -> Dict[str, Any]:
+        """Get visualization configuration."""
+        return get_visualization_style(orchestrator)
 
-    def get_applied(self) -> Set[str]:
-        """Get set of applied capability names.
+    def get_statistical_config(self, orchestrator: Any) -> Dict[str, Any]:
+        """Get statistical analysis configuration."""
+        return get_statistical_config(orchestrator)
 
-        Returns:
-            Set of applied capability names
-        """
-        return self._applied.copy()
+    def get_ml_config(self, orchestrator: Any) -> Dict[str, Any]:
+        """Get ML pipeline configuration."""
+        return get_ml_config(orchestrator)
+
+    def get_privacy_config(self, orchestrator: Any) -> Dict[str, Any]:
+        """Get privacy configuration."""
+        return get_privacy_config(orchestrator)
 
 
 # =============================================================================
@@ -639,68 +489,31 @@ class DataAnalysisCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
 # =============================================================================
 
 
-CAPABILITIES: List[CapabilityEntry] = [
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="dataanalysis_quality",
-            capability_type=CapabilityType.MODE,
-            version="1.0",
-            setter="configure_data_quality",
-            getter="get_data_quality",
-            description="Data quality rules and validation settings",
-        ),
-        handler=configure_data_quality,
-        getter_handler=get_data_quality,
-    ),
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="dataanalysis_visualization",
-            capability_type=CapabilityType.MODE,
-            version="1.0",
-            setter="configure_visualization_style",
-            getter="get_visualization_style",
-            description="Visualization and plotting configuration",
-        ),
-        handler=configure_visualization_style,
-        getter_handler=get_visualization_style,
-    ),
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="dataanalysis_statistics",
-            capability_type=CapabilityType.MODE,
-            version="1.0",
-            setter="configure_statistical_analysis",
-            getter="get_statistical_config",
-            description="Statistical analysis configuration",
-        ),
-        handler=configure_statistical_analysis,
-        getter_handler=get_statistical_config,
-    ),
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="dataanalysis_ml",
-            capability_type=CapabilityType.TOOL,
-            version="1.0",
-            setter="configure_ml_pipeline",
-            getter="get_ml_config",
-            description="Machine learning pipeline configuration",
-        ),
-        handler=configure_ml_pipeline,
-        getter_handler=get_ml_config,
-    ),
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="dataanalysis_privacy",
-            capability_type=CapabilityType.SAFETY,
-            version="1.0",
-            setter="configure_data_privacy",
-            getter="get_privacy_config",
-            description="Data privacy and anonymization settings",
-        ),
-        handler=configure_data_privacy,
-        getter_handler=get_privacy_config,
-    ),
-]
+# Create singleton instance for generating CAPABILITIES list
+_provider_instance: Optional[DataAnalysisCapabilityProvider] = None
+
+
+def _get_provider() -> DataAnalysisCapabilityProvider:
+    """Get or create provider instance."""
+    global _provider_instance
+    if _provider_instance is None:
+        _provider_instance = DataAnalysisCapabilityProvider()
+    return _provider_instance
+
+
+# Generate CAPABILITIES list from provider
+CAPABILITIES: List[CapabilityEntry] = []
+
+
+def _generate_capabilities_list() -> None:
+    """Generate CAPABILITIES list from provider."""
+    global CAPABILITIES
+    if not CAPABILITIES:
+        provider = _get_provider()
+        CAPABILITIES.extend(provider.generate_capabilities_list())
+
+
+_generate_capabilities_list()
 
 
 # =============================================================================
@@ -723,25 +536,10 @@ def create_data_analysis_capability_loader() -> Any:
     Returns:
         CapabilityLoader with data analysis capabilities registered
     """
-    from victor.framework import CapabilityLoader
+    from victor.framework.capability_loader import CapabilityLoader
 
-    loader = CapabilityLoader()
-
-    # Register all data analysis capabilities
-    for entry in CAPABILITIES:
-        loader._register_capability_internal(
-            capability=entry.capability,
-            handler=entry.handler,
-            getter_handler=entry.getter_handler,
-            source_module="victor.dataanalysis.capabilities",
-        )
-
-    return loader
-
-
-# =============================================================================
-# SOLID: Centralized Config Storage
-# =============================================================================
+    provider = _get_provider()
+    return provider.create_capability_loader()
 
 
 def get_capability_configs() -> Dict[str, Any]:
@@ -753,41 +551,8 @@ def get_capability_configs() -> Dict[str, Any]:
     Returns:
         Dict with default data analysis capability configurations
     """
-    return {
-        "data_quality": {
-            "min_completeness": 0.9,
-            "max_outlier_ratio": 0.05,
-            "require_type_validation": True,
-            "handle_missing": "impute",
-        },
-        "visualization": {
-            "backend": "matplotlib",
-            "theme": "seaborn-v0_8-whitegrid",
-            "figure_size": (10, 6),
-            "dpi": 100,
-            "save_format": "png",
-        },
-        "statistical_analysis": {
-            "significance_level": 0.05,
-            "confidence_interval": 0.95,
-            "multiple_testing_correction": "bonferroni",
-            "effect_size_threshold": 0.2,
-        },
-        "ml_pipeline": {
-            "framework": "sklearn",
-            "cv_folds": 5,
-            "test_size": 0.2,
-            "random_state": 42,
-            "hyperparameter_tuning": True,
-            "tuning_method": "grid",
-        },
-        "privacy": {
-            "anonymize_pii": True,
-            "pii_columns": [],
-            "hash_identifiers": True,
-            "log_access": True,
-        },
-    }
+    provider = _get_provider()
+    return provider.generate_capability_configs()
 
 
 __all__ = [
@@ -803,9 +568,8 @@ __all__ = [
     "get_statistical_config",
     "get_ml_config",
     "get_privacy_config",
-    # Provider class and base types
+    # Provider class
     "DataAnalysisCapabilityProvider",
-    "CapabilityMetadata",  # Re-exported from framework for convenience
     # Capability list for loader
     "CAPABILITIES",
     # Convenience functions

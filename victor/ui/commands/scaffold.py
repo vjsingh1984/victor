@@ -33,10 +33,11 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 
 try:
-    from jinja2 import Environment, FileSystemLoader, TemplateNotFound
+    from jinja2 import Environment, FileSystemLoader, select_autoescape, TemplateNotFound
 except ImportError:
     Environment = None  # type: ignore
     FileSystemLoader = None  # type: ignore
+    select_autoescape = None  # type: ignore
     TemplateNotFound = Exception  # type: ignore
 
 scaffold_app = typer.Typer(
@@ -233,10 +234,11 @@ def new_vertical(
     if not dry_run and not check_existing_vertical(vertical_dir, force):
         raise typer.Exit(1)
 
-    # Setup Jinja2 environment
+    # Setup Jinja2 environment with autoescape enabled for security
     env = Environment(
         loader=FileSystemLoader(str(template_dir)),
         keep_trailing_newline=True,
+        autoescape=select_autoescape(enabled_extensions=("j2", "xml", "html")),
     )
 
     # Template context

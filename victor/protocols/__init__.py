@@ -121,6 +121,13 @@ from victor.protocols.agent import (
     IAgentOrchestratorFactory,
 )
 
+# Focused Agent Protocols (ISP-compliant)
+from victor.protocols.chat import ChatProtocol
+from victor.protocols.config_agent import ConfigProtocol
+from victor.protocols.provider import ProviderProtocol
+from victor.protocols.state import StateProtocol
+from victor.protocols.tools import ToolProtocol
+
 # Tool Selector Protocol (unifies tool selection interfaces)
 from victor.protocols.tool_selector import (
     IToolSelector,
@@ -371,6 +378,12 @@ __all__ = [
     # Agent Orchestrator Protocol
     "IAgentOrchestrator",
     "IAgentOrchestratorFactory",
+    # Focused Agent Protocols (ISP-compliant)
+    "ChatProtocol",
+    "ProviderProtocol",
+    "ToolProtocol",
+    "StateProtocol",
+    "ConfigProtocol",
     # Tool Selector Protocol
     "IToolSelector",
     "IConfigurableToolSelector",

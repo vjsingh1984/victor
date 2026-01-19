@@ -4,10 +4,110 @@ This directory contains YAML templates for creating new verticals in Victor.
 
 ## Available Templates
 
-### 1. `base_vertical_template.yaml`
+### Production Templates
+
+#### 1. `coding_vertical_template.yaml`
+**Purpose**: Software development assistant - Victor's primary vertical
+
+**Use when**: Creating a vertical for software development, coding, or programming tasks
+
+**Features**:
+- 19 tools optimized for software development
+- 7-stage workflow (INITIAL, PLANNING, READING, ANALYSIS, EXECUTION, VERIFICATION, COMPLETION)
+- LSP integration for code intelligence
+- Git operations and version control
+- Test execution and validation
+- Multi-language support (Python, TypeScript, Rust, Go, and more)
+- Refactoring tools (rename, extract)
+- Docker integration
+- 2 workflow definitions (code_review, test_generation)
+- 2 team formations (code_review_team, feature_implementation_team)
+
+**Example**:
+```bash
+python scripts/generate_vertical.py \
+  --template coding_vertical_template.yaml \
+  --output victor/my_coding_vertical
+```
+
+#### 2. `devops_vertical_template.yaml`
+**Purpose**: Infrastructure automation and DevOps - competitive with Docker Desktop AI, Terraform Assistant
+
+**Use when**: Creating a vertical for DevOps, infrastructure, or deployment automation
+
+**Features**:
+- 13 tools for DevOps operations
+- 8-stage workflow (INITIAL, ASSESSMENT, PLANNING, IMPLEMENTATION, VALIDATION, DEPLOYMENT, MONITORING, COMPLETION)
+- Container orchestration (Docker, Kubernetes)
+- CI/CD pipeline automation
+- Infrastructure as Code (Terraform, Ansible)
+- Deployment orchestration
+- Monitoring and observability
+- Secret management and security
+- 2 workflow definitions (container_setup, deploy)
+- 2 team formations (infrastructure_team, deployment_team)
+
+**Example**:
+```bash
+python scripts/generate_vertical.py \
+  --template devops_vertical_template.yaml \
+  --output victor/my_devops_vertical
+```
+
+#### 3. `rag_vertical_template.yaml`
+**Purpose**: Retrieval-Augmented Generation for document Q&A
+
+**Use when**: Creating a vertical for document management, knowledge bases, or RAG systems
+
+**Features**:
+- 10 tools for RAG operations
+- 6-stage workflow (INITIAL, INGESTING, SEARCHING, QUERYING, SYNTHESIZING, COMPLETION)
+- Document ingestion (PDF, Markdown, Text, Code)
+- LanceDB vector storage (embedded, no server)
+- Hybrid search (vector + full-text)
+- Semantic chunking with overlap
+- Source citations and attribution
+- Knowledge base management
+- 2 workflow definitions (bulk_ingestion, qa_pipeline)
+- 1 team formation (research_team)
+
+**Example**:
+```bash
+python scripts/generate_vertical.py \
+  --template rag_vertical_template.yaml \
+  --output victor/my_rag_vertical
+```
+
+#### 4. `dataanalysis_vertical_template.yaml`
+**Purpose**: Data exploration and analysis - competitive with ChatGPT Data Analysis, Jupyter AI
+
+**Use when**: Creating a vertical for data science, analytics, or statistical analysis
+
+**Features**:
+- 11 tools for data analysis
+- 8-stage workflow (INITIAL, DATA_LOADING, EXPLORATION, CLEANING, ANALYSIS, VISUALIZATION, REPORTING, COMPLETION)
+- Data loading (CSV, Excel, JSON, Parquet, SQL)
+- Exploratory data analysis
+- Statistical testing and modeling
+- Visualization (matplotlib, seaborn, plotly)
+- Machine learning (scikit-learn)
+- Privacy protection (PII anonymization)
+- 3 workflow definitions (exploratory_analysis, statistical_modeling, ml_pipeline)
+- 1 team formation (analytics_team)
+
+**Example**:
+```bash
+python scripts/generate_vertical.py \
+  --template dataanalysis_vertical_template.yaml \
+  --output victor/my_analysis_vertical
+```
+
+### Example Templates
+
+#### 5. `base_vertical_template.yaml`
 **Purpose**: Minimal starting point for new verticals
 
-**Use when**: Creating a simple vertical with basic functionality
+**Use when**: Creating a simple vertical with basic functionality or learning template structure
 
 **Features**:
 - Minimal metadata
@@ -22,7 +122,7 @@ cp base_vertical_template.yaml my_vertical.yaml
 python scripts/generate_vertical.py --template my_vertical.yaml --output victor/my_vertical
 ```
 
-### 2. `example_documentation_vertical.yaml`
+#### 6. `example_documentation_vertical.yaml`
 **Purpose**: Complete example of a documentation vertical
 
 **Use when**: Learning the template system or creating a documentation-focused vertical
@@ -41,7 +141,7 @@ python scripts/generate_vertical.py \
   --output victor/documentation
 ```
 
-### 3. `example_security_vertical.yaml`
+#### 7. `example_security_vertical.yaml`
 **Purpose**: Comprehensive example of a security vertical
 
 **Use when**: Learning advanced features or creating a security-focused vertical
@@ -49,7 +149,7 @@ python scripts/generate_vertical.py \
 **Features**:
 - Complete metadata with provider hints
 - Security-specific tools (vulnerability_scan, secret_scan, dependency_check)
-- 6-stage workflow (INITIAL, SCANNING, ANALYSIS, REPORTING, COMPLETION)
+- 5-stage workflow (INITIAL, SCANNING, ANALYSIS, REPORTING, COMPLETION)
 - Multiple middleware specifications
 - Safety patterns for dangerous operations
 - Task type hints for different security tasks
@@ -197,9 +297,18 @@ See the existing verticals in `victor/*/` for real-world examples:
 
 All templates in this directory have been validated:
 
+### Production Templates
+✓ `coding_vertical_template.yaml` - Valid (19 tools, 7 stages, 2 workflows, 2 teams)
+✓ `devops_vertical_template.yaml` - Valid (13 tools, 8 stages, 2 workflows, 2 teams)
+✓ `rag_vertical_template.yaml` - Valid (10 tools, 6 stages, 2 workflows, 1 team)
+✓ `dataanalysis_vertical_template.yaml` - Valid (11 tools, 8 stages, 3 workflows, 1 team)
+
+### Example Templates
 ✓ `base_vertical_template.yaml` - Valid
 ✓ `example_documentation_vertical.yaml` - Valid
 ✓ `example_security_vertical.yaml` - Valid
+
+**Total**: 7 validated templates (4 production, 3 examples)
 
 ## Contributing
 

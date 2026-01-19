@@ -283,15 +283,21 @@ class AgentBuilder:
             self._options.tools = ToolSet.airgapped()
 
         elif preset == BuilderPreset.CODING:
-            from victor.coding import CodingAssistant
+            # Use discovery instead of hardcoded import (OCP-compliant)
+            from victor.framework.discovery import VerticalDiscovery
 
-            self._options.vertical = CodingAssistant
+            coding_class = VerticalDiscovery.discover_vertical_by_name("coding")
+            if coding_class:
+                self._options.vertical = coding_class
             self._options.tools = ToolSet.default()
 
         elif preset == BuilderPreset.RESEARCH:
-            from victor.research import ResearchAssistant
+            # Use discovery instead of hardcoded import (OCP-compliant)
+            from victor.framework.discovery import VerticalDiscovery
 
-            self._options.vertical = ResearchAssistant
+            research_class = VerticalDiscovery.discover_vertical_by_name("research")
+            if research_class:
+                self._options.vertical = research_class
 
         return self
 

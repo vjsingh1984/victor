@@ -92,6 +92,69 @@ class ResearchAssistant(VerticalBase):
         """Get the system prompt for research tasks."""
         return cls._get_system_prompt()
 
+    # =========================================================================
+    # PromptBuilder Support (Phase 7)
+    # =========================================================================
+
+    @classmethod
+    def _get_vertical_prompt(cls) -> str:
+        """Get research-specific prompt content for PromptBuilder.
+
+        Returns:
+            Research-specific vertical prompt content
+        """
+        return """You are an expert researcher with strong skills in:
+- Information gathering and synthesis
+- Critical analysis and evaluation
+- Identifying credible sources
+- Drawing evidence-based conclusions
+- Clear communication of findings"""
+
+    @classmethod
+    def get_prompt_builder(cls):  # type: ignore[override]
+        """Get configured PromptBuilder for research vertical.
+
+        Returns:
+            PromptBuilder with research-specific configuration
+        """
+        from victor.framework.prompt_builder import PromptBuilder
+
+        # Start with base builder
+        builder = super().get_prompt_builder()
+
+        # Add research-specific grounding
+        builder.add_grounding(
+            "Context: You are conducting research on {topic}.",
+            topic="a research question",
+            priority=10,
+        )
+
+        # Add research-specific rules
+        builder.add_rules(
+            [
+                "Use multiple sources to verify information",
+                "Distinguish between facts and opinions",
+                "Cite sources appropriately",
+                "Consider potential biases",
+                "Update knowledge based on new evidence",
+            ],
+            priority=20,
+        )
+
+        # Add research-specific checklist
+        builder.add_checklist(
+            [
+                "Information is from credible sources",
+                "Multiple perspectives considered",
+                "Claims are evidence-based",
+                "Sources are properly cited",
+                "Conclusions are well-supported",
+            ],
+            priority=30,
+        )
+
+        return builder
+
     @classmethod
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get research-specific stage definitions.

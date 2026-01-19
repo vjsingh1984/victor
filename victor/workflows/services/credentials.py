@@ -76,7 +76,7 @@ logger = logging.getLogger(__name__)
 
 # Optional imports
 try:
-    import keyring
+    import keyring  # type: ignore
 
     KEYRING_AVAILABLE = True
 except ImportError:
@@ -84,9 +84,9 @@ except ImportError:
     keyring = None  # type: ignore
 
 try:
-    from cryptography.fernet import Fernet
-    from cryptography.hazmat.primitives import hashes
-    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    from cryptography.fernet import Fernet  # type: ignore
+    from cryptography.hazmat.primitives import hashes  # type: ignore
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC  # type: ignore
 
     CRYPTO_AVAILABLE = True
 except ImportError:
@@ -94,7 +94,7 @@ except ImportError:
 
 # TOTP for authenticator apps
 try:
-    import pyotp
+    import pyotp  # type: ignore
 
     TOTP_AVAILABLE = True
 except ImportError:
@@ -103,7 +103,7 @@ except ImportError:
 
 # Touch ID / biometric auth on macOS
 try:
-    import LocalAuthentication  # pyobjc on macOS
+    import LocalAuthentication  # type: ignore  # pyobjc on macOS
 
     BIOMETRIC_AVAILABLE = platform.system() == "Darwin"
 except ImportError:
@@ -1285,14 +1285,14 @@ class SystemAuthenticator:
             return False
 
         try:
-            import pam
+            import pam  # type: ignore
 
             p = pam.pam()
             return p.authenticate(username, password, service=service)
         except ImportError:
             # Try python-pam
             try:
-                import PAM
+                import PAM  # type: ignore
 
                 def pam_conv(auth, query_list, userData):
                     resp = []
@@ -1439,7 +1439,7 @@ class SystemAuthenticator:
         """
         try:
             # Try GSSAPI (Unix/macOS)
-            import gssapi
+            import gssapi  # type: ignore
 
             server_name = gssapi.Name(service, gssapi.NameType.hostbased_service)
 
@@ -1456,7 +1456,7 @@ class SystemAuthenticator:
 
         # Try pyspnego (cross-platform)
         try:
-            import spnego
+            import spnego  # type: ignore
 
             ctx = spnego.client(service)
             token = ctx.step()
@@ -1526,7 +1526,7 @@ class SystemAuthenticator:
     ) -> bool:
         """Verify NTLM credentials using pyspnego (cross-platform)."""
         try:
-            import spnego
+            import spnego  # type: ignore
 
             # Create NTLM context for validation
             ctx = spnego.client(
@@ -1556,8 +1556,8 @@ class SystemAuthenticator:
         """
         if platform.system() == "Windows":
             try:
-                import sspi
-                import sspicon
+                import sspi  # type: ignore
+                import sspicon  # type: ignore
 
                 sspi.QuerySecurityPackageInfo("NTLM")
 
@@ -1584,7 +1584,7 @@ class SystemAuthenticator:
 
         # Try pyspnego
         try:
-            import spnego
+            import spnego  # type: ignore
 
             ctx = spnego.client(service="host", hostname="localhost", protocol="ntlm")
             return ctx.step()
@@ -1914,7 +1914,7 @@ class AWSCredentials:
     def to_boto3_session(self) -> Any:
         """Create boto3 session from these credentials."""
         try:
-            import boto3
+            import boto3  # type: ignore
 
             return boto3.Session(
                 aws_access_key_id=self.access_key_id,
@@ -2561,7 +2561,7 @@ class CredentialManager:
 
         # Try IAM role (EC2, Lambda, EKS)
         try:
-            import boto3
+            import boto3  # type: ignore
 
             session = boto3.Session()
             credentials = session.get_credentials()

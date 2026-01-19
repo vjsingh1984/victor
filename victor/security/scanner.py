@@ -188,10 +188,10 @@ class PythonDependencyParser(BaseDependencyParser):
         """Parse poetry.lock format."""
         deps = []
         try:
-            import tomllib
+            import tomllib  # type: ignore
         except ImportError:
             try:
-                import tomli as tomllib
+                import tomli as tomllib  # type: ignore
             except ImportError:
                 logger.warning("tomllib/tomli not available for poetry.lock parsing")
                 return deps

@@ -234,13 +234,18 @@ def run_command(
 ) -> CommandResult:
     """Execute a command synchronously and return structured result.
 
+    SECURITY WARNING: Avoid shell=True whenever possible. Using shell=True with
+    untrusted input can lead to command injection vulnerabilities. Always prefer
+    list arguments with shell=False for better security.
+
     Args:
-        args: Command to execute. Either a string (requires shell=True) or list of args.
+        args: Command to execute. List of args is strongly preferred over string.
+              String arguments require shell=True (SECURITY RISK: avoid with untrusted input).
         working_dir: Working directory for command execution.
         timeout: Timeout in seconds (default: 60).
         check_dangerous: Whether to check for dangerous commands (default: True).
         env: Environment variables to set.
-        shell: Whether to use shell execution (default: False).
+        shell: Whether to use shell execution (default: False, SECURITY RISK if True).
 
     Returns:
         CommandResult with execution details.
@@ -287,7 +292,7 @@ def run_command(
             timeout=timeout,
             cwd=working_dir,
             env=env,
-            shell=shell,
+            shell=shell,  # nosec B602
         )
 
         duration_ms = (time.time() - start_time) * 1000
@@ -369,8 +374,12 @@ async def run_command_async(
 ) -> CommandResult:
     """Execute a shell command asynchronously and return structured result.
 
+    SECURITY WARNING: This function uses shell execution by default. Only use with
+    trusted input. The dangerous command check provides some protection but is not
+    a complete security solution. Prefer run_command() with list arguments when possible.
+
     Args:
-        command: Shell command to execute.
+        command: Shell command to execute (SECURITY RISK: ensure input is trusted).
         working_dir: Working directory for command execution.
         timeout: Timeout in seconds (default: 60).
         check_dangerous: Whether to check for dangerous commands (default: True).
@@ -412,7 +421,7 @@ async def run_command_async(
             )
 
     try:
-        process = await asyncio.create_subprocess_shell(
+        process = await asyncio.create_subprocess_shell(  # nosec B602
             command,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

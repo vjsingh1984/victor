@@ -106,6 +106,12 @@ from victor.framework.prompt_builder import (
     create_research_prompt_builder,
 )
 from victor.framework.prompt_sections import (
+    GroundingSection,
+    RuleSection,
+    ChecklistSection,
+    VerticalPromptSection,
+)
+from victor.framework.prompt_sections_legacy import (
     # Grounding rules
     GROUNDING_RULES_MINIMAL,
     GROUNDING_RULES_EXTENDED,
@@ -500,7 +506,7 @@ __all__ = (
         "BudgetExhaustedError",
         "CancellationError",
         "StateTransitionError",
-        # Prompt Sections
+        # Prompt Sections (legacy constants)
         "GROUNDING_RULES_MINIMAL",
         "GROUNDING_RULES_EXTENDED",
         "PARALLEL_READ_GUIDANCE",
@@ -535,6 +541,11 @@ __all__ = (
         "DEEPSEEK_TOOL_EFFICIENCY",
         "XAI_GROK_GUIDANCE",
         "OLLAMA_STRICT_GUIDANCE",
+        # Prompt Section Classes (Phase 7)
+        "GroundingSection",
+        "RuleSection",
+        "ChecklistSection",
+        "VerticalPromptSection",
         # Vertical Templates
         "VerticalTemplate",
         "VerticalMetadata",

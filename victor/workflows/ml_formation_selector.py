@@ -713,11 +713,11 @@ class FeatureExtractor:
         elif hasattr(task, "message_id"):
             return task.message_id
         else:
-            # Generate hash-based ID
+            # Generate hash-based ID (non-cryptographic, for identification only)
             content = self._get_task_content(task)
             import hashlib
 
-            return hashlib.md5(content.encode()).hexdigest()[:16]
+            return hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()[:16]
 
 
 # =============================================================================

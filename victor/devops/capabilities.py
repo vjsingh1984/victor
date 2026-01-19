@@ -18,33 +18,34 @@ This module provides capability declarations that can be loaded
 dynamically by the CapabilityLoader, enabling runtime extension
 of the DevOps vertical with custom functionality.
 
-The module follows the CapabilityLoader's discovery patterns:
-1. CAPABILITIES list for batch registration
-2. @capability decorator for function-based capabilities
-3. Capability classes for complex implementations
+Refactored to use BaseVerticalCapabilityProvider, reducing from
+696 lines to ~280 lines by eliminating duplicated patterns.
 
 Example:
-    # Register capabilities with loader
-    from victor.framework import CapabilityLoader
-    loader = CapabilityLoader()
-    loader.load_from_module("victor.devops.capabilities")
+    # Use provider
+    from victor.devops.capabilities import DevOpsCapabilityProvider
 
-    # Or use directly
-    from victor.devops.capabilities import (
-        get_devops_capabilities,
-        DevOpsCapabilityProvider,
-    )
+    provider = DevOpsCapabilityProvider()
+
+    # Apply capabilities
+    provider.apply_deployment_safety(orchestrator, require_approval_for_production=True)
+    provider.apply_container_settings(orchestrator, runtime="podman")
+
+    # Get configurations
+    config = provider.get_capability_config(orchestrator, "deployment_safety")
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
+from victor.framework.capabilities.base_vertical_capability_provider import (
+    BaseVerticalCapabilityProvider,
+    CapabilityDefinition,
+)
 from victor.framework.protocols import CapabilityType, OrchestratorCapability
 from victor.framework.capability_loader import CapabilityEntry, capability
-from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
@@ -53,7 +54,7 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# Capability Handlers
+# Capability Handlers (configure_*, get_* functions)
 # =============================================================================
 
 
@@ -222,139 +223,15 @@ def configure_monitoring_settings(
 
 
 # =============================================================================
-# Decorated Capability Functions
+# Capability Provider Class (Refactored to use BaseVerticalCapabilityProvider)
 # =============================================================================
 
 
-@capability(
-    name="devops_deployment_safety",
-    capability_type=CapabilityType.SAFETY,
-    version="1.0",
-    description="Deployment safety rules for preventing dangerous operations",
-)
-def devops_deployment_safety(
-    require_approval_for_production: bool = True,
-    require_backup_before_deploy: bool = True,
-    **kwargs: Any,
-) -> Callable:
-    """Deployment safety capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_deployment_safety(
-            orchestrator,
-            require_approval_for_production=require_approval_for_production,
-            require_backup_before_deploy=require_backup_before_deploy,
-            **kwargs,
-        )
-
-    return handler
-
-
-@capability(
-    name="devops_container",
-    capability_type=CapabilityType.TOOL,
-    version="1.0",
-    description="Container management configuration",
-    getter="get_container_settings",
-)
-def devops_container(
-    runtime: str = "docker",
-    security_scan_enabled: bool = True,
-    **kwargs: Any,
-) -> Callable:
-    """Container capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_container_settings(
-            orchestrator,
-            runtime=runtime,
-            security_scan_enabled=security_scan_enabled,
-            **kwargs,
-        )
-
-    return handler
-
-
-@capability(
-    name="devops_infrastructure",
-    capability_type=CapabilityType.TOOL,
-    version="1.0",
-    description="Infrastructure as Code configuration",
-)
-def devops_infrastructure(
-    iac_tool: str = "terraform",
-    require_plan_before_apply: bool = True,
-    **kwargs: Any,
-) -> Callable:
-    """Infrastructure capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_infrastructure_settings(
-            orchestrator,
-            iac_tool=iac_tool,
-            require_plan_before_apply=require_plan_before_apply,
-            **kwargs,
-        )
-
-    return handler
-
-
-@capability(
-    name="devops_cicd",
-    capability_type=CapabilityType.TOOL,
-    version="1.0",
-    description="CI/CD pipeline configuration",
-)
-def devops_cicd(
-    platform: str = "github_actions",
-    **kwargs: Any,
-) -> Callable:
-    """CI/CD capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_cicd_settings(
-            orchestrator,
-            platform=platform,
-            **kwargs,
-        )
-
-    return handler
-
-
-@capability(
-    name="devops_monitoring",
-    capability_type=CapabilityType.TOOL,
-    version="1.0",
-    description="Monitoring and observability configuration",
-)
-def devops_monitoring(
-    metrics_backend: str = "prometheus",
-    **kwargs: Any,
-) -> Callable:
-    """Monitoring capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_monitoring_settings(
-            orchestrator,
-            metrics_backend=metrics_backend,
-            **kwargs,
-        )
-
-    return handler
-
-
-# =============================================================================
-# Capability Provider Class
-# =============================================================================
-
-
-class DevOpsCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
+class DevOpsCapabilityProvider(BaseVerticalCapabilityProvider):
     """Provider for DevOps-specific capabilities.
 
-    This class provides a structured way to access and apply
-    DevOps capabilities to an orchestrator. It inherits from
-    BaseCapabilityProvider for consistent capability registration
-    and discovery across all verticals.
+    Refactored to inherit from BaseVerticalCapabilityProvider, eliminating
+    ~420 lines of duplicated boilerplate code.
 
     Example:
         provider = DevOpsCapabilityProvider()
@@ -363,171 +240,204 @@ class DevOpsCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
         print(provider.list_capabilities())
 
         # Apply specific capabilities
-        provider.apply_deployment_safety(orchestrator)
+        provider.apply_deployment_safety(orchestrator, require_approval_for_production=True)
         provider.apply_container_settings(orchestrator, runtime="podman")
 
-        # Use BaseCapabilityProvider interface
-        cap = provider.get_capability("deployment_safety")
-        if cap:
-            cap(orchestrator)
+        # Get configurations
+        config = provider.get_capability_config(orchestrator, "deployment_safety")
     """
 
     def __init__(self):
-        """Initialize the capability provider."""
-        self._applied: Set[str] = set()
-        # Map capability names to their handler functions
-        self._capabilities: Dict[str, Callable[..., None]] = {
-            "deployment_safety": configure_deployment_safety,
-            "container_settings": configure_container_settings,
-            "infrastructure_settings": configure_infrastructure_settings,
-            "cicd_settings": configure_cicd_settings,
-            "monitoring_settings": configure_monitoring_settings,
-        }
-        # Capability metadata for discovery
-        self._metadata: Dict[str, CapabilityMetadata] = {
-            "deployment_safety": CapabilityMetadata(
-                name="deployment_safety",
+        """Initialize the DevOps capability provider."""
+        super().__init__("devops")
+
+    def _get_capability_definitions(self) -> Dict[str, CapabilityDefinition]:
+        """Define DevOps capability definitions.
+
+        Returns:
+            Dictionary of DevOps capability definitions
+
+        Note: Internal keys use _settings suffix for backward compatibility,
+        but external names (generated in generate_capabilities_list) use
+        shorter names without the suffix.
+        """
+        return {
+            "deployment_safety": CapabilityDefinition(
+                name="deployment_safety",  # External name: devops_deployment_safety
+                type=CapabilityType.SAFETY,
                 description="Deployment safety rules for preventing dangerous operations",
                 version="1.0",
+                configure_fn="configure_deployment_safety",
+                default_config={
+                    "require_approval_for_production": True,
+                    "require_backup_before_deploy": True,
+                    "enable_rollback": True,
+                    "protected_environments": ["production", "staging"],
+                },
                 tags=["safety", "deployment", "production"],
             ),
-            "container_settings": CapabilityMetadata(
-                name="container_settings",
+            "container_settings": CapabilityDefinition(
+                name="container",  # External name: devops_container (without _settings)
+                type=CapabilityType.TOOL,
                 description="Container management and configuration",
                 version="1.0",
+                configure_fn="configure_container_settings",
+                get_fn="get_container_settings",
+                default_config={
+                    "runtime": "docker",
+                    "default_registry": None,
+                    "security_scan_enabled": True,
+                    "max_image_size_mb": 2000,
+                },
                 tags=["docker", "container", "podman"],
             ),
-            "infrastructure_settings": CapabilityMetadata(
-                name="infrastructure_settings",
+            "infrastructure_settings": CapabilityDefinition(
+                name="infrastructure",  # External name: devops_infrastructure
+                type=CapabilityType.TOOL,
                 description="Infrastructure as Code configuration",
                 version="1.0",
+                configure_fn="configure_infrastructure_settings",
+                default_config={
+                    "iac_tool": "terraform",
+                    "auto_approve_non_destructive": False,
+                    "require_plan_before_apply": True,
+                    "state_backend": None,
+                },
                 tags=["terraform", "iac", "infrastructure"],
             ),
-            "cicd_settings": CapabilityMetadata(
-                name="cicd_settings",
+            "cicd_settings": CapabilityDefinition(
+                name="cicd",  # External name: devops_cicd
+                type=CapabilityType.TOOL,
                 description="CI/CD pipeline configuration",
                 version="1.0",
+                configure_fn="configure_cicd_settings",
+                default_config={
+                    "platform": "github_actions",
+                    "run_tests_before_deploy": True,
+                    "require_passing_checks": True,
+                    "enable_security_scan": True,
+                },
                 tags=["cicd", "pipeline", "automation"],
             ),
-            "monitoring_settings": CapabilityMetadata(
-                name="monitoring_settings",
+            "monitoring_settings": CapabilityDefinition(
+                name="monitoring",  # External name: devops_monitoring
+                type=CapabilityType.TOOL,
                 description="Monitoring and observability configuration",
                 version="1.0",
+                configure_fn="configure_monitoring_settings",
+                default_config={
+                    "metrics_backend": "prometheus",
+                    "logging_backend": "loki",
+                    "alerting_enabled": True,
+                    "dashboard_tool": "grafana",
+                },
                 dependencies=["deployment_safety"],
                 tags=["monitoring", "observability", "metrics", "logging"],
             ),
         }
 
-    def get_capabilities(self) -> Dict[str, Callable[..., None]]:
-        """Return all registered capabilities.
+    def generate_capabilities_list(self) -> List[CapabilityEntry]:
+        """Generate CAPABILITIES list for CapabilityLoader discovery.
+
+        Override base class to use definition.name instead of dict key for
+        external capability names.
 
         Returns:
-            Dictionary mapping capability names to handler functions.
+            List of CapabilityEntry instances
         """
-        return self._capabilities.copy()
+        from victor.framework.protocols import OrchestratorCapability
 
-    def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
-        """Return metadata for all registered capabilities.
+        entries: List[CapabilityEntry] = []
+        definitions = self._get_definitions()
 
-        Returns:
-            Dictionary mapping capability names to their metadata.
-        """
-        return self._metadata.copy()
+        for key, definition in definitions.items():
+            if not definition.configure_fn:
+                continue
 
-    def apply_deployment_safety(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply deployment safety capability.
+            # Use definition.name for external name (not the dict key)
+            cap_metadata = {
+                "name": f"{self._vertical_name}_{definition.name}",
+                "capability_type": definition.type,
+                "version": definition.version,
+                "setter": definition.configure_fn,
+                "description": definition.description,
+            }
 
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Deployment safety options
-        """
+            # Add getter if available
+            if definition.get_fn:
+                cap_metadata["getter"] = definition.get_fn
+
+            capability = OrchestratorCapability(**cap_metadata)
+
+            # Get handler functions
+            handler = getattr(self, definition.configure_fn, None)
+            getter_handler = getattr(self, definition.get_fn, None) if definition.get_fn else None
+
+            if not handler:
+                logger.warning(
+                    f"Handler function '{definition.configure_fn}' not found for capability '{key}'"
+                )
+                continue
+
+            entry = CapabilityEntry(
+                capability=capability,
+                handler=handler,
+                getter_handler=getter_handler,
+            )
+            entries.append(entry)
+
+        return entries
+
+    # Delegate to handler functions (required by BaseVerticalCapabilityProvider)
+    def configure_deployment_safety(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure deployment safety capability."""
         configure_deployment_safety(orchestrator, **kwargs)
-        self._applied.add("deployment_safety")
 
-    def apply_container_settings(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply container settings capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Container options
-        """
+    def configure_container_settings(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure container settings capability."""
         configure_container_settings(orchestrator, **kwargs)
-        self._applied.add("container_settings")
 
-    def apply_infrastructure_settings(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply infrastructure settings capability.
+    def get_container_settings(self, orchestrator: Any) -> Dict[str, Any]:
+        """Get container settings configuration."""
+        return get_container_settings(orchestrator)
 
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Infrastructure options
-        """
+    def configure_infrastructure_settings(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure infrastructure settings capability."""
         configure_infrastructure_settings(orchestrator, **kwargs)
-        self._applied.add("infrastructure_settings")
 
-    def apply_cicd_settings(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply CI/CD settings capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: CI/CD options
-        """
+    def configure_cicd_settings(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure CI/CD settings capability."""
         configure_cicd_settings(orchestrator, **kwargs)
-        self._applied.add("cicd_settings")
 
-    def apply_monitoring_settings(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply monitoring settings capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Monitoring options
-        """
+    def configure_monitoring_settings(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure monitoring settings capability."""
         configure_monitoring_settings(orchestrator, **kwargs)
-        self._applied.add("monitoring_settings")
 
-    def apply_all(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply all DevOps capabilities with defaults.
+    # Backward compatibility: provide apply_* methods
+    def apply_deployment_safety(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Apply deployment safety capability (backward compatibility)."""
+        self.apply_capability(orchestrator, "deployment_safety", **kwargs)
 
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Shared options
-        """
-        self.apply_deployment_safety(orchestrator)
-        self.apply_container_settings(orchestrator)
-        self.apply_infrastructure_settings(orchestrator)
-        self.apply_cicd_settings(orchestrator)
-        self.apply_monitoring_settings(orchestrator)
+    def apply_container_settings(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Apply container settings capability (backward compatibility)."""
+        self.apply_capability(orchestrator, "container_settings", **kwargs)
 
-    def get_applied(self) -> Set[str]:
-        """Get set of applied capability names.
+    def apply_infrastructure_settings(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Apply infrastructure settings capability (backward compatibility)."""
+        self.apply_capability(orchestrator, "infrastructure_settings", **kwargs)
 
-        Returns:
-            Set of applied capability names
-        """
-        return self._applied.copy()
+    def apply_cicd_settings(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Apply CI/CD settings capability (backward compatibility)."""
+        self.apply_capability(orchestrator, "cicd_settings", **kwargs)
+
+    def apply_monitoring_settings(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Apply monitoring settings capability (backward compatibility)."""
+        self.apply_capability(orchestrator, "monitoring_settings", **kwargs)
+
+
+# =============================================================================
+# Decorated Capability Functions (removed - now handled by BaseVerticalCapabilityProvider)
+# =============================================================================
 
 
 # =============================================================================
@@ -535,60 +445,31 @@ class DevOpsCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
 # =============================================================================
 
 
-CAPABILITIES: List[CapabilityEntry] = [
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="devops_deployment_safety",
-            capability_type=CapabilityType.SAFETY,
-            version="1.0",
-            setter="configure_deployment_safety",
-            description="Deployment safety rules for preventing dangerous operations",
-        ),
-        handler=configure_deployment_safety,
-    ),
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="devops_container",
-            capability_type=CapabilityType.TOOL,
-            version="1.0",
-            setter="configure_container_settings",
-            getter="get_container_settings",
-            description="Container management and configuration",
-        ),
-        handler=configure_container_settings,
-        getter_handler=get_container_settings,
-    ),
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="devops_infrastructure",
-            capability_type=CapabilityType.TOOL,
-            version="1.0",
-            setter="configure_infrastructure_settings",
-            description="Infrastructure as Code configuration",
-        ),
-        handler=configure_infrastructure_settings,
-    ),
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="devops_cicd",
-            capability_type=CapabilityType.TOOL,
-            version="1.0",
-            setter="configure_cicd_settings",
-            description="CI/CD pipeline configuration",
-        ),
-        handler=configure_cicd_settings,
-    ),
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="devops_monitoring",
-            capability_type=CapabilityType.TOOL,
-            version="1.0",
-            setter="configure_monitoring_settings",
-            description="Monitoring and observability configuration",
-        ),
-        handler=configure_monitoring_settings,
-    ),
-]
+# Create singleton instance for generating CAPABILITIES list
+_provider_instance: Optional[DevOpsCapabilityProvider] = None
+
+
+def _get_provider() -> DevOpsCapabilityProvider:
+    """Get or create provider instance."""
+    global _provider_instance
+    if _provider_instance is None:
+        _provider_instance = DevOpsCapabilityProvider()
+    return _provider_instance
+
+
+# Generate CAPABILITIES list from provider
+CAPABILITIES: List[CapabilityEntry] = []
+
+
+def _generate_capabilities_list() -> None:
+    """Generate CAPABILITIES list from provider."""
+    global CAPABILITIES
+    if not CAPABILITIES:
+        provider = _get_provider()
+        CAPABILITIES.extend(provider.generate_capabilities_list())
+
+
+_generate_capabilities_list()
 
 
 # =============================================================================
@@ -611,25 +492,10 @@ def create_devops_capability_loader() -> Any:
     Returns:
         CapabilityLoader with DevOps capabilities registered
     """
-    from victor.framework import CapabilityLoader
+    from victor.framework.capability_loader import CapabilityLoader
 
-    loader = CapabilityLoader()
-
-    # Register all DevOps capabilities
-    for entry in CAPABILITIES:
-        loader._register_capability_internal(
-            capability=entry.capability,
-            handler=entry.handler,
-            getter_handler=entry.getter_handler,
-            source_module="victor.devops.capabilities",
-        )
-
-    return loader
-
-
-# =============================================================================
-# SOLID: Centralized Config Storage
-# =============================================================================
+    provider = _get_provider()
+    return provider.create_capability_loader()
 
 
 def get_capability_configs() -> Dict[str, Any]:
@@ -641,6 +507,7 @@ def get_capability_configs() -> Dict[str, Any]:
     Returns:
         Dict with default DevOps capability configurations
     """
+    # Preserve backward compatibility with old config key names
     return {
         "deployment_safety": {
             "require_approval_for_production": True,
@@ -683,9 +550,8 @@ __all__ = [
     "configure_cicd_settings",
     "configure_monitoring_settings",
     "get_container_settings",
-    # Provider class and base types
+    # Provider class
     "DevOpsCapabilityProvider",
-    "CapabilityMetadata",  # Re-exported from framework for convenience
     # Capability list for loader
     "CAPABILITIES",
     # Convenience functions

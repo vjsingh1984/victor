@@ -1,0 +1,295 @@
+# Prometheus Alerting Rules for Victor AI
+#
+# This file contains alert rules for monitoring Victor AI in production.
+# Install in Prometheus: prometheus --config.file=config/alerting/alerts.yml
+#
+# Usage:
+#   1. Configure Prometheus to load this file
+#   2. Set up AlertManager for notifications
+#   3. Tune thresholds for your environment
+
+groups:
+  # =============================================================================
+  # API Health Alerts
+  # =============================================================================
+  - name: victor_api_health
+    interval: 30s
+    rules:
+      - alert: VictorHighErrorRate
+        expr: |
+          rate(victor_request_errors_total[5m])
+          / rate(victor_request_total[5m])
+          > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: victor
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+          runbook_url: "https://docs.victor.ai/runbooks/high-error-rate"
+
+      - alert: VictorHighLatency
+        expr: |
+          histogram_quantile(0.95,
+            rate(victor_request_latency_ms_bucket[5m])
+          ) > 5000
+        for: 10m
+        labels:
+          severity: warning
+          service: victor
+        annotations:
+          summary: "High request latency"
+          description: "P95 latency is {{ $value }}ms for the last 10 minutes"
+          runbook_url: "https://docs.victor.ai/runbooks/high-latency"
+
+      - alert: VictorVeryHighLatency
+        expr: |
+          histogram_quantile(0.95,
+            rate(victor_request_latency_ms_bucket[5m])
+          ) > 10000
+        for: 5m
+        labels:
+          severity: critical
+          service: victor
+        annotations:
+          summary: "Very high request latency"
+          description: "P95 latency is {{ $value }}ms for the last 5 minutes"
+          runbook_url: "https://docs.victor.ai/runbooks/high-latency"
+
+  # =============================================================================
+  # Tool Execution Alerts
+  # =============================================================================
+  - name: victor_tool_health
+    interval: 30s
+    rules:
+      - alert: VictorHighToolErrorRate
+        expr: |
+          rate(victor_tool_errors_total[5m])
+          / rate(victor_tool_calls_total[5m])
+          > 0.10
+        for: 5m
+        labels:
+          severity: warning
+          service: victor
+        annotations:
+          summary: "High tool error rate"
+          description: "Tool error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+
+      - alert: VictorSlowToolExecution
+        expr: |
+          histogram_quantile(0.95,
+            rate(victor_tool_duration_ms_bucket[5m])
+          ) > 30000
+        for: 10m
+        labels:
+          severity: warning
+          service: victor
+        annotations:
+          summary: "Slow tool execution"
+          description: "P95 tool execution time is {{ $value }}ms for the last 10 minutes"
+
+  # =============================================================================
+  # Cache Performance Alerts
+  # =============================================================================
+  - name: victor_cache_health
+    interval: 1m
+    rules:
+      - alert: VictorLowCacheHitRate
+        expr: |
+          victor_cache_hits_total
+          / (victor_cache_hits_total + victor_cache_misses_total)
+          < 0.70
+        for: 15m
+        labels:
+          severity: warning
+          service: victor
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Cache hit rate is {{ $value | humanizePercentage }} for the last 15 minutes"
+
+      - alert: VictorVeryLowCacheHitRate
+        expr: |
+          victor_cache_hits_total
+          / (victor_cache_hits_total + victor_cache_misses_total)
+          < 0.50
+        for: 10m
+        labels:
+          severity: critical
+          service: victor
+        annotations:
+          summary: "Very low cache hit rate"
+          description: "Cache hit rate is {{ $value | humanizePercentage }} for the last 10 minutes"
+
+  # =============================================================================
+  # System Resource Alerts
+  # =============================================================================
+  - name: victor_system_health
+    interval: 30s
+    rules:
+      - alert: VictorHighMemoryUsage
+        expr: |
+          victor_memory_usage_bytes
+          / (1024 * 1024 * 1024)
+          > 4096
+        for: 10m
+        labels:
+          severity: warning
+          service: victor
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value }}GB for the last 10 minutes"
+
+      - alert: VictorVeryHighMemoryUsage
+        expr: |
+          victor_memory_usage_bytes
+          / (1024 * 1024 * 1024)
+          > 8192
+        for: 5m
+        labels:
+          severity: critical
+          service: victor
+        annotations:
+          summary: "Very high memory usage"
+          description: "Memory usage is {{ $value }}GB for the last 5 minutes - immediate action required"
+
+      - alert: VictorHighCPUUsage
+        expr: victor_cpu_usage_percent > 80
+        for: 10m
+        labels:
+          severity: warning
+          service: victor
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}% for the last 10 minutes"
+
+      - alert: VictorVeryHighCPUUsage
+        expr: victor_cpu_usage_percent > 95
+        for: 5m
+        labels:
+          severity: critical
+          service: victor
+        annotations:
+          summary: "Very high CPU usage"
+          description: "CPU usage is {{ $value }}% for the last 5 minutes"
+
+  # =============================================================================
+  # Business Logic Alerts
+  # =============================================================================
+  - name: victor_business_health
+    interval: 1m
+    rules:
+      - alert: VictorHighTaskFailureRate
+        expr: |
+          rate(victor_tasks_failed_total[5m])
+          / (rate(victor_tasks_completed_total[5m]) + rate(victor_tasks_failed_total[5m]))
+          > 0.10
+        for: 10m
+        labels:
+          severity: warning
+          service: victor
+        annotations:
+          summary: "High task failure rate"
+          description: "Task failure rate is {{ $value | humanizePercentage }} for the last 10 minutes"
+
+      - alert: VictorCostSpike
+        expr: |
+          rate(victor_total_cost_usd[1h])
+          > rate(victor_total_cost_usd[1h] offset 1h) * 2
+        for: 15m
+        labels:
+          severity: warning
+          service: victor
+        annotations:
+          summary: "Cost spike detected"
+          description: "Hourly cost has doubled compared to previous hour"
+
+  # =============================================================================
+  # Availability Alerts
+  # =============================================================================
+  - name: victor_availability
+    interval: 15s
+    rules:
+      - alert: VictorServiceDown
+        expr: up{job="victor"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: victor
+        annotations:
+          summary: "Victor service is down"
+          description: "Victor service has been down for 2 minutes"
+          runbook_url: "https://docs.victor.ai/runbooks/service-down"
+
+      - alert: VictorLowRequestRate
+        expr: |
+          rate(victor_request_total[5m])
+          < 0.01
+        for: 15m
+        labels:
+          severity: warning
+          service: victor
+        annotations:
+          summary: "Abnormally low request rate"
+          description: "Request rate is {{ $value | humanize }} req/s for the last 15 minutes"
+
+  # =============================================================================
+  # Coordinator Alerts
+  # =============================================================================
+  - name: victor_coordinator_health
+    interval: 30s
+    rules:
+      - alert: VictorCoordinatorFailureRate
+        expr: |
+          rate(victor_coordinator_errors_total[5m])
+          / rate(victor_coordinator_invocations_total[5m])
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: victor
+        annotations:
+          summary: "High coordinator failure rate"
+          description: "Coordinator failure rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+
+      - alert: VictorSlowCoordinator
+        expr: |
+          histogram_quantile(0.95,
+            rate(victor_coordinator_duration_ms_bucket[5m])
+          ) > 60000
+        for: 10m
+        labels:
+          severity: warning
+          service: victor
+        annotations:
+          summary: "Slow coordinator execution"
+          description: "P95 coordinator duration is {{ $value }}ms for the last 10 minutes"
+
+  # =============================================================================
+  # Token Usage Alerts
+  # =============================================================================
+  - name: victor_token_usage
+    interval: 1m
+    rules:
+      - alert: VictorHighTokenUsage
+        expr: |
+          rate(victor_tokens_used_total[5m]) > 10000
+        for: 10m
+        labels:
+          severity: warning
+          service: victor
+        annotations:
+          summary: "High token usage rate"
+          description: "Token usage rate is {{ $value }} tokens/sec for the last 10 minutes"
+
+      - alert: VictorTokenCostSpike
+        expr: |
+          rate(victor_tokens_used_total[1h])
+          > rate(victor_tokens_used_total[1h] offset 1h) * 3
+        for: 15m
+        labels:
+          severity: critical
+          service: victor
+        annotations:
+          summary: "Token usage spike"
+          description: "Token usage has tripled compared to previous hour"

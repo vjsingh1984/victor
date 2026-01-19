@@ -148,7 +148,7 @@ async def _connect_mysql(
     """Connect to MySQL database."""
     pool = connection_pool if connection_pool is not None else _connections
     try:
-        import mysql.connector
+        import mysql.connector  # type: ignore
 
         conn = mysql.connector.connect(
             host=kwargs.get("host", "localhost"),
@@ -181,7 +181,7 @@ async def _connect_sqlserver(
     """Connect to SQL Server database."""
     pool = connection_pool if connection_pool is not None else _connections
     try:
-        import pyodbc
+        import pyodbc  # type: ignore
 
         conn_string = (
             f"DRIVER={{ODBC Driver 17 for SQL Server}};"

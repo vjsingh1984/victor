@@ -42,7 +42,7 @@ Example (caller):
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, Optional, Set
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Set
 
 from victor.framework.protocols import (
     CapabilityType,
@@ -51,16 +51,46 @@ from victor.framework.protocols import (
     IncompatibleVersionError,
 )
 
+if TYPE_CHECKING:
+    from victor.agent.capabilities.registry import DynamicCapabilityRegistry
+
 logger = logging.getLogger(__name__)
 
+# =============================================================================
+# Dynamic Capability Registry (OCP Compliant)
+# =============================================================================
+
+_global_registry: Optional["DynamicCapabilityRegistry"] = None
+
+
+def get_capability_registry() -> "DynamicCapabilityRegistry":
+    """Get global capability registry.
+
+    Returns:
+        Global DynamicCapabilityRegistry instance
+
+    Example:
+        from victor.agent.capability_registry import get_capability_registry
+        registry = get_capability_registry()
+        method = registry.get_method_for_capability("enabled_tools")
+    """
+    global _global_registry
+    if _global_registry is None:
+        from victor.agent.capabilities.registry import DynamicCapabilityRegistry
+
+        _global_registry = DynamicCapabilityRegistry()
+    return _global_registry
+
 
 # =============================================================================
-# Capability Method Mappings (Single Source of Truth)
+# Legacy Capability Method Mappings (Deprecated)
 # =============================================================================
+# NOTE: This is kept for backward compatibility only.
+# New code should use get_capability_registry().get_method_for_capability()
+# This will be removed in a future version.
 
 # Maps capability names to their setter method names.
-# This is the single source of truth for capability → method resolution.
-# Import this from other modules instead of duplicating the mapping.
+# DEPRECATED: Use get_capability_registry().get_method_for_capability() instead
 CAPABILITY_METHOD_MAPPINGS: Dict[str, str] = {
     # Tool capabilities
     "enabled_tools": "set_enabled_tools",
@@ -94,15 +124,20 @@ def get_method_for_capability(capability_name: str) -> str:
     """Get the method name for a capability.
 
     This is the canonical way to resolve capability names to method names.
-    Uses CAPABILITY_METHOD_MAPPINGS as the source of truth.
+    Uses the dynamic capability registry for OCP compliance.
 
     Args:
         capability_name: Name of the capability
 
     Returns:
         Method name to call for this capability
+
+    Example:
+        method = get_method_for_capability("enabled_tools")
+        # Returns: "set_enabled_tools"
     """
-    return CAPABILITY_METHOD_MAPPINGS.get(capability_name, f"set_{capability_name}")
+    registry = get_capability_registry()
+    return registry.get_method_for_capability(capability_name)
 
 
 class CapabilityRegistryMixin:

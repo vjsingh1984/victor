@@ -17,6 +17,9 @@
 This module provides task type hints and system prompt sections
 specific to software development tasks. These are injected into
 the framework via the PromptContributorProtocol.
+
+Common patterns are now imported from victor.framework.prompts to reduce
+duplication and maintain consistency across verticals.
 """
 
 from __future__ import annotations
@@ -24,6 +27,13 @@ from __future__ import annotations
 from typing import Dict
 
 from victor.core.verticals.protocols import PromptContributorProtocol, TaskTypeHint
+from victor.framework.prompts import (
+    GroundingRulesBuilder,
+    SystemPromptBuilder,
+    TaskCategory,
+    TaskHint,
+    TOOL_USAGE_CODING_TEMPLATE,
+)
 
 
 # Task-type-specific prompt hints for coding tasks
@@ -174,48 +184,23 @@ ANTI-PATTERNS TO AVOID:
 }
 
 
-# Coding-specific grounding rules
-CODING_GROUNDING_RULES = """
-GROUNDING: Base ALL responses on tool output only. Never invent file paths or content.
-Quote code exactly from tool output. If more info needed, call another tool.
-""".strip()
+# Coding-specific grounding rules (now using framework builders)
+CODING_GROUNDING_RULES = GroundingRulesBuilder().minimal().build()
+
+CODING_GROUNDING_EXTENDED = GroundingRulesBuilder().extended().build()
 
 
-# Extended grounding for local models
-CODING_GROUNDING_EXTENDED = """
-CRITICAL - TOOL OUTPUT GROUNDING:
-When you receive tool output in <TOOL_OUTPUT> tags:
-1. The content between ═══ markers is ACTUAL file/command output - NEVER ignore it
-2. You MUST base your analysis ONLY on this actual content
-3. NEVER fabricate, invent, or imagine file contents that differ from tool output
-4. If you need more information, call another tool - do NOT guess
-5. When citing code, quote EXACTLY from the tool output
-6. If tool output is empty or truncated, acknowledge this limitation
-
-VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
-""".strip()
-
-
-# Coding-specific system prompt section
-CODING_SYSTEM_PROMPT_SECTION = """
-When exploring code:
-- Use semantic_code_search for conceptual queries ("authentication logic")
-- Use code_search for exact patterns ("def authenticate")
-- Use overview to understand file structure
-
-When modifying code:
-- Use edit for surgical changes to existing code
-- Use write only for new files or complete rewrites
-- Always verify changes compile/pass tests when possible
-
-Code quality guidelines:
-1. **Understand before modifying**: Always read and understand code before making changes
-2. **Incremental changes**: Make small, focused changes rather than large rewrites
-3. **Verify changes**: Run tests or validation after modifications
-4. **Explain reasoning**: Briefly explain your approach when making non-trivial changes
-5. **Preserve style**: Match existing code style and patterns
-6. **Handle errors gracefully**: If something fails, diagnose and recover
-""".strip()
+# Coding-specific system prompt section (now using framework templates)
+CODING_SYSTEM_PROMPT_SECTION = SystemPromptBuilder().with_tool_usage(
+    TOOL_USAGE_CODING_TEMPLATE
+).with_guidelines([
+    "Understand before modifying: Always read and understand code before making changes",
+    "Incremental changes: Make small, focused changes rather than large rewrites",
+    "Verify changes: Run tests or validation after modifications",
+    "Explain reasoning: Briefly explain your approach when making non-trivial changes",
+    "Preserve style: Match existing code style and patterns",
+    "Handle errors gracefully: If something fails, diagnose and recover",
+]).build()
 
 
 class CodingPromptContributor(PromptContributorProtocol):

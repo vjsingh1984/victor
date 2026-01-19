@@ -57,7 +57,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from statistics import mean, median, quantiles
+from statistics import mean, median, quantiles, StatisticsError
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
@@ -315,11 +315,19 @@ class Histogram(Metric):
         with self._lock:
             if not self._values:
                 return None
+            if len(self._values) == 1:
+                return self._values[0]
             if p == 50:
                 return median(self._values)
-            q = quantiles(self._values, n=100)
-            idx = max(0, min(int(p) - 1, len(q) - 1))
-            return q[idx]
+            try:
+                q = quantiles(self._values, n=100)
+                idx = max(0, min(int(p) - 1, len(q) - 1))
+                return q[idx]
+            except StatisticsError:
+                # Fall back to simple interpolation if quantiles fails
+                sorted_values = sorted(self._values)
+                idx = int((p / 100) * (len(sorted_values) - 1))
+                return sorted_values[max(0, min(idx, len(sorted_values) - 1))]
 
     def collect(self) -> Dict[str, Any]:
         """Collect histogram data."""

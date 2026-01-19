@@ -51,12 +51,26 @@ Usage:
         cache.put_query(key, tools)
 """
 
+from victor.tools.caches.adaptive_cache import (
+    AdaptiveMetrics,
+    AdaptiveLRUCache,
+)
 from victor.tools.caches.cache_keys import (
     CacheKeyGenerator,
     calculate_tools_hash,
     generate_context_key,
     generate_query_key,
     get_cache_key_generator,
+)
+from victor.tools.caches.multi_level_cache import (
+    CacheEntry,
+    LevelMetrics,
+    MultiLevelCache,
+)
+from victor.tools.caches.predictive_warmer import (
+    PredictionResult,
+    PredictiveCacheWarmer,
+    QueryPattern,
 )
 from victor.tools.caches.selection_cache import (
     CachedSelection,
@@ -79,4 +93,13 @@ __all__ = [
     "invalidate_tool_selection_cache",
     "CachedSelection",
     "CacheMetrics",
+    # Advanced optimization
+    "AdaptiveMetrics",
+    "AdaptiveLRUCache",
+    "PredictionResult",
+    "PredictiveCacheWarmer",
+    "QueryPattern",
+    "CacheEntry",
+    "LevelMetrics",
+    "MultiLevelCache",
 ]

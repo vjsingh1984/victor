@@ -83,6 +83,12 @@ from victor.core.verticals.vertical_loader import (
     get_active_vertical,
     get_vertical_extensions,
 )
+from victor.core.verticals.lazy_extensions import (
+    ExtensionLoadTrigger,
+    LazyVerticalExtensions,
+    create_lazy_extensions,
+    get_extension_load_trigger,
+)
 
 # Layer boundary enforcement: moved from victor.agent.vertical_context
 from victor.core.verticals.context import (
@@ -137,6 +143,11 @@ __all__ = [
     "load_vertical",
     "get_active_vertical",
     "get_vertical_extensions",
+    # Lazy extensions
+    "ExtensionLoadTrigger",
+    "LazyVerticalExtensions",
+    "create_lazy_extensions",
+    "get_extension_load_trigger",
     # Helper functions
     "get_vertical",
     "list_verticals",

@@ -20,6 +20,9 @@ caching, and metrics collection.
 
 All middleware implementations are consolidated in framework.py and
 re-exported here for convenience.
+
+Common safety rule factory functions are available in common_middleware.py
+for use across all verticals.
 """
 
 # Export all middleware from framework.py (consolidated implementation)
@@ -51,6 +54,30 @@ from victor.framework.middleware.builder import (
     MiddlewareProtocol,
 )
 
+# Export common safety rule factory functions
+from victor.framework.middleware.common_middleware import (
+    # Git safety
+    create_git_safety_rules,
+    # File operations
+    create_file_operation_safety_rules,
+    # DevOps infrastructure
+    create_deployment_safety_rules,
+    create_container_safety_rules,
+    create_infrastructure_safety_rules,
+    # Data privacy
+    create_pii_safety_rules,
+    # Research
+    create_source_credibility_safety_rules,
+    create_content_quality_safety_rules,
+    # RAG
+    create_bulk_operation_safety_rules,
+    create_ingestion_safety_rules,
+    # Data analysis
+    create_data_export_safety_rules,
+    # Convenience
+    create_all_common_safety_rules,
+)
+
 __all__ = [
     # Middleware implementations (all from framework.py)
     "ValidationMiddleware",
@@ -76,4 +103,17 @@ __all__ = [
     "MiddlewareBuilder",
     "MiddlewareChain",
     "MiddlewareProtocol",
+    # Common safety rule factory functions
+    "create_git_safety_rules",
+    "create_file_operation_safety_rules",
+    "create_deployment_safety_rules",
+    "create_container_safety_rules",
+    "create_infrastructure_safety_rules",
+    "create_pii_safety_rules",
+    "create_source_credibility_safety_rules",
+    "create_content_quality_safety_rules",
+    "create_bulk_operation_safety_rules",
+    "create_ingestion_safety_rules",
+    "create_data_export_safety_rules",
+    "create_all_common_safety_rules",
 ]

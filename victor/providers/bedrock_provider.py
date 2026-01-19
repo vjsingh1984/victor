@@ -210,8 +210,8 @@ class BedrockProvider(BaseProvider):
         """Get or create boto3 Bedrock runtime client."""
         if self._runtime_client is None:
             try:
-                import boto3
-                from botocore.config import Config
+                import boto3  # type: ignore
+                from botocore.config import Config  # type: ignore
 
                 config = Config(
                     read_timeout=self.timeout,

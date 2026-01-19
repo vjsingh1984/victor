@@ -321,7 +321,7 @@ class S3Service(ServiceLifecycle):
         logger.info(f"Initializing S3 service: {config.name}")
 
         try:
-            import aioboto3
+            import aioboto3  # type: ignore
 
             session = aioboto3.Session(
                 aws_access_key_id=config.config.get("aws_access_key_id"),

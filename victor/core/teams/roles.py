@@ -27,7 +27,7 @@ from __future__ import annotations
 from enum import Enum
 
 
-class SubAgentRole(Enum):
+class SubAgentRole(str, Enum):
     """Role specialization for sub-agents.
 
     Each role has specific capabilities and constraints:

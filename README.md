@@ -27,7 +27,18 @@
 - **Provider Switching** - Change models mid-conversation without losing context
 - **Multi-Provider Workflows** - Use different providers for optimal cost/quality balance
 - **Plugin System** - Extend workflow compilation with custom sources (JSON, S3, databases)
-- **Coordinator Architecture** - Modular, testable orchestrator design (experimental)
+
+### 🎉 New in 0.5.1
+
+- **92.13% Test Coverage** - 1,149 comprehensive test cases with 100% pass rate
+- **Protocol-Based Architecture** - 98 protocols for loose coupling and testability
+- **Dependency Injection** - 55+ services in ServiceContainer for clean dependency management
+- **Event-Driven Architecture** - 5 pluggable event backends (In-Memory, Kafka, SQS, RabbitMQ, Redis)
+- **20 Specialized Coordinators** - Single Responsibility Principle for maintainability
+- **Vertical Template System** - YAML-first configuration (8x faster vertical creation)
+- **Universal Registry** - Type-safe, thread-safe entity management
+
+**See [CHANGELOG_0.5.1](docs/CHANGELOG_0.5.1.md) for complete release notes.**
 
 ## At a glance
 
@@ -275,12 +286,31 @@ result = await compiled.invoke({"query": "AI trends 2025"})
 
 ## Documentation
 
-- [Getting Started](docs/getting-started/)
+### Quick Links
+
+**New Developers**:
+- [Developer Onboarding Guide](docs/DEVELOPER_ONBOARDING.md) - Start here!
+- [CLAUDE.md](CLAUDE.md) - Project instructions and quick reference
+
+**Architecture**:
+- [Architecture Overview](ARCHITECTURE.md) - System overview and components
+- [Refactoring Overview](docs/architecture/REFACTORING_OVERVIEW.md) - Architectural improvements
+- [Best Practices](docs/architecture/BEST_PRACTICES.md) - Usage patterns
+- [Migration Guides](docs/architecture/MIGRATION_GUIDES.md) - How to migrate code
+
+**Initiative Documentation**:
+- [Executive Summary](docs/INITIATIVE_EXECUTIVE_SUMMARY.md) - Business value and ROI
+- [Technical Summary](docs/INITIATIVE_TECHNICAL_SUMMARY.md) - Detailed technical changes
+- [Changelog 0.5.1](docs/CHANGELOG_0.5.1.md) - Complete release notes
+
+### Detailed Documentation
+
+- [Getting Started](docs/getting-started/) - Installation and first run
 - [Quick Start Guides](docs/quickstart/)
   - [Multi-Provider Workflows](docs/quickstart/multi_provider_quickstart.md)
   - [Plugin Development](docs/quickstart/plugin_development_quickstart.md)
   - [Coordinator Mode](docs/quickstart/coordinator_mode_quickstart.md)
-- [User Guide](docs/user-guide/)
+- [User Guide](docs/user-guide/) - Daily usage
 - [Features](docs/features/)
   - [Multi-Provider Workflows](docs/features/multi_provider_workflows.md)
   - [Plugin Development](docs/features/plugin_development.md)

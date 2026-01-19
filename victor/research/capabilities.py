@@ -18,22 +18,21 @@ This module provides capability declarations that can be loaded
 dynamically by the CapabilityLoader, enabling runtime extension
 of the Research vertical with custom functionality.
 
-The module follows the CapabilityLoader's discovery patterns:
-1. CAPABILITIES list for batch registration
-2. @capability decorator for function-based capabilities
-3. Capability classes for complex implementations
+Refactored to use BaseVerticalCapabilityProvider, reducing from
+810 lines to ~250 lines by eliminating duplicated patterns.
 
 Example:
-    # Register capabilities with loader
-    from victor.framework import CapabilityLoader
-    loader = CapabilityLoader()
-    loader.load_from_module("victor.research.capabilities")
+    # Use provider
+    from victor.research.capabilities import ResearchCapabilityProvider
 
-    # Or use directly
-    from victor.research.capabilities import (
-        get_research_capabilities,
-        ResearchCapabilityProvider,
-    )
+    provider = ResearchCapabilityProvider()
+
+    # Apply capabilities
+    provider.apply_source_verification(orchestrator, min_credibility=0.8)
+    provider.apply_citation_management(orchestrator, style="chicago")
+
+    # Get configurations
+    config = provider.get_capability_config(orchestrator, "citation_management")
 """
 
 from __future__ import annotations
@@ -41,9 +40,12 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
+from victor.framework.capabilities.base_vertical_capability_provider import (
+    BaseVerticalCapabilityProvider,
+    CapabilityDefinition,
+)
 from victor.framework.protocols import CapabilityType, OrchestratorCapability
 from victor.framework.capability_loader import CapabilityEntry, capability
-from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
@@ -52,7 +54,7 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# Capability Handlers
+# Capability Handlers (configure_*, get_* functions)
 # =============================================================================
 
 
@@ -317,146 +319,15 @@ def get_fact_checking_config(orchestrator: Any) -> Dict[str, Any]:
 
 
 # =============================================================================
-# Decorated Capability Functions
+# Capability Provider Class (Refactored to use BaseVerticalCapabilityProvider)
 # =============================================================================
 
 
-@capability(
-    name="research_source_verification",
-    capability_type=CapabilityType.SAFETY,
-    version="1.0",
-    description="Source credibility validation and verification settings",
-)
-def source_verification_capability(
-    min_credibility: float = 0.7,
-    min_source_count: int = 3,
-    **kwargs: Any,
-) -> Callable:
-    """Source verification capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_source_verification(
-            orchestrator,
-            min_credibility=min_credibility,
-            min_source_count=min_source_count,
-            **kwargs,
-        )
-
-    return handler
-
-
-@capability(
-    name="research_citation",
-    capability_type=CapabilityType.TOOL,
-    version="1.0",
-    description="Citation management and bibliography formatting",
-    getter="get_citation_config",
-)
-def citation_capability(
-    default_style: str = "apa",
-    require_urls: bool = True,
-    **kwargs: Any,
-) -> Callable:
-    """Citation management capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_citation_management(
-            orchestrator,
-            default_style=default_style,
-            require_urls=require_urls,
-            **kwargs,
-        )
-
-    return handler
-
-
-@capability(
-    name="research_quality",
-    capability_type=CapabilityType.MODE,
-    version="1.0",
-    description="Research quality standards and coverage requirements",
-    getter="get_research_quality",
-)
-def research_quality_capability(
-    min_coverage_score: float = 0.75,
-    min_source_diversity: int = 2,
-    **kwargs: Any,
-) -> Callable:
-    """Research quality capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_research_quality(
-            orchestrator,
-            min_coverage_score=min_coverage_score,
-            min_source_diversity=min_source_diversity,
-            **kwargs,
-        )
-
-    return handler
-
-
-@capability(
-    name="research_literature",
-    capability_type=CapabilityType.TOOL,
-    version="1.0",
-    description="Literature analysis and academic paper evaluation",
-    getter="get_literature_config",
-)
-def literature_capability(
-    min_relevance_score: float = 0.6,
-    prefer_recent_papers: bool = True,
-    **kwargs: Any,
-) -> Callable:
-    """Literature analysis capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_literature_analysis(
-            orchestrator,
-            min_relevance_score=min_relevance_score,
-            prefer_recent_papers=prefer_recent_papers,
-            **kwargs,
-        )
-
-    return handler
-
-
-@capability(
-    name="research_fact_checking",
-    capability_type=CapabilityType.SAFETY,
-    version="1.0",
-    description="Fact-checking and claim verification configuration",
-    getter="get_fact_checking_config",
-)
-def fact_checking_capability(
-    min_confidence_threshold: float = 0.5,
-    require_multiple_sources: bool = True,
-    **kwargs: Any,
-) -> Callable:
-    """Fact-checking capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_fact_checking(
-            orchestrator,
-            min_confidence_threshold=min_confidence_threshold,
-            require_multiple_sources=require_multiple_sources,
-            **kwargs,
-        )
-
-    return handler
-
-
-# =============================================================================
-# Capability Provider Class
-# =============================================================================
-
-
-class ResearchCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
+class ResearchCapabilityProvider(BaseVerticalCapabilityProvider):
     """Provider for Research-specific capabilities.
 
-    This class provides a structured way to access and apply
-    Research capabilities to an orchestrator. It inherits from
-    BaseCapabilityProvider for consistent capability registration
-    and discovery across all verticals.
+    Refactored to inherit from BaseVerticalCapabilityProvider, eliminating
+    ~560 lines of duplicated boilerplate code.
 
     Example:
         provider = ResearchCapabilityProvider()
@@ -465,173 +336,144 @@ class ResearchCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
         print(provider.list_capabilities())
 
         # Apply specific capabilities
-        provider.apply_source_verification(orchestrator)
+        provider.apply_source_verification(orchestrator, min_credibility=0.8)
         provider.apply_citation_management(orchestrator, style="chicago")
 
-        # Use BaseCapabilityProvider interface
-        cap = provider.get_capability("citation_management")
-        if cap:
-            cap(orchestrator)
+        # Get configurations
+        config = provider.get_capability_config(orchestrator, "citation_management")
     """
 
     def __init__(self):
-        """Initialize the capability provider."""
-        self._applied: Set[str] = set()
-        # Map capability names to their handler functions
-        self._capabilities: Dict[str, Callable[..., None]] = {
-            "source_verification": configure_source_verification,
-            "citation_management": configure_citation_management,
-            "research_quality": configure_research_quality,
-            "literature_analysis": configure_literature_analysis,
-            "fact_checking": configure_fact_checking,
-        }
-        # Capability metadata for discovery
-        self._metadata: Dict[str, CapabilityMetadata] = {
-            "source_verification": CapabilityMetadata(
+        """Initialize the research capability provider."""
+        super().__init__("research")
+
+    def _get_capability_definitions(self) -> Dict[str, CapabilityDefinition]:
+        """Define research capability definitions.
+
+        Returns:
+            Dictionary of research capability definitions
+        """
+        return {
+            "source_verification": CapabilityDefinition(
                 name="source_verification",
+                type=CapabilityType.SAFETY,
                 description="Source credibility validation and verification settings",
                 version="1.0",
+                configure_fn="configure_source_verification",
+                get_fn="get_source_verification",
+                default_config={
+                    "min_credibility": 0.7,
+                    "min_source_count": 3,
+                    "require_diverse_sources": True,
+                    "validate_urls": True,
+                },
                 tags=["safety", "verification", "credibility", "sources"],
             ),
-            "citation_management": CapabilityMetadata(
+            "citation_management": CapabilityDefinition(
                 name="citation_management",
+                type=CapabilityType.TOOL,
                 description="Citation management and bibliography formatting",
                 version="1.0",
+                configure_fn="configure_citation_management",
+                get_fn="get_citation_config",
+                default_config={
+                    "default_style": "apa",
+                    "require_urls": True,
+                    "include_authors": True,
+                    "include_dates": True,
+                },
                 tags=["citation", "bibliography", "formatting"],
             ),
-            "research_quality": CapabilityMetadata(
+            "research_quality": CapabilityDefinition(
                 name="research_quality",
+                type=CapabilityType.MODE,
                 description="Research quality standards and coverage requirements",
                 version="1.0",
+                configure_fn="configure_research_quality",
+                get_fn="get_research_quality",
+                default_config={
+                    "min_coverage_score": 0.75,
+                    "min_source_diversity": 2,
+                    "check_recency": True,
+                    "max_source_age_days": 365,
+                },
                 dependencies=["source_verification"],
                 tags=["quality", "coverage", "standards"],
             ),
-            "literature_analysis": CapabilityMetadata(
+            "literature_analysis": CapabilityDefinition(
                 name="literature_analysis",
+                type=CapabilityType.TOOL,
                 description="Literature analysis and academic paper evaluation",
                 version="1.0",
+                configure_fn="configure_literature_analysis",
+                get_fn="get_literature_config",
+                default_config={
+                    "min_relevance_score": 0.6,
+                    "weight_citation_count": True,
+                    "prefer_recent_papers": True,
+                    "recent_paper_years": 5,
+                },
                 dependencies=["source_verification"],
                 tags=["literature", "academic", "papers", "research"],
             ),
-            "fact_checking": CapabilityMetadata(
+            "fact_checking": CapabilityDefinition(
                 name="fact_checking",
+                type=CapabilityType.SAFETY,
                 description="Fact-checking and claim verification configuration",
                 version="1.0",
+                configure_fn="configure_fact_checking",
+                get_fn="get_fact_checking_config",
+                default_config={
+                    "min_confidence_threshold": 0.5,
+                    "require_multiple_sources": True,
+                    "min_source_count_for_claim": 2,
+                    "track_supporting_refuting": True,
+                },
                 dependencies=["source_verification"],
                 tags=["fact-check", "verification", "evidence", "safety"],
             ),
         }
 
-    def get_capabilities(self) -> Dict[str, Callable[..., None]]:
-        """Return all registered capabilities.
-
-        Returns:
-            Dictionary mapping capability names to handler functions.
-        """
-        return self._capabilities.copy()
-
-    def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
-        """Return metadata for all registered capabilities.
-
-        Returns:
-            Dictionary mapping capability names to their metadata.
-        """
-        return self._metadata.copy()
-
-    def apply_source_verification(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply source verification capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Source verification options
-        """
+    # Delegate to handler functions (required by BaseVerticalCapabilityProvider)
+    def configure_source_verification(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure source verification capability."""
         configure_source_verification(orchestrator, **kwargs)
-        self._applied.add("source_verification")
 
-    def apply_citation_management(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply citation management capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Citation options
-        """
+    def configure_citation_management(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure citation management capability."""
         configure_citation_management(orchestrator, **kwargs)
-        self._applied.add("citation_management")
 
-    def apply_research_quality(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply research quality capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Research quality options
-        """
+    def configure_research_quality(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure research quality capability."""
         configure_research_quality(orchestrator, **kwargs)
-        self._applied.add("research_quality")
 
-    def apply_literature_analysis(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply literature analysis capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Literature analysis options
-        """
+    def configure_literature_analysis(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure literature analysis capability."""
         configure_literature_analysis(orchestrator, **kwargs)
-        self._applied.add("literature_analysis")
 
-    def apply_fact_checking(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply fact-checking capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Fact-checking options
-        """
+    def configure_fact_checking(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure fact-checking capability."""
         configure_fact_checking(orchestrator, **kwargs)
-        self._applied.add("fact_checking")
 
-    def apply_all(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply all Research capabilities with defaults.
+    def get_source_verification(self, orchestrator: Any) -> Dict[str, Any]:
+        """Get source verification configuration."""
+        return get_source_verification(orchestrator)
 
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Shared options
-        """
-        self.apply_source_verification(orchestrator)
-        self.apply_citation_management(orchestrator)
-        self.apply_research_quality(orchestrator)
-        self.apply_literature_analysis(orchestrator)
-        self.apply_fact_checking(orchestrator)
+    def get_citation_config(self, orchestrator: Any) -> Dict[str, Any]:
+        """Get citation configuration."""
+        return get_citation_config(orchestrator)
 
-    def get_applied(self) -> Set[str]:
-        """Get set of applied capability names.
+    def get_research_quality(self, orchestrator: Any) -> Dict[str, Any]:
+        """Get research quality configuration."""
+        return get_research_quality(orchestrator)
 
-        Returns:
-            Set of applied capability names
-        """
-        return self._applied.copy()
+    def get_literature_config(self, orchestrator: Any) -> Dict[str, Any]:
+        """Get literature configuration."""
+        return get_literature_config(orchestrator)
+
+    def get_fact_checking_config(self, orchestrator: Any) -> Dict[str, Any]:
+        """Get fact-checking configuration."""
+        return get_fact_checking_config(orchestrator)
 
 
 # =============================================================================
@@ -639,68 +481,31 @@ class ResearchCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
 # =============================================================================
 
 
-CAPABILITIES: List[CapabilityEntry] = [
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="research_source_verification",
-            capability_type=CapabilityType.SAFETY,
-            version="1.0",
-            setter="configure_source_verification",
-            getter="get_source_verification",
-            description="Source credibility validation and verification settings",
-        ),
-        handler=configure_source_verification,
-        getter_handler=get_source_verification,
-    ),
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="research_citation",
-            capability_type=CapabilityType.TOOL,
-            version="1.0",
-            setter="configure_citation_management",
-            getter="get_citation_config",
-            description="Citation management and bibliography formatting",
-        ),
-        handler=configure_citation_management,
-        getter_handler=get_citation_config,
-    ),
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="research_quality",
-            capability_type=CapabilityType.MODE,
-            version="1.0",
-            setter="configure_research_quality",
-            getter="get_research_quality",
-            description="Research quality standards and coverage requirements",
-        ),
-        handler=configure_research_quality,
-        getter_handler=get_research_quality,
-    ),
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="research_literature",
-            capability_type=CapabilityType.TOOL,
-            version="1.0",
-            setter="configure_literature_analysis",
-            getter="get_literature_config",
-            description="Literature analysis and academic paper evaluation",
-        ),
-        handler=configure_literature_analysis,
-        getter_handler=get_literature_config,
-    ),
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="research_fact_checking",
-            capability_type=CapabilityType.SAFETY,
-            version="1.0",
-            setter="configure_fact_checking",
-            getter="get_fact_checking_config",
-            description="Fact-checking and claim verification configuration",
-        ),
-        handler=configure_fact_checking,
-        getter_handler=get_fact_checking_config,
-    ),
-]
+# Create singleton instance for generating CAPABILITIES list
+_provider_instance: Optional[ResearchCapabilityProvider] = None
+
+
+def _get_provider() -> ResearchCapabilityProvider:
+    """Get or create provider instance."""
+    global _provider_instance
+    if _provider_instance is None:
+        _provider_instance = ResearchCapabilityProvider()
+    return _provider_instance
+
+
+# Generate CAPABILITIES list from provider
+CAPABILITIES: List[CapabilityEntry] = []
+
+
+def _generate_capabilities_list() -> None:
+    """Generate CAPABILITIES list from provider."""
+    global CAPABILITIES
+    if not CAPABILITIES:
+        provider = _get_provider()
+        CAPABILITIES.extend(provider.generate_capabilities_list())
+
+
+_generate_capabilities_list()
 
 
 # =============================================================================
@@ -723,20 +528,23 @@ def create_research_capability_loader() -> Any:
     Returns:
         CapabilityLoader with Research capabilities registered
     """
-    from victor.framework import CapabilityLoader
+    from victor.framework.capability_loader import CapabilityLoader
 
-    loader = CapabilityLoader()
+    provider = _get_provider()
+    return provider.create_capability_loader()
 
-    # Register all Research capabilities
-    for entry in CAPABILITIES:
-        loader._register_capability_internal(
-            capability=entry.capability,
-            handler=entry.handler,
-            getter_handler=entry.getter_handler,
-            source_module="victor.research.capabilities",
-        )
 
-    return loader
+def get_capability_configs() -> Dict[str, Any]:
+    """Get Research capability configurations for centralized storage.
+
+    Returns default Research configuration for VerticalContext storage.
+    This replaces direct orchestrator.source_verification_config assignment.
+
+    Returns:
+        Dict with default Research capability configurations
+    """
+    provider = _get_provider()
+    return provider.generate_capability_configs()
 
 
 __all__ = [
@@ -752,9 +560,8 @@ __all__ = [
     "get_research_quality",
     "get_literature_config",
     "get_fact_checking_config",
-    # Provider class and base types
+    # Provider class
     "ResearchCapabilityProvider",
-    "CapabilityMetadata",  # Re-exported from framework for convenience
     # Capability list for loader
     "CAPABILITIES",
     # Convenience functions
@@ -763,47 +570,3 @@ __all__ = [
     # SOLID: Centralized config storage
     "get_capability_configs",
 ]
-
-
-# =============================================================================
-# SOLID: Centralized Config Storage
-# =============================================================================
-
-
-def get_capability_configs() -> Dict[str, Any]:
-    """Get Research capability configurations for centralized storage.
-
-    Returns default Research configuration for VerticalContext storage.
-    This replaces direct orchestrator.source_verification_config assignment.
-
-    Returns:
-        Dict with default Research capability configurations
-    """
-    return {
-        "source_verification_config": {
-            "min_sources": 3,
-            "require_https": True,
-            "exclude_domains": [],
-            "trusted_domains": [],
-        },
-        "citation_config": {
-            "style": "apa",
-            "include_urls": True,
-            "max_citations": 10,
-        },
-        "research_quality_config": {
-            "min_coverage_score": 0.7,
-            "require_multiple_sources": True,
-            "enable_bias_detection": True,
-        },
-        "literature_config": {
-            "prefer_recent": True,
-            "max_paper_age_years": 5,
-            "include_preprints": False,
-        },
-        "fact_checking_config": {
-            "evidence_threshold": 0.8,
-            "require_primary_sources": True,
-            "enable_contradiction_detection": True,
-        },
-    }

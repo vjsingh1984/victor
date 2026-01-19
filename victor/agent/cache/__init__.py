@@ -27,6 +27,8 @@ This package provides hierarchical caching for tool results with:
 from victor.agent.cache.dependency_extractor import DependencyExtractor
 from victor.agent.cache.dependency_graph import ToolDependencyGraph
 from victor.agent.cache.file_watcher import FileWatcher, FileChangeHandler
+from victor.agent.cache.indexed_lru_cache import IndexedLRUCache
+from victor.agent.cache.lazy_invalidation import LazyInvalidationCache
 from victor.agent.cache.tool_cache_manager import (
     ToolCacheManager,
     CacheNamespace,
@@ -44,4 +46,7 @@ __all__ = [
     "FileChangeHandler",
     # Dependency extraction
     "DependencyExtractor",
+    # Performance-optimized caches
+    "IndexedLRUCache",
+    "LazyInvalidationCache",
 ]

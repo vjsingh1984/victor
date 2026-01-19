@@ -137,6 +137,32 @@ def chat(
         "--endpoint",
         help="Override base URL for local providers (ollama, lmstudio, vllm).",
     ),
+    # Provider pool options
+    pool: bool = typer.Option(
+        False,
+        "--pool",
+        help="Enable provider pool for load balancing across multiple provider instances.",
+    ),
+    pool_size: int = typer.Option(
+        3,
+        "--pool-size",
+        help="Maximum number of provider instances in the pool (1-10).",
+    ),
+    pool_load_balancer: str = typer.Option(
+        "adaptive",
+        "--pool-load-balancer",
+        help="Load balancing strategy: round_robin, least_connections, adaptive, random.",
+    ),
+    pool_enable_warmup: bool = typer.Option(
+        True,
+        "--pool-warmup/--no-pool-warmup",
+        help="Warm up provider connections to reduce first-request latency.",
+    ),
+    pool_health_check_interval: int = typer.Option(
+        30,
+        "--pool-health-check-interval",
+        help="Health check interval in seconds (5-300).",
+    ),
     input_file: Optional[str] = typer.Option(
         None,
         "--input-file",
@@ -393,6 +419,27 @@ def chat(
             settings.load_profiles = lambda: {profile: override_profile}  # type: ignore[attr-defined]
             settings.default_provider = provider
             settings.default_model = model
+
+        # Apply provider pool settings
+        if pool:
+            settings.enable_provider_pool = True
+            console.print(
+                f"[bold green]Provider pool enabled[/bold green] "
+                f"(size={pool_size}, load_balancer={pool_load_balancer})"
+            )
+
+            # Apply pool settings
+            settings.pool_size = pool_size
+            settings.pool_load_balancer = pool_load_balancer
+            settings.pool_enable_warmup = pool_enable_warmup
+            settings.pool_health_check_interval = pool_health_check_interval
+
+            # Log pool configuration in verbose mode
+            if log_level and log_level.upper() == "DEBUG":
+                console.print(f"  Pool size: {pool_size}")
+                console.print(f"  Load balancer: {pool_load_balancer}")
+                console.print(f"  Warmup: {pool_enable_warmup}")
+                console.print(f"  Health check interval: {pool_health_check_interval}s")
 
         if actual_message:
             asyncio.run(

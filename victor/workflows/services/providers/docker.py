@@ -48,9 +48,9 @@ logger = logging.getLogger(__name__)
 
 # Optional Docker SDK import
 try:
-    import docker
-    from docker.errors import APIError, ContainerError, ImageNotFound, NotFound
-    from docker.models.containers import Container
+    import docker  # type: ignore
+    from docker.errors import APIError, ContainerError, ImageNotFound, NotFound  # type: ignore
+    from docker.models.containers import Container  # type: ignore
 
     DOCKER_AVAILABLE = True
 except ImportError:

@@ -180,14 +180,14 @@ class TestResearchVerticalCapabilities:
         orchestrator = MockOrchestrator()
 
         # Apply source verification capability
-        cap_provider.apply_source_verification(orchestrator, min_credibility=0.8)
+        cap_provider.configure_source_verification(orchestrator, min_credibility=0.8)
 
         assert orchestrator.source_verification_config is not None
         assert orchestrator.source_verification_config["min_credibility"] == 0.8
         assert orchestrator.source_verification_config["min_source_count"] == 3
 
         # Apply citation management
-        cap_provider.apply_citation_management(orchestrator, default_style="chicago")
+        cap_provider.configure_citation_management(orchestrator, default_style="chicago")
 
         assert orchestrator.citation_config is not None
         assert orchestrator.citation_config["default_style"] == "chicago"
@@ -303,14 +303,14 @@ class TestDevOpsVerticalCapabilities:
         orchestrator = MockOrchestrator()
 
         # Apply deployment safety
-        cap_provider.apply_deployment_safety(orchestrator, require_approval_for_production=True)
+        cap_provider.configure_deployment_safety(orchestrator, require_approval_for_production=True)
 
         assert orchestrator.safety_config is not None
         assert "deployment" in orchestrator.safety_config
         assert orchestrator.safety_config["deployment"]["require_approval_for_production"] is True
 
         # Apply container settings
-        cap_provider.apply_container_settings(orchestrator, runtime="podman")
+        cap_provider.configure_container_settings(orchestrator, runtime="podman")
 
         assert orchestrator.container_config is not None
         assert orchestrator.container_config["runtime"] == "podman"
@@ -425,13 +425,13 @@ class TestDataAnalysisVerticalCapabilities:
         orchestrator = MockOrchestrator()
 
         # Apply data quality
-        cap_provider.apply_data_quality(orchestrator, min_completeness=0.95)
+        cap_provider.configure_data_quality(orchestrator, min_completeness=0.95)
 
         assert orchestrator.data_quality_config is not None
         assert orchestrator.data_quality_config["min_completeness"] == 0.95
 
         # Apply visualization style
-        cap_provider.apply_visualization_style(orchestrator, default_backend="plotly")
+        cap_provider.configure_visualization_style(orchestrator, default_backend="plotly")
 
         assert orchestrator.visualization_config is not None
         assert orchestrator.visualization_config["backend"] == "plotly"
@@ -518,13 +518,13 @@ class TestCodingVerticalCapabilities:
         orchestrator = MockOrchestrator()
 
         # Apply code style (this doesn't depend on CodingSafetyExtension)
-        cap_provider.apply_code_style(orchestrator, formatter="black")
+        cap_provider.configure_code_style(orchestrator, formatter="black")
 
         assert orchestrator.code_style is not None
         assert orchestrator.code_style["formatter"] == "black"
 
         # Apply test requirements
-        cap_provider.apply_test_requirements(orchestrator, min_coverage=0.8)
+        cap_provider.configure_test_requirements(orchestrator, min_coverage=0.8)
 
         assert orchestrator.test_config is not None
         assert orchestrator.test_config["min_coverage"] == 0.8
@@ -640,14 +640,14 @@ class TestRAGVerticalCapabilities:
         orchestrator = MockOrchestrator()
 
         # Apply indexing
-        cap_provider.apply_indexing(orchestrator, chunk_size=1024)
+        cap_provider.configure_indexing(orchestrator, chunk_size=1024)
 
         assert orchestrator.rag_config is not None
         assert "indexing" in orchestrator.rag_config
         assert orchestrator.rag_config["indexing"]["chunk_size"] == 1024
 
         # Apply retrieval
-        cap_provider.apply_retrieval(orchestrator, top_k=10)
+        cap_provider.configure_retrieval(orchestrator, top_k=10)
 
         assert "retrieval" in orchestrator.rag_config
         assert orchestrator.rag_config["retrieval"]["top_k"] == 10
@@ -782,7 +782,7 @@ class TestCapabilityProviderErrorHandling:
 
         # Should not raise exception - capabilities check hasattr
         try:
-            cap_provider.apply_source_verification(invalid_orch)
+            cap_provider.configure_source_verification(invalid_orch)
             # If no error, capability gracefully skipped application
         except Exception as e:
             # If error occurs, it should be informative
@@ -977,16 +977,16 @@ class TestCrossVerticalCapabilityIntegration:
 
         # Apply Research capabilities
         research_provider = ResearchCapabilityProvider()
-        research_provider.apply_source_verification(orchestrator)
-        research_provider.apply_citation_management(orchestrator)
+        research_provider.configure_source_verification(orchestrator)
+        research_provider.configure_citation_management(orchestrator)
 
         # Apply DevOps capabilities
         devops_provider = DevOpsCapabilityProvider()
-        devops_provider.apply_deployment_safety(orchestrator)
+        devops_provider.configure_deployment_safety(orchestrator)
 
         # Apply Coding capabilities (skip git_safety due to CodingSafetyExtension dependency)
         coding_provider = CodingCapabilityProvider()
-        coding_provider.apply_code_style(orchestrator)
+        coding_provider.configure_code_style(orchestrator)
 
         # Verify all capabilities were applied
         assert orchestrator.source_verification_config is not None

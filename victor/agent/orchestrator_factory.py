@@ -473,8 +473,20 @@ class OrchestratorFactory(ModeAwareMixin):
         """Get or create the DI container."""
         if self._container is None:
             from victor.core.bootstrap import ensure_bootstrapped
+            from victor.agent.protocols import ResponseSanitizerProtocol
 
             self._container = ensure_bootstrapped(self.settings)
+
+            # Verify orchestrator services are registered
+            # If ResponseSanitizer is not registered, bootstrapping was incomplete
+            if not self._container.is_registered(ResponseSanitizerProtocol):
+                # Need to re-bootstrap with orchestrator services
+                from victor.core.bootstrap import bootstrap_container
+                from victor.core.container import set_container
+
+                # Create a new fully-bootstrapped container
+                self._container = bootstrap_container(self.settings)
+
         return self._container
 
     def create_sanitizer(self) -> "ResponseSanitizer":
@@ -550,9 +562,14 @@ class OrchestratorFactory(ModeAwareMixin):
         Returns:
             PresentationProtocol implementation (EmojiPresentationAdapter by default)
         """
-        from victor.agent.presentation import PresentationProtocol
+        from victor.agent.presentation import PresentationProtocol, EmojiPresentationAdapter
 
-        return self.container.get(PresentationProtocol)
+        # Try to get from container, fallback to direct instantiation
+        adapter = self.container.get_optional(PresentationProtocol)
+        if adapter is None:
+            # Container not bootstrapped yet, create directly
+            adapter = EmojiPresentationAdapter()
+        return adapter
 
     # ==========================================================================
     # Coordinator Creation Methods (Phase 1.4)
@@ -1236,9 +1253,13 @@ class OrchestratorFactory(ModeAwareMixin):
             UnifiedTaskTracker instance configured with model exploration parameters
         """
         from victor.agent.protocols import TaskTrackerProtocol, ModeControllerProtocol
+        from victor.agent.unified_task_tracker import UnifiedTaskTracker
 
-        # Resolve from DI container (guaranteed to be registered)
-        unified_tracker = self.container.get(TaskTrackerProtocol)
+        # Resolve from DI container (might be scoped)
+        unified_tracker = self.container.get_optional(TaskTrackerProtocol)
+        if unified_tracker is None:
+            # Container not bootstrapped or not in scope, create directly
+            unified_tracker = UnifiedTaskTracker()
 
         # Apply model-specific exploration settings
         unified_tracker.set_model_exploration_settings(
@@ -1892,9 +1913,15 @@ class OrchestratorFactory(ModeAwareMixin):
             ConversationStateMachine instance
         """
         from victor.agent.protocols import ConversationStateMachineProtocol
+        from victor.agent.conversation_state import ConversationStateMachine
 
-        # Resolve from DI container (guaranteed to be registered)
-        return self.container.get(ConversationStateMachineProtocol)
+        # Try to resolve from DI container (might be scoped)
+        # Use get_optional since we're not in a scope yet
+        state_machine = self.container.get_optional(ConversationStateMachineProtocol)
+        if state_machine is None:
+            # Container not bootstrapped or not in scope, create directly
+            state_machine = ConversationStateMachine()
+        return state_machine
 
     def create_integration_config(self) -> Any:
         """Create intelligent pipeline integration configuration.
@@ -2222,6 +2249,120 @@ class OrchestratorFactory(ModeAwareMixin):
             manager.tool_adapter,
             manager.capabilities,
         )
+
+    async def create_provider_pool_if_enabled(
+        self,
+        base_provider: "BaseProvider",
+    ) -> tuple["BaseProvider", bool]:
+        """Create provider pool if enabled in settings.
+
+        Args:
+            base_provider: Base provider to wrap in pool
+
+        Returns:
+            Tuple of (provider or pool, is_pool_enabled)
+        """
+        from victor.providers.provider_pool import (
+            ProviderPool,
+            ProviderPoolConfig,
+            PoolStrategy,
+            create_provider_pool,
+        )
+        from victor.providers.load_balancer import LoadBalancerType
+        from victor.providers.health_monitor import HealthCheckConfig
+        from victor.providers.circuit_breaker import CircuitBreakerConfig
+
+        # Check if provider pool is enabled
+        if not getattr(self.settings, "enable_provider_pool", False):
+            logger.debug("Provider pool disabled, using single provider")
+            return base_provider, False
+
+        # For now, only support pooling when we have multiple endpoints
+        # This is a simplified implementation - full pooling would require
+        # creating multiple provider instances from different base URLs
+        provider_name = getattr(base_provider, "name", "unknown")
+
+        # Check if provider has multiple base URLs (for load balancing)
+        base_urls = getattr(self.settings, f"{provider_name}_base_urls", None)
+        if not base_urls or not isinstance(base_urls, list) or len(base_urls) <= 1:
+            logger.debug(
+                f"Provider pool enabled but {provider_name} has only one endpoint, "
+                "using single provider"
+            )
+            return base_provider, False
+
+        # Create pool configuration from settings
+        pool_config = ProviderPoolConfig(
+            pool_size=getattr(self.settings, "pool_size", 3),
+            min_instances=getattr(self.settings, "pool_min_instances", 1),
+            load_balancer=LoadBalancerType(
+                getattr(self.settings, "pool_load_balancer", "adaptive")
+            ),
+            pool_strategy=PoolStrategy.ACTIVE_ACTIVE,
+            enable_warmup=getattr(self.settings, "pool_enable_warmup", True),
+            warmup_concurrency=getattr(self.settings, "pool_warmup_concurrency", 3),
+            health_check_config=HealthCheckConfig(
+                check_interval_seconds=getattr(
+                    self.settings, "pool_health_check_interval", 30
+                ),
+            ),
+            circuit_breaker_config=CircuitBreakerConfig(),
+            max_retries=getattr(self.settings, "pool_max_retries", 3),
+        )
+
+        # Create provider instances from each base URL
+        providers = {}
+        for i, base_url in enumerate(base_urls[:pool_config.pool_size]):
+            # Create provider instance with specific base URL
+            provider_instance = await self._create_provider_for_url(
+                provider_name, base_url
+            )
+            provider_id = f"{provider_name}-{i}"
+            providers[provider_id] = provider_instance
+
+        # Create and initialize pool
+        logger.info(
+            f"Creating provider pool with {len(providers)} instances "
+            f"using {pool_config.load_balancer.value} load balancing"
+        )
+
+        pool = await create_provider_pool(
+            name=f"{provider_name}-pool",
+            providers=providers,
+            config=pool_config,
+        )
+
+        # Log pool stats
+        stats = pool.get_pool_stats()
+        logger.info(f"Provider pool stats: {stats}")
+
+        return pool, True
+
+    async def _create_provider_for_url(
+        self,
+        provider_name: str,
+        base_url: str,
+    ) -> "BaseProvider":
+        """Create a provider instance for a specific base URL.
+
+        Args:
+            provider_name: Name of the provider class
+            base_url: Base URL for this provider instance
+
+        Returns:
+            BaseProvider instance configured with the base URL
+        """
+        from victor.providers.registry import ProviderRegistry
+
+        # Get provider class
+        provider_class = ProviderRegistry.get_provider_class(provider_name)
+
+        # Create instance with base URL override
+        # This is a simplified approach - full implementation would
+        # need to handle provider-specific initialization
+        provider = provider_class(api_key=None, base_url=base_url)
+
+        return provider
 
     def create_tool_calling_matrix(self) -> tuple[Any, Any]:
         """Create ToolCallingMatrix for managing tool calling capabilities.

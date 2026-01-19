@@ -458,6 +458,7 @@ class TestErrorHandling:
     @pytest.mark.asyncio
     async def test_unpickleable_value_raises_error(self, connected_backend):
         """Test that unpickleable value raises appropriate error."""
+
         # Lambda functions are not pickle-able
         def _unpickleable(x):
             return x

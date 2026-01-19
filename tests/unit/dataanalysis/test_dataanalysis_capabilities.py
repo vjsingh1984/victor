@@ -299,12 +299,63 @@ class TestDataAnalysisCapabilityProvider:
 
         assert cap is None
 
-    def test_apply_data_quality(self, provider):
-        """Test apply_data_quality sets config and tracks application."""
+    def test_get_capability_definition(self, provider):
+        """Test get_capability_definition returns capability definition."""
+        definition = provider.get_capability_definition("data_quality")
+
+        assert definition is not None
+        assert definition.name == "data_quality"
+        assert definition.type.name == "MODE"
+        assert definition.configure_fn == "configure_data_quality"
+        assert definition.get_fn == "get_data_quality"
+
+    def test_apply_capability_by_name(self, provider):
+        """Test apply_capability applies capability by name."""
         orchestrator = MagicMock()
         orchestrator.data_quality_config = {}
 
-        provider.apply_data_quality(orchestrator)
+        provider.apply_capability(orchestrator, "data_quality")
+
+        assert orchestrator.data_quality_config["min_completeness"] == 0.9
+        assert "data_quality" in provider.get_applied()
+
+    def test_apply_capability_with_custom_config(self, provider):
+        """Test apply_capability merges custom config with defaults."""
+        orchestrator = MagicMock()
+        orchestrator.data_quality_config = {}
+
+        provider.apply_capability(orchestrator, "data_quality", min_completeness=0.95)
+
+        assert orchestrator.data_quality_config["min_completeness"] == 0.95
+        # Other defaults should still be present
+        assert orchestrator.data_quality_config["handle_missing"] == "impute"
+
+    def test_get_capability_config(self, provider):
+        """Test get_capability_config retrieves current config."""
+        orchestrator = MagicMock()
+        orchestrator.data_quality_config = {
+            "min_completeness": 0.95,
+            "max_outlier_ratio": 0.1,
+        }
+
+        config = provider.get_capability_config(orchestrator, "data_quality")
+
+        assert config["min_completeness"] == 0.95
+        assert config["max_outlier_ratio"] == 0.1
+
+    def test_get_default_config(self, provider):
+        """Test get_default_config returns default configuration."""
+        config = provider.get_default_config("data_quality")
+
+        assert config["min_completeness"] == 0.9
+        assert config["handle_missing"] == "impute"
+
+    def test_apply_data_quality(self, provider):
+        """Test apply_capability with data_quality sets config and tracks application."""
+        orchestrator = MagicMock()
+        orchestrator.data_quality_config = {}
+
+        provider.apply_capability(orchestrator, "data_quality")
 
         assert orchestrator.data_quality_config["min_completeness"] == 0.9
         assert "data_quality" in provider.get_applied()
@@ -327,6 +378,49 @@ class TestDataAnalysisCapabilityProvider:
         assert "statistical_analysis" in applied
         assert "ml_pipeline" in applied
         assert "data_privacy" in applied
+
+    def test_reset_applied(self, provider):
+        """Test reset_applied clears applied tracking."""
+        orchestrator = MagicMock()
+        orchestrator.data_quality_config = {}
+
+        provider.apply_capability(orchestrator, "data_quality")
+        assert len(provider.get_applied()) == 1
+
+        provider.reset_applied()
+        assert len(provider.get_applied()) == 0
+
+    def test_generate_capabilities_list(self, provider):
+        """Test generate_capabilities_list creates CapabilityEntry list."""
+        capabilities_list = provider.generate_capabilities_list()
+
+        assert len(capabilities_list) == 5
+        for entry in capabilities_list:
+            assert entry.capability is not None
+            assert entry.handler is not None
+            assert callable(entry.handler)
+
+    def test_generate_capability_configs(self, provider):
+        """Test generate_capability_configs creates config dict."""
+        configs = provider.generate_capability_configs()
+
+        assert "data_quality_config" in configs
+        assert "visualization_style_config" in configs
+        assert "statistical_analysis_config" in configs
+        assert "ml_pipeline_config" in configs
+        assert "data_privacy_config" in configs
+
+        # Verify default values are present
+        assert configs["data_quality_config"]["min_completeness"] == 0.9
+        assert configs["ml_pipeline_config"]["default_framework"] == "sklearn"
+
+    def test_create_capability_loader(self, provider):
+        """Test create_capability_loader creates configured loader."""
+        loader = provider.create_capability_loader()
+
+        assert loader is not None
+        # Loader should have capabilities registered
+        assert hasattr(loader, "_capabilities")
 
 
 class TestCAPABILITIESList:
@@ -359,6 +453,28 @@ class TestCAPABILITIESList:
 
         assert len(caps) == len(CAPABILITIES)
         assert caps is not CAPABILITIES  # Should be a copy
+
+
+class TestConvenienceFunctions:
+    """Tests for convenience functions."""
+
+    def test_get_capability_configs(self):
+        """Test get_capability_configs returns default configs."""
+        from victor.dataanalysis.capabilities import get_capability_configs
+
+        configs = get_capability_configs()
+
+        assert isinstance(configs, dict)
+        assert "data_quality_config" in configs
+        assert "ml_pipeline_config" in configs
+
+    def test_create_data_analysis_capability_loader(self):
+        """Test create_data_analysis_capability_loader creates loader."""
+        from victor.dataanalysis.capabilities import create_data_analysis_capability_loader
+
+        loader = create_data_analysis_capability_loader()
+
+        assert loader is not None
 
 
 class TestAssistantIntegration:

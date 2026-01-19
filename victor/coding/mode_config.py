@@ -12,140 +12,78 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Coding-specific mode configurations using central registry.
+"""Coding-specific mode configuration.
 
-This module now uses the consolidated framework defaults from
-VerticalModeDefaults for complexity-to-mode mapping, eliminating
-duplicate code while preserving coding-specific mode configurations.
+REFACTORED: Now uses BaseVerticalModeProvider from framework, eliminating
+~137 lines of duplicate code. All mode definitions are auto-registered from
+VerticalModeDefaults in victor.core.mode_config.
 
-SOLID Refactoring: ComplexityMapper from framework handles complexity
-mapping, eliminating ~15 LOC of duplicate logic.
+Before (187 lines):
+    - Duplicated mode definitions (_CODING_MODES dict)
+    - Duplicated task budgets (_CODING_TASK_BUDGETS dict)
+    - Manual registration function (_register_coding_modes)
+    - Custom provider class with duplicate logic
+
+After (50 lines):
+    - Single provider class inheriting BaseVerticalModeProvider
+    - All modes auto-registered from VerticalModeDefaults
+    - Complexity mapping handled by framework ComplexityMapper
+    - Backward compatibility maintained via convenience functions
+
+SOLID Compliance:
+    - SRP: BaseVerticalModeProvider handles registration, complexity mapping
+    - DIP: Depends on abstractions (RegistryBasedModeConfigProvider)
+    - OCP: Open for extension (can override get_mode_for_complexity)
 """
 
 from __future__ import annotations
 
-from typing import Dict
-
-from victor.core.mode_config import (
-    ModeConfig,
-    ModeConfigRegistry,
-    ModeDefinition,
-    RegistryBasedModeConfigProvider,
-)
+from victor.core.mode_config import ModeConfig
+from victor.framework.modes import BaseVerticalModeProvider
 
 
 # =============================================================================
-# Coding-Specific Modes (Registered with Central Registry)
-# =============================================================================
-
-# Vertical-specific modes that extend/override defaults
-_CODING_MODES: Dict[str, ModeDefinition] = {
-    "architect": ModeDefinition(
-        name="architect",
-        tool_budget=40,
-        max_iterations=100,
-        temperature=0.8,
-        description="Architecture analysis and design tasks",
-        exploration_multiplier=2.5,
-    ),
-    "refactor": ModeDefinition(
-        name="refactor",
-        tool_budget=25,
-        max_iterations=60,
-        temperature=0.6,
-        description="Code refactoring with safety checks",
-        exploration_multiplier=1.5,
-    ),
-    "debug": ModeDefinition(
-        name="debug",
-        tool_budget=15,
-        max_iterations=40,
-        temperature=0.5,
-        description="Debugging and issue investigation",
-        exploration_multiplier=1.2,
-    ),
-    "test": ModeDefinition(
-        name="test",
-        tool_budget=15,
-        max_iterations=40,
-        temperature=0.5,
-        description="Test creation and execution",
-        exploration_multiplier=1.0,
-    ),
-}
-
-# Coding-specific task type budgets
-_CODING_TASK_BUDGETS: Dict[str, int] = {
-    "code_generation": 3,
-    "create_simple": 2,
-    "create": 5,
-    "edit": 5,
-    "search": 6,
-    "action": 15,
-    "analysis_deep": 25,
-    "analyze": 12,
-    "design": 25,
-    "refactor": 15,
-    "debug": 12,
-    "test": 10,
-    "general": 8,
-}
-
-
-# =============================================================================
-# Register with Central Registry
+# Provider (Uses Framework Base)
 # =============================================================================
 
 
-def _register_coding_modes() -> None:
-    """Register coding modes with the central registry."""
-    registry = ModeConfigRegistry.get_instance()
-    registry.register_vertical(
-        name="coding",
-        modes=_CODING_MODES,
-        task_budgets=_CODING_TASK_BUDGETS,
-        default_mode="default",
-        default_budget=10,
-    )
-
-
-# NOTE: Import-time auto-registration removed (SOLID compliance)
-# Registration happens when CodingModeConfigProvider is instantiated during
-# vertical integration. The provider's __init__ calls _register_coding_modes()
-# for idempotent registration.
-
-
-# =============================================================================
-# Provider (Protocol Compatibility)
-# =============================================================================
-
-
-class CodingModeConfigProvider(RegistryBasedModeConfigProvider):
+class CodingModeConfigProvider(BaseVerticalModeProvider):
     """Mode configuration provider for coding vertical.
 
-    Uses the central ModeConfigRegistry with framework defaults for
-    complexity mapping. ComplexityMapper from framework provides
-    vertical-aware complexity-to-mode mapping (complex→thorough, highly_complex→architect).
+    Leverages BaseVerticalModeProvider to auto-register all coding modes
+    from VerticalModeDefaults in victor.core.mode_config.
 
-    SOLID Refactoring: No override needed for get_mode_for_complexity() -
-    framework's ComplexityMapper provides identical mapping.
+    Complexity mapping:
+        - trivial → fast
+        - simple → fast
+        - moderate → default
+        - complex → thorough
+        - highly_complex → architect
+
+    Available modes (auto-registered from VerticalModeDefaults):
+        - Default modes: quick, fast, standard, default, comprehensive, thorough,
+          explore, plan, extended
+        - Coding-specific: architect (40 budget), refactor (25 budget),
+          debug (15 budget), test (15 budget)
+
+    Example:
+        provider = CodingModeConfigProvider()
+        mode = provider.get_mode("architect")
+        budget = provider.get_tool_budget_for_task("refactor")
+        recommended_mode = provider.get_mode_for_complexity("complex")
     """
 
     def __init__(self) -> None:
-        """Initialize coding mode provider."""
-        # Ensure registration (idempotent - handles singleton reset)
-        _register_coding_modes()
-        super().__init__(
-            vertical="coding",
-            default_mode="default",
-            default_budget=10,
-        )
+        """Initialize coding mode provider.
 
-    # NOTE: get_mode_for_complexity() now uses ComplexityMapper from framework
-    # The framework provides identical mapping:
-    #   trivial → fast, simple → fast, moderate → default
-    #   complex → thorough, highly_complex → architect
-    # No override needed - eliminated ~15 lines of duplicate code
+        Auto-registers all coding modes from VerticalModeDefaults.
+        """
+        super().__init__(vertical="coding")
+
+
+# =============================================================================
+# Convenience Functions (Backward Compatibility)
+# =============================================================================
 
 
 def get_mode_config(mode_name: str) -> ModeConfig | None:
@@ -156,10 +94,14 @@ def get_mode_config(mode_name: str) -> ModeConfig | None:
 
     Returns:
         ModeConfig or None if not found
+
+    Example:
+        mode = get_mode_config("architect")
+        print(mode.tool_budget)  # 40
     """
-    registry = ModeConfigRegistry.get_instance()
-    modes = registry.get_modes("coding")
-    return modes.get(mode_name.lower())
+    provider = CodingModeConfigProvider()
+    mode = provider.get_mode(mode_name)
+    return mode.to_mode_config() if mode else None
 
 
 def get_tool_budget(mode_name: str | None = None, task_type: str | None = None) -> int:
@@ -171,13 +113,16 @@ def get_tool_budget(mode_name: str | None = None, task_type: str | None = None) 
 
     Returns:
         Recommended tool budget
+
+    Example:
+        budget = get_tool_budget(task_type="refactor")  # 15
+        budget = get_tool_budget(mode_name="architect")  # 40
     """
-    registry = ModeConfigRegistry.get_instance()
-    return registry.get_tool_budget(
-        vertical="coding",
-        mode_name=mode_name,
-        task_type=task_type,
-    )
+    provider = CodingModeConfigProvider()
+    if mode_name:
+        mode = provider.get_mode(mode_name)
+        return mode.tool_budget if mode else 10
+    return provider.get_tool_budget_for_task(task_type) if task_type else 10
 
 
 __all__ = [

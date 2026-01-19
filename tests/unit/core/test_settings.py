@@ -597,8 +597,13 @@ class TestSettingsExtra:
 
     def test_settings_semantic_tool_selection(self):
         """Test semantic tool selection settings."""
-        settings = Settings(use_semantic_tool_selection=True)
-        assert settings.use_semantic_tool_selection is True
+        # Test with new tool_selection_strategy parameter instead of deprecated use_semantic_tool_selection
+        settings = Settings(tool_selection_strategy="semantic")
+        assert settings.tool_selection_strategy == "semantic"
+
+        # Also test backward compatibility - use_semantic_tool_selection still works but auto-migrates
+        settings2 = Settings(use_semantic_tool_selection=True)
+        assert settings2.tool_selection_strategy == "semantic"
 
     def test_settings_airgapped_mode(self):
         """Test airgapped mode settings."""

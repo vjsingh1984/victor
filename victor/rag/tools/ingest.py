@@ -489,7 +489,7 @@ class RAGIngestTool(BaseTool):
     async def _read_pdf(self, path: Path) -> str:
         """Read text from PDF file."""
         try:
-            import pypdf
+            import pypdf  # type: ignore
 
             reader = pypdf.PdfReader(str(path))
             text_parts = []

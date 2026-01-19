@@ -138,16 +138,14 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
         # Check if table exists
         try:
-            existing_tables = self.db.table_names()
+            existing_tables = self.db.list_tables()
         except AttributeError:
             # Fallback for older LanceDB versions
             existing_tables = []
             try:
-                existing_tables = (
-                    self.db.list_tables().tables if hasattr(self.db, "list_tables") else []
-                )
+                existing_tables = self.db.table_names() if hasattr(self.db, "table_names") else []
             except Exception:
-                # If list_tables also fails, try to open table directly and catch exception
+                # If both fail, try to open table directly and catch exception
                 existing_tables = []
 
         if table_name not in existing_tables:

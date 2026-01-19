@@ -244,6 +244,9 @@ def create_deployment_safety_rules(
 ) -> None:
     """Register deployment-specific safety rules.
 
+    This function now delegates to the framework-level common middleware
+    to avoid code duplication across verticals.
+
     Args:
         enforcer: SafetyEnforcer to register rules with
         require_approval_for_production: Require approval for production deployments
@@ -259,45 +262,16 @@ def create_deployment_safety_rules(
             protected_environments=["production", "staging"]
         )
     """
-    protected = protected_environments or ["production", "prod", "staging"]
+    from victor.framework.middleware import create_deployment_safety_rules as framework_deployment_rules
 
-    if require_approval_for_production:
-        enforcer.add_rule(
-            SafetyRule(
-                name="deployment_require_approval",
-                description="Require approval for production deployments",
-                check_fn=lambda op: any(env in op.lower() for env in protected)
-                and any(cmd in op for cmd in ["deploy", "kubectl apply", "terraform apply"]),
-                level=SafetyLevel.HIGH,
-                allow_override=True,
-            )
-        )
-
-    if require_backup_before_deploy:
-        enforcer.add_rule(
-            SafetyRule(
-                name="deployment_require_backup",
-                description="Require backup before deployment to production",
-                check_fn=lambda op: any(env in op.lower() for env in protected)
-                and "deploy" in op.lower()
-                and "backup" not in op.lower(),
-                level=SafetyLevel.MEDIUM,
-                allow_override=True,
-            )
-        )
-
-    if enable_rollback:
-        enforcer.add_rule(
-            SafetyRule(
-                name="deployment_rollback_plan",
-                description="Warn if deployment doesn't include rollback plan",
-                check_fn=lambda op: any(env in op.lower() for env in protected)
-                and "deploy" in op.lower()
-                and "rollback" not in op.lower(),
-                level=SafetyLevel.LOW,  # Warn only
-                allow_override=True,
-            )
-        )
+    # Delegate to framework implementation
+    framework_deployment_rules(
+        enforcer,
+        require_approval_for_production=require_approval_for_production,
+        require_backup_before_deploy=require_backup_before_deploy,
+        protected_environments=protected_environments,
+        enable_rollback=enable_rollback,
+    )
 
 
 def create_container_safety_rules(
@@ -308,6 +282,9 @@ def create_container_safety_rules(
     require_health_checks: bool = False,
 ) -> None:
     """Register container-specific safety rules.
+
+    This function now delegates to the framework-level common middleware
+    to avoid code duplication across verticals.
 
     Args:
         enforcer: SafetyEnforcer to register rules with
@@ -323,45 +300,15 @@ def create_container_safety_rules(
             block_root_user=True
         )
     """
-    if block_privileged_containers:
-        enforcer.add_rule(
-            SafetyRule(
-                name="container_block_privileged",
-                description="Block privileged container creation",
-                check_fn=lambda op: "docker" in op.lower()
-                or "kubectl" in op.lower()
-                and "--privileged" in op
-                or "privileged: true" in op.lower(),
-                level=SafetyLevel.HIGH,
-                allow_override=False,
-            )
-        )
+    from victor.framework.middleware import create_container_safety_rules as framework_container_rules
 
-    if block_root_user:
-        enforcer.add_rule(
-            SafetyRule(
-                name="container_block_root",
-                description="Block containers running as root user",
-                check_fn=lambda op: ("docker" in op.lower() or "kubectl" in op.lower())
-                and ("user: 0" in op or "USER root" in op or "--user 0" in op),
-                level=SafetyLevel.HIGH,
-                allow_override=True,
-            )
-        )
-
-    if require_health_checks:
-        enforcer.add_rule(
-            SafetyRule(
-                name="container_require_healthcheck",
-                description="Require health checks in container definitions",
-                check_fn=lambda op: ("docker" in op.lower() or "kubernetes" in op.lower())
-                and "healthcheck" not in op.lower()
-                and "readinessProbe" not in op
-                and "livenessProbe" not in op,
-                level=SafetyLevel.LOW,  # Warn only
-                allow_override=True,
-            )
-        )
+    # Delegate to framework implementation
+    framework_container_rules(
+        enforcer,
+        block_privileged_containers=block_privileged_containers,
+        block_root_user=block_root_user,
+        require_health_checks=require_health_checks,
+    )
 
 
 def create_infrastructure_safety_rules(
@@ -372,6 +319,9 @@ def create_infrastructure_safety_rules(
     protected_resources: list[str] | None = None,
 ) -> None:
     """Register infrastructure-specific safety rules.
+
+    This function now delegates to the framework-level common middleware
+    to avoid code duplication across verticals.
 
     Args:
         enforcer: SafetyEnforcer to register rules with
@@ -387,51 +337,15 @@ def create_infrastructure_safety_rules(
             protected_resources=["database", "storage", "vpc", "load-balancer"]
         )
     """
-    protected = protected_resources or ["database", "storage", "vpc"]
+    from victor.framework.middleware import create_infrastructure_safety_rules as framework_infra_rules
 
-    if block_destructive_commands:
-        enforcer.add_rule(
-            SafetyRule(
-                name="infra_block_destructive",
-                description="Block destructive infrastructure commands",
-                check_fn=lambda op: any(
-                    cmd in op
-                    for cmd in [
-                        "terraform destroy",
-                        "kubectl delete",
-                        "helm uninstall",
-                        "aws cloudformation delete-stack",
-                        "gcloud deployment-manager delete",
-                    ]
-                ),
-                level=SafetyLevel.HIGH,
-                allow_override=False,
-            )
-        )
-
-        enforcer.add_rule(
-            SafetyRule(
-                name="infra_block_protected_resource_deletion",
-                description=f"Block deletion of protected resources: {', '.join(protected)}",
-                check_fn=lambda op: ("delete" in op.lower() or "destroy" in op.lower())
-                and any(resource in op.lower() for resource in protected),
-                level=SafetyLevel.HIGH,
-                allow_override=True,
-            )
-        )
-
-    if require_state_backup:
-        enforcer.add_rule(
-            SafetyRule(
-                name="infra_require_state_backup",
-                description="Require Terraform state backup before modification",
-                check_fn=lambda op: "terraform" in op.lower()
-                and any(cmd in op for cmd in ["apply", "destroy"])
-                and "backup" not in op.lower(),
-                level=SafetyLevel.MEDIUM,
-                allow_override=True,
-            )
-        )
+    # Delegate to framework implementation
+    framework_infra_rules(
+        enforcer,
+        block_destructive_commands=block_destructive_commands,
+        require_state_backup=require_state_backup,
+        protected_resources=protected_resources,
+    )
 
 
 def create_all_devops_safety_rules(

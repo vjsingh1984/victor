@@ -281,14 +281,14 @@ class TestDevOpsCapabilityProvider:
 
     def test_apply_deployment_safety(self, provider, orchestrator):
         """Test applying deployment safety capability."""
-        provider.apply_deployment_safety(orchestrator)
+        provider.configure_deployment_safety(orchestrator)
 
         assert "deployment_safety" in provider.get_applied()
         assert "deployment" in orchestrator.safety_config
 
     def test_apply_container_settings(self, provider, orchestrator):
         """Test applying container settings capability."""
-        provider.apply_container_settings(orchestrator, runtime="podman")
+        provider.configure_container_settings(orchestrator, runtime="podman")
 
         assert "container_settings" in provider.get_applied()
         assert orchestrator.container_config["runtime"] == "podman"

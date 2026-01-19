@@ -61,6 +61,13 @@ except ImportError:
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import PromptContributorProtocol
 
+# Import section types for composition
+# Note: Must import from specific modules, not the package __init__
+from victor.framework.prompt_sections.grounding import GroundingSection
+from victor.framework.prompt_sections.rules import RuleSection
+from victor.framework.prompt_sections.checklist import ChecklistSection
+from victor.framework.prompt_sections.vertical import VerticalPromptSection
+
 logger = logging.getLogger(__name__)
 
 
@@ -385,6 +392,185 @@ class PromptBuilder:
         self._custom_grounding = None
         return self
 
+    # =========================================================================
+    # Section Composition Methods (Phase 7)
+    # =========================================================================
+    # These methods provide typed composition using structured section classes
+
+    def add_grounding(self, content: str, priority: int = 10, **variables) -> Self:
+        """Add grounding section with variable substitution.
+
+        Grounding sections provide contextual information with support for
+        variable substitution using {variable} syntax.
+
+        Args:
+            content: Grounding content template with {variable} placeholders
+            priority: Ordering priority (lower = earlier). Default is 10.
+            **variables: Variable names and values for substitution
+
+        Returns:
+            Self for method chaining
+
+        Example:
+            builder.add_grounding(
+                "Project: {name}, Stage: {stage}",
+                project="Victor",
+                stage="development"
+            )
+        """
+        section = GroundingSection(
+            content=content,
+            priority=priority,
+            variables=variables,
+        )
+        self._sections[f"grounding_{id(section)}"] = PromptSection(
+            name=f"grounding_{id(section)}",
+            content=section.render(),
+            priority=priority,
+            enabled=True,
+            header="",  # No header for grounding
+        )
+        return self
+
+    def add_rules(self, rules: List[str], priority: int = 20) -> Self:
+        """Add rule section with behavioral guidelines.
+
+        Rules are rendered as a bulleted list in the final prompt.
+
+        Args:
+            rules: List of rule strings
+            priority: Ordering priority (lower = earlier). Default is 20.
+
+        Returns:
+            Self for method chaining
+
+        Example:
+            builder.add_rules([
+                "Always read files first",
+                "Verify changes",
+                "Write tests"
+            ])
+        """
+        section = RuleSection(rules=rules, priority=priority)
+        self._sections[f"rules_{id(section)}"] = PromptSection(
+            name=f"rules_{id(section)}",
+            content=section.render(),
+            priority=priority,
+            enabled=True,
+            header="## Rules\n",
+        )
+        return self
+
+    def add_checklist(self, checklist: List[str], priority: int = 30) -> Self:
+        """Add checklist section for verification.
+
+        Checklist items are rendered as Markdown checkboxes.
+
+        Args:
+            checklist: List of checklist item strings
+            priority: Ordering priority (lower = earlier). Default is 30.
+
+        Returns:
+            Self for method chaining
+
+        Example:
+            builder.add_checklist([
+                "Code compiles",
+                "Tests pass",
+                "Documentation updated"
+            ])
+        """
+        section = ChecklistSection(checklist=checklist, priority=priority)
+        self._sections[f"checklist_{id(section)}"] = PromptSection(
+            name=f"checklist_{id(section)}",
+            content=section.render(),
+            priority=priority,
+            enabled=True,
+            header="## Checklist\n",
+        )
+        return self
+
+    def add_vertical_section(
+        self,
+        vertical: str,
+        content: str,
+        priority: int = 40,
+    ) -> Self:
+        """Add vertical-specific section.
+
+        Vertical sections provide domain-specific content for particular verticals.
+
+        Args:
+            vertical: The vertical identifier (e.g., "coding", "research")
+            content: The vertical-specific content
+            priority: Ordering priority (lower = earlier). Default is 40.
+
+        Returns:
+            Self for method chaining
+
+        Example:
+            builder.add_vertical_section(
+                vertical="coding",
+                content="You are an expert software developer..."
+            )
+        """
+        section = VerticalPromptSection(
+            vertical=vertical,
+            content=content,
+            priority=priority,
+        )
+        self._sections[f"vertical_{vertical}"] = PromptSection(
+            name=f"vertical_{vertical}",
+            content=section.render(),
+            priority=priority,
+            enabled=True,
+            header="",  # Vertical content typically has its own structure
+        )
+        return self
+
+    def add_custom_section(self, section: Any) -> Self:
+        """Add any section type that implements render() method.
+
+        This is a generic method that can accept any object with a render()
+        method, including custom section types beyond the built-in ones.
+
+        Args:
+            section: Any object with a render() method and optional priority attribute
+
+        Returns:
+            Self for method chaining
+
+        Example:
+            class CustomSection:
+                def __init__(self, content, priority=50):
+                    self.content = content
+                    self.priority = priority
+                def render(self):
+                    return self.content
+
+            builder.add_custom_section(CustomSection("Custom content"))
+        """
+        # Get priority if available
+        priority = getattr(section, "priority", 50)
+
+        # Get name if available
+        name = getattr(section, "name", f"section_{id(section)}")
+
+        # Render content
+        if hasattr(section, "render"):
+            content = section.render()
+        else:
+            content = str(section)
+
+        self._sections[name] = PromptSection(
+            name=name,
+            content=content,
+            priority=priority,
+            enabled=True,
+            header=None,  # Auto-generate header from name
+        )
+        return self
+
     def add_from_contributor(
         self,
         contributor: "PromptContributorProtocol",
@@ -484,8 +670,8 @@ class PromptBuilder:
         Returns:
             Grounding rules text based on mode or custom setting
         """
-        # Import here to avoid circular imports
-        from victor.framework.prompt_sections import (
+        # Import from legacy file to avoid circular import with package
+        from victor.framework.prompt_sections_legacy import (
             GROUNDING_RULES_MINIMAL,
             GROUNDING_RULES_EXTENDED,
         )
@@ -564,7 +750,7 @@ def create_coding_prompt_builder() -> PromptBuilder:
     Returns:
         A PromptBuilder with coding-specific defaults
     """
-    from victor.framework.prompt_sections import (
+    from victor.framework.prompt_sections_legacy import (
         CODING_IDENTITY,
         CODING_GUIDELINES,
         CODING_TOOL_USAGE,
@@ -584,7 +770,7 @@ def create_devops_prompt_builder() -> PromptBuilder:
     Returns:
         A PromptBuilder with DevOps-specific defaults
     """
-    from victor.framework.prompt_sections import (
+    from victor.framework.prompt_sections_legacy import (
         DEVOPS_IDENTITY,
         DEVOPS_SECURITY_CHECKLIST,
         DEVOPS_COMMON_PITFALLS,
@@ -604,7 +790,7 @@ def create_research_prompt_builder() -> PromptBuilder:
     Returns:
         A PromptBuilder with research-specific defaults
     """
-    from victor.framework.prompt_sections import (
+    from victor.framework.prompt_sections_legacy import (
         RESEARCH_IDENTITY,
         RESEARCH_QUALITY_CHECKLIST,
         RESEARCH_SOURCE_HIERARCHY,
@@ -628,7 +814,7 @@ def create_data_analysis_prompt_builder() -> PromptBuilder:
     Returns:
         A PromptBuilder with data analysis-specific defaults
     """
-    from victor.framework.prompt_sections import (
+    from victor.framework.prompt_sections_legacy import (
         DATA_ANALYSIS_IDENTITY,
         DATA_ANALYSIS_LIBRARIES,
         DATA_ANALYSIS_OPERATIONS,

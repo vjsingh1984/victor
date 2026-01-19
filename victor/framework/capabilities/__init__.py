@@ -22,6 +22,9 @@ Phase 2: Generic Capabilities - Framework Layer (SOLID Refactoring)
 Capabilities:
 - BaseCapabilityProvider: Abstract base for vertical capability providers
 - CapabilityMetadata: Metadata for capability registration
+- BaseVerticalCapabilityProvider: Comprehensive base for vertical providers (eliminates ~2000 LOC)
+- CapabilityRegistry: Global registry for vertical capability management
+- CapabilityDefinition: Declarative capability definitions
 - ConfigurationCapabilityProvider: Generic configuration management (configure_X + get_X pattern)
 - FileOperationsCapability: Common file operation tools (read, write, edit, grep)
 - PromptContributionCapability: Common prompt hints for task types
@@ -30,6 +33,16 @@ Capabilities:
 
 # Base classes for capability providers
 from .base import BaseCapabilityProvider, CapabilityMetadata
+
+# Vertical capability provider base classes (new)
+from .base_vertical_capability_provider import (
+    BaseVerticalCapabilityProvider,
+    CapabilityDefinition,
+    _map_capability_type,
+)
+
+# Global registry for capability providers
+from .registry import CapabilityRegistry
 
 # Concrete capability implementations
 from .configuration import ConfigurationCapabilityProvider, configure_capability, get_capability
@@ -41,6 +54,11 @@ __all__ = [
     # Base classes
     "BaseCapabilityProvider",
     "CapabilityMetadata",
+    # Vertical capability providers (NEW - eliminates ~2000 LOC duplication)
+    "BaseVerticalCapabilityProvider",
+    "CapabilityDefinition",
+    "_map_capability_type",
+    "CapabilityRegistry",
     # Concrete implementations
     "ConfigurationCapabilityProvider",
     "configure_capability",

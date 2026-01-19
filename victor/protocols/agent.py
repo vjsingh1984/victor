@@ -27,6 +27,7 @@ Solution:
     - Define IAgentOrchestrator protocol in neutral location
     - Modules depend on protocol, not concrete class
     - Orchestrator implements protocol implicitly (duck typing)
+    - Protocol composed of focused sub-protocols (ISP compliance)
 
 Usage:
     # Instead of:
@@ -37,10 +38,22 @@ Usage:
     from victor.protocols.agent import IAgentOrchestrator
     def process(orchestrator: IAgentOrchestrator): ...
 
+    # Or use focused protocols (ISP):
+    from victor.protocols.chat import ChatProtocol
+    def chat(chat_interface: ChatProtocol): ...
+
 Design Principles:
     - DIP: Depend on abstractions (protocol), not concretions (class)
-    - ISP: Protocol contains only commonly-needed methods
+    - ISP: Protocol composed of focused sub-protocols
     - OCP: New features added via protocol extension, not modification
+
+Architecture:
+    IAgentOrchestrator (composite)
+    ├── ChatProtocol (chat methods)
+    ├── ProviderProtocol (provider properties)
+    ├── ToolProtocol (tool registry access)
+    ├── StateProtocol (session state properties)
+    └── ConfigProtocol (configuration properties)
 """
 
 from __future__ import annotations
@@ -61,198 +74,52 @@ from typing import (
 if TYPE_CHECKING:
     from victor.providers.base import StreamChunk
 
+# Import focused protocols for composition
+from victor.protocols.chat import ChatProtocol
+from victor.protocols.config_agent import ConfigProtocol
+from victor.protocols.provider import ProviderProtocol
+from victor.protocols.state import StateProtocol
+from victor.protocols.tools import ToolProtocol
 
-@runtime_checkable
-class IAgentOrchestrator(Protocol):
-    """Protocol for agent orchestrator functionality.
 
-    This protocol defines the minimal interface for agent orchestration
-    that other modules commonly need. It enables dependency inversion
-    and breaks circular import chains.
+class IAgentOrchestrator(
+    ChatProtocol,
+    ProviderProtocol,
+    ToolProtocol,
+    StateProtocol,
+    ConfigProtocol,
+    Protocol,
+):
+    """Composite protocol for agent orchestrator functionality.
 
-    Implementations:
-        - AgentOrchestrator (full implementation)
-        - Mock implementations for testing
+    This protocol composes focused protocols (ChatProtocol, ProviderProtocol,
+    ToolProtocol, StateProtocol, ConfigProtocol) to provide backward
+    compatibility with existing code that depends on IAgentOrchestrator.
 
-    Categories of functionality:
-        1. Chat/completion interface
-        2. Provider/model access
-        3. Tool registry access
-        4. Session state access
-        5. Configuration access
+    This design follows the Interface Segregation Principle (ISP) by:
+        - Providing focused protocols for specific use cases
+        - Composing them into a composite for backward compatibility
+        - Allowing code to depend on minimal interfaces
+
+    Backward Compatibility:
+        Existing code using IAgentOrchestrator continues to work without
+        changes. New code can depend on focused protocols for better
+        separation of concerns.
+
+    Examples:
+        # Old way (still works):
+        from victor.protocols.agent import IAgentOrchestrator
+        def process(orchestrator: IAgentOrchestrator): ...
+
+        # New way (ISP-compliant):
+        from victor.protocols.chat import ChatProtocol
+        def chat_only(chat: ChatProtocol): ...
+
+        # Composition:
+        def multi_tool(chat: ChatProtocol, provider: ProviderProtocol): ...
     """
 
-    # =========================================================================
-    # CHAT/COMPLETION INTERFACE
-    # =========================================================================
-
-    async def chat(
-        self,
-        message: str,
-        *,
-        stream: bool = False,
-        **kwargs: Any,
-    ) -> Any:
-        """Send a message and get a response.
-
-        Args:
-            message: User message
-            stream: Whether to stream the response
-            **kwargs: Additional provider-specific options
-
-        Returns:
-            Response from the LLM (string or structured response)
-        """
-        ...
-
-    async def stream_chat(
-        self,
-        message: str,
-        **kwargs: Any,
-    ) -> AsyncIterator["StreamChunk"]:
-        """Stream a chat response.
-
-        Args:
-            message: User message
-            **kwargs: Additional provider-specific options
-
-        Yields:
-            StreamChunk objects with response content
-        """
-        ...
-
-    # =========================================================================
-    # PROVIDER/MODEL ACCESS
-    # =========================================================================
-
-    @property
-    def provider(self) -> Any:
-        """Get the current LLM provider instance.
-
-        Returns:
-            BaseProvider instance
-        """
-        ...
-
-    @property
-    def provider_name(self) -> str:
-        """Get the name of the current provider.
-
-        Returns:
-            Provider name (e.g., 'anthropic', 'openai', 'ollama')
-        """
-        ...
-
-    @property
-    def model(self) -> str:
-        """Get the current model identifier.
-
-        Returns:
-            Model name (e.g., 'claude-sonnet-4-20250514', 'gpt-4o')
-        """
-        ...
-
-    @property
-    def temperature(self) -> float:
-        """Get the temperature setting for sampling.
-
-        Returns:
-            Temperature value (0.0 to 1.0+)
-        """
-        ...
-
-    # =========================================================================
-    # TOOL REGISTRY ACCESS
-    # =========================================================================
-
-    @property
-    def tool_registry(self) -> Any:
-        """Get the tool registry.
-
-        Returns:
-            ToolRegistry instance with available tools
-        """
-        ...
-
-    @property
-    def allowed_tools(self) -> Optional[List[str]]:
-        """Get list of allowed tool names, if restricted.
-
-        Returns:
-            List of allowed tool names, or None if all allowed
-        """
-        ...
-
-    # =========================================================================
-    # SESSION STATE ACCESS
-    # =========================================================================
-
-    @property
-    def tool_calls_used(self) -> int:
-        """Get number of tool calls used in this session.
-
-        Returns:
-            Count of tool calls made
-        """
-        ...
-
-    @property
-    def executed_tools(self) -> List[str]:
-        """Get list of executed tool names in order.
-
-        Returns:
-            List of tool names that have been executed
-        """
-        ...
-
-    @property
-    def failed_tool_signatures(self) -> Set[Tuple[str, str]]:
-        """Get set of failed tool call signatures.
-
-        Returns:
-            Set of (tool_name, args_hash) for failed calls
-        """
-        ...
-
-    @property
-    def observed_files(self) -> Set[str]:
-        """Get set of files observed during session.
-
-        Returns:
-            Set of file paths that have been read
-        """
-        ...
-
-    # =========================================================================
-    # CONFIGURATION ACCESS
-    # =========================================================================
-
-    @property
-    def settings(self) -> Any:
-        """Get configuration settings.
-
-        Returns:
-            Settings object with agent configuration
-        """
-        ...
-
-    @property
-    def tool_budget(self) -> int:
-        """Get the tool budget for this session.
-
-        Returns:
-            Maximum number of tool calls allowed
-        """
-        ...
-
-    @property
-    def mode(self) -> Any:
-        """Get the current agent mode.
-
-        Returns:
-            AgentMode enum value (BUILD, PLAN, EXPLORE)
-        """
-        ...
+    pass
 
 
 @runtime_checkable
@@ -285,4 +152,10 @@ class IAgentOrchestratorFactory(Protocol):
 __all__ = [
     "IAgentOrchestrator",
     "IAgentOrchestratorFactory",
+    # Re-export focused protocols for convenience
+    "ChatProtocol",
+    "ProviderProtocol",
+    "ToolProtocol",
+    "StateProtocol",
+    "ConfigProtocol",
 ]

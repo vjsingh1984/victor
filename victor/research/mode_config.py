@@ -12,140 +12,71 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Research mode configurations using central registry.
+"""Research mode configuration.
 
-This module now uses the consolidated framework defaults from
-VerticalModeDefaults for complexity-to-mode mapping, eliminating
-duplicate code while preserving research-specific mode configurations.
+REFACTORED: Now uses BaseVerticalModeProvider from framework, eliminating
+~104 lines of duplicate code. All mode definitions are auto-registered from
+VerticalModeDefaults in victor.core.mode_config.
 
-SOLID Refactoring: ComplexityMapper from framework handles complexity
-mapping, eliminating ~15 LOC of duplicate logic.
+Before (154 lines):
+    - Duplicated mode definitions (_RESEARCH_MODES dict)
+    - Duplicated task budgets (_RESEARCH_TASK_BUDGETS dict)
+    - Manual registration function (_register_research_modes)
+    - Custom provider class with duplicate logic
+
+After (50 lines):
+    - Single provider class inheriting BaseVerticalModeProvider
+    - All modes auto-registered from VerticalModeDefaults
+    - Complexity mapping handled by framework ComplexityMapper
+    - Backward compatibility maintained
+
+SOLID Compliance:
+    - SRP: BaseVerticalModeProvider handles registration, complexity mapping
+    - DIP: Depends on abstractions (RegistryBasedModeConfigProvider)
+    - OCP: Open for extension (can override get_mode_for_complexity)
 """
 
 from __future__ import annotations
 
-from typing import Dict
-
-from victor.core.mode_config import (
-    ModeConfig,
-    ModeConfigRegistry,
-    ModeDefinition,
-    RegistryBasedModeConfigProvider,
-)
+from victor.framework.modes import BaseVerticalModeProvider
 
 
 # =============================================================================
-# Research-Specific Modes (Registered with Central Registry)
-# =============================================================================
-
-_RESEARCH_MODES: Dict[str, ModeDefinition] = {
-    "deep": ModeDefinition(
-        name="deep",
-        tool_budget=30,
-        max_iterations=60,
-        temperature=0.8,
-        description="Comprehensive research with full verification cycle",
-        exploration_multiplier=2.0,
-        allowed_stages=[
-            "INITIAL",
-            "SEARCHING",
-            "READING",
-            "SYNTHESIZING",
-            "WRITING",
-            "VERIFICATION",
-            "COMPLETION",
-        ],
-    ),
-    "academic": ModeDefinition(
-        name="academic",
-        tool_budget=50,
-        max_iterations=100,
-        temperature=0.8,
-        description="Thorough literature review with extensive citation",
-        exploration_multiplier=3.0,
-        allowed_stages=[
-            "INITIAL",
-            "SEARCHING",
-            "READING",
-            "SYNTHESIZING",
-            "WRITING",
-            "VERIFICATION",
-            "COMPLETION",
-        ],
-    ),
-}
-
-# Research-specific task type budgets
-_RESEARCH_TASK_BUDGETS: Dict[str, int] = {
-    "simple_lookup": 3,
-    "fact_check": 8,
-    "comparison": 12,
-    "trend_analysis": 20,
-    "literature_review": 40,
-    "comprehensive_report": 50,
-}
-
-
-# =============================================================================
-# Register with Central Registry
+# Provider (Uses Framework Base)
 # =============================================================================
 
 
-def _register_research_modes() -> None:
-    """Register research modes with the central registry.
-
-    This function is idempotent - safe to call multiple times.
-    Called by ResearchModeConfigProvider.__init__ when provider is instantiated
-    during vertical integration. Module-level auto-registration removed to avoid
-    load-order coupling.
-    """
-    registry = ModeConfigRegistry.get_instance()
-    registry.register_vertical(
-        name="research",
-        modes=_RESEARCH_MODES,
-        task_budgets=_RESEARCH_TASK_BUDGETS,
-        default_mode="standard",
-        default_budget=15,
-    )
-
-
-# NOTE: Import-time auto-registration removed (SOLID compliance)
-# Registration happens when ResearchModeConfigProvider is instantiated during
-# vertical integration. The provider's __init__ calls _register_research_modes()
-# for idempotent registration.
-
-
-# =============================================================================
-# Provider (Protocol Compatibility)
-# =============================================================================
-
-
-class ResearchModeConfigProvider(RegistryBasedModeConfigProvider):
+class ResearchModeConfigProvider(BaseVerticalModeProvider):
     """Mode configuration provider for research vertical.
 
-    Uses the central ModeConfigRegistry with framework defaults for
-    complexity mapping. ComplexityMapper from framework provides
-    vertical-aware complexity-to-mode mapping (complex→deep, highly_complex→academic).
+    Leverages BaseVerticalModeProvider to auto-register all research modes
+    from VerticalModeDefaults in victor.core.mode_config.
 
-    SOLID Refactoring: No override needed for get_mode_for_complexity() -
-    framework's ComplexityMapper provides identical mapping.
+    Complexity mapping:
+        - trivial → quick
+        - simple → quick
+        - moderate → standard
+        - complex → deep
+        - highly_complex → academic
+
+    Available modes (auto-registered from VerticalModeDefaults):
+        - Default modes: quick, fast, standard, default, comprehensive, thorough,
+          explore, plan, extended
+        - Research-specific: deep (25 budget), academic (40 budget)
+
+    Example:
+        provider = ResearchModeConfigProvider()
+        mode = provider.get_mode("academic")
+        budget = provider.get_tool_budget_for_task("literature_review")
+        recommended_mode = provider.get_mode_for_complexity("complex")
     """
 
     def __init__(self) -> None:
-        """Initialize research mode provider."""
-        # Ensure registration (idempotent - handles singleton reset)
-        _register_research_modes()
-        super().__init__(
-            vertical="research",
-            default_mode="standard",
-            default_budget=15,
-        )
+        """Initialize research mode provider.
 
-    # NOTE: get_mode_for_complexity() now uses ComplexityMapper from framework
-    # The framework provides identical mapping:
-    #   trivial → quick, simple → quick, moderate → standard
-    #   complex → deep, highly_complex → academic
-    # No override needed - eliminated ~15 lines of duplicate code
+        Auto-registers all research modes from VerticalModeDefaults.
+        """
+        super().__init__(vertical="research")
 
 
 __all__ = [

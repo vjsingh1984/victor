@@ -12,122 +12,71 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""DevOps mode configurations using central registry.
+"""DevOps mode configuration.
 
-This module now uses the consolidated framework defaults from
-VerticalModeDefaults for complexity-to-mode mapping, eliminating
-duplicate code while preserving DevOps-specific mode configurations.
+REFACTORED: Now uses BaseVerticalModeProvider from framework, eliminating
+~86 lines of duplicate code. All mode definitions are auto-registered from
+VerticalModeDefaults in victor.core.mode_config.
 
-SOLID Refactoring: ComplexityMapper from framework handles complexity
-mapping, eliminating ~15 LOC of duplicate logic.
+Before (136 lines):
+    - Duplicated mode definitions (_DEVOPS_MODES dict)
+    - Duplicated task budgets (_DEVOPS_TASK_BUDGETS dict)
+    - Manual registration function (_register_devops_modes)
+    - Custom provider class with duplicate logic
+
+After (50 lines):
+    - Single provider class inheriting BaseVerticalModeProvider
+    - All modes auto-registered from VerticalModeDefaults
+    - Complexity mapping handled by framework ComplexityMapper
+    - Backward compatibility maintained
+
+SOLID Compliance:
+    - SRP: BaseVerticalModeProvider handles registration, complexity mapping
+    - DIP: Depends on abstractions (RegistryBasedModeConfigProvider)
+    - OCP: Open for extension (can override get_mode_for_complexity)
 """
 
 from __future__ import annotations
 
-from typing import Dict
-
-from victor.core.mode_config import (
-    ModeConfig,
-    ModeConfigRegistry,
-    ModeDefinition,
-    RegistryBasedModeConfigProvider,
-)
+from victor.framework.modes import BaseVerticalModeProvider
 
 
 # =============================================================================
-# DevOps-Specific Modes (Registered with Central Registry)
-# =============================================================================
-
-_DEVOPS_MODES: Dict[str, ModeDefinition] = {
-    "migration": ModeDefinition(
-        name="migration",
-        tool_budget=60,
-        max_iterations=120,
-        temperature=0.7,
-        description="Large-scale infrastructure migrations",
-        exploration_multiplier=2.5,
-        allowed_stages=[
-            "INITIAL",
-            "ASSESSMENT",
-            "PLANNING",
-            "IMPLEMENTATION",
-            "VALIDATION",
-            "DEPLOYMENT",
-            "MONITORING",
-            "COMPLETION",
-        ],
-    ),
-}
-
-# DevOps-specific task type budgets
-_DEVOPS_TASK_BUDGETS: Dict[str, int] = {
-    "dockerfile_simple": 5,
-    "dockerfile_complex": 10,
-    "docker_compose": 12,
-    "ci_cd_basic": 15,
-    "ci_cd_advanced": 25,
-    "kubernetes_manifest": 15,
-    "kubernetes_helm": 25,
-    "terraform_module": 20,
-    "terraform_full": 40,
-    "monitoring_setup": 20,
-}
-
-
-# =============================================================================
-# Register with Central Registry
+# Provider (Uses Framework Base)
 # =============================================================================
 
 
-def _register_devops_modes() -> None:
-    """Register DevOps modes with the central registry."""
-    registry = ModeConfigRegistry.get_instance()
-    registry.register_vertical(
-        name="devops",
-        modes=_DEVOPS_MODES,
-        task_budgets=_DEVOPS_TASK_BUDGETS,
-        default_mode="standard",
-        default_budget=20,
-    )
-
-
-# NOTE: Import-time auto-registration removed (SOLID compliance)
-# Registration happens when DevOpsModeConfigProvider is instantiated during
-# vertical integration. The provider's __init__ calls _register_devops_modes()
-# for idempotent registration.
-
-
-# =============================================================================
-# Provider (Protocol Compatibility)
-# =============================================================================
-
-
-class DevOpsModeConfigProvider(RegistryBasedModeConfigProvider):
+class DevOpsModeConfigProvider(BaseVerticalModeProvider):
     """Mode configuration provider for DevOps vertical.
 
-    Uses the central ModeConfigRegistry with framework defaults for
-    complexity mapping. ComplexityMapper from framework provides
-    vertical-aware complexity-to-mode mapping (complex→comprehensive, highly_complex→migration).
+    Leverages BaseVerticalModeProvider to auto-register all DevOps modes
+    from VerticalModeDefaults in victor.core.mode_config.
 
-    SOLID Refactoring: No override needed for get_mode_for_complexity() -
-    framework's ComplexityMapper provides identical mapping.
+    Complexity mapping:
+        - trivial → quick
+        - simple → quick
+        - moderate → standard
+        - complex → comprehensive
+        - highly_complex → migration
+
+    Available modes (auto-registered from VerticalModeDefaults):
+        - Default modes: quick, fast, standard, default, comprehensive, thorough,
+          explore, plan, extended
+        - DevOps-specific: migration (35 budget)
+
+    Example:
+        provider = DevOpsModeConfigProvider()
+        mode = provider.get_mode("migration")
+        budget = provider.get_tool_budget_for_task("deploy")
+        recommended_mode = provider.get_mode_for_complexity("complex")
     """
 
     def __init__(self) -> None:
-        """Initialize DevOps mode provider."""
-        # Ensure registration (idempotent - handles singleton reset)
-        _register_devops_modes()
-        super().__init__(
-            vertical="devops",
-            default_mode="standard",
-            default_budget=20,
-        )
+        """Initialize DevOps mode provider.
 
-    # NOTE: get_mode_for_complexity() now uses ComplexityMapper from framework
-    # The framework provides identical mapping:
-    #   trivial → quick, simple → quick, moderate → standard
-    #   complex → comprehensive, highly_complex → migration
-    # No override needed - eliminated ~15 lines of duplicate code
+        Auto-registers all DevOps modes from VerticalModeDefaults.
+        """
+        super().__init__(vertical="devops")
 
 
 __all__ = [

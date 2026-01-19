@@ -256,7 +256,7 @@ class HumanEvalRunner(BaseBenchmarkRunner):
         tasks = []
 
         try:
-            from datasets import load_dataset
+            from datasets import load_dataset  # type: ignore
 
             logger.info("Loading HumanEval dataset from HuggingFace...")
             dataset = load_dataset("openai/openai_humaneval", split="test")
@@ -400,7 +400,7 @@ class MBPPRunner(BaseBenchmarkRunner):
         tasks = []
 
         try:
-            from datasets import load_dataset
+            from datasets import load_dataset  # type: ignore
 
             logger.info(f"Loading MBPP dataset (split={self._split}) from HuggingFace...")
             dataset = load_dataset(

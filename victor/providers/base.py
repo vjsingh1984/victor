@@ -390,7 +390,7 @@ class BaseProvider(ABC):
             ProviderError: If the request fails
         """
         # Abstract async generator - yield needed for mypy to recognize as generator
-        if False:
+        if False:  # pragma: no cover (unreachable but needed for type checking)
             yield StreamChunk()
         raise NotImplementedError
 

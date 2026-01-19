@@ -224,6 +224,80 @@ When modifying code:
 
 You have access to 45+ tools. Use them efficiently to accomplish tasks."""
 
+    # =========================================================================
+    # PromptBuilder Support (Phase 7)
+    # =========================================================================
+
+    @classmethod
+    def _get_vertical_prompt(cls) -> str:
+        """Get coding-specific prompt content for PromptBuilder.
+
+        Returns:
+            Coding-specific vertical prompt content
+        """
+        return """You are an expert software developer with deep knowledge of:
+- Software architecture and design patterns
+- Multiple programming languages and frameworks
+- Best practices for clean, maintainable code
+- Testing, debugging, and optimization
+
+You excel at:
+- Reading and understanding existing codebases
+- Implementing new features with quality code
+- Refactoring for better design and performance
+- Writing comprehensive tests
+- Debugging complex issues
+- Following project conventions and style guides"""
+
+    @classmethod
+    def get_prompt_builder(cls):  # type: ignore[override]
+        """Get configured PromptBuilder for coding vertical.
+
+        Returns:
+            PromptBuilder with coding-specific configuration
+        """
+        from victor.framework.prompt_builder import PromptBuilder
+
+        # Start with base builder
+        builder = super().get_prompt_builder()
+
+        # Add coding-specific grounding
+        builder.add_grounding(
+            "Context: You are assisting with software development for {project}.",
+            project="a coding project",
+            priority=10,
+        )
+
+        # Add coding-specific rules
+        builder.add_rules(
+            [
+                "Always read existing files before making changes",
+                "Understand the broader codebase context",
+                "Follow existing code style and conventions",
+                "Add appropriate error handling",
+                "Write or update tests for new code",
+                "Consider edge cases and potential issues",
+                "Document non-obvious code",
+                "Ensure changes don't break existing functionality",
+            ],
+            priority=20,
+        )
+
+        # Add coding-specific checklist
+        builder.add_checklist(
+            [
+                "Code compiles without errors",
+                "Tests pass (add tests if needed)",
+                "Code follows project style",
+                "No obvious bugs or issues",
+                "Error handling is appropriate",
+                "Changes are minimal and focused",
+            ],
+            priority=30,
+        )
+
+        return builder
+
     @classmethod
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get coding-specific stage definitions.

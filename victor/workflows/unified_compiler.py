@@ -74,7 +74,8 @@ from typing import (
 
 if TYPE_CHECKING:
     from victor.protocols import WorkflowAgentProtocol
-    from victor.framework.graph import CompiledGraph, GraphExecutionResult, GraphConfig
+    from victor.framework.config import GraphConfig
+    from victor.framework.graph import CompiledGraph, GraphExecutionResult
     from victor.tools.registry import ToolRegistry
     from victor.workflows.cache import (
         WorkflowDefinitionCache,

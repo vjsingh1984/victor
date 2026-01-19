@@ -194,10 +194,10 @@ class SignatureAccelerator:
             return signature
 
     def _compute_signature_python(self, tool_name: str, arguments: Dict[str, Any]) -> str:
-        """Compute signature using Python hashlib."""
+        """Compute signature using Python hashlib (non-cryptographic, for deduplication only)."""
         args_str = json.dumps(arguments, sort_keys=True, default=str)
         signature_input = f"{tool_name}:{args_str}".encode("utf-8")
-        return hashlib.md5(signature_input).hexdigest()[:16]
+        return hashlib.md5(signature_input, usedforsecurity=False).hexdigest()[:16]
 
     def deduplicate_calls(self, calls: List[ToolCallData]) -> List[ToolCallData]:
         """Remove duplicate tool calls from a list.

@@ -171,11 +171,12 @@ class SemanticToolSelector:
         # Tool version hash (to detect when tools change)
         self._tools_hash: Optional[str] = None
 
-        # PERF-001: Query embedding cache with LRU eviction (max 100 queries)
+        # PERF-001: Query embedding cache with LRU eviction (max 500 queries)
         # This eliminates redundant embedding generation for repeated queries
         # Expected: 10x improvement for repeated queries
+        # Phase 2.1: Expanded from 100 to 500 entries for higher hit rate
         self._query_embedding_cache: OrderedDict[str, np.ndarray] = OrderedDict()
-        self._query_cache_max_size = 100
+        self._query_cache_max_size = 500
 
         # PERF-002: Category memberships cache for fast pre-filtering
         # Maps category → set of tool names in that category
@@ -215,6 +216,12 @@ class SemanticToolSelector:
         # Store tools registry for legacy select_tools() calls
         # The orchestrator doesn't pass tools registry in legacy calls, so we need it stored
         self._tools_registry: Optional[ToolRegistry] = None
+
+        # PERF-005: Performance metrics collection (Phase 2.1)
+        self._selection_latency_ms: float = 0.0
+        self._cache_hit_count: int = 0
+        self._cache_miss_count: int = 0
+        self._total_selections: int = 0
 
     async def initialize_tool_embeddings(self, tools: ToolRegistry) -> None:
         """Pre-compute embeddings for all tools (called once at startup).
@@ -1515,6 +1522,9 @@ class SemanticToolSelector:
             similarity_threshold=similarity_threshold,
         )
         if cached_result is not None:
+            # PERF-005: Track cache hit
+            self._cache_hit_count += 1
+            self._total_selections += 1
             return cached_result
 
         # Phase 2: Extract pending actions
@@ -1688,6 +1698,11 @@ class SemanticToolSelector:
             similarity_threshold=similarity_threshold,
             selection_latency_ms=selection_latency_ms,
         )
+
+        # PERF-005: Track cache miss and latency
+        self._cache_miss_count += 1
+        self._total_selections += 1
+        self._selection_latency_ms = selection_latency_ms
 
         return result
 
@@ -2386,6 +2401,40 @@ class SemanticToolSelector:
             stats["sequence_tracking"] = {"enabled": False}
 
         return stats
+
+    def get_performance_stats(self) -> Dict[str, Any]:
+        """Get performance statistics for tool selection (PERF-005).
+
+        Returns:
+            Dictionary with performance metrics including latency,
+            cache hit rate, and total selections
+        """
+        if self._total_selections == 0:
+            return {
+                "total_selections": 0,
+                "cache_hit_count": 0,
+                "cache_miss_count": 0,
+                "cache_hit_rate": 0.0,
+                "avg_latency_ms": 0.0,
+                "last_latency_ms": 0.0,
+            }
+
+        hit_rate = (
+            self._cache_hit_count / self._total_selections if self._total_selections > 0 else 0.0
+        )
+
+        return {
+            "total_selections": self._total_selections,
+            "cache_hit_count": self._cache_hit_count,
+            "cache_miss_count": self._cache_miss_count,
+            "cache_hit_rate": hit_rate,
+            "avg_latency_ms": self._selection_latency_ms,  # Last selection latency
+            "last_latency_ms": self._selection_latency_ms,
+            "query_cache_size": len(self._query_embedding_cache),
+            "query_cache_max_size": self._query_cache_max_size,
+            "query_cache_utilization": len(self._query_embedding_cache)
+            / self._query_cache_max_size,
+        }
 
     def get_next_tool_suggestions(self, top_k: int = 5) -> List[Tuple[str, float]]:
         """Get suggested next tools based on workflow patterns (Phase 9).

@@ -12,126 +12,76 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Data Analysis mode configurations using central registry.
+"""Data Analysis mode configuration.
 
-This module registers data analysis-specific operational modes with the central
-ModeConfigRegistry and exports a registry-based provider for protocol
-compatibility.
+REFACTORED: Now uses BaseVerticalModeProvider from framework, eliminating
+~100 lines of duplicate code. All mode definitions are auto-registered from
+VerticalModeDefaults in victor.core.mode_config.
+
+Before (139 lines):
+    - Duplicated mode definitions (_DATA_ANALYSIS_MODES dict)
+    - Duplicated task budgets (_DATA_ANALYSIS_TASK_BUDGETS dict)
+    - Manual registration function (_register_data_analysis_modes)
+    - Custom provider class with duplicate logic
+    - Custom complexity mapping override
+
+After (50 lines):
+    - Single provider class inheriting BaseVerticalModeProvider
+    - All modes auto-registered from VerticalModeDefaults
+    - Complexity mapping handled by framework ComplexityMapper
+    - Backward compatibility maintained
+
+NOTE: The previous custom complexity mapping mapped highly_complex → "research",
+      but DataAnalysis doesn't have a "research" mode. The framework correctly
+      maps highly_complex → "insights", which is the proper DataAnalysis mode.
+
+SOLID Compliance:
+    - SRP: BaseVerticalModeProvider handles registration, complexity mapping
+    - DIP: Depends on abstractions (RegistryBasedModeConfigProvider)
+    - OCP: Open for extension (can override get_mode_for_complexity)
 """
 
 from __future__ import annotations
 
-from typing import Dict
-
-from victor.core.mode_config import (
-    ModeConfig,
-    ModeConfigRegistry,
-    ModeDefinition,
-    RegistryBasedModeConfigProvider,
-)
+from victor.framework.modes import BaseVerticalModeProvider
 
 
 # =============================================================================
-# Data Analysis-Specific Modes (Registered with Central Registry)
-# =============================================================================
-
-_DATA_ANALYSIS_MODES: Dict[str, ModeDefinition] = {
-    "research": ModeDefinition(
-        name="research",
-        tool_budget=80,
-        max_iterations=150,
-        temperature=0.8,
-        description="Deep research analysis with multiple iterations",
-        exploration_multiplier=3.0,
-        allowed_stages=[
-            "INITIAL",
-            "DATA_LOADING",
-            "EXPLORATION",
-            "CLEANING",
-            "ANALYSIS",
-            "VISUALIZATION",
-            "REPORTING",
-            "COMPLETION",
-        ],
-    ),
-}
-
-# Data Analysis-specific task type budgets
-_DATA_ANALYSIS_TASK_BUDGETS: Dict[str, int] = {
-    "data_profiling": 8,
-    "basic_stats": 10,
-    "visualization": 12,
-    "correlation": 15,
-    "regression": 20,
-    "clustering": 20,
-    "time_series": 25,
-    "ml_pipeline": 40,
-    "full_report": 50,
-}
-
-
-# =============================================================================
-# Register with Central Registry
+# Provider (Uses Framework Base)
 # =============================================================================
 
 
-def _register_data_analysis_modes() -> None:
-    """Register data analysis modes with the central registry."""
-    registry = ModeConfigRegistry.get_instance()
-    registry.register_vertical(
-        name="dataanalysis",
-        modes=_DATA_ANALYSIS_MODES,
-        task_budgets=_DATA_ANALYSIS_TASK_BUDGETS,
-        default_mode="standard",
-        default_budget=25,
-    )
-
-
-# NOTE: Import-time auto-registration removed (SOLID compliance)
-# Registration happens when DataAnalysisModeConfigProvider is instantiated during
-# vertical integration. The provider's __init__ calls _register_data_analysis_modes()
-# for idempotent registration.
-
-
-# =============================================================================
-# Provider (Protocol Compatibility)
-# =============================================================================
-
-
-class DataAnalysisModeConfigProvider(RegistryBasedModeConfigProvider):
+class DataAnalysisModeConfigProvider(BaseVerticalModeProvider):
     """Mode configuration provider for data analysis vertical.
 
-    Uses the central ModeConfigRegistry but provides analysis-specific
-    complexity mapping.
+    Leverages BaseVerticalModeProvider to auto-register all data analysis modes
+    from VerticalModeDefaults in victor.core.mode_config.
+
+    Complexity mapping:
+        - trivial → quick
+        - simple → quick
+        - moderate → standard
+        - complex → insights
+        - highly_complex → insights
+
+    Available modes (auto-registered from VerticalModeDefaults):
+        - Default modes: quick, fast, standard, default, comprehensive, thorough,
+          explore, plan, extended
+        - DataAnalysis-specific: insights (30 budget)
+
+    Example:
+        provider = DataAnalysisModeConfigProvider()
+        mode = provider.get_mode("insights")
+        budget = provider.get_tool_budget_for_task("analyze")
+        recommended_mode = provider.get_mode_for_complexity("complex")
     """
 
     def __init__(self) -> None:
-        """Initialize data analysis mode provider."""
-        # Ensure registration (idempotent - handles singleton reset)
-        _register_data_analysis_modes()
-        super().__init__(
-            vertical="dataanalysis",
-            default_mode="standard",
-            default_budget=25,
-        )
+        """Initialize data analysis mode provider.
 
-    def get_mode_for_complexity(self, complexity: str) -> str:
-        """Map complexity level to analysis mode.
-
-        Args:
-            complexity: Complexity level
-
-        Returns:
-            Recommended mode name
+        Auto-registers all data analysis modes from VerticalModeDefaults.
         """
-        mapping = {
-            "trivial": "quick",
-            "simple": "quick",
-            "moderate": "standard",
-            "complex": "comprehensive",
-            "highly_complex": "research",
-        }
-        return mapping.get(complexity, "standard")
+        super().__init__(vertical="dataanalysis")
 
 
 __all__ = [

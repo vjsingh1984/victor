@@ -181,7 +181,7 @@ class BrowserTool:
             return True
 
         try:
-            from playwright.async_api import async_playwright
+            from playwright.async_api import async_playwright  # type: ignore
 
             self._playwright = await async_playwright().start()
 

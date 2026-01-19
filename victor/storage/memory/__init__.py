@@ -128,6 +128,14 @@ from victor.storage.memory.adapters import (
     create_graph_adapter,
     create_tool_results_adapter,
 )
+from victor.storage.memory.enhanced_memory import (
+    EnhancedMemory,
+    Memory,
+    MemoryConfig,
+    MemoryPriority,
+    MemoryType,
+    MemoryCluster,
+)
 
 __all__ = [
     # Entity types
@@ -183,4 +191,11 @@ __all__ = [
     "create_conversation_adapter",
     "create_graph_adapter",
     "create_tool_results_adapter",
+    # Enhanced Memory
+    "EnhancedMemory",
+    "Memory",
+    "MemoryConfig",
+    "MemoryPriority",
+    "MemoryType",
+    "MemoryCluster",
 ]

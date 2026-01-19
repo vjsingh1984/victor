@@ -304,7 +304,7 @@ class TestDataAnalysisCapabilityProvider:
         orchestrator = MagicMock()
         orchestrator.data_quality_config = {}
 
-        provider.apply_data_quality(orchestrator)
+        provider.configure_data_quality(orchestrator)
 
         assert orchestrator.data_quality_config["min_completeness"] == 0.9
         assert "data_quality" in provider.get_applied()

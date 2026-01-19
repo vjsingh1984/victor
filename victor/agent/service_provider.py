@@ -205,6 +205,15 @@ class OrchestratorServiceProvider:
             StateCoordinatorProtocol,
             PromptCoordinatorProtocol,
         )
+        from typing import TYPE_CHECKING as TYPE_CHECKING_VENDOR
+
+        # Import new coordinator classes (Phase 5)
+        # These are used at runtime for service registration, not just for type checking
+        from victor.agent.coordinators.tool_retry_coordinator import ToolRetryCoordinator
+        from victor.agent.coordinators.memory_coordinator import MemoryCoordinator
+        from victor.agent.coordinators.tool_capability_coordinator import (
+            ToolCapabilityCoordinator,
+        )
 
         # ToolRegistry - shared tool definitions
         self._register_tool_registry(container)
@@ -552,13 +561,105 @@ class OrchestratorServiceProvider:
         )
 
         # =========================================================================
+        # Phase 5 Coordinators (Orchestrator Integration)
+        # =========================================================================
+
+        # ToolRetryCoordinator - scoped for tool retry logic
+        container.register(
+            ToolRetryCoordinator,
+            lambda c: self._create_tool_retry_coordinator(),
+            ServiceLifetime.SCOPED,
+        )
+
+        # MemoryCoordinator - scoped for memory management
+        container.register(
+            MemoryCoordinator,
+            lambda c: self._create_memory_coordinator(),
+            ServiceLifetime.SCOPED,
+        )
+
+        # ToolCapabilityCoordinator - singleton for capability checks
+        container.register(
+            ToolCapabilityCoordinator,
+            lambda c: self._create_tool_capability_coordinator(),
+            ServiceLifetime.SINGLETON,
+        )
+
+        # =========================================================================
         # Presentation Abstraction Layer
         # =========================================================================
 
         # PresentationAdapter - singleton for icon/formatting concerns
         self._register_presentation_adapter(container)
 
+        # =========================================================================
+        # Provider Pool Services (Load Balancing & Health Monitoring)
+        # =========================================================================
+        # These services enable provider pooling for improved reliability and
+        # performance. Only registered if provider pool is enabled in settings.
+
+        if self._settings.enable_provider_pool:
+            self._register_provider_pool_services(container)
+
         logger.debug("Registered singleton orchestrator services")
+
+    def _register_provider_pool_services(self, container: ServiceContainer) -> None:
+        """Register provider pool services for load balancing.
+
+        Args:
+            container: DI container to register services in
+        """
+        from victor.providers.health_monitor import (
+            ProviderHealthRegistry,
+            HealthMonitor,
+            get_health_registry,
+        )
+        from victor.providers.load_balancer import LoadBalancerType, create_load_balancer
+
+        # ProviderHealthRegistry - singleton for health monitoring
+        # Note: We register a factory that returns the registry
+        container.register(
+            ProviderHealthRegistry,
+            lambda c: get_health_registry(),
+            ServiceLifetime.SINGLETON,
+        )
+
+        # LoadBalancerFactory - factory for creating load balancers
+        # Store as instance variable for later access
+        self._load_balancer_factory = self._create_load_balancer_factory()
+
+        logger.info("Registered provider pool services (health monitoring, load balancing)")
+
+    def get_load_balancer_factory(self) -> callable:
+        """Get the load balancer factory instance.
+
+        Returns:
+            Factory function for creating load balancers
+        """
+        return getattr(self, "_load_balancer_factory", None)
+
+    def _create_load_balancer_factory(self) -> callable:
+        """Create factory function for load balancers.
+
+        Returns:
+            Factory function that creates LoadBalancer instances
+        """
+        from victor.providers.load_balancer import LoadBalancerType, create_load_balancer
+
+        def factory(strategy: str, name: str = None):
+            """Create a load balancer instance.
+
+            Args:
+                strategy: Load balancing strategy name
+                name: Optional custom name
+
+            Returns:
+                LoadBalancer instance
+            """
+            load_balancer_type = LoadBalancerType(strategy)
+            return create_load_balancer(load_balancer_type, name=name)
+
+        return factory
 
     def register_scoped_services(self, container: ServiceContainer) -> None:
         """Register scoped (per-session) services.
@@ -1414,8 +1515,13 @@ class OrchestratorServiceProvider:
         # Get context compactor from DI container (optional)
         context_compactor = self.container.get_optional(ContextCompactorProtocol)
 
-        # Get unified tracker from DI container
-        unified_tracker = self.container.get(TaskTrackerProtocol)
+        # Get unified tracker from DI container (might be scoped)
+        unified_tracker = self.container.get_optional(TaskTrackerProtocol)
+        if unified_tracker is None:
+            # Create directly if not in scope (will be replaced later when in scope)
+            from victor.agent.unified_task_tracker import UnifiedTaskTracker
+
+            unified_tracker = UnifiedTaskTracker()
 
         return StreamingRecoveryCoordinator(
             recovery_handler=recovery_handler,
@@ -1487,7 +1593,15 @@ class OrchestratorServiceProvider:
 
         # Get dependencies from DI container
         task_analyzer = self.container.get(TaskAnalyzerProtocol)
-        unified_tracker = self.container.get(TaskTrackerProtocol)
+
+        # TaskTracker might be scoped
+        unified_tracker = self.container.get_optional(TaskTrackerProtocol)
+        if unified_tracker is None:
+            # Create directly if not in scope
+            from victor.agent.unified_task_tracker import UnifiedTaskTracker
+
+            unified_tracker = UnifiedTaskTracker()
+
         prompt_builder = self.container.get(SystemPromptBuilderProtocol)
 
         return TaskCoordinator(
@@ -1620,6 +1734,101 @@ class OrchestratorServiceProvider:
             prompt_builder=PromptBuilder(),
             config=config,
             base_identity=base_identity,
+        )
+
+    def _create_tool_retry_coordinator(self) -> Any:
+        """Create ToolRetryCoordinator instance.
+
+        The ToolRetryCoordinator provides centralized retry logic for tool execution,
+        including exponential backoff, cache integration, and error classification.
+
+        Returns:
+            ToolRetryCoordinator instance
+        """
+        from victor.agent.coordinators.tool_retry_coordinator import (
+            ToolRetryCoordinator,
+            ToolRetryConfig,
+            create_tool_retry_coordinator,
+        )
+        from victor.agent.protocols import ToolExecutorProtocol, ToolCacheProtocol
+
+        # Get dependencies from DI container
+        tool_executor = self.container.get(ToolExecutorProtocol)
+        tool_cache = self.container.get_optional(ToolCacheProtocol)
+
+        # Build config from settings
+        retry_enabled = getattr(self._settings, "tool_retry_enabled", True)
+        max_attempts = getattr(self._settings, "tool_retry_max_attempts", 3)
+        base_delay = getattr(self._settings, "tool_retry_base_delay", 1.0)
+        max_delay = getattr(self._settings, "tool_retry_max_delay", 10.0)
+        cache_enabled = getattr(self._settings, "enable_tool_cache", True)
+
+        config = ToolRetryConfig(
+            retry_enabled=retry_enabled,
+            max_attempts=max_attempts,
+            base_delay=base_delay,
+            max_delay=max_delay,
+            cache_enabled=cache_enabled,
+        )
+
+        # Note: task_completion_detector will be set by orchestrator if available
+        return ToolRetryCoordinator(
+            tool_executor=tool_executor,
+            tool_cache=tool_cache,
+            task_completion_detector=None,  # Will be set by orchestrator
+            config=config,
+        )
+
+    def _create_memory_coordinator(self) -> Any:
+        """Create MemoryCoordinator instance.
+
+        The MemoryCoordinator provides centralized memory management operations,
+        including context retrieval, session statistics, and session recovery.
+
+        Returns:
+            MemoryCoordinator instance
+        """
+        from victor.agent.coordinators.memory_coordinator import (
+            MemoryCoordinator,
+            create_memory_coordinator,
+        )
+        from victor.agent.protocols import ToolExecutorProtocol
+
+        # Note: Memory manager and session_id will be set by orchestrator
+        # conversation_store will be provided by orchestrator
+        return MemoryCoordinator(
+            memory_manager=None,  # Will be set by orchestrator
+            session_id=None,  # Will be set by orchestrator
+            conversation_store=None,  # Will be set by orchestrator
+        )
+
+    def _create_tool_capability_coordinator(self) -> Any:
+        """Create ToolCapabilityCoordinator instance.
+
+        The ToolCapabilityCoordinator provides centralized tool capability checks,
+        including tool calling support, model capability queries, and warnings.
+
+        Returns:
+            ToolCapabilityCoordinator instance
+        """
+        from victor.agent.coordinators.tool_capability_coordinator import (
+            ToolCapabilityCoordinator,
+            create_tool_capability_coordinator,
+        )
+
+        # Get tool capabilities from settings
+        tool_capabilities = getattr(self._settings, "tool_capabilities", None)
+        if tool_capabilities is None:
+            # Create a default capability checker
+            from victor.agent.tool_calling.capabilities import ToolCallingCapabilities
+
+            tool_capabilities = ToolCallingCapabilities()
+
+        # Console will be set by orchestrator (for user-facing messages)
+        return ToolCapabilityCoordinator(
+            tool_capabilities=tool_capabilities,
+            console=None,  # Will be set by orchestrator
+            warn_once=True,
         )
 
     # =========================================================================

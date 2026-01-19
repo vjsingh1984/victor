@@ -22,7 +22,13 @@ import logging
 import re
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    try:
+        import tomllib
+    except ImportError:
+        pass
 
 from victor.deps.protocol import (
     Dependency,

@@ -31,7 +31,7 @@ from victor.framework.prompt_builder import (
     create_research_prompt_builder,
     create_data_analysis_prompt_builder,
 )
-from victor.framework.prompt_sections import (
+from victor.framework.prompt_sections_legacy import (
     GROUNDING_RULES_MINIMAL,
     GROUNDING_RULES_EXTENDED,
     CODING_IDENTITY,

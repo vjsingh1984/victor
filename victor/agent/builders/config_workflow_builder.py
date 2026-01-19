@@ -109,6 +109,57 @@ class ConfigWorkflowBuilder(FactoryAwareBuilder):
         orchestrator._progress_metrics = ProgressMetrics()
         components["progress_metrics"] = orchestrator._progress_metrics
 
+        # =========================================================================
+        # Phase 5 Coordinators (Orchestrator Integration)
+        # =========================================================================
+
+        # Initialize ToolRetryCoordinator for tool execution with retry logic
+        from victor.agent.coordinators.tool_retry_coordinator import ToolRetryCoordinator
+
+        tool_retry_coordinator = factory.container.get_optional(ToolRetryCoordinator)
+        if tool_retry_coordinator:
+            # Wire up task completion detector if available
+            if hasattr(orchestrator, "_task_completion_detector"):
+                tool_retry_coordinator._task_completion_detector = (
+                    orchestrator._task_completion_detector
+                )
+            components["tool_retry_coordinator"] = tool_retry_coordinator
+        else:
+            logger.debug("ToolRetryCoordinator not available in container")
+            components["tool_retry_coordinator"] = None
+
+        # Initialize MemoryCoordinator for memory management operations
+        from victor.agent.coordinators.memory_coordinator import MemoryCoordinator
+
+        memory_coordinator = factory.container.get_optional(MemoryCoordinator)
+        if memory_coordinator:
+            # Wire up memory manager and session ID
+            memory_coordinator._memory_manager = orchestrator._memory_manager_wrapper
+            memory_coordinator._session_id = orchestrator._memory_session_id
+            # Wire up conversation store for fallback
+            if hasattr(orchestrator, "conversation"):
+                memory_coordinator._conversation_store = orchestrator.conversation
+            components["memory_coordinator"] = memory_coordinator
+        else:
+            logger.debug("MemoryCoordinator not available in container")
+            components["memory_coordinator"] = None
+
+        # Initialize ToolCapabilityCoordinator for provider/model capability checks
+        from victor.agent.coordinators.tool_capability_coordinator import ToolCapabilityCoordinator
+
+        tool_capability_coordinator = factory.container.get_optional(ToolCapabilityCoordinator)
+        if tool_capability_coordinator:
+            # Wire up console for user-facing messages
+            tool_capability_coordinator._console = orchestrator.console
+            components["tool_capability_coordinator"] = tool_capability_coordinator
+        else:
+            logger.debug("ToolCapabilityCoordinator not available in container")
+            components["tool_capability_coordinator"] = None
+
+        # =========================================================================
+        # End Phase 5 Coordinators
+        # =========================================================================
+
         # Initialize token budget based on provider/model context window
         try:
             from victor.config.config_loaders import get_provider_limits

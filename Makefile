@@ -7,7 +7,7 @@
 #   make build        # Build distribution packages
 #   make release      # Create a release (requires version)
 
-.PHONY: help install install-dev test lint format clean build build-binary docker release security security-full
+.PHONY: help install install-dev test lint format clean build build-binary docker release security security-full load-test load-test-quick load-test-report benchmark dev-tools check-protocol lint-vertical validate-config profile-coordinators coverage-report generate-docs qa qa-fast qa-report release-checklist release-validate
 
 # Default target
 help:
@@ -34,6 +34,26 @@ help:
 	@echo "  make tui           Start TUI"
 	@echo "  make security     Run quick security scans"
 	@echo "  make security-full Run comprehensive security scans"
+	@echo "  make benchmark     Run performance benchmarks"
+	@echo "  make load-test     Run load tests with Locust"
+	@echo "  make load-test-quick Run quick load tests"
+	@echo "  make load-test-report Generate load test report"
+	@echo ""
+	@echo "Developer Tools (Phase 4):"
+	@echo "  make dev-tools     Run all developer tools"
+	@echo "  make check-protocol Check protocol conformance"
+	@echo "  make lint-vertical Lint verticals"
+	@echo "  make validate-config Validate YAML configs"
+	@echo "  make profile-coordinators Profile coordinator performance"
+	@echo "  make coverage-report Generate coverage reports"
+	@echo "  make generate-docs Generate documentation"
+	@echo ""
+	@echo "Quality Assurance (Phase 5):"
+	@echo "  make qa           Run comprehensive QA suite"
+	@echo "  make qa-fast      Run quick QA validation (skip slow tests)"
+	@echo "  make qa-report    Generate QA report in JSON format"
+	@echo "  make release-checklist Show release checklist"
+	@echo "  make release-validate Validate release readiness"
 
 # =============================================================================
 # Development
@@ -193,4 +213,169 @@ check-dist:
 	@test -f scripts/install/install.ps1 && echo "✓ install.ps1" || echo "✗ install.ps1 missing"
 	@test -f Formula/victor.rb && echo "✓ Homebrew formula" || echo "✗ Homebrew formula missing"
 	@echo ""
+
+# =============================================================================
+# Performance & Load Testing
+# =============================================================================
+
+benchmark:
+	@echo "Running performance benchmarks..."
+	pytest tests/benchmark/test_performance_baselines.py -v -m benchmark --tb=short
+
+benchmark-all:
+	@echo "Running all performance benchmarks..."
+	pytest tests/benchmark/ -v -m benchmark --tb=short
+
+load-test-quick:
+	@echo "Running quick load tests (pytest-based)..."
+	pytest tests/load_test/test_scalability.py::TestConcurrentRequests::test_10_concurrent_requests -v -s --tb=short
+
+load-test:
+	@echo "Running load tests with Locust..."
+	@echo "Make sure the Victor API server is running on http://localhost:8000"
+	@echo "Start it with: victor serve"
+	@echo ""
+	@if ! command -v locust >/dev/null 2>&1; then \
+		echo "Locust not installed. Installing..."; \
+		pip install locust>=2.0; \
+	fi
+	@echo "Starting Locust web interface on http://localhost:8089"
+	locust -f tests/load_test/load_test_framework.py --host=http://localhost:8000
+
+load-test-headless:
+	@echo "Running headless load test..."
+	@if ! command -v locust >/dev/null 2>&1; then \
+		echo "Locust not installed. Installing..."; \
+		pip install locust>=2.0; \
+	fi
+	locust -f tests/load_test/load_test_framework.py \
+		--host=http://localhost:8000 \
+		--headless \
+		--users=100 \
+		--spawn-rate=10 \
+		--run-time=5m \
+		--html=load-test-report.html
+
+load-test-report:
+	@echo "Generating load test report..."
+	@mkdir -p load-test-reports
+	@echo "Running load test and generating HTML report..."
+	locust -f tests/load_test/load_test_framework.py \
+		--host=http://localhost:8000 \
+		--headless \
+		--users=50 \
+		--spawn-rate=5 \
+		--run-time=2m \
+		--html=load-test-reports/report_$(shell date +%Y%m%d_%H%M%S).html
+	@echo "Report saved to load-test-reports/"
+
+scalability-test:
+	@echo "Running comprehensive scalability tests..."
+	pytest tests/load_test/test_scalability.py -v -s -m "slow" --tb=short
+
+scalability-report:
+	@echo "Generating scalability report..."
+	@mkdir -p /tmp/scalability-reports
+	pytest tests/load_test/test_scalability.py -v --tb=short - scalability-reports-dir=/tmp/scalability-reports
+	@echo "Scalability reports saved to /tmp/scalability-reports/"
+
+performance-regression-check:
+	@echo "Checking for performance regressions..."
+	pytest tests/benchmark/test_performance_baselines.py::TestPerformanceRegression -v --tb=short
+
 	@echo "Run 'make build' to test the build process"
+
+# =============================================================================
+# Developer Tools (Phase 4)
+# =============================================================================
+
+dev-tools: check-protocol lint-vertical validate-config
+	@echo ""
+	@echo "All developer tools completed!"
+	@echo "Run individual tools for more details:"
+	@echo "  make check-protocol"
+	@echo "  make lint-vertical"
+	@echo "  make validate-config"
+
+check-protocol:
+	@echo "Checking protocol conformance..."
+	python scripts/check_protocol_conformance.py --all-verticals
+	@echo "Protocol conformance check complete!"
+
+lint-vertical:
+	@echo "Linting verticals..."
+	python scripts/lint_vertical.py --all-verticals
+	@echo "Vertical linting complete!"
+
+validate-config:
+	@echo "Validating configuration files..."
+	python scripts/validate_config.py --all-configs
+	@echo "Configuration validation complete!"
+
+profile-coordinators:
+	@echo "Profiling coordinators..."
+	python scripts/profile_coordinators.py --all-coordinators --json-output profiling_results.json
+	@echo "Coordinator profiling complete!"
+	@echo "Results saved to profiling_results/"
+
+coverage-report:
+	@echo "Generating coverage reports..."
+	python scripts/coverage_report.py --format html --check-goals
+	@echo "Coverage report complete!"
+	@echo "HTML report: htmlcov/index.html"
+
+generate-docs:
+	@echo "Generating documentation..."
+	python scripts/generate_docs.py --all --output docs/generated
+	@echo "Documentation generation complete!"
+	@echo "Generated docs: docs/generated/"
+
+# =============================================================================
+# Quality Assurance (Phase 5)
+# =============================================================================
+
+qa:
+	@echo "Running comprehensive QA validation..."
+	@echo "======================================="
+	python scripts/run_full_qa.py --coverage --report text
+	@echo ""
+	@echo "QA validation complete!"
+	@echo "Run 'make qa-report' for detailed JSON report"
+
+qa-fast:
+	@echo "Running quick QA validation..."
+	@echo "=============================="
+	python scripts/run_full_qa.py --fast --report text
+	@echo ""
+	@echo "Quick QA validation complete!"
+
+qa-report:
+	@echo "Generating detailed QA report..."
+	@echo "================================="
+	python scripts/run_full_qa.py --fast --report json --output qa_report.json
+	@echo "QA report generated: qa_report.json"
+	@echo ""
+	@echo "Summary:"
+	@python -c "import json; data = json.load(open('qa_report.json')); s = data['summary']; print(f\"  Total: {s['total_checks']}, Passed: {s['passed']}, Failed: {s['failed']}, Success: {s['success_rate']:.1f}%\")" || true
+
+release-checklist:
+	@echo "Victor AI Release Checklist"
+	@echo "==========================="
+	@echo ""
+	@cat RELEASE_CHECKLIST.md
+
+release-validate:
+	@echo "Validating release readiness..."
+	@echo "================================"
+	@echo ""
+	@test -f RELEASE_CHECKLIST.md && echo "✓ RELEASE_CHECKLIST.md exists" || echo "✗ RELEASE_CHECKLIST.md missing"
+	@test -f CHANGELOG.md && echo "✓ CHANGELOG.md exists" || echo "✗ CHANGELOG.md missing"
+	@test -f docs/RELEASE_NOTES_0.5.1.md && echo "✓ Release notes exist" || echo "✗ Release notes missing"
+	@test -f README.md && echo "✓ README.md exists" || echo "✗ README.md missing"
+	@test -f LICENSE && echo "✓ LICENSE exists" || echo "✗ LICENSE missing"
+	@echo ""
+	@echo "Running QA validation..."
+	python scripts/run_full_qa.py --fast --report json --output release_qa_report.json
+	@echo ""
+	@echo "Release validation complete!"
+	@echo "Review release_qa_report.json for details"

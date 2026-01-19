@@ -30,7 +30,14 @@ Example:
 
 import logging
 import re
-from typing import Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Dict, List, Optional, Set
+
+if TYPE_CHECKING:
+    # Type stubs for native extensions (optional)
+    try:
+        import victor_native
+    except ImportError:
+        pass
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +46,7 @@ _NATIVE_AVAILABLE = False
 _native = None
 
 try:
-    import victor_native as _native
+    import victor_native as _native  # type: ignore
 
     _NATIVE_AVAILABLE = True
     logger.debug("Native pattern matching available for search term extraction")

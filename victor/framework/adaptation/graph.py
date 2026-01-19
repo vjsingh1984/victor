@@ -39,7 +39,10 @@ from victor.framework.adaptation.types import (
 )
 
 if TYPE_CHECKING:
-    from langchain_core.runnables import Runnable
+    try:
+        from langchain_core.runnables import Runnable
+    except ImportError:
+        Runnable = object  # type: ignore
 
 logger = logging.getLogger(__name__)
 

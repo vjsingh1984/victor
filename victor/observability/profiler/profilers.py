@@ -524,7 +524,7 @@ class LineProfiler(BaseProfiler):
         self._start_time = time.time()
 
         try:
-            from line_profiler import LineProfiler as LP
+            from line_profiler import LineProfiler as LP  # type: ignore
 
             self._line_profiler = LP()
             for func in self._functions_to_profile:

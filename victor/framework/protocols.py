@@ -544,7 +544,7 @@ class OrchestratorProtocol(Protocol):
             ToolError: If tool execution fails critically
         """
         ...
-        yield OrchestratorStreamChunk()  # type: ignore (protocol stub)
+        yield OrchestratorStreamChunk()
 
     async def chat(
         self,

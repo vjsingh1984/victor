@@ -469,6 +469,61 @@ class EscapeHatchRegistry:
             replace=replace,
         )
 
+    def discover_from_all_verticals(
+        self,
+        *,
+        replace: bool = False,
+    ) -> Tuple[int, int]:
+        """Auto-discover and register escape hatches from all verticals.
+
+        Uses VerticalDiscovery to find all verticals and load their escape
+        hatches. This is OCP-compliant as it doesn't hardcode vertical names.
+
+        Args:
+            replace: If True, replace existing entries
+
+        Returns:
+            Tuple of (total_conditions_registered, total_transforms_registered)
+
+        Example:
+            registry = EscapeHatchRegistry.get_instance()
+            cond_count, trans_count = registry.discover_from_all_verticals()
+            print(f"Registered {cond_count} conditions and {trans_count} transforms")
+        """
+        from victor.framework.discovery import VerticalDiscovery
+
+        total_conditions = 0
+        total_transforms = 0
+
+        try:
+            # Discover escape hatches from all verticals
+            escape_hatches = VerticalDiscovery.discover_escape_hatches()
+
+            # Register each vertical's escape hatches
+            for vertical_name, hatch_dict in escape_hatches.items():
+                conditions = hatch_dict.get("conditions", {})
+                transforms = hatch_dict.get("transforms", {})
+
+                if conditions or transforms:
+                    cond_count, trans_count = self.register_from_vertical(
+                        vertical=vertical_name,
+                        conditions=conditions,
+                        transforms=transforms,
+                        replace=replace,
+                    )
+                    total_conditions += cond_count
+                    total_transforms += trans_count
+
+            logger.debug(
+                f"Discovered and registered {total_conditions} conditions and "
+                f"{total_transforms} transforms from {len(escape_hatches)} verticals"
+            )
+
+        except Exception as e:
+            logger.error(f"Error during escape hatch discovery: {e}")
+
+        return (total_conditions, total_transforms)
+
 
 # Module-level convenience functions
 

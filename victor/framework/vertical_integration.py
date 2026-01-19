@@ -146,6 +146,7 @@ from typing import (
 )
 
 from victor.core.verticals import VerticalContext, create_vertical_context
+from victor.core.verticals.mutable_context import MutableVerticalContext
 
 if TYPE_CHECKING:
     from victor.framework.step_handlers import StepHandlerRegistry
@@ -1735,19 +1736,23 @@ class VerticalIntegrationPipeline:
 
     def _create_context(
         self, vertical: Type["VerticalBase"], result: IntegrationResult
-    ) -> Optional[VerticalContext]:
-        """Create the VerticalContext for this vertical.
+    ) -> Optional[MutableVerticalContext]:
+        """Create the MutableVerticalContext for this vertical (DIP compliant).
+
+        Uses MutableVerticalContext for capability mutation tracking, ensuring
+        dependency inversion and observability without direct orchestrator mutation.
 
         Args:
             vertical: Vertical class
             result: Result to update
 
         Returns:
-            VerticalContext or None on error
+            MutableVerticalContext or None on error
         """
         try:
             config = vertical.get_config()
-            context = create_vertical_context(
+            # Use MutableVerticalContext for DIP compliance and mutation tracking
+            context = MutableVerticalContext(
                 name=vertical.name,
                 config=config,
             )

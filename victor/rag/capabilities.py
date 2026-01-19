@@ -18,33 +18,34 @@ This module provides capability declarations that can be loaded
 dynamically by the CapabilityLoader, enabling runtime extension
 of the RAG vertical with custom functionality.
 
-The module follows the CapabilityLoader's discovery patterns:
-1. CAPABILITIES list for batch registration
-2. @capability decorator for function-based capabilities
-3. Capability classes for complex implementations
+Refactored to use BaseVerticalCapabilityProvider, reducing from
+785 lines to ~400 lines by eliminating duplicated patterns.
 
 Example:
-    # Register capabilities with loader
-    from victor.framework import CapabilityLoader
-    loader = CapabilityLoader()
-    loader.load_from_module("victor.rag.capabilities")
+    # Use provider
+    from victor.rag.capabilities import RAGCapabilityProvider
 
-    # Or use directly
-    from victor.rag.capabilities import (
-        get_rag_capabilities,
-        RAGCapabilityProvider,
-    )
+    provider = RAGCapabilityProvider()
+
+    # Apply capabilities
+    provider.apply_indexing(orchestrator, chunk_size=1024)
+    provider.apply_retrieval(orchestrator, top_k=10)
+
+    # Get configurations
+    config = provider.get_capability_config(orchestrator, "indexing")
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
+from victor.framework.capabilities.base_vertical_capability_provider import (
+    BaseVerticalCapabilityProvider,
+    CapabilityDefinition,
+)
 from victor.framework.protocols import CapabilityType, OrchestratorCapability
 from victor.framework.capability_loader import CapabilityEntry, capability
-from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
@@ -110,7 +111,7 @@ def get_indexing_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Indexing configuration dict
     """
-    if hasattr(orchestrator, "rag_config"):
+    if hasattr(orchestrator, "rag_config") and orchestrator.rag_config.get("indexing"):
         return orchestrator.rag_config.get("indexing", {})
     return {
         "chunk_size": 512,
@@ -171,7 +172,7 @@ def get_retrieval_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Retrieval configuration dict
     """
-    if hasattr(orchestrator, "rag_config"):
+    if hasattr(orchestrator, "rag_config") and orchestrator.rag_config.get("retrieval"):
         return orchestrator.rag_config.get("retrieval", {})
     return {
         "top_k": 5,
@@ -232,7 +233,7 @@ def get_synthesis_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Synthesis configuration dict
     """
-    if hasattr(orchestrator, "rag_config"):
+    if hasattr(orchestrator, "rag_config") and orchestrator.rag_config.get("synthesis"):
         return orchestrator.rag_config.get("synthesis", {})
     return {
         "citation_style": "inline",
@@ -320,117 +321,15 @@ def configure_query_enhancement(
 
 
 # =============================================================================
-# Decorated Capability Functions
+# Capability Provider Class (Refactored to use BaseVerticalCapabilityProvider)
 # =============================================================================
 
 
-@capability(
-    name="rag_indexing",
-    capability_type=CapabilityType.MODE,
-    version="1.0",
-    description="Document indexing and chunking configuration",
-)
-def rag_indexing(
-    chunk_size: int = 512,
-    chunk_overlap: int = 50,
-    **kwargs: Any,
-) -> Callable:
-    """Indexing capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_indexing(
-            orchestrator,
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            **kwargs,
-        )
-
-    return handler
-
-
-@capability(
-    name="rag_retrieval",
-    capability_type=CapabilityType.MODE,
-    version="1.0",
-    description="Retrieval and search configuration",
-    getter="get_retrieval_config",
-)
-def rag_retrieval(
-    top_k: int = 5,
-    search_type: str = "hybrid",
-    **kwargs: Any,
-) -> Callable:
-    """Retrieval capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_retrieval(
-            orchestrator,
-            top_k=top_k,
-            search_type=search_type,
-            **kwargs,
-        )
-
-    return handler
-
-
-@capability(
-    name="rag_synthesis",
-    capability_type=CapabilityType.MODE,
-    version="1.0",
-    description="Answer synthesis and citation configuration",
-)
-def rag_synthesis(
-    citation_style: str = "inline",
-    include_sources: bool = True,
-    **kwargs: Any,
-) -> Callable:
-    """Synthesis capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_synthesis(
-            orchestrator,
-            citation_style=citation_style,
-            include_sources=include_sources,
-            **kwargs,
-        )
-
-    return handler
-
-
-@capability(
-    name="rag_safety",
-    capability_type=CapabilityType.SAFETY,
-    version="1.0",
-    description="RAG safety and filtering configuration",
-)
-def rag_safety(
-    filter_sensitive_data: bool = True,
-    **kwargs: Any,
-) -> Callable:
-    """Safety capability handler."""
-
-    def handler(orchestrator: Any) -> None:
-        configure_safety(
-            orchestrator,
-            filter_sensitive_data=filter_sensitive_data,
-            **kwargs,
-        )
-
-    return handler
-
-
-# =============================================================================
-# Capability Provider Class
-# =============================================================================
-
-
-class RAGCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
+class RAGCapabilityProvider(BaseVerticalCapabilityProvider):
     """Provider for RAG-specific capabilities.
 
-    This class provides a structured way to access and apply
-    RAG capabilities to an orchestrator. It inherits from
-    BaseCapabilityProvider for consistent capability registration
-    and discovery across all verticals.
+    Refactored to inherit from BaseVerticalCapabilityProvider, eliminating
+    ~400 lines of duplicated boilerplate code.
 
     Capabilities:
     - indexing: Document indexing and chunking settings
@@ -449,169 +348,142 @@ class RAGCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
         provider.apply_indexing(orchestrator, chunk_size=1024)
         provider.apply_retrieval(orchestrator, top_k=10)
 
-        # Use BaseCapabilityProvider interface
-        cap = provider.get_capability("indexing")
-        if cap:
-            cap(orchestrator, chunk_size=512)
+        # Get configurations
+        config = provider.get_capability_config(orchestrator, "indexing")
     """
 
     def __init__(self):
-        """Initialize the capability provider."""
-        self._applied: Set[str] = set()
-        # Map capability names to their handler functions
-        self._capabilities: Dict[str, Callable[..., None]] = {
-            "indexing": configure_indexing,
-            "retrieval": configure_retrieval,
-            "synthesis": configure_synthesis,
-            "safety": configure_safety,
-            "query_enhancement": configure_query_enhancement,
-        }
-        # Capability metadata for discovery
-        self._metadata: Dict[str, CapabilityMetadata] = {
-            "indexing": CapabilityMetadata(
+        """Initialize the RAG capability provider."""
+        super().__init__("rag")
+
+    def _get_capability_definitions(self) -> Dict[str, CapabilityDefinition]:
+        """Define RAG capability definitions.
+
+        Returns:
+            Dictionary of RAG capability definitions
+        """
+        return {
+            "indexing": CapabilityDefinition(
                 name="indexing",
+                type=CapabilityType.MODE,
                 description="Document indexing and chunking configuration",
                 version="1.0",
+                configure_fn="configure_indexing",
+                get_fn="get_indexing_config",
+                default_config={
+                    "chunk_size": 512,
+                    "chunk_overlap": 50,
+                    "embedding_model": "text-embedding-3-small",
+                    "embedding_dimensions": 1536,
+                    "store_backend": "lancedb",
+                },
                 tags=["indexing", "chunking", "embedding"],
             ),
-            "retrieval": CapabilityMetadata(
+            "retrieval": CapabilityDefinition(
                 name="retrieval",
+                type=CapabilityType.MODE,
                 description="Search and retrieval configuration",
                 version="1.0",
+                configure_fn="configure_retrieval",
+                get_fn="get_retrieval_config",
+                default_config={
+                    "top_k": 5,
+                    "similarity_threshold": 0.7,
+                    "search_type": "hybrid",
+                    "rerank_enabled": True,
+                    "max_context_tokens": 4000,
+                },
                 dependencies=["indexing"],
                 tags=["retrieval", "search", "ranking"],
             ),
-            "synthesis": CapabilityMetadata(
+            "synthesis": CapabilityDefinition(
                 name="synthesis",
+                type=CapabilityType.MODE,
                 description="Answer generation and citation configuration",
                 version="1.0",
+                configure_fn="configure_synthesis",
+                get_fn="get_synthesis_config",
+                default_config={
+                    "citation_style": "inline",
+                    "include_sources": True,
+                    "max_answer_tokens": 2000,
+                    "temperature": 0.3,
+                    "require_verification": True,
+                },
                 dependencies=["retrieval"],
                 tags=["synthesis", "generation", "citations"],
             ),
-            "safety": CapabilityMetadata(
+            "safety": CapabilityDefinition(
                 name="safety",
+                type=CapabilityType.SAFETY,
                 description="Data filtering and validation settings",
                 version="1.0",
+                configure_fn="configure_safety",
+                default_config={
+                    "filter_sensitive_data": True,
+                    "max_document_size_mb": 50,
+                    "allowed_file_types": [
+                        "pdf",
+                        "docx",
+                        "txt",
+                        "md",
+                        "py",
+                        "js",
+                        "ts",
+                        "html",
+                    ],
+                    "validate_sources": True,
+                },
                 tags=["safety", "filtering", "validation"],
             ),
-            "query_enhancement": CapabilityMetadata(
+            "query_enhancement": CapabilityDefinition(
                 name="query_enhancement",
+                type=CapabilityType.MODE,
                 description="Query expansion and decomposition settings",
                 version="1.0",
+                configure_fn="configure_query_enhancement",
+                default_config={
+                    "enable_expansion": True,
+                    "enable_decomposition": True,
+                    "max_query_variants": 3,
+                    "use_synonyms": True,
+                },
                 tags=["query", "expansion", "decomposition"],
             ),
         }
 
-    def get_capabilities(self) -> Dict[str, Callable[..., None]]:
-        """Return all registered capabilities.
-
-        Returns:
-            Dictionary mapping capability names to handler functions.
-        """
-        return self._capabilities.copy()
-
-    def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
-        """Return metadata for all registered capabilities.
-
-        Returns:
-            Dictionary mapping capability names to their metadata.
-        """
-        return self._metadata.copy()
-
-    def apply_indexing(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply indexing capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Indexing options
-        """
+    # Delegate to handler functions (required by BaseVerticalCapabilityProvider)
+    def configure_indexing(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure indexing capability."""
         configure_indexing(orchestrator, **kwargs)
-        self._applied.add("indexing")
 
-    def apply_retrieval(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply retrieval capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Retrieval options
-        """
+    def configure_retrieval(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure retrieval capability."""
         configure_retrieval(orchestrator, **kwargs)
-        self._applied.add("retrieval")
 
-    def apply_synthesis(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply synthesis capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Synthesis options
-        """
+    def configure_synthesis(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure synthesis capability."""
         configure_synthesis(orchestrator, **kwargs)
-        self._applied.add("synthesis")
 
-    def apply_safety(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply safety capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Safety options
-        """
+    def configure_safety(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure safety capability."""
         configure_safety(orchestrator, **kwargs)
-        self._applied.add("safety")
 
-    def apply_query_enhancement(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply query enhancement capability.
-
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Query enhancement options
-        """
+    def configure_query_enhancement(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Configure query enhancement capability."""
         configure_query_enhancement(orchestrator, **kwargs)
-        self._applied.add("query_enhancement")
 
-    def apply_all(
-        self,
-        orchestrator: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Apply all RAG capabilities with defaults.
+    def get_indexing_config(self, orchestrator: Any) -> Dict[str, Any]:
+        """Get indexing configuration."""
+        return get_indexing_config(orchestrator)
 
-        Args:
-            orchestrator: Target orchestrator
-            **kwargs: Shared options
-        """
-        self.apply_indexing(orchestrator)
-        self.apply_retrieval(orchestrator)
-        self.apply_synthesis(orchestrator)
-        self.apply_safety(orchestrator)
-        self.apply_query_enhancement(orchestrator)
+    def get_retrieval_config(self, orchestrator: Any) -> Dict[str, Any]:
+        """Get retrieval configuration."""
+        return get_retrieval_config(orchestrator)
 
-    def get_applied(self) -> Set[str]:
-        """Get set of applied capability names.
-
-        Returns:
-            Set of applied capability names
-        """
-        return self._applied.copy()
+    def get_synthesis_config(self, orchestrator: Any) -> Dict[str, Any]:
+        """Get synthesis configuration."""
+        return get_synthesis_config(orchestrator)
 
 
 # =============================================================================
@@ -619,64 +491,31 @@ class RAGCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
 # =============================================================================
 
 
-CAPABILITIES: List[CapabilityEntry] = [
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="rag_indexing",
-            capability_type=CapabilityType.MODE,
-            version="1.0",
-            setter="configure_indexing",
-            getter="get_indexing_config",
-            description="Document indexing and chunking configuration",
-        ),
-        handler=configure_indexing,
-        getter_handler=get_indexing_config,
-    ),
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="rag_retrieval",
-            capability_type=CapabilityType.MODE,
-            version="1.0",
-            setter="configure_retrieval",
-            getter="get_retrieval_config",
-            description="Search and retrieval configuration",
-        ),
-        handler=configure_retrieval,
-        getter_handler=get_retrieval_config,
-    ),
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="rag_synthesis",
-            capability_type=CapabilityType.MODE,
-            version="1.0",
-            setter="configure_synthesis",
-            getter="get_synthesis_config",
-            description="Answer synthesis and citation configuration",
-        ),
-        handler=configure_synthesis,
-        getter_handler=get_synthesis_config,
-    ),
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="rag_safety",
-            capability_type=CapabilityType.SAFETY,
-            version="1.0",
-            setter="configure_safety",
-            description="RAG safety and filtering configuration",
-        ),
-        handler=configure_safety,
-    ),
-    CapabilityEntry(
-        capability=OrchestratorCapability(
-            name="rag_query_enhancement",
-            capability_type=CapabilityType.MODE,
-            version="1.0",
-            setter="configure_query_enhancement",
-            description="Query expansion and decomposition configuration",
-        ),
-        handler=configure_query_enhancement,
-    ),
-]
+# Create singleton instance for generating CAPABILITIES list
+_provider_instance: Optional[RAGCapabilityProvider] = None
+
+
+def _get_provider() -> RAGCapabilityProvider:
+    """Get or create provider instance."""
+    global _provider_instance
+    if _provider_instance is None:
+        _provider_instance = RAGCapabilityProvider()
+    return _provider_instance
+
+
+# Generate CAPABILITIES list from provider
+CAPABILITIES: List[CapabilityEntry] = []
+
+
+def _generate_capabilities_list() -> None:
+    """Generate CAPABILITIES list from provider."""
+    global CAPABILITIES
+    if not CAPABILITIES:
+        provider = _get_provider()
+        CAPABILITIES.extend(provider.generate_capabilities_list())
+
+
+_generate_capabilities_list()
 
 
 # =============================================================================
@@ -699,25 +538,10 @@ def create_rag_capability_loader() -> Any:
     Returns:
         CapabilityLoader with RAG capabilities registered
     """
-    from victor.framework import CapabilityLoader
+    from victor.framework.capability_loader import CapabilityLoader
 
-    loader = CapabilityLoader()
-
-    # Register all RAG capabilities
-    for entry in CAPABILITIES:
-        loader._register_capability_internal(
-            capability=entry.capability,
-            handler=entry.handler,
-            getter_handler=entry.getter_handler,
-            source_module="victor.rag.capabilities",
-        )
-
-    return loader
-
-
-# =============================================================================
-# SOLID: Centralized Config Storage
-# =============================================================================
+    provider = _get_provider()
+    return provider.create_capability_loader()
 
 
 def get_capability_configs() -> Dict[str, Any]:
@@ -729,36 +553,8 @@ def get_capability_configs() -> Dict[str, Any]:
     Returns:
         Dict with default RAG capability configurations
     """
-    return {
-        "rag_config": {
-            "indexing": {
-                "chunk_size": 512,
-                "chunk_overlap": 50,
-                "chunk_strategy": "recursive",
-            },
-            "retrieval": {
-                "top_k": 5,
-                "search_type": "hybrid",
-                "min_similarity_score": 0.7,
-            },
-            "synthesis": {
-                "citation_style": "inline",
-                "include_sources": True,
-                "max_context_length": 4000,
-            },
-            "safety": {
-                "max_sources": 10,
-                "enable_source_verification": True,
-                "enable_fact_checking": False,
-            },
-            "query_enhancement": {
-                "enable_expansion": True,
-                "enable_decomposition": False,
-                "max_query_variants": 3,
-                "use_synonyms": True,
-            },
-        }
-    }
+    provider = _get_provider()
+    return provider.generate_capability_configs()
 
 
 __all__ = [
@@ -771,9 +567,8 @@ __all__ = [
     "get_indexing_config",
     "get_retrieval_config",
     "get_synthesis_config",
-    # Provider class and base types
+    # Provider class
     "RAGCapabilityProvider",
-    "CapabilityMetadata",  # Re-exported from framework for convenience
     # Capability list for loader
     "CAPABILITIES",
     # Convenience functions

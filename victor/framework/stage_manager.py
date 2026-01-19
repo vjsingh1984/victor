@@ -74,6 +74,9 @@ from typing import (
 
 # Import from victor.core to enforce layer boundaries (Framework should not depend on Agent)
 from victor.core.state import ConversationStage
+
+# Import business logic from agent layer (legitimate dependency)
+# ConversationStateMachine contains the stage detection algorithms
 from victor.agent.conversation_state import (
     ConversationStateMachine,
     STAGE_ORDER,

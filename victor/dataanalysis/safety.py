@@ -200,6 +200,9 @@ def create_dataanalysis_pii_safety_rules(
 ) -> None:
     """Register data analysis PII-specific safety rules.
 
+    This function now delegates to the framework-level common middleware
+    to avoid code duplication across verticals.
+
     Args:
         enforcer: SafetyEnforcer to register rules with
         block_pii_exports: Block exporting data containing PII
@@ -214,88 +217,15 @@ def create_dataanalysis_pii_safety_rules(
             warn_on_pii_columns=True
         )
     """
-    if block_pii_exports:
-        enforcer.add_rule(
-            SafetyRule(
-                name="dataanalysis_block_pii_export",
-                description="Block exporting data containing PII",
-                check_fn=lambda op: any(
-                    phrase in op.lower()
-                    for phrase in [
-                        "export",
-                        "to_csv",
-                        "to_excel",
-                        "to_json",
-                        "upload",
-                    ]
-                )
-                and any(
-                    pii in op.lower()
-                    for pii in [
-                        "ssn",
-                        "social security",
-                        "credit card",
-                        "password",
-                        "medical",
-                        "health",
-                    ]
-                ),
-                level=SafetyLevel.HIGH,
-                allow_override=False,  # PII exports should NEVER be allowed
-            )
-        )
+    from victor.framework.middleware import create_pii_safety_rules
 
-    if warn_on_pii_columns:
-        enforcer.add_rule(
-            SafetyRule(
-                name="dataanalysis_warn_pii_columns",
-                description="Warn when PII columns are detected in operations",
-                check_fn=lambda op: any(
-                    pii in op.lower()
-                    for pii in [
-                        "ssn",
-                        "social security",
-                        "credit card",
-                        "email",
-                        "phone",
-                        "address",
-                        "date of birth",
-                        "salary",
-                        "income",
-                    ]
-                )
-                and ("df" in op.lower() or "dataframe" in op.lower() or "column" in op.lower()),
-                level=SafetyLevel.LOW,  # Warn only
-                allow_override=True,
-            )
-        )
-
-    if require_anonymization:
-        enforcer.add_rule(
-            SafetyRule(
-                name="dataanalysis_require_anonymization",
-                description="Require anonymization for PII data before export",
-                check_fn=lambda op: any(
-                    phrase in op.lower()
-                    for phrase in [
-                        "export",
-                        "to_csv",
-                        "to_excel",
-                        "upload",
-                        "share",
-                    ]
-                )
-                and any(
-                    pii in op.lower()
-                    for pii in ["ssn", "social security", "credit card", "password"]
-                )
-                and "anonymize" not in op.lower()
-                and "hash" not in op.lower()
-                and "mask" not in op.lower(),
-                level=SafetyLevel.MEDIUM,
-                allow_override=True,
-            )
-        )
+    # Delegate to framework implementation
+    create_pii_safety_rules(
+        enforcer,
+        block_pii_exports=block_pii_exports,
+        warn_on_pii_columns=warn_on_pii_columns,
+        require_anonymization=require_anonymization,
+    )
 
 
 def create_dataanalysis_export_safety_rules(
@@ -306,6 +236,9 @@ def create_dataanalysis_export_safety_rules(
     require_encryption: bool = True,
 ) -> None:
     """Register data analysis export-specific safety rules.
+
+    This function now delegates to the framework-level common middleware
+    to avoid code duplication across verticals.
 
     Args:
         enforcer: SafetyEnforcer to register rules with
@@ -321,93 +254,15 @@ def create_dataanalysis_export_safety_rules(
             require_encryption=True
         )
     """
-    if block_external_uploads:
-        enforcer.add_rule(
-            SafetyRule(
-                name="dataanalysis_block_external_uploads",
-                description="Block uploading data to external services",
-                check_fn=lambda op: any(
-                    phrase in op.lower()
-                    for phrase in [
-                        "upload to",
-                        "send to",
-                        "transfer to",
-                    ]
-                )
-                and any(
-                    external in op.lower()
-                    for external in [
-                        "s3",
-                        "gcs",
-                        "azure",
-                        "dropbox",
-                        "google drive",
-                        "external",
-                    ]
-                ),
-                level=SafetyLevel.HIGH,
-                allow_override=True,
-            )
-        )
+    from victor.framework.middleware import create_data_export_safety_rules
 
-    if block_production_db_access:
-        enforcer.add_rule(
-            SafetyRule(
-                name="dataanalysis_block_production_db",
-                description="Block direct access to production databases",
-                check_fn=lambda op: any(
-                    phrase in op.lower()
-                    for phrase in [
-                        "production",
-                        "prod",
-                    ]
-                )
-                and any(
-                    db in op.lower()
-                    for db in [
-                        "database",
-                        "db.",
-                        "sql",
-                        "query",
-                        "connect",
-                    ]
-                ),
-                level=SafetyLevel.HIGH,
-                allow_override=True,
-            )
-        )
-
-    if require_encryption:
-        enforcer.add_rule(
-            SafetyRule(
-                name="dataanalysis_require_encryption",
-                description="Require encryption for sensitive data exports",
-                check_fn=lambda op: any(
-                    phrase in op.lower()
-                    for phrase in [
-                        "export",
-                        "to_csv",
-                        "to_excel",
-                        "to_json",
-                        "save",
-                    ]
-                )
-                and any(
-                    sensitive in op.lower()
-                    for sensitive in [
-                        "ssn",
-                        "credit card",
-                        "password",
-                        "medical",
-                        "personal",
-                    ]
-                )
-                and "encrypt" not in op.lower()
-                and "secure" not in op.lower(),
-                level=SafetyLevel.MEDIUM,
-                allow_override=True,
-            )
-        )
+    # Delegate to framework implementation
+    create_data_export_safety_rules(
+        enforcer,
+        block_external_uploads=block_external_uploads,
+        block_production_db_access=block_production_db_access,
+        require_encryption=require_encryption,
+    )
 
 
 def create_all_dataanalysis_safety_rules(
