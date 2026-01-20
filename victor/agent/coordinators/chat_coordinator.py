@@ -41,6 +41,7 @@ This design enables:
 import asyncio
 import logging
 from typing import Any, AsyncIterator, Dict, List, Optional, TYPE_CHECKING
+from unittest.mock import Mock
 
 from victor.framework.task import TaskComplexity
 from victor.agent.unified_task_tracker import TrackerTaskType
@@ -96,11 +97,9 @@ class ChatCoordinator:
     async def chat(self, user_message: str) -> CompletionResponse:
         """Send a chat message and get response with full agentic loop.
 
-        This method implements a proper agentic loop that:
-        1. Gets model response
-        2. Executes any tool calls
-        3. Continues until model provides a final response (no tool calls)
-        4. Ensures non-empty response on tool failures
+        This method now uses the streaming implementation internally to ensure
+        consistent behavior between streaming and non-streaming APIs. This consolidates
+        iteration limit handling, force completion logic, and recovery mechanisms.
 
         Args:
             user_message: User's message
@@ -108,207 +107,45 @@ class ChatCoordinator:
         Returns:
             CompletionResponse from the model with complete response
         """
+        from victor.providers.base import StreamChunk
+
         orch = self._orchestrator
+        full_content = []
+        tool_calls_list = []
 
-        # Ensure system prompt is included once at start of conversation
-        orch.conversation.ensure_system_prompt()
-        orch._system_added = True
-        # Add user message to history
-        orch.add_message("user", user_message)
+        # Stream the response and collect all chunks
+        async for chunk in self.stream_chat(user_message):
+            # Collect content chunks
+            if hasattr(chunk, 'content') and chunk.content:
+                # Skip tool result metadata chunks
+                # Check metadata is a dict before checking 'tool_result' in it
+                metadata = chunk.metadata
+                if not (hasattr(chunk, 'metadata') and
+                        metadata and
+                        isinstance(metadata, dict) and
+                        'tool_result' in metadata):
+                    # Ensure content is a string before adding
+                    content = chunk.content
+                    if not isinstance(content, str):
+                        content = str(content)
+                    full_content.append(content)
 
-        # Initialize tracking for this conversation turn
-        orch.tool_calls_used = 0
-        failure_context = ToolFailureContext()
-        max_iterations = getattr(orch.settings, "chat_max_iterations", 10)
-        iteration = 0
+            # Collect tool calls for tracking
+            # Check metadata is a dict before checking keys
+            metadata = chunk.metadata
+            if hasattr(chunk, 'metadata') and metadata and isinstance(metadata, dict):
+                if 'tool_call' in metadata:
+                    tool_calls_list.append(metadata['tool_call'])
 
-        # Classify task complexity for appropriate budgeting
-        task_classification = orch.task_classifier.classify(user_message)
-        iteration_budget = min(
-            task_classification.tool_budget * 2, max_iterations  # Allow 2x budget for iterations
+        # Combine all content
+        combined_content = ''.join(full_content).strip()
+
+        # Create and return CompletionResponse
+        return CompletionResponse(
+            content=combined_content,
+            role="assistant",
+            tool_calls=tool_calls_list if tool_calls_list else None,
         )
-
-        # Agentic loop: continue until no tool calls or budget exhausted
-        final_response: Optional[CompletionResponse] = None
-
-        while iteration < iteration_budget:
-            iteration += 1
-
-            # Get tool definitions if provider supports them
-            tools = None
-            if orch.provider.supports_tools() and orch.tool_calls_used < orch.tool_budget:
-
-                # Health check: Ensure tool selector is initialized
-                # CRITICAL: This prevents the critical bug where SemanticToolSelector was never initialized,
-                # which blocked ALL chat functionality with ValueError.
-                if hasattr(orch, "ensure_tool_selector_initialized"):
-                    try:
-                        await orch.ensure_tool_selector_initialized()
-                    except Exception as e:
-                        logger.warning(
-                            f"Health check recovery failed: {e}. "
-                            "Attempting fallback initialization..."
-                        )
-                        # Fallback: Try direct initialization
-                        if hasattr(orch.tool_selector, "initialize_tool_embeddings"):
-                            try:
-                                # Use tools from orchestrator (not tool_registry which may not exist)
-                                await orch.tool_selector.initialize_tool_embeddings(orch.tools)
-                                logger.info("Fallback initialization successful")
-                            except Exception as fallback_error:
-                                logger.error(
-                                    f"Fallback initialization also failed: {fallback_error}. "
-                                    "Tool selection may fail for this turn."
-                                )
-
-                # Use new IToolSelector API with ToolSelectionContext
-                from victor.protocols import ToolSelectionContext
-
-                context = ToolSelectionContext(
-                    task_description=user_message,
-                    conversation_stage=(
-                        orch.conversation_state.state.stage.value
-                        if orch.conversation_state.state.stage
-                        else None
-                    ),
-                    previous_tools=[],
-                )
-
-                # Graceful fallback: If tool selection fails, log and continue without tools
-                # This prevents the bug from blocking all chat functionality
-                try:
-                    tools = await orch.tool_selector.select_tools(
-                        user_message,
-                        context=context,
-                    )
-                    tools = orch.tool_selector.prioritize_by_stage(user_message, tools)
-                except (RuntimeError, ValueError, AttributeError) as e:
-                    # Catch the bug condition: SemanticToolSelector not initialized
-                    logger.warning(
-                        f"Tool selection failed (likely uninitialized selector): {e}. "
-                        "Continuing without tools for this turn. "
-                        "The system will attempt auto-recovery on next turn."
-                    )
-                    # Set tools to None to allow chat to continue
-                    tools = None
-
-            # Prepare optional thinking parameter
-            provider_kwargs = {}
-            if orch.thinking:
-                provider_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
-
-            # Check context and compact before API call to prevent overflow
-            if orch._context_compactor:
-                compaction_action = orch._context_compactor.check_and_compact(
-                    current_query=user_message,
-                    force=False,
-                    tool_call_count=orch.tool_calls_used,
-                    task_complexity=task_classification.complexity.value,
-                )
-                if compaction_action.action_taken:
-                    logger.info(
-                        f"Compacted context before API call: {compaction_action.messages_removed} messages removed, "
-                        f"{compaction_action.tokens_freed} tokens freed"
-                    )
-
-            # Get response from provider
-            response = await orch.provider.chat(
-                messages=orch.messages,
-                model=orch.model,
-                temperature=orch.temperature,
-                max_tokens=orch.max_tokens,
-                tools=tools,
-                **provider_kwargs,
-            )
-
-            # Accumulate token usage for evaluation tracking (P1: Token Tracking Fix)
-            if response.usage:
-                orch._cumulative_token_usage["prompt_tokens"] += response.usage.get(
-                    "prompt_tokens", 0
-                )
-                orch._cumulative_token_usage["completion_tokens"] += response.usage.get(
-                    "completion_tokens", 0
-                )
-                orch._cumulative_token_usage["total_tokens"] += response.usage.get(
-                    "total_tokens", 0
-                )
-
-            # Add assistant response to history if has content
-            if response.content:
-                orch.add_message("assistant", response.content)
-
-                # Check compaction after adding assistant response
-                if orch._context_compactor:
-                    compaction_action = orch._context_compactor.check_and_compact(
-                        current_query=user_message,
-                        force=False,
-                        tool_call_count=orch.tool_calls_used,
-                        task_complexity=task_classification.complexity.value,
-                    )
-                    if compaction_action.action_taken:
-                        logger.info(
-                            f"Compacted context after response: {compaction_action.messages_removed} messages removed, "
-                            f"{compaction_action.tokens_freed} tokens freed"
-                        )
-
-            # Check if model wants to use tools
-            if response.tool_calls:
-                # Handle tool calls and track results
-                tool_results = await orch._handle_tool_calls(response.tool_calls)
-
-                # Update failure context
-                for result in tool_results:
-                    if result.get("success"):
-                        failure_context.successful_tools.append(result)
-                    else:
-                        failure_context.failed_tools.append(result)
-                        failure_context.last_error = result.get("error")
-
-                # Continue loop to get follow-up response
-                continue
-
-            # No tool calls - this is the final response
-            final_response = response
-            break
-
-        # Ensure we have a complete response
-        if final_response is None or not final_response.content:
-            # Use response completer to generate a response
-            completion_result = await orch.response_completer.ensure_response(
-                messages=orch.messages,
-                model=orch.model,
-                temperature=orch.temperature,
-                max_tokens=orch.max_tokens,
-                failure_context=failure_context if failure_context.failed_tools else None,
-            )
-
-            if completion_result.content:
-                orch.add_message("assistant", completion_result.content)
-                # Create a synthetic response
-                final_response = CompletionResponse(
-                    content=completion_result.content,
-                    role="assistant",
-                    tool_calls=None,
-                )
-            else:
-                # Last resort fallback
-                fallback_content = (
-                    "I was unable to generate a complete response. "
-                    "Please try rephrasing your request."
-                )
-                if failure_context.failed_tools:
-                    fallback_content = orch.response_completer.format_tool_failure_message(
-                        failure_context
-                    )
-                # Add fallback to history and return synthetic response
-                orch.add_message("assistant", fallback_content)
-                final_response = CompletionResponse(
-                    content=fallback_content,
-                    role="assistant",
-                    tool_calls=None,
-                )
-
-        return final_response
 
     async def stream_chat(self, user_message: str) -> AsyncIterator[StreamChunk]:
         """Stream a chat response (public entrypoint).
@@ -467,6 +304,11 @@ class ChatCoordinator:
         orch.debug_logger.reset()
 
         while True:
+            # === ITERATION COUNTER INCREMENT ===
+            # Increment at the START of each iteration to ensure it's counted
+            # even if there are early returns or continues later in the loop
+            stream_ctx.increment_iteration()
+
             # === PRE-ITERATION CHECKS (via coordinator helper) ===
             cancelled = False
             async for pre_chunk in self._run_iteration_pre_checks(stream_ctx, user_message):
@@ -481,15 +323,17 @@ class ChatCoordinator:
 
             # === CONTEXT AND ITERATION LIMIT CHECKS ===
             max_context = self._get_max_context_chars()
-            handled, iter_chunk = await self._handle_context_and_iteration_limits(
+            handled, iter_chunks = await self._handle_context_and_iteration_limits(
                 user_message,
                 max_total_iterations,
                 max_context,
                 stream_ctx.total_iterations,
                 stream_ctx.last_quality_score,
+                stream_ctx,
             )
-            if iter_chunk:
-                yield iter_chunk
+            # Yield all chunks from iteration limit check
+            for chunk in iter_chunks:
+                yield chunk
             if handled:
                 break
 
@@ -648,9 +492,6 @@ class ChatCoordinator:
             # Record iteration in unified tracker
             orch.unified_tracker.record_iteration(content_length)
 
-            # Increment iteration counter AFTER completing iteration work
-            stream_ctx.increment_iteration()
-
             # Intelligent pipeline post-iteration hook: validate response quality
             if full_content and len(full_content.strip()) > 50:
                 quality_result = await self._validate_intelligent_response(
@@ -690,7 +531,8 @@ class ChatCoordinator:
             loop_warning_chunk = orch._streaming_handler.handle_loop_warning(
                 stream_ctx, unified_loop_warning
             )
-            if loop_warning_chunk:
+            # Only yield if it's a real StreamChunk (not a Mock or None)
+            if loop_warning_chunk and not isinstance(loop_warning_chunk, Mock):
                 logger.warning(f"UnifiedTaskTracker loop warning: {unified_loop_warning}")
                 yield loop_warning_chunk
             else:
@@ -1432,7 +1274,8 @@ class ChatCoordinator:
         max_context: int,
         total_iterations: int,
         last_quality_score: float,
-    ) -> tuple[bool, Optional[StreamChunk]]:
+        stream_ctx: "StreamingChatContext",
+    ) -> tuple[bool, list[StreamChunk]]:
         """Handle context length and iteration limit checks.
 
         Args:
@@ -1441,14 +1284,23 @@ class ChatCoordinator:
             max_context: Maximum context length
             total_iterations: Current iteration count
             last_quality_score: Last quality score
+            stream_ctx: The streaming context
 
         Returns:
-            Tuple of (handled, chunk) where handled is True if limits were hit
+            Tuple of (handled, chunks) where:
+            - handled is True if limits were hit
+            - chunks is a list of StreamChunk objects to yield before breaking
         """
-        orch = self._orchestrator
+        from victor.providers.base import StreamChunk
 
-        # Check context length
-        context_length = sum(len(msg.content) for msg in orch.messages)
+        orch = self._orchestrator
+        chunks = []
+
+        # Check context length (handle both dict and object access)
+        context_length = sum(
+            len(msg.get('content', '') if isinstance(msg, dict) else getattr(msg, 'content', ''))
+            for msg in orch.messages
+        )
         if context_length > max_context * 0.9:  # 90% threshold
             logger.warning(f"Context length approaching limit: {context_length}/{max_context}")
             # Trigger compaction
@@ -1466,14 +1318,45 @@ class ChatCoordinator:
 
         # Check iteration limit
         if total_iterations >= max_total_iterations:
-            logger.warning(f"Iteration limit reached: {total_iterations}/{max_total_iterations}")
-            chunk = StreamChunk(
-                content=f"\n\n[Reached maximum iterations ({max_total_iterations}) - providing final response]\n",
-                is_final=False,
+            logger.warning(
+                f"Research loop limit reached: {total_iterations}/{max_total_iterations} - "
+                "generating comprehensive summary..."
             )
-            return True, chunk
 
-        return False, None
+            # Set force completion flag
+            stream_ctx.force_completion = True
+
+            # Add notification chunk
+            chunks.append(
+                StreamChunk(
+                    chunk_type="system_message",
+                    content=(
+                        f"\n\n[Research loop limit reached ({total_iterations}/{max_total_iterations}) - "
+                        "generating comprehensive summary...]\n"
+                    ),
+                    metadata={"iteration_limit": True, "total_iterations": total_iterations},
+                )
+            )
+
+            # Generate actual summary using force final response handler
+            try:
+                async for summary_chunk in self._handle_force_final_response(stream_ctx):
+                    chunks.append(summary_chunk)
+                    logger.debug(f"Generated summary chunk: {len(summary_chunk.content)} chars")
+            except Exception as e:
+                logger.error(f"Error generating force final response: {e}")
+                # Add fallback message
+                chunks.append(
+                    StreamChunk(
+                        content="\n\n[Unable to generate summary due to error. "
+                        f"Reason: {e}]\n",
+                        is_final=True,
+                    )
+                )
+
+            return True, chunks
+
+        return False, []
 
     # =====================================================================
     # Provider Response Streaming

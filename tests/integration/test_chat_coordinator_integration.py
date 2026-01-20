@@ -114,6 +114,19 @@ def integration_orchestrator():
         return_value=Mock(tool_budget=5, complexity=TaskComplexity.MEDIUM)
     )
 
+    # Intent classifier for intent classification handler
+    from victor.storage.embeddings.intent_classifier import IntentType
+    orch.intent_classifier = Mock()
+    # Create a proper mock result with required attributes
+    mock_intent_result = Mock()
+    mock_intent_result.intent = IntentType.COMPLETION  # Use actual enum
+    mock_intent_result.confidence = 0.8
+    mock_intent_result.should_continue = False
+    mock_intent_result.requires_action = False
+    mock_intent_result.is_final = True
+    mock_intent_result.top_matches = []  # Empty list of matches
+    orch.intent_classifier.classify_intent_sync = Mock(return_value=mock_intent_result)
+
     # Settings
     orch.settings = Mock()
     orch.settings.chat_max_iterations = 10
@@ -137,7 +150,28 @@ def integration_orchestrator():
 
     # Tool pipeline
     orch._handle_tool_calls = AsyncMock(return_value=[])
+
+    # Mock _tool_pipeline.execute_tool_calls to return a proper result
+    from victor.agent.streaming.tool_execution import ToolExecutionResult
+
+    async def mock_execute_tool_calls(tool_calls, context=None):
+        """Mock tool execution that returns results."""
+        results = []
+        for tc in tool_calls:
+            tool_name = tc.get("name", "unknown")
+            results.append({"name": tool_name, "output": f"Mock output from {tool_name}"})
+
+        # Return a mock result object
+        mock_result = Mock()
+        mock_result.results = results
+        mock_result.tool_calls_executed = len(tool_calls)
+        mock_result.chunks = []  # No chunks to yield
+        mock_result.should_return = False
+        mock_result.last_tool_name = tool_name if tool_calls else None
+        return mock_result
+
     orch._tool_pipeline = Mock()
+    orch._tool_pipeline.execute_tool_calls = AsyncMock(side_effect=mock_execute_tool_calls)
 
     # Response completer
     orch.response_completer = Mock()
@@ -156,7 +190,13 @@ def integration_orchestrator():
     orch._metrics_coordinator.stop_streaming = Mock()
 
     orch._metrics_collector = Mock()
-    orch._metrics_collector.init_stream_metrics = Mock(return_value=Mock(start_time=0.0))
+    # Create a proper mock for stream_metrics with mutable attributes
+    mock_stream_metrics = Mock()
+    mock_stream_metrics.total_chunks = 0
+    mock_stream_metrics.total_content_length = 0
+    mock_stream_metrics.tool_calls_count = 0
+    mock_stream_metrics.start_time = 0.0
+    orch._metrics_collector.init_stream_metrics = Mock(return_value=mock_stream_metrics)
     orch._metrics_collector.record_first_token = Mock()
 
     orch._session_state = Mock()
@@ -233,9 +273,20 @@ def integration_orchestrator():
     orch._chunk_generator.generate_content_chunk = Mock(
         side_effect=lambda c, is_final=False: StreamChunk(content=c, is_final=is_final)
     )
+    # Important: Return empty list for tool result chunks to avoid iteration issues
+    orch._chunk_generator.generate_tool_result_chunks = Mock(return_value=[])
+    orch._chunk_generator.generate_tool_start_chunk = Mock(
+        side_effect=lambda n, a, m: StreamChunk(content="", metadata={"tool_start": True})
+    )
+    orch._chunk_generator.generate_thinking_status_chunk = Mock(
+        return_value=StreamChunk(content="", metadata={"thinking": True})
+    )
 
     # Streaming handler
     orch._streaming_handler = Mock()
+    # Important: Return None by default to avoid Mock objects being yielded as chunks
+    orch._streaming_handler.handle_loop_warning = Mock(return_value=None)
+    orch._streaming_handler.check_time_limit = Mock(return_value=None)
 
     # Recovery coordinator
     orch._recovery_coordinator = Mock()
@@ -243,6 +294,18 @@ def integration_orchestrator():
     orch._recovery_coordinator.handle_empty_response = Mock(return_value=(None, False))
     orch._recovery_coordinator.check_force_action = Mock(return_value=(False, None))
     orch._recovery_coordinator.get_recovery_fallback_message = Mock(return_value="Fallback message")
+    orch._recovery_coordinator.check_progress = Mock(return_value=True)  # Assume making progress
+    orch._recovery_coordinator.check_tool_budget = Mock(return_value=None)
+    # Important: Return tuple for truncate_tool_calls
+    orch._recovery_coordinator.truncate_tool_calls = Mock(return_value=([], None))  # (tool_calls, truncated)
+    orch._recovery_coordinator.filter_blocked_tool_calls = Mock(return_value=([], [], 0))  # (filtered, chunks, blocked_count)
+    orch._recovery_coordinator.check_blocked_threshold = Mock(return_value=None)
+
+    # Handler methods that should return None or proper values
+    orch._check_progress_with_handler = Mock(return_value=False)
+    orch._handle_force_completion_with_handler = Mock(return_value=None)
+    orch._handle_budget_exhausted = Mock(return_value=[])  # Async generator yielding nothing
+    orch._handle_force_final_response = Mock(return_value=[])  # Async generator yielding nothing
 
     # Task completion detector
     orch._task_completion_detector = Mock()
@@ -300,6 +363,32 @@ def create_stream_generator(chunks: List[StreamChunk]):
     return generator
 
 
+def create_stream_from_completion(response: CompletionResponse):
+    """Create a stream generator from a CompletionResponse.
+
+    This helper converts CompletionResponse objects (used in non-streaming tests)
+    into stream generators for the streaming-based implementation.
+
+    Args:
+        response: CompletionResponse to convert
+
+    Returns:
+        Async generator function (callable that returns async generator)
+    """
+    # Create StreamChunk with proper metadata handling
+    chunk = StreamChunk(
+        content=response.content,
+        is_final=True,
+        tool_calls=response.tool_calls,
+        usage=response.usage,
+    )
+
+    async def generator(*args, **kwargs):
+        yield chunk
+
+    return generator
+
+
 # ============================================================================
 # Multi-Turn Agentic Loop Integration Tests
 # ============================================================================
@@ -335,9 +424,20 @@ class TestMultiTurnAgenticLoop:
             tool_calls=None,
         )
 
-        integration_orchestrator.provider.chat = AsyncMock(
-            side_effect=[tool_call_response, final_response]
-        )
+        # Mock provider.stream to yield chunks from responses
+        # Create wrapper that returns the generator
+        call_count = [0]
+
+        async def mock_stream(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                gen = create_stream_from_completion(tool_call_response)
+            else:
+                gen = create_stream_from_completion(final_response)
+            async for chunk in gen(*args, **kwargs):
+                yield chunk
+
+        integration_orchestrator.provider.stream = mock_stream
         integration_orchestrator._handle_tool_calls = AsyncMock(
             return_value=[{"success": True, "name": "search", "output": "Results"}]
         )
@@ -347,7 +447,7 @@ class TestMultiTurnAgenticLoop:
 
         # Assert
         assert response.content == "Based on the search results, here's what I found."
-        assert integration_orchestrator.provider.chat.call_count == 2
+        assert call_count[0] == 2
         integration_orchestrator._handle_tool_calls.assert_called_once()
 
     @pytest.mark.asyncio
