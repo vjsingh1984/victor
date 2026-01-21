@@ -1,0 +1,135 @@
+{{- if .Values.grafana.enabled }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-credentials
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "victor-monitoring.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+type: Opaque
+stringData:
+  admin-user: {{ .Values.grafana.credentials.adminUser | quote }}
+  admin-password: {{ .Values.grafana.credentials.adminPassword | quote }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "victor-monitoring.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+spec:
+  replicas: {{ .Values.grafana.replicas }}
+  selector:
+    matchLabels:
+      {{- include "victor-monitoring.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: grafana
+  template:
+    metadata:
+      labels:
+        {{- include "victor-monitoring.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: grafana
+      annotations:
+        {{- with .Values.grafana.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccounts.grafana.name }}
+      containers:
+        - name: grafana
+          image: "{{ .Values.global.imageRegistry }}{{ .Values.grafana.image.repository }}:{{ .Values.grafana.image.tag }}"
+          imagePullPolicy: {{ .Values.grafana.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-credentials
+                  key: admin-user
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-credentials
+                  key: admin-password
+            - name: GF_SERVER_ROOT_URL
+              value: "http://localhost:3000"
+            - name: GF_INSTALL_PLUGINS
+              value: {{ .Values.grafana.plugins | join "," | quote }}
+            - name: GF_ANALYTICS_REPORTING_ENABLED
+              value: "false"
+            - name: GF_ANALYTICS_CHECK_FOR_UPDATES
+              value: "false"
+            - name: GF_USERS_ALLOW_SIGN_UP
+              value: "false"
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.grafana.resources | nindent 12 }}
+          volumeMounts:
+            - name: storage
+              mountPath: /var/lib/grafana
+      volumes:
+        - name: storage
+          {{- if .Values.grafana.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: grafana-pvc
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "victor-monitoring.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+spec:
+  type: {{ .Values.grafana.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.grafana.service.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    {{- include "victor-monitoring.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+---
+{{- if .Values.grafana.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-pvc
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "victor-monitoring.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.grafana.persistence.size }}
+  storageClassName: {{ .Values.grafana.persistence.storageClass }}
+{{- end }}
+{{- end }}

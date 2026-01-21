@@ -1,0 +1,11 @@
+{{- if .Values.namespace.create }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace.name }}
+  labels:
+    name: {{ .Values.namespace.name }}
+    app.kubernetes.io/name: {{ include "victor-monitoring.name" . }}
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}

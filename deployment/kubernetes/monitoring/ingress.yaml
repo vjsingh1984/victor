@@ -1,0 +1,154 @@
+# Ingress for Monitoring Stack
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: victor-monitoring-ingress
+  namespace: victor-monitoring
+  labels:
+    app.kubernetes.io/name: victor
+    app.kubernetes.io/component: monitoring
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - prometheus.victor-ai.com
+        - grafana.victor-ai.com
+        - alertmanager.victor-ai.com
+      secretName: victor-monitoring-tls
+  rules:
+    - host: prometheus.victor-ai.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus
+                port:
+                  number: 9090
+
+    - host: grafana.victor-ai.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 3000
+
+    - host: alertmanager.victor-ai.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: alertmanager
+                port:
+                  number: 9093
+---
+# NetworkPolicy for Monitoring Namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: victor-monitoring-netpol
+  namespace: victor-monitoring
+  labels:
+    app.kubernetes.io/name: victor
+    app.kubernetes.io/component: monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 9090  # Prometheus
+        - protocol: TCP
+          port: 3000  # Grafana
+        - protocol: TCP
+          port: 9093  # AlertManager
+
+    # Allow traffic within monitoring namespace
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 3000
+        - protocol: TCP
+          port: 9093
+        - protocol: TCP
+          port: 4317  # OTLP gRPC
+        - protocol: TCP
+          port: 4318  # OTLP HTTP
+        - protocol: TCP
+          port: 8888  # OTEL metrics
+
+    # Allow traffic from Victor namespaces
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: victor-production
+        - namespaceSelector:
+            matchLabels:
+              name: victor-staging
+      ports:
+        - protocol: TCP
+          port: 4317
+        - protocol: TCP
+          port: 4318
+
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+
+    # Allow traffic to Kubernetes API
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: TCP
+          port: 443
+
+    # Allow traffic within monitoring namespace
+    - to:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 3000
+        - protocol: TCP
+          port: 9093
+
+    # Allow external access for alert notifications
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 587  # SMTP
+        - protocol: TCP
+          port: 443  # HTTPS

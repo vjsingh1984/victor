@@ -846,6 +846,43 @@ class Settings(BaseSettings):
         20  # Number of recent calls to track (increased for better coverage)
     )
 
+    # ==========================================================================
+    # Advanced Cache Configuration (Track 5.2)
+    # ==========================================================================
+    # Tool selection cache with advanced optimization strategies
+    # Persistent cache, adaptive TTL, multi-level cache, predictive warming
+
+    # Enable/disable advanced caching
+    tool_selection_cache_enabled: bool = True  # Master switch for caching
+
+    # Persistent cache (SQLite)
+    persistent_cache_enabled: bool = True  # Save cache to disk
+    persistent_cache_path: Optional[str] = None  # Default: ~/.victor/cache/tool_selection_cache.db
+    persistent_cache_auto_compact: bool = True  # Auto-remove expired entries
+
+    # Adaptive TTL
+    adaptive_ttl_enabled: bool = True  # Dynamically adjust TTL based on access patterns
+    adaptive_ttl_min: int = 60  # Minimum TTL (1 minute)
+    adaptive_ttl_max: int = 7200  # Maximum TTL (2 hours)
+    adaptive_ttl_initial: int = 3600  # Initial TTL (1 hour)
+    adaptive_ttl_adjustment_threshold: int = 5  # Adjust after N accesses
+
+    # Multi-level cache
+    multi_level_cache_enabled: bool = False  # L1/L2/L3 cache hierarchy
+    multi_level_cache_l1_size: int = 100  # L1 cache size (in-memory)
+    multi_level_cache_l2_size: int = 1000  # L2 cache size (disk)
+    multi_level_cache_l3_size: int = 10000  # L3 cache size (larger storage)
+
+    # Predictive cache warming
+    predictive_warming_enabled: bool = False  # Predict and prewarm cache entries
+    predictive_warming_max_patterns: int = 100  # Max query patterns to track
+    predictive_warming_top_k: int = 5  # Number of predictions to make
+
+    # Cache sizes (basic LRU cache)
+    tool_selection_cache_size: int = 1000  # Max entries per namespace
+    tool_selection_cache_query_ttl: int = 3600  # Query cache TTL (1 hour)
+    tool_selection_cache_context_ttl: int = 300  # Context cache TTL (5 minutes)
+
     # UI
     theme: str = "monokai"
     show_token_count: bool = True
@@ -1296,6 +1333,55 @@ class Settings(BaseSettings):
     serialization_include_format_hint: bool = True  # Include format description in output
     serialization_min_rows_for_tabular: int = 3  # Min rows to consider tabular formats
     serialization_debug_mode: bool = False  # Include data characteristics in output
+
+    # ==========================================================================
+    # Agentic AI Features (Phase 3 Integration)
+    # ==========================================================================
+    # Controls advanced agentic AI capabilities for autonomous planning, memory,
+    # skill discovery, and self-improvement. These features enable Victor to
+    # exhibit more intelligent, adaptive behavior in complex scenarios.
+
+    # Hierarchical Planning - Break down complex tasks into subtasks automatically
+    enable_hierarchical_planning: bool = False  # Enable hierarchical task decomposition
+    hierarchical_planning_max_depth: int = 5  # Maximum decomposition depth
+    hierarchical_planning_min_subtasks: int = 2  # Minimum subtasks per decomposition
+    hierarchical_planning_max_subtasks: int = 10  # Maximum subtasks per decomposition
+
+    # Episodic Memory - Store and retrieve agent experiences
+    enable_episodic_memory: bool = False  # Enable episodic memory for conversations
+    episodic_memory_max_episodes: int = 1000  # Maximum episodes to store
+    episodic_memory_recall_threshold: float = 0.3  # Minimum similarity for recall
+    episodic_memory_consolidation_interval: int = 100  # Episodes between consolidation
+
+    # Semantic Memory - Store and query factual knowledge
+    enable_semantic_memory: bool = False  # Enable semantic knowledge memory
+    semantic_memory_max_facts: int = 5000  # Maximum facts to store
+    semantic_memory_query_threshold: float = 0.25  # Minimum similarity for query
+    semantic_memory_link_threshold: float = 0.4  # Minimum similarity for knowledge links
+
+    # Skill Discovery - Discover and compose dynamic tool chains
+    enable_skill_discovery: bool = False  # Enable dynamic skill discovery
+    skill_discovery_max_tools: int = 20  # Maximum tools to consider
+    skill_discovery_min_compatibility: float = 0.5  # Minimum tool compatibility score
+    skill_discovery_auto_composition: bool = True  # Automatically compose compatible tools
+
+    # Skill Chaining - Plan and execute multi-step skill chains
+    enable_skill_chaining: bool = False  # Enable skill chaining workflows
+    skill_chaining_max_chain_length: int = 10  # Maximum skills in a chain
+    skill_chaining_validation_enabled: bool = True  # Validate chains before execution
+    skill_chaining_parallel_enabled: bool = True  # Enable parallel chain execution
+
+    # Self-Improvement - Track proficiency and optimize performance
+    enable_self_improvement: bool = False  # Enable proficiency tracking and learning
+    proficiency_tracker_window_size: int = 100  # Outcomes to track per tool/task
+    proficiency_tracker_decay_rate: float = 0.95  # Exponential decay for old outcomes
+    proficiency_tracker_min_samples: int = 5  # Minimum samples before suggesting changes
+
+    # RL Coordinator - Enhanced reinforcement learning for decision optimization
+    enable_rl_coordinator: bool = True  # Enable RL-based decision optimization (NEW)
+    rl_reward_shaping: str = "sparse"  # Reward shaping: sparse, dense, hybrid
+    rl_policy_update_interval: int = 50  # Episodes between policy updates
+    rl_exploration_rate: float = 0.3  # Initial exploration rate (epsilon-greedy)
 
     # ==========================================================================
     # Event System Configuration (Canonical core/events)

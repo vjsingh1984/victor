@@ -309,7 +309,7 @@ class VerticalModeConfig:
 DEFAULT_MODES: Dict[str, ModeDefinition] = {
     "quick": ModeDefinition(
         name="quick",
-        tool_budget=5,
+        tool_budget=10,
         max_iterations=10,
         temperature=0.5,
         description="Quick tasks with minimal exploration",
@@ -317,7 +317,7 @@ DEFAULT_MODES: Dict[str, ModeDefinition] = {
     ),
     "fast": ModeDefinition(
         name="fast",
-        tool_budget=5,
+        tool_budget=10,
         max_iterations=10,
         temperature=0.5,
         description="Alias for quick mode",
@@ -325,7 +325,7 @@ DEFAULT_MODES: Dict[str, ModeDefinition] = {
     ),
     "standard": ModeDefinition(
         name="standard",
-        tool_budget=15,
+        tool_budget=50,
         max_iterations=40,
         temperature=0.7,
         description="Balanced mode for typical tasks",
@@ -333,7 +333,7 @@ DEFAULT_MODES: Dict[str, ModeDefinition] = {
     ),
     "default": ModeDefinition(
         name="default",
-        tool_budget=10,
+        tool_budget=25,
         max_iterations=30,
         temperature=0.7,
         description="Default operational mode",
@@ -341,7 +341,7 @@ DEFAULT_MODES: Dict[str, ModeDefinition] = {
     ),
     "comprehensive": ModeDefinition(
         name="comprehensive",
-        tool_budget=30,
+        tool_budget=100,
         max_iterations=80,
         temperature=0.8,
         description="Thorough analysis and comprehensive changes",
@@ -349,7 +349,7 @@ DEFAULT_MODES: Dict[str, ModeDefinition] = {
     ),
     "thorough": ModeDefinition(
         name="thorough",
-        tool_budget=30,
+        tool_budget=100,
         max_iterations=80,
         temperature=0.8,
         description="Alias for comprehensive mode",
@@ -357,7 +357,7 @@ DEFAULT_MODES: Dict[str, ModeDefinition] = {
     ),
     "explore": ModeDefinition(
         name="explore",
-        tool_budget=20,
+        tool_budget=75,
         max_iterations=60,
         temperature=0.7,
         description="Extended exploration for understanding",
@@ -365,7 +365,7 @@ DEFAULT_MODES: Dict[str, ModeDefinition] = {
     ),
     "plan": ModeDefinition(
         name="plan",
-        tool_budget=15,
+        tool_budget=50,
         max_iterations=50,
         temperature=0.6,
         description="Planning and analysis mode before implementation",
@@ -373,7 +373,7 @@ DEFAULT_MODES: Dict[str, ModeDefinition] = {
     ),
     "extended": ModeDefinition(
         name="extended",
-        tool_budget=50,
+        tool_budget=100,
         max_iterations=100,
         temperature=0.8,
         description="Extended operations for large tasks",
@@ -382,26 +382,27 @@ DEFAULT_MODES: Dict[str, ModeDefinition] = {
 }
 
 # Default task type budgets (fallback for all verticals)
+# Significantly increased to support comprehensive exploration
 DEFAULT_TASK_BUDGETS: Dict[str, int] = {
     # General tasks
-    "general": 8,
-    "simple": 5,
-    "moderate": 12,
-    "complex": 20,
+    "general": 50,
+    "simple": 10,
+    "moderate": 25,
+    "complex": 50,
     # Analysis tasks
-    "analyze": 12,
-    "analysis_deep": 25,
-    "explore": 15,
-    "search": 8,
+    "analyze": 50,
+    "analysis_deep": 100,
+    "explore": 75,
+    "search": 25,
     # Modification tasks
-    "create": 8,
-    "create_simple": 3,
-    "edit": 6,
-    "refactor": 15,
+    "create": 15,
+    "create_simple": 5,
+    "edit": 15,
+    "refactor": 50,
     # Specialized tasks
-    "debug": 12,
-    "test": 10,
-    "design": 20,
+    "debug": 20,
+    "test": 15,
+    "design": 100,
 }
 
 
@@ -892,7 +893,7 @@ class VerticalModeDefaults:
         return {
             "architect": ModeDefinition(
                 name="architect",
-                tool_budget=40,
+                tool_budget=100,
                 max_iterations=100,
                 temperature=0.8,
                 description="Architecture analysis and design tasks",
@@ -900,7 +901,7 @@ class VerticalModeDefaults:
             ),
             "refactor": ModeDefinition(
                 name="refactor",
-                tool_budget=25,
+                tool_budget=50,
                 max_iterations=60,
                 temperature=0.6,
                 description="Code refactoring with safety checks",
@@ -908,7 +909,7 @@ class VerticalModeDefaults:
             ),
             "debug": ModeDefinition(
                 name="debug",
-                tool_budget=15,
+                tool_budget=25,
                 max_iterations=40,
                 temperature=0.5,
                 description="Debugging and issue investigation",
@@ -916,7 +917,7 @@ class VerticalModeDefaults:
             ),
             "test": ModeDefinition(
                 name="test",
-                tool_budget=15,
+                tool_budget=20,
                 max_iterations=40,
                 temperature=0.5,
                 description="Test creation and execution",
@@ -932,19 +933,19 @@ class VerticalModeDefaults:
             Dict of task type to tool budget
         """
         return {
-            "code_generation": 3,
-            "create_simple": 2,
-            "create": 5,
-            "edit": 5,
-            "search": 6,
-            "action": 15,
-            "analysis_deep": 25,
-            "analyze": 12,
-            "design": 25,
-            "refactor": 15,
-            "debug": 12,
-            "test": 10,
-            "general": 8,
+            "code_generation": 10,
+            "create_simple": 5,
+            "create": 15,
+            "edit": 15,
+            "search": 25,
+            "action": 50,
+            "analysis_deep": 100,
+            "analyze": 50,
+            "design": 100,
+            "refactor": 50,
+            "debug": 20,
+            "test": 15,
+            "general": 50,
         }
 
     @staticmethod
@@ -989,7 +990,7 @@ class VerticalModeDefaults:
         return {
             "index": ModeDefinition(
                 name="index",
-                tool_budget=25,
+                tool_budget=50,
                 max_iterations=70,
                 temperature=0.6,
                 description="Document ingestion and indexing",
@@ -1020,7 +1021,7 @@ class VerticalModeDefaults:
         return {
             "insights": ModeDefinition(
                 name="insights",
-                tool_budget=30,
+                tool_budget=75,
                 max_iterations=80,
                 temperature=0.7,
                 description="Deep data analysis and insight generation",
@@ -1051,7 +1052,7 @@ class VerticalModeDefaults:
         return {
             "deep": ModeDefinition(
                 name="deep",
-                tool_budget=25,
+                tool_budget=75,
                 max_iterations=70,
                 temperature=0.7,
                 description="Deep research with extensive analysis",
@@ -1059,7 +1060,7 @@ class VerticalModeDefaults:
             ),
             "academic": ModeDefinition(
                 name="academic",
-                tool_budget=40,
+                tool_budget=100,
                 max_iterations=100,
                 temperature=0.8,
                 description="Academic-level research with citation management",

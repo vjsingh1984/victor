@@ -1,0 +1,263 @@
+stages:
+  - lint
+  - test
+  - security
+  - build
+  - deploy
+  - release
+
+variables:
+  REGISTRY: docker.io
+  IMAGE_NAME: victorai/victor
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+  KUBERNETES_NAMESPACE_OVERWRITE: "victor-ai-${CI_ENVIRONMENT_NAME}"
+
+# Cache configuration
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .cache/pip
+    - .cache/docker
+
+# Anchors
+.python_base: &python_base
+  image: python:3.11-slim
+  before_script:
+    - pip install --upgrade pip setuptools wheel
+    - pip install -e ".[dev]"
+    - pip install -e ".[api]"
+
+.docker_base: &docker_base
+  image: docker:24-dind
+  services:
+    - docker:24-dind
+  before_script:
+    - docker login -u $DOCKER_REGISTRY_USER -p $DOCKER_REGISTRY_PASSWORD $REGISTRY
+
+# Linting stage
+lint:
+  stage: lint
+  <<: *python_base
+  script:
+    - ruff check victor tests
+    - black --check victor tests
+    - mypy victor
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-lint
+    paths:
+      - .cache/pip
+  only:
+    - branches
+    - merge_requests
+
+# Testing stage
+unit-tests:
+  stage: test
+  <<: *python_base
+  script:
+    - pytest tests/unit -v --cov=victor --cov-report=xml --cov-report=html
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - htmlcov/
+    expire_in: 1 week
+  only:
+    - branches
+    - merge_requests
+
+integration-tests:
+  stage: test
+  <<: *python_base
+  services:
+    - postgres:15-alpine
+    - redis:7-alpine
+  variables:
+    POSTGRES_DB: victor_test
+    POSTGRES_USER: victor
+    POSTGRES_PASSWORD: test
+    DATABASE_URL: postgresql://victor:test@postgres:5432/victor_test
+    REDIS_URL: redis://redis:6379/0
+  script:
+    - pytest tests/integration -v --timeout=300
+  only:
+    - main
+    - develop
+    - tags
+
+# Security scanning stage
+security-scan:
+  stage: security
+  image: aquasec/trivy:latest
+  script:
+    - trivy fs --format json --output trivy-report.json .
+    - trivy fs --severity HIGH,CRITICAL .
+  artifacts:
+    reports:
+      sast: gl-sast-report.json
+    paths:
+      - trivy-report.json
+    expire_in: 1 week
+  only:
+    - branches
+    - merge_requests
+
+bandit:
+  stage: security
+  <<: *python_base
+  script:
+    - pip install bandit[toml]
+    - bandit -r victor -f json -o bandit-report.json
+    - bandit -r victor
+  artifacts:
+    paths:
+      - bandit-report.json
+    expire_in: 1 week
+  allow_failure: true
+  only:
+    - branches
+    - merge_requests
+
+# Build stage
+build-image:
+  stage: build
+  <<: *docker_base
+  script:
+    - docker buildx create --use
+    - docker buildx build
+      --platform linux/amd64,linux/arm64
+      --file ./deployment/docker/Dockerfile
+      --target slim
+      --cache-from type=local,src=/tmp/.buildx-cache
+      --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max
+      --tag $REGISTRY/$IMAGE_NAME:$CI_COMMIT_SHORT_SHA
+      --tag $REGISTRY/$IMAGE_NAME:latest
+      --push .
+    - rm -rf /tmp/.buildx-cache
+    - mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+  only:
+    - main
+    - develop
+    - tags
+
+build-image-mr:
+  stage: build
+  <<: *docker_base
+  script:
+    - docker buildx create --use
+    - docker buildx build
+      --platform linux/amd64
+      --file ./deployment/docker/Dockerfile
+      --target slim
+      --cache-from type=local,src=/tmp/.buildx-cache
+      --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max
+      --tag $REGISTRY/$IMAGE_NAME:mr-$CI_COMMIT_SHORT_SHA
+      --push .
+    - rm -rf /tmp/.buildx-cache
+    - mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+  only:
+    - merge_requests
+
+# Security scan image
+scan-image:
+  stage: build
+  image: aquasec/trivy:latest
+  needs: [build-image]
+  script:
+    - trivy image --format json --output trivy-image-report.json $REGISTRY/$IMAGE_NAME:$CI_COMMIT_SHORT_SHA
+    - trivy image --severity HIGH,CRITICAL $REGISTRY/$IMAGE_NAME:$CI_COMMIT_SHORT_SHA
+  artifacts:
+    paths:
+      - trivy-image-report.json
+    expire_in: 1 week
+  allow_failure: true
+  only:
+    - main
+    - develop
+    - tags
+
+# Deploy stages
+deploy-staging:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  environment:
+    name: staging
+    url: https://victor-ai-staging.example.com
+  needs: [build-image]
+  script:
+    - kubectl config use-context $KUBE_CONTEXT_STAGING
+    - kubectl apply -k deployment/kubernetes/overlays/staging
+    - kubectl rollout status deployment/victor-ai -n victor-ai-staging --timeout=5m
+    - kubectl run smoke-test --image=curlimages/curl:latest --rm -i --restart=Never -- curl -f http://victor-ai.victor-ai-staging.svc.cluster.local/health
+  only:
+    - develop
+
+deploy-production:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  environment:
+    name: production
+    url: https://victor-ai.example.com
+  needs: [build-image, scan-image]
+  script:
+    - kubectl config use-context $KUBE_CONTEXT_PROD
+    - kubectl apply -k deployment/kubernetes/overlays/production
+    - kubectl rollout status deployment/victor-ai -n victor-ai-prod --timeout=10m
+    - kubectl run smoke-test --image=curlimages/curl:latest --rm -i --restart=Never -- curl -f http://victor-ai.victor-ai-prod.svc.cluster.local/health
+  when: manual
+  only:
+    - main
+    - tags
+
+# Release stage
+release-pypi:
+  stage: release
+  <<: *python_base
+  script:
+    - pip install build twine
+    - python -m build
+    - twine upload dist/*
+  variables:
+    TWINE_USERNAME: __token__
+    TWINE_PASSWORD: $PYPI_TOKEN
+  only:
+    - tags
+  when: manual
+
+release-github:
+  stage: release
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache git curl
+  script:
+    - git log $(git describe --tags --abbrev=0 HEAD^)..HEAD --oneline > CHANGELOG.md
+    - |
+      curl -X POST \
+        -H "Authorization: token $GITHUB_TOKEN" \
+        -H "Accept: application/vnd.github.v3+json" \
+        https://api.github.com/repos/${CI_PROJECT_PATH}/releases \
+        -d '{"tag_name":"'${CI_COMMIT_TAG}'","name":"'${CI_COMMIT_TAG}'","body":null,"draft":false,"prerelease":false}'
+  only:
+    - tags
+  when: manual
+
+# Notifications
+notify-slack:
+  stage: .post
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl
+  script:
+    - |
+      curl -X POST $SLACK_WEBHOOK \
+        -H 'Content-Type: application/json' \
+        -d '{"text":"Pipeline '${CI_PIPELINE_SOURCE}' for '${CI_COMMIT_REF_NAME}' completed with status '${CI_JOB_STATUS}'"}'
+  when: always()
+  only:
+    - main
+    - develop
+    - tags

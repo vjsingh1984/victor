@@ -360,6 +360,20 @@ class ServiceContainer:
         except ServiceNotFoundError:
             return None
 
+    def get_service(self, service_type: Type[T]) -> T:
+        """Alias for get() for backward compatibility.
+
+        Args:
+            service_type: Type of service to retrieve
+
+        Returns:
+            Service instance
+
+        Raises:
+            ServiceNotFoundError: If service is not registered
+        """
+        return self.get(service_type)
+
     def is_registered(self, service_type: Type) -> bool:
         """Check if a service type is registered.
 

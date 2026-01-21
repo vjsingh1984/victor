@@ -597,4 +597,205 @@ def create_vertical(
     )
 
 
+@vertical_app.command("list-templates")
+def list_templates(
+    category: str = typer.Option(
+        None,
+        "--category",
+        "-c",
+        help="Filter by category",
+    ),
+    tag: str = typer.Option(
+        None,
+        "--tag",
+        "-t",
+        help="Filter by tag",
+    ),
+) -> None:
+    """List available vertical templates.
+
+    Examples:
+        victor vertical list-templates
+        victor vertical list-templates --category development
+        victor vertical list-templates --tag security
+    """
+    from victor.framework.vertical_template_registry import get_template_registry
+
+    registry = get_template_registry()
+
+    # Load built-in templates if not already loaded
+    if not registry.list_names():
+        from pathlib import Path
+
+        templates_dir = Path(__file__).parent.parent.parent / "config" / "templates"
+        if templates_dir.exists():
+            count = registry.load_directory(templates_dir, pattern="*_vertical_template.yaml")
+            console.print(f"[dim]Loaded {count} built-in templates[/]\n")
+
+    templates = registry.list_all()
+
+    # Apply filters
+    if category:
+        templates = [t for t in templates if t.metadata.category == category]
+    if tag:
+        templates = [t for t in templates if tag in t.metadata.tags]
+
+    if not templates:
+        console.print("[yellow]No templates found[/]")
+        return
+
+    # Display table
+    table = Table(title="Vertical Templates", show_header=True)
+    table.add_column("Name", style="cyan", no_wrap=True)
+    table.add_column("Version", style="green")
+    table.add_column("Category", style="yellow")
+    table.add_column("Description", style="white")
+    table.add_column("Tools", style="blue")
+    table.add_column("Stages", style="magenta")
+
+    for template in sorted(templates, key=lambda t: t.metadata.name):
+        description = template.metadata.description
+        if len(description) > 50:
+            description = description[:47] + "..."
+
+        table.add_row(
+            template.metadata.name,
+            template.metadata.version,
+            template.metadata.category,
+            description,
+            str(len(template.tools)),
+            str(len(template.stages)),
+        )
+
+    console.print(table)
+    console.print()
+    console.print(f"[dim]Total: {len(templates)} template(s)[/]")
+
+
+@vertical_app.command("validate-template")
+def validate_template(
+    path: str = typer.Argument(
+        ...,
+        help="Path to template YAML file",
+    ),
+) -> None:
+    """Validate a vertical template YAML file.
+
+    Examples:
+        victor vertical validate-template templates/my_vertical.yaml
+        victor vertical validate-template victor/config/templates/base_vertical_template.yaml
+    """
+    from victor.framework.vertical_template_registry import get_template_registry
+
+    registry = get_template_registry()
+
+    console.print()
+    console.print(f"[dim]Validating template: {path}[/]")
+
+    # Load template
+    template = registry.load_from_yaml(path, resolve_inheritance=False)
+
+    if template is None:
+        console.print("[red]Error: Failed to load template[/]")
+        raise typer.Exit(1)
+
+    # Validate template
+    errors = template.validate()
+
+    if errors:
+        console.print()
+        console.print("[red]Validation errors:[/]")
+        for error in errors:
+            console.print(f"  [red]✗[/] {error}")
+        console.print()
+        raise typer.Exit(1)
+    else:
+        console.print("[green]Template is valid![/]")
+        console.print()
+
+        # Show template info
+        console.print("[bold]Template Information:[/]")
+        console.print(f"  Name: {template.metadata.name}")
+        console.print(f"  Version: {template.metadata.version}")
+        console.print(f"  Category: {template.metadata.category}")
+        console.print(f"  Tools: {len(template.tools)}")
+        console.print(f"  Stages: {len(template.stages)}")
+        console.print(f"  Workflows: {len(template.workflows)}")
+        console.print(f"  Teams: {len(template.teams)}")
+        console.print(f"  Capabilities: {len(template.capabilities)}")
+        console.print()
+
+
+@vertical_app.command("export-template")
+def export_template(
+    vertical_name: str = typer.Argument(
+        ...,
+        help="Name of the vertical to export (e.g., 'coding', 'research')",
+    ),
+    output: str = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Output file path (default: {vertical_name}_template.yaml)",
+    ),
+) -> None:
+    """Export an existing vertical to a template YAML file.
+
+    This creates a template from an existing vertical implementation,
+    which can then be used as a base for creating new verticals.
+
+    Examples:
+        victor vertical export-template coding
+        victor vertical export-template research --output templates/research_template.yaml
+    """
+    from pathlib import Path
+
+    from victor.core.verticals.base import VerticalRegistry
+    from victor.framework.vertical_template_registry import get_template_registry
+
+    # Get vertical class
+    vertical_class = VerticalRegistry.get(vertical_name)
+
+    if vertical_class is None:
+        console.print(f"[red]Error: Vertical '{vertical_name}' not found[/]")
+        console.print()
+        console.print("[dim]Use 'victor vertical list --source builtin' to see available verticals[/]")
+        raise typer.Exit(1)
+
+    console.print()
+    console.print(f"[dim]Exporting vertical '{vertical_name}' to template...[/]")
+
+    # Extract template from vertical
+    from victor.framework.vertical_extractor import VerticalExtractor
+
+    extractor = VerticalExtractor()
+    template = extractor.extract_from_vertical(vertical_class)
+
+    if template is None:
+        console.print("[red]Error: Failed to extract template from vertical[/]")
+        raise typer.Exit(1)
+
+    # Determine output path
+    if output is None:
+        output = f"{vertical_name}_template.yaml"
+
+    output_path = Path(output)
+
+    # Save template
+    registry = get_template_registry()
+    success = registry.save_to_yaml(template, output_path, validate=True)
+
+    if success:
+        console.print(f"[green]Template exported to: {output_path}[/]")
+        console.print()
+        console.print("[bold]Next steps:[/]")
+        console.print(f"  1. Review and customize the template: {output_path}")
+        console.print(f"  2. Validate: victor vertical validate-template {output_path}")
+        console.print(f"  3. Use to create new vertical: victor vertical create my_vertical --template {output_path}")
+        console.print()
+    else:
+        console.print("[red]Error: Failed to save template[/]")
+        raise typer.Exit(1)
+
+
 __all__ = ["vertical_app"]

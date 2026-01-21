@@ -1,0 +1,53 @@
+apiVersion: v2
+name: victor-ai
+description: A Helm chart for Victor AI - Open-source AI coding assistant
+type: application
+version: 0.5.1
+appVersion: "0.5.1"
+keywords:
+  - ai
+  - coding
+  - assistant
+  - llm
+  - developer-tools
+home: https://github.com/victor-ai/victor
+sources:
+  - https://github.com/victor-ai/victor
+icon: https://raw.githubusercontent.com/victor-ai/victor/main/docs/logo.png
+maintainers:
+  - name: Victor AI Team
+    email: team@victor.ai
+    url: https://victor.ai
+annotations:
+  artifacthub.io/category: "developer-tools"
+  artifacthub.io/changes: |
+    - Added production deployment support
+    - Added Kubernetes manifests
+    - Added Helm chart
+    - Added CI/CD pipelines
+  artifacthub.io/containsSecurityUpdates: "false"
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/links: |
+    - name: Documentation
+      url: https://docs.victor.ai
+    - name: Support
+      url: https://github.com/victor-ai/victor/issues
+  artifacthub.io/operator: "false"
+  artifacthub.io/prerelease: "false"
+  artifacthub.io/recommendations: |
+    - url: https://artifacthub.io/packages/helm/bitnami/postgresql
+    - url: https://artifacthub.io/packages/helm/bitnami/redis
+  artifacthub.io/signKey: |
+    fingerprint: <PGP_KEY_FINGERPRINT>
+    url: https://github.com/victor-ai/victor/blob/main/KEYS
+dependencies:
+  - name: postgresql
+    version: 12.x.x
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+    alias: postgresql
+  - name: redis
+    version: 17.x.x
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+    alias: redis

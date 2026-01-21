@@ -381,3 +381,187 @@ class TestMethodChaining:
 
         assert container.is_registered(MockLogger)
         assert container.is_registered(MockCache)
+
+
+class TestServiceDescriptor:
+    """Tests for ServiceDescriptor dataclass."""
+
+    def test_create_service_descriptor(self):
+        """Test creating a service descriptor."""
+        from victor.core.container import ServiceDescriptor, ServiceLifetime
+
+        descriptor = ServiceDescriptor(
+            service_type=MockLogger,
+            factory=lambda c: MockLogger(),
+            lifetime=ServiceLifetime.SINGLETON
+        )
+
+        assert descriptor.service_type == MockLogger
+        assert descriptor.lifetime == ServiceLifetime.SINGLETON
+        assert descriptor.instance is None
+
+    def test_descriptor_create_instance(self):
+        """Test ServiceDescriptor.create_instance method."""
+        from victor.core.container import ServiceDescriptor, ServiceLifetime
+
+        descriptor = ServiceDescriptor(
+            service_type=MockLogger,
+            factory=lambda c: MockLogger(),
+            lifetime=ServiceLifetime.TRANSIENT
+        )
+
+        container = ServiceContainer()
+        instance = descriptor.create_instance(container)
+
+        assert isinstance(instance, MockLogger)
+
+
+class TestDisposableProtocol:
+    """Tests for Disposable protocol."""
+
+    def test_disposable_protocol(self):
+        """Test that DisposableService implements Disposable protocol."""
+        from victor.core.container import Disposable
+
+        service = DisposableService()
+        assert isinstance(service, Disposable)
+
+    def test_dispose_method_exists(self):
+        """Test dispose method exists on disposable services."""
+        service = DisposableService()
+        assert hasattr(service, "dispose")
+        assert callable(service.dispose)
+
+
+class TestServiceLifetimeEnum:
+    """Tests for ServiceLifetime enum."""
+
+    def test_singleton_lifetime(self):
+        """Test SINGLETON enum value."""
+        from victor.core.container import ServiceLifetime
+
+        assert ServiceLifetime.SINGLETON.value == "singleton"
+
+    def test_scoped_lifetime(self):
+        """Test SCOPED enum value."""
+        from victor.core.container import ServiceLifetime
+
+        assert ServiceLifetime.SCOPED.value == "scoped"
+
+    def test_transient_lifetime(self):
+        """Test TRANSIENT enum value."""
+        from victor.core.container import ServiceLifetime
+
+        assert ServiceLifetime.TRANSIENT.value == "transient"
+
+    def test_lifetime_iteration(self):
+        """Test can iterate over ServiceLifetime."""
+        from victor.core.container import ServiceLifetime
+
+        lifetimes = list(ServiceLifetime)
+        assert len(lifetimes) == 3
+        assert ServiceLifetime.SINGLETON in lifetimes
+        assert ServiceLifetime.SCOPED in lifetimes
+        assert ServiceLifetime.TRANSIENT in lifetimes
+
+
+class TestErrorClasses:
+    """Tests for exception classes."""
+
+    def test_service_not_found_error_properties(self):
+        """Test ServiceNotFoundError has service_type property."""
+        try:
+            raise ServiceNotFoundError(MockLogger)
+        except ServiceNotFoundError as e:
+            assert e.service_type == MockLogger
+            assert "MockLogger" in str(e)
+
+    def test_service_already_registered_error_properties(self):
+        """Test ServiceAlreadyRegisteredError has service_type property."""
+        try:
+            raise ServiceAlreadyRegisteredError(MockLogger)
+        except ServiceAlreadyRegisteredError as e:
+            assert e.service_type == MockLogger
+            assert "MockLogger" in str(e)
+
+    def test_scope_disposed_error(self):
+        """Test ScopeDisposedError can be raised and caught."""
+        try:
+            raise ScopeDisposedError("Scope is disposed")
+        except ScopeDisposedError as e:
+            assert "disposed" in str(e).lower()
+
+
+class TestAdvancedScenarios:
+    """Tests for advanced container scenarios."""
+
+    def test_nested_dependencies(self):
+        """Test container with nested dependency chain."""
+        class Database:
+            def __init__(self, logger: ILogger):
+                self.logger = logger
+
+        class Repository:
+            def __init__(self, db: Database):
+                self.db = db
+
+        container = ServiceContainer()
+        container.register(MockLogger, lambda c: MockLogger())
+        container.register(Database, lambda c: Database(c.get(MockLogger)))
+        container.register(Repository, lambda c: Repository(c.get(Database)))
+
+        repo = container.get(Repository)
+        assert isinstance(repo, Repository)
+        assert isinstance(repo.db, Database)
+        assert isinstance(repo.db.logger, MockLogger)
+
+    def test_multiple_scopes_independent(self):
+        """Test that multiple scopes are independent."""
+        container = ServiceContainer()
+        container.register(
+            MockLogger,
+            lambda c: MockLogger(),
+            ServiceLifetime.SCOPED
+        )
+
+        with container.create_scope() as scope1:
+            logger1 = scope1.get(MockLogger)
+            logger1.messages.append("scope1")
+
+        with container.create_scope() as scope2:
+            logger2 = scope2.get(MockLogger)
+            logger2.messages.append("scope2")
+
+        # Scopes should be independent
+        assert "scope1" not in logger2.messages
+
+    def test_transient_in_scope(self):
+        """Test that transient services create new instances even in scope."""
+        container = ServiceContainer()
+        container.register(
+            MockLogger,
+            lambda c: MockLogger(),
+            ServiceLifetime.TRANSIENT
+        )
+
+        with container.create_scope() as scope:
+            logger1 = scope.get(MockLogger)
+            logger2 = scope.get(MockLogger)
+
+            assert logger1 is not logger2
+
+    def test_container_dispose_idempotent(self):
+        """Test that dispose can be called multiple times safely."""
+        container = ServiceContainer()
+        container.register(
+            DisposableService,
+            lambda c: DisposableService()
+        )
+        container.get(DisposableService)
+
+        container.dispose()
+        assert DisposableService.disposed
+
+        # Second dispose should not raise
+        container.dispose()
+        assert DisposableService.disposed

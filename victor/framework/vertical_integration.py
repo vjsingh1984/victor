@@ -25,6 +25,19 @@ Design Philosophy:
 - SOLID-compliant extension points
 - Step handlers for Single Responsibility (Phase 3.1)
 
+**PRIMARY EXTENSION MECHANISM**: StepHandlerRegistry
+
+This module uses StepHandlerRegistry as its PRIMARY extension mechanism.
+Custom integration logic should be implemented as step handlers, not by
+modifying VerticalIntegrationPipeline or its methods.
+
+See docs/extensions/step_handler_guide.md for complete guide.
+
+**DEPRECATED PATTERNS**:
+- Direct vertical method overrides (use step handlers instead)
+- Private attribute access (use capability registry)
+- Monolithic apply_to_orchestrator() (use focused handlers)
+
 Architecture (Refactored with Step Handlers):
     VerticalIntegrationPipeline (Facade)
     │
@@ -1756,6 +1769,10 @@ class VerticalIntegrationPipeline:
                 name=vertical.name,
                 config=config,
             )
+            # Auto-apply stages from config to context
+            # This ensures context.stages is populated even if step handlers don't run
+            if config.stages:
+                context.apply_stages(config.stages)
             return context
         except Exception as e:
             result.add_error(f"Failed to create context: {e}")

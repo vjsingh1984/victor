@@ -1,0 +1,94 @@
+# Prometheus Configuration for Victor AI
+# Global configuration
+global:
+  scrape_interval: 15s  # Default scrape interval
+  scrape_timeout: 10s   # Default scrape timeout
+  evaluation_interval: 15s  # Evaluate rules every 15 seconds
+
+  # External labels
+  external_labels:
+    cluster: 'victor-production'
+    environment: 'production'
+
+# AlertManager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - 'localhost:9093'
+      timeout: 10s
+      api_version: v2
+
+# Rule files
+rule_files:
+  - '/etc/prometheus/alerting_rules.yml'
+  - '/etc/prometheus/recording_rules.yml'
+
+# Scrape configurations
+scrape_configs:
+  # Victor AI metrics endpoint
+  - job_name: 'victor-ai'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: '/metrics'
+    scheme: 'http'
+
+    static_configs:
+      - targets:
+          - 'localhost:9091'  # Victor AI metrics endpoint
+        labels:
+          service: 'victor-ai'
+          environment: 'production'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    scrape_interval: 15s
+    static_configs:
+      - targets:
+          - 'localhost:9090'
+        labels:
+          service: 'prometheus'
+
+  # Node exporter for system metrics
+  - job_name: 'node-exporter'
+    scrape_interval: 15s
+    static_configs:
+      - targets:
+          - 'localhost:9100'
+        labels:
+          service: 'node-exporter'
+
+  # cAdvisor for container metrics
+  - job_name: 'cadvisor'
+    scrape_interval: 15s
+    static_configs:
+      - targets:
+          - 'localhost:8080'
+        labels:
+          service: 'cadvisor'
+
+# Storage configuration
+storage:
+  tsdb:
+    path: /prometheus
+    retention.time: 15d
+    retention.size: 10GB
+
+# Tracing configuration (optional)
+# tracing:
+#   endpoint: "localhost:4318"
+#   client_type: "grpc"
+#   headers:
+#     X-Trace-Header: "value"
+
+# Remote write configuration (optional - for long-term storage)
+# remote_write:
+#   - url: "http://remote-storage:9009/api/v1/write"
+#     queue_config:
+#       capacity: 10000
+#       max_shards: 50
+#       min_shards: 1
+#       max_samples_per_send: 5000
+#       batch_send_deadline: 5s
+#       min_backoff: 30ms
+#       max_backoff: 100ms

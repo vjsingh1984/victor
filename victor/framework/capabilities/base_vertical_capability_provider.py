@@ -465,6 +465,15 @@ class BaseVerticalCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
                         exc_info=True,
                     )
 
+    def configure_all(self, orchestrator: Any, **kwargs: Any) -> None:
+        """Alias for apply_all() for backward compatibility.
+
+        Args:
+            orchestrator: Target orchestrator
+            **kwargs: Shared options passed to all capabilities
+        """
+        self.apply_all(orchestrator, **kwargs)
+
     def get_applied(self) -> Set[str]:
         """Get set of applied capability names.
 

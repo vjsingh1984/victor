@@ -1,173 +1,670 @@
 <div align="center">
 
-# Victor Documentation
+# Victor AI Documentation Index
 
-**Provider-agnostic AI coding assistant with multi-provider support, workflow orchestration, and extensible tool system**
+**Complete navigation for Victor AI 0.5.1**
 
-[![PyPI version](https://badge.fury.io/py/victor-ai.svg)](https://pypi.org/project/victor-ai/)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Tests](https://github.com/vjsingh1984/victor/actions/workflows/test.yml/badge.svg)](https://github.com/vjsingh1984/victor/actions/workflows/test.yml)
+[![Version](https://badge.fury.io/py/victor-ai.svg)](https://pypi.org/project/victor-ai/)
+[![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](./index.md)
 
 </div>
 
 ---
 
-## Welcome! 👋
+## Welcome to Victor AI Documentation
 
-Victor is an open-source AI coding assistant supporting **21 LLM providers** with **55 specialized tools** across **5 domain verticals**. Whether you need local development with Ollama, cloud capabilities with Claude/GPT, or enterprise deployments with Azure/AWS, Victor provides a unified interface with powerful features like semantic codebase search, YAML-first workflows, multi-agent coordination, and air-gapped mode support.
+Victor AI is an open-source AI coding assistant supporting **21 LLM providers** with **55 specialized tools** across **5 domain verticals**. This documentation hub contains **369 markdown files** with **132,000+ lines** of documentation organized by audience and topic.
 
-## What is Victor?
+### Documentation Statistics
 
-Victor is a **provider-agnostic AI coding assistant** that gives you the freedom to choose between local and cloud LLM providers through a single, consistent CLI/TUI interface. Built with extensibility in mind, Victor's vertical architecture lets you specialize workflows for coding, DevOps, RAG, data analysis, and research tasks.
-
-### Key Highlights
-
-- 🌐 **21 LLM Providers** - Switch between Anthropic, OpenAI, Google, Azure, AWS Bedrock, Ollama, LM Studio, vLLM, and more
-- 🛠️ **55 Specialized Tools** - Across 5 domain verticals (Coding, DevOps, RAG, Data Analysis, Research)
-- 🔄 **YAML-First Workflows** - Define multi-step automation with StateGraph DSL and checkpointing
-- 🔒 **Air-Gapped Mode** - Full functionality with local models for secure, offline environments
-- 🔍 **Semantic Codebase Search** - Context-aware code understanding with Tree-sitter and embeddings
-- 🤖 **Multi-Agent Teams** - Coordinate specialized agents for complex tasks
-- 🔌 **MCP Protocol Support** - Model Context Protocol for IDE integration
-- ⚡ **Provider Switching** - Change models mid-conversation without losing context
-
-## Quick Navigation
-
-### 🚀 Getting Started
-New to Victor? Start here!
-
-- **[Installation](getting-started/installation.md)** - Install Victor via pip, pipx, or Docker
-- **[Quick Start](getting-started/quickstart.md)** - Get up and running in 5 minutes
-- **[Configuration](getting-started/configuration.md)** - Configure providers, profiles, and settings
-- **[First Run](getting-started/first-run.md)** - Initialize your Victor environment
-
-### 📖 User Guide
-Master Victor's features and capabilities.
-
-- **[CLI Commands](reference/cli-commands.md)** - Complete command reference
-- **[User Guide Index](user-guide/index.md)** - Comprehensive user documentation
-- **[Providers](user-guide/providers.md)** - LLM provider configuration and comparison
-- **[Tools](user-guide/tools.md)** - Available tools and usage examples
-- **[Workflows](user-guide/workflows.md)** - Create and manage YAML workflows
-- **[TUI Mode](user-guide/tui-mode.md)** - Terminal user interface guide
-- **[Session Management](user-guide/session-management.md)** - Manage conversation sessions
-- **[Troubleshooting](user-guide/troubleshooting.md)** - Common issues and solutions
-
-### 📚 Tutorials
-Learn by doing with hands-on tutorials.
-
-- **[Build a Custom Tool](tutorials/build-custom-tool.md)** - Create your own tools
-- **[Create a Workflow](tutorials/create-workflow.md)** - Design multi-step automation
-- **[Integrate a Provider](tutorials/integrate-provider.md)** - Add a new LLM provider
-
-### 🔧 Reference
-In-depth technical documentation.
-
-- **[Configuration Options](reference/configuration-options.md)** - Complete settings reference
-- **[Environment Variables](reference/environment-variables.md)** - All environment variables
-- **[CLI Commands](reference/cli-commands.md)** - Command-line interface reference
-- **[API Reference](api-reference/)** - Python API documentation
-  - [Protocols](api-reference/protocols.md) - Core protocol definitions
-  - [Providers](api-reference/providers.md) - Provider API
-  - [Tools](api-reference/tools.md) - Tool API
-  - [Workflows](api-reference/workflows.md) - Workflow API
-
-### 🏗️ Development
-Contributor and architect documentation.
-
-- **[Development Setup](development/setup.md)** - Development environment setup
-- **[Code Style](development/code-style.md)** - Coding standards and conventions
-- **[Testing](development/testing.md)** - Testing strategy and guidelines
-- **[Architecture Overview](architecture/overview.md)** - System architecture and design
-- **[Extending Victor](development/index.md)** - Plugin development and extensions
-  - [Plugins](development/extending/plugins.md) - Build plugins
-  - [Verticals](development/extending/verticals.md) - Create domain verticals
-- **[Releasing](development/releasing/publishing.md)** - Release and publishing process
-
-### 🎯 Verticals
-Domain-specific documentation.
-
-- **[Coding](verticals/coding.md)** - AST analysis, code review, test generation
-- **[DevOps](verticals/devops.md)** - CI/CD, Docker, Terraform, infrastructure
-- **[RAG](verticals/rag.md)** - Document ingestion, vector search, retrieval
-- **[Data Analysis](verticals/data-analysis.md)** - Pandas, visualization, statistics
-- **[Research](verticals/research.md)** - Web search, citations, synthesis
-
-## Project Information
-
-### Version
-**Current Version:** v0.5.0 (see [CHANGELOG](../CHANGELOG.md))
-
-### Links
-- **[GitHub Repository](https://github.com/vjsingh1984/victor)** - Source code and issues
-- **[PyPI Package](https://pypi.org/project/victor-ai/)** - Install via pip
-- **[Contributing Guide](../CONTRIBUTING.md)** - How to contribute
-- **[Code of Conduct](../CODE_OF_CONDUCT.md)** - Community guidelines
-- **[Security Policy](../SECURITY.md)** - Security reporting and policies
-
-### License
-Apache License 2.0 - see [LICENSE](../LICENSE) for details.
+- **Total Files**: 369 markdown documents
+- **Total Lines**: 132,020 lines
+- **Total Size**: 13 MB
+- **Last Updated**: January 18, 2026
+- **Version**: 0.5.1
 
 ---
 
-## Quick Start
+## Quick Navigation by Audience
 
-### Choose Your Path
+### For Everyone
 
-```bash
-# Local model (privacy, offline, free tier)
-pipx install victor-ai
-ollama pull qwen2.5-coder:7b
-victor chat "Hello"
+New to Victor? Start with these essential documents:
 
-# Cloud model (max capability)
-pipx install victor-ai
-export ANTHROPIC_API_KEY=sk-...
-victor chat --provider anthropic
+| Document | Description | Reading Time |
+|----------|-------------|--------------|
+| [Quick Start](./QUICKSTART.md) | Get started in 5 minutes | 5 min |
+| [Installation](./getting-started/installation.md) | Install Victor via pip, pipx, or Docker | 5 min |
+| [First Run](./getting-started/first-run.md) | Initialize your Victor environment | 3 min |
+| [Configuration](./getting-started/configuration.md) | Configure providers, profiles, and settings | 10 min |
+| [User Guide Index](./user-guide/index.md) | Comprehensive user documentation | 30 min |
+| [FAQ](./user-guide/faq.md) | Frequently asked questions | 5 min |
+| [Troubleshooting](./TROUBLESHOOTING.md) | Common issues and solutions | 10 min |
 
-# Docker (isolated environment)
-docker pull ghcr.io/vjsingh1984/victor:latest
-docker run -it -v ~/.victor:/root/.victor ghcr.io/vjsingh1984/victor:latest
-```
+### For Architects
 
-### Architecture Overview
+System design and architecture documentation:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    CLIENTS                                       │
-│  CLI/TUI  │  VS Code (HTTP)  │  MCP Server  │  API Server       │
-└─────────────────────────┬───────────────────────────────────────┘
-                          ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                 AGENT ORCHESTRATOR (Facade)                      │
-│  Delegates to: ConversationController, ToolPipeline,            │
-│  StreamingController, ProviderManager, ToolRegistrar            │
-└─────────────────────────┬───────────────────────────────────────┘
-                          ▼
-┌───────────┬─────────────┬───────────────┬───────────────────────┐
-│ PROVIDERS │   TOOLS     │  WORKFLOWS    │  VERTICALS            │
-│  21       │   55        │  StateGraph   │  Coding/DevOps/RAG/   │
-│           │             │  + YAML       │  DataAnalysis/Research│
-└───────────┴─────────────┴───────────────┴───────────────────────┘
-```
+| Document | Description | Reading Time |
+|----------|-------------|--------------|
+| [Architect Quick Start](./ARCHITECT_QUICKSTART.md) | Architecture overview for architects | 15 min |
+| [Architecture Overview](./architecture/overview.md) | High-level system architecture | 20 min |
+| [Architecture README](./architecture/README.md) | Architecture documentation hub | 5 min |
+| [Design Patterns](./architecture/DESIGN_PATTERNS.md) | SOLID patterns and best practices | 30 min |
+| [Component Reference](./architecture/COMPONENT_REFERENCE.md) | Detailed component documentation | 45 min |
+| [Protocols Reference](./architecture/PROTOCOLS_REFERENCE.md) | Protocol definitions and usage | 25 min |
+| [Best Practices](./architecture/BEST_PRACTICES.md) | Architecture best practices | 20 min |
+| [Refactoring Overview](./architecture/REFACTORING_OVERVIEW.md) | Recent refactoring summary | 15 min |
 
-### Key Concepts
+### For Developers
 
-- **Provider Agnosticism** - Switch between 21 LLM providers seamlessly
-- **Vertical Architecture** - Self-contained domains with specialized tools
-- **YAML Workflows** - Declarative workflow definitions with Python escape hatches
-- **StateGraph DSL** - LangGraph-compatible workflow API for complex automation
-- **Multi-Agent Coordination** - Team formations with specialized roles
-- **SOLID Compliance** - Clean architecture following SOLID principles
+Implementation and extension documentation:
 
-## Support & Community
+| Document | Description | Reading Time |
+|----------|-------------|--------------|
+| [Contributor Quick Start](./CONTRIBUTOR_QUICKSTART.md) | Start contributing in 10 minutes | 10 min |
+| [Developer Onboarding](./DEVELOPER_ONBOARDING.md) | Complete developer guide | 30 min |
+| [Development Setup](./development/setup.md) | Development environment setup | 15 min |
+| [Code Style](./development/code-style.md) | Coding standards and conventions | 10 min |
+| [Testing Guide](./development/testing.md) | Testing strategy and guidelines | 20 min |
+| [API Reference](./api/README.md) | Python API documentation hub | 10 min |
+| [Extension Development](./extensions/README.md) | Plugin and extension development | 25 min |
+| [Vertical Creation Guide](./development/vertical_creation_guide.md) | Create domain verticals | 30 min |
+| [Tool Composition Guide](./TOOL_COMPOSITION_GUIDE.md) | Build and compose tools | 20 min |
 
-- **Documentation** - You are here! Explore the sections above
-- **GitHub Issues** - [Report bugs or request features](https://github.com/vjsingh1984/victor/issues)
-- **Discussions** - [Join community discussions](https://github.com/vjsingh1984/victor/discussions)
-- **Contributing** - See [Contributing Guide](../CONTRIBUTING.md) for details
+### For Contributors
+
+Community and contribution documentation:
+
+| Document | Description | Reading Time |
+|----------|-------------|--------------|
+| [Contributing Guide](../CONTRIBUTING.md) | How to contribute | 15 min |
+| [Code of Conduct](../CODE_OF_CONDUCT.md) | Community guidelines | 5 min |
+| [Development](./development/index.md) | Development documentation hub | 10 min |
+| [Testing](./testing/README.md) | Testing documentation | 15 min |
+| [CI/CD](./ci_cd/README.md) | Continuous integration and deployment | 10 min |
 
 ---
 
-**Built with ❤️ by the Victor community**
+## Documentation by Topic
+
+### Architecture & Design
+
+Comprehensive architecture documentation (180 KB, 19 files):
+
+- [Architecture Overview](./architecture/overview.md) - System architecture introduction
+- [Architecture README](./architecture/README.md) - Architecture documentation hub
+- [ARCHITECTURE.md](./architecture/ARCHITECTURE.md) - Complete architecture documentation
+- [Design Patterns](./architecture/DESIGN_PATTERNS.md) - SOLID design patterns
+- [Component Reference](./architecture/COMPONENT_REFERENCE.md) - Detailed component docs
+- [Protocols Reference](./architecture/PROTOCOLS_REFERENCE.md) - Protocol definitions
+- [Best Practices](./architecture/BEST_PRACTICES.md) - Architecture best practices
+- [Coordinator-Based Architecture](./architecture/coordinator_based_architecture.md) - Coordinator pattern
+- [Coordinator Separation](./architecture/coordinator_separation.md) - Separation concerns
+- [Refactoring Overview](./architecture/REFACTORING_OVERVIEW.md) - Refactoring summary
+- [Migration Guides](./architecture/MIGRATION_GUIDES.md) - Architecture migrations
+- [ISP Migration Guide](./architecture/ISP_MIGRATION_GUIDE.md) - Interface segregation
+- [Refactoring Migration Guide](./architecture/REFACTORING_MIGRATION_GUIDE.md) - Refactoring migrations
+- [Track 2 ISP Summary](./architecture/TRACK2_ISP_SUMMARY.md) - ISP compliance
+- [Workflow Consolidation](./architecture/WORKFLOW_CONSOLIDATION.md) - Workflow system
+- [Victor Framework Analysis](./architecture/VICTOR_FRAMEWORK_ANALYSIS.md) - Framework analysis
+- [Architecture Decision Records](./adr/) - ADRs (5 documents)
+
+### API & Reference
+
+Complete API documentation (110 KB, 5 files):
+
+- [API README](./api/README.md) - API documentation hub
+- [API Reference](./api/API_REFERENCE.md) - Complete API reference
+- [Protocol Reference](./api/PROTOCOL_REFERENCE.md) - Protocol documentation
+- [Provider Reference](./api/PROVIDER_REFERENCE.md) - Provider API
+- [Configuration Reference](./api/CONFIGURATION_REFERENCE.md) - Configuration API
+
+### Performance & Optimization
+
+Performance documentation (18 files):
+
+- [Performance README](./performance/README.md) - Performance documentation hub
+- [Optimization Guide](./performance/optimization_guide.md) - Complete optimization guide
+- [Advanced Optimization](./performance/advanced_optimization.md) - Advanced techniques
+- [Caching Strategy](./performance/caching_strategy.md) - Caching strategies
+- [Tool Selection Caching](./performance/tool_selection_caching.md) - Tool selection cache
+- [Lazy Loading](./performance/lazy_loading.md) - Lazy loading optimization
+- [Benchmark Summary](./performance/BENCHMARK_SUMMARY.md) - Benchmark results
+- [Benchmark CI Integration](./performance/BENCHMARK_CI_INTEGRATION.md) - CI benchmarks
+- [Tool Selection Cache Implementation](./performance/tool_selection_cache_implementation.md) - Implementation details
+- [Track 6 Summary](./performance/track6_summary.md) - Performance track 6
+- [Phase 4 Summary](./performance/PHASE4_SUMMARY.md) - Performance phase 4
+- [Quick Reference](./performance/QUICK_REFERENCE.md) - Performance quick reference
+- [Quick Start](./performance/QUICK_START.md) - Performance quick start
+
+### Extension Development
+
+Extension and plugin documentation (7 files, 5,071 lines):
+
+- [Extensions README](./extensions/README.md) - Extensions documentation hub
+- [Step Handler Guide](./extensions/step_handler_guide.md) - Step handler development
+- [Step Handler Examples](./extensions/step_handler_examples.md) - Step handler examples
+- [Step Handler Migration](./extensions/step_handler_migration.md) - Migration guide
+- [Step Handler Quick Reference](./extensions/step_handler_quick_reference.md) - Quick reference
+- [Step Handler Promotion Summary](./extensions/STEP_HANDLER_PROMOTION_SUMMARY.md) - Promotion summary
+- [Track 7 Completion Report](./extensions/TRACK_7_COMPLETION_REPORT.md) - Track 7 report
+
+### Migration Guides
+
+All migration documentation:
+
+- [Migration Roadmap](./MIGRATION_ROADMAP.md) - Overview of all migrations
+- [ISP Migration Guide](./ISP_MIGRATION_GUIDE.md) - Interface segregation migration
+- [Vertical Protocol Migration Status](./VERTICAL_PROTOCOL_MIGRATION_STATUS.md) - Vertical protocol status
+- [Refactoring Migration Guide](./architecture/REFACTORING_MIGRATION_GUIDE.md) - Refactoring migrations
+- [Architecture Migration Guides](./architecture/MIGRATION_GUIDES.md) - Architecture migrations
+- [Step Handler Migration](./extensions/step_handler_migration.md) - Step handler migration
+- [Middleware Migration](./middleware/migration_guide.md) - Middleware migration
+
+### Development Guides
+
+Developer documentation:
+
+- [Developer Onboarding](./DEVELOPER_ONBOARDING.md) - Complete developer guide
+- [Development Index](./development/index.md) - Development hub
+- [Development Setup](./development/setup.md) - Environment setup
+- [Code Style](./development/code-style.md) - Coding standards
+- [Testing](./development/testing.md) - Testing guide
+- [Vertical Creation Guide](./development/vertical_creation_guide.md) - Create verticals
+- [Template Reference](./development/template_reference.md) - Template system
+- [Migration Tool Guide](./development/migration_tool_guide.md) - Migration tools
+- [Vertical Template System Summary](./development/vertical_template_system_summary.md) - Template summary
+
+### User Guides
+
+End-user documentation:
+
+- [User Guide Index](./user-guide/index.md) - User guide hub
+- [CLI Reference](./user-guide/cli-reference.md) - Command-line reference
+- [Providers](./user-guide/providers.md) - LLM provider configuration
+- [Tools](./user-guide/tools.md) - Available tools
+- [Workflows](./user-guide/workflows.md) - Workflow management
+- [TUI Mode](./user-guide/tui-mode.md) - Terminal interface
+- [Session Management](./user-guide/session-management.md) - Session management
+- [Troubleshooting](./user-guide/troubleshooting.md) - User troubleshooting
+- [Troubleshooting Detailed](./user-guide/troubleshooting-detailed.md) - Detailed troubleshooting
+- [Troubleshooting Legacy](./user-guide/troubleshooting-legacy.md) - Legacy troubleshooting
+- [FAQ](./user-guide/faq.md) - Frequently asked questions
+
+### Getting Started
+
+Quick start documentation:
+
+- [Installation](./getting-started/installation.md) - Installation guide
+- [Quick Start](./getting-started/quickstart.md) - 5-minute quick start
+- [Configuration](./getting-started/configuration.md) - Configuration guide
+- [First Run](./getting-started/first-run.md) - First run guide
+- [Basic Usage](./getting-started/basic-usage.md) - Basic usage
+- [Getting Started Index](./getting-started/index.md) - Getting started hub
+- [Coordinator Mode Quick Start](./getting-started/coordinator_mode_quickstart.md) - Coordinator mode
+- [Multi-Provider Quick Start](./getting-started/multi_provider_quickstart.md) - Multiple providers
+- [Plugin Development Quick Start](./getting-started/plugin_development_quickstart.md) - Plugin development
+
+### Reference Documentation
+
+Reference materials:
+
+- [CLI Commands](./reference/cli-commands.md) - Command reference
+- [Configuration Options](./reference/configuration-options.md) - Configuration reference
+- [Environment Variables](./reference/environment-variables.md) - Environment variables
+- [API Reference](./api-reference/) - API documentation
+
+### Tutorials
+
+Hands-on tutorials:
+
+- [Build a Custom Tool](./tutorials/build-custom-tool.md) - Create custom tools
+- [Create a Workflow](./tutorials/create-workflow.md) - Design workflows
+- [Integrate a Provider](./tutorials/integrate-provider.md) - Add providers
+
+### Features
+
+Feature documentation:
+
+- [Advanced Features](./ADVANCED_FEATURES.md) - Advanced features
+- [Advanced RAG Guide](./ADVANCED_RAG_GUIDE.md) - RAG capabilities
+- [Agent Swarming Guide](./AGENT_SWARMING_GUIDE.md) - Multi-agent coordination
+- [Multimodal Guide](./MULTIMODAL_GUIDE.md) - Multimodal capabilities
+
+### Deployment & Operations
+
+Deployment and operations:
+
+- [Deployment Guide](./DEPLOYMENT_GUIDE.md) - Deployment documentation
+- [Docker Setup](./DOCKER_SETUP.md) - Docker deployment
+- [Kubernetes Setup](./KUBERNETES_SETUP.md) - Kubernetes deployment
+- [CI/CD Setup](./CI_CD_SETUP.md) - CI/CD configuration
+- [Production Monitoring](./production_monitoring.md) - Monitoring guide
+- [Scalability Report](./SCALABILITY_REPORT.md) - Scalability analysis
+
+### Security
+
+Security documentation:
+
+- [Security Audit Report](./SECURITY_AUDIT_REPORT.md) - Security audit
+- [Security Best Practices](./SECURITY_BEST_PRACTICES.md) - Security guidelines
+- [Security Phase 4 Summary](./SECURITY_PHASE_4_SUMMARY.md) - Security phase 4
+- [Security Remediation Phase 1](./SECURITY_REMEDIATION_PHASE1.md) - Remediation phase 1
+- [Security Scanning](./security/scanning.md) - Security scanning
+- [Scan Findings](./security/scan-findings.md) - Scan results
+
+### Testing
+
+Testing documentation:
+
+- [Testing README](./testing/README.md) - Testing documentation hub
+- [QA Framework](./QA_FRAMEWORK.md) - QA framework
+- [QA Quick Start](./QA_QUICKSTART.md) - QA quick start
+- [QA Summary](./QA_SUMMARY.md) - QA summary
+- [Testing Guide](./testing/testing-guide.md) - Testing guide
+
+### Observability
+
+Observability documentation:
+
+- [Observability README](./observability/README.md) - Observability hub
+- [Event System](./observability/event_system.md) - Event system
+- [Metrics](./observability/metrics.md) - Metrics collection
+- [Tracing](./observability/tracing.md) - Distributed tracing
+- [Logging](./observability/logging.md) - Logging system
+
+### Performance Reports
+
+Performance reports and benchmarks:
+
+- [Performance Tuning Report](./PERFORMANCE_TUNING_REPORT.md) - Tuning report
+- [Performance Validation Report](./PERFORMANCE_VALIDATION_REPORT.md) - Validation report
+- [Cache Invalidation Optimization](./cache_invalidation_optimization.md) - Cache optimization
+
+### Guides
+
+Comprehensive guides:
+
+- [Guides Index](./guides/README.md) - Guides hub
+- [Provider Pool Guide](./provider_pool_guide.md) - Provider pooling
+- [Provider Pool Getting Started](./provider_pool_getting_started.md) - Provider pool quick start
+- [Provider Pool Implementation Summary](./provider_pool_implementation_summary.md) - Implementation
+- [Provider Pool Integration Summary](./provider_pool_integration_summary.md) - Integration
+- [Vertical Quick Start](./vertical_quickstart.md) - Vertical quick start
+- [Vertical Template Guide](./vertical_template_guide.md) - Vertical templates
+
+### Workflows
+
+Workflow documentation:
+
+- [Workflow Diagrams](./workflow-diagrams/) - Workflow diagrams (64 files)
+- [Workflows README](./workflows/README.md) - Workflows hub
+
+### Teams
+
+Team coordination documentation:
+
+- [Teams README](./teams/README.md) - Teams documentation hub
+
+### Caching
+
+Caching documentation:
+
+- [Caching README](./caching/README.md) - Caching documentation hub
+- [Cache Strategies](./caching/strategies.md) - Cache strategies
+- [Cache Implementation](./caching/implementation.md) - Cache implementation
+
+### Migration
+
+Migration documentation:
+
+- [Migration README](./migration/README.md) - Migration hub
+- [Migration Roadmap](./MIGRATION_ROADMAP.md) - Migration roadmap
+
+### Reference
+
+Reference documentation:
+
+- [Reference Index](./reference/README.md) - Reference hub
+- [CLI Commands](./reference/cli-commands.md) - CLI reference
+- [Configuration Options](./reference/configuration-options.md) - Configuration
+- [Environment Variables](./reference/environment-variables.md) - Environment variables
+
+### Native Modules
+
+Native module documentation:
+
+- [Native README](./native/README.md) - Native modules hub
+- [Regex Engine](./native/regex_engine.md) - Regex engine
+- [Regex Engine Quick Reference](./native/regex_engine_quickref.md) - Regex quick reference
+- [AST Processor Accelerator](./native/ast_processor_accelerator.md) - AST accelerator
+- [Serialization Module](./native/SERIALIZATION_MODULE.md) - Serialization
+
+### Roadmap
+
+Roadmap documentation:
+
+- [Future Roadmap](./roadmap/future_roadmap.md) - Future plans
+
+### Stories
+
+User stories:
+
+- [Stories Index](./stories/README.md) - Stories hub
+
+### Videos
+
+Video tutorials:
+
+- [Videos README](./videos/README.md) - Video tutorials hub
+
+### Examples
+
+Example code:
+
+- [Examples Index](./examples/README.md) - Examples hub
+
+### Diagrams
+
+Architecture diagrams:
+
+- [Diagrams Index](./diagrams/README.md) - Diagrams hub
+
+### Benchmarks
+
+Benchmark documentation:
+
+- [Benchmarks Index](./benchmarks/README.md) - Benchmarks hub
+
+### Features
+
+Feature documentation:
+
+- [Features README](./features/README.md) - Features hub
+
+### Technical
+
+Technical documentation:
+
+- [Technical Index](./technical/README.md) - Technical hub
+
+### API Reference
+
+API reference documentation:
+
+- [API Reference README](./api-reference/README.md) - API reference hub
+- [Protocols](./api-reference/protocols.md) - Protocol API
+- [Providers](./api-reference/providers.md) - Provider API
+- [Tools](./api-reference/tools.md) - Tool API
+- [Workflows](./api-reference/workflows.md) - Workflow API
+
+### Operations
+
+Operations documentation:
+
+- [Operations README](./operations/README.md) - Operations hub
+
+### Production
+
+Production documentation:
+
+- [Production README](./production/README.md) - Production hub
+
+### Contributing
+
+Contributing documentation:
+
+- [Contributing README](./contributing/README.md) - Contributing hub
+
+### Validation
+
+Validation documentation:
+
+- [Validation README](./validation/README.md) - Validation hub
+
+### Verticals
+
+Vertical-specific documentation:
+
+- [Verticals README](./verticals/README.md) - Verticals hub
+- [Coding](./verticals/coding.md) - Coding vertical
+- [DevOps](./verticals/devops.md) - DevOps vertical
+- [RAG](./verticals/rag.md) - RAG vertical
+- [Data Analysis](./verticals/data-analysis.md) - Data analysis vertical
+- [Research](./verticals/research.md) - Research vertical
+
+### Archive
+
+Archived documentation:
+
+- [Archive README](./archive/README.md) - Archive hub
+- [Legacy Migration](./archive/MIGRATION.md) - Legacy migration guide
+- [Legacy Troubleshooting](./archive/troubleshooting.md) - Legacy troubleshooting
+
+### Changelogs
+
+Version history:
+
+- [CHANGELOG 0.5.1](./CHANGELOG_0.5.1.md) - Version 0.5.1 changelog
+- [Release Notes 0.5.1](./RELEASE_NOTES_0.5.1.md) - Release notes
+
+### Project Documentation
+
+Project management:
+
+- [Incident Response Plan](./INCIDENT_RESPONSE_PLAN.md) - Incident response
+- [Security Audit Report](./SECURITY_AUDIT_REPORT.md) - Security audit
+
+### Developer Tools
+
+Developer tools documentation:
+
+- [Developer Tools](./developer_tools.md) - Developer tools
+- [Developer Tools CI/CD](./developer_tools_cicd.md) - CI/CD tools
+
+### Phase Reports
+
+Development phase reports:
+
+- [Phase 1 Summary](./PHASE1_SUMMARY.md) - Phase 1 completion
+- [Phase 2.1 Tool Selection Optimization](./phase_2.1_tool_selection_optimization.md) - Tool selection
+- [Phase 4 Scalability Complete](./PHASE_4_SCALABILITY_COMPLETE.md) - Scalability
+- [Phase 5 Completion Report](./PHASE_5_COMPLETION_REPORT.md) - Phase 5 report
+- [Phase 5 SRP Coordinator Status](./PHASE_5_SRP_COORDINATOR_STATUS.md) - SRP coordinator
+- [Phase 5 Summary](./PHASE5_SUMMARY.md) - Phase 5 summary
+- [Phase 6 Implementation](./phase6_implementation.md) - Phase 6 implementation
+- [Phase 6 Final Report](./phase6_final_report.md) - Phase 6 report
+- [Phase 6 Quick Reference](./phase6_quick_reference.md) - Phase 6 quick reference
+
+### Refactoring
+
+Refactoring documentation:
+
+- [Refactoring README](./refactoring/README.md) - Refactoring hub
+
+### Known Issues
+
+Known issues:
+
+- [Known Issues README](./known_issues/README.md) - Known issues hub
+
+### Middleware
+
+Middleware documentation:
+
+- [Middleware Migration Guide](./middleware/migration_guide.md) - Middleware migration
+
+### CI/CD
+
+CI/CD documentation:
+
+- [Workflow Validation](./ci_cd/workflow_validation.md) - Workflow validation
+- [CI/CD README](./ci_cd/README.md) - CI/CD hub
+
+### Prompts
+
+Prompt documentation:
+
+- [Prompts README](./prompts/README.md) - Prompts hub
+
+### Architecture Decision Records
+
+ADRs:
+
+- [ADR-001: Coordinator Architecture](./adr/ADR-001-coordinator-architecture.md) - Coordinator architecture
+- [ADR-002: YAML Vertical Config](./adr/ADR-002-yaml-vertical-config.md) - YAML configuration
+- [ADR-003: Distributed Caching](./adr/ADR-003-distributed-caching.md) - Distributed caching
+- [ADR-004: Protocol-Based Design](./adr/ADR-004-protocol-based-design.md) - Protocol design
+- [ADR-005: Performance Optimization](./adr/ADR-005-performance-optimization.md) - Performance optimization
+
+### Summary Reports
+
+Comprehensive summaries:
+
+- [Final Comprehensive Summary](./FINAL_COMPREHENSIVE_SUMMARY.md) - Complete summary
+- [Initiative Executive Summary](./INITIATIVE_EXECUTIVE_SUMMARY.md) - Executive summary
+- [Initiative Technical Summary](./INITIATIVE_TECHNICAL_SUMMARY.md) - Technical summary
+- [SOLID Architecture Refactoring Report](./SOLID_ARCHITECTURE_REFACTORING_REPORT.md) - SOLID refactoring
+- [Architecture Analysis Comprehensive](./ARCHITECTURE_ANALYSIS_COMPREHENSIVE.md) - Architecture analysis
+
+### Special Topics
+
+Specialized documentation:
+
+- [Mode Config Refactoring Summary](./mode_config_refactoring_summary.md) - Mode config refactoring
+- [Type Safety Phase 1 Summary](./type_safety_phase1_summary.md) - Type safety
+- [Low Priority Phase Complete](./LOW_PRIORITY_PHASE_COMPLETE.md) - Low priority phase
+- [Document Testing Report](./DOCUMENTATION_TEST_REPORT.md) - Documentation testing
+
+### Change Documentation
+
+Change tracking:
+
+- [Changes Index](./changes/README.md) - Changes hub
+
+### FEPs
+
+Feature Enhancement Proposals:
+
+- [FEPs Index](./feps/README.md) - FEPs hub
+
+---
+
+## Special Indices
+
+### Mermaid Diagrams
+
+All architecture and workflow diagrams:
+
+- [Diagrams Index](./DIAGRAMS.md) - Complete diagram index
+
+### Glossary
+
+Technical terms and definitions:
+
+- [Glossary](./GLOSSARY.md) - Complete glossary
+
+### Migration Roadmap
+
+All migration guides in one place:
+
+- [Migration Roadmap](./MIGRATION_ROADMAP.md) - Complete migration guide
+
+---
+
+## Reading Paths
+
+### For New Users (First-Time Setup)
+
+1. [Quick Start](./QUICKSTART.md) - 5 minutes
+2. [Installation](./getting-started/installation.md) - 5 minutes
+3. [Configuration](./getting-started/configuration.md) - 10 minutes
+4. [Basic Usage](./getting-started/basic-usage.md) - 5 minutes
+5. [User Guide Index](./user-guide/index.md) - 30 minutes
+
+**Total Time**: ~1 hour
+
+### For Contributors (New Contributors)
+
+1. [Contributor Quick Start](./CONTRIBUTOR_QUICKSTART.md) - 10 minutes
+2. [Development Setup](./development/setup.md) - 15 minutes
+3. [Code Style](./development/code-style.md) - 10 minutes
+4. [Testing Guide](./development/testing.md) - 20 minutes
+5. [Contributing Guide](../CONTRIBUTING.md) - 15 minutes
+
+**Total Time**: ~1 hour
+
+### For Architects (System Design)
+
+1. [Architect Quick Start](./ARCHITECT_QUICKSTART.md) - 15 minutes
+2. [Architecture Overview](./architecture/overview.md) - 20 minutes
+3. [Design Patterns](./architecture/DESIGN_PATTERNS.md) - 30 minutes
+4. [Component Reference](./architecture/COMPONENT_REFERENCE.md) - 45 minutes
+5. [Best Practices](./architecture/BEST_PRACTICES.md) - 20 minutes
+
+**Total Time**: ~2 hours
+
+### For Plugin Developers (Extension Development)
+
+1. [Plugin Development Quick Start](./getting-started/plugin_development_quickstart.md) - 10 minutes
+2. [Extension Development](./extensions/README.md) - 25 minutes
+3. [Vertical Creation Guide](./development/vertical_creation_guide.md) - 30 minutes
+4. [Tool Composition Guide](./TOOL_COMPOSITION_GUIDE.md) - 20 minutes
+5. [API Reference](./api/README.md) - 10 minutes
+
+**Total Time**: ~1.5 hours
+
+### For Performance Engineers (Optimization)
+
+1. [Performance Quick Start](./performance/QUICK_START.md) - 5 minutes
+2. [Optimization Guide](./performance/optimization_guide.md) - 30 minutes
+3. [Caching Strategy](./performance/caching_strategy.md) - 15 minutes
+4. [Advanced Optimization](./performance/advanced_optimization.md) - 30 minutes
+5. [Benchmark Summary](./performance/BENCHMARK_SUMMARY.md) - 10 minutes
+
+**Total Time**: ~1.5 hours
+
+---
+
+## Search Tips
+
+### Finding Information Quickly
+
+1. **Use the INDEX.md** - Start here for comprehensive navigation
+2. **Check the Glossary** - Look up unfamiliar terms in [GLOSSARY.md](./GLOSSARY.md)
+3. **Follow Reading Paths** - Choose the path that matches your role
+4. **Use Quick Start Guides** - Get started quickly with topic-specific guides
+5. **Check Troubleshooting** - Find solutions in [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
+
+### Documentation Conventions
+
+- **README.md** files - Directory hubs and navigation
+- **GUIDE.md** files - Comprehensive guides
+- **QUICKSTART.md** files - Quick start guides
+- **REFERENCE.md** files - Reference documentation
+- **SUMMARY.md** files - Executive summaries
+- **REPORT.md** files - Detailed reports
+
+---
+
+## Need Help?
+
+- **[Troubleshooting](./TROUBLESHOOTING.md)** - Common issues and solutions
+- **[FAQ](./user-guide/faq.md)** - Frequently asked questions
+- **[GitHub Issues](https://github.com/vjsingh1984/victor/issues)** - Report bugs or request features
+- **[GitHub Discussions](https://github.com/vjsingh1984/victor/discussions)** - Community discussions
+
+---
+
+**Last Updated**: January 18, 2026
+**Version**: 0.5.1
+**Maintained By**: Victor AI Community
+
+---
+
+<div align="center">
+
+**[Back to Main Documentation](./index.md)**
+
+</div>

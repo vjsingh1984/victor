@@ -500,7 +500,8 @@ class ProviderPool:
             Health status for each provider
         """
         if self._health_registry:
-            return await self._health_registry.get_all_stats()
+            # get_all_stats is not async, don't await it
+            return self._health_registry.get_all_stats()
         return {}
 
     async def close(self) -> None:

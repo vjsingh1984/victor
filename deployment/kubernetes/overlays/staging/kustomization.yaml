@@ -1,0 +1,38 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: victor-ai-staging
+
+commonLabels:
+  environment: staging
+  app: victor-ai
+
+resources:
+- ../../base
+
+patchesStrategicMerge:
+- deployment-patch.yaml
+
+configMapGenerator:
+- name: victor-ai-config
+  behavior: merge
+  literals:
+  - VICTOR_PROFILE=staging
+  - VICTOR_LOG_LEVEL=DEBUG
+  - VICTOR_MAX_WORKERS=4
+  - VICTOR_CACHE_SIZE=1000
+  - event-bus-backend=memory
+  - checkpoint-backend=sqlite
+  - cache-backend=memory
+  - enable-metrics=true
+  - enable-tracing=true
+  - enable-rate-limiting=true
+  - rate-limit-requests-per-minute=500
+
+images:
+- name: victorai/victor
+  newTag: 0.5.1-staging
+
+replicas:
+- name: victor-ai
+  count: 2

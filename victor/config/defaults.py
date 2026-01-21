@@ -114,7 +114,8 @@ class ToolDefaults:
     """
 
     # Maximum tool calls per session
-    TOOL_BUDGET: Final[int] = 25
+    # Increased from 25 to 100 to support comprehensive analysis and exploration
+    TOOL_BUDGET: Final[int] = 100
 
     # Maximum concurrent tool executions
     MAX_CONCURRENT_TOOLS: Final[int] = 5

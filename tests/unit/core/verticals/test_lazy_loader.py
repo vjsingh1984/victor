@@ -102,7 +102,7 @@ class TestLazyVerticalProxy:
             def get_tools(self):
                 return ["read", "write"]
 
-        proxy = LazyVerticalProxy(vertical_name="test", loader=lambda: MockVertical)
+        proxy = LazyVerticalProxy(vertical_name="test", loader=lambda: MockVertical())
 
         # Attribute access should trigger loading
         assert not proxy.is_loaded()
@@ -154,19 +154,14 @@ class TestLazyVerticalProxy:
     def test_recursive_loading_detection(self):
         """Test that recursive loading is detected and prevented."""
 
-        class BadLoader:
-            loading = False
+        proxy = None
 
-            @classmethod
-            def recursive_loader(cls):
-                if cls.loading:
-                    raise RuntimeError("Recursive!")
-                cls.loading = True
-                # Trigger another load (would cause infinite recursion without protection)
-                proxy.load()
-                return MagicMock()
+        def recursive_loader():
+            # Trigger another load (would cause infinite recursion without protection)
+            proxy.load()
+            return MagicMock()
 
-        proxy = LazyVerticalProxy(vertical_name="bad", loader=BadLoader.recursive_loader)
+        proxy = LazyVerticalProxy(vertical_name="bad", loader=recursive_loader)
 
         with pytest.raises(RuntimeError, match="Recursive loading"):
             proxy.load()

@@ -1,0 +1,33 @@
+apiVersion: v2
+name: victor-monitoring
+description: Production-ready monitoring stack for Victor AI 0.5.1
+type: application
+version: 0.5.1
+appVersion: "0.5.1"
+keywords:
+  - victor
+  - monitoring
+  - prometheus
+  - grafana
+  - alertmanager
+  - otel
+  - observability
+maintainers:
+  - name: Victor AI Team
+    email: dev@victor-ai.com
+home: https://github.com/victor-ai/victor
+sources:
+  - https://github.com/victor-ai/victor
+icon: https://victor-ai.com/icon.png
+dependencies: []
+annotations:
+  artifacthub.io/category: monitoring-logging
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/links: |
+    - name: Documentation
+      url: https://docs.victor-ai.com
+    - name: Support
+      url: https://github.com/victor-ai/victor/issues
+  artifacthub.io/operator: "false"
+  artifacthub.io/prerelease: "false"
+  artifacthub.io/containsSecurityUpdates: "false"

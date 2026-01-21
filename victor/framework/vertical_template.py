@@ -484,6 +484,9 @@ class VerticalTemplate:
     2. Created programmatically using this dataclass
     3. Generated from existing verticals using VerticalExtractor
 
+    Templates support inheritance through the parent_template field, allowing
+    child templates to extend and override parent templates.
+
     Attributes:
         metadata: Vertical metadata (name, description, version, etc.)
         tools: List of tool names for this vertical
@@ -495,6 +498,7 @@ class VerticalTemplate:
         capabilities: Capability specifications
         custom_config: Custom vertical-specific configuration
         file_templates: Custom file templates (e.g., custom __init__.py)
+        parent_template: Optional parent template name for inheritance
     """
 
     metadata: VerticalMetadata
@@ -507,6 +511,7 @@ class VerticalTemplate:
     capabilities: List[CapabilitySpec] = field(default_factory=list)
     custom_config: Dict[str, Any] = field(default_factory=dict)
     file_templates: Dict[str, str] = field(default_factory=dict)
+    parent_template: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert template to dictionary for YAML serialization.
@@ -514,7 +519,7 @@ class VerticalTemplate:
         Returns:
             Dictionary representation of the template
         """
-        return {
+        result = {
             "metadata": self.metadata.to_dict(),
             "tools": self.tools,
             "system_prompt": self.system_prompt,
@@ -535,6 +540,12 @@ class VerticalTemplate:
             "custom_config": self.custom_config,
             "file_templates": self.file_templates,
         }
+
+        # Add parent_template if set
+        if self.parent_template:
+            result["parent_template"] = self.parent_template
+
+        return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "VerticalTemplate":
@@ -571,6 +582,7 @@ class VerticalTemplate:
             capabilities=[CapabilitySpec.from_dict(c) for c in data.get("capabilities", [])],
             custom_config=data.get("custom_config", {}),
             file_templates=data.get("file_templates", {}),
+            parent_template=data.get("parent_template"),
         )
 
     def validate(self) -> List[str]:
@@ -662,6 +674,101 @@ class VerticalTemplate:
             True if template passes validation
         """
         return len(self.validate()) == 0
+
+    def merge_with_parent(self, parent: "VerticalTemplate") -> "VerticalTemplate":
+        """Merge this template with parent template (inheritance).
+
+        Child template values override or extend parent values:
+        - Metadata: Child values override parent
+        - Tools: Child tools added to parent tools
+        - System prompt: Child prompt overrides parent
+        - Stages: Child stages override parent stages with same name
+        - Extensions: Child extensions extend parent extensions
+        - Workflows/Teams/Capabilities: Child items added to parent
+
+        Args:
+            parent: Parent template to merge with
+
+        Returns:
+            New merged VerticalTemplate
+
+        Example:
+            base_template = VerticalTemplate(...)
+            custom_template = VerticalTemplate(...)
+            merged = custom_template.merge_with_parent(base_template)
+        """
+        from dataclasses import replace
+
+        # Merge metadata (child overrides parent)
+        merged_metadata_dict = parent.metadata.to_dict()
+        child_metadata_dict = self.metadata.to_dict()
+
+        # Override parent metadata with child metadata
+        for key, value in child_metadata_dict.items():
+            if value or (isinstance(value, list) and len(value) > 0):
+                merged_metadata_dict[key] = value
+
+        merged_metadata = VerticalMetadata.from_dict(merged_metadata_dict)
+
+        # Merge tools (child adds to parent, deduplicated)
+        merged_tools = list(set(parent.tools + self.tools))
+
+        # Use child's system prompt if provided, otherwise parent's
+        merged_system_prompt = self.system_prompt if self.system_prompt.strip() else parent.system_prompt
+
+        # Merge stages (child overrides parent stages with same name)
+        merged_stages = {**parent.stages}
+        for name, stage in self.stages.items():
+            merged_stages[name] = stage
+
+        # Merge extensions
+        merged_extensions_dict = parent.extensions.to_dict()
+        child_extensions_dict = self.extensions.to_dict()
+
+        # Extend middleware
+        if "middleware" in child_extensions_dict and child_extensions_dict["middleware"]:
+            merged_extensions_dict.setdefault("middleware", []).extend(child_extensions_dict["middleware"])
+
+        # Extend safety patterns
+        if "safety_patterns" in child_extensions_dict and child_extensions_dict["safety_patterns"]:
+            merged_extensions_dict.setdefault("safety_patterns", []).extend(
+                child_extensions_dict["safety_patterns"]
+            )
+
+        # Extend prompt hints
+        if "prompt_hints" in child_extensions_dict and child_extensions_dict["prompt_hints"]:
+            merged_extensions_dict.setdefault("prompt_hints", []).extend(child_extensions_dict["prompt_hints"])
+
+        # Update handlers, personas, composed_chains (child overrides parent)
+        for key in ["handlers", "personas", "composed_chains"]:
+            if key in child_extensions_dict and child_extensions_dict[key]:
+                merged_extensions_dict[key] = {**merged_extensions_dict.get(key, {}), **child_extensions_dict[key]}
+
+        merged_extensions = ExtensionSpecs.from_dict(merged_extensions_dict)
+
+        # Merge workflows, teams, capabilities (child adds to parent)
+        merged_workflows = parent.workflows + self.workflows
+        merged_teams = parent.teams + self.teams
+        merged_capabilities = parent.capabilities + self.capabilities
+
+        # Merge custom config (child overrides parent)
+        merged_custom_config = {**parent.custom_config, **self.custom_config}
+
+        # Merge file templates (child overrides parent)
+        merged_file_templates = {**parent.file_templates, **self.file_templates}
+
+        return VerticalTemplate(
+            metadata=merged_metadata,
+            tools=merged_tools,
+            system_prompt=merged_system_prompt,
+            stages=merged_stages,
+            extensions=merged_extensions,
+            workflows=merged_workflows,
+            teams=merged_teams,
+            capabilities=merged_capabilities,
+            custom_config=merged_custom_config,
+            file_templates=merged_file_templates,
+        )
 
 
 __all__ = [

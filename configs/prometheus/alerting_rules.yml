@@ -1,0 +1,286 @@
+# Prometheus Alerting Rules for Victor AI
+groups:
+  # Critical alerts
+  - name: victor_critical
+    interval: 30s
+    rules:
+      # High error rate
+      - alert: HighErrorRate
+        expr: |
+          (
+            rate(victor_request_duration_seconds_count{status=~"5.."}[5m])
+            /
+            rate(victor_request_duration_seconds_count[5m])
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          service: victor-ai
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for endpoint {{ $labels.endpoint }}"
+          runbook_url: "https://docs.victor.ai/runbooks/high_error_rate"
+
+      # Slow response time
+      - alert: SlowResponseTime
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(victor_request_duration_seconds_bucket[5m])) by (endpoint, le)
+          ) > 30
+        for: 5m
+        labels:
+          severity: critical
+          service: victor-ai
+        annotations:
+          summary: "Slow response time detected"
+          description: "P95 response time is {{ $value }}s for endpoint {{ $labels.endpoint }}"
+          runbook_url: "https://docs.victor.ai/runbooks/slow_response"
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: |
+          victor_memory_usage_bytes{component="orchestrator"}
+          /
+          victor_memory_limit_bytes > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          service: victor-ai
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value | humanizePercentage }} for component {{ $labels.component }}"
+          runbook_url: "https://docs.victor.ai/runbooks/high_memory"
+
+      # Provider error rate
+      - alert: HighProviderErrorRate
+        expr: |
+          (
+            rate(victor_provider_requests_total{status="failure"}[5m])
+            /
+            rate(victor_provider_requests_total[5m])
+          ) > 0.1
+        for: 3m
+        labels:
+          severity: critical
+          service: victor-ai
+        annotations:
+          summary: "High provider error rate"
+          description: "Provider {{ $labels.provider }} error rate is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.victor.ai/runbooks/provider_errors"
+
+      # Security test failure
+      - alert: SecurityTestFailure
+        expr: |
+          victor_security_test_pass_rate < 0.9
+        for: 1m
+        labels:
+          severity: critical
+          service: victor-ai
+        annotations:
+          summary: "Security test failure detected"
+          description: "Security test pass rate is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.victor.ai/runbooks/security_failure"
+
+      # Service down
+      - alert: ServiceDown
+        expr: |
+          up{job="victor-ai"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: victor-ai
+        annotations:
+          summary: "Victor AI service is down"
+          description: "Victor AI service has been down for more than 1 minute"
+          runbook_url: "https://docs.victor.ai/runbooks/service_down"
+
+  # Warning alerts
+  - name: victor_warning
+    interval: 1m
+    rules:
+      # Degraded response time
+      - alert: DegradedResponseTime
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(victor_request_duration_seconds_bucket[5m])) by (endpoint, le)
+          ) > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: victor-ai
+        annotations:
+          summary: "Degraded response time"
+          description: "P95 response time is {{ $value }}s for endpoint {{ $labels.endpoint }}"
+
+      # Elevated memory usage
+      - alert: ElevatedMemoryUsage
+        expr: |
+          victor_memory_usage_bytes
+          /
+          victor_memory_limit_bytes > 0.75
+        for: 10m
+        labels:
+          severity: warning
+          service: victor-ai
+        annotations:
+          summary: "Elevated memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }} for component {{ $labels.component }}"
+
+      # High tool failure rate
+      - alert: HighToolFailureRate
+        expr: |
+          (
+            rate(victor_tool_executions_total{status="failure"}[5m])
+            /
+            rate(victor_tool_executions_total[5m])
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: victor-ai
+        annotations:
+          summary: "High tool failure rate"
+          description: "Tool {{ $labels.tool }} failure rate is {{ $value | humanizePercentage }}"
+
+      # Low vertical success rate
+      - alert: LowVerticalSuccessRate
+        expr: |
+          victor_tool_success_rate < 0.9
+        for: 10m
+        labels:
+          severity: warning
+          service: victor-ai
+        annotations:
+          summary: "Low vertical success rate"
+          description: "Vertical {{ $labels.vertical }} success rate is {{ $value | humanizePercentage }}"
+
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: |
+          victor_cpu_usage_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: victor-ai
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}%"
+
+      # Cache miss rate high
+      - alert: HighCacheMissRate
+        expr: |
+          (
+            rate(victor_cache_misses_total[5m])
+            /
+            (rate(victor_cache_hits_total[5m]) + rate(victor_cache_misses_total[5m]))
+          ) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          service: victor-ai
+        annotations:
+          summary: "High cache miss rate"
+          description: "Cache {{ $labels.cache_name }} miss rate is {{ $value | humanizePercentage }}"
+
+  # Provider-specific alerts
+  - name: victor_providers
+    interval: 1m
+    rules:
+      # Provider rate limit
+      - alert: ProviderRateLimit
+        expr: |
+          rate(victor_provider_requests_total{status="rate_limited"}[1m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: victor-ai
+        annotations:
+          summary: "Provider rate limit hit"
+          description: "Provider {{ $labels.provider }} is rate limiting requests"
+
+      # Provider timeout
+      - alert: ProviderTimeout
+        expr: |
+          rate(victor_provider_requests_total{status="timeout"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: victor-ai
+        annotations:
+          summary: "Provider timeout detected"
+          description: "Provider {{ $labels.provider }} is experiencing timeouts"
+
+  # Vertical-specific alerts
+  - name: victor_verticals
+    interval: 1m
+    rules:
+      # RAG retrieval latency high
+      - alert: HighRAGRetrievalLatency
+        expr: |
+          histogram_quantile(0.95,
+            rate(victor_rag_retrieval_latency_seconds_bucket[5m])
+          ) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: victor-ai
+          vertical: rag
+        annotations:
+          summary: "High RAG retrieval latency"
+          description: "P95 RAG retrieval latency is {{ $value }}s"
+
+      # Coding analysis backlog
+      - alert: CodingAnalysisBacklog
+        expr: |
+          victor_coding_pending_analysis_files > 100
+        for: 10m
+        labels:
+          severity: warning
+          service: victor-ai
+          vertical: coding
+        annotations:
+          summary: "Coding analysis backlog"
+          description: "{{ $value }} files pending analysis"
+
+      # DevOps deployment failure
+      - alert: DevOpsDeploymentFailure
+        expr: |
+          rate(victor_devops_deployments_total{status="failure"}[5m])
+          /
+          rate(victor_devops_deployments_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: victor-ai
+          vertical: devops
+        annotations:
+          summary: "High DevOps deployment failure rate"
+          description: "Deployment failure rate is {{ $value | humanizePercentage }}"
+
+  # Agentic AI alerts
+  - name: victor_agentic
+    interval: 1m
+    rules:
+      # Low planning success rate
+      - alert: LowPlanningSuccessRate
+        expr: |
+          victor_planning_success_rate < 0.8
+        for: 10m
+        labels:
+          severity: warning
+          service: victor-ai
+        annotations:
+          summary: "Low planning success rate"
+          description: "Planning success rate is {{ $value | humanizePercentage }}"
+
+      # Memory recall accuracy low
+      - alert: LowMemoryRecallAccuracy
+        expr: |
+          victor_memory_recall_accuracy < 0.7
+        for: 10m
+        labels:
+          severity: warning
+          service: victor-ai
+        annotations:
+          summary: "Low memory recall accuracy"
+          description: "Memory recall accuracy is {{ $value | humanizePercentage }}"

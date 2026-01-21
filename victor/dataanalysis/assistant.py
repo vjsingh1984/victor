@@ -6,13 +6,7 @@ Competitive positioning: ChatGPT Data Analysis, Claude Artifacts, Jupyter AI.
 from typing import Any, Dict, List, Optional
 
 from victor.core.verticals.base import StageDefinition, VerticalBase
-from victor.core.verticals.protocols import (
-    ModeConfigProviderProtocol,
-    PromptContributorProtocol,
-    SafetyExtensionProtocol,
-    TieredToolConfig,
-    ToolDependencyProviderProtocol,
-)
+from victor.core.verticals.protocols import ToolDependencyProviderProtocol
 
 # Phase 3: Import framework capabilities
 from victor.framework.capabilities import FileOperationsCapability
@@ -20,10 +14,6 @@ from victor.framework.capabilities import FileOperationsCapability
 # Import ISP-compliant provider protocols
 from victor.core.verticals.protocols.providers import (
     HandlerProvider,
-    ModeConfigProvider,
-    PromptContributorProvider,
-    SafetyProvider,
-    TieredToolConfigProvider,
     ToolDependencyProvider,
     ToolProvider,
 )
@@ -42,12 +32,12 @@ class DataAnalysisAssistant(VerticalBase):
 
         Implemented Protocols:
         - ToolProvider: Provides tools optimized for data analysis tasks
-        - PromptContributorProvider: Provides data analysis-specific task hints
         - ToolDependencyProvider: Provides tool dependency patterns
         - HandlerProvider: Provides workflow compute handlers
-        - ModeConfigProvider: Provides mode configurations
-        - SafetyProvider: Provides data analysis safety patterns
-        - TieredToolConfigProvider: Provides tiered tool configuration
+
+        Note: Other protocols (PromptContributorProvider, ModeConfigProvider,
+        SafetyProvider, TieredToolConfigProvider) are inherited from VerticalBase
+        and do not require explicit registration.
     """
 
     name = "data_analysis"
@@ -264,15 +254,15 @@ When presenting analysis:
 
 
 # Register protocols at module level after class definition
+# Only register protocols with explicit implementations (ISP compliance)
 DataAnalysisAssistant.register_protocol(ToolProvider)
-DataAnalysisAssistant.register_protocol(PromptContributorProvider)
 DataAnalysisAssistant.register_protocol(ToolDependencyProvider)
 DataAnalysisAssistant.register_protocol(HandlerProvider)
-DataAnalysisAssistant.register_protocol(ModeConfigProvider)
-DataAnalysisAssistant.register_protocol(SafetyProvider)
-DataAnalysisAssistant.register_protocol(TieredToolConfigProvider)
 
 # ISP Compliance Note:
 # This vertical explicitly declares protocol conformance through registration
 # rather than inheriting from all protocol interfaces. The framework can check
 # capabilities via isinstance(vertical, ToolProvider).
+#
+# Other protocols are inherited from VerticalBase and auto-registered by the
+# VerticalExtensionLoaderMeta metaclass.

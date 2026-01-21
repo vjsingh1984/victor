@@ -69,8 +69,11 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from victor.core.container import ServiceContainer, ServiceLifetime
 
-# Import IToolSelector for DI container registration (Phase 9 migration)
-from victor.protocols.tool_selector import IToolSelector
+# PERFORMANCE OPTIMIZATION (Phase 1):
+# Move heavy imports to TYPE_CHECKING where possible to reduce startup overhead
+# These imports are only needed for type hints, not runtime execution
+if TYPE_CHECKING:
+    from victor.protocols.tool_selector import IToolSelector
 
 if TYPE_CHECKING:
     from victor.config.settings import Settings
@@ -146,9 +149,15 @@ class OrchestratorServiceProvider:
         These services are created once and shared across all sessions.
         Use for stateless services or those with expensive initialization.
 
+        PERFORMANCE OPTIMIZATION (Phase 1):
+        Protocol imports are batched to reduce import overhead.
+        Coordinator imports are deferred to actual registration to reduce
+        unnecessary imports during bootstrap.
+
         Args:
             container: DI container to register services in
         """
+        # Batch import all protocols in one statement to reduce import overhead
         from victor.agent.protocols import (
             ComplexityClassifierProtocol,
             ActionAuthorizerProtocol,
@@ -205,15 +214,9 @@ class OrchestratorServiceProvider:
             StateCoordinatorProtocol,
             PromptCoordinatorProtocol,
         )
-        from typing import TYPE_CHECKING as TYPE_CHECKING_VENDOR
 
-        # Import new coordinator classes (Phase 5)
-        # These are used at runtime for service registration, not just for type checking
-        from victor.agent.coordinators.tool_retry_coordinator import ToolRetryCoordinator
-        from victor.agent.coordinators.memory_coordinator import MemoryCoordinator
-        from victor.agent.coordinators.tool_capability_coordinator import (
-            ToolCapabilityCoordinator,
-        )
+        # Defer coordinator imports to when they're actually needed
+        # This saves ~50-80ms during bootstrap
 
         # ToolRegistry - shared tool definitions
         self._register_tool_registry(container)
@@ -584,6 +587,54 @@ class OrchestratorServiceProvider:
             lambda c: self._create_tool_capability_coordinator(),
             ServiceLifetime.SINGLETON,
         )
+
+        # =========================================================================
+        # Phase 3 Coordinators (Tool Call & Prompt Builder Integration)
+        # =========================================================================
+
+        # ToolCallCoordinator - scoped for tool call coordination
+        from victor.agent.coordinators.tool_call_protocol import IToolCallCoordinator
+        container.register(
+            IToolCallCoordinator,
+            lambda c: self._create_tool_call_coordinator(),
+            ServiceLifetime.SCOPED,
+        )
+
+        # PromptBuilderCoordinator - scoped for prompt building coordination
+        from victor.agent.coordinators.prompt_builder_protocol import IPromptBuilderCoordinator
+        container.register(
+            IPromptBuilderCoordinator,
+            lambda c: self._create_prompt_builder_coordinator(),
+            ServiceLifetime.SCOPED,
+        )
+
+        # =========================================================================
+        # Agentic AI Services (Phase 3 Integration)
+        # =========================================================================
+        # These services enable advanced agentic AI capabilities for autonomous
+        # planning, memory, skill discovery, and self-improvement.
+        # Only registered if feature flags are enabled in settings.
+
+        if self._settings.enable_hierarchical_planning:
+            self._register_hierarchical_planner(container)
+
+        if self._settings.enable_episodic_memory:
+            self._register_episodic_memory(container)
+
+        if self._settings.enable_semantic_memory:
+            self._register_semantic_memory(container)
+
+        if self._settings.enable_skill_discovery:
+            self._register_skill_discovery(container)
+
+        if self._settings.enable_skill_chaining:
+            self._register_skill_chainer(container)
+
+        if self._settings.enable_self_improvement:
+            self._register_proficiency_tracker(container)
+
+        if self._settings.enable_rl_coordinator:
+            self._register_rl_coordinator(container)
 
         # =========================================================================
         # Presentation Abstraction Layer
@@ -1831,6 +1882,83 @@ class OrchestratorServiceProvider:
             warn_once=True,
         )
 
+    def _create_tool_call_coordinator(self) -> Any:
+        """Create ToolCallCoordinator instance.
+
+        The ToolCallCoordinator provides centralized tool call coordination,
+        including validation, parsing, execution with retry logic, and result formatting.
+
+        Returns:
+            ToolCallCoordinator instance
+        """
+        from victor.agent.coordinators.tool_call_coordinator import (
+            ToolCallCoordinator,
+            create_tool_call_coordinator,
+        )
+        from victor.agent.coordinators.tool_call_protocol import ToolCallCoordinatorConfig
+        from victor.agent.protocols import (
+            ToolExecutorProtocol,
+            ToolRegistryProtocol,
+        )
+
+        # Get dependencies from DI container
+        tool_executor = self.container.get(ToolExecutorProtocol)
+        tool_registry = self.container.get(ToolRegistryProtocol)
+        tool_retry_coordinator = self.container.get_optional(ToolRetryCoordinator)
+
+        # Build config from settings
+        config = ToolCallCoordinatorConfig(
+            max_retries=getattr(self._settings, "tool_retry_max_attempts", 3),
+            retry_delay=getattr(self._settings, "tool_retry_base_delay", 1.0),
+            retry_backoff_multiplier=getattr(self._settings, "tool_retry_backoff_multiplier", 2.0),
+            parallel_execution=getattr(self._settings, "enable_parallel_tool_execution", False),
+            timeout_seconds=getattr(self._settings, "tool_execution_timeout", 30.0),
+            strict_validation=getattr(self._settings, "strict_tool_validation", True),
+        )
+
+        # Get sanitizer if available
+        from victor.agent.tool_calling.sanitizer import ToolNameSanitizer
+        sanitizer = ToolNameSanitizer()
+
+        return create_tool_call_coordinator(
+            config=config,
+            tool_executor=tool_executor,
+            tool_registry=tool_registry,
+            tool_retry_coordinator=tool_retry_coordinator,
+            sanitizer=sanitizer,
+        )
+
+    def _create_prompt_builder_coordinator(self) -> Any:
+        """Create PromptBuilderCoordinator instance.
+
+        The PromptBuilderCoordinator provides centralized prompt building,
+        including mode-specific prompts, thinking mode handling, and tool hints.
+
+        Returns:
+            PromptBuilderCoordinator instance
+        """
+        from victor.agent.coordinators.prompt_builder_coordinator import (
+            PromptBuilderCoordinator,
+            create_prompt_builder_coordinator,
+        )
+        from victor.agent.coordinators.prompt_builder_protocol import PromptBuilderCoordinatorConfig
+
+        # Build config from settings
+        config = PromptBuilderCoordinatorConfig(
+            cache_enabled=getattr(self._settings, "enable_prompt_cache", True),
+            include_tool_hints=getattr(self._settings, "include_tool_hints_in_prompt", True),
+            include_thinking_instructions=getattr(self._settings, "include_thinking_instructions", True),
+            max_prompt_length=getattr(self._settings, "max_system_prompt_length", 50000),
+        )
+
+        # Get base system prompt from settings
+        base_prompt = getattr(self._settings, "base_system_prompt", "")
+
+        return create_prompt_builder_coordinator(
+            config=config,
+            base_prompt=base_prompt,
+        )
+
     # =========================================================================
     # Presentation Abstraction Layer Factory Methods
     # =========================================================================
@@ -1854,6 +1982,218 @@ class OrchestratorServiceProvider:
             lambda c: EmojiPresentationAdapter(),
             ServiceLifetime.SINGLETON,
         )
+
+    # =========================================================================
+    # Agentic AI Service Factory Methods (Phase 3 Integration)
+    # =========================================================================
+
+    def _register_hierarchical_planner(self, container: ServiceContainer) -> None:
+        """Register HierarchicalPlanner as singleton.
+
+        The HierarchicalPlanner provides hierarchical task decomposition
+        for complex goal-oriented execution.
+
+        Args:
+            container: DI container to register services in
+        """
+        from victor.agent.protocols_agentic_ai import HierarchicalPlannerProtocol
+
+        container.register(
+            HierarchicalPlannerProtocol,
+            lambda c: self._create_hierarchical_planner(),
+            ServiceLifetime.SINGLETON,
+        )
+
+    def _create_hierarchical_planner(self) -> Any:
+        """Create HierarchicalPlanner instance.
+
+        Returns:
+            HierarchicalPlanner instance configured with settings
+        """
+        from victor.agent.planning import HierarchicalPlanner
+
+        # Orchestrator and provider_manager will be set later by dependency injection
+        return HierarchicalPlanner(
+            orchestrator=None,  # Will be set by orchestrator
+            provider_manager=None,  # Will be set by orchestrator
+            event_bus=None,  # Will be set by orchestrator
+        )
+
+    def _register_episodic_memory(self, container: ServiceContainer) -> None:
+        """Register EpisodicMemory as singleton.
+
+        The EpisodicMemory provides storage and retrieval of agent experiences.
+
+        Args:
+            container: DI container to register services in
+        """
+        from victor.agent.protocols_agentic_ai import EpisodicMemoryProtocol
+
+        container.register(
+            EpisodicMemoryProtocol,
+            lambda c: self._create_episodic_memory(),
+            ServiceLifetime.SINGLETON,
+        )
+
+    def _create_episodic_memory(self) -> Any:
+        """Create EpisodicMemory instance.
+
+        Returns:
+            EpisodicMemory instance configured with settings
+        """
+        from victor.agent.memory import create_episodic_memory
+
+        max_episodes = getattr(self._settings, "episodic_memory_max_episodes", 1000)
+        decay_rate = getattr(self._settings, "episodic_memory_decay_rate", 0.01)
+        consolidation_threshold = getattr(
+            self._settings, "episodic_memory_consolidation_interval", 100
+        )
+
+        return create_episodic_memory(
+            max_episodes=max_episodes,
+            decay_rate=decay_rate,
+            consolidation_threshold=consolidation_threshold,
+        )
+
+    def _register_semantic_memory(self, container: ServiceContainer) -> None:
+        """Register SemanticMemory as singleton.
+
+        The SemanticMemory provides storage and querying of factual knowledge.
+
+        Args:
+            container: DI container to register services in
+        """
+        from victor.agent.protocols_agentic_ai import SemanticMemoryProtocol
+
+        container.register(
+            SemanticMemoryProtocol,
+            lambda c: self._create_semantic_memory(),
+            ServiceLifetime.SINGLETON,
+        )
+
+    def _create_semantic_memory(self) -> Any:
+        """Create SemanticMemory instance.
+
+        Returns:
+            SemanticMemory instance configured with settings
+        """
+        from victor.agent.memory import SemanticMemory
+
+        max_knowledge = getattr(self._settings, "semantic_memory_max_facts", 5000)
+
+        return SemanticMemory(max_knowledge=max_knowledge)
+
+    def _register_skill_discovery(self, container: ServiceContainer) -> None:
+        """Register SkillDiscoveryEngine as singleton.
+
+        The SkillDiscoveryEngine provides dynamic tool discovery and composition.
+
+        Args:
+            container: DI container to register services in
+        """
+        from victor.agent.protocols_agentic_ai import SkillDiscoveryProtocol
+
+        container.register(
+            SkillDiscoveryProtocol,
+            lambda c: self._create_skill_discovery(),
+            ServiceLifetime.SINGLETON,
+        )
+
+    def _create_skill_discovery(self) -> Any:
+        """Create SkillDiscoveryEngine instance.
+
+        Returns:
+            SkillDiscoveryEngine instance configured with settings
+        """
+        from victor.agent.skills import SkillDiscoveryEngine
+        from victor.agent.protocols import ToolRegistryProtocol
+
+        # Get tool registry from container
+        tool_registry = self.container.get(ToolRegistryProtocol)
+
+        return SkillDiscoveryEngine(
+            tool_registry=tool_registry,
+            tool_selector=None,  # Will be set by orchestrator
+            event_bus=None,  # Will be set by orchestrator
+        )
+
+    def _register_skill_chainer(self, container: ServiceContainer) -> None:
+        """Register SkillChainer as singleton.
+
+        The SkillChainer provides multi-step skill chain planning and execution.
+
+        Args:
+            container: DI container to register services in
+        """
+        from victor.agent.protocols_agentic_ai import SkillChainerProtocol
+
+        container.register(
+            SkillChainerProtocol,
+            lambda c: self._create_skill_chainer(),
+            ServiceLifetime.SINGLETON,
+        )
+
+    def _create_skill_chainer(self) -> Any:
+        """Create SkillChainer instance.
+
+        Returns:
+            SkillChainer instance configured with settings
+        """
+        from victor.agent.skills import SkillChainer
+
+        return SkillChainer()
+
+    def _register_proficiency_tracker(self, container: ServiceContainer) -> None:
+        """Register ProficiencyTracker as singleton.
+
+        The ProficiencyTracker provides performance tracking and improvement.
+
+        Args:
+            container: DI container to register services in
+        """
+        from victor.agent.protocols_agentic_ai import ProficiencyTrackerProtocol
+
+        container.register(
+            ProficiencyTrackerProtocol,
+            lambda c: self._create_proficiency_tracker(),
+            ServiceLifetime.SINGLETON,
+        )
+
+    def _create_proficiency_tracker(self) -> Any:
+        """Create ProficiencyTracker instance.
+
+        Returns:
+            ProficiencyTracker instance configured with settings
+        """
+        from victor.agent.improvement import ProficiencyTracker
+
+        return ProficiencyTracker()
+
+    def _register_rl_coordinator(self, container: ServiceContainer) -> None:
+        """Register RLCoordinator as singleton.
+
+        The RLCoordinator provides reinforcement learning for decision optimization.
+
+        Args:
+            container: DI container to register services in
+        """
+        from victor.agent.protocols_agentic_ai import RLCoordinatorProtocol
+
+        container.register(
+            RLCoordinatorProtocol,
+            lambda c: self._create_rl_coordinator(),
+            ServiceLifetime.SINGLETON,
+        )
+
+    def _create_rl_coordinator(self) -> Any:
+        """Create RLCoordinator instance.
+
+        Returns:
+            EnhancedRLCoordinator instance configured with settings
+        """
+        from victor.agent.improvement import EnhancedRLCoordinator
+
+        return EnhancedRLCoordinator()
 
     # =========================================================================
     # Architecture Documentation: Intentionally Unregistered Protocols

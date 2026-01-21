@@ -1,0 +1,354 @@
+# Victor AI Performance Monitoring Alert Rules
+#
+# This file defines alerting rules for performance-related metrics.
+# Rules are organized by severity (warning, critical) and component.
+#
+# Deploy to Prometheus:
+#   kubectl apply -f deployment/kubernetes/monitoring/performance-alerts.yaml
+#
+# View in AlertManager:
+#   kubectl port-forward -n victor-monitoring svc/alertmanager 9093:9093
+#   open http://localhost:9093
+
+groups:
+  - name: victor_performance_cache
+    interval: 30s
+    rules:
+      # Cache miss rate alerts
+      - alert: HighCacheMissRate
+        expr: |
+          victor_cache_hit_rate{namespace="overall"} < 0.4
+        for: 5m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Cache miss rate too high (below 40%)"
+          description: "Cache hit rate is {{ $value | humanizePercentage }} for the last 5 minutes. Consider increasing cache size or TTL."
+
+      - alert: CriticalCacheMissRate
+        expr: |
+          victor_cache_hit_rate{namespace="overall"} < 0.2
+        for: 10m
+        labels:
+          severity: critical
+          component: cache
+        annotations:
+          summary: "Critical cache miss rate (below 20%)"
+          description: "Cache hit rate is {{ $value | humanizePercentage }}. Cache is ineffective."
+
+      # Cache utilization alerts
+      - alert: HighCacheUtilization
+        expr: |
+          victor_cache_utilization{namespace="overall"} > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Cache utilization too high (above 80%)"
+          description: "Cache utilization is {{ $value | humanizePercentage }}. Consider increasing cache size."
+
+      - alert: CriticalCacheUtilization
+        expr: |
+          victor_cache_utilization{namespace="overall"} > 0.95
+        for: 5m
+        labels:
+          severity: critical
+          component: cache
+        annotations:
+          summary: "Cache nearly full (above 95%)"
+          description: "Cache utilization is {{ $value | humanizePercentage }}. Immediate action required."
+
+      # Cache eviction alerts
+      - alert: HighCacheEvictionRate
+        expr: |
+          rate(victor_cache_operations_total{operation="evictions"}[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "High cache eviction rate"
+          description: "Cache eviction rate is {{ $value | humanize }} evictions/sec. Cache size may be too small."
+
+  - name: victor_performance_tool_selection
+    interval: 30s
+    rules:
+      # Tool selection latency alerts
+      - alert: HighToolSelectionLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(victor_tool_duration_ms_bucket[5m])) by (le)
+          ) > 1.0
+        for: 10m
+        labels:
+          severity: warning
+          component: tool_selection
+        annotations:
+          summary: "High tool selection latency (P95 > 1ms)"
+          description: "P95 tool selection latency is {{ $value | humanize }}ms for the last 10 minutes."
+
+      - alert: CriticalToolSelectionLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(victor_tool_duration_ms_bucket[5m])) by (le)
+          ) > 5.0
+        for: 5m
+        labels:
+          severity: critical
+          component: tool_selection
+        annotations:
+          summary: "Critical tool selection latency (P95 > 5ms)"
+          description: "P95 tool selection latency is {{ $value | humanize }}ms. Performance severely degraded."
+
+      # Tool selection error rate
+      - alert: HighToolSelectionMissRate
+        expr: |
+          sum(rate(victor_cache_operations_total{operation="misses"}[5m])) /
+          sum(rate(victor_cache_operations_total[5m])) > 0.7
+        for: 5m
+        labels:
+          severity: warning
+          component: tool_selection
+        annotations:
+          summary: "Tool selection cache miss rate too high (above 70%)"
+          description: "Cache miss rate is {{ $value | humanizePercentage }} for the last 5 minutes."
+
+  - name: victor_performance_system
+    interval: 30s
+    rules:
+      # Memory usage alerts
+      - alert: HighMemoryUsage
+        expr: |
+          victor_system_memory_bytes > 1073741824
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage (above 1GB)"
+          description: "Memory usage is {{ $value | humanize }}B for the last 10 minutes."
+
+      - alert: CriticalMemoryUsage
+        expr: |
+          victor_system_memory_bytes > 2147483648
+        for: 5m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Critical memory usage (above 2GB)"
+          description: "Memory usage is {{ $value | humanize }}B. Risk of OOM."
+
+      # CPU usage alerts
+      - alert: HighCPUUsage
+        expr: |
+          victor_system_cpu_percent > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage (above 80%)"
+          description: "CPU usage is {{ $value | humanizePercentage }} for the last 10 minutes."
+
+      - alert: CriticalCPUUsage
+        expr: |
+          victor_system_cpu_percent > 95
+        for: 5m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Critical CPU usage (above 95%)"
+          description: "CPU usage is {{ $value | humanizePercentage }}. System overload."
+
+      # Thread count alerts
+      - alert: HighThreadCount
+        expr: |
+          victor_system_threads > 100
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High thread count (above 100)"
+          description: "Thread count is {{ $value }} for the last 10 minutes. Possible thread leak."
+
+  - name: victor_performance_tool_execution
+    interval: 30s
+    rules:
+      # Tool execution latency alerts
+      - alert: HighToolExecutionLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(victor_tool_duration_ms_bucket[5m])) by (le)
+          ) > 1000
+        for: 10m
+        labels:
+          severity: warning
+          component: tool_execution
+        annotations:
+          summary: "High tool execution latency (P95 > 1s)"
+          description: "P95 tool execution latency is {{ $value | humanize }}ms for the last 10 minutes."
+
+      - alert: CriticalToolExecutionLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(victor_tool_duration_ms_bucket[5m])) by (le)
+          ) > 5000
+        for: 5m
+        labels:
+          severity: critical
+          component: tool_execution
+        annotations:
+          summary: "Critical tool execution latency (P95 > 5s)"
+          description: "P95 tool execution latency is {{ $value | humanize }}ms. Tools are timing out."
+
+      # Tool execution error rate
+      - alert: HighToolErrorRate
+        expr: |
+          victor_tool_error_rate > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          component: tool_execution
+        annotations:
+          summary: "High tool execution error rate (above 5%)"
+          description: "Tool error rate is {{ $value | humanizePercentage }} for the last 10 minutes."
+
+      - alert: CriticalToolErrorRate
+        expr: |
+          victor_tool_error_rate > 0.15
+        for: 5m
+        labels:
+          severity: critical
+          component: tool_execution
+        annotations:
+          summary: "Critical tool execution error rate (above 15%)"
+          description: "Tool error rate is {{ $value | humanizePercentage }}. Many tools are failing."
+
+  - name: victor_performance_provider_pool
+    interval: 30s
+    rules:
+      # Provider health alerts
+      - alert: UnhealthyProviders
+        expr: |
+          count(victor_provider_health == 0) > 0
+        for: 5m
+        labels:
+          severity: warning
+          component: provider_pool
+        annotations:
+          summary: "One or more providers are unhealthy"
+          description: "{{ $value }} provider(s) are marked as unhealthy."
+
+      - alert: HighProviderFailureRate
+        expr: |
+          sum(rate(victor_provider_errors_total[5m])) /
+          sum(rate(victor_provider_requests_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: provider_pool
+        annotations:
+          summary: "High provider failure rate (above 10%)"
+          description: "Provider failure rate is {{ $value | humanizePercentage }} for the last 5 minutes."
+
+      - alert: CriticalProviderFailureRate
+        expr: |
+          sum(rate(victor_provider_errors_total[5m])) /
+          sum(rate(victor_provider_requests_total[5m])) > 0.3
+        for: 2m
+        labels:
+          severity: critical
+          component: provider_pool
+        annotations:
+          summary: "Critical provider failure rate (above 30%)"
+          description: "Provider failure rate is {{ $value | humanizePercentage }}. Provider issues affecting service."
+
+      # Provider latency alerts
+      - alert: HighProviderLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(victor_provider_latency_ms_bucket[5m])) by (le, provider)
+          ) > 10000
+        for: 10m
+        labels:
+          severity: warning
+          component: provider_pool
+        annotations:
+          summary: "High provider latency (P95 > 10s)"
+          description: "Provider {{ $labels.provider }} P95 latency is {{ $value | humanize }}ms."
+
+  - name: victor_performance_bootstrap
+    interval: 30s
+    rules:
+      # Startup time alerts (only trigger on restart)
+      - alert: SlowStartup
+        expr: |
+          victor_system_uptime_seconds < 300 and
+          increase(victor_system_uptime_seconds[5m]) > 0
+        labels:
+          severity: info
+          component: bootstrap
+        annotations:
+          summary: "Victor AI starting up"
+          description: "Victor AI is starting up. Monitoring startup performance..."
+
+      # TODO: Add startup time comparison alerts once we track historical data
+      # - alert: DegradedStartupTime
+      #   expr: |
+      #     victor_bootstrap_total_time_ms > (avg_over_time(victor_bootstrap_total_time_ms[7d]) * 1.5)
+      #   labels:
+      #     severity: warning
+      #     component: bootstrap
+      #   annotations:
+      #     summary: "Startup time degraded 50% vs average"
+      #     description: "Current startup: {{ $value }}ms, 7-day average: {{ $avg }}ms"
+
+  - name: victor_performance_summary
+    interval: 1m
+    rules:
+      # Recording rules for dashboard performance
+      - record: victor_performance_health_score
+        expr: |
+          (
+            # Cache hit rate (40% weight)
+            (victor_cache_hit_rate{namespace="overall"} * 0.4) +
+            # Tool success rate (30% weight)
+            ((1 - victor_tool_error_rate) * 0.3) +
+            # System availability (20% weight)
+            ((1 - (victor_system_cpu_percent / 100)) * 0.1) +
+            ((1 - (victor_system_memory_bytes / 2147483648)) * 0.1) +
+            # Low latency (10% weight)
+            ((1 - min(1, histogram_quantile(0.95, sum(rate(victor_tool_duration_ms_bucket[5m])) by (le)) / 5000)) * 0.1)
+          ) * 100
+
+      - record: victor_performance_alert_count
+        expr: |
+          count(ALERTS{alertname=~".*Performance.*", alertstate="firing"})
+
+      # Summary alert
+      - alert: PerformanceDegraded
+        expr: |
+          victor_performance_health_score < 70
+        for: 10m
+        labels:
+          severity: warning
+          component: summary
+        annotations:
+          summary: "Victor AI performance degraded"
+          description: "Overall performance health score is {{ $value | humanize }}/100. Multiple metrics may be affected."
+
+      - alert: PerformanceCritical
+        expr: |
+          victor_performance_health_score < 50
+        for: 5m
+        labels:
+          severity: critical
+          component: summary
+        annotations:
+          summary: "Victor AI performance critical"
+          description: "Overall performance health score is {{ $value | humanize }}/100. Immediate investigation required."

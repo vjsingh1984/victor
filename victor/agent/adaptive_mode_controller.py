@@ -590,17 +590,21 @@ class AdaptiveModeController:
     }
 
     # Default tool budgets by task type
+    # Default tool budgets by task type
+    # Significantly increased to support comprehensive exploration
     DEFAULT_TOOL_BUDGETS = {
-        "code_generation": 3,
-        "create_simple": 2,
-        "create": 5,
-        "edit": 5,
-        "search": 6,
-        "action": 10,
-        "analysis_deep": 15,
-        "analyze": 8,
-        "design": 20,
-        "general": 8,
+        "code_generation": 10,        # Increased from 3
+        "create_simple": 5,           # Increased from 2
+        "create": 15,                  # Increased from 5
+        "edit": 15,                    # Increased from 5
+        "search": 25,                  # Increased from 6
+        "action": 50,                  # Increased from 10
+        "analysis_deep": 100,          # Increased from 15 (KEY FIX for architectural reviews)
+        "analyze": 50,                 # Increased from 8
+        "design": 100,                 # Increased from 20
+        "general": 50,                 # Increased from 8
+        "research": 75,                # NEW: Added for research tasks
+        "refactor": 50,                # NEW: Added for refactoring tasks
     }
 
     # Provider-aware iteration thresholds for loop detection

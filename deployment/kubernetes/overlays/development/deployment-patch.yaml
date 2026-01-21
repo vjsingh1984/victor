@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: victor-ai
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+      - name: victor-ai
+        resources:
+          requests:
+            cpu: 250m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        env:
+        - name: VICTOR_PROFILE
+          value: "development"
+        - name: VICTOR_LOG_LEVEL
+          value: "DEBUG"
+        - name: VICTOR_ENABLE_DEV_TOOLS
+          value: "true"
+        - name: VICTOR_HOT_RELOAD
+          value: "true"

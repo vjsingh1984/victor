@@ -256,14 +256,18 @@ class UnifiedTaskProgress:
 
 
 class UnifiedTaskConfigLoader:
-    """Loads unified task configuration from YAML."""
+    """Loads unified task configuration from YAML.
 
-    DEFAULT_CONFIG: Dict[str, Any] = {
+    Uses centralized DEFAULT_TOOL_BUDGETS from adaptive_mode_controller
+    as the single source of truth for task-type budgets.
+    """
+
+    # Base configuration template (tool_budget populated dynamically from DEFAULT_TOOL_BUDGETS)
+    BASE_CONFIG_TEMPLATE: Dict[str, Any] = {
         "task_types": {
             "edit": {
                 "max_exploration_iterations": 10,
                 "force_action_after_target_read": True,
-                "tool_budget": 25,
                 "loop_repeat_threshold": 8,
                 "required_tools": ["edit_files", "read_file"],
                 "stage_tools": {
@@ -280,7 +284,6 @@ class UnifiedTaskConfigLoader:
             "create": {
                 "max_exploration_iterations": 10,
                 "force_action_after_target_read": False,
-                "tool_budget": 25,
                 "loop_repeat_threshold": 8,
                 "required_tools": ["write_file"],
                 "stage_tools": {
@@ -296,7 +299,6 @@ class UnifiedTaskConfigLoader:
             "create_simple": {
                 "max_exploration_iterations": 10,
                 "force_action_after_target_read": False,
-                "tool_budget": 20,
                 "loop_repeat_threshold": 6,
                 "required_tools": ["write_file"],
                 "stage_tools": {
@@ -312,7 +314,6 @@ class UnifiedTaskConfigLoader:
             "search": {
                 "max_exploration_iterations": 10,
                 "force_action_after_target_read": False,
-                "tool_budget": 25,
                 "loop_repeat_threshold": 6,
                 "required_tools": ["code_search", "read_file"],
                 "stage_tools": {
@@ -328,7 +329,6 @@ class UnifiedTaskConfigLoader:
             "analyze": {
                 "max_exploration_iterations": 20,
                 "force_action_after_target_read": False,
-                "tool_budget": 40,
                 "loop_repeat_threshold": 10,
                 "required_tools": ["read_file", "execute_bash"],
                 "stage_tools": {
@@ -344,7 +344,6 @@ class UnifiedTaskConfigLoader:
             "research": {
                 "max_exploration_iterations": 10,
                 "force_action_after_target_read": False,
-                "tool_budget": 20,
                 "loop_repeat_threshold": 6,
                 "required_tools": ["web_search", "web_fetch"],
                 "stage_tools": {
@@ -360,10 +359,8 @@ class UnifiedTaskConfigLoader:
             "design": {
                 # Architecture/design questions require codebase exploration
                 # to understand key components, structure, and patterns.
-                # Increased limits from 3/5 to match "analyze" task type.
                 "max_exploration_iterations": 20,
                 "force_action_after_target_read": False,
-                "tool_budget": 40,
                 "loop_repeat_threshold": 10,
                 "needs_tools": True,
                 "required_tools": ["read_file", "list_directory", "code_search"],
@@ -380,7 +377,6 @@ class UnifiedTaskConfigLoader:
             "general": {
                 "max_exploration_iterations": 15,
                 "force_action_after_target_read": False,
-                "tool_budget": 35,
                 "loop_repeat_threshold": 8,
                 "required_tools": ["read_file", "list_directory"],
                 "stage_tools": {
@@ -413,12 +409,61 @@ class UnifiedTaskConfigLoader:
         },
     }
 
+    @classmethod
+    def _get_default_config(cls) -> Dict[str, Any]:
+        """Get default configuration with tool budgets from centralized settings.
+
+        This ensures UnifiedTaskTracker uses the same budget values as
+        AdaptiveModeController, maintaining a single source of truth.
+        """
+        # Lazy import to avoid circular dependency
+        from victor.agent.adaptive_mode_controller import AdaptiveModeController
+
+        # Deep copy the template
+        config = {
+            "task_types": {},
+            "model_overrides": cls.BASE_CONFIG_TEMPLATE["model_overrides"].copy(),
+            "global": cls.BASE_CONFIG_TEMPLATE["global"].copy(),
+        }
+
+        # Map task types to their budget keys in AdaptiveModeController.DEFAULT_TOOL_BUDGETS
+        budget_key_map = {
+            "edit": "edit",
+            "create": "create",
+            "create_simple": "create_simple",
+            "search": "search",
+            "analyze": "analyze",
+            "research": "research",
+            "design": "design",
+            "general": "general",
+        }
+
+        # Get the centralized budgets
+        DEFAULT_TOOL_BUDGETS = AdaptiveModeController.DEFAULT_TOOL_BUDGETS
+
+        # Populate task configs with budgets from AdaptiveModeController
+        for task_type, template in cls.BASE_CONFIG_TEMPLATE["task_types"].items():
+            budget_key = budget_key_map.get(task_type, "general")
+            tool_budget = DEFAULT_TOOL_BUDGETS.get(budget_key, 50)
+
+            # Copy template and inject tool_budget
+            task_config = template.copy()
+            task_config["tool_budget"] = tool_budget
+            config["task_types"][task_type] = task_config
+
+        return config
+
+    DEFAULT_CONFIG: Dict[str, Any] = None  # Set by _get_default_config()
+
     _instance: Optional["UnifiedTaskConfigLoader"] = None
     _config: Optional[Dict[str, Any]] = None
 
     def __new__(cls) -> "UnifiedTaskConfigLoader":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
+            # Initialize DEFAULT_CONFIG on first instantiation
+            if cls.DEFAULT_CONFIG is None:
+                cls.DEFAULT_CONFIG = cls._get_default_config()
         return cls._instance
 
     def __init__(self) -> None:
@@ -428,10 +473,14 @@ class UnifiedTaskConfigLoader:
     def _load_config(self) -> None:
         """Load configuration from existing YAML files.
 
-        Uses:
-        - task_tool_config.yaml for task type configurations
+        Uses centralized DEFAULT_TOOL_BUDGETS as single source of truth:
+        - task_tool_config.yaml for task type configurations (if exists, merges with defaults)
         - model_capabilities.yaml for model-specific settings (via capabilities loader)
         """
+        # Ensure DEFAULT_CONFIG is initialized
+        if UnifiedTaskConfigLoader.DEFAULT_CONFIG is None:
+            UnifiedTaskConfigLoader.DEFAULT_CONFIG = UnifiedTaskConfigLoader._get_default_config()
+
         # Load task config from existing task_tool_config.yaml
         task_config_path = Path(__file__).parent.parent / "config" / "task_tool_config.yaml"
 
@@ -440,25 +489,35 @@ class UnifiedTaskConfigLoader:
                 with open(task_config_path) as f:
                     task_config = yaml.safe_load(f) or {}
 
-                # Restructure to match our expected format
+                # Merge with default config (YAML overrides defaults, but tool_budget comes from DEFAULT_TOOL_BUDGETS)
                 self._config = {
-                    "task_types": task_config.get("task_types", {}),
-                    "global": {
-                        "max_total_iterations": 50,
-                        "min_content_threshold": 150,
-                        "signature_history_size": 10,
-                        "max_overlapping_reads_per_file": 3,
-                        "max_searches_per_query_prefix": 2,
-                    },
-                    # Model overrides come from model_capabilities.yaml via capabilities loader
-                    "model_overrides": self.DEFAULT_CONFIG.get("model_overrides", {}),
+                    "task_types": {},
+                    "global": self.DEFAULT_CONFIG.get("global", {}).copy(),
+                    "model_overrides": self.DEFAULT_CONFIG.get("model_overrides", {}).copy(),
                 }
-                logger.debug(f"Loaded task config from {task_config_path}")
+
+                # Populate task types, using tool_budget from DEFAULT_TOOL_BUDGETS
+                for task_type, default_template in self.DEFAULT_CONFIG.get("task_types", {}).items():
+                    yaml_config = task_config.get("task_types", {}).get(task_type, {})
+
+                    # Start with default template
+                    task_type_config = default_template.copy()
+
+                    # Override with YAML values (except tool_budget, which uses centralized value)
+                    for key, value in yaml_config.items():
+                        if key != "tool_budget":
+                            task_type_config[key] = value
+
+                    # Ensure tool_budget comes from DEFAULT_TOOL_BUDGETS
+                    task_type_config["tool_budget"] = default_template["tool_budget"]
+                    self._config["task_types"][task_type] = task_type_config
+
+                logger.debug(f"Loaded task config from {task_config_path} (merged with centralized budgets)")
             except Exception as e:
-                logger.warning(f"Failed to load task config: {e}, using defaults")
+                logger.warning(f"Failed to load task config: {e}, using defaults with centralized budgets")
                 self._config = self.DEFAULT_CONFIG
         else:
-            logger.debug("Using default task config (task_tool_config.yaml not found)")
+            logger.debug("Using default task config with centralized budgets (task_tool_config.yaml not found)")
             self._config = self.DEFAULT_CONFIG
 
     def reload(self) -> None:

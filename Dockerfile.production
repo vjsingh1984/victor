@@ -1,0 +1,191 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Victor AI - Production Dockerfile
+# Multi-stage build for optimized, secure, and production-ready image
+# Target image size: < 1GB
+
+# =============================================================================
+# Stage 1: Builder
+# =============================================================================
+FROM python:3.12-slim AS builder
+
+LABEL maintainer="Vijaykumar Singh <singhvjd@gmail.com>"
+LABEL description="Victor AI - Production Build"
+LABEL version="0.5.0"
+
+# Build arguments for customization
+ARG VERSION="0.5.0"
+ARG BUILD_DATE
+ARG VCS_REF
+
+# Set build labels
+LABEL org.opencontainers.image.created="${BUILD_DATE}"
+LABEL org.opencontainers.image.revision="${VCS_REF}"
+LABEL org.opencontainers.image.version="${VERSION}"
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /build
+
+# Copy dependency files
+COPY pyproject.toml README.md ./
+
+# Install Python dependencies to /usr/local
+# Use --install-option to install to clean location for easy copying
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir --prefix=/install . && \
+    # Install optional API server dependencies for production
+    pip install --no-cache-dir --prefix=/install \
+        fastapi>=0.109 \
+        uvicorn>=0.27 \
+        starlette>=0.49.1 \
+    # Clean up
+    rm -rf /root/.cache/pip
+
+# =============================================================================
+# Stage 2: Runtime
+# =============================================================================
+FROM python:3.12-slim AS runtime
+
+# Runtime arguments
+ARG VERSION="0.5.0"
+ARG BUILD_DATE
+ARG VCS_REF
+
+# Metadata
+LABEL maintainer="Vijaykumar Singh <singhvjd@gmail.com>"
+LABEL description="Victor AI - Enterprise AI Coding Assistant"
+LABEL version="${VERSION}"
+LABEL org.opencontainers.image.created="${BUILD_DATE}"
+LABEL org.opencontainers.image.revision="${VCS_REF}"
+LABEL org.opencontainers.image.version="${VERSION}"
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Create non-root user with specific UID for consistency
+RUN groupadd -r victor -g 1000 && \
+    useradd -r -g victor -u 1000 -m -s /bin/bash victor && \
+    mkdir -p /home/victor/.victor/{cache,data,embeddings,logs} && \
+    chown -R victor:victor /home/victor
+
+# Set working directory
+WORKDIR /app
+
+# Copy Python packages from builder
+COPY --from=builder --chown=victor:victor /install /usr/local
+
+# Copy application code
+COPY --chown=victor:victor victor ./victor
+COPY --chown=victor:victor examples ./examples
+COPY --chown=victor:victor README.md ./
+
+# Copy configuration and profiles
+COPY --chown=victor:victor docker/profiles.yaml.example /home/victor/.victor/profiles.yaml
+
+# Create startup script
+RUN echo '#!/bin/bash\n\
+set -e\n\
+\n\
+# Initialize Victor configuration\n\
+if [ ! -f /home/victor/.victor/profiles.yaml ]; then\n\
+    cp /app/docker/profiles.yaml.example /home/victor/.victor/profiles.yaml\n\
+fi\n\
+\n\
+# Execute the command\n\
+exec "$@"\n' > /usr/local/bin/docker-entrypoint.sh && \
+    chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# Set ownership
+RUN chown -R victor:victor /app /home/victor /usr/local/bin/victor /usr/local/bin/vic
+
+# Switch to non-root user
+USER victor
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    VICTOR_HOME=/home/victor/.victor \
+    VICTOR_LOG_LEVEL=INFO \
+    VICTOR_PROFILE=production
+
+# Expose ports
+# 8000: FastAPI server (if running API mode)
+# 9090: Metrics endpoint (if observability enabled)
+EXPOSE 8000 9090
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD victor --version || exit 1
+
+# Set entrypoint
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+
+# Default command (can be overridden)
+# Examples:
+#   - victor chat (CLI mode)
+#   - victor serve --port 8000 (API server mode)
+#   - victor (TUI mode)
+CMD ["victor"]
+
+# =============================================================================
+# Build Instructions
+# =============================================================================
+#
+# Build standard image:
+#   docker build -f Dockerfile.production -t victor:latest .
+#
+# Build with build arguments:
+#   docker build \
+#     -f Dockerfile.production \
+#     --build-arg VERSION=$(cat pyproject.toml | grep version | head -1 | awk -F= '{print $2}' | tr -d ' "') \
+#     --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+#     --build-arg VCS_REF=$(git rev-parse --short HEAD) \
+#     -t victor:production .
+#
+# Run container:
+#   docker run -it --rm \
+#     -v $(pwd)/workspace:/workspace \
+#     -e ANTHROPIC_API_KEY=xxx \
+#     victor:production
+#
+# Run as API server:
+#   docker run -d --name victor-api \
+#     -p 8000:8000 \
+#     -e VICTOR_PROFILE=production \
+#     victor:production victor serve --port 8000
+#
+# Size optimization tips:
+#   - Multi-stage build separates build and runtime dependencies
+#   - Only copies necessary artifacts from builder stage
+#   - Uses --no-install-recommends for apt packages
+#   - Cleans up apt cache after installs
+#   - Non-root user reduces security surface
+#   - Pre-built wheels reduce installation time
+# =============================================================================

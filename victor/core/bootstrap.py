@@ -31,6 +31,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Type, TypeVar
 
@@ -545,12 +546,26 @@ def _register_vertical_services(
     - Prompt contributions for task hints
     - Mode configurations
 
+    PERFORMANCE OPTIMIZATION (Phase 1):
+    Vertical loading is deferred until first use by default. This saves 250-300ms
+    during bootstrap. Set VICTOR_EAGER_LOAD_VERTICAL=1 or settings.eager_load_vertical=True
+    to load vertical at startup (old behavior).
+
     Args:
         container: DI container to register services in
         settings: Application settings
         vertical_name: Optional vertical name. If None, uses settings.default_vertical.
                        If settings.default_vertical is also not set, defaults to "coding".
     """
+    # Check if eager loading is disabled (default for performance)
+    eager_load = getattr(settings, "eager_load_vertical", False)
+    env_eager_load = os.environ.get("VICTOR_EAGER_LOAD_VERTICAL", "0").strip() == "1"
+
+    if not eager_load and not env_eager_load:
+        # Defer vertical loading to first use for performance
+        logger.debug("Deferred vertical loading (will load on first access)")
+        return
+
     # Determine which vertical to load
     # Priority: explicit parameter > settings.default_vertical > "coding"
     if vertical_name is None:

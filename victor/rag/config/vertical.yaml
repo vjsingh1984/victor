@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""RAGAssistant - YAML Configuration.
-
-Retrieval-Augmented Generation assistant for document Q&A.
-Features: Document ingestion, vector search, query generation, source attribution.
-"""
-
+# =============================================================================
+# RAGAssistant - YAML Configuration
+#
+# Retrieval-Augmented Generation assistant for document Q&A.
+# Features: Document ingestion, vector search, query generation, source attribution.
 # =============================================================================
 # Metadata
 # =============================================================================
@@ -25,6 +24,15 @@ metadata:
   name: rag
   version: "1.0.0"
   description: "Retrieval-Augmented Generation assistant for document Q&A"
+  vector_store: "lancedb"
+  supported_formats:
+    - pdf
+    - markdown
+    - txt
+    - code
+  embedding_model: "default"
+  chunk_size: 1000
+  chunk_overlap: 200
 
 # =============================================================================
 # Core Configuration
@@ -173,16 +181,3 @@ extensions:
     module: victor.rag.tool_dependencies
     class: RAGToolDependencyProvider
 
-# =============================================================================
-# Additional Metadata
-# =============================================================================
-metadata:
-  vector_store: "lancedb"
-  supported_formats:
-    - pdf
-    - markdown
-    - txt
-    - code
-  embedding_model: "default"
-  chunk_size: 1000
-  chunk_overlap: 200

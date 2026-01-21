@@ -1,0 +1,119 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+*.cover
+.hypothesis/
+
+# Documentation
+docs/_build/
+docs/_static/
+docs/_templates/
+*.md
+!README.md
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Deployment
+deployment/
+terraform/
+ansible/
+
+# Logs and databases
+*.log
+*.sql
+*.sqlite
+*.db
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Cache and temp
+.cache/
+*.tmp
+tmp/
+temp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node modules (if any)
+node_modules/
+npm-debug.log
+
+# Rust (if any maturin builds)
+target/
+Cargo.lock
+
+# Local development files
+.docker
+*.local
+.local/
+
+# Secrets (should never be in image)
+*.pem
+*.key
+*.cert
+secrets/
+credentials/
+
+# Benchmarks and profiling
+*.prof
+*.pstats
+benchmarks/
+
+# Misc
+.editorconfig
+.pre-commit-config.yaml
+EOF

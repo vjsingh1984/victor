@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: victor-ai
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+      - name: victor-ai
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+        env:
+        - name: VICTOR_PROFILE
+          value: "staging"
+        - name: VICTOR_LOG_LEVEL
+          value: "DEBUG"

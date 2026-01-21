@@ -1,0 +1,898 @@
+# API Integration Vertical Template
+# Production template for API integration, webhooks, and service communication
+# Competitive with Postman AI, Insomnia AI, Zapier
+
+metadata:
+  name: api_integration
+  description: "API integration, webhook handling, and service communication assistant"
+  version: "1.0.0"
+  author: "Victor Team"
+  license: "Apache-2.0"
+  category: integration
+  tags:
+    - api
+    - integration
+    - webhooks
+    - rest
+    - graphql
+    - grpc
+    - microservices
+  provider_hints:
+    preferred_models:
+      - claude-sonnet-4-5
+      - gpt-4
+    min_context: 100000
+    supports_tools: true
+  evaluation_criteria:
+    - integration_success_rate
+    - error_handling_quality
+    - response_time
+    - reliability
+
+# Core tools for API integration
+tools:
+  # Framework file operations
+  - read_file
+  - write_file
+  - edit_file
+  - grep
+
+  # Core filesystem operations
+  - ls
+  - overview
+
+  # Code search and navigation
+  - code_search
+  - semantic_code_search
+  - plan
+
+  # Shell for API testing
+  - shell
+
+  # Web tools for API calls
+  - web_search
+  - web_fetch
+
+  # Git for version control
+  - git
+
+# Main system prompt
+system_prompt: |
+  You are Victor, an expert API integration specialist specializing in connecting services, handling webhooks, and implementing robust API clients.
+
+  Your capabilities:
+  - REST API integration (GET, POST, PUT, DELETE, PATCH)
+  - GraphQL query and mutation design
+  - Webhook handling and event processing
+  - API client library generation
+  - Authentication handling (OAuth2, JWT, API keys, Basic Auth)
+  - Rate limiting and retry logic
+  - Error handling and recovery
+  - Request/response serialization and validation
+  - API testing and debugging
+  - API documentation generation
+  - Microservices communication patterns
+  - Async/concurrent API requests
+  - API versioning and migration
+
+  Guidelines:
+  1. **Use appropriate HTTP methods**: GET (read), POST (create), PUT (update), PATCH (partial update), DELETE (remove)
+  2. **Handle errors gracefully**: Implement retry logic, exponential backoff, and proper error messages
+  3. **Validate responses**: Check status codes, validate schemas, handle unexpected responses
+  4. **Implement rate limiting**: Respect API rate limits and implement throttling
+  5. **Secure credentials**: Never hardcode API keys; use environment variables and secret management
+  6. **Log API calls**: Log requests and responses for debugging (but mask sensitive data)
+  7. **Use timeouts**: Always set timeouts to prevent hanging requests
+  8. **Implement caching**: Cache responses when appropriate to reduce API calls
+  9. **Handle webhooks idempotently**: Design webhook handlers to be idempotent
+  10. **Document integrations**: Maintain clear documentation of API endpoints and usage
+
+  API Integration Best Practices:
+
+  **Authentication**:
+  - Use OAuth2 for third-party integrations
+  - Store tokens securely (environment variables, secret managers)
+  - Implement token refresh logic
+  - Handle authentication failures gracefully
+  - Never log tokens or API keys
+
+  **Request Design**:
+  - Include descriptive user-agent headers
+  - Set appropriate timeouts (connection, read)
+  - Use connection pooling for performance
+  - Compress request bodies when large
+  - Include request IDs for tracing
+
+  **Response Handling**:
+  - Check status codes before processing
+  - Validate response schemas
+  - Handle pagination for list endpoints
+  - Parse errors from response bodies
+  - Implement retry for transient failures
+
+  **Error Handling**:
+  - Retry on 429 (rate limit), 500, 502, 503, 504
+  - Implement exponential backoff
+  - Give up after max retries
+  - Log errors with context
+  - Provide meaningful error messages
+
+  **Webhook Handling**:
+  - Verify webhook signatures
+  - Process webhooks asynchronously
+  - Acknowledge webhooks immediately (return 200)
+  - Implement idempotency keys
+  - Retry failed processing
+  - Log all webhook events
+
+  **Rate Limiting**:
+  - Respect rate limit headers (X-RateLimit-*)
+  - Implement token bucket or sliding window
+  - Queue requests when rate limited
+  - Prioritize critical requests
+  - Monitor rate limit usage
+
+  Common API Patterns:
+
+  **REST API Client**:
+  ```python
+  import requests
+  from typing import Dict, Any
+
+  class APIClient:
+      def __init__(self, base_url: str, api_key: str):
+          self.base_url = base_url
+          self.session = requests.Session()
+          self.session.headers.update({
+              "Authorization": f"Bearer {api_key}",
+              "Content-Type": "application/json",
+          })
+
+      def get(self, endpoint: str, params: Dict = None) -> Dict[str, Any]:
+          response = self.session.get(
+              f"{self.base_url}{endpoint}",
+              params=params,
+              timeout=30
+          )
+          response.raise_for_status()
+          return response.json()
+  ```
+
+  **Webhook Handler**:
+  ```python
+  def handle_webhook(request):
+      # Verify signature
+      if not verify_signature(request):
+          return {"error": "Invalid signature"}, 401
+
+      # Acknowledge immediately
+      process_webhook_async(request.data)
+
+      return {"status": "received"}, 200
+  ```
+
+  When implementing API integrations:
+  - Read API documentation carefully
+  - Test endpoints with tools like curl or Postman first
+  - Implement robust error handling
+  - Add comprehensive logging
+  - Write tests for integration code
+  - Handle API versioning
+  - Plan for migration and deprecation
+
+  You have access to file operations, code search, web tools, and shell. Use them to create reliable, production-ready API integrations.
+
+# Stage definitions for API integration workflow
+stages:
+  INITIAL:
+    name: INITIAL
+    description: "Understanding API integration requirements"
+    tools:
+      - read_file
+      - ls
+      - overview
+    keywords:
+      - what
+      - how
+      - integrate
+      - api
+    next_stages:
+      - DISCOVERY
+      - ANALYSIS
+
+  DISCOVERY:
+    name: DISCOVERY
+    description: "Discovering API documentation and requirements"
+    tools:
+      - web_search
+      - web_fetch
+      - read_file
+    keywords:
+      - discover
+      - find
+      - document
+      - explore
+    next_stages:
+      - ANALYSIS
+      - DESIGN
+
+  ANALYSIS:
+    name: ANALYSIS
+    description: "Analyzing API specification and requirements"
+    tools:
+      - read_file
+      - web_fetch
+      - web_search
+    keywords:
+      - analyze
+      - review
+      - understand
+      - spec
+    next_stages:
+      - DESIGN
+      - IMPLEMENTATION
+
+  DESIGN:
+    name: DESIGN
+    description: "Designing integration architecture"
+    tools:
+      - read_file
+      - write_file
+      - code_search
+    keywords:
+      - design
+      - plan
+      - architecture
+      - structure
+    next_stages:
+      - IMPLEMENTATION
+
+  IMPLEMENTATION:
+    name: IMPLEMENTATION
+    description: "Implementing API integration code"
+    tools:
+      - read_file
+      - write_file
+      - edit_file
+      - web_search
+    keywords:
+      - implement
+      - code
+      - integrate
+      - client
+    next_stages:
+      - TESTING
+      - REFINEMENT
+
+  TESTING:
+    name: TESTING
+    description: "Testing API integration"
+    tools:
+      - shell
+      - web_fetch
+      - read_file
+    keywords:
+      - test
+      - verify
+      - validate
+      - check
+    next_stages:
+      - REFINEMENT
+      - COMPLETION
+
+  REFINEMENT:
+    name: REFINEMENT
+    description: "Refining error handling and reliability"
+    tools:
+      - read_file
+      - edit_file
+      - shell
+    keywords:
+      - refine
+      - improve
+      - fix
+      - optimize
+    next_stages:
+      - TESTING
+      - COMPLETION
+
+  COMPLETION:
+    name: COMPLETION
+    description: "Integration complete and documented"
+    tools:
+      - write_file
+      - git
+    keywords:
+      - done
+      - complete
+      - finish
+      - document
+    next_stages: []
+
+# Extension specifications
+extensions:
+  # Middleware for API operations
+  middleware:
+    - name: rate_limiting
+      class_name: RateLimitingMiddleware
+      module: victor.api.middleware
+      enabled: true
+      config:
+        requests_per_second: 10
+        burst_size: 20
+
+    - name: retry_logic
+      class_name: RetryMiddleware
+      module: victor.api.middleware
+      enabled: true
+      config:
+        max_retries: 3
+        backoff_factor: 2
+
+    - name: api_monitoring
+      class_name: APIMonitoringMiddleware
+      module: victor.api.middleware
+      enabled: true
+      config:
+        log_requests: true
+        log_responses: false
+        mask_secrets: true
+
+  # Safety patterns for API operations
+  safety_patterns:
+    - name: hardcoded_api_key
+      pattern: "(api_key|secret|token).*=.*['\"][^'\"]{20,}['\"]"
+      description: "Hardcoded API keys or secrets"
+      severity: critical
+      category: security
+
+    - name: insecure_http
+      pattern: "http://(?!localhost|127\\.0\\.0\\.1)"
+      description: "Insecure HTTP (non-HTTPS) calls"
+      severity: high
+      category: security
+
+    - name: missing_timeout
+      pattern: "(requests\\..*\\(|session\\..*\\([^)]*\\)(?!.*timeout))"
+      description: "API requests without timeout"
+      severity: medium
+      category: reliability
+
+    - name: sql_injection_risk
+      pattern: "(execute|executemany).*\\+.*%s"
+      description: "Potential SQL injection in API parameters"
+      severity: critical
+      category: security
+
+  # Task type hints for different API tasks
+  prompt_hints:
+    - task_type: implement_rest_client
+      hint: "[REST] Implement REST API client with authentication, error handling, retry logic, and rate limiting."
+      tool_budget: 30
+      priority_tools:
+        - read_file
+        - write_file
+        - web_search
+        - web_fetch
+
+    - task_type: implement_webhook_handler
+      hint: "[WEBHOOK] Implement webhook handler with signature verification, async processing, and idempotency."
+      tool_budget: 25
+      priority_tools:
+        - read_file
+        - write_file
+        - code_search
+
+    - task_type: integrate_third_party_api
+      hint: "[INTEGRATION] Integrate third-party API. Read docs, implement client, handle auth and errors."
+      tool_budget: 35
+      priority_tools:
+        - web_fetch
+        - read_file
+        - write_file
+        - shell
+
+    - task_type: implement_graphql_client
+      hint: "[GRAPHQL] Implement GraphQL client with queries, mutations, and subscriptions."
+      tool_budget: 30
+      priority_tools:
+        - read_file
+        - write_file
+        - web_search
+
+    - task_type: debug_api_integration
+      hint: "[DEBUG] Debug API integration issues. Check logs, test endpoints, validate requests/responses."
+      tool_budget: 20
+      priority_tools:
+        - read_file
+        - shell
+        - web_fetch
+
+    - task_type: implement_rate_limiting
+      hint: "[RATE-LIMIT] Implement rate limiting for API client. Respect limits, handle throttling."
+      tool_budget: 15
+      priority_tools:
+        - read_file
+        - write_file
+        - code_search
+
+  # Workflow handlers
+  handlers:
+    api_client_generator: victor.api.handlers
+    webhook_generator: victor.api.handlers
+    api_tester: victor.api.handlers
+
+  # Persona definitions for API teams
+  personas:
+    api_integrator:
+      name: "API Integrator"
+      role: "integrator"
+      expertise: "API integration and client development"
+      communication_style: "technical"
+      decision_approach: "pragmatic"
+      system_prompt_extension: |
+        You are an API integration specialist. You:
+        - Implement robust API clients
+        - Handle authentication and security
+        - Implement error handling and retries
+        - Follow API best practices
+
+    webhook_specialist:
+      name: "Webhook Specialist"
+      role: "webhook"
+      expertise: "Webhook handling and event processing"
+      communication_style: "practical"
+      decision_approach: "reliability-focused"
+      system_prompt_extension: |
+        You are a webhook specialist. You:
+        - Design reliable webhook handlers
+        - Implement signature verification
+        - Ensure idempotency
+        - Handle async processing
+
+    api_architect:
+      name: "API Architect"
+      role: "architect"
+      expertise: "API design and microservices communication"
+      communication_style: "strategic"
+      decision_approach: "scalability-focused"
+      system_prompt_extension: |
+        You are an API architect. You:
+        - Design scalable API integrations
+        - Plan for versioning and migration
+        - Consider performance and reliability
+        - Choose appropriate protocols
+
+  # Composed middleware chains
+  composed_chains:
+    robust_api_client:
+      - rate_limiting
+      - retry_logic
+      - api_monitoring
+
+    production_webhook:
+      - api_monitoring
+      - retry_logic
+
+# Workflow definitions
+workflows:
+  - name: rest_api_integration
+    description: "Implement REST API client integration"
+    file: workflows/rest_api_integration.yaml
+    handler_module: victor.api.handlers
+
+  - name: webhook_implementation
+    description: "Implement webhook handler"
+    file: workflows/webhook_implementation.yaml
+    handler_module: victor.api.handlers
+
+  - name: graphql_integration
+    description: "Implement GraphQL client integration"
+    file: workflows/graphql_integration.yaml
+    handler_module: victor.api.handlers
+
+  - name: api_migration
+    description: "Migrate to new API version"
+    file: workflows/api_migration.yaml
+    handler_module: victor.api.handlers
+
+# Team formations for multi-agent API work
+teams:
+  - name: api_integration_team
+    display_name: "API Integration Team"
+    description: "Comprehensive API integration and testing"
+    formation: pipeline
+    communication_style: structured
+    max_iterations: 10
+    roles:
+      - name: api_researcher
+        display_name: "API Researcher"
+        description: "Researches API documentation and specifications"
+        persona: "You research APIs, read documentation, and understand endpoints and capabilities."
+        tool_categories:
+          - web_search
+          - web_fetch
+          - read_file
+
+      - name: client_developer
+        display_name: "Client Developer"
+        description: "Develops API client code"
+        persona: "You develop robust API clients with authentication and error handling."
+        tool_categories:
+          - read_file
+          - write_file
+          - code_search
+
+      - name: integration_tester
+        display_name: "Integration Tester"
+        description: "Tests API integrations"
+        persona: "You test API integrations, validate responses, and check error handling."
+        tool_categories:
+          - shell
+          - web_fetch
+          - read_file
+
+      - name: documenter
+        display_name: "Documentation Writer"
+        description: "Documents integration and usage"
+        persona: "You document API integrations, provide examples, and create guides."
+        tool_categories:
+          - read_file
+          - write_file
+
+# Capability specifications
+capabilities:
+  - name: rest_client_generation
+    type: workflow
+    description: "Generate REST API client from OpenAPI spec"
+    enabled: true
+    handler: victor.api.workflows:RESTClientGenerationWorkflow
+    config:
+      include_tests: true
+      include_docs: true
+
+  - name: webhook_handler
+    type: tool
+    description: "Handle webhooks with verification and processing"
+    enabled: true
+    config:
+      verify_signature: true
+      async_processing: true
+
+  - name: rate_limiting
+    type: middleware
+    description: "Implement rate limiting for API calls"
+    enabled: true
+    config:
+      algorithm: token_bucket
+      requests_per_second: 10
+
+# Custom vertical configuration
+custom_config:
+  # Supported API types
+  api_types:
+    - rest
+    - graphql
+    - grpc
+    - websocket
+    - webhook
+
+  # Authentication methods
+  auth_methods:
+    - oauth2
+    - jwt
+    - api_key
+    - basic_auth
+    - bearer_token
+    - mutual_tls
+
+  # HTTP status codes
+  status_codes:
+    success:
+      - 200
+      - 201
+      - 204
+    redirect:
+      - 301
+      - 302
+      - 304
+    client_error:
+      - 400
+      - 401
+      - 403
+      - 404
+      - 429
+    server_error:
+      - 500
+      - 502
+      - 503
+      - 504
+
+  # Retry strategy
+  retry_config:
+    max_retries: 3
+    backoff_factor: 2
+    retry_on:
+      - 429
+      - 500
+      - 502
+      - 503
+      - 504
+
+  # Common headers
+  standard_headers:
+    User-Agent: "Victor-API-Client/1.0"
+    Accept: "application/json"
+    Content-Type: "application/json"
+
+  # Custom prompt sections
+  grounding_rules: |
+    GROUNDING: Base ALL API integrations on actual API documentation.
+    Never assume API behavior. Always verify endpoints, parameters,
+    and responses from official documentation.
+
+    Test API calls with curl or similar tools before implementing clients.
+    Validate all assumptions about API behavior.
+
+  system_prompt_section: |
+    API Integration Best Practices:
+    1. Always use HTTPS for production APIs
+    2. Implement proper authentication (OAuth2, JWT, API keys)
+    3. Handle rate limiting and implement retry logic
+    4. Set appropriate timeouts for all requests
+    5. Validate response schemas and status codes
+    6. Log requests and responses (mask sensitive data)
+    7. Implement circuit breakers for failing services
+    8. Use connection pooling for performance
+    9. Cache responses when appropriate
+    10. Plan for API versioning and deprecation
+
+# File templates (custom generated files)
+file_templates:
+  api_client.py: |
+    """
+    API Client for {{ service_name }}.
+
+    This client handles authentication, rate limiting, and error handling
+    for {{ service_name }} API integration.
+    """
+
+    import requests
+    from typing import Dict, Any, Optional
+    import time
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+
+    class {{ service_name | replace(' ', '') | title }}Client:
+        """Client for {{ service_name }} API."""
+
+        def __init__(
+            self,
+            api_key: str,
+            base_url: str = "{{ default_base_url }}",
+            timeout: int = 30,
+            max_retries: int = 3,
+        ):
+            """
+            Initialize the API client.
+
+            Args:
+                api_key: API key for authentication
+                base_url: Base URL for API endpoints
+                timeout: Request timeout in seconds
+                max_retries: Maximum number of retries
+            """
+            self.base_url = base_url.rstrip("/")
+            self.api_key = api_key
+            self.timeout = timeout
+            self.max_retries = max_retries
+
+            self.session = requests.Session()
+            self.session.headers.update({
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "User-Agent": "{{ user_agent }}",
+            })
+
+        def _make_request(
+            self,
+            method: str,
+            endpoint: str,
+            params: Optional[Dict] = None,
+            data: Optional[Dict] = None,
+            **kwargs
+        ) -> Dict[str, Any]:
+            """
+            Make API request with retry logic.
+
+            Args:
+                method: HTTP method
+                endpoint: API endpoint
+                params: Query parameters
+                data: Request body data
+                **kwargs: Additional request options
+
+            Returns:
+                Response data as dictionary
+
+            Raises:
+                requests.HTTPError: On request failure after retries
+            """
+            url = f"{self.base_url}{endpoint}"
+            retry_count = 0
+            last_error = None
+
+            while retry_count <= self.max_retries:
+                try:
+                    response = self.session.request(
+                        method=method,
+                        url=url,
+                        params=params,
+                        json=data,
+                        timeout=self.timeout,
+                        **kwargs
+                    )
+                    response.raise_for_status()
+                    return response.json()
+
+                except requests.HTTPError as e:
+                    last_error = e
+                    retry_count += 1
+
+                    # Don't retry client errors (except 429 rate limit)
+                    if 400 <= e.response.status_code < 500 and e.response.status_code != 429:
+                        raise
+
+                    # Retry with exponential backoff
+                    if retry_count <= self.max_retries:
+                        wait_time = 2 ** retry_count
+                        logger.warning(
+                            f"Request failed (attempt {retry_count}/{self.max_retries}), "
+                            f"retrying in {wait_time}s: {e}"
+                        )
+                        time.sleep(wait_time)
+
+            raise last_error
+
+        def get(self, endpoint: str, params: Optional[Dict] = None) -> Dict[str, Any]:
+            """
+            Make GET request.
+
+            Args:
+                endpoint: API endpoint
+                params: Query parameters
+
+            Returns:
+                Response data
+            """
+            return self._make_request("GET", endpoint, params=params)
+
+        def post(self, endpoint: str, data: Optional[Dict] = None) -> Dict[str, Any]:
+            """
+            Make POST request.
+
+            Args:
+                endpoint: API endpoint
+                data: Request body data
+
+            Returns:
+                Response data
+            """
+            return self._make_request("POST", endpoint, data=data)
+
+        def put(self, endpoint: str, data: Optional[Dict] = None) -> Dict[str, Any]:
+            """
+            Make PUT request.
+
+            Args:
+                endpoint: API endpoint
+                data: Request body data
+
+            Returns:
+                Response data
+            """
+            return self._make_request("PUT", endpoint, data=data)
+
+        def delete(self, endpoint: str) -> Dict[str, Any]:
+            """
+            Make DELETE request.
+
+            Args:
+                endpoint: API endpoint
+
+            Returns:
+                Response data
+            """
+            return self._make_request("DELETE", endpoint)
+
+  webhook_handler.py: |
+    """
+    Webhook handler for {{ service_name }}.
+
+    This module handles incoming webhooks with signature verification
+    and asynchronous processing.
+    """
+
+    import hmac
+    import hashlib
+    from flask import Flask, request, jsonify
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+
+    def verify_signature(payload: bytes, signature: str, secret: str) -> bool:
+        """
+        Verify webhook signature.
+
+        Args:
+            payload: Request payload
+            signature: Signature from header
+            secret: Webhook secret
+
+        Returns:
+            True if signature is valid
+        """
+        expected_signature = hmac.new(
+            secret.encode(),
+            payload,
+            hashlib.sha256
+        ).hexdigest()
+
+        return hmac.compare_digest(expected_signature, signature)
+
+
+    def create_webhook_app(secret: str) -> Flask:
+        """
+        Create Flask app for webhook handling.
+
+        Args:
+            secret: Webhook secret for signature verification
+
+        Returns:
+            Flask application
+        """
+        app = Flask(__name__)
+
+        @app.route("/webhook", methods=["POST"])
+        def handle_webhook():
+            """Handle incoming webhook."""
+            # Get signature from header
+            signature = request.headers.get("X-Webhook-Signature", "")
+            if not signature:
+                return jsonify({"error": "Missing signature"}), 401
+
+            # Verify signature
+            if not verify_signature(request.data, signature, secret):
+                return jsonify({"error": "Invalid signature"}), 401
+
+            # Get event type
+            event_type = request.headers.get("X-Webhook-Event", "unknown")
+            payload = request.get_json()
+
+            # Log webhook
+            logger.info(f"Received webhook: {event_type}")
+
+            # Process asynchronously (implement your processing logic)
+            process_webhook_async(event_type, payload)
+
+            # Acknowledge immediately
+            return jsonify({"status": "received"}), 200
+
+        return app
+
+
+    def process_webhook_async(event_type: str, payload: dict):
+        """
+        Process webhook asynchronously.
+
+        Args:
+            event_type: Type of webhook event
+            payload: Webhook payload data
+        """
+        # Implement your webhook processing logic here
+        # This should be run in a background task queue
+        logger.info(f"Processing webhook: {event_type}")
+        logger.debug(f"Payload: {payload}")

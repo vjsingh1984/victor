@@ -1,0 +1,17 @@
+# Persistent Volume Claim for Victor cache
+# Stores tool selection cache and other cached data
+# Track 5.3: Advanced Caching in Production
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: victor-cache-pvc
+  labels:
+    app: victor-ai
+spec:
+  accessModes:
+    - ReadWriteOnce  # Single pod writer (shared cache via SQLite in future)
+  resources:
+    requests:
+      storage: 5Gi  # Enough for cache + embeddings
+  storageClassName: fast-ssd  # Use fast SSD for better performance

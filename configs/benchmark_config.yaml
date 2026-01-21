@@ -1,0 +1,296 @@
+# Victor AI Comprehensive Benchmark Configuration
+# Version: 0.5.1
+#
+# This configuration defines benchmark scenarios, performance thresholds,
+# and regression limits for the comprehensive benchmarking suite.
+
+# Global configuration
+version: "0.5.1"
+project_name: "Victor AI"
+
+# Benchmark scenarios
+scenarios:
+  # Startup performance benchmarks
+  startup:
+    enabled: true
+    description: "Measure cold start, warm start, and bootstrap times"
+    benchmarks:
+      cold_start:
+        enabled: true
+        description: "Time to first import (no caches)"
+        target_ms: 200
+        threshold_ms: 200
+        baseline_ms: 8000
+        improvement_pct: 98.7
+
+      warm_start:
+        enabled: true
+        description: "Time to access already-imported module"
+        target_ms: 50
+        threshold_ms: 50
+
+      bootstrap_time:
+        enabled: true
+        description: "Time to bootstrap DI container"
+        target_ms: 100
+        threshold_ms: 100
+
+  # Memory usage benchmarks
+  memory:
+    enabled: true
+    description: "Measure memory footprint and detect leaks"
+    benchmarks:
+      baseline_memory:
+        enabled: true
+        description: "Peak memory after importing victor"
+        target_mb: 50
+        threshold_mb: 50
+
+      memory_leak_detection:
+        enabled: true
+        description: "Memory growth over 100 iterations"
+        target_mb: 5
+        threshold_mb: 5
+        iterations: 100
+
+  # Throughput benchmarks
+  throughput:
+    enabled: true
+    description: "Measure operations per second"
+    benchmarks:
+      tool_selection_throughput:
+        enabled: true
+        description: "Tool selections per second"
+        target_ops_per_sec: 1000
+        threshold_ops_per_sec: 1000
+        iterations: 10000
+
+  # Latency benchmarks
+  latency:
+    enabled: true
+    description: "Measure p50, p95, p99 latencies"
+    benchmarks:
+      tool_selection_latency:
+        enabled: true
+        description: "Tool selection latency percentiles"
+        iterations: 1000
+        thresholds:
+          p50_ms: 1.0
+          p95_ms: 2.0
+          p99_ms: 5.0
+
+  # Cache performance benchmarks
+  cache:
+    enabled: true
+    description: "Measure cache hit rates and effectiveness"
+    benchmarks:
+      cold_cache:
+        enabled: true
+        description: "Uncached tool selection (0% hit rate)"
+        expected_hit_rate: 0.0
+
+      warm_cache:
+        enabled: true
+        description: "Cached tool selection (100% hit rate)"
+        expected_hit_rate: 1.0
+        target_speedup: 10  # 10x faster than uncached
+
+      mixed_cache:
+        enabled: true
+        description: "Mixed workload (50% hit rate)"
+        expected_hit_rate: 0.5
+        acceptable_range: [0.4, 0.6]
+
+      cache_size_performance:
+        enabled: true
+        description: "Cache size impact on performance"
+        sizes: [100, 500, 1000]
+        max_degradation_pct: 300  # Allow 3x latency for 10x size
+
+  # Provider pool benchmarks
+  provider_pool:
+    enabled: true
+    description: "Measure provider pooling benefits"
+    benchmarks:
+      connection_reuse:
+        enabled: true
+        description: "Connection reuse efficiency"
+        target_reuse_rate: 0.8  # 80% of connections reused
+
+      load_balancing:
+        enabled: true
+        description: "Load balancing across providers"
+        providers: ["anthropic", "openai", "ollama"]
+        target_distribution_std: 0.2  # Standard deviation of distribution
+
+  # Tool selection benchmarks
+  tool_selection:
+    enabled: true
+    description: "Compare semantic vs keyword vs hybrid selection"
+    benchmarks:
+      semantic_selection:
+        enabled: true
+        description: "Semantic similarity-based selection"
+        target_accuracy: 0.85
+        target_latency_ms: 50
+
+      keyword_selection:
+        enabled: true
+        description: "Keyword-based selection"
+        target_accuracy: 0.70
+        target_latency_ms: 10
+
+      hybrid_selection:
+        enabled: true
+        description: "Hybrid semantic + keyword selection"
+        target_accuracy: 0.80
+        target_latency_ms: 30
+
+  # Response caching benchmarks
+  response_cache:
+    enabled: true
+    description: "Measure exact match vs semantic caching"
+    benchmarks:
+      exact_match_cache:
+        enabled: true
+        description: "Exact match response caching"
+        target_hit_rate: 0.30
+        target_latency_ms: 1
+
+      semantic_cache:
+        enabled: true
+        description: "Semantic similarity response caching"
+        target_hit_rate: 0.20
+        target_latency_ms: 5
+        similarity_threshold: 0.85
+
+# Concurrent request benchmarks
+concurrent:
+  enabled: true
+  description: "Measure performance under concurrent load"
+  scenarios:
+    - name: "single_user"
+      concurrent_users: 1
+      requests_per_second: 10
+      duration_seconds: 60
+
+    - name: "light_load"
+      concurrent_users: 10
+      requests_per_second: 50
+      duration_seconds: 60
+
+    - name: "moderate_load"
+      concurrent_users: 50
+      requests_per_second: 100
+      duration_seconds: 60
+
+    - name: "heavy_load"
+      concurrent_users: 100
+      requests_per_second: 200
+      duration_seconds: 60
+
+  performance_targets:
+    p95_latency_ms: 1000  # Max acceptable p95 latency
+    error_rate: 0.01  # Max 1% error rate
+
+# Test data sizes
+test_data:
+  small_queries: 10
+  medium_queries: 100
+  large_queries: 1000
+
+  small_tools: 10
+  medium_tools: 47  # Current Victor tool count
+  large_tools: 100
+
+# Performance regression limits
+regression_limits:
+  # Percentage degradation allowed before flagging as regression
+  startup_time_pct: 10  # 10% slower than baseline
+  memory_usage_pct: 20  # 20% more memory
+  throughput_pct: 15  # 15% lower throughput
+  latency_pct: 15  # 15% higher latency
+
+  # Absolute limits
+  max_startup_time_ms: 500
+  max_memory_mb: 100
+  min_throughput_ops_per_sec: 500
+  max_p99_latency_ms: 10
+
+# Reporting configuration
+reporting:
+  formats:
+    - markdown
+    - json
+    - html
+
+  output_directory: ".benchmark_results"
+
+  # Include charts in reports (if supported)
+  include_charts: true
+
+  # Comparison thresholds
+  significant_change_pct: 5  # Mark changes >5% as significant
+  regression_change_pct: 10  # Flag changes >10% as potential regressions
+
+# CI/CD integration
+ci_cd:
+  # Fail CI if benchmarks fail
+  fail_on_regression: true
+
+  # Fail CI if performance degrades beyond limits
+  fail_on_threshold: true
+
+  # Allow some flakiness in CI (network delays, etc.)
+  allowed_flakiness_pct: 5
+
+  # Baseline comparison
+  baseline_file: ".benchmark_results/baseline.json"
+
+  # Performance budget
+  performance_budget:
+    startup_time_ms: 200
+    memory_mb: 50
+    throughput_ops_per_sec: 1000
+
+# Environment configuration
+environments:
+  development:
+    iterations: 100
+    warmup_iterations: 10
+    verbose: true
+
+  production:
+    iterations: 1000
+    warmup_iterations: 100
+    verbose: false
+
+  ci:
+    iterations: 500
+    warmup_iterations: 50
+    verbose: false
+    timeout_seconds: 300
+
+# Advanced settings
+advanced:
+  # Memory profiling
+  enable_memory_profiling: true
+  tracemalloc_frames: 10
+
+  # CPU profiling
+  enable_cpu_profiling: false
+  profiler: "cProfile"  # cProfile or pyinstrument
+
+  # Statistical analysis
+  confidence_level: 0.95
+  bootstrap_samples: 1000
+
+  # Outlier detection
+  outlier_method: "iqr"  # iqr or zscore
+  outlier_threshold: 3.0
+
+# Metadata
+metadata:
+  created: "2025-01-18"
+  version: "0.5.1"
+  description: "Comprehensive benchmark configuration for Victor AI"

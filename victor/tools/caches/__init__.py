@@ -55,6 +55,13 @@ from victor.tools.caches.adaptive_cache import (
     AdaptiveMetrics,
     AdaptiveLRUCache,
 )
+from victor.tools.caches.adaptive_ttl import AdaptiveTTLCache
+from victor.tools.caches.advanced_cache_manager import (
+    AdvancedCacheManager,
+    AdvancedCacheMetrics,
+    get_advanced_cache,
+    reset_advanced_cache,
+)
 from victor.tools.caches.cache_keys import (
     CacheKeyGenerator,
     calculate_tools_hash,
@@ -66,6 +73,12 @@ from victor.tools.caches.multi_level_cache import (
     CacheEntry,
     LevelMetrics,
     MultiLevelCache,
+)
+from victor.tools.caches.persistent_cache import (
+    PersistentCacheEntry,
+    PersistentSelectionCache,
+    get_persistent_cache,
+    reset_persistent_cache,
 )
 from victor.tools.caches.predictive_warmer import (
     PredictionResult,
@@ -96,10 +109,20 @@ __all__ = [
     # Advanced optimization
     "AdaptiveMetrics",
     "AdaptiveLRUCache",
+    "AdaptiveTTLCache",
     "PredictionResult",
     "PredictiveCacheWarmer",
     "QueryPattern",
     "CacheEntry",
     "LevelMetrics",
     "MultiLevelCache",
+    "PersistentCacheEntry",
+    "PersistentSelectionCache",
+    "get_persistent_cache",
+    "reset_persistent_cache",
+    # Advanced cache manager
+    "AdvancedCacheManager",
+    "AdvancedCacheMetrics",
+    "get_advanced_cache",
+    "reset_advanced_cache",
 ]

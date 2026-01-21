@@ -1,0 +1,254 @@
+# Default values for victor-ai
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 3
+
+image:
+  repository: victorai/victor
+  pullPolicy: Always
+  tag: "0.5.1"
+  pullSecrets: []
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+    - ALL
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: http
+  metricsPort: 9090
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: victor-ai.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: victor-ai-tls
+  #    hosts:
+  #      - victor-ai.local
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# Node selectors and affinity
+nodeSelector: {}
+tolerations: []
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - victor-ai
+          topologyKey: kubernetes.io/hostname
+
+priorityClassName: ""
+
+# Configuration
+config:
+  profile: production
+  logLevel: INFO
+  maxWorkers: 4
+  cacheSize: 1000
+  toolSelectionStrategy: hybrid
+  enableTelemetry: true
+  enableMetrics: true
+  enableTracing: false
+  enableRateLimiting: true
+
+# Event bus configuration
+eventBus:
+  backend: memory  # memory, kafka, sqs, rabbitmq, redis
+  kafka:
+    enabled: false
+    bootstrapServers: ""
+    topicPrefix: victor
+
+# Checkpoint configuration
+checkpoint:
+  backend: memory  # memory, sqlite, postgres, redis
+  sqlite:
+    path: /app/data/checkpoints.db
+  redis:
+    keyPrefix: "victor:checkpoint:"
+
+# Cache configuration
+cache:
+  backend: memory  # memory, redis
+  redis:
+    url: ""
+    ttl: 3600
+
+# Provider configuration
+provider:
+  default: anthropic
+  model: claude-sonnet-4-5
+
+# Verticals
+verticals:
+  enabled: coding,devops,rag,dataanalysis,research,benchmark
+
+# Secrets (use --set-file or external secrets)
+secrets:
+  existingSecret: ""
+  database:
+    url: postgresql://victor:password@victor-postgres:5432/victor
+  redis:
+    url: redis://victor-redis:6379/0
+  apiKeys:
+    anthropic: ""
+    openai: ""
+    google: ""
+    azure: ""
+    # Add other providers as needed
+
+# PostgreSQL dependency
+postgresql:
+  enabled: false
+  auth:
+    postgresPassword: ""
+    username: victor
+    password: ""
+    database: victor
+  primary:
+    service:
+      ports:
+        postgresql: 5432
+    persistence:
+      enabled: true
+      size: 10Gi
+
+# Redis dependency
+redis:
+  enabled: false
+  auth:
+    enabled: false
+  architecture: standalone
+  master:
+    persistence:
+      enabled: true
+      size: 5Gi
+
+# Monitoring
+monitoring:
+  enabled: false
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    scrapeTimeout: 10s
+  prometheusRule:
+    enabled: false
+    rules: []
+
+# Network policies
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+
+# Liveness and readiness probes
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# Volume mounts
+volumes:
+  - name: cache
+    emptyDir:
+      sizeLimit: 1Gi
+  - name: config
+    configMap:
+      name: victor-ai-config
+
+volumeMounts:
+  - name: cache
+    mountPath: /app/.cache
+  - name: config
+    mountPath: /app/config
+    readOnly: true
+
+# Service mesh
+serviceMesh:
+  enabled: false
+  istio:
+    enabled: false

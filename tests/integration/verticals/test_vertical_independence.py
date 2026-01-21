@@ -61,12 +61,14 @@ class TestResearchVerticalIndependence:
         from victor.core.verticals.protocols import VerticalExtensions
 
         extensions = ResearchAssistant.get_extensions()
-        assert isinstance(extensions, VerticalExtensions)
-
-        # Research vertical has extensions (can vary based on framework)
-        # The key is that it can be created without coding module errors
+        # Note: LazyVerticalExtensions implements the VerticalExtensions protocol
+        # but doesn't inherit from it (dataclass field conflicts).
+        # Protocol compliance is verified via hasattr checks below.
         assert hasattr(extensions, "middleware")
         assert hasattr(extensions, "safety_extensions")
+        assert hasattr(extensions, "get_all_safety_patterns")
+        assert hasattr(extensions, "get_all_task_hints")
+        assert hasattr(extensions, "get_all_mode_configs")
 
     def test_research_provides_valid_tools(self):
         """ResearchAssistant provides valid tool configurations."""
@@ -97,7 +99,14 @@ class TestDevOpsVerticalIndependence:
         from victor.core.verticals.protocols import VerticalExtensions
 
         extensions = DevOpsAssistant.get_extensions()
-        assert isinstance(extensions, VerticalExtensions)
+        # Note: LazyVerticalExtensions implements the VerticalExtensions protocol
+        # but doesn't inherit from it (dataclass field conflicts).
+        # Protocol compliance is verified via hasattr checks below.
+        assert hasattr(extensions, "middleware")
+        assert hasattr(extensions, "safety_extensions")
+        assert hasattr(extensions, "get_all_safety_patterns")
+        assert hasattr(extensions, "get_all_task_hints")
+        assert hasattr(extensions, "get_all_mode_configs")
 
     def test_devops_provides_valid_tools(self):
         """DevOpsAssistant provides valid tool configurations."""

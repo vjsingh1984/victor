@@ -1,0 +1,305 @@
+# Prometheus Recording Rules for Victor AI
+# These rules pre-compute frequently used queries for better performance
+
+groups:
+  # Request metrics
+  - name: victor_requests
+    interval: 30s
+    rules:
+      # Request rate
+      - record: job:victor_request_rate:5m
+        expr: |
+          sum(rate(victor_request_duration_seconds_count[5m])) by (job, instance)
+
+      # Error rate
+      - record: job:victor_error_rate:5m
+        expr: |
+          sum(rate(victor_request_duration_seconds_count{status=~"5.."}[5m])) by (job, instance)
+          /
+          sum(rate(victor_request_duration_seconds_count[5m])) by (job, instance)
+
+      # Request duration percentiles
+      - record: job:victor_request_duration:p50:5m
+        expr: |
+          histogram_quantile(0.5,
+            sum(rate(victor_request_duration_seconds_bucket[5m])) by (job, le)
+          )
+
+      - record: job:victor_request_duration:p95:5m
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(victor_request_duration_seconds_bucket[5m])) by (job, le)
+          )
+
+      - record: job:victor_request_duration:p99:5m
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(victor_request_duration_seconds_bucket[5m])) by (job, le)
+          )
+
+  # Tool metrics
+  - name: victor_tools
+    interval: 30s
+    rules:
+      # Tool execution rate
+      - record: victor:tool_execution_rate:5m
+        expr: |
+          sum(rate(victor_tool_executions_total[5m])) by (tool, vertical)
+
+      # Tool success rate
+      - record: victor:tool_success_rate:5m
+        expr: |
+          sum(rate(victor_tool_executions_total{status="success"}[5m])) by (tool, vertical)
+          /
+          sum(rate(victor_tool_executions_total[5m])) by (tool, vertical)
+
+      # Tool execution duration percentiles
+      - record: victor:tool_execution_duration:p95:5m
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(victor_tool_execution_duration_seconds_bucket[5m])) by (tool, vertical, le)
+          )
+
+  # Provider metrics
+  - name: victor_providers
+    interval: 30s
+    rules:
+      # Provider request rate
+      - record: victor:provider_request_rate:5m
+        expr: |
+          sum(rate(victor_provider_requests_total[5m])) by (provider, model)
+
+      # Provider success rate
+      - record: victor:provider_success_rate:5m
+        expr: |
+          sum(rate(victor_provider_requests_total{status="success"}[5m])) by (provider, model)
+          /
+          sum(rate(victor_provider_requests_total[5m])) by (provider, model)
+
+      # Provider latency percentiles
+      - record: victor:provider_latency:p50:5m
+        expr: |
+          histogram_quantile(0.5,
+            sum(rate(victor_provider_latency_seconds_bucket[5m])) by (provider, le)
+          )
+
+      - record: victor:provider_latency:p95:5m
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(victor_provider_latency_seconds_bucket[5m])) by (provider, le)
+          )
+
+      - record: victor:provider_latency:p99:5m
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(victor_provider_latency_seconds_bucket[5m])) by (provider, le)
+          )
+
+  # Vertical metrics
+  - name: victor_verticals
+    interval: 1m
+    rules:
+      # Vertical usage rate
+      - record: victor:vertical_usage_rate:5m
+        expr: |
+          sum(rate(victor_vertical_usage_total[5m])) by (vertical)
+
+      # Vertical success rate
+      - record: victor:vertical_success_rate:5m
+        expr: |
+          sum(rate(victor_tool_executions_total{status="success", vertical="$1"}[5m]))
+          /
+          sum(rate(victor_tool_executions_total{vertical="$1"}[5m]))
+
+  # Chat metrics
+  - name: victor_chat
+    interval: 30s
+    rules:
+      # Chat request rate
+      - record: victor:chat_request_rate:5m
+        expr: |
+          sum(rate(victor_chat_request_duration_seconds_count[5m]))
+
+      # Chat duration percentiles
+      - record: victor:chat_duration:p50:5m
+        expr: |
+          histogram_quantile(0.5,
+            rate(victor_chat_request_duration_seconds_bucket[5m])
+          )
+
+      - record: victor:chat_duration:p95:5m
+        expr: |
+          histogram_quantile(0.95,
+            rate(victor_chat_request_duration_seconds_bucket[5m])
+          )
+
+      - record: victor:chat_duration:p99:5m
+        expr: |
+          histogram_quantile(0.99,
+            rate(victor_chat_request_duration_seconds_bucket[5m])
+          )
+
+  # Agentic AI metrics
+  - name: victor_agentic
+    interval: 1m
+    rules:
+      # Planning success rate
+      - record: victor:planning_success_rate:5m
+        expr: |
+          sum(rate(victor_planning_operations_total{status="success"}[5m])) by (vertical)
+          /
+          sum(rate(victor_planning_operations_total[5m])) by (vertical)
+
+      # Memory hit rate
+      - record: victor:memory_hit_rate:5m
+        expr: |
+          sum(rate(victor_memory_operations_total{operation="retrieve", status="success"}[5m])) by (memory_type)
+          /
+          sum(rate(victor_memory_operations_total{operation="retrieve"}[5m])) by (memory_type)
+
+  # Cache metrics
+  - name: victor_cache
+    interval: 30s
+    rules:
+      # Cache hit rate
+      - record: victor:cache_hit_rate:5m
+        expr: |
+          sum(rate(victor_cache_hits_total[5m])) by (cache_name)
+          /
+          (sum(rate(victor_cache_hits_total[5m])) by (cache_name)
+           + sum(rate(victor_cache_misses_total[5m])) by (cache_name))
+
+      # Cache eviction rate
+      - record: victor:cache_eviction_rate:5m
+        expr: |
+          sum(rate(victor_cache_evictions_total[5m])) by (cache_name)
+
+  # Business metrics
+  - name: victor_business
+    interval: 1m
+    rules:
+      # Requests per user
+      - record: victor:requests_per_user:5m
+        expr: |
+          sum(rate(victor_total_requests[5m]))
+          /
+          sum(victor_active_users)
+
+      # Average session duration
+      - record: victor:session_duration:avg:5m
+        expr: |
+          sum(rate(victor_session_duration_seconds_sum[5m]))
+          /
+          sum(rate(victor_session_duration_seconds_count[5m]))
+
+  # Resource metrics
+  - name: victor_resources
+    interval: 30s
+    rules:
+      # Memory usage percentage
+      - record: victor:memory_usage_percent:5m
+        expr: |
+          sum(victor_memory_usage_bytes) by (component)
+          /
+          sum(victor_memory_limit_bytes) by (component)
+          * 100
+
+      # Average CPU usage
+      - record: victor:cpu_usage:avg:5m
+        expr: |
+          avg(rate(victor_cpu_usage_percent[5m])) by (component)
+
+  # Security metrics
+  - name: victor_security
+    interval: 1m
+    rules:
+      # Authorization success rate
+      - record: victor:authorization_success_rate:5m
+        expr: |
+          sum(rate(victor_security_authorizations_total{status="success"}[5m]))
+          /
+          sum(rate(victor_security_authorizations_total[5m]))
+
+      # Failed authorization rate
+      - record: victor:failed_authorization_rate:5m
+        expr: |
+          sum(rate(victor_security_authorizations_total{status="failure"}[5m]))
+
+  # Vertical-specific recording rules
+  - name: victor_coding_vertical
+    interval: 1m
+    rules:
+      # Files analyzed per minute
+      - record: victor:coding:files_analyzed_rate:5m
+        expr: |
+          rate(victor_coding_files_analyzed_total[5m])
+
+      # Issues found per minute
+      - record: victor:coding:issues_found_rate:5m
+        expr: |
+          rate(victor_coding_issues_found_total[5m])
+
+      # Test generation success rate
+      - record: victor:coding:test_generation_success_rate:5m
+        expr: |
+          sum(rate(victor_coding_tests_generated_total{status="success"}[5m]))
+          /
+          sum(rate(victor_coding_tests_generated_total[5m]))
+
+  - name: victor_rag_vertical
+    interval: 1m
+    rules:
+      # Documents ingested per minute
+      - record: victor:rag:documents_ingested_rate:5m
+        expr: |
+          rate(victor_rag_documents_ingested_total[5m])
+
+      # Search accuracy
+      - record: victor:rag:search_accuracy:5m
+        expr: |
+          avg(victor_rag_search_accuracy)
+
+  - name: victor_devops_vertical
+    interval: 1m
+    rules:
+      # Deployment success rate
+      - record: victor:devops:deployment_success_rate:5m
+        expr: |
+          sum(rate(victor_devops_deployments_total{status="success"}[5m]))
+          /
+          sum(rate(victor_devops_deployments_total[5m]))
+
+      # Containers managed
+      - record: victor:devops:containers_managed:current
+        expr: |
+          sum(victor_devops_containers_managed) by (environment)
+
+  - name: victor_dataanalysis_vertical
+    interval: 1m
+    rules:
+      # Queries per minute
+      - record: victor:dataanalysis:query_rate:5m
+        expr: |
+          rate(victor_dataanalysis_queries_total[5m])
+
+      # Average query duration
+      - record: victor:dataanalysis:query_duration:avg:5m
+        expr: |
+          sum(rate(victor_dataanalysis_query_duration_seconds_sum[5m]))
+          /
+          sum(rate(victor_dataanalysis_query_duration_seconds_count[5m]))
+
+  - name: victor_research_vertical
+    interval: 1m
+    rules:
+      # Searches per minute
+      - record: victor:research:search_rate:5m
+        expr: |
+          rate(victor_research_searches_total[5m])
+
+      # Citations per search
+      - record: victor:research:citations_per_search:5m
+        expr: |
+          sum(rate(victor_research_citations_generated_total[5m]))
+          /
+          sum(rate(victor_research_searches_total[5m]))

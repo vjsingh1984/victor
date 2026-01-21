@@ -194,15 +194,20 @@ class DocumentStore:
         self,
         config: Optional[DocumentStoreConfig] = None,
         embedding_service: Optional[Any] = None,
+        chunking_config: Optional[Any] = None,
     ):
         """Initialize document store.
 
         Args:
             config: Store configuration
             embedding_service: Optional embedding service (uses default if None)
+            chunking_config: Optional chunking configuration (uses default if None)
         """
+        from victor.rag.chunker import ChunkingConfig
+
         self.config = config or DocumentStoreConfig()
         self._embedding_service = embedding_service
+        self._chunking_config = chunking_config or ChunkingConfig()
         self._db: Optional[Any] = None
         self._table: Optional[Any] = None
         self._initialized = False
@@ -264,7 +269,7 @@ class DocumentStore:
                     pa.field("company", pa.string()),  # Company name
                     # Keep JSON for other dynamic metadata
                     pa.field("metadata", pa.string()),
-                    pa.field("vector", pa.list_(pa.float32(), self.config.embedding_dim)),
+                    pa.field("vector", pa.list_(pa.float32(), list_size=self.config.embedding_dim)),
                 ]
             )
 
@@ -346,8 +351,8 @@ class DocumentStore:
 
         await self.initialize()
 
-        # Chunk the document
-        chunker = DocumentChunker()
+        # Chunk the document using the configured chunking config
+        chunker = DocumentChunker(self._chunking_config)
         chunks = await chunker.chunk_document(doc, self._get_embedding)
 
         # Store chunks
@@ -532,7 +537,13 @@ class DocumentStore:
                 if not matches:
                     continue
 
-            score = 1.0 - row.get("_distance", 0.5)  # Convert distance to similarity
+            # Convert distance to similarity score (0-1 range)
+            # LanceDB returns L2 distance, which can be any non-negative value
+            # We normalize it using a sigmoid-like function
+            distance = row.get("_distance", 0.0)
+            # Use exponential decay: similarity = 1 / (1 + distance)
+            # This gives values in (0, 1] range, with 1 for identical vectors
+            score = 1.0 / (1.0 + distance) if distance >= 0 else 0.0
             search_results.append(
                 DocumentSearchResult(
                     chunk=chunk,

@@ -1,313 +1,262 @@
 # Victor AI Release Checklist
 
-**Version:** 0.5.1
-**Release Date:** [TBD]
-**Release Manager:** [Name]
-
-This checklist ensures comprehensive validation and proper release procedures for Victor AI.
-
----
+This checklist ensures a smooth, controlled release process for Victor AI.
 
 ## Pre-Release Checklist
 
 ### Code Quality
-
-- [ ] **All tests passing**
-  - [ ] Unit tests (4,000+ tests)
-  - [ ] Integration tests
-  - [ ] Smoke tests
-  - [ ] Performance benchmarks
-  - [ ] Security tests
-
-- [ ] **Code quality checks passing**
-  - [ ] Ruff linting (0 errors, warnings acceptable)
-  - [ ] Black formatting check
-  - [ ] Mypy type checking (< 100 errors)
-  - [ ] Coverage >= 70%
-
-- [ ] **Security validation**
-  - [ ] Bandit scan (0 HIGH severity issues)
-  - [ ] Safety check (0 vulnerabilities)
-  - [ ] Pip-audit (0 critical issues)
-  - [ ] No hardcoded secrets in code
-  - [ ] Proper API key management
+- [ ] All tests passing (unit + integration)
+  - [ ] Unit tests: `pytest tests/unit -v`
+  - [ ] Integration tests: `pytest tests/integration -v`
+  - [ ] End-to-end tests: `pytest tests/integration/test_end_to_end_workflows.py -v`
+  - [ ] Test coverage > 80%
+- [ ] Code formatting complete
+  - [ ] `black victor tests --check`
+  - [ ] `ruff check victor tests`
+  - [ ] `mypy victor` (gradual adoption)
+- [ ] Security scan clean
+  - [ ] `bandit -r victor`
+  - [ ] `safety check`
+  - [ ] `pip-audit`
+  - [ ] `semgrep victor`
 
 ### Documentation
+- [ ] CHANGELOG.md updated with version and release date
+- [ ] RELEASE_NOTES.md complete with all sections
+- [ ] VERSION file updated with version, build SHA, and date
+- [ ] README.md version references updated
+- [ ] API documentation generated: `victor-generate-docs`
+- [ ] Architecture documentation up to date
+- [ ] Migration guide updated (if breaking changes)
 
-- [ ] **Documentation complete**
-  - [ ] README.md up to date
-  - [ ] CHANGELOG.md updated for this version
-  - [ ] API documentation complete
-  - [ ] All code examples working
-  - [ ] Migration guides updated
-  - [ ] Architecture docs current
+### Configuration
+- [ ] pyproject.toml version updated
+- [ ] Dependencies verified and up to date
+- [ ] No deprecated features used
+- [ ] Environment variables documented
+- [ ] YAML configuration files validated
 
-- [ ] **Documentation builds successfully**
-  - [ ] `mkdocs build` succeeds
-  - [ ] No broken links
-  - [ ] All images load correctly
-  - [ ] Code examples validated
-
-### Performance
-
-- [ ] **Performance benchmarks meet targets**
-  - [ ] Tool selection latency < 200ms (warm cache)
-  - [ ] Startup time < 2s
+### Testing
+- [ ] Smoke tests pass on all platforms
+  - [ ] macOS (ARM64)
+  - [ ] macOS (x64)
+  - [ ] Linux (x64)
+  - [ ] Windows (x64)
+- [ ] Performance benchmarks run and documented
+  - [ ] Startup time < 500ms (with lazy loading)
+  - [ ] Tool selection latency < 20ms
   - [ ] Memory usage acceptable
-  - [ ] No regressions from baseline
+- [ ] Security tests pass (> 95% pass rate)
+- [ ] Load tests pass (if applicable)
 
-- [ ] **Load testing complete**
-  - [ ] Concurrent user testing
-  - [ ] Stress testing
-  - [ ] Resource exhaustion handling
-  - [ ] Error recovery validated
-
-### Release Preparation
-
-- [ ] **Version management**
-  - [ ] Version number updated in `pyproject.toml`
-  - [ ] Version number updated in `victor/__init__.py`
-  - [ ] Release branch created
-  - [ ] Version tag prepared
-
-- [ ] **CHANGELOG updated**
-  - [ ] All features listed
-  - [ ] All bug fixes listed
-  - [ ] Breaking changes highlighted
-  - [ ] Migration notes included
-  - [ ] Contributors credited
-
-- [ ] **Release notes prepared**
-  - [ ] Executive summary
-  - [ ] Key features highlighted
-  - [ ] Upgrade instructions
-  - [ ] Known issues documented
-  - [ ] Future roadmap teaser
-
----
-
-## Release Checklist
-
-### Build Validation
-
-- [ ] **Build artifacts validated**
-  - [ ] `pip install -e .` succeeds
-  - [ ] All dependencies install correctly
-  - [ ] Entry points registered properly
-  - [ ] Optional dependencies tested
-
-- [ ] **Distribution packages built**
-  - [ ] Source distribution (sdist) builds
-  - [ ] Wheel distribution builds
-  - [ ] Packages install cleanly in fresh venv
-  - [ ] Package size reasonable
-
-- [ ] **Docker validation**
-  - [ ] Docker image builds successfully
-  - [ ] Docker image runs correctly
-  - [ ] Docker Compose tested
-  - [ ] Multi-arch builds tested (if applicable)
-
-### Testing Validation
-
-- [ ] **Full QA suite passed**
+### Build Verification
+- [ ] Clean build from scratch
   ```bash
-  python scripts/run_full_qa.py --coverage --report json --output qa_report.json
+  rm -rf dist/ build/ *.egg-info
+  python -m build
   ```
+- [ ] Source distribution (sdist) builds correctly
+- [ ] Wheel builds correctly
+- [ ] Installation works: `pip install dist/victor_ai-*.whl`
+- [ ] Import works: `python -c "import victor; print(victor.__version__)"`
 
-- [ ] **Smoke tests passed**
-  ```bash
-  pytest tests/smoke/ -v
-  ```
+### Git Preparation
+- [ ] All changes committed
+- [ ] Working directory clean: `git status`
+- [ ] On main branch (or release branch)
+- [ ] Release branch merged to main (if using release branches)
+- [ ] No merge conflicts
 
-- [ ] **Integration tests passed**
-  ```bash
-  pytest tests/integration/ -v -m integration
-  ```
+## Release Execution
 
-- [ ] **Manual testing complete**
-  - [ ] CLI mode tested
-  - [ ] TUI mode tested
-  - [ ] API server tested (if applicable)
-  - [ ] Key workflows tested end-to-end
-
-### Deployment Validation
-
-- [ ] **CI/CD pipeline validated**
-  - [ ] All CI checks pass
-  - [ ] Deployment pipeline tested
-  - [ ] Rollback procedure tested
-  - [ ] Monitoring configured
-
-- [ ] **Kubernetes validation (if applicable)**
-  - [ ] Helm charts validated
-  - [ ] Deployment tested in minikube/kind
-  - [ ] Service exposure validated
-  - [ ] Ingress configured correctly
-
----
-
-## Post-Release Checklist
-
-### Publication
-
-- [ ] **Git tag pushed**
-  ```bash
-  git tag -a v0.5.1 -m "Release 0.5.1"
-  git push origin v0.5.1
-  ```
-
-- [ ] **PyPI published**
-  - [ ] Source distribution uploaded
-  - [ ] Wheel distribution uploaded
-  - [ ] PyPI page validated
-  - [ ] Installation tested from PyPI
-
-- [ ] **Docker Hub published (if applicable)**
-  - [ ] Images pushed to Docker Hub
-  - [ ] Tags applied correctly
-  - [ ] Image documentation updated
-
-- [ ] **GitHub release created**
-  - [ ] Release notes included
-  - [ ] Assets attached
-  - [ ] Release announcements prepared
-
-### Communication
-
-- [ ] **Announcements posted**
-  - [ ] GitHub release announcement
-  - [ ] Twitter/X announcement
-  - [ ] LinkedIn announcement
-  - [ ] Community channels notified
-  - [ ] Email to stakeholders
-
-- [ ] **Documentation updated**
-  - [ ] Version-specific docs published
-  - [ ] Stable links updated
-  - [ ] API docs updated
-  - [ ] Tutorial screenshots updated
-
-### Monitoring
-
-- [ ] **Monitoring configured**
-  - [ ] Error tracking enabled
-  - [ ] Performance monitoring active
-  - [ ] Usage analytics configured
-  - [ ] Alerts configured
-
-- [ ] **Support prepared**
-  - [ ] Common issues documented
-  - [ ] Troubleshooting guide ready
-  - [ ] Support team briefed
-  - [ ] Escalation path clear
-
----
-
-## Rollback Plan
-
-### If Critical Issues Found
-
-1. **Stop deployment** - Immediately halt any ongoing deployments
-2. **Assess impact** - Determine severity and affected users
-3. **Communicate** - Notify users of the issue
-4. **Rollback** - Revert to previous stable version
-5. **Fix** - Address the issue in a patch release
-6. **Retest** - Run full QA suite on fix
-7. **Redeploy** - Deploy patch with appropriate communication
-
-### Rollback Commands
-
+### Automated Release
+Run the release script:
 ```bash
-# Git rollback
-git revert <commit-hash>
-git push origin main
-
-# PyPI rollback (contact PyPI admin)
-# Cannot delete, but can yank versions
-twine yank <version>
-
-# Docker rollback
-docker tag victor-ai:0.5.0 victor-ai:latest
-docker push victor-ai:latest
+./scripts/release.sh 1.0.0
 ```
 
----
+Or manual steps below:
 
-## Version-Specific Notes
+### Version Bump
+- [ ] Update version in pyproject.toml
+- [ ] Update VERSION file
+- [ ] Commit version bump: `git commit -m "chore: bump version to 1.0.0"`
 
-### 0.5.1 Focus Areas
+### Build Packages
+- [ ] Build source distribution: `python -m build --sdist`
+- [ ] Build wheel: `python -m build --wheel`
+- [ ] Verify packages in `dist/`
 
-This release focuses on:
+### Generate Checksums
+- [ ] Run: `python scripts/create_checksums.py`
+- [ ] Verify SHA256SUMS file created
+- [ ] (Optional) Sign with GPG: `gpg --detach-sign --armor SHA256SUMS`
 
-1. **Quality Assurance** - Comprehensive QA framework and validation
-2. **Provider Error Handling** - Unified error handling across all providers
-3. **Performance Optimization** - Tool selection caching improvements
-4. **Documentation** - Complete migration guides and architecture docs
-5. **Testing** - 4,000+ tests with 70%+ coverage
+### Git Tag
+- [ ] Create annotated tag: `git tag -a v1.0.0 -m "Release 1.0.0"`
+- [ ] Push tag: `git push origin v1.0.0`
+- [ ] Verify tag on GitHub
 
-### Known Issues in 0.5.1
+### PyPI Upload
+- [ ] Test upload to TestPyPI first (optional):
+  ```bash
+  twine upload --repository testpypi dist/*
+  ```
+- [ ] Upload to PyPI:
+  ```bash
+  twine upload dist/*
+  ```
+- [ ] Verify on PyPI: https://pypi.org/project/victor-ai/
 
-- [List any known issues and workarounds]
+### GitHub Release
+- [ ] Go to GitHub Releases page
+- [ ] Click "Draft a new release"
+- [ ] Choose tag: v1.0.0
+- [ ] Release title: "Victor AI 1.0.0"
+- [ ] Copy RELEASE_NOTES.md content to release description
+- [ ] Attach distribution files (optional)
+- [ ] Attach SHA256SUMS file
+- [ ] Click "Publish release"
 
-### Migration Notes for 0.5.1
+### Package Managers (Optional)
+- [ ] Homebrew formula updated (if applicable)
+- [ ] Debian/Ubuntu packages built (if applicable)
+- [ ] RPM packages built (if applicable)
+- [ ] Docker images pushed (if applicable)
 
-- [List any breaking changes and migration steps]
+## Post-Release Verification
 
----
+### Installation Verification
+- [ ] Clean install from PyPI works:
+  ```bash
+  pip install victor-ai==1.0.0
+  ```
+- [ ] Version check works: `victor --version`
+- [ ] Health check passes: `victor --health-check`
+- [ ] Basic functionality works: `victor chat --no-tui --query "test"`
 
-## Sign-Off
+### Integration Verification
+- [ ] VS Code extension works with new version
+- [ ] JetBrains extension works with new version
+- [ ] API server starts correctly: `victor serve`
+- [ ] MCP server works: `victor mcp`
 
-**Release Engineer:** _________________ **Date:** _______
+### Documentation Verification
+- [ ] GitHub release notes visible
+- [ ] PyPI page shows correct version
+- [ ] Documentation links work
+- [ ] Examples run successfully
 
-**QA Lead:** _________________ **Date:** _______
+### Monitoring
+- [ ] Monitor GitHub Issues for release-related issues
+- [ ] Monitor PyPI download stats
+- [ ] Monitor error reports (if error tracking enabled)
+- [ ] Monitor performance metrics
 
-**Tech Lead:** _________________ **Date:** _______
+## Rollback Procedure
 
-**Final Approval:** _________________ **Date:** _______
+If critical issues are found:
 
----
+### PyPI Rollback
+- [ ] **Note**: PyPI does not allow deleting releases, only yanking
+- [ ] Yank the release if critical: `twine yank victor-ai==1.0.0`
+- [ ] Upload hotfix as 1.0.1
 
-## Appendix: Quick Reference
+### Git Tag Rollback
+- [ ] Delete local tag: `git tag -d v1.0.0`
+- [ ] Delete remote tag: `git push origin :refs/tags/v1.0.0`
+- [ ] Create new tag for fixed version
+
+### GitHub Release Rollback
+- [ ] Edit release to mark as "Pre-release"
+- [ ] Add warning about critical issues
+- [ ] Delete and recreate with hotfix version
+
+### Communication
+- [ ] Post announcement about issues
+- [ ] Provide workaround or fix timeline
+- [ ] Update documentation with known issues
+
+## Post-Release Tasks
+
+### Announcements
+- [ ] Post announcement on GitHub Discussions
+- [ ] Update project website (if applicable)
+- [ ] Post on social media (Twitter, LinkedIn, etc.)
+- [ ] Send email newsletter (if applicable)
+
+### Metrics
+- [ ] Track PyPI downloads
+- [ ] Track GitHub stars/forks
+- [ ] Track GitHub issues/PRs
+- [ ] Collect user feedback
+
+### Next Version Planning
+- [ ] Create milestone for next version
+- [ ] Roadmap updated
+- [ ] Backlog prioritized
+- [ ] Release target date set
+
+### Maintenance
+- [ ] Monitor for bug reports
+- [ ] Respond to issues promptly
+- [ ] Backport critical fixes to release branch (if applicable)
+- [ ] Prepare for patch release if needed
+
+## Quick Reference
 
 ### Essential Commands
-
 ```bash
-# Run full QA
-python scripts/run_full_qa.py --coverage
+# Run all tests
+make test-all
 
-# Run tests
-pytest tests/ -v --cov=victor
-
-# Lint and format
-ruff check victor/ tests/
-black victor/ tests/
-mypy victor/
-
-# Security scan
-bandit -r victor/
+# Run security scans
+make lint
+bandit -r victor
 safety check
 pip-audit
 
-# Build distribution
+# Build packages
 python -m build
 
-# Publish to PyPI
+# Generate checksums
+python scripts/create_checksums.py
+
+# Create git tag
+git tag -a v1.0.0 -m "Release 1.0.0"
+
+# Upload to PyPI
 twine upload dist/*
 
-# Create release tag
-git tag -a v0.5.1 -m "Release 0.5.1"
-git push origin v0.5.1
+# Automated release
+./scripts/release.sh 1.0.0
 ```
 
-### Contact Information
+### File Locations
+- CHANGELOG: `CHANGELOG.md`
+- Release notes: `RELEASE_NOTES.md`
+- Version: `VERSION`
+- Configuration: `pyproject.toml`
+- Debian: `debian/`
+- RPM spec: `victor-ai.spec`
+- Release script: `scripts/release.sh`
+- Checksums: `scripts/create_checksums.py`
 
-- **Release Manager:** [Email]
-- **QA Lead:** [Email]
-- **Tech Lead:** [Email]
-- **Incident Response:** [Email/Slack]
+### Critical URLs
+- PyPI: https://pypi.org/project/victor-ai/
+- GitHub: https://github.com/vijayksingh/victor
+- Releases: https://github.com/vijayksingh/victor/releases
+- Issues: https://github.com/vijayksingh/victor/issues
 
 ---
 
-**Last Updated:** 2025-01-18
-**Checklist Version:** 1.0
+## Notes
+
+- Always test in a clean virtual environment
+- Never skip tests unless absolutely necessary
+- Always have a rollback plan
+- Communicate early and often
+- Monitor after release closely
+- Learn from each release
+
+**Remember**: A good release is boring. No news is good news!

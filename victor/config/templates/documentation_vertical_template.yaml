@@ -1,0 +1,742 @@
+# Documentation Vertical Template
+# Production template for documentation generation and maintenance
+# Competitive with Mintlify, Docusaurus AI, GitBook AI, ReadMe AI
+
+metadata:
+  name: documentation
+  description: "Documentation generation, maintenance, and technical writing assistant"
+  version: "1.0.0"
+  author: "Victor Team"
+  license: "Apache-2.0"
+  category: documentation
+  tags:
+    - documentation
+    - technical-writing
+    - api-docs
+    - markdown
+    - guides
+    - tutorials
+  provider_hints:
+    preferred_models:
+      - claude-sonnet-4-5
+      - gpt-4
+      - deepseek-coder
+    min_context: 100000
+    supports_tools: true
+  evaluation_criteria:
+    - documentation_coverage
+    - clarity_score
+    - example_quality
+    - consistency_score
+
+# Core tools for documentation
+tools:
+  # Framework file operations
+  - read_file
+  - write_file
+  - edit_file
+  - grep
+
+  # Core filesystem operations
+  - ls
+  - overview
+
+  # Code search and navigation
+  - code_search
+  - semantic_code_search
+  - plan
+
+  # Web for reference and best practices
+  - web_search
+  - web_fetch
+
+  # Git for documentation version control
+  - git
+
+# Main system prompt
+system_prompt: |
+  You are Victor, an expert technical documentation specialist specializing in creating clear, comprehensive, and maintainable documentation.
+
+  Your capabilities:
+  - API documentation from code annotations (docstrings, type hints, comments)
+  - User guides and tutorials with step-by-step instructions
+  - Technical architecture documentation (system design, data flow, components)
+  - Developer documentation (setup guides, contributing guides, code examples)
+  - Release notes and changelogs
+  - Code examples and usage samples
+  - Troubleshooting guides and FAQs
+  - Documentation maintenance and updates
+  - Multi-format output (Markdown, reStructuredText, JSDoc, etc.)
+  - Diagram and visualization suggestions (Mermaid, PlantUML)
+
+  Guidelines:
+  1. **Clarity first**: Use simple, direct language. Avoid jargon unless necessary.
+  2. **Be specific**: Provide concrete examples with real code and data.
+  3. **Stay organized**: Use clear structure with headings, sections, and hierarchy.
+  4. **Keep it current**: Document code as it evolves, not as an afterthought.
+  5. **Know your audience**: Adjust depth and tone for the target audience (developers, users, stakeholders)
+  6. **Show, don't just tell**: Include examples, screenshots, and diagrams.
+  7. **Be consistent**: Use consistent terminology, formatting, and style throughout.
+  8. **Make it actionable**: Provide clear steps and expected outcomes.
+  9. **Link related content**: Cross-reference other docs, APIs, and resources.
+  10. **Version awareness**: Document version-specific information clearly.
+
+  When writing documentation:
+  - **Start with WHY**: Explain the purpose and value before the details.
+  - **Provide context**: Explain when and why to use something, not just how.
+  - **Include examples**: Show, don't just tell. Real code examples are invaluable.
+  - **Add troubleshooting**: Anticipate common problems and solutions.
+  - **Use visuals**: Suggest diagrams for complex concepts (architecture, data flow, state machines).
+  - **Keep it scannable**: Use headings, bullet points, and code blocks effectively.
+  - **Include prerequisites**: List requirements before getting started.
+  - **Provide outcomes**: Set expectations about what will be achieved.
+
+  Documentation Structure:
+  1. **Title and Overview**: Brief description of what's being documented
+  2. **Purpose**: Why this exists, what problem it solves
+  3. **Prerequisites**: What readers need before starting
+  4. **Quick Start**: Fast path to first success
+  5. **Detailed Guide**: Comprehensive step-by-step instructions
+  6. **Examples**: Real-world code samples and use cases
+  7. **Reference**: Detailed API/component reference
+  8. **Troubleshooting**: Common issues and solutions
+  9. **Related Resources**: Links to related docs and external resources
+
+  Code Documentation Best Practices:
+  - Write docstrings for all functions, classes, and modules
+  - Include parameter types and return types
+  - Provide usage examples for complex APIs
+  - Document edge cases and error conditions
+  - Explain non-obvious implementation details
+  - Keep comments up-to-date with code changes
+
+  API Documentation Structure:
+  ```markdown
+  ## Function Name
+
+  Brief description of what the function does.
+
+  **Parameters:**
+  - `param1` (type): Description
+  - `param2` (type): Description
+
+  **Returns:**
+  - `type`: Description of return value
+
+  **Raises:**
+  - `ExceptionType`: When and why this exception is raised
+
+  **Example:**
+  ```python
+  code_example_here
+  ```
+  ```
+
+  You have access to file operations, code search, and web resources. Use them to create comprehensive, accurate documentation.
+
+# Stage definitions for documentation workflow
+stages:
+  INITIAL:
+    name: INITIAL
+    description: "Understanding documentation requirements"
+    tools:
+      - read_file
+      - ls
+      - overview
+    keywords:
+      - what
+      - how
+      - explain
+      - document
+      - guide
+    next_stages:
+      - DISCOVERY
+      - ANALYSIS
+
+  DISCOVERY:
+    name: DISCOVERY
+    description: "Discovering codebase structure and components"
+    tools:
+      - overview
+      - ls
+      - code_search
+      - semantic_code_search
+    keywords:
+      - discover
+      - explore
+      - find
+      - locate
+    next_stages:
+      - ANALYSIS
+      - WRITING
+
+  ANALYSIS:
+    name: ANALYSIS
+    description: "Analyzing code for documentation content"
+    tools:
+      - read_file
+      - code_search
+      - semantic_code_search
+      - grep
+    keywords:
+      - analyze
+      - understand
+      - review
+      - examine
+    next_stages:
+      - WRITING
+      - PLANNING
+
+  PLANNING:
+    name: PLANNING
+    description: "Planning documentation structure and outline"
+    tools:
+      - read_file
+      - web_search
+      - web_fetch
+    keywords:
+      - plan
+      - outline
+      - structure
+      - organize
+    next_stages:
+      - WRITING
+
+  WRITING:
+    name: WRITING
+    description: "Creating and writing documentation"
+    tools:
+      - read_file
+      - write_file
+      - edit_file
+      - web_search
+      - web_fetch
+    keywords:
+      - write
+      - create
+      - generate
+      - draft
+      - document
+    next_stages:
+      - REVIEW
+      - REFINEMENT
+
+  REFINEMENT:
+    name: REFINEMENT
+    description: "Refining and improving documentation"
+    tools:
+      - read_file
+      - edit_file
+      - grep
+    keywords:
+      - refine
+      - improve
+      - polish
+      - enhance
+    next_stages:
+      - REVIEW
+
+  REVIEW:
+    name: REVIEW
+    description: "Reviewing documentation for completeness"
+    tools:
+      - read_file
+      - grep
+      - code_search
+    keywords:
+      - review
+      - check
+      - validate
+      - verify
+    next_stages:
+      - COMPLETION
+      - WRITING
+
+  COMPLETION:
+    name: COMPLETION
+    description: "Documentation complete and published"
+    tools:
+      - write_file
+      - git
+    keywords:
+      - done
+      - complete
+      - finish
+      - publish
+    next_stages: []
+
+# Extension specifications
+extensions:
+  # Middleware for documentation operations
+  middleware:
+    - name: doc_validation
+      class_name: DocumentationValidationMiddleware
+      module: victor.documentation.middleware
+      enabled: true
+      config:
+        check_links: true
+        validate_examples: true
+        enforce_style: true
+
+    - name: example_testing
+      class_name: ExampleTestingMiddleware
+      module: victor.documentation.middleware
+      enabled: true
+      config:
+        run_code_examples: true
+        validate_outputs: true
+
+  # Safety patterns to prevent accidental deletion
+  safety_patterns:
+    - name: delete_readme
+      pattern: "rm.*README"
+      description: "Deleting README files"
+      severity: high
+      category: files
+
+    - name: delete_docs
+      pattern: "rm.*(docs?/|documentation/)"
+      description: "Deleting documentation files"
+      severity: high
+      category: files
+
+  # Task type hints for different documentation tasks
+  prompt_hints:
+    - task_type: generate_api_docs
+      hint: "[API-DOCS] Generate comprehensive API documentation from code. Include parameters, returns, examples, and error conditions."
+      tool_budget: 20
+      priority_tools:
+        - read_file
+        - code_search
+        - grep
+        - write_file
+
+    - task_type: generate_user_guide
+      hint: "[GUIDE] Create user-friendly guide with step-by-step instructions, screenshots, and troubleshooting."
+      tool_budget: 25
+      priority_tools:
+        - read_file
+        - code_search
+        - web_search
+        - write_file
+
+    - task_type: generate_architecture_doc
+      hint: "[ARCH] Document system architecture, components, data flow, and design decisions with diagrams."
+      tool_budget: 30
+      priority_tools:
+        - read_file
+        - code_search
+        - overview
+        - write_file
+
+    - task_type: generate_tutorial
+      hint: "[TUTORIAL] Create hands-on tutorial with examples, exercises, and expected outcomes."
+      tool_budget: 25
+      priority_tools:
+        - read_file
+        - write_file
+        - code_search
+
+    - task_type: update_docs
+      hint: "[UPDATE] Update existing documentation with new features, changes, and fixes."
+      tool_budget: 15
+      priority_tools:
+        - read_file
+        - edit_file
+        - grep
+
+    - task_type: generate_changelog
+      hint: "[CHANGELOG] Generate changelog from git commits and PR descriptions."
+      tool_budget: 10
+      priority_tools:
+        - git
+        - read_file
+        - write_file
+
+    - task_type: generate_examples
+      hint: "[EXAMPLES] Create code examples demonstrating usage patterns and best practices."
+      tool_budget: 20
+      priority_tools:
+        - read_file
+        - code_search
+        - write_file
+
+  # Workflow handlers
+  handlers:
+    doc_generator: victor.documentation.handlers
+    example_generator: victor.documentation.handlers
+    diagram_generator: victor.documentation.handlers
+
+  # Persona definitions for documentation teams
+  personas:
+    technical_writer:
+      name: "Technical Writer"
+      role: "writer"
+      expertise: "Technical documentation and user guides"
+      communication_style: "clear"
+      decision_approach: "user-centric"
+      system_prompt_extension: |
+        You are an expert technical writer. You:
+        - Write clear, concise, user-friendly documentation
+        - Structure information logically
+        - Provide concrete examples
+        - Anticipate user questions
+        - Use consistent terminology
+
+    api_documenter:
+      name: "API Documenter"
+      role: "api_writer"
+      expertise: "API documentation and reference material"
+      communication_style: "precise"
+      decision_approach: "detailed"
+      system_prompt_extension: |
+        You are an API documentation specialist. You:
+        - Document all endpoints, parameters, and responses
+        - Provide accurate type information
+        - Include request/response examples
+        - Explain authentication and error handling
+        - Maintain consistent formatting
+
+    developer_advocate:
+      name: "Developer Advocate"
+      role: "advocate"
+      expertise: "Developer guides, tutorials, and best practices"
+      communication_style: "engaging"
+      decision_approach: "practical"
+      system_prompt_extension: |
+        You are a developer advocate. You:
+        - Create practical tutorials and guides
+        - Show real-world use cases
+        - Demonstrate best practices
+        - Build community resources
+        - Make complex topics accessible
+
+  # Composed middleware chains
+  composed_chains:
+    doc_quality_check:
+      - doc_validation
+      - example_testing
+
+    full_doc_workflow:
+      - doc_validation
+      - example_testing
+
+# Workflow definitions
+workflows:
+  - name: api_documentation_generation
+    description: "Generate API documentation from code"
+    file: workflows/api_doc_generation.yaml
+    handler_module: victor.documentation.handlers
+
+  - name: user_guide_creation
+    description: "Create comprehensive user guides"
+    file: workflows/user_guide_creation.yaml
+    handler_module: victor.documentation.handlers
+
+  - name: architecture_documentation
+    description: "Document system architecture and design"
+    file: workflows/architecture_documentation.yaml
+    handler_module: victor.documentation.handlers
+
+  - name: tutorial_creation
+    description: "Create hands-on tutorials with examples"
+    file: workflows/tutorial_creation.yaml
+    handler_module: victor.documentation.handlers
+
+  - name: changelog_generation
+    description: "Generate changelog from version control"
+    file: workflows/changelog_generation.yaml
+    handler_module: victor.documentation.handlers
+
+  - name: documentation_audit
+    description: "Audit documentation for completeness and accuracy"
+    file: workflows/documentation_audit.yaml
+    handler_module: victor.documentation.handlers
+
+# Team formations for multi-agent documentation
+teams:
+  - name: documentation_team
+    display_name: "Documentation Team"
+    description: "Comprehensive documentation creation and maintenance"
+    formation: pipeline
+    communication_style: structured
+    max_iterations: 10
+    roles:
+      - name: content_analyzer
+        display_name: "Content Analyzer"
+        description: "Analyzes codebase for documentation content"
+        persona: "You analyze code to identify what needs documentation. Find APIs, components, and features."
+        tool_categories:
+          - code_search
+          - read_file
+          - overview
+
+      - name: doc_writer
+        display_name: "Documentation Writer"
+        description: "Writes clear, comprehensive documentation"
+        persona: "You write user-friendly documentation with examples and best practices."
+        tool_categories:
+          - read_file
+          - write_file
+          - web_search
+
+      - name: example_creator
+        display_name: "Example Creator"
+        description: "Creates code examples and samples"
+        persona: "You create practical code examples demonstrating usage patterns."
+        tool_categories:
+          - read_file
+          - write_file
+          - code_search
+
+      - name: doc_reviewer
+        display_name: "Documentation Reviewer"
+        description: "Reviews documentation for quality and completeness"
+        persona: "You review documentation for clarity, accuracy, and completeness."
+        tool_categories:
+          - read_file
+          - grep
+          - edit_file
+
+  - name: api_doc_team
+    display_name: "API Documentation Team"
+    description: "Specialized API documentation team"
+    formation: parallel
+    communication_style: structured
+    max_iterations: 5
+    roles:
+      - name: endpoint_doc_writer
+        display_name: "Endpoint Documenter"
+        description: "Documents API endpoints"
+        persona: "You document API endpoints with parameters, responses, and examples."
+        tool_categories:
+          - read_file
+          - grep
+          - write_file
+
+      - name: type_specialist
+        display_name: "Type Specialist"
+        description: "Documents types and schemas"
+        persona: "You document data types, schemas, and validation rules."
+        tool_categories:
+          - read_file
+          - code_search
+          - write_file
+
+      - name: example_generator
+        display_name: "Example Generator"
+        description: "Generates request/response examples"
+        persona: "You generate realistic API usage examples in multiple languages."
+        tool_categories:
+          - read_file
+          - write_file
+
+      - name: error_doc_specialist
+        display_name: "Error Documentation Specialist"
+        description: "Documents error codes and handling"
+        persona: "You document error conditions, codes, and handling strategies."
+        tool_categories:
+          - read_file
+          - grep
+          - write_file
+
+# Capability specifications
+capabilities:
+  - name: api_documentation
+    type: workflow
+    description: "Generate API documentation from code"
+    enabled: true
+    handler: victor.documentation.workflows:APIDocumentationWorkflow
+    config:
+      include_private: false
+      generate_examples: true
+      output_format: markdown
+
+  - name: docstring_generation
+    type: tool
+    description: "Generate docstrings for code"
+    enabled: true
+    config:
+      style: google
+      include_types: true
+      include_examples: true
+
+  - name: diagram_generation
+    type: workflow
+    description: "Generate architecture diagrams"
+    enabled: true
+    handler: victor.documentation.workflows:DiagramGenerationWorkflow
+    config:
+      format: mermaid
+      include_legend: true
+
+# Custom vertical configuration
+custom_config:
+  # Documentation style settings
+  style_guide: google
+  max_line_length: 80
+
+  # Supported formats
+  output_formats:
+    - markdown
+    - rst
+    - html
+    - json
+
+  # Documentation sections
+  standard_sections:
+    - Overview
+    - Installation
+    - Quick Start
+    - API Reference
+    - Examples
+    - Troubleshooting
+    - Changelog
+    - Contributing
+
+  # Code example settings
+  example_languages:
+    - python
+    - javascript
+    - typescript
+    - java
+    - go
+
+  # Diagram types
+  diagram_types:
+    - architecture
+    - sequence
+    - flowchart
+    - entity_relationship
+    - state_machine
+
+  # Custom prompt sections
+  grounding_rules: |
+    GROUNDING: Base ALL documentation on actual code implementation.
+    Never document features that don't exist. If code lacks documentation,
+    acknowledge this and suggest what should be documented.
+
+    Always verify code examples before including them.
+    Check that examples are current and working.
+
+  system_prompt_section: |
+    Documentation Best Practices:
+    1. Start with WHY, then WHAT, then HOW
+    2. Provide concrete, working examples
+    3. Keep it concise but complete
+    4. Update when code changes
+    5. Include troubleshooting for common issues
+    6. Use consistent formatting and style
+    7. Cross-reference related documentation
+    8. Include version-specific information
+
+# File templates (custom generated files)
+file_templates:
+  README.md: |
+    # {{ project_name }}
+
+    {{ brief_description }}
+
+    ## Overview
+
+    {{ overview }}
+
+    ## Features
+
+    {{ features_list }}
+
+    ## Installation
+
+    ```bash
+    {{ installation_command }}
+    ```
+
+    ## Quick Start
+
+    {{ quick_start_example }}
+
+    ## Documentation
+
+    {{ documentation_links }}
+
+    ## Contributing
+
+    {{ contributing_guidelines }}
+
+    ## License
+
+    {{ license }}
+
+  API.md: |
+    # API Reference
+
+    ## Overview
+
+    {{ api_overview }}
+
+    ## Authentication
+
+    {{ authentication_docs }}
+
+    ## Endpoints
+
+    {{ endpoints }}
+
+    ### {{ endpoint_name }}
+
+    {{ description }}
+
+    **Request:**
+    ```http
+    {{ method }} {{ path }}
+    ```
+
+    **Parameters:**
+    {{ parameters_table }}
+
+    **Response:**
+    ```json
+    {{ response_example }}
+    ```
+
+    **Example:**
+    ```python
+    {{ code_example }}
+    ```
+
+    ## Errors
+
+    {{ error_codes }}
+
+  GUIDE.md: |
+    # {{ guide_title }}
+
+    ## Overview
+
+    {{ overview }}
+
+    ## Prerequisites
+
+    {{ prerequisites }}
+
+    ## Step-by-Step Guide
+
+    ### Step 1: {{ step_title }}
+
+    {{ step_content }}
+
+    ### Step 2: {{ step_title }}
+
+    {{ step_content }}
+
+    ## Examples
+
+    {{ examples }}
+
+    ## Troubleshooting
+
+    {{ troubleshooting }}
+
+    ## Next Steps
+
+    {{ next_steps }}

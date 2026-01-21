@@ -1,0 +1,2520 @@
+personas:
+  senior_developer:
+    id: senior_developer
+    name: Senior Developer
+    description: Experienced, pragmatic developer
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    - debugging
+    - testing
+    - code_review
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.214513'
+    version: 1
+  security_expert:
+    id: security_expert
+    name: Security Expert
+    description: Security-focused specialist
+    personality: cautious
+    communication_style: formal
+    expertise:
+    - security
+    - vulnerabilities
+    - auditing
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.216453'
+    version: 1
+  mentor:
+    id: mentor
+    name: Programming Mentor
+    description: Patient educator
+    personality: supportive
+    communication_style: educational
+    expertise:
+    - teaching
+    - explanation
+    - skill_development
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.219523'
+    version: 1
+  custom_persona_0:
+    id: custom_persona_0
+    name: Persona_0
+    description: Persona 0
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.223512'
+    version: 1
+  custom_persona_1:
+    id: custom_persona_1
+    name: Persona_1
+    description: Persona 1
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.228591'
+    version: 1
+  custom_persona_2:
+    id: custom_persona_2
+    name: Persona_2
+    description: Persona 2
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.242668'
+    version: 1
+  custom_persona_3:
+    id: custom_persona_3
+    name: Persona_3
+    description: Persona 3
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.261123'
+    version: 1
+  custom_persona_4:
+    id: custom_persona_4
+    name: Persona_4
+    description: Persona 4
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.269600'
+    version: 1
+  custom_persona_5:
+    id: custom_persona_5
+    name: Persona_5
+    description: Persona 5
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.301353'
+    version: 1
+  custom_persona_6:
+    id: custom_persona_6
+    name: Persona_6
+    description: Persona 6
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.339778'
+    version: 1
+  custom_persona_7:
+    id: custom_persona_7
+    name: Persona_7
+    description: Persona 7
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.376533'
+    version: 1
+  custom_persona_8:
+    id: custom_persona_8
+    name: Persona_8
+    description: Persona 8
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.452778'
+    version: 1
+  custom_persona_9:
+    id: custom_persona_9
+    name: Persona_9
+    description: Persona 9
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.493391'
+    version: 1
+  custom_persona_10:
+    id: custom_persona_10
+    name: Persona_10
+    description: Persona 10
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.550948'
+    version: 1
+  custom_persona_11:
+    id: custom_persona_11
+    name: Persona_11
+    description: Persona 11
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.594647'
+    version: 1
+  custom_persona_12:
+    id: custom_persona_12
+    name: Persona_12
+    description: Persona 12
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.621836'
+    version: 1
+  custom_persona_13:
+    id: custom_persona_13
+    name: Persona_13
+    description: Persona 13
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.673138'
+    version: 1
+  custom_persona_14:
+    id: custom_persona_14
+    name: Persona_14
+    description: Persona 14
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.708116'
+    version: 1
+  custom_persona_15:
+    id: custom_persona_15
+    name: Persona_15
+    description: Persona 15
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.729125'
+    version: 1
+  custom_persona_16:
+    id: custom_persona_16
+    name: Persona_16
+    description: Persona 16
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.750768'
+    version: 1
+  custom_persona_17:
+    id: custom_persona_17
+    name: Persona_17
+    description: Persona 17
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.854560'
+    version: 1
+  custom_persona_18:
+    id: custom_persona_18
+    name: Persona_18
+    description: Persona 18
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.961034'
+    version: 1
+  custom_persona_19:
+    id: custom_persona_19
+    name: Persona_19
+    description: Persona 19
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:17.990345'
+    version: 1
+  custom_persona_20:
+    id: custom_persona_20
+    name: Persona_20
+    description: Persona 20
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:18.094064'
+    version: 1
+  custom_persona_21:
+    id: custom_persona_21
+    name: Persona_21
+    description: Persona 21
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:18.185441'
+    version: 1
+  custom_persona_22:
+    id: custom_persona_22
+    name: Persona_22
+    description: Persona 22
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:18.237857'
+    version: 1
+  custom_persona_23:
+    id: custom_persona_23
+    name: Persona_23
+    description: Persona 23
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:18.343578'
+    version: 1
+  custom_persona_24:
+    id: custom_persona_24
+    name: Persona_24
+    description: Persona 24
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:18.447152'
+    version: 1
+  custom_persona_25:
+    id: custom_persona_25
+    name: Persona_25
+    description: Persona 25
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:18.482464'
+    version: 1
+  custom_persona_26:
+    id: custom_persona_26
+    name: Persona_26
+    description: Persona 26
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:18.515231'
+    version: 1
+  custom_persona_27:
+    id: custom_persona_27
+    name: Persona_27
+    description: Persona 27
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:18.618386'
+    version: 1
+  custom_persona_28:
+    id: custom_persona_28
+    name: Persona_28
+    description: Persona 28
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:18.653397'
+    version: 1
+  custom_persona_29:
+    id: custom_persona_29
+    name: Persona_29
+    description: Persona 29
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:18.859339'
+    version: 1
+  custom_persona_30:
+    id: custom_persona_30
+    name: Persona_30
+    description: Persona 30
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:19.004354'
+    version: 1
+  custom_persona_31:
+    id: custom_persona_31
+    name: Persona_31
+    description: Persona 31
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:19.097438'
+    version: 1
+  custom_persona_32:
+    id: custom_persona_32
+    name: Persona_32
+    description: Persona 32
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:19.137594'
+    version: 1
+  custom_persona_33:
+    id: custom_persona_33
+    name: Persona_33
+    description: Persona 33
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:19.177987'
+    version: 1
+  custom_persona_34:
+    id: custom_persona_34
+    name: Persona_34
+    description: Persona 34
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:19.219559'
+    version: 1
+  custom_persona_35:
+    id: custom_persona_35
+    name: Persona_35
+    description: Persona 35
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:19.399038'
+    version: 1
+  custom_persona_36:
+    id: custom_persona_36
+    name: Persona_36
+    description: Persona 36
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:19.527588'
+    version: 1
+  custom_persona_37:
+    id: custom_persona_37
+    name: Persona_37
+    description: Persona 37
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:19.639981'
+    version: 1
+  custom_persona_38:
+    id: custom_persona_38
+    name: Persona_38
+    description: Persona 38
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:19.686007'
+    version: 1
+  custom_persona_39:
+    id: custom_persona_39
+    name: Persona_39
+    description: Persona 39
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:19.889038'
+    version: 1
+  custom_persona_40:
+    id: custom_persona_40
+    name: Persona_40
+    description: Persona 40
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:20.006560'
+    version: 1
+  custom_persona_41:
+    id: custom_persona_41
+    name: Persona_41
+    description: Persona 41
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:20.193620'
+    version: 1
+  custom_persona_42:
+    id: custom_persona_42
+    name: Persona_42
+    description: Persona 42
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:20.290878'
+    version: 1
+  custom_persona_43:
+    id: custom_persona_43
+    name: Persona_43
+    description: Persona 43
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:20.437439'
+    version: 1
+  custom_persona_44:
+    id: custom_persona_44
+    name: Persona_44
+    description: Persona 44
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:20.637238'
+    version: 1
+  custom_persona_45:
+    id: custom_persona_45
+    name: Persona_45
+    description: Persona 45
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:20.692046'
+    version: 1
+  custom_persona_46:
+    id: custom_persona_46
+    name: Persona_46
+    description: Persona 46
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:20.907451'
+    version: 1
+  custom_persona_47:
+    id: custom_persona_47
+    name: Persona_47
+    description: Persona 47
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:21.075799'
+    version: 1
+  custom_persona_48:
+    id: custom_persona_48
+    name: Persona_48
+    description: Persona 48
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:21.174127'
+    version: 1
+  custom_persona_49:
+    id: custom_persona_49
+    name: Persona_49
+    description: Persona 49
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:21.232532'
+    version: 1
+  custom_security_expert_0:
+    id: custom_security_expert_0
+    name: security_expert_0
+    description: Expert in security
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - security
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:21.464989'
+    version: 1
+  custom_performance_expert_1:
+    id: custom_performance_expert_1
+    name: performance_expert_1
+    description: Expert in performance
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - performance
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:21.643858'
+    version: 1
+  custom_testing_expert_2:
+    id: custom_testing_expert_2
+    name: testing_expert_2
+    description: Expert in testing
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - testing
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:21.712703'
+    version: 1
+  custom_debugging_expert_3:
+    id: custom_debugging_expert_3
+    name: debugging_expert_3
+    description: Expert in debugging
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - debugging
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:21.900313'
+    version: 1
+  custom_architecture_expert_4:
+    id: custom_architecture_expert_4
+    name: architecture_expert_4
+    description: Expert in architecture
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - architecture
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:22.029747'
+    version: 1
+  custom_design_expert_5:
+    id: custom_design_expert_5
+    name: design_expert_5
+    description: Expert in design
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - design
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:22.239451'
+    version: 1
+  custom_deployment_expert_6:
+    id: custom_deployment_expert_6
+    name: deployment_expert_6
+    description: Expert in deployment
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - deployment
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:22.410430'
+    version: 1
+  custom_monitoring_expert_7:
+    id: custom_monitoring_expert_7
+    name: monitoring_expert_7
+    description: Expert in monitoring
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - monitoring
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:22.622857'
+    version: 1
+  custom_security_expert_8:
+    id: custom_security_expert_8
+    name: security_expert_8
+    description: Expert in security
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - security
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:22.801922'
+    version: 1
+  custom_performance_expert_9:
+    id: custom_performance_expert_9
+    name: performance_expert_9
+    description: Expert in performance
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - performance
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:22.966999'
+    version: 1
+  custom_testing_expert_10:
+    id: custom_testing_expert_10
+    name: testing_expert_10
+    description: Expert in testing
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - testing
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:23.160750'
+    version: 1
+  custom_debugging_expert_11:
+    id: custom_debugging_expert_11
+    name: debugging_expert_11
+    description: Expert in debugging
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - debugging
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:23.325904'
+    version: 1
+  custom_architecture_expert_12:
+    id: custom_architecture_expert_12
+    name: architecture_expert_12
+    description: Expert in architecture
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - architecture
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:23.480057'
+    version: 1
+  custom_design_expert_13:
+    id: custom_design_expert_13
+    name: design_expert_13
+    description: Expert in design
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - design
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:23.713078'
+    version: 1
+  custom_deployment_expert_14:
+    id: custom_deployment_expert_14
+    name: deployment_expert_14
+    description: Expert in deployment
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - deployment
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:23.791178'
+    version: 1
+  custom_monitoring_expert_15:
+    id: custom_monitoring_expert_15
+    name: monitoring_expert_15
+    description: Expert in monitoring
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - monitoring
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:23.998329'
+    version: 1
+  custom_security_expert_16:
+    id: custom_security_expert_16
+    name: security_expert_16
+    description: Expert in security
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - security
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:24.175572'
+    version: 1
+  custom_performance_expert_17:
+    id: custom_performance_expert_17
+    name: performance_expert_17
+    description: Expert in performance
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - performance
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:24.463803'
+    version: 1
+  custom_testing_expert_18:
+    id: custom_testing_expert_18
+    name: testing_expert_18
+    description: Expert in testing
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - testing
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:24.677692'
+    version: 1
+  custom_debugging_expert_19:
+    id: custom_debugging_expert_19
+    name: debugging_expert_19
+    description: Expert in debugging
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - debugging
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:24.759765'
+    version: 1
+  custom_architecture_expert_20:
+    id: custom_architecture_expert_20
+    name: architecture_expert_20
+    description: Expert in architecture
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - architecture
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:25.072257'
+    version: 1
+  custom_design_expert_21:
+    id: custom_design_expert_21
+    name: design_expert_21
+    description: Expert in design
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - design
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:25.312430'
+    version: 1
+  custom_deployment_expert_22:
+    id: custom_deployment_expert_22
+    name: deployment_expert_22
+    description: Expert in deployment
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - deployment
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:25.475766'
+    version: 1
+  custom_monitoring_expert_23:
+    id: custom_monitoring_expert_23
+    name: monitoring_expert_23
+    description: Expert in monitoring
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - monitoring
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:25.695884'
+    version: 1
+  custom_security_expert_24:
+    id: custom_security_expert_24
+    name: security_expert_24
+    description: Expert in security
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - security
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:25.981384'
+    version: 1
+  custom_performance_expert_25:
+    id: custom_performance_expert_25
+    name: performance_expert_25
+    description: Expert in performance
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - performance
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:26.107233'
+    version: 1
+  custom_testing_expert_26:
+    id: custom_testing_expert_26
+    name: testing_expert_26
+    description: Expert in testing
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - testing
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:26.381466'
+    version: 1
+  custom_debugging_expert_27:
+    id: custom_debugging_expert_27
+    name: debugging_expert_27
+    description: Expert in debugging
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - debugging
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:26.593078'
+    version: 1
+  custom_architecture_expert_28:
+    id: custom_architecture_expert_28
+    name: architecture_expert_28
+    description: Expert in architecture
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - architecture
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:26.865134'
+    version: 1
+  custom_design_expert_29:
+    id: custom_design_expert_29
+    name: design_expert_29
+    description: Expert in design
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - design
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:27.124419'
+    version: 1
+  custom_deployment_expert_30:
+    id: custom_deployment_expert_30
+    name: deployment_expert_30
+    description: Expert in deployment
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - deployment
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:27.442919'
+    version: 1
+  custom_monitoring_expert_31:
+    id: custom_monitoring_expert_31
+    name: monitoring_expert_31
+    description: Expert in monitoring
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - monitoring
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:27.678675'
+    version: 1
+  custom_security_expert_32:
+    id: custom_security_expert_32
+    name: security_expert_32
+    description: Expert in security
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - security
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:27.951435'
+    version: 1
+  custom_performance_expert_33:
+    id: custom_performance_expert_33
+    name: performance_expert_33
+    description: Expert in performance
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - performance
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:28.234633'
+    version: 1
+  custom_testing_expert_34:
+    id: custom_testing_expert_34
+    name: testing_expert_34
+    description: Expert in testing
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - testing
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:28.450225'
+    version: 1
+  custom_debugging_expert_35:
+    id: custom_debugging_expert_35
+    name: debugging_expert_35
+    description: Expert in debugging
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - debugging
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:28.788596'
+    version: 1
+  custom_architecture_expert_36:
+    id: custom_architecture_expert_36
+    name: architecture_expert_36
+    description: Expert in architecture
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - architecture
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:28.953903'
+    version: 1
+  custom_design_expert_37:
+    id: custom_design_expert_37
+    name: design_expert_37
+    description: Expert in design
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - design
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:29.290778'
+    version: 1
+  custom_deployment_expert_38:
+    id: custom_deployment_expert_38
+    name: deployment_expert_38
+    description: Expert in deployment
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - deployment
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:29.548864'
+    version: 1
+  custom_monitoring_expert_39:
+    id: custom_monitoring_expert_39
+    name: monitoring_expert_39
+    description: Expert in monitoring
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - monitoring
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:29.806251'
+    version: 1
+  custom_security_expert_40:
+    id: custom_security_expert_40
+    name: security_expert_40
+    description: Expert in security
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - security
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:29.914416'
+    version: 1
+  custom_performance_expert_41:
+    id: custom_performance_expert_41
+    name: performance_expert_41
+    description: Expert in performance
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - performance
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:30.185117'
+    version: 1
+  custom_testing_expert_42:
+    id: custom_testing_expert_42
+    name: testing_expert_42
+    description: Expert in testing
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - testing
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:30.557381'
+    version: 1
+  custom_debugging_expert_43:
+    id: custom_debugging_expert_43
+    name: debugging_expert_43
+    description: Expert in debugging
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - debugging
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:30.768578'
+    version: 1
+  custom_architecture_expert_44:
+    id: custom_architecture_expert_44
+    name: architecture_expert_44
+    description: Expert in architecture
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - architecture
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:31.063924'
+    version: 1
+  custom_design_expert_45:
+    id: custom_design_expert_45
+    name: design_expert_45
+    description: Expert in design
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - design
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:31.445769'
+    version: 1
+  custom_deployment_expert_46:
+    id: custom_deployment_expert_46
+    name: deployment_expert_46
+    description: Expert in deployment
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - deployment
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:31.655858'
+    version: 1
+  custom_monitoring_expert_47:
+    id: custom_monitoring_expert_47
+    name: monitoring_expert_47
+    description: Expert in monitoring
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - monitoring
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:32.004163'
+    version: 1
+  custom_security_expert_48:
+    id: custom_security_expert_48
+    name: security_expert_48
+    description: Expert in security
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - security
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:32.317572'
+    version: 1
+  custom_performance_expert_49:
+    id: custom_performance_expert_49
+    name: performance_expert_49
+    description: Expert in performance
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - performance
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:32.634743'
+    version: 1
+  custom_testing_expert_50:
+    id: custom_testing_expert_50
+    name: testing_expert_50
+    description: Expert in testing
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - testing
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:32.955848'
+    version: 1
+  custom_debugging_expert_51:
+    id: custom_debugging_expert_51
+    name: debugging_expert_51
+    description: Expert in debugging
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - debugging
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:33.288876'
+    version: 1
+  custom_architecture_expert_52:
+    id: custom_architecture_expert_52
+    name: architecture_expert_52
+    description: Expert in architecture
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - architecture
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:33.558487'
+    version: 1
+  custom_design_expert_53:
+    id: custom_design_expert_53
+    name: design_expert_53
+    description: Expert in design
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - design
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:33.929377'
+    version: 1
+  custom_deployment_expert_54:
+    id: custom_deployment_expert_54
+    name: deployment_expert_54
+    description: Expert in deployment
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - deployment
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:34.092247'
+    version: 1
+  custom_monitoring_expert_55:
+    id: custom_monitoring_expert_55
+    name: monitoring_expert_55
+    description: Expert in monitoring
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - monitoring
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:34.402787'
+    version: 1
+  custom_security_expert_56:
+    id: custom_security_expert_56
+    name: security_expert_56
+    description: Expert in security
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - security
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:34.775773'
+    version: 1
+  custom_performance_expert_57:
+    id: custom_performance_expert_57
+    name: performance_expert_57
+    description: Expert in performance
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - performance
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:35.143742'
+    version: 1
+  custom_testing_expert_58:
+    id: custom_testing_expert_58
+    name: testing_expert_58
+    description: Expert in testing
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - testing
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:35.553645'
+    version: 1
+  custom_debugging_expert_59:
+    id: custom_debugging_expert_59
+    name: debugging_expert_59
+    description: Expert in debugging
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - debugging
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:35.838140'
+    version: 1
+  custom_architecture_expert_60:
+    id: custom_architecture_expert_60
+    name: architecture_expert_60
+    description: Expert in architecture
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - architecture
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:36.186766'
+    version: 1
+  custom_design_expert_61:
+    id: custom_design_expert_61
+    name: design_expert_61
+    description: Expert in design
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - design
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:36.388396'
+    version: 1
+  custom_deployment_expert_62:
+    id: custom_deployment_expert_62
+    name: deployment_expert_62
+    description: Expert in deployment
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - deployment
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:36.720989'
+    version: 1
+  custom_monitoring_expert_63:
+    id: custom_monitoring_expert_63
+    name: monitoring_expert_63
+    description: Expert in monitoring
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - monitoring
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:37.062173'
+    version: 1
+  custom_security_expert_64:
+    id: custom_security_expert_64
+    name: security_expert_64
+    description: Expert in security
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - security
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:37.419679'
+    version: 1
+  custom_performance_expert_65:
+    id: custom_performance_expert_65
+    name: performance_expert_65
+    description: Expert in performance
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - performance
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:37.602440'
+    version: 1
+  custom_testing_expert_66:
+    id: custom_testing_expert_66
+    name: testing_expert_66
+    description: Expert in testing
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - testing
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:38.055434'
+    version: 1
+  custom_debugging_expert_67:
+    id: custom_debugging_expert_67
+    name: debugging_expert_67
+    description: Expert in debugging
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - debugging
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:38.389766'
+    version: 1
+  custom_architecture_expert_68:
+    id: custom_architecture_expert_68
+    name: architecture_expert_68
+    description: Expert in architecture
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - architecture
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:38.808695'
+    version: 1
+  custom_design_expert_69:
+    id: custom_design_expert_69
+    name: design_expert_69
+    description: Expert in design
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - design
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:39.016589'
+    version: 1
+  custom_deployment_expert_70:
+    id: custom_deployment_expert_70
+    name: deployment_expert_70
+    description: Expert in deployment
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - deployment
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:39.484816'
+    version: 1
+  custom_monitoring_expert_71:
+    id: custom_monitoring_expert_71
+    name: monitoring_expert_71
+    description: Expert in monitoring
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - monitoring
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:39.851709'
+    version: 1
+  custom_security_expert_72:
+    id: custom_security_expert_72
+    name: security_expert_72
+    description: Expert in security
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - security
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:40.223433'
+    version: 1
+  custom_performance_expert_73:
+    id: custom_performance_expert_73
+    name: performance_expert_73
+    description: Expert in performance
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - performance
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:40.440646'
+    version: 1
+  custom_testing_expert_74:
+    id: custom_testing_expert_74
+    name: testing_expert_74
+    description: Expert in testing
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - testing
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:40.752552'
+    version: 1
+  custom_debugging_expert_75:
+    id: custom_debugging_expert_75
+    name: debugging_expert_75
+    description: Expert in debugging
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - debugging
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:41.211369'
+    version: 1
+  custom_architecture_expert_76:
+    id: custom_architecture_expert_76
+    name: architecture_expert_76
+    description: Expert in architecture
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - architecture
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:41.621475'
+    version: 1
+  custom_design_expert_77:
+    id: custom_design_expert_77
+    name: design_expert_77
+    description: Expert in design
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - design
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:41.967311'
+    version: 1
+  custom_deployment_expert_78:
+    id: custom_deployment_expert_78
+    name: deployment_expert_78
+    description: Expert in deployment
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - deployment
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:42.310315'
+    version: 1
+  custom_monitoring_expert_79:
+    id: custom_monitoring_expert_79
+    name: monitoring_expert_79
+    description: Expert in monitoring
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - monitoring
+    - coding
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:42.791690'
+    version: 1
+  custom_test:
+    id: custom_test
+    name: Test
+    description: Test
+    personality: pragmatic
+    communication_style: technical
+    expertise: []
+    backstory: null
+    constraints:
+      max_tool_calls: null
+      preferred_tools: []
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:43.219015'
+    version: 1
+  test_persona:
+    id: test_persona
+    name: Test Persona
+    description: A test persona
+    personality: pragmatic
+    communication_style: technical
+    expertise:
+    - coding
+    - testing
+    backstory: Test backstory
+    constraints:
+      max_tool_calls: 50
+      preferred_tools:
+      - read_file
+      - write_file
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    created_at: '2026-01-21T07:03:43.569036'
+    version: 1

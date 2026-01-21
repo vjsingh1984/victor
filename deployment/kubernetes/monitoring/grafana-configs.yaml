@@ -1,0 +1,337 @@
+# Grafana Configuration ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-config
+  namespace: victor-monitoring
+  labels:
+    app.kubernetes.io/name: victor
+    app.kubernetes.io/component: grafana
+data:
+  grafana.ini: |
+    [server]
+    root_url = http://localhost:3000
+
+    [database]
+    type = sqlite3
+    path = /var/lib/grafana/grafana.db
+
+    [session]
+    provider = file
+    provider_config = sessions
+
+    [analytics]
+    check_for_updates = false
+    reporting_enabled = false
+
+    [security]
+    disable_gravatar = true
+    cookie_secure = true
+    content_security_policy = true
+    x_content_type_options = true
+    x_xss_protection = true
+
+    [users]
+    allow_sign_up = false
+    auto_assign_org_role = Viewer
+
+    [log]
+    mode = console
+    level = info
+
+    [log.console]
+    format = json
+
+    [alerting]
+    enabled = true
+
+    [unified_alerting]
+    enabled = true
+---
+# Grafana Datasources ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: victor-monitoring
+  labels:
+    app.kubernetes.io/name: victor
+    app.kubernetes.io/component: grafana
+data:
+  prometheus.yaml: |
+    apiVersion: 1
+
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus:9090
+        isDefault: true
+        editable: true
+        jsonData:
+          timeInterval: "15s"
+          queryTimeout: "60s"
+          httpMethod: POST
+---
+# Grafana Dashboard Providers ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-providers
+  namespace: victor-monitoring
+  labels:
+    app.kubernetes.io/name: victor
+    app.kubernetes.io/component: grafana
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+
+    providers:
+      - name: 'Victor AI'
+        orgId: 1
+        folder: 'Victor AI'
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 30
+        allowUiUpdates: true
+        options:
+          path: /var/lib/grafana/dashboards
+          foldersFromFilesStructure: true
+---
+# Grafana Dashboards ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: victor-monitoring
+  labels:
+    app.kubernetes.io/name: victor
+    app.kubernetes.io/component: grafana
+data:
+  provider_metrics.json: |
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": "-- Grafana --",
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "editable": true,
+      "gnetId": null,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": true
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "short"
+            }
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 0
+          },
+          "id": 1,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          },
+          "targets": [
+            {
+              "expr": "victor_model_requests_total",
+              "refId": "A"
+            }
+          ],
+          "title": "Provider Request Rate",
+          "type": "timeseries"
+        }
+      ],
+      "schemaVersion": 27,
+      "style": "dark",
+      "tags": ["victor", "providers", "metrics"],
+      "templating": {
+        "list": []
+      },
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "timepicker": {},
+      "timezone": "",
+      "title": "Provider Metrics",
+      "uid": "victor-provider-metrics",
+      "version": 1
+    }
+  request_metrics.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "gnetId": null,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [],
+      "schemaVersion": 27,
+      "style": "dark",
+      "tags": ["victor", "requests", "metrics"],
+      "templating": {
+        "list": []
+      },
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "timepicker": {},
+      "timezone": "",
+      "title": "Request Metrics",
+      "uid": "victor-request-metrics",
+      "version": 1
+    }
+  system_health.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "gnetId": null,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [],
+      "schemaVersion": 27,
+      "style": "dark",
+      "tags": ["victor", "health", "system"],
+      "templating": {
+        "list": []
+      },
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "timepicker": {},
+      "timezone": "",
+      "title": "System Health",
+      "uid": "victor-system-health",
+      "version": 1
+    }
+  tool_execution.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "gnetId": null,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [],
+      "schemaVersion": 27,
+      "style": "dark",
+      "tags": ["victor", "tools", "execution"],
+      "templating": {
+        "list": []
+      },
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "timepicker": {},
+      "timezone": "",
+      "title": "Tool Execution",
+      "uid": "victor-tool-execution",
+      "version": 1
+    }
+  workflow_metrics.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "gnetId": null,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [],
+      "schemaVersion": 27,
+      "style": "dark",
+      "tags": ["victor", "workflows", "metrics"],
+      "templating": {
+        "list": []
+      },
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "timepicker": {},
+      "timezone": "",
+      "title": "Workflow Metrics",
+      "uid": "victor-workflow-metrics",
+      "version": 1
+    }
+---
+# Grafana Credentials Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-credentials
+  namespace: victor-monitoring
+  labels:
+    app.kubernetes.io/name: victor
+    app.kubernetes.io/component: grafana
+type: Opaque
+stringData:
+  admin-user: "admin"
+  admin-password: "changeme123"  # CHANGE THIS IN PRODUCTION

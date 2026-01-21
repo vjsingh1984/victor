@@ -1,0 +1,7 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --with python3 --buildsystem=pyproject
+
+override_dh_auto_test:
+	# Skip tests during package build (run during CI instead)

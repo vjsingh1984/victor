@@ -108,6 +108,35 @@ from victor.security.manager import (
     reset_security_manager,
 )
 
+# Penetration Testing (NEW)
+from victor.security.penetration_testing import (
+    SecurityTestSuite,
+    SeverityLevel,
+    AttackType,
+    Vulnerability as PenTestVulnerability,
+    SecurityReport,
+    ComprehensiveSecurityReport,
+    run_security_tests,
+)
+
+# Enhanced Authorization (NEW)
+from victor.security.authorization_enhanced import (
+    EnhancedAuthorizer,
+    Permission,
+    Role,
+    User,
+    Policy,
+    PolicyEffect,
+    ResourceType,
+    ActionType,
+    AuthorizationDecision,
+    get_enhanced_authorizer,
+    set_enhanced_authorizer,
+)
+
+# Legacy alias for backwards compatibility
+EnhancedUser = User
+
 # Submodules exposed via lazy imports to avoid circular import issues
 # Users can still do: from victor.security import auth, safety, audit
 # The submodules are imported on first access via __getattr__
@@ -147,6 +176,27 @@ __all__ = [
     "SecurityManager",
     "get_security_manager",
     "reset_security_manager",
+    # Penetration Testing (NEW)
+    "SecurityTestSuite",
+    "SeverityLevel",
+    "AttackType",
+    "PenTestVulnerability",
+    "SecurityReport",
+    "ComprehensiveSecurityReport",
+    "run_security_tests",
+    # Enhanced Authorization (NEW)
+    "EnhancedAuthorizer",
+    "Permission",
+    "Role",
+    "User",
+    "EnhancedUser",  # Legacy alias
+    "Policy",
+    "PolicyEffect",
+    "ResourceType",
+    "ActionType",
+    "AuthorizationDecision",
+    "get_enhanced_authorizer",
+    "set_enhanced_authorizer",
 ]
 
 
@@ -164,4 +214,12 @@ def __getattr__(name: str) -> Any:
         from victor.security import audit
 
         return audit
+    elif name == "penetration_testing":
+        from victor.security import penetration_testing
+
+        return penetration_testing
+    elif name == "authorization_enhanced":
+        from victor.security import authorization_enhanced
+
+        return authorization_enhanced
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

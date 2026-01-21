@@ -1,0 +1,120 @@
+# Production values for victor-ai
+# Override default values for production deployment
+
+replicaCount: 6
+
+image:
+  tag: "0.5.1"
+  pullPolicy: Always
+
+resources:
+  requests:
+    cpu: 1000m
+    memory: 1Gi
+  limits:
+    cpu: 4000m
+    memory: 4Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 6
+  maxReplicas: 50
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+config:
+  profile: production
+  logLevel: INFO
+  maxWorkers: 8
+  cacheSize: 2000
+  enableMetrics: true
+  enableTracing: true
+  enableRateLimiting: true
+
+eventBus:
+  backend: kafka
+  kafka:
+    enabled: true
+    bootstrapServers: victor-kafka:9092
+    topicPrefix: victor
+
+checkpoint:
+  backend: postgres
+
+cache:
+  backend: redis
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+  hosts:
+    - host: victor-ai.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: victor-ai-tls
+      hosts:
+        - victor-ai.example.com
+
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: change-me
+    password: change-me
+  primary:
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+    persistence:
+      size: 50Gi
+
+redis:
+  enabled: true
+  master:
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+    persistence:
+      size: 10Gi
+
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+
+networkPolicy:
+  enabled: true
+
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: app
+              operator: In
+              values:
+                - victor-ai
+        topologyKey: topology.kubernetes.io/zone
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: nodepool
+              operator: In
+              values:
+                - production

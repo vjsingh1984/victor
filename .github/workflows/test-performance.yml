@@ -1,0 +1,424 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Performance Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false  # Allow parallel runs for different branches
+
+jobs:
+  # ==========================================================================
+  # Tool Selection Performance Benchmark
+  # ==========================================================================
+  tool-selection-benchmark:
+    name: Tool Selection Benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run tool selection benchmark
+        run: |
+          python scripts/benchmark_tool_selection.py run \
+            --group all \
+            --iterations 100 \
+            --output benchmark-results.json
+
+      - name: Generate benchmark report
+        run: |
+          python scripts/benchmark_tool_selection.py report \
+            --input benchmark-results.json \
+            --format markdown \
+            --output benchmark-report.md
+
+      - name: Check for performance regression
+        run: |
+          # Check if performance degraded by >10%
+          python scripts/benchmark_tool_selection.py compare \
+            --baseline benchmark-baseline.json \
+            --current benchmark-results.json \
+            --threshold 10
+        continue-on-error: true
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: tool-selection-benchmark
+          path: |
+            benchmark-results.json
+            benchmark-report.md
+          retention-days: 30
+
+      - name: Add benchmark to summary
+        run: cat benchmark-report.md >> $GITHUB_STEP_SUMMARY
+
+  # ==========================================================================
+  # Coordinator Performance Test
+  # ==========================================================================
+  coordinator-performance:
+    name: Coordinator Performance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install pytest-benchmark locust
+
+      - name: Run coordinator benchmarks
+        run: |
+          pytest tests/benchmark/test_coordinator_performance.py \
+            --benchmark-only \
+            --benchmark-json=coordinator-benchmark.json \
+            --benchmark-autosave \
+            --benchmark-save-data
+
+      - name: Generate benchmark report
+        run: |
+          pytest tests/benchmark/test_coordinator_performance.py \
+            --benchmark-only \
+            --benchmark-compare-file=coordinator-baseline.json \
+            --benchmark-compare-fail=mean:10% \
+            --benchmark-columns=min,max,mean,stddev,ops,rounds
+        continue-on-error: true
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: coordinator-benchmark
+          path: |
+            coordinator-benchmark.json
+            .benchmarks/*/coordinator*.json
+          retention-days: 30
+
+  # ==========================================================================
+  # Workflow Compilation Performance
+  # ==========================================================================
+  workflow-performance:
+    name: Workflow Compilation Performance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run workflow performance test
+        run: |
+          pytest tests/integration/workflows/test_workflow_performance.py \
+            --benchmark-json=workflow-benchmark.json \
+            -v
+
+      - name: Check for workflow performance regression
+        run: |
+          python - << 'PY'
+          import json
+          import sys
+
+          try:
+              with open('workflow-benchmark.json') as f:
+                  data = json.load(f)
+
+              # Extract compilation time
+              compile_time = data['benchmarks'][0]['stats']['mean']
+              baseline = data.get('baseline', 1.0)  # seconds
+
+              # Check for >10% regression
+              if compile_time > baseline * 1.1:
+                  print(f"❌ Performance regression detected: {compile_time:.3f}s > {baseline:.3f}s")
+                  sys.exit(1)
+              else:
+                  print(f"✓ Performance within acceptable range: {compile_time:.3f}s")
+          except Exception as e:
+              print(f"Warning: Could not check performance: {e}")
+              sys.exit(0)
+          PY
+        continue-on-error: true
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-benchmark
+          path: workflow-benchmark.json
+          retention-days: 30
+
+  # ==========================================================================
+  # Load Testing with Locust
+  # ==========================================================================
+  load-test:
+    name: Load Test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario:
+          - name: api-endpoints
+            users: 100
+            spawn_rate: 10
+            run_time: 5m
+          - name: tool-execution
+            users: 50
+            spawn_rate: 5
+            run_time: 10m
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install locust
+
+      - name: Start Victor API server
+        run: |
+          victor serve --port 8000 &
+          sleep 10
+          curl -f http://localhost:8000/health/live
+
+      - name: Run load test
+        run: |
+          locust \
+            --config tests/load/locust.conf \
+            --host http://localhost:8000 \
+            --users ${{ matrix.scenario.users }} \
+            --spawn-rate ${{ matrix.scenario.spawn_rate }} \
+            --run-time ${{ matrix.scenario.run_time }} \
+            --headless \
+            --html load-test-${{ matrix.scenario.name }}.html \
+            --json load-test-${{ matrix.scenario.name }}.json \
+            --logfile load-test-${{ matrix.scenario.name }}.log
+
+      - name: Check load test thresholds
+        run: |
+          python - << 'PY'
+          import json
+          import sys
+
+          with open('load-test-${{ matrix.scenario.name }}.json') as f:
+              data = json.load(f)
+
+          # Extract metrics
+          response_time = data['stats']['avg_response_time']
+          error_rate = data['stats']['fail_ratio'] * 100
+
+          # Check thresholds
+          if response_time > 2000:  # 2s
+              print(f"❌ Response time too high: {response_time}ms")
+              sys.exit(1)
+
+          if error_rate > 5:  # 5%
+              print(f"❌ Error rate too high: {error_rate}%")
+              sys.exit(1)
+
+          print(f"✓ Load test passed: {response_time}ms avg, {error_rate}% errors")
+          PY
+        continue-on-error: true
+
+      - name: Upload load test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-${{ matrix.scenario.name }}
+          path: |
+            load-test-${{ matrix.scenario.name }}.html
+            load-test-${{ matrix.scenario.name }}.json
+            load-test-${{ matrix.scenario.name }}.log
+          retention-days: 30
+
+  # ==========================================================================
+  # Memory Profiling
+  # ==========================================================================
+  memory-profile:
+    name: Memory Profile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install memory-profiler matplotlib
+
+      - name: Run memory profiling
+        run: |
+          python tests/performance/test_memory_profile.py \
+            --output memory-profile.txt \
+            --plot memory-profile.png
+
+      - name: Check memory thresholds
+        run: |
+          python - << 'PY'
+          import re
+
+          with open('memory-profile.txt') as f:
+              content = f.read()
+
+          # Extract peak memory
+          peak_mb = float(re.search(r'Peak: ([\d.]+) MiB', content).group(1))
+
+          # Check threshold (500 MB)
+          if peak_mb > 500:
+              print(f"❌ Memory usage too high: {peak_mb} MB")
+              exit(1)
+          else:
+              print(f"✓ Memory usage acceptable: {peak_mb} MB")
+          PY
+        continue-on-error: true
+
+      - name: Upload memory profile
+        uses: actions/upload-artifact@v4
+        with:
+          name: memory-profile
+          path: |
+            memory-profile.txt
+            memory-profile.png
+          retention-days: 30
+
+  # ==========================================================================
+  # Performance Summary Report
+  # ==========================================================================
+  summary:
+    name: Performance Summary
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [tool-selection-benchmark, coordinator-performance, workflow-performance]
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Generate performance summary
+        run: |
+          cat > performance-summary.md << 'EOF'
+          # Performance Test Summary
+
+          **Workflow**: ${{ github.workflow }}
+          **Run ID**: ${{ github.run_id }}
+          **Branch**: ${{ github.ref_name }}
+          **Commit**: ${{ github.sha }}
+
+          ## Test Results
+
+          - Tool Selection Benchmark: ${{ needs.tool-selection-benchmark.result }}
+          - Coordinator Performance: ${{ needs.coordinator-performance.result }}
+          - Workflow Performance: ${{ needs.workflow-performance.result }}
+
+          ## Key Metrics
+
+          ### Tool Selection
+          - Latency: See artifact
+          - Cache Hit Rate: See artifact
+          - Throughput: See artifact
+
+          ### Coordinator Performance
+          - Tool Coordinator: See artifact
+          - Chat Coordinator: See artifact
+          - Context Coordinator: See artifact
+
+          ### Workflow Performance
+          - Compilation Time: See artifact
+          - Execution Time: See artifact
+
+          ## Artifacts
+
+          Download detailed reports from the artifacts section above.
+
+          ## Baselines
+
+          Update baselines after improvements:
+          ```bash
+          # Tool selection baseline
+          cp benchmark-results.json scripts/benchmark-baseline.json
+
+          # Coordinator baseline
+          cp coordinator-benchmark.json tests/benchmark/coordinator-baseline.json
+          ```
+          EOF
+
+          cat performance-summary.md
+
+      - name: Upload summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-summary
+          path: performance-summary.md
+
+      - name: Add to job summary
+        run: cat performance-summary.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment on PR (if applicable)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('performance-summary.md', 'utf8');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });

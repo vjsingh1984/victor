@@ -48,7 +48,9 @@ Examples:
 import argparse
 import asyncio
 import logging
+import os
 import re
+import warnings
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
@@ -245,17 +247,42 @@ class SECFilingFetcher:
     BASE_URL = "https://www.sec.gov"
     EDGAR_API = "https://data.sec.gov"
 
-    def __init__(self):
+    def __init__(self, verify_ssl: bool = True):
+        """Initialize SEC filing fetcher.
+
+        Args:
+            verify_ssl: Whether to verify SSL certificates (default: True).
+                       Set to False ONLY for testing/demo with self-signed certs.
+                       ENV: SEC_VERIFY_SSL can override this (true/false).
+        """
         self.headers = {
             "User-Agent": "VictorRAG/1.0 (research@example.com)",
             "Accept": "application/json",
         }
-        # Create SSL context that doesn't verify certificates (for demo purposes)
+
+        # Check environment variable for SSL verification preference
+        env_verify_ssl = os.getenv("SEC_VERIFY_SSL", "true").lower() == "true"
+        self._verify_ssl = verify_ssl and env_verify_ssl
+
         import ssl
 
-        self._ssl_context = ssl.create_default_context()
-        self._ssl_context.check_hostname = False
-        self._ssl_context.verify_mode = ssl.CERT_NONE
+        if self._verify_ssl:
+            # SECURE: Verify SSL certificates (default, recommended)
+            self._ssl_context = ssl.create_default_context()
+            self._ssl_context.check_hostname = True
+            self._ssl_context.verify_mode = ssl.CERT_REQUIRED
+        else:
+            # INSECURE: Skip SSL verification (for demo/testing ONLY)
+            warnings.warn(
+                "SECURITY WARNING: SSL certificate verification is DISABLED. "
+                "This is NOT recommended for production use. "
+                "Data interception and man-in-the-middle attacks are possible. "
+                "Enable SSL verification by removing SEC_VERIFY_SSL=false environment variable.",
+                stacklevel=2,
+            )
+            self._ssl_context = ssl.create_default_context()
+            self._ssl_context.check_hostname = False
+            self._ssl_context.verify_mode = ssl.CERT_NONE
 
     async def get_company_filings(
         self,
@@ -400,6 +427,7 @@ async def ingest_sec_filings(
     filing_type: str = "10-K",
     count: int = 1,
     max_concurrent: int = 5,
+    verify_ssl: bool = True,
 ) -> Dict[str, int]:
     """Ingest SEC filings into RAG store.
 
@@ -408,6 +436,7 @@ async def ingest_sec_filings(
         filing_type: Filing type to ingest
         count: Number of filings per company
         max_concurrent: Maximum concurrent downloads
+        verify_ssl: Verify SSL certificates (default: True).
 
     Returns:
         Dict mapping company symbols to chunk counts
@@ -429,7 +458,7 @@ async def ingest_sec_filings(
         logger.error("No valid company symbols provided")
         return {}
 
-    fetcher = SECFilingFetcher()
+    fetcher = SECFilingFetcher(verify_ssl=verify_ssl)
     store = DocumentStore()
     await store.initialize()
 
@@ -727,6 +756,12 @@ def main():
         default=5,
         help="Maximum concurrent downloads (default: 5)",
     )
+    parser.add_argument(
+        "--no-verify-ssl",
+        action="store_true",
+        help="DISABLE SSL certificate verification (INSECURE, for demo only). "
+             "Alternatively, set SEC_VERIFY_SSL=false environment variable.",
+    )
 
     args = parser.parse_args()
 
@@ -781,6 +816,7 @@ def main():
             filing_type=args.filing_type,
             count=args.count,
             max_concurrent=args.max_concurrent,
+            verify_ssl=not args.no_verify_ssl,
         )
     )
 

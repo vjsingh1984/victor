@@ -1,0 +1,12 @@
+victor-ai (1.0.0-1) unstable; urgency=medium
+
+  * Initial release of Victor AI 1.0.0
+  * Production-ready AI coding assistant
+  * 21 LLM provider support
+  * 55+ specialized tools across 5 verticals
+  * SOLID architecture with 98 protocols
+  * Comprehensive security suite (132 tests)
+  * 72.8% faster startup with lazy loading
+  * Full backward compatibility with 0.5.x
+
+ -- Vijaykumar Singh <singhvjd@gmail.com>  Tue, 21 Jan 2025 00:00:00 +0000

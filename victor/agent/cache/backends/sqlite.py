@@ -77,6 +77,7 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, Optional
 
 from victor.agent.cache.backends.protocol import ICacheBackend
+from victor.core.security import safe_pickle_dumps, safe_pickle_loads
 
 
 logger = logging.getLogger(__name__)
@@ -338,8 +339,8 @@ class SQLiteCacheBackend(ICacheBackend):
                 )
                 self._conn.commit()
 
-                # Deserialize value
-                value = pickle.loads(value_blob)
+                # Deserialize value (with HMAC signature verification)
+                value = safe_pickle_loads(value_blob)
                 return value
 
         except sqlite3.Error as e:
@@ -373,8 +374,8 @@ class SQLiteCacheBackend(ICacheBackend):
 
         try:
             with self._lock:
-                # Serialize value
-                value_blob = pickle.dumps(value)
+                # Serialize value (with HMAC signature)
+                value_blob = safe_pickle_dumps(value)
 
                 # Insert or replace (UPSERT)
                 self._cursor.execute(

@@ -14,8 +14,9 @@
 
 """BenchmarkVertical - Domain-specific vertical for AI coding benchmarks.
 
-Follows the same pattern as CodingAssistant, ResearchAssistant, etc.
-Provides tools, stages, and workflows optimized for benchmark evaluation.
+This vertical demonstrates ISP-compliant protocol registration, where only the
+protocols actually implemented by the vertical are registered, rather than
+inheriting from all possible protocol interfaces.
 """
 
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
@@ -31,6 +32,9 @@ from victor.core.verticals.protocols.providers import (
     ToolProvider,
     WorkflowProvider,
 )
+
+# Phase 3: Import framework capabilities
+from victor.framework.capabilities import FileOperationsCapability
 
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import ModeConfigProviderProtocol
@@ -66,6 +70,9 @@ class BenchmarkVertical(VerticalBase):
     description = "AI coding benchmark evaluation and performance testing"
     version = "1.0.0"
 
+    # Phase 3: Framework file operations capability (read, write, edit, grep)
+    _file_ops = FileOperationsCapability()
+
     # Benchmark-specific stages
     STAGE_UNDERSTANDING = "UNDERSTANDING"
     STAGE_ANALYSIS = "ANALYSIS"
@@ -76,31 +83,41 @@ class BenchmarkVertical(VerticalBase):
     def get_tools(cls) -> List[str]:
         """Tools optimized for benchmark task execution.
 
+        Phase 3: Uses framework FileOperationsCapability for common file operations
+        to reduce code duplication and maintain consistency across verticals.
+
         Returns a curated set of tools for:
         - Code reading and understanding
         - Code search and navigation
         - Code modification
         - Test execution and verification
+
+        This method is part of the ToolProvider protocol.
         """
-        return [
-            # Core reading/navigation (always needed)
-            ToolNames.READ,
-            ToolNames.LS,
-            ToolNames.GREP,
-            # Code-specific tools
-            ToolNames.CODE_SEARCH,  # Semantic code search
-            ToolNames.SYMBOL,  # Find symbol definitions
-            ToolNames.REFS,  # Find references
-            # Modification tools
-            ToolNames.WRITE,
-            ToolNames.EDIT,
-            # Execution/verification
-            ToolNames.SHELL,
-            ToolNames.TEST,
-            # Git for patch generation (unified git tool)
-            ToolNames.GIT,
-            ToolNames.DIFF,  # Create patches
-        ]
+        # Start with framework file operations (read, write, edit, grep)
+        tools = cls._file_ops.get_tool_list()
+
+        # Add benchmark-specific tools
+        tools.extend(
+            [
+                # Core reading/navigation (always needed)
+                ToolNames.LS,
+                # Code-specific tools
+                ToolNames.CODE_SEARCH,  # Semantic code search
+                ToolNames.SYMBOL,  # Find symbol definitions
+                ToolNames.REFS,  # Find references
+                # Modification tools
+                ToolNames.EDIT,
+                # Execution/verification
+                ToolNames.SHELL,
+                ToolNames.TEST,
+                # Git for patch generation (unified git tool)
+                ToolNames.GIT,
+                ToolNames.DIFF,  # Create patches
+            ]
+        )
+
+        return tools
 
     @classmethod
     def get_system_prompt(cls) -> str:
@@ -278,12 +295,28 @@ You are being evaluated on:
         - big_code_bench: Large-scale code understanding
         - aider_polyglot: Multi-language code modification
 
+        This method is part of the WorkflowProvider protocol.
+
         Returns:
             BenchmarkWorkflowProvider instance
         """
         from victor.benchmark.workflows import BenchmarkWorkflowProvider
 
         return BenchmarkWorkflowProvider()
+
+    @classmethod
+    def get_workflows(cls) -> Dict[str, Any]:
+        """Get benchmark workflow definitions.
+
+        Returns available workflows from BenchmarkWorkflowProvider.
+
+        This method is part of the WorkflowProvider protocol.
+
+        Returns:
+            Dict mapping workflow names to workflow definitions
+        """
+        provider = cls.get_workflow_provider()
+        return provider.get_workflows() if provider else {}
 
     @classmethod
     def get_mode_config_provider(cls) -> Optional["ModeConfigProviderProtocol"]:
@@ -309,6 +342,8 @@ You are being evaluated on:
         - passk_generation: Multi-attempt code generation with pass@k metrics
         - git_diff_generator: Create git diffs from code changes
 
+        This method is part of the HandlerProvider protocol.
+
         Returns:
             Dict mapping handler name to handler instance
         """
@@ -319,6 +354,19 @@ You are being evaluated on:
         except ImportError:
             # Handlers not yet implemented
             return {}
+
+    # NOTE: The following getters are auto-generated by VerticalExtensionLoaderMeta:
+    # - get_safety_extension()
+    # - get_prompt_contributor()
+    # - get_team_spec_provider()
+    # - get_capability_provider()
+    # - get_enrichment_strategy()
+    # - get_middleware()
+    # - get_rl_config_provider()
+    # - get_rl_hooks()
+    #
+    # get_extensions() is inherited from VerticalBase with full caching support.
+    # To clear all caches, use cls.clear_config_cache().
 
 
 # Register protocols at module level after class definition

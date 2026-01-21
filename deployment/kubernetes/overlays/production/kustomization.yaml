@@ -1,0 +1,40 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: victor-ai-prod
+
+commonLabels:
+  environment: production
+  app: victor-ai
+
+resources:
+- ../../base
+- pvc-cache.yaml
+
+patchesStrategicMerge:
+- deployment-patch.yaml
+- hpa-patch.yaml
+
+configMapGenerator:
+- name: victor-ai-config
+  behavior: merge
+  literals:
+  - VICTOR_PROFILE=production
+  - VICTOR_LOG_LEVEL=INFO
+  - VICTOR_MAX_WORKERS=8
+  - VICTOR_CACHE_SIZE=2000
+  - event-bus-backend=kafka
+  - checkpoint-backend=postgres
+  - cache-backend=redis
+  - enable-metrics=true
+  - enable-tracing=true
+  - enable-rate-limiting=true
+  - rate-limit-requests-per-minute=1000
+
+images:
+- name: victorai/victor
+  newTag: 0.5.1
+
+replicas:
+- name: victor-ai
+  count: 6

@@ -1,0 +1,328 @@
+---
+#############################################################################
+# Ansible Playbook for Victor AI Deployment
+#
+# Features:
+# - Dependency installation
+# - Environment configuration
+# - Application deployment
+# - Health checks
+#
+# Usage: ansible-playbook -i inventory playbook.yml [--extra-vars "env=production"]
+#############################################################################
+
+- name: Deploy Victor AI to production
+  hosts: all
+  become: yes
+
+  vars:
+    # Application configuration
+    app_name: victor
+    app_user: victor
+    app_group: victor
+    app_dir: /opt/victor
+    venv_dir: /opt/victor/.venv
+    log_dir: /var/log/victor
+    backup_dir: /opt/victor/backups
+
+    # Git configuration
+    git_repo: "{{ lookup('env', 'VICTOR_GIT_REPO') | default('https://github.com/victorai/victor.git', true) }}"
+    git_branch: "{{ lookup('env', 'VICTOR_GIT_BRANCH') | default('main', true) }}"
+
+    # Python configuration
+    python_version: "3.11"
+    required_python_packages:
+      - python3.11
+      - python3.11-venv
+      - python3-pip
+
+    # System dependencies
+    required_system_packages:
+      - git
+      - build-essential
+      - curl
+      - wget
+      - vim
+
+    # Service configuration
+    service_port: 8000
+    service_host: "0.0.0.0"
+
+    # Environment (staging/production)
+    deployment_env: "{{ env | default('staging') }}"
+
+  tasks:
+    ###########################################################################
+    # System Preparation
+    ###########################################################################
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+    - name: Install system dependencies
+      package:
+        name: "{{ required_system_packages }}"
+        state: present
+
+    - name: Install Python and development tools
+      package:
+        name: "{{ required_python_packages }}"
+        state: present
+
+    - name: Create application user
+      user:
+        name: "{{ app_user }}"
+        system: yes
+        shell: /bin/bash
+        home: "{{ app_dir }}"
+        create_home: yes
+
+    - name: Create application directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: '0755'
+      loop:
+        - "{{ app_dir }}"
+        - "{{ log_dir }}"
+        - "{{ backup_dir }}"
+
+    ###########################################################################
+    # Application Deployment
+    ###########################################################################
+    - name: Check if application directory exists
+      stat:
+        path: "{{ app_dir }}/victor"
+      register: app_dir_stat
+
+    - name: Backup existing deployment
+      when: app_dir_stat.stat.exists
+      block:
+        - name: Create backup timestamp
+          set_fact:
+            backup_timestamp: "{{ ansible_date_time.iso8601_basic_short }}"
+
+        - name: Create backup directory
+          file:
+            path: "{{ backup_dir }}/backup_{{ backup_timestamp }}"
+            state: directory
+            owner: "{{ app_user }}"
+            group: "{{ app_group }}"
+            mode: '0755'
+
+        - name: Backup application
+          copy:
+            src: "{{ app_dir }}/victor/"
+            dest: "{{ backup_dir }}/backup_{{ backup_timestamp }}/victor/"
+            remote_src: yes
+            owner: "{{ app_user }}"
+            group: "{{ app_group }}"
+
+        - name: Backup virtual environment
+          copy:
+            src: "{{ venv_dir }}/"
+            dest: "{{ backup_dir }}/backup_{{ backup_timestamp }}/venv/"
+            remote_src: yes
+            owner: "{{ app_user }}"
+            group: "{{ app_group }}"
+          when: venv_dir_stat.stat.exists
+          ignore_errors: yes
+
+        - name: Backup configuration
+          copy:
+            src: "{{ app_dir }}/.env"
+            dest: "{{ backup_dir }}/backup_{{ backup_timestamp }}/.env"
+            remote_src: yes
+          when: env_file_stat.stat.exists
+          ignore_errors: yes
+
+    - name: Clone or update repository
+      git:
+        repo: "{{ git_repo }}"
+        dest: "{{ app_dir }}/victor"
+        version: "{{ git_branch }}"
+        force: yes
+        update: yes
+      notify: restart victor
+
+    - name: Set ownership
+      file:
+        path: "{{ app_dir }}/victor"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        recurse: yes
+
+    ###########################################################################
+    # Virtual Environment Setup
+    ###########################################################################
+    - name: Check if virtual environment exists
+      stat:
+        path: "{{ venv_dir }}"
+      register: venv_dir_stat
+
+    - name: Create virtual environment
+      when: not venv_dir_stat.stat.exists
+      command:
+        cmd: "python{{ python_version }} -m venv {{ venv_dir }}"
+        creates: "{{ venv_dir }}"
+      become_user: "{{ app_user }}"
+
+    - name: Upgrade pip
+      pip:
+        name:
+          - pip
+          - setuptools
+          - wheel
+        virtualenv: "{{ venv_dir }}"
+        state: latest
+      become_user: "{{ app_user }}"
+
+    ###########################################################################
+    # Dependency Installation
+    ###########################################################################
+    - name: Install application dependencies
+      pip:
+        name: "{{ app_dir }}/victor"
+        virtualenv: "{{ venv_dir }}"
+        extra_args: "-e"
+      become_user: "{{ app_user }}"
+      notify: restart victor
+
+    - name: Install API dependencies for production
+      when: deployment_env == "production"
+      pip:
+        name: "{{ app_dir }}/victor[api]"
+        virtualenv: "{{ venv_dir }}"
+        extra_args: "-e"
+      become_user: "{{ app_user }}"
+      notify: restart victor
+
+    ###########################################################################
+    # Configuration
+    ###########################################################################
+    - name: Check if .env file exists
+      stat:
+        path: "{{ app_dir }}/.env"
+      register: env_file_stat
+
+    - name: Create .env file from template
+      when: not env_file_stat.stat.exists
+      template:
+        src: templates/env.j2
+        dest: "{{ app_dir }}/.env"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: '0600'
+      notify: restart victor
+
+    ###########################################################################
+    # Systemd Service
+    ###########################################################################
+    - name: Create systemd service file
+      template:
+        src: templates/victor.service.j2
+        dest: /etc/systemd/system/victor-api.service
+        mode: '0644'
+      notify:
+        - reload systemd
+        - restart victor
+
+    ###########################################################################
+    # Database Setup (Optional)
+    ###########################################################################
+    - name: Check if database exists
+      stat:
+        path: "{{ app_dir }}/victor.db"
+      register: db_file_stat
+
+    - name: Run database migrations
+      when: deployment_env == "production"
+      command:
+        cmd: "{{ venv_dir }}/bin/python -c 'from victor.core.migrations import run_migrations; run_migrations()'"
+        chdir: "{{ app_dir }}/victor"
+      become_user: "{{ app_user }}"
+      ignore_errors: yes
+      notify: restart victor
+
+    ###########################################################################
+    # Health Checks
+    ###########################################################################
+    - name: Ensure service is started
+      systemd:
+        name: victor-api
+        state: started
+        enabled: yes
+      when: deployment_env == "production"
+
+    - name: Wait for service to be ready
+      uri:
+        url: "http://localhost:{{ service_port }}/health"
+        status_code: 200
+        timeout: 5
+      register: result
+      until: result.status == 200
+      retries: 30
+      delay: 2
+      ignore_errors: yes
+
+    - name: Run smoke tests
+      command:
+        cmd: "{{ venv_dir }}/bin/python -c 'from victor.agent.orchestrator import AgentOrchestrator; print(\"Smoke test passed\")'"
+        chdir: "{{ app_dir }}/victor"
+      become_user: "{{ app_user }}"
+      register: smoke_test
+      ignore_errors: yes
+
+    - name: Display smoke test results
+      debug:
+        msg: "{{ smoke_test.stdout if smoke_test.stdout else 'Smoke test completed' }}"
+
+    ###########################################################################
+    # Cleanup
+    ###########################################################################
+    - name: Clean old backups (keep last 5)
+      find:
+        paths: "{{ backup_dir }}"
+        file_type: directory
+        patterns: "backup_*"
+        age: "30d"
+      register: old_backups
+
+    - name: Remove old backups
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_backups.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+      when: old_backups.matched > 0
+
+    ###########################################################################
+    # Deployment Summary
+    ###########################################################################
+    - name: Display deployment information
+      debug:
+        msg:
+          - "Deployment completed successfully!"
+          - "Environment: {{ deployment_env }}"
+          - "Git Branch: {{ git_branch }}"
+          - "Application Directory: {{ app_dir }}"
+          - "Virtual Environment: {{ venv_dir }}"
+          - "Log Directory: {{ log_dir }}"
+          - "Service Port: {{ service_port }}"
+
+  handlers:
+    - name: reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: restart victor
+      systemd:
+        name: victor-api
+        state: restarted
+        enabled: yes

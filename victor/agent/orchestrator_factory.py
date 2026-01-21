@@ -2355,7 +2355,7 @@ class OrchestratorFactory(ModeAwareMixin):
         from victor.providers.registry import ProviderRegistry
 
         # Get provider class
-        provider_class = ProviderRegistry.get_provider_class(provider_name)
+        provider_class = ProviderRegistry.get(provider_name)
 
         # Create instance with base URL override
         # This is a simplified approach - full implementation would

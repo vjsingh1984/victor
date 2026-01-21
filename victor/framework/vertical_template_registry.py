@@ -189,11 +189,17 @@ class VerticalTemplateRegistry:
             self._templates.clear()
             logger.info("Cleared all vertical templates")
 
-    def load_from_yaml(self, path: str | Path) -> Optional[VerticalTemplate]:
+    def load_from_yaml(
+        self,
+        path: str | Path,
+        *,
+        resolve_inheritance: bool = True,
+    ) -> Optional[VerticalTemplate]:
         """Load a template from a YAML file.
 
         Args:
             path: Path to YAML file
+            resolve_inheritance: If True, resolve parent template inheritance
 
         Returns:
             Loaded VerticalTemplate or None if loading failed
@@ -214,6 +220,12 @@ class VerticalTemplateRegistry:
 
             template = VerticalTemplate.from_dict(data)
 
+            # Resolve template inheritance if requested
+            if resolve_inheritance and hasattr(template, 'parent_template') and template.parent_template:
+                template = self._resolve_inheritance(template)
+                if template is None:
+                    return None
+
             # Validate loaded template
             errors = template.validate()
             if errors:
@@ -227,6 +239,42 @@ class VerticalTemplateRegistry:
         except Exception as e:
             logger.error(f"Error loading template from {path}: {e}")
             return None
+
+    def _resolve_inheritance(
+        self,
+        template: VerticalTemplate,
+    ) -> Optional[VerticalTemplate]:
+        """Resolve template inheritance by merging with parent template.
+
+        Args:
+            template: Template with parent_template set
+
+        Returns:
+            Merged template or None if parent not found
+        """
+        if not template.parent_template:
+            return template
+
+        # Get parent template
+        parent = self.get(template.parent_template)
+        if parent is None:
+            logger.error(
+                f"Parent template '{template.parent_template}' not found for '{template.metadata.name}'"
+            )
+            return None
+
+        # Recursively resolve parent inheritance first
+        resolved_parent = self._resolve_inheritance(parent) if parent.parent_template else parent
+        if resolved_parent is None:
+            return None
+
+        # Merge child with parent
+        merged = template.merge_with_parent(resolved_parent)
+        logger.info(
+            f"Merged template '{template.metadata.name}' with parent '{template.parent_template}'"
+        )
+
+        return merged
 
     def load_and_register(
         self,

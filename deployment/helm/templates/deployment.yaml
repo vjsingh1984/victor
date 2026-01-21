@@ -1,0 +1,125 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "victor-ai.fullname" . }}
+  labels:
+    {{- include "victor-ai.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "victor-ai.selectorLabels" . | nindent 6 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        prometheus.io/scrape: "{{ .Values.monitoring.enabled }}"
+        prometheus.io/port: "{{ .Values.service.metricsPort }}"
+        prometheus.io/path: "/metrics"
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "victor-ai.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "victor-ai.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: {{ .Chart.Name }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        - name: metrics
+          containerPort: {{ .Values.service.metricsPort }}
+          protocol: TCP
+        env:
+        - name: VICTOR_PROFILE
+          value: {{ .Values.config.profile | quote }}
+        - name: VICTOR_LOG_LEVEL
+          value: {{ .Values.config.logLevel | quote }}
+        - name: VICTOR_MAX_WORKERS
+          value: {{ .Values.config.maxWorkers | quote }}
+        - name: VICTOR_CACHE_SIZE
+          value: {{ .Values.config.cacheSize | quote }}
+        - name: VICTOR_TOOL_SELECTION_STRATEGY
+          value: {{ .Values.config.toolSelectionStrategy | quote }}
+        - name: VICTOR_ENABLE_TELEMETRY
+          value: {{ .Values.config.enableTelemetry | quote }}
+        - name: VICTOR_ENABLE_METRICS
+          value: {{ .Values.config.enableMetrics | quote }}
+        - name: VICTOR_ENABLE_TRACING
+          value: {{ .Values.config.enableTracing | quote }}
+        - name: VICTOR_ENABLE_RATE_LIMITING
+          value: {{ .Values.config.enableRateLimiting | quote }}
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.secrets.existingSecret | default (include "victor-ai.fullname" .) }}
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.secrets.existingSecret | default (include "victor-ai.fullname" .) }}
+              key: redis-url
+        {{- if .Values.secrets.apiKeys.anthropic }}
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.secrets.existingSecret | default (include "victor-ai.fullname" .) }}
+              key: anthropic-api-key
+        {{- end }}
+        {{- if .Values.secrets.apiKeys.openai }}
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.secrets.existingSecret | default (include "victor-ai.fullname" .) }}
+              key: openai-api-key
+        {{- end }}
+        envFrom:
+        - configMapRef:
+            name: {{ include "victor-ai.fullname" . }}-config
+        livenessProbe:
+          {{- toYaml .Values.livenessProbe | nindent 10 }}
+        readinessProbe:
+          {{- toYaml .Values.readinessProbe | nindent 10 }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        volumeMounts:
+        {{- toYaml .Values.volumeMounts | nindent 8 }}
+      volumes:
+      {{- toYaml .Values.volumes | nindent 6 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}

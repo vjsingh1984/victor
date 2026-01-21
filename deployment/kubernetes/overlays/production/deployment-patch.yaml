@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: victor-ai
+spec:
+  replicas: 6
+  template:
+    spec:
+      containers:
+      - name: victor-ai
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 1Gi
+          limits:
+            cpu: 4000m
+            memory: 4Gi
+        env:
+        - name: VICTOR_PROFILE
+          value: "production"
+        - name: VICTOR_LOG_LEVEL
+          value: "INFO"
+        - name: VICTOR_MAX_WORKERS
+          value: "8"
+
+        # =========================================================================
+        # Advanced Cache Configuration (Track 5.3)
+        # =========================================================================
+        # Master switch for caching
+        - name: VICTOR_TOOL_SELECTION_CACHE_ENABLED
+          value: "true"
+
+        # Persistent cache (SQLite) - enables warm cache on restart
+        - name: VICTOR_PERSISTENT_CACHE_ENABLED
+          value: "true"
+        - name: VICTOR_PERSISTENT_CACHE_PATH
+          value: "/app/.victor/cache/tool_selection_cache.db"
+        - name: VICTOR_PERSISTENT_CACHE_AUTO_COMPACT
+          value: "true"
+
+        # Adaptive TTL - dynamically adjusts TTL based on access patterns
+        - name: VICTOR_ADAPTIVE_TTL_ENABLED
+          value: "true"
+        - name: VICTOR_ADAPTIVE_TTL_MIN
+          value: "60"  # 1 minute minimum
+        - name: VICTOR_ADAPTIVE_TTL_MAX
+          value: "7200"  # 2 hours maximum
+        - name: VICTOR_ADAPTIVE_TTL_INITIAL
+          value: "3600"  # 1 hour initial TTL
+        - name: VICTOR_ADAPTIVE_TTL_ADJUSTMENT_THRESHOLD
+          value: "5"  # Adjust after 5 accesses
+
+        # Multi-level cache (L1/L2/L3) - optional, can enable later
+        - name: VICTOR_MULTI_LEVEL_CACHE_ENABLED
+          value: "false"
+        - name: VICTOR_MULTI_LEVEL_CACHE_L1_SIZE
+          value: "100"
+        - name: VICTOR_MULTI_LEVEL_CACHE_L2_SIZE
+          value: "1000"
+        - name: VICTOR_MULTI_LEVEL_CACHE_L3_SIZE
+          value: "10000"
+
+        # Predictive cache warming - optional, can enable later
+        - name: VICTOR_PREDICTIVE_WARMING_ENABLED
+          value: "false"
+        - name: VICTOR_PREDICTIVE_WARMING_MAX_PATTERNS
+          value: "100"
+        - name: VICTOR_PREDICTIVE_WARMING_TOP_K
+          value: "5"
+
+        # Basic cache settings
+        - name: VICTOR_CACHE_SIZE
+          value: "2000"  # Increased for production
+        - name: VICTOR_TOOL_SELECTION_CACHE_QUERY_TTL
+          value: "3600"  # 1 hour
+        - name: VICTOR_TOOL_SELECTION_CACHE_CONTEXT_TTL
+          value: "300"  # 5 minutes
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: victor-cache
+          mountPath: /app/.victor/cache
+      volumes:
+      - name: tmp
+        emptyDir:
+          sizeLimit: 2Gi
+      - name: victor-cache
+        persistentVolumeClaim:
+          claimName: victor-cache-pvc
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - victor-ai
+            topologyKey: "topology.kubernetes.io/zone"
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: nodepool
+                operator: In
+                values:
+                - production
+            - matchExpressions:
+              - key: workload-type
+                operator: In
+                values:
+                - cpu-optimized

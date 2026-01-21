@@ -54,7 +54,6 @@ from victor.core.verticals.protocols.providers import (
     TieredToolConfigProvider,
     ToolDependencyProvider,
     ToolProvider,
-    WorkflowProvider,
 )
 
 # Phase 3: Import framework capabilities
@@ -94,11 +93,13 @@ class CodingAssistant(VerticalBase):
         - MiddlewareProvider: Provides code correction and git safety middleware
         - ToolDependencyProvider: Provides tool dependency patterns
         - HandlerProvider: Provides workflow compute handlers
-        - WorkflowProvider: Provides YAML-based workflows
         - CapabilityProvider: Provides coding capability configurations
         - ModeConfigProvider: Provides mode configurations (build, plan, explore)
         - ServiceProvider: Provides coding-specific DI services
         - TieredToolConfigProvider: Provides tiered tool configuration
+
+        Note: WorkflowProvider is NOT registered as this vertical uses auto-generated
+        workflow provider getter without implementing the required get_workflows() method.
 
     Example:
         from victor.coding import CodingAssistant
@@ -579,7 +580,7 @@ CodingAssistant.register_protocol(PromptContributorProvider)
 CodingAssistant.register_protocol(MiddlewareProvider)
 CodingAssistant.register_protocol(ToolDependencyProvider)
 CodingAssistant.register_protocol(HandlerProvider)
-CodingAssistant.register_protocol(WorkflowProvider)
+# Note: WorkflowProvider NOT registered - missing get_workflows() method
 CodingAssistant.register_protocol(CapabilityProvider)
 CodingAssistant.register_protocol(ModeConfigProvider)
 CodingAssistant.register_protocol(ServiceProvider)

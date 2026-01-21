@@ -191,9 +191,200 @@ Vertical templates provide a 70% reduction in code when creating new verticals b
 
 ---
 
+#### 5. Security Vertical Template (Production)
+
+**File**: `security_vertical_template.yaml`
+
+**Description**: Security analysis, vulnerability scanning, and threat detection. Competitive with GitHub Advanced Security, Snyk, Checkmarx, Veracode.
+
+**Key Features**:
+- Static code analysis (OWASP Top 10, CWE Top 25)
+- Dependency vulnerability scanning (CVE checking)
+- Secret and credential detection
+- Security compliance checking (OWASP, SOC2, PCI-DSS, HIPAA)
+- Threat modeling and attack surface analysis
+- Security testing recommendations
+- Remediation guidance with code examples
+
+**Tools Included**:
+- File operations: read, write, edit, grep, ls, overview
+- Code search: code_search, plan
+- Shell: shell for security tools (bandit, safety, semgrep)
+- Web: web_search, web_fetch for threat intelligence
+- Git: git for security history
+
+**Stages**: INITIAL → DISCOVERY → SCANNING → THREAT_MODELING → ANALYSIS → ASSESSMENT → REPORTING → COMPLETION
+
+**Workflows**:
+- comprehensive_security_scan: Full security scan with vulnerabilities, secrets, and compliance
+- vulnerability_assessment: Focused vulnerability assessment with remediation
+- secret_scan: Scan for exposed secrets and credentials
+- dependency_audit: Dependency vulnerability scanning
+- compliance_audit: Security compliance audit against standards
+- threat_modeling: Threat model and attack surface analysis
+
+**Teams**:
+- security_review_team: Parallel security review (vulnerability, secrets, dependencies, compliance, threat)
+- incident_response_team: Rapid response pipeline for security incidents
+- security_architecture_review: Consensus-based architecture review
+
+**Use Cases**:
+- Security audits and assessments
+- Vulnerability scanning and detection
+- Secret scanning and credential management
+- Compliance checking (OWASP, SOC2, PCI-DSS)
+- Threat modeling and risk assessment
+- Security code reviews
+- Dependency security
+
+**Best For**: Security teams, DevSecOps, compliance officers, security researchers
+
+---
+
+#### 6. Documentation Vertical Template (Production)
+
+**File**: `documentation_vertical_template.yaml`
+
+**Description**: Documentation generation and maintenance. Competitive with Mintlify, Docusaurus AI, GitBook AI, ReadMe AI.
+
+**Key Features**:
+- API documentation from code annotations
+- User guides and tutorials
+- Technical architecture documentation
+- Developer documentation (setup, contributing, examples)
+- Release notes and changelogs
+- Code examples and usage samples
+- Diagram and visualization suggestions
+
+**Tools Included**:
+- File operations: read, write, edit, grep, ls, overview
+- Code search: code_search, semantic_code_search, plan
+- Web: web_search, web_fetch for best practices
+- Git: git for documentation version control
+
+**Stages**: INITIAL → DISCOVERY → ANALYSIS → PLANNING → WRITING → REFINEMENT → REVIEW → COMPLETION
+
+**Workflows**:
+- api_documentation_generation: Generate API documentation from code
+- user_guide_creation: Create comprehensive user guides
+- architecture_documentation: Document system architecture and design
+- tutorial_creation: Create hands-on tutorials with examples
+- changelog_generation: Generate changelog from version control
+- documentation_audit: Audit documentation for completeness
+
+**Teams**:
+- documentation_team: Pipeline for comprehensive documentation creation
+- api_doc_team: Parallel API documentation team (endpoints, types, examples, errors)
+
+**Use Cases**:
+- API documentation
+- User guides and tutorials
+- Architecture documentation
+- Developer documentation
+- Release notes and changelogs
+- Code examples and samples
+
+**Best For**: Technical writers, documentation teams, developer advocates
+
+---
+
+#### 7. Testing Vertical Template (Production)
+
+**File**: `testing_vertical_template.yaml`
+
+**Description**: Test generation, maintenance, and quality assurance. Competitive with GitHub Copilot for Testing, TestGen, Codium.
+
+**Key Features**:
+- Unit test generation with comprehensive coverage
+- Integration test design
+- End-to-end test scenarios
+- Test-driven development (TDD) support
+- Mock and stub generation
+- Property-based testing
+- Flaky test detection and debugging
+- Test coverage analysis and improvement
+
+**Tools Included**:
+- File operations: read, write, edit, grep, ls, overview
+- Code search: code_search, semantic_code_search, plan
+- Test execution: shell, test
+- Web: web_search, web_fetch for testing best practices
+- Git: git for test tracking
+
+**Stages**: INITIAL → DISCOVERY → ANALYSIS → PLANNING → GENERATION → EXECUTION → REFINEMENT → COMPLETION
+
+**Workflows**:
+- comprehensive_test_generation: Generate test suite with high coverage
+- coverage_improvement: Analyze coverage and generate tests for gaps
+- flaky_test_fix: Identify and fix flaky tests
+- test_refactoring: Refactor tests for maintainability
+- tdd_workflow: Test-driven development workflow
+
+**Teams**:
+- test_generation_team: Parallel test generation (unit, integration, edge cases, coverage)
+- test_refactoring_team: Sequential test refactoring (audit, refactor, fix flaky)
+
+**Use Cases**:
+- Unit test generation
+- Integration test design
+- End-to-end testing
+- Test coverage improvement
+- Flaky test debugging
+- Test refactoring and maintenance
+
+**Best For**: QA teams, developers, test engineers
+
+---
+
+#### 8. API Integration Vertical Template (Production)
+
+**File**: `api_integration_vertical_template.yaml`
+
+**Description**: API integration, webhook handling, and service communication. Competitive with Postman AI, Insomnia AI, Zapier.
+
+**Key Features**:
+- REST API integration (GET, POST, PUT, DELETE, PATCH)
+- GraphQL query and mutation design
+- Webhook handling and event processing
+- API client library generation
+- Authentication handling (OAuth2, JWT, API keys, Basic Auth)
+- Rate limiting and retry logic
+- Error handling and recovery
+- API testing and debugging
+
+**Tools Included**:
+- File operations: read, write, edit, grep, ls, overview
+- Code search: code_search, semantic_code_search, plan
+- Shell: shell for API testing
+- Web: web_search, web_fetch for API calls
+- Git: git for version control
+
+**Stages**: INITIAL → DISCOVERY → ANALYSIS → DESIGN → IMPLEMENTATION → TESTING → REFINEMENT → COMPLETION
+
+**Workflows**:
+- rest_api_integration: Implement REST API client integration
+- webhook_implementation: Implement webhook handler
+- graphql_integration: Implement GraphQL client integration
+- api_migration: Migrate to new API version
+
+**Teams**:
+- api_integration_team: Pipeline for comprehensive API integration (research, develop, test, document)
+
+**Use Cases**:
+- REST API integration
+- GraphQL integration
+- Webhook handling
+- Third-party service integration
+- API client generation
+- Microservices communication
+
+**Best For**: Backend developers, integration engineers, DevOps teams
+
+---
+
 ### Example Templates
 
-#### 5. Security Vertical Template (Example)
+#### 9. Security Vertical Template (Example - Legacy)
 
 **File**: `example_security_vertical.yaml`
 
@@ -768,6 +959,35 @@ For template-related questions:
 
 ## Changelog
 
+### Version 1.1.0 (2025-01-20)
+
+**Added**:
+- Security vertical production template (security_vertical_template.yaml)
+- Documentation vertical production template (documentation_vertical_template.yaml)
+- Testing vertical production template (testing_vertical_template.yaml)
+- API Integration vertical production template (api_integration_vertical_template.yaml)
+- Updated template index with new templates
+- Enhanced template documentation
+
+**Templates**: 11 total (8 production, 3 examples)
+
+**Production Templates**: 8
+- Coding
+- DevOps
+- RAG
+- Data Analysis
+- Security (NEW)
+- Documentation (NEW)
+- Testing (NEW)
+- API Integration (NEW)
+
+**Example Templates**: 3
+- Security (example - legacy)
+- Documentation (example)
+- Base Template
+
+---
+
 ### Version 1.0.0 (2025-01-18)
 
 **Added**:
@@ -781,7 +1001,7 @@ For template-related questions:
 
 ---
 
-**Last Updated**: 2025-01-18
-**Template Count**: 7
-**Production Templates**: 4
+**Last Updated**: 2025-01-20
+**Template Count**: 11
+**Production Templates**: 8
 **Example Templates**: 3

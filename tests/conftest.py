@@ -603,3 +603,489 @@ def temp_workflow_context():
         "analysis": None,
         "output": None,
     }
+
+
+# ============ Provider Fixtures ============
+
+
+@pytest.fixture
+def mock_completion_response():
+    """Mock CompletionResponse for testing.
+
+    Returns a factory function that creates mock responses.
+    """
+    from tests.utils.test_helpers import create_test_completion_response
+
+    return create_test_completion_response
+
+
+@pytest.fixture
+def mock_provider():
+    """Mock LLM provider for testing.
+
+    Creates a provider with pre-configured async methods.
+    """
+    from tests.utils.test_helpers import create_mock_provider
+
+    return create_mock_provider()
+
+
+@pytest.fixture
+def mock_streaming_provider():
+    """Mock streaming provider for testing.
+
+    Creates a provider that supports streaming responses.
+    """
+    from tests.utils.test_helpers import create_mock_provider
+
+    return create_mock_provider(supports_streaming=True)
+
+
+@pytest.fixture
+def mock_tool_provider():
+    """Mock tool-calling provider for testing.
+
+    Creates a provider that supports tool calling.
+    """
+    from tests.utils.test_helpers import create_mock_provider
+
+    return create_mock_provider(supports_tools=True)
+
+
+@pytest.fixture
+def mock_messages():
+    """Mock messages for testing.
+
+    Creates a standard set of test messages.
+    """
+    from tests.utils.test_helpers import create_test_messages
+
+    return create_test_messages()
+
+
+@pytest.fixture
+def mock_conversation():
+    """Mock conversation history for testing.
+
+    Creates a multi-turn conversation.
+    """
+    from tests.utils.test_helpers import create_test_conversation
+
+    return create_test_conversation()
+
+
+# ============ Orchestrator Fixtures ============
+
+
+@pytest.fixture
+def mock_orchestrator():
+    """Mock orchestrator for testing.
+
+    Creates a mock orchestrator with common methods stubbed.
+    """
+    from tests.utils.test_helpers import create_mock_orchestrator
+
+    return create_mock_orchestrator()
+
+
+@pytest.fixture
+def mock_orchestrator_with_provider(mock_provider):
+    """Mock orchestrator with a specific provider.
+
+    Creates an orchestrator using the given mock provider.
+    """
+    from tests.utils.test_helpers import create_mock_orchestrator
+
+    return create_mock_orchestrator(provider=mock_provider)
+
+
+# ============ Tool Registry Fixtures ============
+
+
+@pytest.fixture
+def mock_tool_registry():
+    """Mock tool registry for testing.
+
+    Creates a registry with common methods stubbed.
+    """
+    from tests.utils.test_helpers import create_mock_tool_registry
+
+    return create_mock_tool_registry()
+
+
+@pytest.fixture
+def mock_tool_registry_with_tools():
+    """Mock tool registry with pre-configured tools.
+
+    Creates a registry with a set of test tools.
+    """
+    from tests.utils.test_helpers import create_mock_tool_registry
+
+    tools = ["read", "write", "grep", "bash"]
+    return create_mock_tool_registry(tools=tools)
+
+
+# ============ Event Bus Fixtures ============
+
+
+@pytest.fixture
+def mock_event_bus():
+    """Mock event bus for testing.
+
+    Creates an event bus with async methods stubbed.
+    """
+    from tests.utils.test_helpers import create_mock_event_bus
+
+    return create_mock_event_bus()
+
+
+# ============ Settings Fixtures ============
+
+
+@pytest.fixture
+def mock_settings():
+    """Mock settings object for testing.
+
+    Creates a settings object with common configuration.
+    """
+    from tests.utils.test_helpers import create_test_settings
+
+    return create_test_settings()
+
+
+# ============ Tool Definition Fixtures ============
+
+
+@pytest.fixture
+def mock_tool_definition():
+    """Mock tool definition for testing.
+
+    Creates a standard tool definition structure.
+    """
+    from tests.utils.test_helpers import create_test_tool_definition
+
+    return create_test_tool_definition()
+
+
+@pytest.fixture
+def mock_tool_definitions():
+    """List of mock tool definitions for testing.
+
+    Creates multiple tool definitions.
+    """
+    from tests.utils.test_helpers import create_test_tool_definition
+
+    return [
+        create_test_tool_definition(name="read", description="Read a file"),
+        create_test_tool_definition(name="write", description="Write a file"),
+        create_test_tool_definition(name="grep", description="Search for text"),
+    ]
+
+
+# ============ Test Data Fixtures ============
+
+
+@pytest.fixture
+def sample_codebase_path(tmp_path):
+    """Create a sample codebase structure for testing.
+
+    Creates a temporary directory with common project files.
+    """
+    import os
+
+    # Create directory structure
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "docs").mkdir()
+
+    # Create sample files
+    (tmp_path / "README.md").write_text("# Test Project\n\nThis is a test project.")
+    (tmp_path / "pyproject.toml").write_text("[project]\nname = 'test'")
+    (tmp_path / ".gitignore").write_text("*.pyc\n__pycache__/")
+
+    # Create Python source file
+    (tmp_path / "src" / "main.py").write_text(
+        """
+def hello():
+    print("Hello, World!")
+
+if __name__ == "__main__":
+    hello()
+"""
+    )
+
+    # Create test file
+    (tmp_path / "tests" / "test_main.py").write_text(
+        """
+def test_hello():
+    assert True
+"""
+    )
+
+    return str(tmp_path)
+
+
+@pytest.fixture
+def sample_python_file(tmp_path):
+    """Create a sample Python file for testing.
+
+    Creates a temporary Python file with sample code.
+    """
+    python_file = tmp_path / "sample.py"
+    python_file.write_text(
+        '''
+"""Sample Python module for testing."""
+
+from typing import List
+
+
+class SampleClass:
+    """A sample class for testing."""
+
+    def __init__(self, name: str):
+        """Initialize the sample class."""
+        self.name = name
+
+    def greet(self) -> str:
+        """Return a greeting message."""
+        return f"Hello, {self.name}!"
+
+    def process_items(self, items: List[str]) -> List[str]:
+        """Process a list of items."""
+        return [item.upper() for item in items]
+
+
+def sample_function(x: int, y: int) -> int:
+    """Add two numbers together."""
+    return x + y
+
+
+if __name__ == "__main__":
+    cls = SampleClass("World")
+    print(cls.greet())
+    print(sample_function(1, 2))
+'''
+    )
+    return str(python_file)
+
+
+# ============ Network Mocking Fixtures ============
+
+
+@pytest.fixture
+def mock_http_client():
+    """Mock HTTP client for testing.
+
+    Mocks httpx.Client to prevent actual network calls.
+    """
+    from unittest.mock import patch, MagicMock
+
+    with patch("httpx.AsyncClient") as mock_client:
+        client = MagicMock()
+        mock_client.return_value = client
+        yield client
+
+
+@pytest.fixture
+def mock_network(request):
+    """Mock network access for testing.
+
+    Automatically applies to tests marked with 'requires_network'.
+    """
+    import httpx
+    from unittest.mock import patch, AsyncMock
+
+    # Only apply if test has the marker
+    if "requires_network" in request.keywords:
+        with patch("httpx.AsyncClient") as mock_client:
+            client = AsyncMock()
+            mock_client.return_value = client
+            yield mock_client
+    else:
+        yield None
+
+
+# ============ Performance Testing Fixtures ============
+
+
+@pytest.fixture
+def performance_threshold():
+    """Performance threshold for benchmark tests.
+
+    Returns default threshold in seconds.
+    """
+    return 1.0  # 1 second default threshold
+
+
+@pytest.fixture
+def measure_time():
+    """Context manager to measure execution time.
+
+    Usage:
+        with measure_time() as timer:
+            # do work
+        elapsed = timer.elapsed
+    """
+    import time
+
+    class TimeTimer:
+        def __init__(self):
+            self.start_time = None
+            self.end_time = None
+            self.elapsed = None
+
+        def __enter__(self):
+            self.start_time = time.time()
+            return self
+
+        def __exit__(self, *args):
+            self.end_time = time.time()
+            self.elapsed = self.end_time - self.start_time
+
+    return TimeTimer
+
+
+# ============ Database Fixtures ============
+
+
+@pytest.fixture
+def mock_database():
+    """Mock database connection for testing.
+
+    Creates a mock database without requiring actual DB.
+    """
+    from unittest.mock import AsyncMock, MagicMock
+
+    db = MagicMock()
+    db.connect = AsyncMock()
+    db.disconnect = AsyncMock()
+    db.execute = AsyncMock(return_value=[])
+    db.fetch_one = AsyncMock(return_value=None)
+    db.fetch_all = AsyncMock(return_value=[])
+    db.commit = AsyncMock()
+    db.rollback = AsyncMock()
+    return db
+
+
+@pytest.fixture
+def mock_cache():
+    """Mock cache for testing.
+
+    Creates an in-memory cache for testing.
+    """
+    from unittest.mock import AsyncMock, MagicMock
+
+    cache = MagicMock()
+    cache._data = {}
+
+    def get_mock(key):
+        return cache._data.get(key)
+
+    def set_mock(key, value):
+        cache._data[key] = value
+
+    cache.get = MagicMock(side_effect=get_mock)
+    cache.set = MagicMock(side_effect=set_mock)
+    cache.delete = AsyncMock()
+    cache.clear = MagicMock(side_effect=lambda: cache._data.clear())
+    cache.exists = MagicMock(side_effect=lambda k: k in cache._data)
+
+    return cache
+
+
+# ============ Assertion Helper Fixtures ============
+
+
+@pytest.fixture
+def assert_valid_completion():
+    """Fixture that provides completion validation function."""
+    from tests.utils.test_helpers import assert_completion_valid
+
+    return assert_completion_valid
+
+
+@pytest.fixture
+def assert_provider_called_with():
+    """Fixture that provides provider call assertion function."""
+    from tests.utils.test_helpers import assert_provider_called
+
+    return assert_provider_called_with
+
+
+# ============ Integration Test Fixtures ============
+
+
+@pytest.fixture
+def integration_test_config():
+    """Configuration for integration tests.
+
+    Provides common settings for integration tests.
+    """
+    return {
+        "timeout": 30,
+        "retry_attempts": 3,
+        "retry_delay": 1.0,
+        "cleanup": True,
+        "verbose": True,
+    }
+
+
+@pytest.fixture
+def test_environment_setup(tmp_path):
+    """Set up a complete test environment.
+
+    Creates a temporary directory with configuration, source code,
+    and test files for integration testing.
+    """
+    import os
+
+    # Create project structure
+    project_dir = tmp_path / "test_project"
+    project_dir.mkdir()
+
+    # Create .victor directory
+    (project_dir / ".victor").mkdir()
+
+    # Create config file
+    config_content = """
+provider: anthropic
+model: claude-sonnet-4-5
+temperature: 0.7
+max_tokens: 4096
+"""
+    (project_dir / ".victor" / "config.yaml").write_text(config_content)
+
+    # Create source directory
+    src_dir = project_dir / "src"
+    src_dir.mkdir()
+
+    # Create sample source file
+    (src_dir / "main.py").write_text(
+        """
+def main():
+    print("Hello from test project!")
+
+if __name__ == "__main__":
+    main()
+"""
+    )
+
+    # Create tests directory
+    tests_dir = project_dir / "tests"
+    tests_dir.mkdir()
+
+    (tests_dir / "test_main.py").write_text(
+        """
+def test_main():
+    assert True
+"""
+    )
+
+    # Change to project directory
+    original_cwd = os.getcwd()
+    os.chdir(str(project_dir))
+
+    yield str(project_dir)
+
+    # Cleanup: restore original directory
+    os.chdir(original_cwd)

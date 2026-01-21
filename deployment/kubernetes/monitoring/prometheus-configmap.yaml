@@ -1,0 +1,197 @@
+# Prometheus Configuration ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: victor-monitoring
+  labels:
+    app.kubernetes.io/name: victor
+    app.kubernetes.io/component: prometheus
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: 'victor-production'
+        replica: '1'
+
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets:
+                - alertmanager:9093
+
+    rule_files:
+      - 'alerting_rules.yml'
+      - 'recording_rules.yml'
+      - 'performance_alerts.yml'
+
+    scrape_configs:
+      # Victor AI metrics endpoint
+      - job_name: 'victor'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - victor-production
+                - victor-staging
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name
+
+      # Kubernetes API Server
+      - job_name: 'kubernetes-apiservers'
+        kubernetes_sd_configs:
+          - role: endpoints
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: default;kubernetes;https
+
+      # Kubernetes Nodes
+      - job_name: 'kubernetes-nodes'
+        kubernetes_sd_configs:
+          - role: node
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+
+      # Prometheus self-monitoring
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+
+      # AlertManager
+      - job_name: 'alertmanager'
+        static_configs:
+          - targets: ['alertmanager:9093']
+
+      # OpenTelemetry Collector
+      - job_name: 'otel-collector'
+        static_configs:
+          - targets: ['otel-collector:8888']
+
+    storage:
+      tsdb:
+        path: /prometheus/data
+        retention.time: 30d
+        retention.size: 50GB
+
+  alerting_rules.yml: |
+    groups:
+      - name: victor_alerts
+        interval: 30s
+        rules:
+          - alert: HighErrorRate
+            expr: rate(victor_errors_total[5m]) > 0.05
+            for: 5m
+            labels:
+              severity: warning
+              component: core
+            annotations:
+              summary: "High error rate detected"
+              description: "Error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+
+          - alert: CriticalErrorRate
+            expr: rate(victor_errors_total[5m]) > 0.15
+            for: 2m
+            labels:
+              severity: critical
+              component: core
+            annotations:
+              summary: "Critical error rate detected"
+              description: "Error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+
+          - alert: HighLatency
+            expr: |
+              histogram_quantile(0.95,
+                sum(rate(victor_tool_duration_ms_bucket[5m])) by (le)
+              ) > 1000
+            for: 10m
+            labels:
+              severity: warning
+              component: tool_executor
+            annotations:
+              summary: "High tool execution latency"
+              description: "P95 tool latency is {{ $value | humanize }}ms"
+
+          - alert: CriticalMemoryUsage
+            expr: |
+              process_resident_memory_bytes{job="victor"} / 1024 / 1024 > 4096
+            for: 5m
+            labels:
+              severity: critical
+              component: system
+            annotations:
+              summary: "Critical memory usage"
+              description: "Memory usage is {{ $value | humanize }}MB"
+
+          - alert: ProviderFailure
+            expr: rate(victor_provider_errors_total[5m]) > 0.1
+            for: 5m
+            labels:
+              severity: warning
+              component: provider
+            annotations:
+              summary: "High provider failure rate"
+              description: "Provider {{ $labels.provider }} failure rate is {{ $value | humanizePercentage }}"
+
+  recording_rules.yml: |
+    groups:
+      - name: victor_metrics
+        interval: 30s
+        rules:
+          - record: victor_tool_calls_rate
+            expr: rate(victor_tool_calls_total[5m])
+
+          - record: victor_tool_duration_p95
+            expr: |
+              histogram_quantile(0.95,
+                sum(rate(victor_tool_duration_ms_bucket[5m])) by (le, tool)
+              )
+
+          - record: victor_model_latency_p95
+            expr: |
+              histogram_quantile(0.95,
+                sum(rate(victor_model_latency_ms_bucket[5m])) by (le, provider)
+              )
+
+          - record: victor_provider_success_rate
+            expr: |
+              sum(rate(victor_provider_requests_total[5m])) by (provider)
+              - sum(rate(victor_provider_errors_total[5m])) by (provider)
+              / sum(rate(victor_provider_requests_total[5m])) by (provider)
+
+  # Performance monitoring alerts are loaded from performance_alerts.yml
+  # This file is created as a separate ConfigMap for easier management
+  performance_alerts.yml: |
+    # Performance alerts are managed in a separate ConfigMap
+    # See: deployment/kubernetes/monitoring/performance-alerts.yaml
+    []

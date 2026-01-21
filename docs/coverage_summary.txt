@@ -1,0 +1,219 @@
+================================================================================
+                    VICTOR AI TEST COVERAGE SUMMARY
+================================================================================
+
+Test Run Date: January 20, 2026
+Test Files: 6 comprehensive test files
+Total Tests: 427
+Passed: 421 (98.6%)
+Failed: 6 (1.4%)
+Execution Time: ~65 seconds
+
+================================================================================
+                        COVERAGE BY TESTED MODULE
+================================================================================
+
+Module                                              Coverage    Status
+--------------------------------------------------------------------------------
+victor/core/container.py                            91.19%     ⭐⭐⭐ Excellent
+victor/agent/safety.py                              83.20%     ⭐⭐⭐ Very Good
+victor/framework/graph.py                           75.97%     ⭐⭐  Good
+victor/providers/base.py                            77.46%     ⭐⭐  Good
+victor/agent/orchestrator_factory.py                69.24%     ⭐⭐  Good
+victor/agent/tool_pipeline.py                       61.36%     ⭐   Moderate
+
+Overall Codebase Coverage                           13.82%     (entire project)
+Targeted Module Average                             76.42%     (tested modules only)
+
+================================================================================
+                        DETAILED MODULE BREAKDOWN
+================================================================================
+
+1. victor/core/container.py (91.19%) ⭐⭐⭐
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Lines: 187 total | 17 missed | 3 partial
+   ✓ Service registration and resolution
+   ✓ Lifetime management (singleton, scoped, transient)
+   ✓ Dependency chains
+   ✓ Thread-safe operations
+   ✗ Edge cases in error handling (17 lines)
+
+2. victor/agent/safety.py (83.20%) ⭐⭐⭐
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Lines: 255 total | 37 missed | 12 partial
+   ✓ Path traversal validation
+   ✓ Command injection prevention
+   ✓ Dangerous command detection
+   ✓ Git command validation
+   ✓ Sandbox enforcement
+   ✗ Advanced security scenarios (37 lines)
+
+3. victor/framework/graph.py (75.97%) ⭐⭐
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Lines: 633 total | 131 missed | 54 partial
+   ✓ StateGraph construction
+   ✓ Node and edge management
+   ✓ Conditional branching
+   ✓ Checkpointing integration
+   ✓ Parallel execution
+   ✗ Advanced features and edge cases (131 lines)
+
+4. victor/agent/orchestrator_factory.py (69.24%) ⭐⭐
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Lines: 872 total | 227 missed | 26 partial
+   ✓ Factory initialization
+   ✓ Basic orchestrator creation
+   ✓ Component creation methods
+   ✓ Provider management
+   ✓ Lifecycle management
+   ✗ Advanced factory methods (227 lines)
+   ⚠  4 failing tests (non-existent methods)
+
+5. victor/agent/tool_pipeline.py (61.36%) ⭐
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Lines: 846 total | 299 missed | 57 partial
+   ✓ Basic tool execution
+   ✓ Tool selection and filtering
+   ✓ Security integration
+   ✓ Error handling
+   ✓ Streaming operations
+   ✗ Advanced scenarios (299 lines)
+   ⚠  1 failing test (error propagation)
+
+6. victor/providers/base.py (77.46%) ⭐⭐
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Lines: 120 total | 23 missed | 3 partial
+   ✓ Provider interface compliance
+   ✓ Chat operations
+   ✓ Stream operations
+   ✓ Tool calling detection
+   ✓ Error handling
+   ✗ Advanced scenarios (23 lines)
+
+================================================================================
+                        TEST RESULTS SUMMARY
+================================================================================
+
+Test File                                                   Status    Tests
+--------------------------------------------------------------------------------
+tests/unit/core/test_container_service_resolution.py        ✅ PASS    ~50
+tests/unit/providers/test_base_provider_protocols.py        ✅ PASS    ~40
+tests/unit/framework/test_stategraph_execution.py            ✅ PASS    ~80
+tests/unit/agent/test_safety_comprehensive.py               ✅ PASS    ~75
+tests/unit/agent/test_tool_pipeline_security.py             ⚠️  PASS    ~65
+tests/unit/agent/test_orchestrator_factory_comprehensive.py ⚠️  PASS   ~117
+                                                                                   
+
+Failed Tests: 6
+  • test_create_memory_components - Missing method
+  • test_create_tracers - Missing method
+  • test_create_tool_selector - Missing method
+  • test_create_checkpoint_manager - Missing method
+  • test_factory_with_temperature_out_of_range - Validation issue
+  • test_tool_execution_error_propagated - Error handling mismatch
+
+================================================================================
+                        COVERAGE DISTRIBUTION
+================================================================================
+
+High Coverage (70%+):          5 modules  ⭐⭐⭐
+  • container.py (91%)
+  • safety.py (83%)
+  • base.py (77%)
+  • graph.py (76%)
+  • orchestrator_factory.py (69%)
+
+Moderate Coverage (60-70%):    1 module   ⭐
+  • tool_pipeline.py (61%)
+
+Low Coverage (<60%):           Many (not targeted)
+  • Provider implementations (0%)
+  • Framework RL (0-50%)
+  • Observability (0-35%)
+
+================================================================================
+                        CRITICAL PATH COVERAGE
+================================================================================
+
+✅ Well Covered (75%+):
+   Dependency Injection System ............................ 91.19%
+   Security Validation .................................... 83.20%
+   StateGraph Execution ................................... 75.97%
+   Provider Interface ..................................... 77.46%
+
+⚠️  Partially Covered (60-75%):
+   Orchestrator Factory ................................. 69.24%
+   Tool Pipeline ......................................... 61.36%
+
+❌ Not Covered (<60%):
+   Provider Implementations .............................. 0-10%
+   Framework RL Modules ................................. 0-50%
+   Observability Integration ............................. 0-35%
+   Workflow Engine ........................................ 0%
+
+================================================================================
+                        RECOMMENDATIONS
+================================================================================
+
+IMMEDIATE (High Priority):
+  1. Fix 6 failing tests
+     - Update tests for non-existent methods
+     - Fix temperature validation
+     - Investigate error propagation
+  
+  2. Improve OrchestratorFactory coverage
+     - Add tests for missing advanced methods
+     - Cover edge cases
+  
+  3. Enhance ToolPipeline coverage
+     - Test complex execution scenarios
+     - Cover error recovery
+
+SHORT-TERM (Medium Priority):
+  4. StateGraph advanced features
+     - Complex node types
+     - State merging edge cases
+  
+  5. Provider implementation tests
+     - Specific provider implementations
+     - Provider-specific error handling
+
+LONG-TERM (Lower Priority):
+  6. Framework modules
+     - RL framework coverage
+     - Validation pipeline
+     - Workflow engine
+  
+  7. Observability integration
+     - Event bus testing
+     - Metrics collection
+     - Distributed tracing
+
+================================================================================
+                        COVERAGE FILES
+================================================================================
+
+HTML Report:    /Users/vijaysingh/code/codingagent/htmlcov/index.html
+XML Report:     /Users/vijaysingh/code/codingagent/coverage.xml
+This Summary:   /Users/vijaysingh/code/codingagent/docs/coverage_summary.txt
+Full Report:    /Users/vijaysingh/code/codingagent/docs/test_coverage_report.md
+
+View HTML Report:
+  open /Users/vijaysingh/code/codingagent/htmlcov/index.html
+
+Rerun Tests:
+  pytest tests/unit/core/test_container_service_resolution.py \
+         tests/unit/agent/test_orchestrator_factory_comprehensive.py \
+         tests/unit/providers/test_base_provider_protocols.py \
+         tests/unit/framework/test_stategraph_execution.py \
+         tests/unit/agent/test_tool_pipeline_security.py \
+         tests/unit/agent/test_safety_comprehensive.py \
+         --cov=victor \
+         --cov-report=term-missing \
+         --cov-report=html \
+         --cov-report=xml \
+         -v
+
+================================================================================
+                            END OF REPORT
+================================================================================

@@ -1,0 +1,873 @@
+# Security Vertical Template
+# Production template for security analysis, vulnerability scanning, and threat detection
+# Competitive with GitHub Advanced Security, Snyk, Checkmarx, Veracode
+
+metadata:
+  name: security
+  description: "Security analysis, vulnerability scanning, and threat detection for codebases and infrastructure"
+  version: "1.0.0"
+  author: "Victor Team"
+  license: "Apache-2.0"
+  category: security
+  tags:
+    - security
+    - vulnerability
+    - threat-detection
+    - compliance
+    - devsecops
+    - audit
+  provider_hints:
+    preferred_models:
+      - claude-sonnet-4-5
+      - gpt-4
+      - deepseek-coder
+    min_context: 128000
+    supports_tools: true
+  evaluation_criteria:
+    - vulnerability_detection_accuracy
+    - false_positive_rate
+    - compliance_coverage
+    - scan_completion_rate
+    - remediation_guidance_quality
+
+# Core tools for security analysis
+tools:
+  # Framework file operations
+  - read_file
+  - write_file
+  - edit_file
+  - grep
+
+  # Core filesystem operations
+  - ls
+  - overview
+
+  # Code search and navigation
+  - code_search
+  - plan
+
+  # Shell execution for security tools
+  - shell
+
+  # Web tools for threat intelligence
+  - web_search
+  - web_fetch
+
+  # Git for security history
+  - git
+
+# Main system prompt
+system_prompt: |
+  You are Victor, an expert security analyst specializing in vulnerability detection, threat analysis, and security compliance.
+
+  Your capabilities:
+  - Static code analysis for security vulnerabilities (SQL injection, XSS, CSRF, SSRF, etc.)
+  - Dependency vulnerability scanning (CVE checking, outdated packages)
+  - Secret and credential detection (API keys, passwords, tokens, certificates)
+  - Security compliance checking (OWASP Top 10, CWE Top 25, SOC2, PCI-DSS, HIPAA)
+  - Threat modeling and attack surface analysis
+  - Security best practices and secure coding patterns
+  - Infrastructure security review (Docker, Kubernetes, CI/CD)
+  - Authentication and authorization analysis
+  - Cryptography review and validation
+  - Security testing recommendations
+
+  Guidelines:
+  1. **Comprehensive scanning**: Always scan for multiple vulnerability types
+  2. **False positive handling**: Verify potential vulnerabilities before flagging
+  3. **Risk prioritization**: Focus on high-severity issues (critical > high > medium > low)
+  4. **Compliance alignment**: Map findings to compliance frameworks when relevant (OWASP, CWE, NIST)
+  5. **Remediation guidance**: Provide actionable, specific fix recommendations with code examples
+  6. **Context awareness**: Consider the application's security context, threat model, and data sensitivity
+  7. **Evidence-based**: Always provide evidence for findings (file locations, code snippets, CVE references)
+  8. **Attack scenarios**: Explain potential attack vectors and business impact
+
+  When scanning code:
+  - Use grep for pattern-based vulnerability searches
+  - Use code_search for semantic security queries ("authentication", "authorization", "encryption")
+   - Use read_file to analyze suspicious code patterns
+   - Use web_search to check CVE databases and security advisories
+   - Use shell to run security tools (bandit, safety, semgrep, pylint)
+
+  When analyzing vulnerabilities:
+  - Assess severity using CVSS scoring when available
+  - Determine exploitability and attack complexity
+  - Estimate business impact and data exposure risk
+  - Prioritize remediation efforts based on risk
+  - Map to OWASP Top 10 categories when applicable
+  - Provide specific code fixes and secure alternatives
+
+  When handling secrets:
+  - Scan for high-entropy strings that might be credentials
+  - Check common secret locations (.env, config files, credentials files)
+  - Look for hardcoded passwords, API keys, tokens
+  - Check git history for accidentally committed secrets
+  - Suggest proper secret management solutions
+
+  When reviewing dependencies:
+  - Check for known vulnerabilities (CVEs)
+  - Identify outdated packages with security issues
+  - Check for malicious or unmaintained packages
+  - Suggest secure alternatives when needed
+
+  Security Best Practices to Enforce:
+  - Input validation and sanitization
+  - Parameterized queries to prevent SQL injection
+  - Output encoding to prevent XSS
+  - Proper authentication and authorization
+  - Secure session management
+  - Encryption at rest and in transit
+  - Secure password handling (hashing, salting)
+  - Least privilege principle
+  - Defense in depth
+
+  You have access to file operations, code search, web resources, and shell tools. Use them efficiently to identify and mitigate security risks.
+
+# Stage definitions for security workflow
+stages:
+  INITIAL:
+    name: INITIAL
+    description: "Understanding the security request and scope"
+    tools:
+      - read_file
+      - ls
+      - overview
+    keywords:
+      - what
+      - how
+      - explain
+      - where
+      - show
+      - security
+    next_stages:
+      - DISCOVERY
+      - SCANNING
+
+  DISCOVERY:
+    name: DISCOVERY
+    description: "Discovering codebase structure and security context"
+    tools:
+      - overview
+      - ls
+      - grep
+      - code_search
+    keywords:
+      - discover
+      - explore
+      - understand
+      - map
+    next_stages:
+      - SCANNING
+      - ANALYSIS
+
+  SCANNING:
+    name: SCANNING
+    description: "Scanning for vulnerabilities and threats"
+    tools:
+      - grep
+      - code_search
+      - shell
+      - read_file
+      - web_search
+    keywords:
+      - scan
+      - check
+      - analyze
+      - find
+      - detect
+      - vulnerability
+    next_stages:
+      - ANALYSIS
+      - THREAT_MODELING
+      - SCANNING
+
+  THREAT_MODELING:
+    name: THREAT_MODELING
+    description: "Analyzing attack surface and threat scenarios"
+    tools:
+      - read_file
+      - code_search
+      - web_search
+      - web_fetch
+    keywords:
+      - threat
+      - attack
+      - exploit
+      - vector
+      - scenario
+    next_stages:
+      - ANALYSIS
+      - ASSESSMENT
+
+  ANALYSIS:
+    name: ANALYSIS
+    description: "Analyzing scan results and assessing risk"
+    tools:
+      - read_file
+      - web_search
+      - web_fetch
+      - code_search
+    keywords:
+      - analyze
+      - assess
+      - evaluate
+      - investigate
+      - severity
+      - impact
+    next_stages:
+      - ASSESSMENT
+      - SCANNING
+
+  ASSESSMENT:
+    name: ASSESSMENT
+    description: "Risk assessment and compliance mapping"
+    tools:
+      - web_search
+      - web_fetch
+      - read_file
+    keywords:
+      - assess
+      - risk
+      - compliance
+      - owasp
+      - cwe
+      - cve
+    next_stages:
+      - REPORTING
+
+  REPORTING:
+    name: REPORTING
+    description: "Generating security reports and recommendations"
+    tools:
+      - write_file
+      - edit_file
+      - read_file
+    keywords:
+      - report
+      - document
+      - summarize
+      - recommend
+      - remediation
+    next_stages:
+      - COMPLETION
+
+  COMPLETION:
+    name: COMPLETION
+    description: "Security analysis complete with actionable findings"
+    tools:
+      - write_file
+      - edit_file
+    keywords:
+      - done
+      - complete
+      - finished
+      - report
+    next_stages: []
+
+# Extension specifications
+extensions:
+  # Middleware for security operations
+  middleware:
+    - name: security_validation
+      class_name: SecurityValidationMiddleware
+      module: victor.security.middleware
+      enabled: true
+      config:
+        block_secrets: true
+        require_compliance: true
+        validate_fixes: true
+
+    - name: audit_logging
+      class_name: AuditLoggingMiddleware
+      module: victor.security.middleware
+      enabled: true
+      config:
+        log_level: detailed
+        include_timestamps: true
+        log_findings: true
+
+  # Safety patterns for dangerous security operations
+  safety_patterns:
+    - name: destructive_scan
+      pattern: "rm.*-rf"
+      description: "Destructive file operations during scan"
+      severity: high
+      category: file_operations
+
+    - name: production_modification
+      pattern: "(prod|production).*(deploy|modify|delete)"
+      description: "Direct production modifications"
+      severity: critical
+      category: deployment
+
+    - name: credential_exposure
+      pattern: "(password|secret|key|token).*(print|echo|log|display)"
+      description: "Potential credential exposure in output"
+      severity: high
+      category: secrets
+
+    - name: database_drop
+      pattern: "DROP.*TABLE|DELETE.*FROM.*WHERE"
+      description: "Destructive database operations"
+      severity: critical
+      category: database
+
+    - name: firewall_disable
+      pattern: "(firewall|iptables).*stop|disable|flush"
+      description: "Disabling security controls"
+      severity: high
+      category: infrastructure
+
+  # Task type hints for different security tasks
+  prompt_hints:
+    - task_type: vulnerability_scan
+      hint: "[SCAN] Run comprehensive vulnerability scan. Check for OWASP Top 10, CWE Top 25, secrets, and dependency issues."
+      tool_budget: 25
+      priority_tools:
+        - grep
+        - code_search
+        - shell
+        - web_search
+
+    - task_type: secret_detection
+      hint: "[SECRETS] Scan for exposed credentials. Check code, configs, environment files, and git history."
+      tool_budget: 20
+      priority_tools:
+        - grep
+        - shell
+        - read_file
+
+    - task_type: dependency_check
+      hint: "[DEPENDENCIES] Check for vulnerable dependencies. Scan requirements, package.json, go.mod, etc."
+      tool_budget: 15
+      priority_tools:
+        - shell
+        - grep
+        - web_search
+
+    - task_type: compliance_audit
+      hint: "[COMPLIANCE] Verify compliance with security standards. Map findings to OWASP/CWE/NIST frameworks."
+      tool_budget: 30
+      priority_tools:
+        - code_search
+        - grep
+        - web_search
+        - read_file
+
+    - task_type: threat_model
+      hint: "[THREAT] Analyze threat model and attack surface. Identify potential attack vectors and scenarios."
+      tool_budget: 35
+      priority_tools:
+        - read_file
+        - code_search
+        - web_search
+        - overview
+
+    - task_type: code_review
+      hint: "[REVIEW] Security-focused code review. Check authentication, authorization, input validation, encryption."
+      tool_budget: 20
+      priority_tools:
+        - read_file
+        - grep
+        - code_search
+
+    - task_type: infrastructure_security
+      hint: "[INFRA] Review infrastructure security. Check Dockerfiles, Kubernetes configs, CI/CD pipelines."
+      tool_budget: 20
+      priority_tools:
+        - read_file
+        - grep
+        - shell
+
+    - task_type: sast_scan
+      hint: "[SAST] Static Application Security Testing. Run bandit, semgrep, pylint for code vulnerabilities."
+      tool_budget: 15
+      priority_tools:
+        - shell
+        - grep
+        - read_file
+
+  # Workflow handlers
+  handlers:
+    security_scan_handler: victor.security.handlers
+    compliance_checker: victor.security.handlers
+    threat_analyzer: victor.security.handlers
+    secret_scanner: victor.security.handlers
+
+  # Persona definitions for security teams
+  personas:
+    security_analyst:
+      name: "Security Analyst"
+      role: "analyst"
+      expertise: "Vulnerability assessment and penetration testing"
+      communication_style: "detailed"
+      decision_approach: "systematic"
+      system_prompt_extension: |
+        You are a meticulous security analyst. You:
+        - Follow structured methodologies (OWASP, NIST)
+        - Provide detailed findings with evidence
+        - Prioritize by severity and exploitability
+        - Suggest specific remediation steps
+
+    compliance_auditor:
+      name: "Compliance Auditor"
+      role: "auditor"
+      expertise: "Security compliance and risk assessment"
+      communication_style: "formal"
+      decision_approach: "methodical"
+      system_prompt_extension: |
+        You are a thorough compliance auditor. You:
+        - Map findings to compliance frameworks
+        - Document audit trails and evidence
+        - Identify control gaps
+        - Provide compliance recommendations
+
+    threat_researcher:
+      name: "Threat Researcher"
+      role: "researcher"
+      expertise: "Threat intelligence and attack analysis"
+      communication_style: "investigative"
+      decision_approach: "analytical"
+      system_prompt_extension: |
+        You are an analytical threat researcher. You:
+        - Analyze attack vectors and scenarios
+        - Research CVEs and security advisories
+        - Assess exploitability and impact
+        - Provide threat intelligence
+
+    pentester:
+      name: "Penetration Tester"
+      role: "tester"
+      expertise: "Ethical hacking and exploit testing"
+      communication_style: "practical"
+      decision_approach: "aggressive"
+      system_prompt_extension: |
+        You are a skilled penetration tester. You:
+        - Think like an attacker
+        - Identify exploitable vulnerabilities
+        - Test security controls
+        - Provide proof-of-concept exploits
+
+  # Composed middleware chains
+  composed_chains:
+    secure_scan:
+      - security_validation
+      - audit_logging
+
+    full_audit:
+      - security_validation
+      - audit_logging
+
+# Workflow definitions
+workflows:
+  - name: comprehensive_security_scan
+    description: "Full security scan including vulnerabilities, secrets, and compliance"
+    file: workflows/comprehensive_security_scan.yaml
+    handler_module: victor.security.handlers
+
+  - name: vulnerability_assessment
+    description: "Focused vulnerability assessment with remediation guidance"
+    file: workflows/vulnerability_assessment.yaml
+    handler_module: victor.security.handlers
+
+  - name: secret_scan
+    description: "Scan for exposed secrets and credentials"
+    file: workflows/secret_scan.yaml
+    handler_module: victor.security.handlers
+
+  - name: dependency_audit
+    description: "Dependency vulnerability scanning"
+    file: workflows/dependency_audit.yaml
+    handler_module: victor.security.handlers
+
+  - name: compliance_audit
+    description: "Security compliance audit against standards"
+    file: workflows/compliance_audit.yaml
+    handler_module: victor.security.handlers
+
+  - name: threat_modeling
+    description: "Threat model and attack surface analysis"
+    file: workflows/threat_modeling.yaml
+    handler_module: victor.security.handlers
+
+# Team formations for multi-agent security analysis
+teams:
+  - name: security_review_team
+    display_name: "Security Review Team"
+    description: "Multi-agent team for comprehensive security review"
+    formation: parallel
+    communication_style: structured
+    max_iterations: 5
+    roles:
+      - name: vulnerability_scanner
+        display_name: "Vulnerability Scanner"
+        description: "Scans for code vulnerabilities and security issues"
+        persona: "You are a vulnerability scanning expert. Focus on OWASP Top 10, CWE Top 25, and common security flaws."
+        tool_categories:
+          - code_search
+          - grep
+          - shell
+        capabilities:
+          - vulnerability_scan
+          - pattern_matching
+          - sast_tools
+
+      - name: secret_detector
+        display_name: "Secret Detector"
+        description: "Detects exposed credentials and secrets"
+        persona: "You are a secret detection expert. Find hardcoded credentials, API keys, tokens, and certificates."
+        tool_categories:
+          - grep
+          - shell
+          - read_file
+        capabilities:
+          - secret_scan
+          - entropy_analysis
+          - git_history_scan
+
+      - name: dependency_auditor
+        display_name: "Dependency Auditor"
+        description: "Reviews dependencies for vulnerabilities"
+        persona: "You are a dependency security expert. Check for CVEs, outdated packages, and malicious dependencies."
+        tool_categories:
+          - shell
+          - web_search
+          - grep
+        capabilities:
+          - dependency_check
+          - cve_lookup
+          - version_analysis
+
+      - name: compliance_specialist
+        display_name: "Compliance Specialist"
+        description: "Verifies security compliance standards"
+        persona: "You are a compliance expert. Map findings to OWASP, CWE, NIST, SOC2, PCI-DSS standards."
+        tool_categories:
+          - code_search
+          - web_search
+          - read_file
+        capabilities:
+          - compliance_check
+          - framework_mapping
+          - risk_assessment
+
+      - name: threat_analyst
+        display_name: "Threat Analyst"
+        description: "Analyzes threat model and attack scenarios"
+        persona: "You are a threat modeling expert. Identify attack vectors, assess impact, and suggest mitigations."
+        tool_categories:
+          - read_file
+          - code_search
+          - web_search
+        capabilities:
+          - threat_modeling
+          - attack_analysis
+          - risk_scoring
+
+  - name: incident_response_team
+    display_name: "Incident Response Team"
+    description: "Rapid response team for security incidents"
+    formation: pipeline
+    communication_style: structured
+    max_iterations: 10
+    roles:
+      - name: triage_analyst
+        display_name: "Triage Analyst"
+        description: "Initial incident triage and assessment"
+        persona: "You are an incident triage expert. Quickly assess severity and scope."
+        tool_categories:
+          - read_file
+          - grep
+          - shell
+
+      - name: threat_hunter
+        display_name: "Threat Hunter"
+        description: "Investigates attack patterns and indicators"
+        persona: "You are a threat hunting expert. Find evidence of compromise."
+        tool_categories:
+          - code_search
+          - grep
+          - shell
+
+      - name: containment_specialist
+        display_name: "Containment Specialist"
+        description: "Develops containment strategies"
+        persona: "You are an incident containment expert. Limit damage and prevent spread."
+        tool_categories:
+          - read_file
+          - shell
+
+      - name: recovery_lead
+        display_name: "Recovery Lead"
+        description: "Coordinates recovery efforts"
+        persona: "You are an incident recovery expert. Restore systems and verify integrity."
+        tool_categories:
+          - shell
+          - read_file
+          - write_file
+
+  - name: security_architecture_review
+    display_name: "Security Architecture Review Team"
+    description: "Reviews security architecture and design"
+    formation: consensus
+    communication_style: structured
+    max_iterations: 8
+    roles:
+      - name: architect_reviewer
+        display_name: "Security Architect"
+        description: "Reviews security architecture and design"
+        persona: "You are a security architect. Evaluate design patterns and security controls."
+        tool_categories:
+          - read_file
+          - code_search
+
+      - name: crypto_reviewer
+        display_name: "Cryptography Reviewer"
+        description: "Reviews cryptographic implementations"
+        persona: "You are a cryptography expert. Validate encryption, hashing, and key management."
+        tool_categories:
+          - read_file
+          - grep
+
+      - name: auth_reviewer
+        display_name: "Authentication/Authorization Reviewer"
+        description: "Reviews authn/authz implementations"
+        persona: "You are an authentication expert. Evaluate identity and access controls."
+        tool_categories:
+          - read_file
+          - code_search
+
+      - name: network_security_reviewer
+        display_name: "Network Security Reviewer"
+        description: "Reviews network security configuration"
+        persona: "You are a network security expert. Check firewall rules, TLS, and network isolation."
+        tool_categories:
+          - read_file
+          - grep
+
+# Capability specifications
+capabilities:
+  - name: vulnerability_detection
+    type: workflow
+    description: "Comprehensive vulnerability detection workflow"
+    enabled: true
+    handler: victor.security.workflows:VulnerabilityDetectionWorkflow
+    config:
+      scan_depth: deep
+      check_dependencies: true
+      check_secrets: true
+
+  - name: secret_scanning
+    type: tool
+    description: "Scan for exposed secrets and credentials"
+    enabled: true
+    config:
+      entropy_threshold: 3.5
+      scan_history: true
+      check_common_patterns: true
+
+  - name: compliance_validation
+    type: validator
+    description: "Validate against security compliance standards"
+    enabled: true
+    config:
+      frameworks:
+        - OWASP_Top_10
+        - CWE_Top_25
+        - NIST_800-53
+        - SOC2
+        - PCI-DSS
+      severity_level: medium
+
+  - name: security_analysis
+    type: tool
+    description: "Static code security analysis"
+    enabled: true
+    config:
+      tools:
+        - bandit
+        - semgrep
+        - pylint
+        - safety
+      max_issues: 100
+
+  - name: threat_intelligence
+    type: workflow
+    description: "Threat intelligence and CVE lookup"
+    enabled: true
+    handler: victor.security.workflows:ThreatIntelligenceWorkflow
+    config:
+      update_interval: 86400
+      sources:
+        - nvd
+        - github_advisories
+        - exploitdb
+
+# Custom vertical configuration
+custom_config:
+  # Security-specific metadata
+  cwe_mapping: true
+  cvss_scoring: true
+  false_positive_threshold: 0.7
+
+  # Default compliance frameworks
+  default_frameworks:
+    - OWASP_Top_10
+    - CWE_Top_25
+    - NIST_800-53
+
+  # Severity weighting
+  severity_weights:
+    critical: 10.0
+    high: 7.5
+    medium: 5.0
+    low: 2.5
+
+  # Security tool configurations
+  security_tools:
+    bandit:
+      enabled: true
+      confidence_level: medium
+    safety:
+      enabled: true
+    semgrep:
+      enabled: true
+      config: auto
+    pylint:
+      enabled: false
+
+  # Vulnerability categories
+  vulnerability_categories:
+    - injection:
+        - sql_injection
+        - command_injection
+        - ldap_injection
+    - xss:
+        - reflected
+        - stored
+        - dom_based
+    - authentication:
+        - weak_auth
+        - session_fixation
+        - csrf
+    - cryptography:
+        - weak_crypto
+        - hard coded_keys
+        - insecure_random
+    - authorization:
+        - idor
+        - privilege_escalation
+        - missing_auth
+    - configuration:
+        - security_misconfiguration
+        - default_accounts
+        - verbose_messages
+    - data_protection:
+        - sensitive_data_exposure
+        - missing_encryption
+        - insecure_storage
+    - dependencies:
+        - vulnerable_components
+        - outdated_dependencies
+        - malicious_packages
+
+  # Custom prompt sections
+  grounding_rules: |
+    GROUNDING: Base ALL security findings on actual scan results and code analysis.
+    Never fabricate vulnerabilities or security issues. If a scan returns no results,
+    acknowledge this rather than inventing issues.
+
+    Always provide evidence for findings:
+    - File paths and line numbers
+    - Code snippets showing the vulnerability
+    - CVE references when applicable
+    - OWASP/CWE category mappings
+    - Attack scenario descriptions
+
+    Verify potential vulnerabilities before flagging to minimize false positives.
+
+  system_prompt_section: |
+    Security Analysis Guidelines:
+    1. Prioritize by severity (CVSS score: critical > high > medium > low)
+    2. Map findings to OWASP Top 10 and CWE categories
+    3. Provide specific, actionable remediation steps
+    4. Include code examples of secure alternatives
+    5. Document attack scenarios and business impact
+    6. Suggest security testing approaches
+    7. Consider defense in depth and layered security
+    8. Recommend security best practices and patterns
+
+# File templates (custom generated files)
+file_templates:
+  security_report.md: |
+    # Security Analysis Report
+
+    **Generated**: {{ date }}
+    **Scope**: {{ scope }}
+    **Analyst**: Victor Security Assistant
+
+    ## Executive Summary
+
+    {{ summary }}
+
+    ## Findings Summary
+
+    | Severity | Count | Status |
+    |----------|-------|--------|
+    | Critical | {{ critical_count }} | {{ critical_status }} |
+    | High | {{ high_count }} | {{ high_status }} |
+    | Medium | {{ medium_count }} | {{ medium_status }} |
+    | Low | {{ low_count }} | {{ low_status }} |
+
+    ## Detailed Findings
+
+    {{ findings }}
+
+    ## Compliance Mapping
+
+    {{ compliance }}
+
+    ## Remediation Recommendations
+
+    {{ recommendations }}
+
+    ## Appendix
+
+    {{ appendix }}
+
+  security_checklist.md: |
+    # Security Checklist
+
+    ## Authentication & Authorization
+    - [ ] Strong password policies enforced
+    - [ ] Multi-factor authentication implemented
+    - [ ] Proper session management
+    - [ ] Role-based access control (RBAC)
+    - [ ] Principle of least privilege
+
+    ## Input Validation
+    - [ ] Input validation on all user inputs
+    - [ ] Output encoding to prevent XSS
+    - [ ] Parameterized queries for SQL
+    - [ ] Length limits enforced
+    - [ ] Type validation implemented
+
+    ## Data Protection
+    - [ ] Encryption at rest (AES-256)
+    - [ ] Encryption in transit (TLS 1.3)
+    - [ ] Sensitive data hashing (bcrypt, Argon2)
+    - [ ] Secure key management
+    - [ ] Data retention policies
+
+    ## Dependencies
+    - [ ] No known vulnerable dependencies
+    - [ ] Dependencies up to date
+    - [ ] Dependency scanning enabled
+    - [ ] SBOM maintained
+
+    ## Infrastructure
+    - [ ] Immutable infrastructure
+    - [ ] Security patches applied
+    - [ ] Firewall rules configured
+    - [ ] Network segmentation
+    - [ ] Container security扫描

@@ -1,0 +1,154 @@
+{
+  "start_time": "2026-01-20T18:55:08.867236",
+  "end_time": "2026-01-20T18:55:10.605493",
+  "metadata": {},
+  "config": {
+    "scenario": "all",
+    "project_root": "/Users/vijaysingh/code/codingagent"
+  },
+  "summary": {
+    "total": 7,
+    "passed": 5,
+    "failed": 2
+  },
+  "results": [
+    {
+      "name": "Cold Start",
+      "category": "startup",
+      "timestamp": "2026-01-20T18:55:08.867249",
+      "passed": false,
+      "metrics": [
+        {
+          "name": "startup_time",
+          "value": 344.4394579855725,
+          "unit": "ms",
+          "description": "Time to import victor module",
+          "threshold": 200.0
+        }
+      ],
+      "metadata": {
+        "target": "<200ms (98.7% improvement)",
+        "baseline": "~8000ms (before refactoring)"
+      }
+    },
+    {
+      "name": "Warm Start",
+      "category": "startup",
+      "timestamp": "2026-01-20T18:55:09.211713",
+      "passed": true,
+      "metrics": [
+        {
+          "name": "startup_time",
+          "value": 0.00016705598682165146,
+          "unit": "ms",
+          "description": "Time to access already-imported victor module",
+          "threshold": 50.0
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "name": "Bootstrap Time",
+      "category": "startup",
+      "timestamp": "2026-01-20T18:55:09.211726",
+      "passed": false,
+      "metrics": [
+        {
+          "name": "bootstrap_time",
+          "value": 1159.7250410122797,
+          "unit": "ms",
+          "description": "Time to bootstrap DI container",
+          "threshold": 100.0
+        }
+      ],
+      "metadata": {
+        "services_registered": 0
+      }
+    },
+    {
+      "name": "Baseline Memory",
+      "category": "memory",
+      "timestamp": "2026-01-20T18:55:10.372281",
+      "passed": true,
+      "metrics": [
+        {
+          "name": "peak_memory",
+          "value": 0.0,
+          "unit": "MB",
+          "description": "Peak memory after importing victor",
+          "threshold": 50.0
+        }
+      ],
+      "metadata": {
+        "current_memory_mb": 0.0
+      }
+    },
+    {
+      "name": "Memory Leak Detection",
+      "category": "memory",
+      "timestamp": "2026-01-20T18:55:10.434987",
+      "passed": true,
+      "metrics": [
+        {
+          "name": "memory_growth",
+          "value": 0,
+          "unit": "MB",
+          "description": "Memory growth over 100 iterations",
+          "threshold": 5.0
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "name": "Tool Selection Throughput",
+      "category": "throughput",
+      "timestamp": "2026-01-20T18:55:10.559127",
+      "passed": true,
+      "metrics": [
+        {
+          "name": "throughput",
+          "value": 258002.3690985128,
+          "unit": "ops/sec",
+          "description": "Tool selections per second",
+          "threshold": 1000.0
+        }
+      ],
+      "metadata": {
+        "iterations": 10000,
+        "elapsed_s": 0.03875933401286602
+      }
+    },
+    {
+      "name": "Tool Selection Latency",
+      "category": "latency",
+      "timestamp": "2026-01-20T18:55:10.603533",
+      "passed": true,
+      "metrics": [
+        {
+          "name": "p50_latency",
+          "value": 0.0017499551177024841,
+          "unit": "ms",
+          "description": "50th percentile latency",
+          "threshold": 1.0
+        },
+        {
+          "name": "p95_latency",
+          "value": 0.0018749851733446121,
+          "unit": "ms",
+          "description": "95th percentile latency",
+          "threshold": 2.0
+        },
+        {
+          "name": "p99_latency",
+          "value": 0.0019579892978072166,
+          "unit": "ms",
+          "description": "99th percentile latency",
+          "threshold": 5.0
+        }
+      ],
+      "metadata": {
+        "iterations": 1000
+      }
+    }
+  ]
+}

@@ -239,6 +239,21 @@ class TestProviderPoolCreation:
 class TestOrchestratorFactoryPoolIntegration:
     """Test orchestrator factory integration with provider pool."""
 
+    def _create_mock_provider(self, name: str) -> MagicMock:
+        """Create a mock provider for testing."""
+        provider = MagicMock()
+        provider.name = name
+        provider.chat = AsyncMock(return_value=MagicMock(content="Response"))
+        provider.close = AsyncMock()
+
+        # Mock stream
+        async def mock_stream_gen(*args, **kwargs):
+            yield MagicMock(content="Chunk")
+
+        provider.stream = mock_stream_gen
+
+        return provider
+
     @pytest.mark.asyncio
     async def test_factory_creates_pool_when_enabled(self, pool_settings):
         """Test that factory creates pool when enabled."""
@@ -325,6 +340,21 @@ class TestOrchestratorFactoryPoolIntegration:
 class TestProviderPoolChatIntegration:
     """Test provider pool chat integration."""
 
+    def _create_mock_provider(self, name: str) -> MagicMock:
+        """Create a mock provider for testing."""
+        provider = MagicMock()
+        provider.name = name
+        provider.chat = AsyncMock(return_value=MagicMock(content="Response"))
+        provider.close = AsyncMock()
+
+        # Mock stream
+        async def mock_stream_gen(*args, **kwargs):
+            yield MagicMock(content="Chunk")
+
+        provider.stream = mock_stream_gen
+
+        return provider
+
     @pytest.mark.asyncio
     async def test_pool_chat_completion(self, pool_settings):
         """Test that pool can handle chat completions."""
@@ -402,6 +432,21 @@ class TestProviderPoolChatIntegration:
 
 class TestProviderPoolHealthMonitoring:
     """Test provider pool health monitoring."""
+
+    def _create_mock_provider(self, name: str) -> MagicMock:
+        """Create a mock provider for testing."""
+        provider = MagicMock()
+        provider.name = name
+        provider.chat = AsyncMock(return_value=MagicMock(content="Response"))
+        provider.close = AsyncMock()
+
+        # Mock stream
+        async def mock_stream_gen(*args, **kwargs):
+            yield MagicMock(content="Chunk")
+
+        provider.stream = mock_stream_gen
+
+        return provider
 
     @pytest.mark.asyncio
     async def test_health_tracking(self, pool_settings):

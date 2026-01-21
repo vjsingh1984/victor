@@ -1,0 +1,38 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: victor-ai-dev
+
+commonLabels:
+  environment: development
+  app: victor-ai
+
+resources:
+- ../../base
+
+patchesStrategicMerge:
+- deployment-patch.yaml
+
+configMapGenerator:
+- name: victor-ai-config
+  behavior: merge
+  literals:
+  - VICTOR_PROFILE=development
+  - VICTOR_LOG_LEVEL=DEBUG
+  - VICTOR_MAX_WORKERS=2
+  - VICTOR_CACHE_SIZE=500
+  - event-bus-backend=memory
+  - checkpoint-backend=memory
+  - cache-backend=memory
+  - enable-metrics=true
+  - enable-tracing=false
+  - enable-rate-limiting=false
+  - tool-selection-strategy=keyword
+
+images:
+- name: victorai/victor
+  newTag: latest
+
+replicas:
+- name: victor-ai
+  count: 1

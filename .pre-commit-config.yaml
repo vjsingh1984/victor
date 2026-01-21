@@ -1,12 +1,16 @@
 # Pre-commit configuration for Victor AI
-# See docs/PRE_COMMIT_HOOKS.md for details
+# See docs/PRE_COMMIT_HOOKS.md and docs/CI_CD_SETUP.md for details
+#
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+# Update hooks: pre-commit autoupdate
 
 # Minimum pre-commit version
-minimum_pre_commit_version: 2.20.0
+minimum_pre_commit_version: 3.5.0
 
 # Default language version
 default_language_version:
-  python: python3.10
+  python: python3.11
 
 # Repositories and hooks
 repos:
@@ -55,28 +59,30 @@ repos:
     hooks:
       - id: black
         name: Format code with Black
-        language_version: python3.10
-        args: [--line-length=100]
+        language_version: python3.11
+        args: ['--config', 'pyproject.toml']
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.3.0
+    rev: v0.5.0
     hooks:
       - id: ruff
         name: Lint with Ruff
-        args: [--fix, --exit-non-zero-on-fix]
+        args: [--fix, --exit-non-zero-on-fix, '--config=pyproject.toml']
 
   # Type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.9.0
+    rev: v1.10.0
     hooks:
       - id: mypy
         name: Type check with MyPy (strict modules)
-        entry: mypy victor/protocols victor/framework/coordinators victor/core/registries victor/core/verticals
+        entry: mypy victor/protocols victor/framework/coordinators victor/core/registries victor/core/verticals --config-file=pyproject.toml
         pass_filenames: false
         additional_dependencies:
+          - pydantic>=2.0
+          - pydantic-settings>=2.0
           - types-pyyaml
           - types-aiofiles
-        language_version: python3.10
+        language_version: python3.11
 
   # Security checks
   - repo: https://github.com/PyCQA/bandit
@@ -84,9 +90,18 @@ repos:
     hooks:
       - id: bandit
         name: Security check with Bandit
-        args: [-ll, -ii]
-        exclude: ^tests/
+        args: ['-c', 'pyproject.toml', '-ll']
+        exclude: ^(tests/|victor/test/)
         additional_dependencies: ['bandit[toml]']
+
+  # Dependency security checks
+  - repo: https://github.com/pyupio/safety
+    rev: 3.2.4
+    hooks:
+      - id: safety
+        name: Check for security vulnerabilities in dependencies
+        args: ['--ignore', '12345']
+        files: pyproject.toml
 
   # YAML linting
   - repo: https://github.com/adrienverge/yamllint
@@ -95,6 +110,24 @@ repos:
       - id: yamllint
         name: Lint YAML files
         args: [-c=.yamllint.yml]
+
+  # YAML formatting
+  - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
+    rev: v2.13.0
+    hooks:
+      - id: pretty-format-yaml
+        name: Format YAML files
+        args: [--autofix, --indent, '2', --offset, '2']
+        exclude: ^(mkdocs\.yml|\.github/)
+
+  # TOML formatting
+  - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
+    rev: v2.13.0
+    hooks:
+      - id: pretty-format-toml
+        name: Format TOML files
+        args: [--autofix]
+        exclude: ^(tests/)
 
   # Local hooks for Victor-specific validation
   - repo: local
@@ -183,7 +216,19 @@ repos:
           Check cyclomatic complexity of functions.
           Functions with complexity > 10 should be refactored.
 
-# CI configuration
+      # Run pytest on changed files (fast smoke tests)
+      - id: pytest-changed-files
+        name: Run pytest on changed Python files
+        entry: pytest -x -v --tb=short -m "not slow and not integration"
+        language: python
+        files: ^victor/.*\.py$|^tests/unit/.*\.py$
+        pass_filenames: false
+        description: >
+          Run pytest on changed Python files.
+          Only runs unit tests, excludes slow and integration tests.
+          This provides fast feedback on code changes.
+
+# CI configuration (for pre-commit.ci)
 ci:
   autofix_commit_msg: |
     [pre-commit.ci] auto fixes from pre-commit hooks
@@ -193,5 +238,58 @@ ci:
   autoupdate_branch: ''
   autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
   autoupdate_schedule: weekly
-  skip: []
+  skip: [mypy, pytest-changed-files]  # Skip mypy and pytest in CI for speed
   submodules: false
+
+# =============================================================================
+# Additional hooks for advanced workflow
+# =============================================================================
+# To enable these additional hooks, uncomment them:
+
+# # Shell script checking
+# - repo: https://github.com/shellcheck-py/shellcheck-py
+#   rev: v0.10.0.1
+#   hooks:
+#     - id: shellcheck
+#       args: ['--severity=warning']
+#       files: \.sh$
+
+# # Dockerfile linting
+# - repo: https://github.com/hadolint/hadolint
+#   rev: v2.12.0
+#   hooks:
+#     - id: hadolint-docker
+#       args: ['--ignore', 'DL3008']
+
+# # Markdown linting
+# - repo: https://github.com/igorshubovych/markdownlint-cli
+#   rev: v0.39.0
+#   hooks:
+#     - id: markdownlint
+#       args: [--fix]
+
+# # Secret scanning
+# - repo: https://github.com/Yelp/detect-secrets
+#   rev: v1.4.0
+#   hooks:
+#     - id: detect-secrets
+#       args: ['--baseline', '.secrets.baseline']
+#       exclude: ^(tests/fixtures/|\.github/)
+
+# # License header checking
+# - repo: https://github.com/Lucas-C/pre-commit-hooks-license
+#   rev: v1.0.0
+#   hooks:
+#     - id: license
+#       name: Check Apache 2.0 license header
+#       args: ['--license-file', 'LICENSE_HEADER']
+#       files: \.py$
+
+# # CI/CD configuration checking
+# - repo: https://github.com/python-jsonschema/check-jsonschema
+#   rev: 0.28.0
+#   hooks:
+#     - id: check-github-workflows
+#     - id: check-github-actions
+#     - id: check-pre-commit-config
+#     - id: check-readthedocs

@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "victor-ai.fullname" . }}-config
+  labels:
+    {{- include "victor-ai.labels" . | nindent 4 }}
+data:
+  {{- with .Values.config }}
+  event-bus-backend: {{ .eventBus.backend }}
+  event-bus-kafka-bootstrap-servers: {{ .eventBus.kafka.bootstrapServers | quote }}
+  event-bus-kafka-topic-prefix: {{ .eventBus.kafka.topicPrefix | quote }}
+
+  checkpoint-backend: {{ .checkpoint.backend }}
+  checkpoint-sqlite-path: {{ .checkpoint.sqlite.path | quote }}
+  checkpoint-redis-key-prefix: {{ .checkpoint.redis.keyPrefix | quote }}
+
+  cache-backend: {{ .cache.backend }}
+  cache-redis-url: {{ .cache.redis.url | quote }}
+  cache-ttl: {{ .cache.redis.ttl | quote }}
+
+  default-provider: {{ $.Values.provider.default }}
+  default-model: {{ $.Values.provider.model }}
+
+  enabled-verticals: {{ .verticals.enabled }}
+  {{- end }}

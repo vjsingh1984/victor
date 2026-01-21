@@ -1,0 +1,145 @@
+{
+  "policies": [
+    {
+      "name": "admin_full_access",
+      "description": "Full system access for administrators",
+      "allow_rules": [
+        {
+          "resource": "*",
+          "action": "*",
+          "roles": ["admin"]
+        }
+      ],
+      "deny_rules": [],
+      "exceptions": [],
+      "priority": 100,
+      "audit_settings": {
+        "log_all": true,
+        "log_denials": true
+      },
+      "enabled": true
+    },
+    {
+      "name": "developer_code_access",
+      "description": "Code access for developers",
+      "allow_rules": [
+        {
+          "resource": "code",
+          "action": "read",
+          "roles": ["developer", "code_reviewer"]
+        },
+        {
+          "resource": "code",
+          "action": "write",
+          "roles": ["developer"]
+        },
+        {
+          "resource": "code",
+          "action": "modify",
+          "roles": ["developer"]
+        }
+      ],
+      "deny_rules": [
+        {
+          "resource": "code",
+          "action": "delete",
+          "roles": ["developer"]
+        }
+      ],
+      "exceptions": [],
+      "priority": 50,
+      "audit_settings": {
+        "log_denials": true
+      },
+      "enabled": true
+    },
+    {
+      "name": "workflow_execution_policy",
+      "description": "Policy governing workflow execution",
+      "allow_rules": [
+        {
+          "resource": "workflow",
+          "action": "execute",
+          "roles": ["developer", "operator"],
+          "conditions": {
+            "time_window": [9, 17]
+          }
+        }
+      ],
+      "deny_rules": [
+        {
+          "resource": "workflow",
+          "action": "execute",
+          "attributes": {
+            "department": "contractor"
+          }
+        }
+      ],
+      "exceptions": [
+        {
+          "resource": "workflow",
+          "action": "execute",
+          "attributes": {
+            "clearance_level": 5
+          }
+        }
+      ],
+      "priority": 75,
+      "audit_settings": {
+        "log_all": true
+      },
+      "enabled": true
+    },
+    {
+      "name": "tool_restriction_policy",
+      "description": "Restrict dangerous tools",
+      "allow_rules": [],
+      "deny_rules": [
+        {
+          "resource": "tool",
+          "action": "execute",
+          "conditions": {
+            "tool_name": ["rm", "format", "shutdown"]
+          }
+        }
+      ],
+      "exceptions": [
+        {
+          "resource": "tool",
+          "action": "execute",
+          "roles": ["admin"]
+        }
+      ],
+      "priority": 90,
+      "audit_settings": {
+        "log_all": true,
+        "alert_on_denial": true
+      },
+      "enabled": true
+    },
+    {
+      "name": "audit_readonly_access",
+      "description": "Read-only access for auditors",
+      "allow_rules": [
+        {
+          "resource": "*",
+          "action": "read",
+          "roles": ["auditor"]
+        }
+      ],
+      "deny_rules": [
+        {
+          "resource": ["settings", "system"],
+          "action": "read",
+          "roles": ["auditor"]
+        }
+      ],
+      "exceptions": [],
+      "priority": 40,
+      "audit_settings": {
+        "log_all": true
+      },
+      "enabled": true
+    }
+  ]
+}

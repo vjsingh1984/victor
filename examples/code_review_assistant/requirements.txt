@@ -1,0 +1,27 @@
+# Victor AI Code Review Assistant Requirements
+
+# Core Victor AI
+victor-ai[coding]==0.5.1
+
+# CLI Framework
+click>=8.1.0
+rich>=13.0.0
+
+# Code Analysis
+tree-sitter>=0.20.0
+tree-sitter-python>=0.20.0
+tree-sitter-javascript>=0.20.0
+tree-sitter-go>=0.20.0
+tree-sitter-rust>=0.20.0
+
+# LSP Support
+pygls>=0.13.0
+
+# Reporting
+jinja2>=3.1.0
+markdown>=3.4.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0

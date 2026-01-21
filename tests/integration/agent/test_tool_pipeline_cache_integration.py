@@ -113,7 +113,13 @@ class TestToolPipelineDecisionCache:
 
     @pytest.mark.asyncio
     async def test_execute_single_call_uses_cache(self, pipeline):
-        """Test that _execute_single_call uses the decision cache."""
+        """Test that _execute_single_call uses the decision cache.
+
+        Note: The cache stores validation results. When the same tool is called
+        twice, the second call should be a cache hit for validation.
+        Normalization may or may not be cached depending on whether the
+        arguments actually needed normalization.
+        """
         # Mock the tool registry to return a valid tool
         pipeline.tools.is_tool_enabled = lambda x: True
         pipeline.tools.has_tool = lambda x: True
@@ -125,10 +131,20 @@ class TestToolPipelineDecisionCache:
         result1 = await pipeline._execute_single_call(tool_call, {})
         result2 = await pipeline._execute_single_call(tool_call, {})
 
-        # Check that cache was used
+        # Check that cache was used for validation
         stats = pipeline._decision_cache.get_stats()
-        assert stats["validation_cache_size"] > 0
-        assert stats["normalization_cache_size"] > 0
+
+        # Validation should be cached (at least 1 entry)
+        assert stats["validation_cache_size"] > 0, \
+            f"Expected validation cache to have entries, got size: {stats['validation_cache_size']}"
+
+        # We should have at least 1 cache hit (second call hits the cache)
+        assert stats["hits"] >= 1, \
+            f"Expected at least 1 cache hit, got: {stats['hits']}"
+
+        # Hit rate should be > 0 (some cache hits occurred)
+        assert stats["hit_rate"] > 0, \
+            f"Expected positive hit rate, got: {stats['hit_rate']}"
 
     def test_cache_hit_rate_increases_with_repeated_calls(self, pipeline):
         """Test that cache hit rate improves with repeated calls."""

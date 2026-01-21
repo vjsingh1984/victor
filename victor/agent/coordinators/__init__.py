@@ -300,6 +300,27 @@ from victor.agent.coordinators.intelligent_feature_coordinator import (
     IntelligentFeatureCoordinator,
     create_intelligent_feature_coordinator,
 )
+# Phase 2 - Tool Call Coordination
+from victor.agent.coordinators.tool_call_coordinator import (
+    ToolCallCoordinator,
+    create_tool_call_coordinator,
+)
+from victor.agent.coordinators.tool_call_protocol import (
+    IToolCallCoordinator,
+    ToolCallContext,
+    ToolCallResult,
+    ToolCallCoordinatorConfig,
+)
+# Phase 2 - Prompt Builder Coordination
+from victor.agent.coordinators.prompt_builder_coordinator import (
+    PromptBuilderCoordinator,
+    create_prompt_builder_coordinator,
+)
+from victor.agent.coordinators.prompt_builder_protocol import (
+    IPromptBuilderCoordinator,
+    PromptContext,
+    PromptBuilderCoordinatorConfig,
+)
 
 __all__ = [
     # Base configuration
@@ -433,4 +454,17 @@ __all__ = [
     "create_middleware_coordinator",
     "IntelligentFeatureCoordinator",
     "create_intelligent_feature_coordinator",
+    # Phase 2 - Tool Call Coordination
+    "ToolCallCoordinator",
+    "create_tool_call_coordinator",
+    "IToolCallCoordinator",
+    "ToolCallContext",
+    "ToolCallResult",
+    "ToolCallCoordinatorConfig",
+    # Phase 2 - Prompt Builder Coordination
+    "PromptBuilderCoordinator",
+    "create_prompt_builder_coordinator",
+    "IPromptBuilderCoordinator",
+    "PromptContext",
+    "PromptBuilderCoordinatorConfig",
 ]

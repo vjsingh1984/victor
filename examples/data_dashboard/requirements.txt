@@ -1,0 +1,36 @@
+# Victor AI Data Analysis Dashboard Requirements
+
+# Core Victor AI
+victor-ai[dataanalysis]==0.5.1
+
+# Dashboard Framework
+streamlit>=1.28.0
+streamlit-ace>=0.1.0
+
+# Data Processing
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Data Loading
+openpyxl>=3.1.0
+xlrd>=2.0.0
+pyarrow>=12.0.0
+
+# Visualization
+plotly>=5.17.0
+seaborn>=0.12.0
+matplotlib>=3.7.0
+
+# Statistics
+scikit-learn>=1.3.0
+statsmodels>=0.14.0
+
+# Export
+reportlab>=4.0.0
+xlsxwriter>=3.1.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0

@@ -1068,6 +1068,98 @@ def get_configured_services() -> list[str]:
     return sorted(configured)
 
 
+class APIKeysProxy:
+    """Proxy for accessing API keys as a dictionary.
+
+    This provides backward compatibility for code that expects
+    victor.config.api_keys.api_keys to be a dict-like object.
+
+    Usage:
+        keys = victor.config.api_keys.api_keys
+        anthropic_key = keys.get("anthropic")
+    """
+
+    def __init__(self):
+        """Initialize the API keys proxy."""
+        self._manager: Optional[APIKeyManager] = None
+
+    def _get_manager(self) -> APIKeyManager:
+        """Get or create the API key manager."""
+        if self._manager is None:
+            self._manager = APIKeyManager()
+        return self._manager
+
+    def get(self, provider: str, default: Optional[str] = None) -> Optional[str]:
+        """Get API key for a provider.
+
+        Args:
+            provider: Provider name
+            default: Default value if not found
+
+        Returns:
+            API key or default value
+        """
+        key = self._get_manager().get_key(provider)
+        return key if key is not None else default
+
+    def __getitem__(self, provider: str) -> Optional[str]:
+        """Get API key using dictionary syntax.
+
+        Args:
+            provider: Provider name
+
+        Returns:
+            API key or None if not found
+        """
+        return self._get_manager().get_key(provider)
+
+    def __contains__(self, provider: str) -> bool:
+        """Check if provider has a configured key.
+
+        Args:
+            provider: Provider name
+
+        Returns:
+            True if key is configured
+        """
+        return self._get_manager().get_key(provider) is not None
+
+    def __repr__(self) -> str:
+        """Return representation of configured keys."""
+        configured = self._get_manager().list_configured_providers()
+        return f"APIKeysProxy(configured={configured})"
+
+    def keys(self):
+        """Return list of providers with configured keys."""
+        return self._get_manager().list_configured_providers()
+
+    def values(self):
+        """Return list of configured API key values."""
+        result = []
+        for provider in self._get_manager().list_configured_providers():
+            key = self._get_manager().get_key(provider)
+            if key:
+                # Return masked value for security
+                result.append(f"{key[:8]}...{key[-4:]}")
+        return result
+
+    def items(self):
+        """Return list of (provider, masked_key) tuples."""
+        result = []
+        for provider in self._get_manager().list_configured_providers():
+            key = self._get_manager().get_key(provider)
+            if key:
+                # Return masked value for security
+                masked = f"{key[:8]}...{key[-4:]}"
+                result.append((provider, masked))
+        return result
+
+
+# Module-level api_keys attribute for backward compatibility
+# This provides dict-like access to configured API keys
+api_keys = APIKeysProxy()
+
+
 def create_api_keys_template() -> str:
     """Generate a template for the API keys file.
 

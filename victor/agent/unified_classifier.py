@@ -712,13 +712,14 @@ class UnifiedTaskClassifier:
                     confidence = min(confidence + 0.1, 0.95)
 
         # Determine tool budget based on type
+        # Use centralized budgets from AdaptiveModeController.DEFAULT_TOOL_BUDGETS
         budget_map = {
-            ClassifierTaskType.ANALYSIS: 200,
-            ClassifierTaskType.ACTION: 50,
-            ClassifierTaskType.GENERATION: 10,
-            ClassifierTaskType.SEARCH: 30,
-            ClassifierTaskType.EDIT: 40,
-            ClassifierTaskType.DEFAULT: 20,
+            ClassifierTaskType.ANALYSIS: 50,      # Maps to "analyze" in AdaptiveModeController
+            ClassifierTaskType.ACTION: 50,         # Maps to "general" in AdaptiveModeController
+            ClassifierTaskType.GENERATION: 15,     # Maps to "create" in AdaptiveModeController
+            ClassifierTaskType.SEARCH: 25,         # Maps to "search" in AdaptiveModeController
+            ClassifierTaskType.EDIT: 15,           # Maps to "edit" in AdaptiveModeController
+            ClassifierTaskType.DEFAULT: 50,        # Maps to "general" in AdaptiveModeController
         }
 
         # Temperature adjustment

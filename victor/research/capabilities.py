@@ -438,22 +438,27 @@ class ResearchCapabilityProvider(BaseVerticalCapabilityProvider):
     def configure_source_verification(self, orchestrator: Any, **kwargs: Any) -> None:
         """Configure source verification capability."""
         configure_source_verification(orchestrator, **kwargs)
+        self._applied.add("source_verification")
 
     def configure_citation_management(self, orchestrator: Any, **kwargs: Any) -> None:
         """Configure citation management capability."""
         configure_citation_management(orchestrator, **kwargs)
+        self._applied.add("citation_management")
 
     def configure_research_quality(self, orchestrator: Any, **kwargs: Any) -> None:
         """Configure research quality capability."""
         configure_research_quality(orchestrator, **kwargs)
+        self._applied.add("research_quality")
 
     def configure_literature_analysis(self, orchestrator: Any, **kwargs: Any) -> None:
         """Configure literature analysis capability."""
         configure_literature_analysis(orchestrator, **kwargs)
+        self._applied.add("literature_analysis")
 
     def configure_fact_checking(self, orchestrator: Any, **kwargs: Any) -> None:
         """Configure fact-checking capability."""
         configure_fact_checking(orchestrator, **kwargs)
+        self._applied.add("fact_checking")
 
     def get_source_verification(self, orchestrator: Any) -> Dict[str, Any]:
         """Get source verification configuration."""

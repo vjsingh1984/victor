@@ -1,0 +1,223 @@
+# Default values for victor-monitoring
+# This is a YAML-formatted file.
+
+# Global settings
+global:
+  enabled: true
+  environment: production
+  imagePullPolicy: IfNotPresent
+  imageRegistry: ""
+
+# Namespace configuration
+namespace:
+  create: true
+  name: victor-monitoring
+
+# Prometheus configuration
+prometheus:
+  enabled: true
+  replicas: 1
+
+  image:
+    repository: prom/prometheus
+    tag: v2.45.0
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+  persistence:
+    enabled: true
+    storageClass: standard
+    size: 50Gi
+
+  retention:
+    time: 30d
+    size: 50GB
+
+  scrapeInterval: 15s
+  evaluationInterval: 15s
+
+  service:
+    type: ClusterIP
+    port: 9090
+
+  ingress:
+    enabled: true
+    className: nginx
+    host: prometheus.victor-ai.com
+    tls: true
+
+# Grafana configuration
+grafana:
+  enabled: true
+  replicas: 1
+
+  image:
+    repository: grafana/grafana
+    tag: 10.0.0
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+  persistence:
+    enabled: true
+    storageClass: standard
+    size: 10Gi
+
+  service:
+    type: ClusterIP
+    port: 3000
+
+  ingress:
+    enabled: true
+    className: nginx
+    host: grafana.victor-ai.com
+    tls: true
+
+  credentials:
+    adminUser: admin
+    adminPassword: changeme123  # CHANGE THIS IN PRODUCTION
+
+  plugins:
+    - grafana-piechart-panel
+
+  datasources:
+    prometheus:
+      enabled: true
+      url: http://prometheus:9090
+      isDefault: true
+
+# AlertManager configuration
+alertmanager:
+  enabled: true
+  replicas: 1
+
+  image:
+    repository: prom/alertmanager
+    tag: v0.25.0
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  persistence:
+    enabled: true
+    storageClass: standard
+    size: 2Gi
+
+  service:
+    type: ClusterIP
+    port: 9093
+
+  ingress:
+    enabled: true
+    className: nginx
+    host: alertmanager.victor-ai.com
+    tls: true
+
+  # Alert notification configuration
+  notifications:
+    email:
+      enabled: false
+      to: alerts@victor-ai.com
+      from: alertmanager@victor-ai.com
+      smarthost: localhost:587
+
+    slack:
+      enabled: false
+      apiUrl: https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+      channel: '#victor-alerts'
+
+    webhook:
+      enabled: false
+      url: http://victor-webhook:8080/alerts
+
+# OpenTelemetry Collector configuration
+otelCollector:
+  enabled: true
+  replicas: 1
+
+  image:
+    repository: otel/opentelemetry-collector-contrib
+    tag: 0.80.0
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  service:
+    type: ClusterIP
+    ports:
+      otlpGrpc: 4317
+      otlpHttp: 4318
+      metrics: 8888
+      healthCheck: 13133
+
+# Network policies
+networkPolicy:
+  enabled: true
+  ingressEnabled: true
+
+# RBAC
+rbac:
+  create: true
+
+# Service accounts
+serviceAccounts:
+  prometheus:
+    create: true
+    name: prometheus
+  grafana:
+    create: true
+    name: grafana
+
+# Pod security
+podSecurityContext:
+  runAsNonRoot: true
+  fsGroup: 65534
+
+# Container security
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  runAsUser: 65534
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Topology spread constraints
+topologySpreadConstraints: []
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod labels
+podLabels: {}

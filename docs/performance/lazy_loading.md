@@ -1,603 +1,356 @@
-# Lazy Loading for Verticals
+# Lazy Loading Implementation for Vertical Extensions
 
 ## Overview
 
-Victor implements lazy loading for vertical imports to significantly improve startup time. Instead of eagerly importing all vertical assistant classes at startup, Victor defers the import until the vertical is first accessed.
+Victor implements lazy loading for vertical extensions to improve startup time and reduce initial memory footprint. This document describes the lazy loading architecture, configuration options, and performance impact.
 
-## Performance Impact
+## Architecture
 
-Lazy loading provides **90.3% faster startup time**:
+### Key Components
 
-| Metric | Eager Loading | Lazy Loading | Improvement |
-|--------|--------------|--------------|-------------|
-| Core Import | 1805ms | 176ms | **90.3% faster** |
-| First Access (cached) | 0ms | 30ms | One-time cost |
-| Total Startup | 1805ms | 205ms | **88.6% faster** |
+1. **LazyVerticalExtensions** (`victor/core/verticals/lazy_extensions.py`)
+   - Thread-safe wrapper for `VerticalExtensions`
+   - Defers loading until first access
+   - Uses double-checked locking pattern
 
-### Real-World Scenarios
+2. **LazyVerticalProxy** (`victor/core/verticals/lazy_loader.py`)
+   - Proxy for lazy-loaded vertical classes
+   - Transparent attribute forwarding
+   - Thread-safe lazy initialization
 
-**Scenario 1: Use only one vertical (e.g., coding)**
-- Lazy Loading: 163ms
-- Eager Loading: 333ms
-- **Improvement: 51.1% faster**
+3. **ExtensionLoader Integration** (`victor/core/verticals/extension_loader.py`)
+   - `get_extensions()` method supports lazy loading
+   - Returns `LazyVerticalExtensions` wrapper when enabled
+   - Falls back to eager loading for backward compatibility
 
-**Scenario 2: List verticals only (no access)**
-- Lazy Loading: 133ms
-- Eager Loading: 343ms
-- **Improvement: 61.2% faster**
-
-## How It Works
-
-### Registration
-
-Verticals are registered as lazy imports using the `VerticalRegistry.register_lazy_import()` method:
-
-```python
-# victor/core/verticals/__init__.py
-
-def _register_builtin_verticals() -> None:
-    """Register all built-in verticals with lazy loading."""
-    lazy_loading_enabled = os.getenv("VICTOR_LAZY_LOADING", "true").lower() == "true"
-
-    if lazy_loading_enabled:
-        # Register lazy imports - loaded on first access
-        VerticalRegistry.register_lazy_import(
-            "coding",
-            "victor.coding:CodingAssistant"
-        )
-        VerticalRegistry.register_lazy_import(
-            "research",
-            "victor.research:ResearchAssistant"
-        )
-        # ... more verticals
-    else:
-        # Eager loading - legacy behavior
-        from victor.coding import CodingAssistant
-        VerticalRegistry.register(CodingAssistant)
-```
-
-### Access Pattern
-
-When you access a vertical, it's automatically loaded:
-
-```python
-from victor.core.verticals import VerticalRegistry
-
-# First access triggers lazy import
-coding = VerticalRegistry.get("coding")  # Loads victor.coding here
-
-# Subsequent accesses use cached class
-coding2 = VerticalRegistry.get("coding")  # Returns cached instance
-
-# Use the vertical normally
-config = coding.get_config()
-tools = coding.get_tools()
-```
+4. **VerticalLoader Integration** (`victor/core/verticals/vertical_loader.py`)
+   - `load()` method supports lazy parameter
+   - Returns `LazyVerticalProxy` when lazy=True
+   - Configurable via `vertical_loading_mode` setting
 
 ## Configuration
 
-### Enable/Disable Lazy Loading
+### Environment Variables
 
-Lazy loading is **enabled by default**. You can control it via environment variable:
+#### VICTOR_LAZY_EXTENSIONS
+
+Controls when vertical extensions are loaded:
+
+- **true** (default): Load extensions lazily (on first access)
+- **false**: Load extensions eagerly (at startup)
+- **auto**: Automatically choose based on profile (production=lazy, dev=eager)
 
 ```bash
 # Enable lazy loading (default)
-export VICTOR_LAZY_LOADING=true
+export VICTOR_LAZY_EXTENSIONS=true
 
-# Disable lazy loading (eager loading)
-export VICTOR_LAZY_LOADING=false
+# Disable lazy loading (eager mode)
+export VICTOR_LAZY_EXTENSIONS=false
+
+# Auto mode (profile-based)
+export VICTOR_LAZY_EXTENSIONS=auto
 ```
 
-### When to Use Eager Loading
+#### VICTOR_VERTICAL_LOADING_MODE
 
-Consider disabling lazy loading (eager loading) when:
-- You need to access all verticals immediately (e.g., batch processing)
-- You want to avoid the one-time lazy load cost during critical operations
-- You're debugging vertical import issues
+Controls when vertical classes are loaded:
 
-## API Reference
+- **eager** (default): Load verticals immediately at startup
+- **lazy**: Load vertical metadata only, defer heavy imports
+- **auto**: Automatically choose based on environment
 
-### VerticalRegistry.register_lazy_import()
+```bash
+# Enable lazy vertical loading
+export VICTOR_VERTICAL_LOADING_MODE=lazy
 
-Register a vertical for lazy loading.
+# Disable (eager mode)
+export VICTOR_VERTICAL_LOADING_MODE=eager
+```
+
+### Python Settings
 
 ```python
-VerticalRegistry.register_lazy_import(
-    name: str,           # Vertical name (e.g., "coding")
-    import_path: str     # Import path "module:ClassName"
-)
+from victor.config.settings import Settings
+
+settings = Settings()
+
+# Check current mode
+print(settings.vertical_loading_mode)  # "eager", "lazy", or "auto"
 ```
 
-**Example:**
-```python
-VerticalRegistry.register_lazy_import(
-    "my_vertical",
-    "my_package:MyVerticalAssistant"
-)
-```
+## Performance Impact
 
-### VerticalRegistry.get()
+### Benchmark Results
 
-Get a vertical by name, triggering lazy load if needed.
+Based on benchmark_lazy_loading.py (2026-01-20):
 
-```python
-vertical = VerticalRegistry.get(name: str) -> Optional[Type[VerticalBase]]
-```
+| Metric | Eager Mode | Lazy Mode | Improvement |
+|--------|-----------|-----------|-------------|
+| Startup Time | 678.44ms | 658.33ms | 3.0% (20ms saved) |
+| Memory (startup) | ~150MB | ~145MB | 3.3% reduction |
+| First Access | <1ms | ~265ms avg | One-time overhead |
 
-**Returns:**
-- `VerticalBase` subclass if found
-- `None` if not found or import fails
+**Note**: The current implementation shows modest improvement (3%) because:
+1. Most extensions are already lightweight
+2. YAML configuration loading dominates startup time
+3. Only 5 verticals tested (coding, research, devops, dataanalysis, benchmark)
 
-### VerticalRegistry.list_names()
+Expected improvement scales with:
+- Number of verticals (more verticals = more benefit)
+- Extension complexity (heavy extensions = more benefit)
+- Use case (CLI tools benefit more than long-running servers)
 
-List all registered vertical names (including lazy imports).
+### When to Use Lazy Loading
 
-```python
-names = VerticalRegistry.list_names() -> List[str]
-```
+**Enable lazy loading when:**
+- Building CLI tools or scripts with short runtime
+- Running in resource-constrained environments
+- Many verticals are installed but few are used
+- Startup time is critical
 
-**Note:** This does **not** trigger lazy loading. It returns both registered and lazy-imported vertical names.
+**Disable lazy loading (use eager) when:**
+- Running long-running server processes
+- All verticals will be used immediately
+- First-access latency is unacceptable
+- Debugging extension loading issues
 
 ## Implementation Details
 
 ### Thread Safety
 
-Lazy loading is thread-safe with double-checked locking:
-
-1. Check if already loaded (fast path)
-2. Acquire lock
-3. Check again (another thread might have loaded it)
-4. Load if still not loaded
-
-Multiple threads can safely access the same vertical simultaneously.
-
-### Error Handling
-
-Failed lazy imports are automatically removed from the registry:
+Lazy loading uses the double-checked locking pattern:
 
 ```python
-# Invalid import path
-VerticalRegistry.register_lazy_import(
-    "invalid",
-    "nonexistent.module:InvalidClass"
-)
-
-# First access fails and removes the entry
-result = VerticalRegistry.get("invalid")  # Returns None
-assert "invalid" not in VerticalRegistry._lazy_imports  # Removed
+def load(self):
+    # Fast path: no lock
+    if self._loaded:
+        return self._instance
+    
+    # Slow path: with lock
+    with self._load_lock:
+        # Double-check
+        if self._loaded:
+            return self._instance
+        
+        # Load
+        self._instance = self.loader()
+        self._loaded = True
+        return self._instance
 ```
 
-### Name Normalization
+This ensures:
+1. Thread-safe lazy initialization
+2. Minimal lock contention (fast path is lock-free)
+3. No recursive loading
 
-Vertical names are normalized using `normalize_vertical_name()`:
+### LazyVerticalExtensions Protocol
 
-- "dataanalysis" → "data_analysis"
-- "myVertical" → "my_vertical"
-- "My_Vertical" → "my_vertical"
-
-This ensures consistent naming regardless of how the vertical is registered or accessed.
-
-## Best Practices
-
-### 1. Use Lazy Loading by Default
+The lazy wrapper implements the full `VerticalExtensions` protocol by proxying:
 
 ```python
-# GOOD - Lazy loading enabled
-from victor.core.verticals import VerticalRegistry
-
-coding = VerticalRegistry.get("coding")
-config = coding.get_config()
+class LazyVerticalExtensions:
+    @property
+    def middleware(self):
+        extensions = self._load_extensions()  # Triggers loading
+        return extensions.middleware
+    
+    @property
+    def safety_extensions(self):
+        extensions = self._load_extensions()  # Uses cached value
+        return extensions.safety_extensions
 ```
 
-### 2. Access Verticals Once and Reuse
+All extension properties trigger loading on first access and cache the result.
+
+### Integration Points
+
+**1. VerticalExtensionLoader.get_extensions()**
 
 ```python
-# GOOD - Access once, reuse
-coding = VerticalRegistry.get("coding")
-tools1 = coding.get_tools()
-tools2 = coding.get_tools()  # Uses same class
-
-# AVOID - Repeated access (slight overhead)
-tools1 = VerticalRegistry.get("coding").get_tools()
-tools2 = VerticalRegistry.get("coding").get_tools()
+@classmethod
+def get_extensions(cls, *, use_cache: bool = True, use_lazy: Optional[bool] = None):
+    # Determine if lazy loading should be used
+    if use_lazy is None:
+        trigger = get_extension_load_trigger()
+        use_lazy = trigger != "eager"
+    
+    # Return lazy wrapper if enabled
+    if use_lazy:
+        return create_lazy_extensions(
+            vertical_name=cls.name,
+            loader=lambda: cls._load_extensions_eager(use_cache=use_cache),
+            trigger=trigger,
+        )
+    
+    # Eager loading path
+    return cls._load_extensions_eager(use_cache=use_cache)
 ```
 
-### 3. Preload Critical Verticals (if needed)
+**2. VerticalLoader.load()**
 
 ```python
-# If you need eager loading for specific verticals
-from victor.coding import CodingAssistant
-from victor.research import ResearchAssistant
-
-# These are now cached and won't be lazy-loaded later
+def load(self, name: str, lazy: Optional[bool] = None):
+    # Determine if lazy loading should be used
+    use_lazy = lazy if lazy is not None else self._lazy_mode
+    
+    vertical = VerticalRegistry.get(name)
+    
+    # Return lazy proxy if enabled
+    if use_lazy:
+        def _load_vertical():
+            self._activate(vertical)
+            return vertical
+        
+        proxy = LazyVerticalProxy(vertical_name=name, loader=_load_vertical)
+        return proxy
+    
+    # Eager mode: activate immediately
+    self._activate(vertical)
+    return vertical
 ```
 
-## Migration Guide
+## Testing
 
-### For Victor Users
-
-**No changes required!** Lazy loading is transparent and backward compatible.
-
-Existing code continues to work:
-
-```python
-# This works exactly the same with lazy loading
-from victor.coding import CodingAssistant
-
-config = CodingAssistant.get_config()
-tools = CodingAssistant.get_tools()
-```
-
-### For Vertical Developers
-
-If you're developing a custom vertical, register it for lazy loading:
-
-```python
-# In your vertical's __init__.py or registration module
-from victor.core.verticals import VerticalRegistry
-
-VerticalRegistry.register_lazy_import(
-    "my_vertical",
-    "my_package:MyVerticalAssistant"
-)
-```
-
-Or use entry points in `pyproject.toml`:
-
-```toml
-[project.entry-points."victor.verticals"]
-my_vertical = "my_package:MyVerticalAssistant"
-```
-
-## Benchmarks
-
-Run the benchmark suite to measure performance on your system:
+### Running Benchmarks
 
 ```bash
-# Compare eager vs lazy loading
-python benchmarks/benchmark_lazy_loading.py
+# Run full benchmark suite
+python scripts/benchmark_lazy_loading.py
 
-# Detailed startup time analysis
-python benchmarks/benchmark_startup.py
+# Test specific verticals
+python scripts/benchmark_lazy_loading.py --verticals coding,research
+
+# Generate markdown report
+python scripts/benchmark_lazy_loading.py --output markdown
+
+# Multiple iterations for accuracy
+python scripts/benchmark_lazy_loading.py --iterations 5
 ```
 
-### Benchmark Results (Reference System)
+### Unit Tests
 
-**System:** macOS, Python 3.12, M-series CPU
+```bash
+# Test lazy loading functionality
+pytest tests/unit/test_lazy_loading.py -v
 
-| Benchmark | Eager | Lazy | Improvement |
-|-----------|-------|------|-------------|
-| Core Import | 1805ms | 176ms | 90.3% |
-| Use 1 Vertical | 333ms | 163ms | 51.1% |
-| List Verticals | 343ms | 133ms | 61.2% |
+# Test extension loading
+pytest tests/unit/verticals/test_extension_loader.py -v
+
+# Test vertical loading
+pytest tests/unit/verticals/test_vertical_loader.py -v
+```
 
 ## Troubleshooting
 
-### Issue: Vertical Not Found
+### Issue: Extensions not loading lazily
 
-**Symptom:** `VerticalRegistry.get("my_vertical")` returns `None`
+**Symptoms**: Startup time doesn't improve with `VICTOR_LAZY_EXTENSIONS=true`
 
-**Solution:** Check that the vertical is registered:
+**Solutions**:
+1. Verify environment variable is set: `echo $VICTOR_LAZY_EXTENSIONS`
+2. Check if calling code bypasses lazy loading: `get_extensions(use_lazy=False)`
+3. Ensure extensions are actually being loaded (check logs for "Lazy loading extensions")
+
+### Issue: First access too slow
+
+**Symptoms**: First extension access takes >500ms
+
+**Solutions**:
+1. Check if heavy imports in extension modules
+2. Consider preloading critical extensions: `get_extensions(use_lazy=False)`
+3. Profile to identify bottlenecks: `python -m cProfile -o profile.stats script.py`
+
+### Issue: Recursive loading detected
+
+**Symptoms**: `RuntimeError: Recursive loading detected`
+
+**Solutions**:
+1. Check for circular dependencies in extension imports
+2. Ensure `__init_subclass__` doesn't call `get_extensions()`
+3. Use lazy imports within extension modules: `import module` inside methods
+
+### Issue: Memory not reduced
+
+**Symptoms**: Memory usage similar between eager and lazy modes
+
+**Solutions**:
+1. Verify lazy loading is actually enabled (check logs)
+2. Measure memory after first access (lazy loading defers, doesn't eliminate)
+3. Check for other memory-intensive operations during startup
+
+## Best Practices
+
+### 1. For Vertical Developers
+
+- **Keep extensions lightweight**: Avoid heavy imports at module level
+- **Use lazy imports**: Import heavy modules inside methods, not at top level
+- **Document dependencies**: Clearly document which extensions require which resources
+
+Example:
 ```python
-from victor.core.verticals import VerticalRegistry
+# BAD: Heavy import at module level
+from transformers import pipeline  # 500MB+
 
-print(VerticalRegistry.list_names())
-print(VerticalRegistry._lazy_imports)
+class MyExtension:
+    def __init__(self):
+        self.model = pipeline("translation")
+
+# GOOD: Lazy import
+class MyExtension:
+    def __init__(self):
+        pass
+    
+    def get_model(self):
+        if not hasattr(self, '_model'):
+            from transformers import pipeline
+            self._model = pipeline("translation")
+        return self._model
 ```
 
-### Issue: Import Error on Access
+### 2. For Application Developers
 
-**Symptom:** First access to a vertical raises `ImportError`
+- **Profile before optimizing**: Measure to find actual bottlenecks
+- **Consider use case**: CLI tools benefit more than servers
+- **Test both modes**: Verify functionality works in both eager and lazy modes
 
-**Solution:** Verify the import path format:
-```python
-# Correct format: "module.path:ClassName"
-VerticalRegistry.register_lazy_import(
-    "coding",
-    "victor.coding:CodingAssistant"  # ✅ Correct
-)
+### 3. For DevOps Engineers
 
-# Wrong formats:
-"victor.coding.CodingAssistant"  # ❌ Missing colon
-"victor.coding:CodingAssistant:Extra"  # ❌ Too many parts
-```
-
-### Issue: Performance Degradation
-
-**Symptom:** First access to vertical is slow
-
-**Explanation:** This is expected! The first access triggers the import, which has a one-time cost. Subsequent accesses are fast (cached).
-
-**Solution:** If you need consistent performance, preload critical verticals:
-```python
-# Preload at startup
-from victor.coding import CodingAssistant
-from victor.research import ResearchAssistant
-```
-
-## Lazy Loading for Vertical Extensions (New Implementation)
-
-### Overview
-
-In addition to lazy import loading, Victor now supports lazy loading for **vertical extensions** to further improve startup time. This feature defers the loading of heavy extension modules (prompts, safety, workflows) until they are actually needed.
-
-### Configuration
-
-The `vertical_loading_mode` setting controls when vertical extensions are loaded:
-
-```bash
-# In settings file or environment variable
-export VICTOR_VERTICAL_LOADING_MODE=lazy
-
-# Or in .env file
-VICTOR_VERTICAL_LOADING_MODE=lazy
-
-# Or in profiles.yaml
-vertical_loading_mode: lazy
-```
-
-### Loading Modes
-
-1. **eager** (default): Load all extensions immediately at startup
-2. **lazy**: Load metadata only, defer heavy modules until first access
-3. **auto**: Automatically choose based on environment (production=lazy, dev=eager)
-
-### Usage
-
-```python
-from victor.core.verticals.vertical_loader import VerticalLoader, load_vertical
-
-# Configure lazy mode
-loader = VerticalLoader()
-loader.configure_lazy_mode(settings)
-
-# Load vertical (respects configured mode)
-vertical = loader.load("coding")
-
-# Force lazy/eager loading
-vertical_lazy = loader.load("coding", lazy=True)
-vertical_eager = loader.load("coding", lazy=False)
-```
-
-### LazyVerticalProxy API
-
-```python
-from victor.core.verticals.lazy_loader import LazyVerticalProxy, LoadTrigger
-
-# Create lazy loader
-loader = LazyVerticalLoader(load_trigger=LoadTrigger.ON_DEMAND)
-loader.register_vertical("coding", lambda: CodingAssistant)
-
-# Get vertical (loads on first access)
-coding = loader.get_vertical("coding")
-
-# Check if loaded
-if coding.is_loaded():
-    print("Already loaded")
-
-# Force immediate loading
-coding.force_load()
-
-# Unload to free memory
-loader.unload_vertical("coding")
-```
-
-### Thread Safety
-
-All lazy loading operations are thread-safe using double-checked locking. Multiple threads can safely access the same vertical simultaneously - it will only be loaded once.
-
-### Performance
-
-Expected improvements:
-- **Startup Time**: 20% reduction (2.5s → 2.0s)
-- **First Access Overhead**: ~50ms (acceptable, one-time)
-- **Memory**: Similar (lazy loader overhead negligible)
-
-### Best Practices
-
-**Use lazy mode when:**
-- Running CLI tools that may not use all verticals
-- Running in production with limited startup time budget
-- Memory-constrained environments
-- Using multiple verticals but not accessing all of them
-
-**Use eager mode when:**
-- Debugging vertical loading issues
-- Running in development with fast startup not critical
-- You need predictable error handling at startup
-- All verticals will be accessed immediately anyway
-
-### Implementation
-
-See `victor/core/verticals/lazy_loader.py` for the thread-safe LazyVerticalProxy implementation.
-
-## Lazy Loading for Vertical Extensions (New)
-
-### Overview
-
-In addition to lazy vertical import loading, Victor now supports **lazy loading for vertical extensions** (middleware, safety patterns, prompt contributors, workflows, etc.) to further improve startup time. This feature defers the loading of heavy extension modules until they are actually accessed.
-
-### Performance Impact
-
-Lazy extension loading provides **~99% faster get_extensions() calls**:
-
-| Operation | Eager Loading | Lazy Loading | Improvement |
-|-----------|--------------|--------------|-------------|
-| get_extensions() call | 245ms | <1ms | **~99% faster** |
-| First extension access | 0ms | ~15ms | One-time cost |
-| Subsequent accesses | <1ms | <1ms | Same performance |
-
-**Total startup time improvement: ~38%** (639ms → 395ms)
-
-### Architecture
-
-The `LazyVerticalExtensions` class is a transparent proxy that:
-
-1. **Defers loading**: Extensions load on first access, not at creation
-2. **Thread-safe**: Uses double-checked locking for concurrent access
-3. **Caches results**: Once loaded, extensions are cached
-4. **Transparent API**: Behaves identically to `VerticalExtensions`
-
-```python
-from victor.coding import CodingAssistant
-
-# Returns LazyVerticalExtensions wrapper
-extensions = CodingAssistant.get_extensions()
-
-# First access triggers loading (~15ms)
-middleware = extensions.middleware
-
-# Subsequent accesses use cache (~0.001ms)
-safety = extensions.safety_extensions
-```
-
-### Configuration
-
-Control lazy extension loading with environment variable:
-
-```bash
-# Enable lazy loading (default, recommended)
-export VICTOR_LAZY_EXTENSIONS=true
-
-# Disable lazy loading (legacy behavior)
-export VICTOR_LAZY_EXTENSIONS=false
-
-# Auto-select based on profile
-export VICTOR_LAZY_EXTENSIONS=auto
-```
-
-**Load triggers:**
-- `true` (default): Load extensions on first access (ON_DEMAND)
-- `false`: Load extensions immediately (EAGER)
-- `auto`: Choose based on `VICTOR_PROFILE` (production=ON_DEMAND, dev=EAGER)
-
-### Usage
-
-```python
-from victor.coding import CodingAssistant
-
-# Default: lazy loading enabled
-extensions = CodingAssistant.get_extensions()
-print(f"Loaded: {extensions.is_loaded()}")  # False
-
-# Access triggers loading
-middleware = extensions.middleware
-print(f"Loaded: {extensions.is_loaded()}")  # True
-
-# Force eager loading (override env var)
-extensions = CodingAssistant.get_extensions(use_lazy=False)
-# Extensions already loaded
-```
-
-### API Reference
-
-#### LazyVerticalExtensions
-
-Thread-safe proxy for lazy-loaded extensions.
-
-```python
-from victor.core.verticals.lazy_extensions import LazyVerticalExtensions
-
-lazy_ext = LazyVerticalExtensions(
-    vertical_name="coding",
-    loader=lambda: load_extensions(),
-    trigger=ExtensionLoadTrigger.ON_DEMAND,
-)
-
-# Check if loaded
-if lazy_ext.is_loaded():
-    print("Already loaded")
-
-# Access any extension attribute (triggers loading if needed)
-middleware = lazy_ext.middleware
-safety = lazy_ext.safety_extensions
-
-# Unload to free memory
-lazy_ext.unload()
-```
-
-#### ExtensionLoadTrigger
-
-Enum controlling when extensions load.
-
-```python
-from victor.core.verticals.lazy_extensions import ExtensionLoadTrigger
-
-# Load immediately at startup (legacy behavior)
-ExtensionLoadTrigger.EAGER
-
-# Load when first accessed (default, recommended)
-ExtensionLoadTrigger.ON_DEMAND
-
-# Auto-select based on environment
-ExtensionLoadTrigger.AUTO
-```
-
-### Thread Safety
-
-Lazy extension loading is thread-safe with double-checked locking:
-
-1. Check if loaded (fast path, no lock)
-2. Acquire lock
-3. Check again (another thread might have loaded it)
-4. Load if still not loaded
-
-Multiple threads can safely access the same extensions simultaneously - they will only be loaded once.
-
-### Best Practices
-
-**Use lazy loading when:**
-- Running in production (fast startup critical)
-- Not all extensions are used immediately
-- Memory-constrained environments
-- CLI tools with quick startup requirements
-
-**Use eager loading when:**
-- Debugging extension loading issues
-- All extensions are needed immediately
-- Running in development
-- Predictable performance required
-
-### Migration Guide
-
-**No changes required!** Lazy extension loading is transparent and backward compatible.
-
-Existing code continues to work:
-
-```python
-# This works exactly the same with lazy loading
-extensions = CodingAssistant.get_extensions()
-middleware = extensions.middleware  # Loads on first access
-```
-
-### Implementation Details
-
-See:
-- `victor/core/verticals/lazy_extensions.py` - LazyVerticalExtensions implementation
-- `victor/core/verticals/extension_loader.py` - Integration with get_extensions()
-- `tests/unit/verticals/test_lazy_extensions.py` - Test suite
+- **Use eager mode in production servers**: All verticals used anyway
+- **Use lazy mode in CLI tools**: Faster startup for short-running tasks
+- **Monitor first-access latency**: Ensure acceptable user experience
 
 ## Future Improvements
 
-Potential enhancements to lazy loading:
+### Planned Enhancements
 
-1. **Async Loading:** Load verticals asynchronously in the background
-2. **Dependency Tracking:** Auto-load dependent verticals
-3. **Selective Loading:** Load only required extensions
-4. **Hot Reload:** Reload verticals without restart
-5. **Metrics:** Track lazy loading statistics
+1. **Selective lazy loading**: Load only specific extensions lazily
+   ```python
+   # Future API
+   get_extensions(lazy=["safety", "workflow"], eager=["middleware"])
+   ```
 
-## Related Documentation
+2. **Async preloading**: Start loading in background, return when ready
+   ```python
+   # Future API
+   extensions = await get_extensions_async()
+   ```
 
-- [Vertical Architecture](../architecture/verticals.md)
-- [Vertical Registry](../api/vertical_registry.md)
-- [Performance Best Practices](../performance/best_practices.md)
-- [Extension Loading](../architecture/extensions.md)
+3. **Dependency tracking**: Automatically load dependent extensions
+   ```python
+   # Future: Automatically load workflow if provider loaded
+   ```
 
-## See Also
+4. **Metrics integration**: Track lazy loading effectiveness
+   ```python
+   # Future API
+   stats = get_lazy_loading_stats()
+   print(f"Extensions loaded: {stats.loaded_count}/{stats.total_count}")
+   ```
 
-- `victor/core/verticals/base.py` - VerticalRegistry implementation
-- `victor/core/verticals/lazy_loader.py` - Lazy vertical loading utilities
-- `victor/core/verticals/lazy_extensions.py` - Lazy extension loading utilities
-- `tests/unit/verticals/test_lazy_loading.py` - Test suite
-- `tests/unit/verticals/test_lazy_extensions.py` - Extension lazy loading tests
+## References
+
+- **Implementation**: `victor/core/verticals/lazy_extensions.py`
+- **Vertical Loader**: `victor/core/verticals/vertical_loader.py`
+- **Extension Loader**: `victor/core/verticals/extension_loader.py`
+- **Benchmarks**: `scripts/benchmark_lazy_loading.py`
+- **Related**: Track 6 - Lazy Loading Implementation for Extensions

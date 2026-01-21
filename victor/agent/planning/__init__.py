@@ -21,6 +21,8 @@ Components:
 - ExecutionPlan: A plan consisting of steps with dependencies
 - PlanStep: Individual step in a plan
 - AutonomousPlanner: Generates and executes plans
+- HierarchicalPlanner: Hierarchical task decomposition engine
+- TaskDecomposition: Task graph management and algorithms
 
 Example:
     from victor.agent.planning import AutonomousPlanner, ExecutionPlan
@@ -35,8 +37,23 @@ Example:
 
     # Execute plan
     result = await planner.execute_plan(plan, auto_approve=True)
+
+Example - Hierarchical Planning:
+    from victor.agent.planning import HierarchicalPlanner
+
+    planner = HierarchicalPlanner(orchestrator=orchestrator)
+
+    # Decompose task
+    graph = await planner.decompose_task("Implement user authentication")
+
+    # Get next tasks
+    tasks = await planner.suggest_next_tasks(graph)
 """
 
+from victor.agent.planning.autonomous import (
+    AutonomousPlanner,
+    PLANNING_SYSTEM_PROMPT,
+)
 from victor.agent.planning.base import (
     ExecutionPlan,
     PlanResult,
@@ -45,20 +62,49 @@ from victor.agent.planning.base import (
     StepStatus,
     StepType,
 )
-from victor.agent.planning.autonomous import (
-    AutonomousPlanner,
-    PLANNING_SYSTEM_PROMPT,
+from victor.agent.planning.hierarchical_planner import (
+    DECOMPOSITION_SYSTEM_PROMPT,
+    HierarchicalPlanner,
+)
+from victor.agent.planning.task_decomposition import (
+    ComplexityScore,
+    DependencyEdge,
+    DependencyType,
+    SimpleTask,
+    Task,
+    TaskDecomposition,
+    TaskGraph,
+    TaskNode,
+    TaskStatus,
+    UpdatedPlan,
+    ValidationResult,
 )
 
 __all__ = [
-    # Base data structures
+    # Base data structures (autonomous planner)
     "ExecutionPlan",
     "PlanResult",
     "PlanStep",
     "StepResult",
     "StepStatus",
     "StepType",
-    # Planner
+    # Autonomous planner
     "AutonomousPlanner",
     "PLANNING_SYSTEM_PROMPT",
+    # Hierarchical planner
+    "HierarchicalPlanner",
+    "DECOMPOSITION_SYSTEM_PROMPT",
+    # Task decomposition (new NetworkX-based + legacy classes)
+    "SimpleTask",
+    "TaskDecomposition",
+    "TaskNode",
+    "TaskStatus",
+    "DependencyType",
+    "DependencyEdge",
+    # Legacy classes (for backward compatibility with hierarchical_planner)
+    "Task",
+    "TaskGraph",
+    "ComplexityScore",
+    "ValidationResult",
+    "UpdatedPlan",
 ]

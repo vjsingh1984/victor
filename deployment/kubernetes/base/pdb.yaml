@@ -1,0 +1,23 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: victor-ai
+  labels:
+    app: victor-ai
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: victor-ai
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: victor-ai-budget
+  labels:
+    app: victor-ai
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: victor-ai

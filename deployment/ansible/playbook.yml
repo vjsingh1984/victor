@@ -1,0 +1,429 @@
+---
+# Victor AI Ansible Playbook
+# Configures and deploys Victor AI on Linux servers
+
+- name: Deploy Victor AI
+  hosts: victor_ai_servers
+  become: yes
+  gather_facts: yes
+
+  vars:
+    victor_version: "0.5.1"
+    victor_user: "victor"
+    victor_group: "victor"
+    victor_install_dir: "/opt/victor-ai"
+    victor_config_dir: "/etc/victor-ai"
+    victor_data_dir: "/var/lib/victor-ai"
+    victor_log_dir: "/var/log/victor-ai"
+    victor_cache_dir: "/var/cache/victor-ai"
+
+    docker_registry: "docker.io"
+    docker_image: "victorai/victor"
+    docker_tag: "{{ victor_version }}"
+
+    # Database configuration
+    db_host: "localhost"
+    db_port: 5432
+    db_name: "victor"
+    db_user: "victor"
+
+    # Redis configuration
+    redis_host: "localhost"
+    redis_port: 6379
+
+    # Service configuration
+    victor_port: 8000
+    victor_workers: 4
+    victor_log_level: "INFO"
+    victor_profile: "production"
+
+  pre_tasks:
+    - name: Display deployment information
+      debug:
+        msg: "Deploying Victor AI {{ victor_version }} to {{ inventory_hostname }}"
+
+  tasks:
+    # System preparation
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+    - name: Install system dependencies
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - python3
+          - python3-pip
+          - git
+        state: present
+      when: ansible_os_family == "Debian"
+
+    # Docker installation
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Start and enable Docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add user to docker group
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+
+    # Create Victor AI user
+    - name: Create Victor AI system user
+      user:
+        name: "{{ victor_user }}"
+        system: yes
+        shell: /bin/bash
+        home: "{{ victor_data_dir }}"
+        create_home: no
+        comment: "Victor AI Service Account"
+
+    # Create directories
+    - name: Create necessary directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ victor_user }}"
+        group: "{{ victor_group }}"
+        mode: '0755'
+      loop:
+        - "{{ victor_install_dir }}"
+        - "{{ victor_config_dir }}"
+        - "{{ victor_data_dir }}"
+        - "{{ victor_log_dir }}"
+        - "{{ victor_cache_dir }}"
+
+    # Pull Docker image
+    - name: Pull Victor AI Docker image
+      docker_image:
+        name: "{{ docker_registry }}/{{ docker_image }}:{{ docker_tag }}"
+        source: pull
+        state: present
+      retries: 3
+      delay: 5
+
+    # Configuration files
+    - name: Create environment file
+      template:
+        src: templates/environment.j2
+        dest: "{{ victor_config_dir }}/environment"
+        owner: "{{ victor_user }}"
+        group: "{{ victor_group }}"
+        mode: '0600'
+      notify: restart victor-ai
+
+    - name: Create Victor AI configuration
+      template:
+        src: templates/victor_config.yml.j2
+        dest: "{{ victor_config_dir }}/config.yml"
+        owner: "{{ victor_user }}"
+        group: "{{ victor_group }}"
+        mode: '0644'
+      notify: restart victor-ai
+
+    # Systemd service
+    - name: Create systemd service file
+      template:
+        src: templates/victor-ai.service.j2
+        dest: /etc/systemd/system/victor-ai.service
+        mode: '0644'
+      notify:
+        - reload systemd
+        - restart victor-ai
+
+    # Log rotation
+    - name: Configure log rotation
+      template:
+        src: templates/logrotate.j2
+        dest: /etc/logrotate.d/victor-ai
+        mode: '0644'
+
+    # Firewall configuration
+    - name: Configure firewall (ufw)
+      ufw:
+        rule: allow
+        port: "{{ victor_port }}"
+        proto: tcp
+      when: ansible_os_family == "Debian"
+      ignore_errors: yes
+
+    # Monitoring and health checks
+    - name: Create health check script
+      template:
+        src: templates/health_check.sh.j2
+        dest: /usr/local/bin/victor-ai-health-check
+        mode: '0755'
+
+    - name: Create cron job for health checks
+      cron:
+        name: "Victor AI Health Check"
+        minute: "*/5"
+        job: "/usr/local/bin/victor-ai-health-check"
+        user: root
+
+    # Start service
+    - name: Enable and start Victor AI service
+      systemd:
+        name: victor-ai
+        state: started
+        enabled: yes
+        daemon_reload: yes
+
+    # Post-deployment checks
+    - name: Wait for Victor AI to be ready
+      uri:
+        url: "http://localhost:{{ victor_port }}/health"
+        status_code: 200
+        timeout: 5
+      register: result
+      until: result.status == 200
+      retries: 30
+      delay: 5
+
+    - name: Display service status
+      systemd:
+        name: victor-ai
+      register: service_status
+
+    - name: Show service status
+      debug:
+        var: service_status.status.ActiveState
+
+  handlers:
+    - name: reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: restart victor-ai
+      systemd:
+        name: victor-ai
+        state: restarted
+
+- name: Install PostgreSQL database
+  hosts: victor_ai_db_servers
+  become: yes
+  vars:
+    db_name: "victor"
+    db_user: "victor"
+    db_password: "{{ vault_db_password }}"
+
+  tasks:
+    - name: Install PostgreSQL
+      apt:
+        name:
+          - postgresql
+          - postgresql-contrib
+          - python3-psycopg2
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Start and enable PostgreSQL
+      systemd:
+        name: postgresql
+        state: started
+        enabled: yes
+
+    - name: Create database
+      become_user: postgres
+      community.postgresql.postgresql_db:
+        name: "{{ db_name }}"
+
+    - name: Create database user
+      become_user: postgres
+      community.postgresql.postgresql_user:
+        db: "{{ db_name }}"
+        name: "{{ db_user }}"
+        password: "{{ db_password }}"
+        priv: "ALL"
+
+    - name: Grant privileges on database
+      become_user: postgres
+      community.postgresql.postgresql_privs:
+        db: "{{ db_name }}"
+        role: "{{ db_user }}"
+        type: database
+        privs: ALL
+
+- name: Install Redis
+  hosts: victor_ai_redis_servers
+  become: yes
+
+  tasks:
+    - name: Install Redis
+      apt:
+        name:
+          - redis-server
+          - python3-redis
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Configure Redis
+      lineinfile:
+        path: /etc/redis/redis.conf
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+      loop:
+        - { regexp: '^bind ', line: 'bind 0.0.0.0' }
+        - { regexp: '^# requirepass ', line: 'requirepass {{ redis_password }}' }
+        - { regexp: '^maxmemory ', line: 'maxmemory 512mb' }
+        - { regexp: '^maxmemory-policy ', line: 'maxmemory-policy allkeys-lru' }
+      notify: restart redis
+
+    - name: Start and enable Redis
+      systemd:
+        name: redis-server
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: restart redis
+      systemd:
+        name: redis-server
+        state: restarted
+
+- name: Setup Nginx reverse proxy
+  hosts: victor_ai_proxy_servers
+  become: yes
+
+  vars:
+    upstream_servers: "{{ groups['victor_ai_servers'] }}"
+    victor_port: 8000
+    domain_name: "victor-ai.example.com"
+
+  tasks:
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+
+    - name: Create Nginx configuration
+      template:
+        src: templates/nginx.conf.j2
+        dest: /etc/nginx/sites-available/victor-ai
+        mode: '0644'
+      notify: reload nginx
+
+    - name: Enable site
+      file:
+        src: /etc/nginx/sites-available/victor-ai
+        dest: /etc/nginx/sites-enabled/victor-ai
+        state: link
+      notify: reload nginx
+
+    - name: Remove default site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: reload nginx
+
+    - name: Start and enable Nginx
+      systemd:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: Configure firewall
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - "80"
+        - "443"
+      when: ansible_os_family == "Debian"
+      ignore_errors: yes
+
+  handlers:
+    - name: reload nginx
+      systemd:
+        name: nginx
+        state: reloaded
+
+- name: Deploy monitoring stack
+  hosts: victor_ai_monitoring
+  become: yes
+
+  tasks:
+    - name: Create monitoring directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /opt/prometheus
+        - /opt/grafana
+        - /etc/prometheus
+        - /etc/grafana
+
+    - name: Install Prometheus
+      docker_container:
+        name: prometheus
+        image: prom/prometheus:latest
+        state: started
+        restart_policy: unless-stopped
+        ports:
+          - "9090:9090"
+        volumes:
+          - /etc/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+          - /opt/prometheus:/prometheus
+        command:
+          - '--config.file=/etc/prometheus/prometheus.yml'
+          - '--storage.tsdb.path=/prometheus'
+
+    - name: Install Grafana
+      docker_container:
+        name: grafana
+        image: grafana/grafana:latest
+        state: started
+        restart_policy: unless-stopped
+        ports:
+          - "3000:3000"
+        env:
+          GF_SECURITY_ADMIN_PASSWORD: "{{ grafana_password }}"
+        volumes:
+          - /opt/grafana:/var/lib/grafana
+
+    - name: Create Prometheus configuration
+      template:
+        src: templates/prometheus.yml.j2
+        dest: /etc/prometheus/prometheus.yml
+        mode: '0644'
+      notify: restart prometheus
+
+  handlers:
+    - name: restart prometheus
+      docker_container:
+        name: prometheus
+        state: restarted

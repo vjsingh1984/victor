@@ -1552,12 +1552,17 @@ async def read(
     # Format with line numbers (1-indexed, adjusted for offset)
     numbered_content = format_with_line_numbers(truncated_content, start_line=offset + 1)
 
-    # Build informative header
+    # Get total file size for complete metadata
+    file_size_bytes = file_path.stat().st_size
+    file_size_kb = file_size_bytes / 1024
+
+    # Build informative header with explicit units to prevent LLM misinterpretation
     actual_end_line = offset + info.lines_returned
     header_parts = [
-        f"[File: {path}]",
-        f"[Lines {offset + 1}-{actual_end_line} of {total_lines}]",
-        f"[Size: {info.bytes_returned:,} bytes]",
+        f"File: {path}",
+        f"Showing lines {offset + 1}-{actual_end_line} of {total_lines} total lines",
+        f"This file is {file_size_bytes:,} bytes ({file_size_kb:.1f} KB)",
+        f"Showing {info.bytes_returned:,} bytes of content",
     ]
 
     # Add truncation warning with specific details
@@ -1575,7 +1580,15 @@ async def read(
             )
 
     header = "\n".join(header_parts) + "\n\n"
-    return header + numbered_content
+
+    # Add summary footer with explicit metrics to reinforce correct interpretation
+    # This defense-in-depth approach prevents LLM from confusing bytes/lines
+    summary_footer = (
+        f"\n[End of excerpt from {path}]\n"
+        f"File has {total_lines} lines total, {file_size_bytes:,} bytes ({file_size_kb:.1f} KB)\n"
+    )
+
+    return header + numbered_content + summary_footer
 
 
 @tool(

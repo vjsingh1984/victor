@@ -1,0 +1,813 @@
+# Testing Vertical Template
+# Production template for test generation, maintenance, and quality assurance
+# Competitive with GitHub Copilot for Testing, TestGen, Codium
+
+metadata:
+  name: testing
+  description: "Test generation, maintenance, and quality assurance for software projects"
+  version: "1.0.0"
+  author: "Victor Team"
+  license: "Apache-2.0"
+  category: testing
+  tags:
+    - testing
+    - tdd
+    - test-generation
+    - quality-assurance
+    - coverage
+    - pytest
+    - jest
+  provider_hints:
+    preferred_models:
+      - claude-sonnet-4-5
+      - gpt-4
+      - deepseek-coder
+    min_context: 128000
+    supports_tools: true
+  evaluation_criteria:
+    - test_coverage
+    - test_quality
+    - bug_detection_rate
+    - assertion_quality
+
+# Core tools for testing
+tools:
+  # Framework file operations
+  - read_file
+  - write_file
+  - edit_file
+  - grep
+
+  # Core filesystem operations
+  - ls
+  - overview
+
+  # Code search and navigation
+  - code_search
+  - semantic_code_search
+  - plan
+
+  # Test execution
+  - shell
+  - test
+
+  # Git for test tracking
+  - git
+
+  # Web for testing best practices
+  - web_search
+  - web_fetch
+
+# Main system prompt
+system_prompt: |
+  You are Victor, an expert testing specialist specializing in test generation, test maintenance, and quality assurance.
+
+  Your capabilities:
+  - Unit test generation with comprehensive coverage
+  - Integration test design for component interactions
+  - End-to-end test scenarios for user workflows
+  - Test-driven development (TDD) support
+  - Test refactoring and maintenance
+  - Mock and stub generation for isolated testing
+  - Property-based testing for edge cases
+  - Test coverage analysis and improvement
+  - Flaky test detection and debugging
+  - Performance test design
+  - Load and stress testing strategies
+  - Test fixture and data generation
+  - Behavior-driven development (BDD) scenarios
+
+  Guidelines:
+  1. **Test behavior, not implementation**: Focus on what the code does, not how it does it
+  2. **Arrange-Act-Assert**: Structure tests clearly with setup, execution, and verification
+  3. **One assertion per test**: Keep tests focused and simple
+  4. **Descriptive names**: Use test names that describe what is being tested and the expected outcome
+  5. **Test edge cases**: Cover boundaries, null values, empty inputs, and error conditions
+  6. **Use mocks appropriately**: Mock external dependencies, not the code under test
+  7. **Make tests fast**: Unit tests should run quickly, integrate tests separately
+  8. **Keep tests independent**: Tests should not depend on each other
+  9. **Test failure conditions**: Ensure tests fail when expectations are not met
+  10. **Maintain test quality**: Refactor tests when code changes
+
+  Test Structure (AAA Pattern):
+  ```python
+  def test_feature_behavior():
+      # Arrange: Set up test data and prerequisites
+      input_data = create_test_data()
+      expected_result = known_value
+
+      # Act: Execute the function being tested
+      actual_result = function_under_test(input_data)
+
+      # Assert: Verify the outcome
+      assert actual_result == expected_result
+  ```
+
+  Test Naming Convention:
+  - Use descriptive names: `test_[feature]_[scenario]_[expected_outcome]`
+  - Examples:
+    - `test_user_login_with_valid_credentials_succeeds`
+    - `test_user_login_with_invalid_credentials_raises_error`
+    - `test_user_registration_with_duplicate_email_returns_error`
+
+  When generating unit tests:
+  - Identify the function/class being tested
+  - Determine expected behavior from code and docstrings
+  - Cover normal cases (happy path)
+  - Cover edge cases (boundaries, null, empty)
+  - Cover error cases (exceptions, invalid input)
+  - Use appropriate assertions (assertEqual, assertTrue, raises, etc.)
+  - Include helpful comments for complex test logic
+
+  When writing integration tests:
+  - Test component interactions
+  - Use real dependencies where appropriate
+  - Test database operations with test databases
+  - Test API endpoints with test servers
+  - Verify state changes and side effects
+  - Clean up test data after tests
+
+  When designing end-to-end tests:
+  - Test critical user workflows
+  - Simulate real user actions
+  - Test across system boundaries
+  - Include UI interactions when applicable
+  - Test error recovery paths
+  - Keep E2E tests minimal and focused
+
+  Test Coverage Goals:
+  - **Unit tests**: 80%+ coverage for business logic
+  - **Integration tests**: Cover all component interfaces
+  - **E2E tests**: Cover critical user paths
+  - **Edge cases**: Test boundaries and error conditions
+  - **Error paths**: Verify error handling and recovery
+
+  Testing Best Practices:
+  - **TDD approach**: Write tests before implementation when possible
+  - **Test isolation**: Each test should be independent
+  - **Test speed**: Keep unit tests fast (< 0.1s each)
+  - **Test clarity**: Tests should be self-documenting
+  - **Mock external dependencies**: Don't test external services
+  - **Use fixtures**: Reuse test setup code
+  - **Parametrize tests**: Test multiple scenarios with one test function
+  - **Test error handling**: Ensure exceptions are raised appropriately
+  - **Avoid test fragility**: Tests should not break with refactoring
+  - **Review test coverage**: Identify and test uncovered code
+
+  Framework-Specific Guidance:
+
+  **Python (pytest)**:
+  - Use pytest fixtures for setup/teardown
+  - Use pytest.mark for test categorization
+  - Use parametrize for data-driven tests
+  - Use pytest.raises for exception testing
+  - Use conftest.py for shared fixtures
+
+  **JavaScript/TypeScript (Jest/Vitest)**:
+  - Use describe/it blocks for organization
+  - Use beforeEach/afterEach for setup
+  - Use mock functions for dependency mocking
+  - Use toThrow for exception testing
+  - Use test.each for data-driven tests
+
+  **Java (JUnit)**:
+  - Use @Test annotation for test methods
+  - Use @Before/@After for setup/teardown
+  - Use @ParameterizedTest for data-driven tests
+  - Use assertThrows for exception testing
+  - Use @Mock for dependency mocking
+
+  You have access to file operations, code search, test execution, and web resources. Use them to create comprehensive, effective test suites.
+
+# Stage definitions for testing workflow
+stages:
+  INITIAL:
+    name: INITIAL
+    description: "Understanding testing requirements"
+    tools:
+      - read_file
+      - ls
+      - overview
+    keywords:
+      - what
+      - how
+      - test
+      - coverage
+    next_stages:
+      - ANALYSIS
+      - DISCOVERY
+
+  DISCOVERY:
+    name: DISCOVERY
+    description: "Discovering code structure and existing tests"
+    tools:
+      - overview
+      - ls
+      - grep
+      - code_search
+    keywords:
+      - discover
+      - find
+      - explore
+      - locate
+    next_stages:
+      - ANALYSIS
+      - GENERATION
+
+  ANALYSIS:
+    name: ANALYSIS
+    description: "Analyzing code for test requirements"
+    tools:
+      - read_file
+      - code_search
+      - semantic_code_search
+      - grep
+    keywords:
+      - analyze
+      - review
+      - examine
+      - understand
+    next_stages:
+      - GENERATION
+      - PLANNING
+
+  PLANNING:
+    name: PLANNING
+    description: "Planning test strategy and coverage"
+    tools:
+      - read_file
+      - web_search
+    keywords:
+      - plan
+      - strategy
+      - design
+      - approach
+    next_stages:
+      - GENERATION
+
+  GENERATION:
+    name: GENERATION
+    description: "Generating test code"
+    tools:
+      - read_file
+      - write_file
+      - edit_file
+      - code_search
+    keywords:
+      - generate
+      - write
+      - create
+      - implement
+    next_stages:
+      - EXECUTION
+      - REFINEMENT
+
+  EXECUTION:
+    name: EXECUTION
+    description: "Running tests and collecting results"
+    tools:
+      - shell
+      - test
+      - read_file
+    keywords:
+      - run
+      - execute
+      - test
+      - verify
+    next_stages:
+      - ANALYSIS
+      - REFINEMENT
+      - COMPLETION
+
+  REFINEMENT:
+    name: REFINEMENT
+    description: "Refining tests based on results"
+    tools:
+      - read_file
+      - edit_file
+      - shell
+      - test
+    keywords:
+      - refine
+      - fix
+      - improve
+      - debug
+    next_stages:
+      - EXECUTION
+      - COMPLETION
+
+  COMPLETION:
+    name: COMPLETION
+    description: "Testing complete with coverage report"
+    tools:
+      - write_file
+      - git
+    keywords:
+      - done
+      - complete
+      - finish
+      - report
+    next_stages: []
+
+# Extension specifications
+extensions:
+  # Middleware for testing operations
+  middleware:
+    - name: test_validation
+      class_name: TestValidationMiddleware
+      module: victor.testing.middleware
+      enabled: true
+      config:
+        check_test_quality: true
+        validate_assertions: true
+        detect_duplicates: true
+
+    - name: flaky_test_detection
+      class_name: FlakyTestDetectionMiddleware
+      module: victor.testing.middleware
+      enabled: true
+      config:
+        rerun_failed: 3
+        detect_intermittent_failures: true
+
+  # Safety patterns to prevent destructive testing
+  safety_patterns:
+    - name: destructive_test
+      pattern: "(rm.*-rf|DROP.*TABLE|DELETE.*FROM)"
+      description: "Destructive operations in tests without cleanup"
+      severity: high
+      category: testing
+
+    - name: production_test
+      pattern: "(prod|production).*test"
+      description: "Running tests against production environment"
+      severity: critical
+      category: testing
+
+    - name: hardcoded_secrets_test
+      pattern: "(password|secret|key).*=.*['\"](?!\\$\\{)"
+      description: "Hardcoded secrets in test data"
+      severity: medium
+      category: security
+
+  # Task type hints for different testing tasks
+  prompt_hints:
+    - task_type: generate_unit_tests
+      hint: "[UNIT] Generate comprehensive unit tests. Cover normal cases, edge cases, and error conditions. Use AAA pattern."
+      tool_budget: 25
+      priority_tools:
+        - read_file
+        - code_search
+        - write_file
+
+    - task_type: generate_integration_tests
+      hint: "[INTEGRATION] Generate integration tests for component interactions. Test with real dependencies."
+      tool_budget: 30
+      priority_tools:
+        - read_file
+        - code_search
+        - write_file
+        - shell
+
+    - task_type: generate_e2e_tests
+      hint: "[E2E] Generate end-to-end tests for critical user workflows. Simulate real user actions."
+      tool_budget: 35
+      priority_tools:
+        - read_file
+        - code_search
+        - write_file
+
+    - task_type: improve_coverage
+      hint: "[COVERAGE] Analyze coverage gaps and generate tests for uncovered code paths."
+      tool_budget: 20
+      priority_tools:
+        - read_file
+        - shell
+        - grep
+        - write_file
+
+    - task_type: fix_flaky_tests
+      hint: "[FLAKY] Identify and fix flaky tests. Improve test isolation and reliability."
+      tool_budget: 25
+      priority_tools:
+        - read_file
+        - shell
+        - test
+        - edit_file
+
+    - task_type: refactor_tests
+      hint: "[REFACTOR] Refactor tests for clarity, maintainability, and best practices."
+      tool_budget: 15
+      priority_tools:
+        - read_file
+        - edit_file
+        - grep
+
+    - task_type: generate_mocks
+      hint: "[MOCKS] Generate mocks and fixtures for external dependencies."
+      tool_budget: 15
+      priority_tools:
+        - read_file
+        - code_search
+        - write_file
+
+  # Workflow handlers
+  handlers:
+    test_generator: victor.testing.handlers
+    coverage_analyzer: victor.testing.handlers
+    test_refactorer: victor.testing.handlers
+
+  # Persona definitions for testing teams
+  personas:
+    test_engineer:
+      name: "Test Engineer"
+      role: "tester"
+      expertise: "Test design and quality assurance"
+      communication_style: "detailed"
+      decision_approach: "systematic"
+      system_prompt_extension: |
+        You are a meticulous test engineer. You:
+        - Design comprehensive test suites
+        - Follow testing best practices
+        - Ensure high coverage and quality
+        - Write maintainable test code
+
+    qa_specialist:
+      name: "QA Specialist"
+      role: "qa"
+      expertise: "Quality assurance and testing strategies"
+      communication_style: "structured"
+      decision_approach: "risk-based"
+      system_prompt_extension: |
+        You are a QA specialist focused on quality. You:
+        - Identify high-risk areas
+        - Design risk-based test plans
+        - Ensure thorough validation
+        - Catch edge cases and bugs
+
+    performance_tester:
+      name: "Performance Tester"
+      role: "performance"
+      expertise: "Performance and load testing"
+      communication_style: "analytical"
+      decision_approach: "metric-driven"
+      system_prompt_extension: |
+        You are a performance testing expert. You:
+        - Design performance tests
+        - Measure key metrics
+        - Identify bottlenecks
+        - Suggest optimizations
+
+  # Composed middleware chains
+  composed_chains:
+    test_quality_check:
+      - test_validation
+      - flaky_test_detection
+
+    full_test_workflow:
+      - test_validation
+      - flaky_test_detection
+
+# Workflow definitions
+workflows:
+  - name: comprehensive_test_generation
+    description: "Generate comprehensive test suite with high coverage"
+    file: workflows/comprehensive_test_generation.yaml
+    handler_module: victor.testing.handlers
+
+  - name: coverage_improvement
+    description: "Analyze coverage and generate tests for gaps"
+    file: workflows/coverage_improvement.yaml
+    handler_module: victor.testing.handlers
+
+  - name: flaky_test_fix
+    description: "Identify and fix flaky tests"
+    file: workflows/flaky_test_fix.yaml
+    handler_module: victor.testing.handlers
+
+  - name: test_refactoring
+    description: "Refactor tests for maintainability"
+    file: workflows/test_refactoring.yaml
+    handler_module: victor.testing.handlers
+
+  - name: tdd_workflow
+    description: "Test-driven development workflow"
+    file: workflows/tdd_workflow.yaml
+    handler_module: victor.testing.handlers
+
+# Team formations for multi-agent testing
+teams:
+  - name: test_generation_team
+    display_name: "Test Generation Team"
+    description: "Collaborative test generation and coverage"
+    formation: parallel
+    communication_style: structured
+    max_iterations: 5
+    roles:
+      - name: unit_test_generator
+        display_name: "Unit Test Generator"
+        description: "Generates unit tests for individual components"
+        persona: "You generate comprehensive unit tests covering all code paths and edge cases."
+        tool_categories:
+          - read_file
+          - code_search
+          - write_file
+        capabilities:
+          - unit_test_generation
+          - mock_generation
+          - assertion_design
+
+      - name: integration_test_generator
+        display_name: "Integration Test Generator"
+        description: "Generates integration tests for components"
+        persona: "You generate integration tests testing component interactions and dependencies."
+        tool_categories:
+          - read_file
+          - code_search
+          - write_file
+        capabilities:
+          - integration_test_generation
+          - fixture_design
+          - test_isolation
+
+      - name: edge_case_specialist
+        display_name: "Edge Case Specialist"
+        description: "Identifies and tests edge cases"
+        persona: "You identify boundary conditions, null inputs, and error scenarios to test."
+        tool_categories:
+          - read_file
+          - code_search
+          - write_file
+        capabilities:
+          - edge_case_identification
+          - boundary_testing
+          - error_scenario_testing
+
+      - name: coverage_analyzer
+        display_name: "Coverage Analyzer"
+        description: "Analyzes and improves test coverage"
+        persona: "You analyze coverage reports and generate tests for uncovered code."
+        tool_categories:
+          - shell
+          - read_file
+          - grep
+          - write_file
+        capabilities:
+          - coverage_analysis
+          - gap_identification
+          - targeted_test_generation
+
+  - name: test_refactoring_team
+    display_name: "Test Refactoring Team"
+    description: "Refactors and improves existing tests"
+    formation: sequential
+    communication_style: structured
+    max_iterations: 8
+    roles:
+      - name: test_auditor
+        display_name: "Test Auditor"
+        description: "Audits existing tests for quality"
+        persona: "You audit test code for quality, maintainability, and best practices."
+        tool_categories:
+          - read_file
+          - grep
+
+      - name: test_refactorer
+        display_name: "Test Refactorer"
+        description: "Refactors tests to improve quality"
+        persona: "You refactor test code to follow best practices and improve maintainability."
+        tool_categories:
+          - read_file
+          - edit_file
+
+      - name: flaky_test_fixer
+        display_name: "Flaky Test Fixer"
+        description: "Identifies and fixes flaky tests"
+        persona: "You identify and fix flaky tests to improve test reliability."
+        tool_categories:
+          - shell
+          - test
+          - read_file
+          - edit_file
+
+# Capability specifications
+capabilities:
+  - name: test_generation
+    type: workflow
+    description: "Generate comprehensive test suites"
+    enabled: true
+    handler: victor.testing.workflows:TestGenerationWorkflow
+    config:
+      target_coverage: 85
+      include_edge_cases: true
+      generate_mocks: true
+
+  - name: coverage_analysis
+    type: tool
+    description: "Analyze test coverage and identify gaps"
+    enabled: true
+    config:
+      format: html
+      min_coverage: 80
+
+  - name: flaky_test_detection
+    type: validator
+    description: "Detect and fix flaky tests"
+    enabled: true
+    config:
+      rerun_count: 3
+      timeout_multiplier: 2
+
+# Custom vertical configuration
+custom_config:
+  # Testing frameworks
+  supported_frameworks:
+    python:
+      - pytest
+      - unittest
+      - nose2
+    javascript:
+      - jest
+      - vitest
+      - mocha
+    typescript:
+      - jest
+      - vitest
+    java:
+      - junit
+      - testng
+    go:
+      - testing
+      - testify
+
+  # Coverage goals
+  coverage_goals:
+    unit: 85
+    integration: 70
+    e2e: 50
+
+  # Test categories
+  test_categories:
+    - unit:
+        description: "Tests for individual functions and classes"
+        isolation: full
+        speed: fast
+    - integration:
+        description: "Tests for component interactions"
+        isolation: partial
+        speed: medium
+    - e2e:
+        description: "Tests for complete user workflows"
+        isolation: none
+        speed: slow
+    - performance:
+        description: "Tests for performance characteristics"
+        isolation: full
+        speed: variable
+    - security:
+        description: "Tests for security vulnerabilities"
+        isolation: full
+        speed: fast
+
+  # Assertion patterns
+  assertion_patterns:
+    - equality
+    - truthiness
+    - containment
+    - exception_raised
+    - approximation
+    - type_checking
+    - length_validation
+    - ordering
+
+  # Mock patterns
+  mock_patterns:
+    - function_mock
+    - class_mock
+    - api_mock
+    - database_mock
+    - file_system_mock
+    - time_mock
+
+  # Custom prompt sections
+  grounding_rules: |
+    GROUNDING: Base ALL tests on actual code implementation.
+    Never test non-existent functionality. Tests must match
+    the actual behavior of the code under test.
+
+    Ensure tests are deterministic and repeatable.
+    Avoid randomness and external dependencies in tests.
+
+  system_prompt_section: |
+    Testing Best Practices:
+    1. Write tests before implementation (TDD) when possible
+    2. Test behavior, not implementation
+    3. Use descriptive test names
+    4. Follow Arrange-Act-Assert pattern
+    5. Test edge cases and error conditions
+    6. Keep tests fast and independent
+    7. Use mocks for external dependencies
+    8. Maintain high coverage (>80% for business logic)
+    9. Refactor tests when code changes
+    10. Review and fix flaky tests immediately
+
+# File templates (custom generated files)
+file_templates:
+  test_file.py: |
+    """
+    Tests for {{ module_name }}.
+    """
+
+    import pytest
+    from {{ module_path }} import {{ class_name }}
+
+
+    class Test{{ class_name }}:
+        """Test suite for {{ class_name }}."""
+
+        def test_{{ test_case }}_{{ expected_outcome }}(self):
+            """
+            Test that {{ test_case }} {{ expected_outcome }}.
+
+            Given: {{ given_condition }}
+            When: {{ when_action }}
+            Then: {{ then_result }}
+            """
+            # Arrange
+            input_data = {{ test_input }}
+            expected = {{ expected_value }}
+
+            # Act
+            result = {{ class_name }}().{{ method }}(input_data)
+
+            # Assert
+            assert result == expected
+
+        @pytest.mark.parametrize("input,expected", [
+            ({{ test_case_1 }}),
+            ({{ test_case_2 }}),
+            ({{ test_case_3 }}),
+        ])
+        def test_{{ method }}_with_various_inputs(self, input, expected):
+            """
+            Test that {{ method }} handles various inputs correctly.
+            """
+            # Arrange
+            instance = {{ class_name }}()
+
+            # Act
+            result = instance.{{ method }}(input)
+
+            # Assert
+            assert result == expected
+
+        def test_{{ method }}_with_invalid_input_raises_error(self):
+            """
+            Test that {{ method }} raises appropriate error for invalid input.
+            """
+            # Arrange
+            instance = {{ class_name }}()
+            invalid_input = {{ invalid_value }}
+
+            # Act & Assert
+            with pytest.raises({{ exception_type }}):
+                instance.{{ method }}(invalid_input)
+
+  conftest.py: |
+    """
+    Pytest configuration and shared fixtures.
+    """
+
+    import pytest
+
+
+    @pytest.fixture
+    def sample_data():
+        """
+        Fixture providing sample test data.
+
+        Returns:
+            dict: Sample data for testing
+        """
+        return {{
+            "key1": "value1",
+            "key2": "value2",
+        }}
+
+
+    @pytest.fixture
+    def mock_external_service(monkeypatch):
+        """
+        Fixture that mocks external service calls.
+
+        Args:
+            monkeypatch: Pytest monkeypatch fixture
+
+        Returns:
+            Mock: Mocked service
+        """
+        def mock_call(*args, **kwargs):
+            return {{ mock_response }}
+
+        monkeypatch.setattr("{{ module }}.{{ function }}", mock_call)
+        return mock_call

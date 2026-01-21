@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: victor-ai-config
+  labels:
+    app: victor-ai
+data:
+  # Event Bus Configuration
+  event-bus-backend: "memory"
+  event-bus-kafka-bootstrap-servers: ""
+  event-bus-kafka-topic-prefix: "victor"
+
+  # Checkpoint Configuration
+  checkpoint-backend: "memory"
+  checkpoint-sqlite-path: "/app/data/checkpoints.db"
+  checkpoint-redis-key-prefix: "victor:checkpoint:"
+
+  # Cache Configuration
+  cache-backend: "memory"
+  cache-redis-url: ""
+  cache-ttl: "3600"
+
+  # Tool Selection Configuration
+  tool-selection-strategy: "hybrid"
+  tool-selection-hybrid-semantic-weight: "0.7"
+  tool-selection-cache-size: "1000"
+  tool-selection-cache-ttl: "3600"
+
+  # Provider Configuration
+  default-provider: "anthropic"
+  default-model: "claude-sonnet-4-5"
+
+  # Workflow Configuration
+  workflow-cache-enabled: "true"
+  workflow-cache-size: "100"
+  workflow-scheduler-enabled: "false"
+
+  # Vertical Configuration
+  enabled-verticals: "coding,devops,rag,dataanalysis,research,benchmark"
+
+  # Security Configuration
+  enable-airgapped-mode: "false"
+  enable-secret-masking: "true"
+  max-tool-budget: "100"
+
+  # Observability Configuration
+  enable-metrics: "true"
+  enable-tracing: "false"
+  metrics-port: "9090"
+  log-format: "json"
+  log-level: "INFO"
+
+  # Performance Configuration
+  max-workers: "4"
+  max-concurrent-tools: "10"
+  tool-execution-timeout: "300"
+
+  # Model Configuration
+  model-capabilities-path: "/app/config/model_capabilities.yaml"
+
+  # Feature Flags
+  enable-mcp-support: "true"
+  enable-semantic-search: "true"
+  enable-lsp-support: "true"
+  enable-test-generation: "true"
+
+  # Rate Limiting
+  enable-rate-limiting: "true"
+  rate-limit-requests-per-minute: "100"
+  rate-limit-burst: "20"
+
+  # CORS Configuration
+  cors-allowed-origins: "*"
+  cors-allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
+  cors-allowed-headers: "*"
+
+  # API Configuration
+  api-rate-limit: "100"
+  api-timeout: "120"
+  api-max-payload-size: "10485760"
+
+  # Database Configuration (for checkpoint backend)
+  database-pool-size: "10"
+  database-max-overflow: "20"
+  database-pool-timeout: "30"
+  database-pool-recycle: "3600"

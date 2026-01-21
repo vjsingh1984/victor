@@ -54,10 +54,10 @@ import os
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.core.verticals.protocols import VerticalExtensions
+    from victor.core.verticals.protocols import VerticalExtensions, SafetyPattern, TaskTypeHint, ModeConfig
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +82,9 @@ class LazyVerticalExtensions:
     This wrapper defers loading of vertical extensions until they are first
     accessed, at which point it delegates to the loader function and caches
     the result. Uses double-checked locking for thread-safe lazy initialization.
+
+    This class implements the VerticalExtensions protocol by proxying all
+    method calls to the underlying loaded extensions.
 
     Thread Safety:
         Uses double-checked locking pattern:
@@ -268,6 +271,39 @@ class LazyVerticalExtensions:
         if self._loaded:
             return f"<LazyVerticalExtensions({self.vertical_name}) loaded>"
         return f"<LazyVerticalExtensions({self.vertical_name}) unloaded>"
+
+    # =========================================================================
+    # VerticalExtensions Protocol Methods
+    # =========================================================================
+
+    def get_all_task_hints(self) -> Dict[str, Any]:
+        """Merge task hints from all contributors.
+
+        Later contributors override earlier ones for same task type.
+
+        Returns:
+            Merged dict of task type hints
+        """
+        extensions = self._load_extensions()
+        return extensions.get_all_task_hints() if extensions else {}
+
+    def get_all_safety_patterns(self) -> List[Any]:
+        """Collect safety patterns from all extensions.
+
+        Returns:
+            Combined list of safety patterns
+        """
+        extensions = self._load_extensions()
+        return extensions.get_all_safety_patterns() if extensions else []
+
+    def get_all_mode_configs(self) -> Dict[str, Any]:
+        """Get mode configs from provider.
+
+        Returns:
+            Dict of mode configurations
+        """
+        extensions = self._load_extensions()
+        return extensions.get_all_mode_configs() if extensions else {}
 
 
 def create_lazy_extensions(

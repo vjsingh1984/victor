@@ -1,0 +1,10 @@
+# Monitoring Namespace for Victor AI
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: victor-monitoring
+  labels:
+    name: victor-monitoring
+    app.kubernetes.io/name: victor
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/version: "0.5.1"

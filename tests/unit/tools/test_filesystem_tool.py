@@ -55,10 +55,14 @@ async def test_read_file_success():
     try:
         result = await read(path=temp_path)
 
-        # Check for header components
-        assert "[File:" in result
-        assert "[Lines 1-1 of 1]" in result
-        assert "[Size:" in result
+        # Check for header components (updated format for clarity)
+        assert "File:" in result
+        assert "Showing lines 1-1 of 1 total lines" in result
+        assert "bytes" in result
+        assert "KB" in result
+        # Check for footer summary
+        assert "[End of excerpt from" in result
+        assert "File has 1 lines total" in result
         # Check content is included (with line number prefix)
         assert "Hello, World!" in result
     finally:
