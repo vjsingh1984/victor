@@ -21,6 +21,8 @@ configMapGenerator:
   - VICTOR_LOG_LEVEL=DEBUG
   - VICTOR_MAX_WORKERS=2
   - VICTOR_CACHE_SIZE=500
+  - VICTOR_ENABLE_DEV_TOOLS=true
+  - VICTOR_HOT_RELOAD=true
   - event-bus-backend=memory
   - checkpoint-backend=memory
   - cache-backend=memory
