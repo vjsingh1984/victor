@@ -141,7 +141,7 @@ def mock_tool_registry():
         ),
     }
 
-    registry.list_tools.return_value = list(tools.values())
+    registry.list_tools.return_value = list(tools.keys())
     registry.get_tool = lambda name: tools.get(name)
 
     return registry
@@ -243,10 +243,8 @@ async def test_vision_agent_discovers_analysis_skills(
     """
     # Discover tools for image analysis
     context = ToolSelectionContext(
-        query="Analyze this image and extract text",
-        mode="standard",
-        max_tools=5,
-        cost_tier=CostTier.MEDIUM
+        task_description="Analyze this image and extract text",
+        conversation_stage="standard"
     )
 
     available_tools = await skill_discovery_engine.discover_tools(
@@ -257,7 +255,7 @@ async def test_vision_agent_discovers_analysis_skills(
 
     # Match tools to specific task
     matched_tools = await skill_discovery_engine.match_tools_to_task(
-        task_description="Extract text from image",
+        task="Extract text from image",
         available_tools=available_tools
     )
 
@@ -377,7 +375,7 @@ async def test_audio_agent_transcription_with_postprocessing(
 
     # Match tools for audio processing task
     matched_tools = await skill_discovery_engine.match_tools_to_task(
-        task_description="Transcribe audio and analyze sentiment",
+        task="Transcribe audio and analyze sentiment",
         available_tools=available_tools
     )
 
@@ -499,7 +497,7 @@ async def test_complex_multimodal_task_with_composed_skills(
 
     # Match tools for video analysis task
     matched_tools = await skill_discovery_engine.match_tools_to_task(
-        task_description="Analyze video frames and transcribe audio",
+        task="Analyze video frames and transcribe audio",
         available_tools=all_tools
     )
 
@@ -585,7 +583,7 @@ async def test_dynamic_skill_adaptation_based_on_content(
 
     # Match tools to refined task
     matched = await skill_discovery_engine.match_tools_to_task(
-        task_description=f"Process image with content: {content_analysis.content}",
+        task=f"Process image with content: {content_analysis.content}",
         available_tools=relevant_tools
     )
 
@@ -659,7 +657,7 @@ async def test_multimodal_skill_performance_under_load(
 
     match_tasks = [
         skill_discovery_engine.match_tools_to_task(
-            task_description=f"Analyze image for task {i}",
+            task=f"Analyze image for task {i}",
             available_tools=tools
         )
         for i in range(50)
