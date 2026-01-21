@@ -651,13 +651,13 @@ class TestSecurityPerformance:
 
 @pytest.fixture
 def sample_code_with_secrets():
-    """Sample code containing various secrets."""
+    """Sample code containing various secrets (all fake/test values)."""
     return """
-    # Configuration
+    # Configuration - ALL VALUES ARE FAKE FOR TESTING
     AWS_ACCESS_KEY_ID = "AKIAIOSFODNN7EXAMPLE"
     AWS_SECRET_ACCESS_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-    OPENAI_API_KEY = "sk-1234567890abcdef1234567890abcdef"
-    GITHUB_TOKEN = "ghp_1234567890abcdef1234567890abcdef123456"
+    OPENAI_API_KEY = "sk-test-fake-key-for-testing-only"
+    GITHUB_TOKEN = "ghp_test_fake_token_for_testing_only"
     SLACK_TOKEN = "xoxb-TEST-FAKE-TOKEN-FOR-TESTING-ONLY"
 
     def main():
