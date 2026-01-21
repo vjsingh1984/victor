@@ -36,10 +36,12 @@ DEFAULT_TIMEOUT = 30.0
 
 @mark.load
 @mark.asyncio
+@pytest.mark.usefixtures("api_server_available")
 class TestToolExecutionLoad:
     """Tool execution load tests.
 
     Measures tool selection, execution, and error handling under load.
+    Requires API server running at localhost:8000.
     """
 
     async def test_single_tool_baseline(self):

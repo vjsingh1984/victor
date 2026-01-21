@@ -36,10 +36,12 @@ DEFAULT_TIMEOUT = 60.0  # Longer timeout for workflows
 
 @mark.load
 @mark.asyncio
+@pytest.mark.usefixtures("api_server_available")
 class TestWorkflowLoad:
     """Workflow execution load tests.
 
     Measures workflow compilation, execution, and state management under load.
+    Requires API server running at localhost:8000.
     """
 
     async def test_simple_workflow_baseline(self):
