@@ -73,10 +73,14 @@ from victor.core.container import ServiceContainer, ServiceLifetime
 # Move heavy imports to TYPE_CHECKING where possible to reduce startup overhead
 # These imports are only needed for type hints, not runtime execution
 if TYPE_CHECKING:
-    from victor.protocols.tool_selector import IToolSelector
-
-if TYPE_CHECKING:
     from victor.config.settings import Settings
+
+# NOTE: IToolSelector and Coordinators are imported at runtime (not TYPE_CHECKING) because they're
+# used in container.register() calls, not just for type hints
+from victor.protocols.tool_selector import IToolSelector
+from victor.agent.coordinators.tool_retry_coordinator import ToolRetryCoordinator
+from victor.agent.coordinators.memory_coordinator import MemoryCoordinator
+from victor.agent.coordinators.tool_capability_coordinator import ToolCapabilityCoordinator
 
 logger = logging.getLogger(__name__)
 
