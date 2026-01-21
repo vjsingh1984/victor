@@ -457,18 +457,24 @@ class TestOverallPerformance:
 
         try:
             # Simulate workload with cache and batching
+            # Use a counter to track iterations
+            counter = 0
+
             async def simulated_workload():
+                nonlocal counter
                 # Try cache first (70% hit rate)
-                messages = [Message(role="user", content=f"Query {i % 10}")]
+                messages = [Message(role="user", content=f"Query {counter % 10}")]
                 cached = await cache.get(messages)
 
                 if cached is None:
                     # Cache miss - use batcher
-                    result = await batcher.submit(operation="query", id=i)
+                    result = await batcher.submit(operation="query", id=counter)
                     response = CompletionResponse(content=result)
                     await cache.put(messages, response)
+                    counter += 1
                     return result
                 else:
+                    counter += 1
                     return cached.content
 
             # Benchmark
