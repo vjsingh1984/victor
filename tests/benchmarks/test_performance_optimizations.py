@@ -364,7 +364,7 @@ class TestResponseCacheBenchmarks:
     @pytest.mark.asyncio
     async def test_cache_write_performance(self, cache):
         """Benchmark cache write performance."""
-        messages = [Message(role="user", content=f"Test message {i}")]
+        messages = [Message(role="user", content="Test message")]
         response = CompletionResponse(content="Test response")
 
         async def write_cache():
