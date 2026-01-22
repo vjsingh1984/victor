@@ -128,6 +128,7 @@ class Persona:
         backstory: Optional background story/context
         constraints: Behavioral and operational constraints
         prompt_templates: Custom prompt templates
+        temperature: LLM temperature for this persona (0.0-1.0)
         created_at: Timestamp of creation
         version: Persona version for tracking changes
     """
@@ -141,6 +142,7 @@ class Persona:
     backstory: Optional[str] = None
     constraints: Optional[PersonaConstraints] = None
     prompt_templates: Optional[PromptTemplates] = None
+    temperature: float = 0.7
     created_at: datetime = field(default_factory=datetime.utcnow)
     version: int = 1
 
@@ -148,6 +150,12 @@ class Persona:
         """Initialize defaults."""
         if self.constraints is None:
             self.constraints = PersonaConstraints()
+
+        # Validate temperature
+        if not 0.0 <= self.temperature <= 1.0:
+            raise ValueError(
+                f"temperature must be between 0.0 and 1.0, got {self.temperature}"
+            )
 
     def matches_expertise(self, required_expertise: Set[str]) -> float:
         """Calculate expertise match score (0.0 to 1.0).
@@ -166,6 +174,28 @@ class Persona:
 
         matches = len(persona_expertise & required)
         return matches / len(required)
+
+    @property
+    def system_prompt(self) -> str:
+        """Get the system prompt for this persona.
+
+        Returns the system prompt from prompt_templates if available,
+        otherwise generates a default system prompt.
+        """
+        if self.prompt_templates:
+            return self.prompt_templates.system_prompt
+
+        # Generate default system prompt
+        return f"""You are {self.name}, an AI assistant with the following characteristics:
+
+Personality: {self.personality.value}
+Communication Style: {self.communication_style.value}
+Expertise: {", ".join(self.expertise) if self.expertise else "General knowledge"}
+{f"Backstory: {self.backstory}" if self.backstory else ""}
+
+Please respond in a manner consistent with this persona, maintaining the specified
+communication style and leveraging your expertise areas to provide helpful,
+accurate responses."""
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert persona to dictionary representation.
@@ -202,6 +232,7 @@ class Persona:
                 if self.prompt_templates
                 else None
             ),
+            "temperature": self.temperature,
             "created_at": self.created_at.isoformat(),
             "version": self.version,
         }
@@ -211,21 +242,60 @@ class Persona:
 class ContextAdjustment:
     """Context-specific adjustments to a persona.
 
-    Attributes:
+    This dataclass supports both legacy and experimental API patterns
+    for backward compatibility during API evolution.
+
+    Legacy Attributes:
         task_type: Type of task triggering the adjustment
         personality_override: Optional personality override
         communication_override: Optional communication style override
         additional_expertise: Expertise areas to add for this context
         constraint_modifications: Temporary constraint changes
         prompt_modifications: Additional prompt content
+
+    Experimental Attributes (Phase 3):
+        temperature: LLM temperature adjustment (0.0-1.0)
+        verbosity: Verbosity level ("concise", "standard", "verbose")
+        tool_preference: Preferred tools for this context
+        expertise_boost: Expertise areas to boost for this context
+        constraint_relaxations: Temporary constraint relaxations
+
+    Note: The experimental attributes provide a more expressive API for
+    persona adaptation based on episodic and semantic memory.
     """
 
-    task_type: str
+    # Legacy attributes (for backward compatibility)
+    task_type: Optional[str] = None
     personality_override: Optional[PersonalityType] = None
     communication_override: Optional[CommunicationStyle] = None
     additional_expertise: List[str] = field(default_factory=list)
     constraint_modifications: Optional[Dict[str, Any]] = None
     prompt_modifications: Optional[List[str]] = None
+
+    # Experimental attributes (Phase 3 memory-driven adaptation)
+    temperature: Optional[float] = None
+    verbosity: Optional[str] = None
+    tool_preference: Optional[List[str]] = None
+    expertise_boost: Optional[List[str]] = None
+    constraint_relaxations: Optional[Dict[str, Any]] = None
+
+    def __post_init__(self) -> None:
+        """Initialize defaults and validate the adjustment."""
+        # Ensure lists are initialized
+        if self.additional_expertise is None:
+            self.additional_expertise = []
+        if self.tool_preference is None:
+            self.tool_preference = []
+        if self.expertise_boost is None:
+            self.expertise_boost = []
+        if self.constraint_relaxations is None:
+            self.constraint_relaxations = {}
+
+        # Map experimental to legacy for compatibility
+        if self.expertise_boost and not self.additional_expertise:
+            self.additional_expertise = self.expertise_boost
+        if self.constraint_relaxations and not self.constraint_modifications:
+            self.constraint_modifications = self.constraint_relaxations
 
 
 @dataclass
@@ -253,19 +323,48 @@ class AdaptedPersona:
     and dynamically calculated traits based on the current task, user preferences,
     and conversation history.
 
-    Attributes:
+    This dataclass supports both legacy and experimental API patterns.
+
+    Legacy Attributes:
         base_persona: Original persona being adapted
-        context_adjustments: Applied context adjustments
+        context_adjustments: List of applied context adjustments
         dynamic_traits: Calculated traits for this context
         adaptation_reason: Explanation of why adaptations were made
         adapted_at: When this adaptation was created
+
+    Experimental Attributes (Phase 3):
+        context_type: Type identifier for the adaptation context
+        adaptations: Single ContextAdjustment object
+        confidence: Confidence score for the adaptation (0.0-1.0)
+        reasoning: Explanation for the adaptation
+
+    Note: The experimental API provides a simpler, more focused interface
+    for memory-driven persona adaptation.
     """
 
     base_persona: Persona
+
+    # Legacy attributes
     context_adjustments: List[ContextAdjustment] = field(default_factory=list)
     dynamic_traits: List[DynamicTrait] = field(default_factory=list)
     adaptation_reason: str = ""
     adapted_at: datetime = field(default_factory=datetime.utcnow)
+
+    # Experimental attributes (Phase 3 memory-driven adaptation)
+    context_type: Optional[str] = None
+    adaptations: Optional[ContextAdjustment] = None
+    confidence: Optional[float] = None
+    reasoning: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        """Initialize and normalize the adapted persona."""
+        # Handle experimental API: convert to legacy format
+        if self.adaptations and not self.context_adjustments:
+            self.context_adjustments = [self.adaptations]
+
+        # Use reasoning as adaptation_reason if set
+        if self.reasoning and not self.adaptation_reason:
+            self.adaptation_reason = self.reasoning
 
     @property
     def personality(self) -> PersonalityType:
@@ -289,7 +388,23 @@ class AdaptedPersona:
         base_expertise = set(self.base_persona.expertise)
         for adjustment in self.context_adjustments:
             base_expertise.update(adjustment.additional_expertise)
+            # Also add experimental expertise_boost
+            if adjustment.expertise_boost:
+                base_expertise.update(adjustment.expertise_boost)
         return list(base_expertise)
+
+    @property
+    def temperature(self) -> float:
+        """Get effective temperature after adjustments.
+
+        Returns the temperature from adaptations if set, otherwise
+        returns the base persona's default temperature.
+        """
+        for adjustment in reversed(self.context_adjustments):
+            if adjustment.temperature is not None:
+                return adjustment.temperature
+        # Default to 0.7 if not set
+        return getattr(self.base_persona, 'temperature', 0.7)
 
     @property
     def constraints(self) -> PersonaConstraints:
@@ -299,8 +414,12 @@ class AdaptedPersona:
         # Apply modifications
         modifications: Dict[str, Any] = {}
         for adjustment in self.context_adjustments:
+            # Legacy constraint_modifications
             if adjustment.constraint_modifications:
                 modifications.update(adjustment.constraint_modifications)
+            # Experimental constraint_relaxations
+            if adjustment.constraint_relaxations:
+                modifications.update(adjustment.constraint_relaxations)
 
         if not modifications:
             return base
@@ -371,25 +490,58 @@ accurate responses."""
 class Feedback:
     """User feedback on persona performance.
 
-    Attributes:
+    This dataclass supports both legacy and experimental API patterns
+    for memory-driven persona evolution.
+
+    Legacy Attributes:
         persona_id: Persona being evaluated
         success_rating: Rating from 1.0 (poor) to 5.0 (excellent)
         user_comments: Optional textual feedback
         suggested_improvements: Suggested changes to persona
         context: Context in which feedback was given
         timestamp: When feedback was provided
+
+    Experimental Attributes (Phase 3):
+        task_type: Type of task the feedback applies to
+        success_rate: Success rate (0.0-1.0)
+        average_reward: Average reward from episodes
+        feedback_data: Structured feedback data
+
+    Note: The experimental API supports aggregated feedback from
+    episodic memory for persona evolution.
     """
 
     persona_id: str
-    success_rating: float
+
+    # Legacy attributes
+    success_rating: Optional[float] = None
     user_comments: Optional[str] = None
     suggested_improvements: Optional[Dict[str, Any]] = None
     context: Optional[Dict[str, Any]] = None
     timestamp: datetime = field(default_factory=datetime.utcnow)
 
+    # Experimental attributes (Phase 3 memory-driven evolution)
+    task_type: Optional[str] = None
+    success_rate: Optional[float] = None
+    average_reward: Optional[float] = None
+    feedback_data: Optional[Dict[str, Any]] = None
+
     def __post_init__(self) -> None:
-        """Validate feedback."""
-        if not (1.0 <= self.success_rating <= 5.0):
+        """Validate and normalize feedback."""
+        # Validate success_rating if set
+        if self.success_rating is not None and not (1.0 <= self.success_rating <= 5.0):
             raise ValueError(
                 f"success_rating must be between 1.0 and 5.0, got {self.success_rating}"
             )
+
+        # Map experimental to legacy for compatibility
+        if self.feedback_data:
+            # Merge feedback_data into context
+            if self.context is None:
+                self.context = {}
+            self.context.update(self.feedback_data)
+
+            # Map success_rate to success_rating if not set
+            if self.success_rating is None and self.success_rate is not None:
+                # Convert 0-1 scale to 1-5 scale
+                self.success_rating = 1.0 + (self.success_rate * 4.0)

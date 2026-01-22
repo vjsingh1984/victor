@@ -103,7 +103,6 @@ def mock_event_bus():
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Experimental Phase 3 feature - ContextAdjustment API mismatch")
 async def test_persona_adapts_based_on_episodic_memory(
     episodic_memory, persona_manager, mock_event_bus
 ):
@@ -201,7 +200,6 @@ async def test_persona_adapts_based_on_episodic_memory(
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Experimental Phase 3 feature - SemanticMemory.add_relationship method not implemented")
 async def test_persona_uses_semantic_memory_for_knowledge_retrieval(
     semantic_memory, persona_manager
 ):
@@ -284,7 +282,6 @@ Use this knowledge to provide accurate, up-to-date responses."""
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Experimental Phase 3 feature - Feedback API mismatch")
 async def test_persona_evolution_based_on_feedback_and_outcomes(
     episodic_memory, persona_manager, mock_event_bus
 ):
@@ -451,7 +448,6 @@ async def test_cross_system_event_propagation(
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Experimental Phase 3 feature - ContextAdjustment API mismatch")
 async def test_persona_memory_performance_under_load(
     episodic_memory, semantic_memory, persona_manager
 ):

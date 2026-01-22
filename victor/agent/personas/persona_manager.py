@@ -444,6 +444,106 @@ class PersonaManager:
             },
         )
 
+    def evolve_persona(self, persona: Persona, feedback_list: List[Feedback]) -> Persona:
+        """Evolve a persona based on aggregated feedback from episodic memory.
+
+        This method creates an evolved version of a persona by applying
+        multiple feedback items to improve persona performance based on
+        historical outcomes.
+
+        Args:
+            persona: Base persona to evolve
+            feedback_list: List of feedback items from episodic memory
+
+        Returns:
+            Evolved persona with improvements applied
+
+        Example:
+            feedback = [
+                Feedback(
+                    persona_id=persona.id,
+                    task_type="code_review",
+                    success_rate=0.75,
+                    average_reward=7.5,
+                    feedback_data={"best_style": "formal"}
+                )
+            ]
+            evolved = manager.evolve_persona(persona, feedback)
+        """
+        if not feedback_list:
+            return persona
+
+        logger.info(f"Evolving persona {persona.id} based on {len(feedback_list)} feedback items")
+
+        # Create a copy of the persona to evolve
+        from dataclasses import replace
+        evolved = replace(persona, version=persona.version + 1)
+
+        # Aggregate feedback data
+        best_styles = []
+        worst_styles = []
+        suggestions = []
+
+        for feedback in feedback_list:
+            # Extract feedback data
+            if feedback.feedback_data:
+                if "best_style" in feedback.feedback_data:
+                    best_styles.append(feedback.feedback_data["best_style"])
+                if "worst_style" in feedback.feedback_data:
+                    worst_styles.append(feedback.feedback_data["worst_style"])
+                if "improvement_suggestion" in feedback.feedback_data:
+                    suggestions.append(feedback.feedback_data["improvement_suggestion"])
+
+        # Apply communication style evolution if we have clear preferences
+        if best_styles:
+            # Count best styles
+            from collections import Counter
+            style_counts = Counter(best_styles)
+            most_common_style = style_counts.most_common(1)[0][0]
+
+            # Map string to CommunicationStyle enum
+            style_map = {
+                "formal": CommunicationStyle.FORMAL,
+                "casual": CommunicationStyle.CASUAL,
+                "concise": CommunicationStyle.CONCISE,
+                "verbose": CommunicationStyle.VERBOSE,
+                "technical": CommunicationStyle.TECHNICAL,
+                "accessible": CommunicationStyle.ACCESSIBLE,
+            }
+
+            if most_common_style in style_map:
+                evolved.communication_style = style_map[most_common_style]
+                logger.debug(f"Evolved communication style to: {most_common_style}")
+
+        # Apply suggestions to improve the persona
+        if suggestions:
+            improvements = {"suggestions": suggestions}
+            self._apply_improvements(evolved, improvements)
+
+        # Update system prompt based on feedback
+        if evolved.prompt_templates:
+            # Add feedback-based improvements to prompt
+            current_prompt = evolved.prompt_templates.system_prompt
+            feedback_section = "\n\nPerformance Feedback:\n"
+            for suggestion in suggestions:
+                feedback_section += f"- {suggestion}\n"
+            evolved.prompt_templates.system_prompt = current_prompt + feedback_section
+
+        logger.info(f"Successfully evolved persona {persona.id} to version {evolved.version}")
+
+        # Publish evolution event
+        self._publish_event(
+            "persona.evolved",
+            {
+                "persona_id": persona.id,
+                "original_version": persona.version,
+                "evolved_version": evolved.version,
+                "feedback_count": len(feedback_list),
+            },
+        )
+
+        return evolved
+
     def export_persona(self, persona_id: str) -> Dict[str, Any]:
         """Export a persona for sharing.
 

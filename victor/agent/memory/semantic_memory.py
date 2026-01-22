@@ -674,6 +674,69 @@ class SemanticMemory:
 
         return True
 
+    async def add_relationship(self, triple: KnowledgeTriple) -> bool:
+        """Add a relationship between knowledge items using a KnowledgeTriple.
+
+        This method provides a more expressive API for creating knowledge graph
+        relationships using the KnowledgeTriple dataclass, which includes
+        metadata and supports semantic web standards.
+
+        Args:
+            triple: KnowledgeTriple containing subject, predicate, object, weight, and metadata
+
+        Returns:
+            True if relationship created, False if knowledge not found
+
+        Raises:
+            ValueError: If triple is invalid
+
+        Example:
+            triple = KnowledgeTriple(
+                subject=fact_id_1,
+                predicate="related_to",
+                object=fact_id_2,
+                weight=0.8,
+                metadata={"source": "inference"}
+            )
+            await memory.add_relationship(triple)
+        """
+        if not triple.subject or not triple.object:
+            raise ValueError("KnowledgeTriple must have non-empty subject and object")
+
+        if triple.subject not in self._knowledge or triple.object not in self._knowledge:
+            logger.warning(
+                f"Cannot create relationship: one or both knowledge IDs not found "
+                f"(subject={triple.subject[:8]}..., object={triple.object[:8]}...)"
+            )
+            return False
+
+        # Convert triple to link and add to knowledge graph
+        link = triple.to_link(triple.subject, triple.object)
+
+        # Check if link already exists
+        for edge in self._graph.edges:
+            if (edge.source_id == link.source_id and
+                edge.target_id == link.target_id and
+                edge.relation == link.relation):
+                # Update weight and metadata
+                edge.weight = link.weight
+                edge.metadata.update(link.metadata)
+                logger.debug(f"Updated existing relationship: {triple}")
+                return True
+
+        # Add to knowledge items
+        self._knowledge[triple.subject].links.append(link)
+
+        # Add to graph
+        self._graph.add_edge(link)
+
+        logger.debug(
+            f"Added relationship: {triple.subject[:8]}... --[{triple.predicate}:{triple.weight:.2f}]--> "
+            f"{triple.object[:8]}..."
+        )
+
+        return True
+
     def get_related_knowledge(self, knowledge_id: str, max_depth: int = 1) -> List[Knowledge]:
         """Get knowledge related to the given knowledge ID.
 
