@@ -54,7 +54,7 @@ class TestOrchestratorFactoryE2E:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             orchestrator = factory.create_orchestrator()
 
         assert orchestrator is not None
@@ -87,7 +87,7 @@ class TestOrchestratorFactoryE2E:
             max_tokens=8192,
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             orchestrator = factory.create_orchestrator()
 
         assert orchestrator.provider == provider
@@ -110,7 +110,7 @@ class TestOrchestratorFactoryE2E:
             thinking=True,
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             orchestrator = factory.create_orchestrator()
 
         assert orchestrator.thinking is True
@@ -130,7 +130,7 @@ class TestOrchestratorFactoryE2E:
             profile_name="test-profile",
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             orchestrator = factory.create_orchestrator()
 
         assert orchestrator._profile_name == "test-profile"
@@ -149,7 +149,7 @@ class TestOrchestratorFactoryE2E:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             components = factory.create_all_components()
 
         assert isinstance(components, OrchestratorComponents)
@@ -175,7 +175,7 @@ class TestOrchestratorFactoryE2E:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             components = factory.create_all_components()
 
         # Provider components
@@ -205,7 +205,7 @@ class TestOrchestratorFactoryE2E:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             orchestrator = factory.create_orchestrator()
 
         assert hasattr(orchestrator, "tools")
@@ -225,7 +225,7 @@ class TestOrchestratorFactoryE2E:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             orchestrator = factory.create_orchestrator()
 
         assert hasattr(orchestrator, "tool_executor")
@@ -245,7 +245,7 @@ class TestOrchestratorFactoryE2E:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             orchestrator = factory.create_orchestrator()
 
         assert hasattr(orchestrator, "_conversation_controller")
@@ -265,7 +265,7 @@ class TestOrchestratorFactoryE2E:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             orchestrator = factory.create_orchestrator()
 
         assert hasattr(orchestrator, "_metrics_collector")
@@ -285,7 +285,7 @@ class TestOrchestratorFactoryE2E:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             orchestrator = factory.create_orchestrator()
 
         assert hasattr(orchestrator, "_recovery_handler")
@@ -305,7 +305,7 @@ class TestOrchestratorFactoryE2E:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             orchestrator1 = factory.create_orchestrator()
             orchestrator2 = factory.create_orchestrator()
 
@@ -334,7 +334,7 @@ class TestOrchestratorFactoryE2E:
             model="gpt-4",
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             orchestrator1 = factory1.create_orchestrator()
             orchestrator2 = factory2.create_orchestrator()
 
@@ -356,7 +356,7 @@ class TestOrchestratorFactoryE2E:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             components = factory.create_all_components()
 
         assert components.workflow_optimization is not None
@@ -375,7 +375,7 @@ class TestOrchestratorFactoryE2E:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             components = factory.create_all_components()
 
         assert components.coordinators is not None
@@ -398,7 +398,7 @@ class TestOrchestratorFactoryE2E:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             orchestrator = factory.create_orchestrator()
 
         # Should have parallel executor configured
@@ -422,7 +422,7 @@ class TestOrchestratorFactoryE2E:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             components = factory.create_all_components()
 
         assert components.tools.tool_cache is not None
@@ -445,7 +445,7 @@ class TestOrchestratorFactoryE2E:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             orchestrator = factory.create_orchestrator()
 
         # Deduplication tracker should be configured
@@ -469,7 +469,7 @@ class TestOrchestratorFactoryE2E:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             components = factory.create_all_components()
 
         # Observability should be enabled
@@ -493,7 +493,7 @@ class TestOrchestratorFactoryE2E:
 
         orchestrator = AgentOrchestrator.__new__(AgentOrchestrator)
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             factory.initialize_orchestrator(orchestrator)
 
         assert orchestrator.provider == provider
@@ -520,7 +520,7 @@ class TestOrchestratorFactoryE2E:
             model="llama2",
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             orchestrator = factory.create_orchestrator()
 
         assert orchestrator is not None
@@ -544,7 +544,7 @@ class TestOrchestratorFactoryE2E:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container"):
+        with patch("victor.core.bootstrap.bootstrap_container"):
             orchestrator = factory.create_orchestrator()
 
         # Tool selector should be configured with semantic strategy
@@ -564,7 +564,7 @@ class TestOrchestratorFactoryE2E:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.bootstrap_container") as mock_bootstrap:
+        with patch("victor.core.bootstrap.bootstrap_container") as mock_bootstrap:
             # First access should bootstrap
             container1 = factory.container
             # Second access should use cached container
