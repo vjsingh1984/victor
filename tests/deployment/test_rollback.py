@@ -1131,7 +1131,9 @@ class TestRollbackIntegration:
         triggered = []
         for trigger_def in IMMEDIATE_TRIGGERS:
             if trigger_def.name in ["error_rate_high", "p95_latency_high", "p99_latency_high"]:
-                if trigger_def.evaluate(current_metrics.get(trigger_def.name.split("_")[0], 0)):
+                # Extract metric name by removing "_high" suffix
+                metric_name = trigger_def.name.replace("_high", "")
+                if trigger_def.evaluate(current_metrics.get(metric_name, 0)):
                     triggered.append(trigger_def)
 
         assert len(triggered) >= 1, "Expected at least one trigger"
