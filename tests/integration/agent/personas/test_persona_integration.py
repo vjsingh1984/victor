@@ -32,48 +32,6 @@ from victor.agent.personas.types import (
 )
 
 
-@pytest.fixture
-def persona_manager():
-    """Create a persona manager with predefined personas."""
-    manager = PersonaManager()
-    # Load predefined personas from YAML
-    _load_predefined_personas(manager)
-    return manager
-
-
-def _load_predefined_personas(manager: PersonaManager) -> None:
-    """Load predefined personas into manager."""
-    predefined = [
-        Persona(
-            id="senior_developer",
-            name="Senior Developer",
-            description="Experienced, pragmatic developer",
-            personality=PersonalityType.PRAGMATIC,
-            communication_style=CommunicationStyle.TECHNICAL,
-            expertise=["coding", "debugging", "testing", "code_review"],
-        ),
-        Persona(
-            id="security_expert",
-            name="Security Expert",
-            description="Security-focused specialist",
-            personality=PersonalityType.CAUTIOUS,
-            communication_style=CommunicationStyle.FORMAL,
-            expertise=["security", "vulnerabilities", "auditing"],
-        ),
-        Persona(
-            id="mentor",
-            name="Programming Mentor",
-            description="Patient educator",
-            personality=PersonalityType.SUPPORTIVE,
-            communication_style=CommunicationStyle.EDUCATIONAL,
-            expertise=["teaching", "explanation", "skill_development"],
-        ),
-    ]
-
-    for persona in predefined:
-        manager.repository.save(persona)
-
-
 @pytest.mark.integration
 class TestPersonaOrchestratorIntegration:
     """Test integration with orchestrator."""
