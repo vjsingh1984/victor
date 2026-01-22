@@ -56,39 +56,6 @@ from victor.agent.personas.types import (
 # ============================================================================
 
 
-@pytest.fixture
-def temp_persona_file(tmp_path):
-    """Create a temporary persona YAML file for testing."""
-    persona_yaml = tmp_path / "test_personas.yaml"
-    persona_yaml.write_text("""
-personas:
-  senior_developer:
-    name: "Senior Developer"
-    personality_type: "analytical"
-    communication_style: "formal"
-    system_prompt: "You are a senior software developer with extensive experience."
-    expertise:
-      - "software_architecture"
-      - "code_review"
-      - "debugging"
-    constraints:
-      max_tool_calls: 20
-      allowed_categories: ["coding", "analysis"]
-
-  creative_designer:
-    name: "Creative Designer"
-    personality_type: "creative"
-    communication_style: "casual"
-    system_prompt: "You are a creative designer focused on UX and innovation."
-    expertise:
-      - "ux_design"
-      - "prototyping"
-      - "user_research"
-    constraints:
-      max_tool_calls: 15
-      allowed_categories: ["design", "research"]
-""")
-    return persona_yaml
 
 
 @pytest.fixture
@@ -116,17 +83,9 @@ def semantic_memory(mock_embedding_service):
     """Create semantic memory instance for testing."""
     memory = SemanticMemory(
         embedding_service=mock_embedding_service,
-        storage_path=":memory:"  # In-memory SQLite
+        max_knowledge=1000  # Smaller limit for tests
     )
     return memory
-
-
-@pytest.fixture
-def persona_manager(temp_persona_file):
-    """Create persona manager with test personas."""
-    repository = PersonaRepository(storage_path=temp_persona_file)
-    manager = PersonaManager(repository=repository)
-    return manager
 
 
 @pytest.fixture
@@ -163,7 +122,7 @@ async def test_persona_adapts_based_on_episodic_memory(
     # Store episodes with different task patterns
     episodes = [
         Episode(
-            id=uuid.uuid4(),
+            id=str(uuid.uuid4()),
             timestamp=datetime.now() - timedelta(hours=2),
             inputs={"task": "code_review", "language": "python"},
             actions=["read_file", "analyze_code", "generate_report"],
@@ -174,7 +133,7 @@ async def test_persona_adapts_based_on_episodic_memory(
             )
         ),
         Episode(
-            id=uuid.uuid4(),
+            id=str(uuid.uuid4()),
             timestamp=datetime.now() - timedelta(hours=1),
             inputs={"task": "debugging", "language": "python"},
             actions=["read_file", "set_breakpoint", "analyze_stack_trace"],
@@ -185,7 +144,7 @@ async def test_persona_adapts_based_on_episodic_memory(
             )
         ),
         Episode(
-            id=uuid.uuid4(),
+            id=str(uuid.uuid4()),
             timestamp=datetime.now() - timedelta(minutes=30),
             inputs={"task": "architecture_design"},
             actions=["analyze_requirements", "design_components", "create_diagram"],
@@ -357,7 +316,7 @@ async def test_persona_evolution_based_on_feedback_and_outcomes(
 
     for data in episodes_data:
         episode = Episode(
-            id=uuid.uuid4(),
+            id=str(uuid.uuid4()),
             timestamp=datetime.now() - timedelta(hours=len(episodes_data)),
             inputs={"task": data["task"], "style": data.get("style"), "verbosity": data.get("verbosity")},
             actions=["analyze", "execute", "verify"],
@@ -428,7 +387,7 @@ async def test_cross_system_event_propagation(
     """
     # Store episode
     episode = Episode(
-        id=uuid.uuid4(),
+        id=str(uuid.uuid4()),
         timestamp=datetime.now(),
         inputs={"task": "learn_python_async"},
         actions=["read_docs", "write_code", "test"],
@@ -512,7 +471,7 @@ async def test_persona_memory_performance_under_load(
     episodes_to_store = []
     for i in range(100):
         episode = Episode(
-            id=uuid.uuid4(),
+            id=str(uuid.uuid4()),
             timestamp=datetime.now() - timedelta(minutes=i),
             inputs={"task": f"task_{i % 10}", "iteration": i},
             actions=["action1", "action2"],
@@ -612,7 +571,7 @@ async def test_memory_guided_persona_selection(
 
     for mapping in persona_task_mapping:
         episode = Episode(
-            id=uuid.uuid4(),
+            id=str(uuid.uuid4()),
             timestamp=datetime.now() - timedelta(hours=4),
             inputs={
                 "persona_used": mapping["persona"],
