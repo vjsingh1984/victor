@@ -498,6 +498,9 @@ class Settings(BaseSettings):
         extra="allow",
     )
 
+    # Deployment Profile (development, testing, production)
+    profile: str = "development"
+
     # Default provider settings (LMStudio by default for local observability)
     default_provider: str = "ollama"
     default_model: str = "qwen3-coder:30b"

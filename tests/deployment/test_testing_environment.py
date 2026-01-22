@@ -195,33 +195,34 @@ class TestTestingEnvironmentIntegration:
     def test_memory_event_bus(self):
         """Test that memory event bus works."""
         from victor.core.events import create_event_backend, MessagingEvent
+        from victor.core.events.protocols import BackendConfig, BackendType
         import asyncio
 
         async def test_bus():
-            backend = create_event_backend(BackendConfig(backend_type="memory"))
+            backend = create_event_backend(BackendConfig(backend_type=BackendType.IN_MEMORY))
             await backend.connect()
 
             # Publish test event
             event = MessagingEvent(
-                topic="test.event", data={"test": "data"}, metadata={"source": "test"}
+                topic="test.event", data={"test": "data"}, source="test"
             )
             await backend.publish(event)
 
-            await backend.close()
+            await backend.disconnect()
 
         asyncio.run(test_bus())
 
     def test_metrics_collection(self):
         """Test that metrics can be collected."""
-        from victor.framework.metrics import Counter, MetricsRegistry
+        from victor.observability.metrics import MetricsRegistry
 
         registry = MetricsRegistry()
-        counter = registry.counter("test_calls", tags={"environment": "testing"})
+        counter = registry.counter("test_calls", "Test counter", labels={"environment": "testing"})
         counter.increment()
         counter.increment()
 
         # Verify metric was recorded
-        metrics = registry.get_metrics()
+        metrics = registry.collect()
         assert len(metrics) > 0
 
 
