@@ -1,0 +1,132 @@
+---
+# cert-manager for automatic TLS certificate management
+# Uses Let's Encrypt for free SSL/TLS certificates
+
+---
+# Install cert-manager CRDs
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager
+  labels:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/name: cert-manager
+    app.kubernetes.io/part-of: cert-manager
+    app.kubernetes.io/version: "v1.13.1"
+
+---
+# Helm-based deployment would be done via the deploy_infrastructure.sh script
+# This manifest shows the ClusterIssuer for Let's Encrypt
+
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+  annotations:
+    description: "Let's Encrypt Staging Environment - For testing"
+spec:
+  acme:
+    # The ACME server URL
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+
+    # Email address used for ACME registration
+    email: admin@victor.ai  # REPLACE WITH YOUR EMAIL
+
+    # Name of a secret used to store the ACME account private key
+    privateKeySecretRef:
+      name: letsencrypt-staging
+
+    # Enable the HTTP-01 challenge provider
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+      selector:
+        matchLabels:
+          cert-manager.io/issuer: letsencrypt-staging
+
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+  annotations:
+    description: "Let's Encrypt Production Environment - For real certificates"
+spec:
+  acme:
+    # The ACME server URL
+    server: https://acme-v02.api.letsencrypt.org/directory
+
+    # Email address used for ACME registration
+    email: admin@victor.ai  # REPLACE WITH YOUR EMAIL
+
+    # Name of a secret used to store the ACME account private key
+    privateKeySecretRef:
+      name: letsencrypt-prod
+
+    # Enable the HTTP-01 challenge provider
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+      selector:
+        matchLabels:
+          cert-manager.io/issuer: letsencrypt-prod
+
+---
+# Example Certificate resource
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: victor-tls
+  namespace: victor
+  annotations:
+    description: "Example certificate for victor.ai domain - UPDATE THIS"
+spec:
+  secretName: victor-tls
+  duration: 2160h # 90d
+  renewBefore: 360h # 15d before expiration
+  subjectOrganizations:
+    - Victor AI
+  commonName: victor.example.com  # REPLACE WITH YOUR DOMAIN
+  dnsNames:
+    - victor.example.com  # REPLACE WITH YOUR DOMAIN
+    - api.victor.example.com  # REPLACE WITH YOUR DOMAIN
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+    group: cert-manager.io
+
+---
+# Example Ingress with TLS
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: victor-ingress
+  namespace: victor
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - victor.example.com  # REPLACE WITH YOUR DOMAIN
+      secretName: victor-tls
+  rules:
+    - host: victor.example.com  # REPLACE WITH YOUR DOMAIN
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: victor
+                port:
+                  number: 8000

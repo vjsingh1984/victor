@@ -28,6 +28,7 @@ configMapGenerator:
   - enable-tracing=true
   - enable-rate-limiting=true
   - rate-limit-requests-per-minute=500
+  - tool-selection-strategy=hybrid
 
 images:
 - name: victorai/victor

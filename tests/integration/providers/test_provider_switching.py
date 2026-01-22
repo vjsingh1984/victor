@@ -267,7 +267,10 @@ class TestLoadBalancing:
         provider2 = SwitchableMockProvider(name="rr-2")
         provider3 = SwitchableMockProvider(name="rr-3")
 
-        config = ProviderPoolConfig(load_balancer=LoadBalancerType.ROUND_ROBIN)
+        config = ProviderPoolConfig(
+            load_balancer=LoadBalancerType.ROUND_ROBIN,
+            enable_warmup=False  # Disable warmup to avoid double counting
+        )
 
         pool = await create_provider_pool(
             name="rr-pool",
@@ -302,7 +305,10 @@ class TestLoadBalancing:
         provider1 = SwitchableMockProvider(name="lc-1")
         provider2 = SwitchableMockProvider(name="lc-2")
 
-        config = ProviderPoolConfig(load_balancer=LoadBalancerType.LEAST_CONNECTIONS)
+        config = ProviderPoolConfig(
+            load_balancer=LoadBalancerType.LEAST_CONNECTIONS,
+            enable_warmup=False  # Disable warmup to avoid double counting
+        )
 
         pool = await create_provider_pool(
             name="lc-pool",
@@ -331,7 +337,9 @@ class TestLoadBalancing:
         provider1 = SwitchableMockProvider(name="weighted-1")
         provider2 = SwitchableMockProvider(name="weighted-2")
 
-        pool = ProviderPool(name="weighted-pool")
+        # Create pool with warmup disabled to avoid double counting
+        config = ProviderPoolConfig(enable_warmup=False)
+        pool = ProviderPool(name="weighted-pool", config=config)
         await pool.initialize()
 
         # Add providers with different weights
@@ -357,7 +365,10 @@ class TestLoadBalancing:
         provider1 = SwitchableMockProvider(name="adaptive-1", response_delay=0.05)
         provider2 = SwitchableMockProvider(name="adaptive-2", response_delay=0.15)
 
-        config = ProviderPoolConfig(load_balancer=LoadBalancerType.ADAPTIVE)
+        config = ProviderPoolConfig(
+            load_balancer=LoadBalancerType.ADAPTIVE,
+            enable_warmup=False  # Disable warmup to avoid double counting
+        )
 
         pool = await create_provider_pool(
             name="adaptive-pool",
@@ -389,6 +400,8 @@ class TestLoadBalancing:
         # Make provider-2 fail
         provider2.set_failure_mode(True)
 
+        # Create pool with warmup disabled to avoid double counting
+        config = ProviderPoolConfig(enable_warmup=False)
         pool = await create_provider_pool(
             name="lb-fail-pool",
             providers={
@@ -396,6 +409,7 @@ class TestLoadBalancing:
                 "provider-2": provider2,
                 "provider-3": provider3,
             },
+            config=config,
         )
 
         messages = ProviderTestHelpers.create_test_messages()

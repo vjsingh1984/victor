@@ -74,14 +74,13 @@ def run_tests_with_timeout(
 def check_pytest_timeout_installed() -> bool:
     """Check if pytest-timeout plugin is installed."""
     try:
+        # Try to import pytest_timeout
         result = subprocess.run(
-            ["pytest", "--version"],
+            [sys.executable, "-c", "import pytest_timeout"],
             capture_output=True,
-            text=True,
             check=False,
         )
-        # Check if timeout is in the plugins list
-        return "timeout" in result.stdout.lower()
+        return result.returncode == 0
     except Exception:
         return False
 

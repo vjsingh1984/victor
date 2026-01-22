@@ -1,0 +1,67 @@
+---
+# Kustomization for Victor AI Infrastructure
+# This allows for easy management and customization of infrastructure components
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Namespace for all resources
+namespace: victor
+
+# List of resource files to apply
+resources:
+  - postgres-statefulset.yaml
+  - redis-statefulset.yaml
+
+# Common labels applied to all resources
+commonLabels:
+  app.kubernetes.io/name: victor
+  app.kubernetes.io/component: infrastructure
+  app.kubernetes.io/managed-by: kustomize
+
+# ConfigMap generator
+configMapGenerator:
+  - name: postgres-config
+    literals:
+      - POSTGRES_DB=victor
+      - POSTGRES_USER=victor
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8
+
+  - name: redis-config
+    files:
+      - redis.conf
+
+# Secret generator (use --secret-file or env vars in production)
+secretGenerator:
+  - name: postgres-secret
+    literals:
+      - POSTGRES_PASSWORD=change-this-password-in-production
+
+# Images to use
+images:
+  - name: postgres
+    newName: postgres
+    newTag: 15-alpine
+  - name: redis
+    newName: redis
+    newTag: 7-alpine
+
+# Patches for customization
+patches:
+  # Increase PostgreSQL storage
+  - patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 20Gi
+    target:
+      kind: PersistentVolumeClaim
+      name: postgres-data
+
+  # Increase Redis storage
+  - patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 10Gi
+    target:
+      kind: PersistentVolumeClaim
+      name: redis-data

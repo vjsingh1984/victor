@@ -87,7 +87,7 @@ class ToolExecutionDecisionCache:
             # Cache miss - validate and cache
             self._misses += 1
 
-            tool_exists = tool_registry.has_tool(tool_name)
+            tool_exists = tool_registry.get(tool_name) is not None
             is_enabled = tool_registry.is_tool_enabled(tool_name) if tool_exists else False
 
             self._validation_cache[tool_name] = ToolValidationResult(

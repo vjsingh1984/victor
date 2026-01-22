@@ -1,0 +1,591 @@
+---
+# Backup CronJob for Victor Application
+# This CronJob creates daily Velero backups of the Victor application
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: victor-backup
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: victor
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/instance: victor-backup
+  annotations:
+    description: "Daily automated backup of Victor application using Velero"
+    backup.retention.days: "30"
+spec:
+  # Run daily at 2 AM
+  schedule: "0 2 * * *"
+  # Keep history of 3 successful and 3 failed jobs
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  # Don't allow concurrent runs
+  concurrencyPolicy: Forbid
+  # Suspend the CronJob if needed (set to true to pause)
+  suspend: false
+  # Deadline for job creation (6 hours)
+  startingDeadlineSeconds: 21600
+
+  jobTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/name: victor
+        app.kubernetes.io/component: backup
+    spec:
+      # Automatic cleanup after 24 hours
+      ttlSecondsAfterFinished: 86400
+      # Retry backoff
+      backoffLimit: 3
+
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: victor
+            app.kubernetes.io/component: backup
+        spec:
+          # Use Velero service account
+          serviceAccountName: velero-server
+
+          # Restart policy
+          restartPolicy: OnFailure
+
+          # Container configuration
+          containers:
+          - name: velero-backup
+            image: velero/velero:v1.13.0
+            imagePullPolicy: IfNotPresent
+
+            command:
+            - /velero
+            args:
+            - backup
+            - create
+            - victor-daily-$(date +%Y%m%d-%H%M%S)
+            - --namespace=velero
+            # Backup all namespaces
+            - --all-namespaces=true
+            # Include cluster resources
+            - --include-cluster-resources=true
+            # Use file system backup for volumes by default
+            - --default-volumes-to-fs-backup=true
+            # Wait for backup to complete
+            - --wait=true
+            # Timeout (4 hours)
+            - --timeout=14400s
+            # Add labels
+            - --selector=app.kubernetes.io/managed-by=helm
+
+            env:
+            - name: VELERO_NAMESPACE
+              value: velero
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+
+            # Resource limits
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 1
+                memory: 1Gi
+
+            # Security context
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                - ALL
+              readOnlyRootFilesystem: true
+              runAsNonRoot: true
+              runAsUser: 1000
+
+            # Liveness probe
+            livenessProbe:
+              exec:
+                command:
+                - /velero
+                - --help
+              initialDelaySeconds: 30
+              periodSeconds: 60
+              timeoutSeconds: 10
+              failureThreshold: 3
+
+            # Volume mounts for temporary storage
+            volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+
+          # Volumes
+          volumes:
+          - name: tmp
+            emptyDir: {}
+
+          # Node selector
+          nodeSelector:
+            kubernetes.io/arch: amd64
+
+          # Tolerations
+          tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
+
+          # Affinity rules
+          affinity:
+            # Prefer nodes with label backup=true
+            nodeAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                preference:
+                  matchExpressions:
+                  - key: backup
+                    operator: In
+                    values:
+                    - "true"
+
+---
+# Backup Verification CronJob
+# This CronJob verifies that backups are completing successfully
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: victor-backup-verification
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: victor
+    app.kubernetes.io/component: backup-verification
+  annotations:
+    description: "Verify latest backup is valid and complete"
+spec:
+  # Run daily at 6 AM (after backup completes)
+  schedule: "0 6 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  suspend: false
+
+  jobTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/name: victor
+        app.kubernetes.io/component: backup-verification
+    spec:
+      ttlSecondsAfterFinished: 86400
+      backoffLimit: 2
+
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: victor
+            app.kubernetes.io/component: backup-verification
+        spec:
+          serviceAccountName: velero-server
+          restartPolicy: OnFailure
+
+          containers:
+          - name: backup-verification
+            image: velero/velero:v1.13.0
+            imagePullPolicy: IfNotPresent
+
+            command:
+            - /bin/bash
+            args:
+            - -c
+            - |
+              set -eo pipefail
+
+              echo "======================================"
+              echo "Victor Backup Verification"
+              echo "======================================"
+              echo "Started at: $(date)"
+              echo ""
+
+              # Function to send alert (placeholder)
+              send_alert() {
+                  local severity=$1
+                  local message=$2
+                  echo "ALERT [$severity]: $message"
+                  # Integrate with your alerting system
+                  # e.g., curl -X POST $SLACK_WEBHOOK -d "{\"text\": \"$message\"}"
+              }
+
+              # Get latest backup
+              echo "Getting latest backup..."
+              LATEST_BACKUP=$(velero backup get -o json | \
+                  jq -r '.items | sort_by(.status.startTimestamp) | reverse | [.[0].name] | .[0]')
+
+              if [ -z "$LATEST_BACKUP" ] || [ "$LATEST_BACKUP" = "null" ]; then
+                  echo "ERROR: No backups found!"
+                  send_alert "CRITICAL" "Victor backup verification failed: No backups found"
+                  exit 1
+              fi
+
+              echo "Latest backup: $LATEST_BACKUP"
+              echo ""
+
+              # Check backup status
+              echo "Checking backup status..."
+              STATUS=$(velero backup get "$LATEST_BACKUP" -o json | jq -r '.status.phase')
+
+              if [ "$STATUS" != "Completed" ]; then
+                  echo "ERROR: Backup failed with status: $STATUS"
+                  send_alert "CRITICAL" "Victor backup $LATEST_BACKUP failed with status: $STATUS"
+                  exit 1
+              fi
+
+              echo "Backup status: $STATUS"
+              echo ""
+
+              # Check for errors
+              echo "Checking for errors..."
+              ERRORS=$(velero backup get "$LATEST_BACKUP" -o json | jq -r '.status.errors')
+
+              if [ "$ERRORS" != "null" ] && [ "$ERRORS" != "0" ]; then
+                  echo "WARNING: Backup completed with errors: $ERRORS"
+                  velero backup describe "$LATEST_BACKUP" --details | grep -A 50 "Errors:" || true
+                  send_alert "WARNING" "Victor backup $LATEST_BACKUP completed with $ERRORS errors"
+              else
+                  echo "No errors found"
+              fi
+              echo ""
+
+              # Check backup age
+              echo "Checking backup age..."
+              BACKUP_TIMESTAMP=$(velero backup get "$LATEST_BACKUP" -o json | jq -r '.status.startTimestamp')
+              BACKUP_AGE_SECONDS=$(($(date -d "$BACKUP_TIMESTAMP" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$BACKUP_TIMESTAMP" +%s)))
+              CURRENT_SECONDS=$(date +%s)
+              AGE_HOURS=$(( ($CURRENT_SECONDS - $BACKUP_AGE_SECONDS) / 3600 ))
+
+              echo "Backup age: $AGE_HOURS hours"
+
+              if [ $AGE_HOURS -gt 24 ]; then
+                  echo "WARNING: Backup is older than 24 hours"
+                  send_alert "WARNING" "Victor backup $LATEST_BACKUP is $AGE_HOURS hours old"
+              fi
+              echo ""
+
+              # Check backup size
+              echo "Getting backup statistics..."
+              velero backup describe "$LATEST_BACKUP" --details | grep -A 20 "Backup Contents" || true
+              echo ""
+
+              # Verify backup storage location
+              echo "Checking backup storage location..."
+              STORAGE_STATUS=$(kubectl get backupstoragelocation.velero.io default -n velero -o json | \
+                  jq -r '.status.phase // "Unknown"')
+
+              if [ "$STORAGE_STATUS" != "Available" ]; then
+                  echo "ERROR: Backup storage location is not available: $STORAGE_STATUS"
+                  send_alert "CRITICAL" "Victor backup storage location status: $STORAGE_STATUS"
+                  exit 1
+              fi
+
+              echo "Storage location status: $STORAGE_STATUS"
+              echo ""
+
+              # Success
+              echo "======================================"
+              echo "Backup verification completed successfully!"
+              echo "Backup: $LATEST_BACKUP"
+              echo "Status: $STATUS"
+              echo "Age: $AGE_HOURS hours"
+              echo "======================================"
+
+            env:
+            - name: VELERO_NAMESPACE
+              value: velero
+
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                - ALL
+              readOnlyRootFilesystem: true
+              runAsNonRoot: true
+              runAsUser: 1000
+
+            volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+
+          volumes:
+          - name: tmp
+            emptyDir: {}
+
+---
+# Backup Cleanup CronJob
+# This CronJob removes old backups beyond retention period
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: victor-backup-cleanup
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: victor
+    app.kubernetes.io/component: backup-cleanup
+  annotations:
+    description: "Remove old backups beyond retention period"
+spec:
+  # Run weekly on Sunday at 3 AM
+  schedule: "0 3 * * 0"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  concurrencyPolicy: Forbid
+  suspend: false
+
+  jobTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/name: victor
+        app.kubernetes.io/component: backup-cleanup
+    spec:
+      ttlSecondsAfterFinished: 86400
+      backoffLimit: 1
+
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: victor
+            app.kubernetes.io/component: backup-cleanup
+        spec:
+          serviceAccountName: velero-server
+          restartPolicy: OnFailure
+
+          containers:
+          - name: backup-cleanup
+            image: velero/velero:v1.13.0
+            imagePullPolicy: IfNotPresent
+
+            command:
+            - /bin/bash
+            args:
+            - -c
+            - |
+              set -eo pipefail
+
+              echo "======================================"
+              echo "Victor Backup Cleanup"
+              echo "======================================"
+              echo "Started at: $(date)"
+              echo ""
+
+              RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-30}
+              CUTOFF_DATE=$(date -d "$RETENTION_DAYS days ago" +%Y-%m-%d 2>/dev/null || \
+                           date -v-${RETENTION_DAYS}d +%Y-%m-%d)
+
+              echo "Retention period: $RETENTION_DAYS days"
+              echo "Cutoff date: $CUTOFF_DATE"
+              echo ""
+
+              # Get old backups
+              echo "Finding backups older than $RETENTION_DAYS days..."
+              BACKUPS_TO_DELETE=$(velero backup get -o json | \
+                  jq -r ".items[] | select(.status.startTimestamp < \"$CUTOFF_DATE\") | .name" | \
+                  grep "^victor-daily-" || true)
+
+              if [ -z "$BACKUPS_TO_DELETE" ]; then
+                  echo "No old backups found to delete"
+              else
+                  BACKUP_COUNT=$(echo "$BACKUPS_TO_DELETE" | wc -l)
+                  echo "Found $BACKUP_COUNT backups to delete:"
+                  echo "$BACKUPS_TO_DELETE"
+                  echo ""
+
+                  # Delete backups
+                  for backup in $BACKUPS_TO_DELETE; do
+                      echo "Deleting backup: $backup"
+                      velero backup delete "$backup" --confirm
+                  done
+
+                  echo ""
+                  echo "Deleted $BACKUP_COUNT old backups"
+              fi
+
+              echo ""
+
+              # List remaining backups
+              echo "Remaining backups:"
+              velero backup get | grep "^victor-daily-" || echo "No backups found"
+
+              echo ""
+              echo "======================================"
+              echo "Backup cleanup completed"
+              echo "======================================"
+
+            env:
+            - name: VELERO_NAMESPACE
+              value: velero
+            - name: BACKUP_RETENTION_DAYS
+              value: "30"
+
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                - ALL
+              readOnlyRootFilesystem: true
+              runAsNonRoot: true
+              runAsUser: 1000
+
+            volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+
+          volumes:
+          - name: tmp
+            emptyDir: {}
+
+---
+# Weekly Backup Test CronJob
+# This CronJob performs test restores to verify backup integrity
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: victor-backup-test
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: victor
+    app.kubernetes.io/component: backup-test
+  annotations:
+    description: "Weekly backup integrity test using dry-run restore"
+spec:
+  # Run weekly on Sunday at 4 AM
+  schedule: "0 4 * * 0"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  concurrencyPolicy: Forbid
+  suspend: false
+
+  jobTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/name: victor
+        app.kubernetes.io/component: backup-test
+    spec:
+      ttlSecondsAfterFinished: 86400
+      backoffLimit: 1
+
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: victor
+            app.kubernetes.io/component: backup-test
+        spec:
+          serviceAccountName: velero-server
+          restartPolicy: OnFailure
+
+          containers:
+          - name: backup-test
+            image: velero/velero:v1.13.0
+            imagePullPolicy: IfNotPresent
+
+            command:
+            - /bin/bash
+            args:
+            - -c
+            - |
+              set -eo pipefail
+
+              echo "======================================"
+              echo "Victor Backup Integrity Test"
+              echo "======================================"
+              echo "Started at: $(date)"
+              echo ""
+
+              # Get latest backup
+              LATEST_BACKUP=$(velero backup get -o json | \
+                  jq -r '.items | sort_by(.status.startTimestamp) | reverse | [.[0].name] | .[0]')
+
+              if [ -z "$LATEST_BACKUP" ] || [ "$LATEST_BACKUP" = "null" ]; then
+                  echo "ERROR: No backups found!"
+                  exit 1
+              fi
+
+              echo "Testing backup: $LATEST_BACKUP"
+              echo ""
+
+              # Perform dry-run restore
+              echo "Performing dry-run restore to verify backup integrity..."
+              TEST_RESTORE="test-restore-$(date +%Y%m%d-%H%M%S)"
+
+              if velero restore create "$TEST_RESTORE" \
+                  --from-backup "$LATEST_BACKUP" \
+                  --namespace-mappings "victor:victor-test" \
+                  --dry-run \
+                  --wait; then
+
+                  echo ""
+                  echo "======================================"
+                  echo "Backup integrity test PASSED"
+                  echo "Backup: $LATEST_BACKUP"
+                  echo "======================================"
+
+                  # Get restore details
+                  velero restore describe "$TEST_RESTORE" --details | head -50
+
+                  # Cleanup test restore
+                  velero restore delete "$TEST_RESTORE" --confirm
+              else
+                  echo ""
+                  echo "======================================"
+                  echo "Backup integrity test FAILED"
+                  echo "Backup: $LATEST_BACKUP"
+                  echo "======================================"
+                  exit 1
+              fi
+
+            env:
+            - name: VELERO_NAMESPACE
+              value: velero
+
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                - ALL
+              readOnlyRootFilesystem: true
+              runAsNonRoot: true
+              runAsUser: 1000
+
+            volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+
+          volumes:
+          - name: tmp
+            emptyDir: {}

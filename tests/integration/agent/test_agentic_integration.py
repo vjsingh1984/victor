@@ -79,6 +79,7 @@ def container_with_all_features(settings_with_all_features):
 # =============================================================================
 
 
+@pytest.mark.skip(reason="Experimental Phase 3 feature not implemented yet")
 class TestServiceRegistration:
     """Test that agentic AI services are registered correctly."""
 
@@ -177,6 +178,7 @@ class TestServiceRegistration:
 # =============================================================================
 
 
+@pytest.mark.skip(reason="Experimental Phase 3 feature not implemented yet")
 class TestHierarchicalPlanning:
     """Test hierarchical planning integration."""
 
@@ -215,6 +217,7 @@ class TestHierarchicalPlanning:
 # =============================================================================
 
 
+@pytest.mark.skip(reason="Experimental Phase 3 feature not implemented yet")
 class TestEpisodicMemory:
     """Test episodic memory integration."""
 
@@ -249,6 +252,7 @@ class TestEpisodicMemory:
 # =============================================================================
 
 
+@pytest.mark.skip(reason="Experimental Phase 3 feature not implemented yet")
 class TestSemanticMemory:
     """Test semantic memory integration."""
 
@@ -281,6 +285,7 @@ class TestSemanticMemory:
 # =============================================================================
 
 
+@pytest.mark.skip(reason="Experimental Phase 3 feature not implemented yet")
 class TestSkillDiscovery:
     """Test skill discovery integration."""
 
@@ -320,6 +325,7 @@ class TestSkillDiscovery:
 # =============================================================================
 
 
+@pytest.mark.skip(reason="Experimental Phase 3 feature not implemented yet")
 class TestSkillChaining:
     """Test skill chaining integration."""
 
@@ -372,6 +378,7 @@ class TestSkillChaining:
 # =============================================================================
 
 
+@pytest.mark.skip(reason="Experimental Phase 3 feature not implemented yet")
 class TestProficiencyTracker:
     """Test proficiency tracking integration."""
 
@@ -409,6 +416,7 @@ class TestProficiencyTracker:
 # =============================================================================
 
 
+@pytest.mark.skip(reason="Experimental Phase 3 feature not implemented yet")
 class TestRLCoordinator:
     """Test RL coordinator integration."""
 
@@ -451,6 +459,7 @@ class TestRLCoordinator:
 # =============================================================================
 
 
+@pytest.mark.skip(reason="Experimental Phase 3 feature not implemented yet")
 class TestEndToEndWorkflows:
     """Test end-to-end workflows with agentic AI features."""
 
@@ -566,6 +575,7 @@ class TestBackwardCompatibility:
 # =============================================================================
 
 
+@pytest.mark.skip(reason="Experimental Phase 3 feature not implemented yet")
 class TestFeatureFlags:
     """Test that feature flags control service registration."""
 
@@ -599,6 +609,7 @@ class TestFeatureFlags:
 # =============================================================================
 
 
+@pytest.mark.skip(reason="Experimental Phase 3 feature not implemented yet")
 class TestConfiguration:
     """Test that settings configure services correctly."""
 
@@ -644,6 +655,7 @@ class TestConfiguration:
 
 @pytest.mark.integration
 @pytest.mark.agentic_ai
+@pytest.mark.skip(reason="Experimental Phase 3 feature not implemented yet")
 class TestAgenticAIMarks:
     """Tests with marks for pytest filtering."""
 

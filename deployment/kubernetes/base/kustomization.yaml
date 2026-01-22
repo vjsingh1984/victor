@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: victor-ai
+
+labels:
+  - pairs:
+      app: victor-ai
+      version: 0.5.1
+
+resources:
+- configmap.yaml
+- deployment.yaml
+- service.yaml
+- serviceaccount.yaml
+- priorityclass.yaml
+- pdb.yaml
+- networkpolicy.yaml
+- secret.yaml
+- hpa.yaml

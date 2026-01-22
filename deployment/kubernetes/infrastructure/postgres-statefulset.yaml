@@ -1,0 +1,231 @@
+---
+# PostgreSQL StatefulSet for Victor AI
+# Provides persistent database storage with automated failover capabilities
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: victor
+  labels:
+    app: postgres
+    component: database
+data:
+  # Database configuration
+  POSTGRES_DB: victor
+  POSTGRES_USER: victor
+  POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+
+  # PostgreSQL configuration
+  postgres.conf: |
+    # Connection settings
+    max_connections = 200
+    shared_buffers = 256MB
+    effective_cache_size = 1GB
+    maintenance_work_mem = 64MB
+    checkpoint_completion_target = 0.9
+    wal_buffers = 16MB
+    default_statistics_target = 100
+    random_page_cost = 1.1
+    effective_io_concurrency = 200
+    work_mem = 2621kB
+    min_wal_size = 1GB
+    max_wal_size = 4GB
+
+    # Logging
+    logging_collector = on
+    log_directory = 'log'
+    log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+    log_statement = 'mod'
+    log_duration = off
+    log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+
+    # Performance
+    shared_preload_libraries = 'pg_stat_statements'
+    pg_stat_statements.track = all
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+  namespace: victor
+  labels:
+    app: postgres
+    component: database
+type: Opaque
+# Password should be generated using: openssl rand -base64 32
+# This is a placeholder - replace with actual secret in production
+stringData:
+  POSTGRES_PASSWORD: "CHANGE_THIS_PASSWORD_IN_PRODUCTION"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: victor
+  labels:
+    app: postgres
+    component: database
+spec:
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgres
+  # ClusterIP None enables direct pod-to-pod communication
+  clusterIP: None
+  selector:
+    app: postgres
+    component: database
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-read
+  namespace: victor
+  labels:
+    app: postgres
+    component: database
+    role: read
+spec:
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgres
+  selector:
+    app: postgres
+    component: database
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: victor
+  labels:
+    app: postgres
+    component: database
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+      component: database
+  template:
+    metadata:
+      labels:
+        app: postgres
+        component: database
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9187"
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+          name: postgres
+          protocol: TCP
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: postgres-config
+              key: POSTGRES_DB
+        - name: POSTGRES_USER
+          valueFrom:
+            configMapKeyRef:
+              name: postgres-config
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_INITDB_ARGS
+          valueFrom:
+            configMapKeyRef:
+              name: postgres-config
+              key: POSTGRES_INITDB_ARGS
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        - name: postgres-config
+          mountPath: /etc/postgresql
+          readOnly: true
+        resources:
+          requests:
+            cpu: 250m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        # Liveness probe - restarts container if unhealthy
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        # Readiness probe - marks pod as ready to serve traffic
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+        # Startup probe - gives additional time during startup
+        startupProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 30
+          successThreshold: 1
+      volumes:
+      - name: postgres-config
+        configMap:
+          name: postgres-config
+          items:
+          - key: postgres.conf
+            path: postgres.conf
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+      labels:
+        app: postgres
+        component: database
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      storageClassName: standard
+      resources:
+        requests:
+          storage: 10Gi

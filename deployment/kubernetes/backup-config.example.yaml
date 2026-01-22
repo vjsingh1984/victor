@@ -1,0 +1,281 @@
+---
+# Velero Backup Configuration Example
+# Copy this file to backup-config.yaml and customize for your environment
+
+# S3 Configuration
+s3:
+  # S3 bucket name for backups
+  bucket: "my-k8s-backups"
+
+  # AWS region
+  region: "us-east-1"
+
+  # Prefix for backups in bucket
+  prefix: "velero"
+
+  # S3 endpoint (optional, for S3-compatible storage like MinIO)
+  # endpoint: "https://s3.example.com"
+
+# Backup Schedule
+schedule:
+  # Cron schedule for daily backups
+  # Format: minute hour day month weekday
+  # Examples:
+  #   "0 2 * * *"     - Daily at 2 AM
+  #   "0 */6 * * *"   - Every 6 hours
+  #   "0 2 * * 0"     - Weekly on Sunday at 2 AM
+  #   "0 2 1 * *"     - Monthly on the 1st at 2 AM
+  daily: "0 2 * * *"
+
+  # Backup verification schedule
+  verification: "0 6 * * *"
+
+  # Backup cleanup schedule
+  cleanup: "0 3 * * 0"
+
+  # Backup test schedule
+  test: "0 4 * * 0"
+
+# Retention Policy
+retention:
+  # Default retention period for backups
+  # Format: Xd (days), Xh (hours), Xw (weeks)
+  default_ttl: "30d"
+
+  # Days to keep daily backups
+  daily: 7
+
+  # Weeks to keep weekly backups
+  weekly: 4
+
+  # Months to keep monthly backups
+  monthly: 3
+
+# Backup Configuration
+backup:
+  # Include all namespaces
+  all_namespaces: true
+
+  # Include cluster resources
+  include_cluster_resources: true
+
+  # Use file system backup for volumes by default
+  default_volumes_to_fs_backup: true
+
+  # Backup timeout (default: 4 hours)
+  timeout: "14400s"
+
+  # Selector for resources to backup
+  # Example: "app.kubernetes.io/managed-by=helm"
+  selector: ""
+
+  # Namespaces to include (if all_namespaces is false)
+  include_namespaces:
+    - "victor"
+    - "victor-database"
+    - "monitoring"
+
+  # Namespaces to exclude
+  exclude_namespaces:
+    - "kube-system"
+    - "kube-public"
+    - "kube-node-lease"
+
+  # Resources to exclude
+  exclude_resources:
+    - "events"
+    - "events.events.k8s.io"
+
+# Volume Snapshot Configuration
+volume_snapshot:
+  # Enable volume snapshots
+  enabled: true
+
+  # Region for snapshots (same as S3 region by default)
+  region: "us-east-1"
+
+# Velero Configuration
+velero:
+  # Velero namespace
+  namespace: "velero"
+
+  # Velero version
+  version: "v1.13.0"
+
+  # Container image
+  image: "velero/velero:v1.13.0"
+
+  # Resources
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+
+  # Pod affinity
+  node_selector:
+    kubernetes.io/arch: "amd64"
+
+  # Tolerations
+  tolerations:
+    - key: "node-role.kubernetes.io/control-plane"
+      operator: "Exists"
+      effect: "NoSchedule"
+
+# Monitoring Configuration
+monitoring:
+  # Enable ServiceMonitor for Prometheus
+  enabled: true
+
+  # ServiceMonitor namespace
+  namespace: "velero"
+
+  # Scrape interval
+  scrape_interval: "30s"
+
+  # Enable Prometheus rules
+  prometheus_rules:
+    enabled: true
+
+  # Alert rules
+  alerts:
+    # Alert when backup fails
+    backup_failed:
+      enabled: true
+      severity: "critical"
+      for: "5m"
+
+    # Alert when backup is older than 24 hours
+    backup_old:
+      enabled: true
+      severity: "warning"
+      age: "24h"
+
+    # Alert when restore fails
+    restore_failed:
+      enabled: true
+      severity: "critical"
+      for: "5m"
+
+    # Alert when storage location is not ready
+    storage_not_ready:
+      enabled: true
+      severity: "critical"
+      for: "10m"
+
+# Credentials Configuration
+credentials:
+  # Use IAM role (recommended for AWS)
+  use_iam_role: true
+
+  # AWS credentials (if not using IAM role)
+  # WARNING: Not recommended for production
+  # aws_access_key_id: ""
+  # aws_secret_access_key: ""
+
+  # Use existing secret
+  existing_secret: false
+
+# CronJob Configuration
+cronjobs:
+  # Backup CronJob
+  backup:
+    enabled: true
+    schedule: "0 2 * * *"
+    successful_jobs_history_limit: 3
+    failed_jobs_history_limit: 3
+    concurrency_policy: "Forbid"
+    suspend: false
+    backoff_limit: 3
+
+  # Verification CronJob
+  verification:
+    enabled: true
+    schedule: "0 6 * * *"
+    successful_jobs_history_limit: 3
+    failed_jobs_history_limit: 3
+    concurrency_policy: "Forbid"
+    suspend: false
+    backoff_limit: 2
+
+  # Cleanup CronJob
+  cleanup:
+    enabled: true
+    schedule: "0 3 * * 0"
+    successful_jobs_history_limit: 1
+    failed_jobs_history_limit: 1
+    concurrency_policy: "Forbid"
+    suspend: false
+    backoff_limit: 1
+    retention_days: 30
+
+  # Test CronJob
+  test:
+    enabled: true
+    schedule: "0 4 * * 0"
+    successful_jobs_history_limit: 1
+    failed_jobs_history_limit: 1
+    concurrency_policy: "Forbid"
+    suspend: false
+    backoff_limit: 1
+
+# Resource Limits for CronJobs
+cronjob_resources:
+  requests:
+    cpu: "100m"
+    memory: "256Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+# Notification Configuration (optional)
+notifications:
+  # Enable notifications
+  enabled: false
+
+  # Slack webhook URL
+  slack_webhook_url: ""
+
+  # Slack channel
+  slack_channel: "#backups"
+
+  # Email notifications
+  email:
+    enabled: false
+    smtp_server: ""
+    smtp_port: 587
+    from_address: ""
+    to_addresses: []
+
+# Feature Flags
+features:
+  # Enable Kopia uploader (new backup format)
+  enable_kopia: false
+
+  # Enable BSR (Backup Store Read) optimization
+  enable_bsr: true
+
+  # Enable CSI snapshotting
+  enable_csi_snapshot: false
+
+# Advanced Configuration
+advanced:
+  # Backup sync period
+  backup_sync_period: "1m"
+
+  # Garbage collection sync period
+  gc_sync_period: "1m"
+
+  # Restic timeout
+  restic_timeout: "1h"
+
+  # Log level
+  log_level: "info"
+
+  # Log format
+  log_format: "text"
+
+  # Profiling port
+  profiling_port: 6060

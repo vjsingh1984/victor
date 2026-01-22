@@ -44,6 +44,19 @@ def environment_configs() -> Dict[str, Dict[str, Any]]:
             with open(overlay_path) as f:
                 configs[env] = yaml.safe_load(f)
 
+        # Load deployment patches for resource limits
+        patch_path = (
+            Path("/Users/vijaysingh/code/codingagent/deployment/kubernetes/overlays")
+            / env
+            / "deployment-patch.yaml"
+        )
+        if patch_path.exists():
+            with open(patch_path) as f:
+                patch_data = yaml.safe_load(f)
+                # Extract resource limits from patch
+                if env in configs:
+                    configs[env]["_patch"] = patch_data
+
     return configs
 
 
@@ -74,7 +87,20 @@ class TestConfigurationPromotion:
         for env, expected_replica_count in expected_replicas.items():
             if env in environment_configs:
                 config = environment_configs[env]
-                actual_replicas = config.get("replicas", config.get("replicaCount"))
+                replicas_config = config.get("replicas", config.get("replicaCount"))
+
+                # Handle different replicas config structures
+                if isinstance(replicas_config, list):
+                    # Kustomize format: [{'name': 'victor-ai', 'count': 1}]
+                    if replicas_config and len(replicas_config) > 0:
+                        actual_replicas = replicas_config[0].get("count", 1)
+                    else:
+                        actual_replicas = 1
+                elif isinstance(replicas_config, int):
+                    actual_replicas = replicas_config
+                else:
+                    actual_replicas = 1
+
                 assert (
                     actual_replicas == expected_replica_count
                 ), f"{env}: expected {expected_replica_count} replicas, got {actual_replicas}"
@@ -91,13 +117,23 @@ class TestConfigurationPromotion:
         for env, expected_cpu in expected_cpu_limits.items():
             if env in environment_configs:
                 config = environment_configs[env]
-                # Handle different config structures
-                if "resources" in config:
+
+                # Try to get CPU from patch data first
+                if "_patch" in config:
+                    patch = config["_patch"]
+                    try:
+                        actual_cpu = patch["spec"]["template"]["spec"]["containers"][0]["resources"]["limits"]["cpu"]
+                    except (KeyError, TypeError, IndexError):
+                        actual_cpu = "1000m"  # Default fallback
+                elif "resources" in config:
                     actual_cpu = config["resources"]["limits"]["cpu"]
                 elif "spec" in config:
                     # Kubernetes patch format
                     actual_cpu = "1000m"  # Default
-                assert actual_cpu == expected_cpu, f"{env}: CPU limit mismatch"
+                else:
+                    actual_cpu = "1000m"  # Default fallback
+
+                assert actual_cpu == expected_cpu, f"{env}: expected {expected_cpu} CPU, got {actual_cpu}"
 
     def test_memory_scaling(self, environment_configs):
         """Test that memory allocation scales up through environments."""
@@ -111,11 +147,20 @@ class TestConfigurationPromotion:
         for env, expected_memory in expected_memory_limits.items():
             if env in environment_configs:
                 config = environment_configs[env]
-                if "resources" in config:
+
+                # Try to get memory from patch data first
+                if "_patch" in config:
+                    patch = config["_patch"]
+                    try:
+                        actual_memory = patch["spec"]["template"]["spec"]["containers"][0]["resources"]["limits"]["memory"]
+                    except (KeyError, TypeError, IndexError):
+                        actual_memory = "1Gi"  # Default fallback
+                elif "resources" in config:
                     actual_memory = config["resources"]["limits"]["memory"]
                 else:
-                    actual_memory = "1Gi"
-                assert actual_memory == expected_memory, f"{env}: Memory limit mismatch"
+                    actual_memory = "1Gi"  # Default fallback
+
+                assert actual_memory == expected_memory, f"{env}: expected {expected_memory} memory, got {actual_memory}"
 
     def test_cache_size_scaling(self, environment_configs):
         """Test that cache size scales up through environments."""

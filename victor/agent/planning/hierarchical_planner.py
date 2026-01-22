@@ -433,10 +433,8 @@ class HierarchicalPlanner:
         for task_id in failed_tasks:
             task_graph.nodes[task_id].status = "failed"
 
-            # Mark dependent tasks as blocked
-            for dependent_id in task_graph.get_dependents(task_id):
-                if task_graph.nodes[dependent_id].status == "pending":
-                    task_graph.nodes[dependent_id].status = "blocked"
+            # Mark dependent tasks as blocked (with transitive propagation)
+            self._propagate_blocked_status(task_graph, task_id)
 
         # Get newly ready tasks
         new_ready_tasks = self._decomposer.get_ready_tasks(task_graph)
@@ -465,6 +463,58 @@ class HierarchicalPlanner:
         )
 
         return result
+
+    def _propagate_blocked_status(
+        self,
+        task_graph: TaskGraph,
+        failed_task_id: str,
+    ) -> None:
+        """Propagate blocked status to all dependent tasks.
+
+        When a task fails, all tasks that depend on it (transitively) should
+        be marked as blocked since they cannot complete.
+
+        This implements the Single Responsibility Principle by handling only
+        status propagation logic, separate from update coordination.
+
+        Args:
+            task_graph: Task graph to update
+            failed_task_id: ID of the task that failed
+
+        Design:
+            - Uses BFS to traverse dependents breadth-first
+            - Marks tasks as "blocked" if they depend on failed task
+            - Preserves existing blocked/completed/failed status
+            - Idempotent: safe to call multiple times
+        """
+        from collections import deque
+
+        # BFS queue for dependents
+        to_process = deque([failed_task_id])
+        processed = set()
+
+        while to_process:
+            current_id = to_process.popleft()
+
+            if current_id in processed:
+                continue
+
+            processed.add(current_id)
+
+            # Find all tasks that depend on the current task
+            for task_id, task in task_graph.nodes.items():
+                # Skip if already processed
+                if task_id in processed:
+                    continue
+
+                # Check if this task depends on the failed task
+                if current_id in task.depends_on:
+                    # Mark as blocked if not already completed/failed/blocked
+                    if task.status not in ("completed", "failed", "blocked"):
+                        task.status = "blocked"
+
+                    # Add to queue for further propagation
+                    to_process.append(task_id)
 
     async def suggest_next_tasks(
         self,

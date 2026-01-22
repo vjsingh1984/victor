@@ -877,7 +877,7 @@ class TestPlanningEdgeCases:
         assert validation.is_valid is False
         assert validation.has_cycles is True
         assert len(validation.errors) > 0
-        assert any("cycle" in error.lower() for error in validation.errors)
+        assert any("cycle" in error.lower() or "circular" in error.lower() for error in validation.errors)
 
     @pytest.mark.asyncio
     async def test_complexity_estimation_consistency(

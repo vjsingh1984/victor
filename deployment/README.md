@@ -1,53 +1,122 @@
-# Victor AI Production Deployment Automation
+# Victor AI Production Deployment
 
-Complete automated deployment system for Victor AI Coding Assistant with zero-downtime deployments, automatic rollback, and comprehensive monitoring.
+Complete production deployment infrastructure for Victor AI with orchestration, monitoring, backups, and comprehensive validation.
 
 ## Overview
 
 This deployment automation provides enterprise-grade deployment capabilities:
 
+- **Master Orchestration**: Single-command complete infrastructure setup
 - **Zero-Downtime Deployment**: Blue-green and rolling update strategies
-- **Automatic Rollback**: Health-based rollback triggers
-- **Pre-Deployment Validation**: Comprehensive readiness checks
-- **Post-Deployment Verification**: Automated health and smoke tests
-- **Interactive Dashboard**: Real-time deployment monitoring
-- **Comprehensive Documentation**: Runbooks and checklists
+- **Automatic Rollback**: Health-based rollback with stage gating
+- **Progress Tracking**: Time estimates and real-time progress
+- **Comprehensive Validation**: Pre and post-deployment verification
+- **Monitoring Stack**: Integrated Prometheus, Grafana, AlertManager
+- **Backup Automation**: Velero integration with automated backups
+- **Deployment Reporting**: JSON reports and detailed logging
 
 ## Quick Start
 
-### 1. Pre-Deployment Validation
+### One-Command Production Deployment
 
 ```bash
-./deployment/scripts/validate_deployment.sh production
+# Deploy everything (infrastructure + monitoring + application)
+./deployment/scripts/deploy_production_complete.sh \
+  --environment production \
+  --image-tag v1.0.0
 ```
 
-Validates:
-- Cluster connectivity
-- Configuration correctness
-- Security settings
-- Monitoring setup
-- Resource availability
-- Backup status
-- Dependencies
+**Estimated time:** ~40 minutes
 
-**Success Criteria**: Score >= 80/100
+### Documentation
 
-### 2. Deploy to Production
+| Document | Description |
+|----------|-------------|
+| **[Deployment Orchestration Guide](./docs/DEPLOYMENT_ORCHESTRATION_GUIDE.md)** | Complete deployment guide with detailed instructions |
+| **[Quick Reference](./docs/DEPLOYMENT_QUICK_REFERENCE.md)** | Quick command reference and common scenarios |
+| **[Kubernetes Guide](./kubernetes/README.md)** | Kubernetes manifests and configurations |
+
+## Deployment Options
+
+### Option 1: Complete Infrastructure Setup
+
+**Use Case:** First-time production deployment
 
 ```bash
-# Blue-green deployment (recommended)
-./deployment/scripts/deploy_production.sh \
+./deployment/scripts/deploy_production_complete.sh \
   --environment production \
-  --image-tag v1.0.0 \
-  --strategy blue-green
+  --image-tag v1.0.0
+```
 
-# Rolling update deployment
-./deployment/scripts/deploy_production.sh \
+**What happens:**
+1. Validates environment and prerequisites (~5 min)
+2. Deploys PostgreSQL, Redis, Ingress (~10 min)
+3. Deploys monitoring stack (~5 min)
+4. Configures secrets (~2 min)
+5. Sets up backups (~3 min)
+6. Deploys application (~10 min)
+7. Runs verification (~5 min)
+
+### Option 2: Application Update Only
+
+**Use Case:** Update existing deployment
+
+```bash
+./deployment/scripts/deploy_production_complete.sh \
   --environment production \
-  --image-tag v1.0.0 \
-  --strategy rolling
+  --image-tag v1.1.0 \
+  --skip-infrastructure \
+  --skip-monitoring
+```
 
-# Dry run (test without changes)
+### Option 3: Blue-Green Deployment
+
+**Use Case:** Zero-downtime production deployment
+
+```bash
+./deployment/scripts/deploy_production_complete.sh \
+  --environment production \
+  --strategy blue-green \
+  --image-tag v2.0.0
+```
+
+### Option 4: Dry Run (Validation)
+
+**Use Case:** Test deployment without changes
+
+```bash
+./deployment/scripts/deploy_production_complete.sh \
+  --environment production \
+  --dry-run
+```
+
+## Deployment Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  MASTER ORCHESTRATION SCRIPT                 │
+│           deploy_production_complete.sh                      │
+│  - Coordinates all stages                                    │
+│  - Progress tracking with time estimates                     │
+│  - Automatic rollback on failure                             │
+│  - Comprehensive reporting                                   │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+        ┌──────────────┼──────────────┬──────────────┐
+        │              │              │              │
+        ▼              ▼              ▼              ▼
+┌──────────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+│  Validation  │ │  Infra   │ │ Monitor  │ │  Deploy  │
+│              │ │          │ │          │ │          │
+│ - Cluster    │ │ - PostgreSQL│-Prometheus│- Application│
+│ - Config     │ │ - Redis  │ │ - Grafana│ │ - Health│
+│ - Security   │ │ - Ingress│ │ - Alerts│ │ - Verify│
+└──────────────┘ └──────────┘ └──────────┘ └──────────┘
+```
+
+## Traditional Deployment Workflow
+
+### 1. Pre-Deployment Validation
 ./deployment/scripts/deploy_production.sh \
   --environment production \
   --image-tag v1.0.0 \

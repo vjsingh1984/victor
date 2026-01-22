@@ -1,0 +1,313 @@
+# Prometheus Alerting Rules for Victor
+#
+# This file defines alerting rules for monitoring Victor's health, performance,
+# and feature flags. Configure Prometheus to load this file and set up
+# alert notifications via Alertmanager.
+#
+# Documentation: https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/
+
+groups:
+  # ==========================================================================
+  # Feature Performance Alerts
+  # ==========================================================================
+  - name: feature_performance
+    interval: 30s
+    rules:
+      - alert: HighFeatureLatency
+        expr: |
+          histogram_quantile(0.95, rate(victor_feature_duration_ms_bucket[5m])) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Feature {{ $labels.feature }} experiencing high latency"
+          description: "Feature {{ $labels.feature }} has p95 latency of {{ $value }}ms for 5 minutes"
+          runbook_url: "https://docs.victor.ai/runbooks/high-latency"
+
+      - alert: CriticalFeatureLatency
+        expr: |
+          histogram_quantile(0.95, rate(victor_feature_duration_ms_bucket[5m])) > 5000
+        for: 2m
+        labels:
+          severity: critical
+          category: performance
+        annotations:
+          summary: "Feature {{ $labels.feature }} has critical latency"
+          description: "Feature {{ $labels.feature }} has p95 latency of {{ $value }}ms for 2 minutes"
+          runbook_url: "https://docs.victor.ai/runbooks/critical-latency"
+
+      - alert: HighFeatureErrorRate
+        expr: |
+          rate(victor_feature_errors_total[5m]) / rate(victor_feature_executions_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          category: errors
+        annotations:
+          summary: "Feature {{ $labels.feature }} error rate above 5%"
+          description: "Feature {{ $labels.feature }} has error rate of {{ $value | humanizePercentage }} for 5 minutes"
+          runbook_url: "https://docs.victor.ai/runbooks/high-error-rate"
+
+      - alert: FeatureNotAdopted
+        expr: |
+          victor_feature_executions_total < 10
+        for: 24h
+        labels:
+          severity: info
+          category: adoption
+        annotations:
+          summary: "Feature {{ $labels.feature }} has low adoption"
+          description: "Feature {{ $labels.feature }} has fewer than 10 executions in 24 hours"
+
+      - alert: FeatureDisabledUnexpectedly
+        expr: |
+          victor_feature_enabled == 0
+        for: 1h
+        labels:
+          severity: warning
+          category: availability
+        annotations:
+          summary: "Feature {{ $labels.feature }} is disabled"
+          description: "Feature {{ $labels.feature }} has been disabled for 1 hour"
+
+  # ==========================================================================
+  # Resource Exhaustion Alerts
+  # ==========================================================================
+  - name: resource_exhaustion
+    interval: 30s
+    rules:
+      - alert: HighMemoryUsage
+        expr: |
+          process_resident_memory_bytes{job="victor"} / process_virtual_memory_max_bytes{job="victor"} > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          category: resources
+        annotations:
+          summary: "Memory usage above 90%"
+          description: "Victor is using {{ $value | humanizePercentage }} of available memory"
+          runbook_url: "https://docs.victor.ai/runbooks/high-memory"
+
+      - alert: HighCPUUsage
+        expr: |
+          rate(process_cpu_seconds_total{job="victor"}[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          category: resources
+        annotations:
+          summary: "CPU usage above 80%"
+          description: "Victor is using {{ $value | humanizePercentage }} of CPU capacity"
+
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          category: resources
+        annotations:
+          summary: "Disk space below 10%"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining"
+
+  # ==========================================================================
+  # Model and Provider Alerts
+  # ==========================================================================
+  - name: model_performance
+    interval: 30s
+    rules:
+      - alert: HighModelLatency
+        expr: |
+          histogram_quantile(0.95, rate(victor_model_latency_ms_bucket[5m])) > 10000
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Model {{ $labels.provider }} experiencing high latency"
+          description: "Model {{ $labels.provider }} has p95 latency of {{ $value }}ms"
+          runbook_url: "https://docs.victor.ai/runbooks/model-latency"
+
+      - alert: LowRequestThroughput
+        expr: |
+          rate(victor_model_requests_total[5m]) < 0.1
+        for: 10m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Low request throughput for {{ $labels.provider }}"
+          description: "Provider {{ $labels.provider }} throughput is {{ $value }} req/s"
+
+      - alert: ProviderCircuitBreakerOpen
+        expr: |
+          victor_provider_circuit_state{provider=~".+"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "Circuit breaker open for {{ $labels.provider }}"
+          description: "Provider {{ $labels.provider }} circuit breaker is open (state=closed)"
+          runbook_url: "https://docs.victor.ai/runbooks/circuit-breaker"
+
+  # ==========================================================================
+  # Tool Execution Alerts
+  # ==========================================================================
+  - name: tool_execution
+    interval: 30s
+    rules:
+      - alert: HighToolErrorRate
+        expr: |
+          rate(victor_tool_errors_total[5m]) / rate(victor_tool_calls_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          category: errors
+        annotations:
+          summary: "Tool {{ $labels.tool }} has high error rate"
+          description: "Tool {{ $labels.tool }} error rate is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.victor.ai/runbooks/tool-errors"
+
+      - alert: ToolTimeoutIncrease
+        expr: |
+          rate(victor_tool_timeouts_total[5m]) / rate(victor_tool_calls_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Tool {{ $labels.tool }} timeout rate increasing"
+          description: "Tool {{ $labels.tool }} timeout rate is {{ $value | humanizePercentage }}"
+
+  # ==========================================================================
+  # System Health Alerts
+  # ==========================================================================
+  - name: system_health
+    interval: 30s
+    rules:
+      - alert: ServiceUnhealthy
+        expr: |
+          victor_health_status{job="victor"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "Victor service is unhealthy"
+          description: "Health check failed for 2 minutes"
+          runbook_url: "https://docs.victor.ai/runbooks/service-health"
+
+      - alert: HighErrorRate
+        expr: |
+          rate(victor_errors_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          category: errors
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value }} errors/sec"
+
+      - alert: ActiveSessionsHigh
+        expr: |
+          victor_active_sessions > 100
+        for: 10m
+        labels:
+          severity: warning
+          category: capacity
+        annotations:
+          summary: "High number of active sessions"
+          description: "{{ $value }} active sessions (capacity may be exceeded)"
+
+  # ==========================================================================
+  # Feature Adoption Alerts
+  # ==========================================================================
+  - name: feature_adoption
+    interval: 1m
+    rules:
+      - alert: LowFeatureAdoption
+        expr: |
+          victor_feature_executions_total / victor_feature_executions_total{feature="lazy_loading_enabled"} < 0.1
+        for: 24h
+        labels:
+          severity: info
+          category: adoption
+        annotations:
+          summary: "Feature {{ $labels.feature }} adoption below 10%"
+          description: "Feature {{ $labels.feature }} has low usage compared to baseline"
+
+      - alert: FeatureAdoptionSpike
+        expr: |
+          rate(victor_feature_executions_total[1h]) / rate(victor_feature_executions_total[24h] offset 24h) > 5
+        for: 1h
+        labels:
+          severity: info
+          category: adoption
+        annotations:
+          summary: "Feature {{ $labels.feature }} usage spiked 5x"
+          description: "Feature adoption increased significantly in the last hour"
+
+  # ==========================================================================
+  # Dependency Health Alerts
+  # ==========================================================================
+  - name: dependency_health
+    interval: 30s
+    rules:
+      - alert: DependencyUnhealthy
+        expr: |
+          victor_dependency_health_status == 0
+        for: 2m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "Dependency {{ $labels.dependency }} is unhealthy"
+          description: "Dependency health check failed for 2 minutes"
+          runbook_url: "https://docs.victor.ai/runbooks/dependency-health"
+
+      - alert: DatabaseSlow
+        expr: |
+          histogram_quantile(0.95, rate(victor_db_query_duration_ms_bucket[5m])) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Database queries slow"
+          description: "Database p95 query latency is {{ $value }}ms"
+
+  # ==========================================================================
+  # Performance Degradation Alerts
+  # ==========================================================================
+  - name: performance_degradation
+    interval: 1m
+    rules:
+      - alert: PerformanceDegradationDetected
+        expr: |
+          (
+            histogram_quantile(0.95, rate(victor_feature_duration_ms_bucket[5m]))
+            /
+            histogram_quantile(0.95, rate(victor_feature_duration_ms_bucket[5m] offset 1h))
+          ) > 1.5
+        for: 10m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Performance degradation detected for {{ $labels.feature }}"
+          description: "Feature latency increased by 50% compared to 1 hour ago"
+          runbook_url: "https://docs.victor.ai/runbooks/performance-degradation"
+
+      - alert: MemoryLeakSuspected
+        expr: |
+          rate(process_resident_memory_bytes{job="victor"}[1h]) > 1000000
+        for: 1h
+        labels:
+          severity: warning
+          category: resources
+        annotations:
+          summary: "Possible memory leak detected"
+          description: "Memory usage growing consistently over 1 hour"
+          runbook_url: "https://docs.victor.ai/runbooks/memory-leak"
