@@ -379,6 +379,7 @@ observability = [
     "opentelemetry-instrumentation-fastapi>=0.60b1",
     "opentelemetry-instrumentation-asgi>=0.60b1",
     "opentelemetry-instrumentation-requests>=0.60b1",
+    "opentelemetry-instrumentation-threading>=0.60b1",  # Threading instrumentation
     "prometheus-client>=0.20",
 ]
 
