@@ -379,7 +379,7 @@ observability = [
 ]
 
 all = [
-    "victor[dev,docs,build,lang-all,vector-alt,database,experiments,observability,api]",
+    "victor-ai[dev,docs,build,lang-all,vector-alt,database,experiments,observability,api]",
 ]
 
 [project.urls]
