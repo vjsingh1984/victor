@@ -89,8 +89,12 @@ async def mock_orchestrator():
 # =============================================================================
 
 
+@pytest.mark.usefixtures("api_server_available")
 class TestConcurrentRequests:
-    """Test system behavior under concurrent load."""
+    """Test system behavior under concurrent load.
+
+    Requires API server running at localhost:8000.
+    """
 
     @pytest.mark.asyncio
     @pytest.mark.slow
@@ -179,8 +183,12 @@ class TestConcurrentRequests:
 # =============================================================================
 
 
+@pytest.mark.usefixtures("api_server_available")
 class TestLargeContext:
-    """Test system behavior with large conversation contexts."""
+    """Test system behavior with large conversation contexts.
+
+    Requires API server running at localhost:8000.
+    """
 
     @pytest.mark.asyncio
     @pytest.mark.slow
@@ -293,8 +301,12 @@ class TestLargeContext:
 # =============================================================================
 
 
+@pytest.mark.usefixtures("api_server_available")
 class TestMemoryLeaks:
-    """Test for memory leaks in long-running sessions."""
+    """Test for memory leaks in long-running sessions.
+
+    Requires API server running at localhost:8000.
+    """
 
     @pytest.mark.asyncio
     @pytest.mark.slow
@@ -373,8 +385,12 @@ class TestMemoryLeaks:
 # =============================================================================
 
 
+@pytest.mark.usefixtures("api_server_available")
 class TestStressTesting:
-    """Find system breaking points and test graceful degradation."""
+    """Find system breaking points and test graceful degradation.
+
+    Requires API server running at localhost:8000.
+    """
 
     @pytest.mark.asyncio
     @pytest.mark.slow
@@ -452,8 +468,14 @@ class TestStressTesting:
 # =============================================================================
 
 
+@pytest.mark.usefixtures("api_server_available")
 class TestEndurance:
-    """Long-running tests to detect memory leaks and performance degradation."""
+    """Test long-running system stability.
+
+    Long-running tests to detect memory leaks and performance degradation.
+
+    Requires API server running at localhost:8000.
+    """
 
     @pytest.mark.asyncio
     @pytest.mark.slow
