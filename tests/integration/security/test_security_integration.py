@@ -380,7 +380,8 @@ class TestSecurityMonitoringAndAlerting:
         assert stats["users_count"] == 2
         assert stats["policies_count"] == 1
 
-    def test_security_report_generation(self):
+    @pytest.mark.asyncio
+    async def test_security_report_generation(self):
         """Test comprehensive security report generation."""
         from unittest.mock import AsyncMock, MagicMock
 
@@ -390,7 +391,7 @@ class TestSecurityMonitoringAndAlerting:
         suite = SecurityTestSuite(safe_mode=True)
 
         # Run all tests
-        report = suite.run_all_security_tests(mock_agent)
+        report = await suite.run_all_security_tests(mock_agent)
 
         # Generate reports in different formats
         text_report = report.generate_text_report()

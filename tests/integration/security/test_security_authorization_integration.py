@@ -395,7 +395,7 @@ async def test_security_tool_execution_creates_audit_trail(
     # Execute multiple tools
     for tool_name, tool in security_tools.items():
         # Authorize
-        granted, _ = await authorization_manager.authorize_tool_execution(
+        granted, reason = await authorization_manager.authorize_tool_execution(
             user=user,
             tool_name=tool_name,
             required_permissions=tool.required_permissions
@@ -409,12 +409,28 @@ async def test_security_tool_execution_creates_audit_trail(
             await security_event_bus.publish(
                 "audit.log",
                 {
+                    "type": "audit.log",
                     "user": user,
                     "tool": tool_name,
                     "action": "execute",
                     "target": "test-target",
                     "timestamp": datetime.now().isoformat(),
                     "result": "success"
+                }
+            )
+        else:
+            # Log denied attempt to audit
+            await security_event_bus.publish(
+                "audit.log",
+                {
+                    "type": "audit.log",
+                    "user": user,
+                    "tool": tool_name,
+                    "action": "execute",
+                    "target": "test-target",
+                    "timestamp": datetime.now().isoformat(),
+                    "result": "denied",
+                    "reason": reason
                 }
             )
 
@@ -571,7 +587,7 @@ async def test_security_events_propagate_across_systems(
 
 @pytest.mark.asyncio
 async def test_security_authorization_performance_under_load(
-    authorization_manager, security_tools
+    authorization_manager, security_tools, test_users
 ):
     """Test performance of security authorization under heavy load.
 
