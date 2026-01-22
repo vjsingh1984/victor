@@ -529,7 +529,7 @@ class TestReplanningAfterFailures:
 
         # Fail task_3
         updated = await integration_planner.update_plan(
-            updated.graph, failed_tasks=["task_3"]
+            updated.graph, completed_tasks=[], failed_tasks=["task_3"]
         )
 
         # Verify blocked tasks
