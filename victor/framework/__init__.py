@@ -94,6 +94,7 @@ from victor.framework.events import (
 )
 from victor.framework.state import Stage, State, StateHooks, StateObserver
 from victor.framework.task import FrameworkTaskType, Task, TaskResult
+from victor.framework.checkpoint import CheckpointBackend
 from victor.framework.shim import FrameworkShim, get_vertical, list_verticals
 from victor.framework.tools import ToolCategory, Tools, ToolSet, ToolsInput
 from victor.framework.prompt_builder import (
@@ -460,6 +461,8 @@ __all__ = (
         "Stage",
         "StateHooks",
         "StateObserver",
+        # Checkpoint
+        "CheckpointBackend",
         # Prompt Builder
         "PromptBuilder",
         "PromptSection",
