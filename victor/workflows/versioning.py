@@ -666,6 +666,13 @@ def get_version_registry() -> WorkflowVersionRegistry:
     return _registry_instance
 
 
+def reset_version_registry() -> None:
+    """Reset the global version registry for test isolation."""
+    global _registry_instance
+    with _registry_lock:
+        _registry_instance = None
+
+
 def parse_version_from_yaml(data: Dict[str, Any]) -> Optional[WorkflowVersion]:
     """Parse version from YAML workflow data.
 

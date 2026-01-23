@@ -345,6 +345,13 @@ def get_trigger_registry() -> WorkflowTriggerRegistry:
     return _registry_instance
 
 
+def reset_trigger_registry() -> None:
+    """Reset the global trigger registry for test isolation."""
+    global _registry_instance
+    with _registry_lock:
+        _registry_instance = None
+
+
 def register_trigger(trigger: WorkflowTrigger) -> None:
     """Register a trigger in the global registry.
 

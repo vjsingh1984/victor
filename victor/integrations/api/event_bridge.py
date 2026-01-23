@@ -142,6 +142,11 @@ class EventBroadcaster:
         self._running = False
         self._initialized = True
 
+    @classmethod
+    def reset_instance(cls) -> None:
+        """Reset the singleton instance for test isolation."""
+        cls._instance = None
+
     async def start(self) -> None:
         """Start the broadcast loop."""
         if self._running:

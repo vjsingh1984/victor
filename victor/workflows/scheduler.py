@@ -688,6 +688,13 @@ def get_scheduler() -> WorkflowScheduler:
     return _scheduler_instance
 
 
+def reset_scheduler() -> None:
+    """Reset the global scheduler for test isolation."""
+    global _scheduler_instance
+    with _scheduler_lock:
+        _scheduler_instance = None
+
+
 def schedule_workflow(
     workflow_name: str,
     cron: str,
