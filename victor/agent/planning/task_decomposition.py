@@ -1056,6 +1056,8 @@ class TaskDecomposition:
                     for dep in deps
                 ):
                     ready_tasks.append(task)
+            # Sort by complexity descending (highest complexity first)
+            ready_tasks.sort(key=lambda t: t.estimated_complexity, reverse=True)
             return ready_tasks
 
         # New API: use internal state
@@ -1259,17 +1261,17 @@ class TaskGraph:
 
     def get_dependencies(self, task_id: str) -> List[str]:
         """Get dependencies for a task (tasks that must complete before this one)."""
-        # Find all edges that point to this task
-        dependencies = []
-        for from_id, to_ids in self.edges.items():
-            if task_id in to_ids:
-                dependencies.append(from_id)
-        return dependencies
+        # Return tasks that this task depends on
+        return self.edges.get(task_id, [])
 
     def get_dependents(self, task_id: str) -> List[str]:
         """Get tasks that depend on this task (tasks that require this task to complete)."""
-        # Return tasks that have this task as a dependency
-        return self.edges.get(task_id, [])
+        # Find all tasks that have this task as a dependency
+        dependents = []
+        for from_id, to_ids in self.edges.items():
+            if task_id in to_ids:
+                dependents.append(from_id)
+        return dependents
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
