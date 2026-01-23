@@ -97,22 +97,21 @@ class TestCodeReviewWorkflow:
         """Test that code review workflow has required nodes."""
         workflow = workflow_builder["code_review"]()
 
-        # Check for required nodes
-        nodes = workflow.nodes
-        node_names = [node.id for node in nodes]
+        # Check for required nodes (nodes is a Dict[str, WorkflowNode])
+        node_ids = list(workflow.nodes.keys())
 
-        assert "identify" in node_names
-        assert "security" in node_names
-        assert "style" in node_names
-        assert "logic" in node_names
-        assert "synthesize" in node_names
+        assert "identify" in node_ids
+        assert "security" in node_ids
+        assert "style" in node_ids
+        assert "logic" in node_ids
+        assert "synthesize" in node_ids
 
     def test_code_review_workflow_parallel_structure(self, workflow_builder):
         """Test parallel review structure."""
         workflow = workflow_builder["code_review"]()
 
-        # Should have parallel execution for reviews
-        nodes = workflow.nodes
+        # Should have parallel execution for reviews (nodes is a Dict[str, WorkflowNode])
+        nodes = list(workflow.nodes.values())
         parallel_nodes = [node for node in nodes if hasattr(node, "is_parallel") and node.is_parallel]
 
         # May have parallel execution nodes
@@ -123,8 +122,9 @@ class TestCodeReviewWorkflow:
         workflow = workflow_builder["code_review"]()
 
         # Workflow should have edges connecting nodes
-        edges = workflow.edges
-        assert len(edges) > 0
+        # Edges are defined via each node's next_nodes attribute
+        total_edges = sum(len(node.next_nodes) for node in workflow.nodes.values())
+        assert total_edges > 0
 
 
 # =============================================================================
@@ -154,11 +154,11 @@ class TestQuickReviewWorkflow:
         """Test quick review workflow nodes."""
         workflow = workflow_builder["quick_review"]()
 
-        nodes = workflow.nodes
-        node_names = [node.id for node in nodes]
+        # nodes is a Dict[str, WorkflowNode]
+        node_ids = list(workflow.nodes.keys())
 
         # Should have identify and review nodes
-        assert "identify" in node_names or "review" in node_names
+        assert "identify" in node_ids or "review" in node_ids
 
 
 # =============================================================================
@@ -180,11 +180,11 @@ class TestPRReviewWorkflow:
         """Test PR review workflow nodes."""
         workflow = workflow_builder["pr_review"]()
 
-        nodes = workflow.nodes
-        node_names = [node.id for node in nodes]
+        # nodes is a Dict[str, WorkflowNode]
+        node_ids = list(workflow.nodes.keys())
 
         # Should have fetch, analyze, test_check, generate_review
-        assert "fetch" in node_names or "generate_review" in node_names
+        assert "fetch" in node_ids or "generate_review" in node_ids
 
     def test_pr_review_workflow_complexity(self, workflow_builder):
         """Test PR review workflow complexity."""
@@ -204,14 +204,34 @@ class TestWorkflowCompilation:
 
     def test_compile_code_review_workflow(self, workflow_builder):
         """Test compiling code review workflow."""
+        from victor.workflows.definition import ParallelNode
+
         workflow = workflow_builder["code_review"]()
 
         # Build state graph
         graph = StateGraph("test_code_review")
 
-        # Add nodes from workflow
-        for node in workflow.nodes:
-            graph.add_node(node.id, node)
+        # Track nodes that are children of ParallelNodes
+        parallel_children = set()
+        for node in workflow.nodes.values():
+            if isinstance(node, ParallelNode):
+                parallel_children.update(node.parallel_nodes)
+
+        # Add only top-level nodes (not children of ParallelNodes)
+        for node_id, node in workflow.nodes.items():
+            if node_id not in parallel_children:
+                graph.add_node(node_id, node)
+
+        # Add edges based on next_nodes
+        for node_id, node in workflow.nodes.items():
+            if node_id not in parallel_children:
+                for next_node in node.next_nodes:
+                    if next_node not in parallel_children:
+                        graph.add_edge(node_id, next_node)
+
+        # Set entry point
+        if workflow.start_node and workflow.start_node not in parallel_children:
+            graph.set_entry_point(workflow.start_node)
 
         # Compile graph
         compiled = graph.compile()
@@ -223,8 +243,17 @@ class TestWorkflowCompilation:
         workflow = workflow_builder["quick_review"]()
 
         graph = StateGraph("test_quick_review")
-        for node in workflow.nodes:
-            graph.add_node(node.id, node)
+        for node_id, node in workflow.nodes.items():
+            graph.add_node(node_id, node)
+
+        # Add edges based on next_nodes
+        for node_id, node in workflow.nodes.items():
+            for next_node in node.next_nodes:
+                graph.add_edge(node_id, next_node)
+
+        # Set entry point
+        if workflow.start_node:
+            graph.set_entry_point(workflow.start_node)
 
         compiled = graph.compile()
 
@@ -396,15 +425,14 @@ class TestMultiAgentCoordination:
         """Test that parallel review uses multiple agents."""
         workflow = workflow_builder["code_review"]()
 
-        nodes = workflow.nodes
+        # nodes is a Dict[str, WorkflowNode]
+        node_ids = list(workflow.nodes.keys())
 
         # Should have separate nodes for different review types
-        node_names = [node.id for node in nodes]
-
         # Check for security, style, logic reviewers
-        has_security = any("security" in name for name in node_names)
-        has_style = any("style" in name for name in node_names)
-        has_logic = any("logic" in name for name in node_names)
+        has_security = any("security" in name for name in node_ids)
+        has_style = any("style" in name for name in node_ids)
+        has_logic = any("logic" in name for name in node_ids)
 
         assert has_security or has_style or has_logic
 
@@ -412,10 +440,8 @@ class TestMultiAgentCoordination:
         """Test that agents have defined roles."""
         workflow = workflow_builder["code_review"]()
 
-        nodes = workflow.nodes
-
-        # Nodes should have role information
-        for node in nodes:
+        # Nodes should have role information (nodes is a Dict[str, WorkflowNode])
+        for node in workflow.nodes.values():
             # Should have role or other metadata
             assert hasattr(node, "id")
 
@@ -449,8 +475,8 @@ class TestWorkflowErrorHandling:
         # Should handle gracefully
         try:
             graph = StateGraph("test")
-            for node in workflow.nodes:
-                graph.add_node(node.id, node)
+            for node_id, node in workflow.nodes.items():
+                graph.add_node(node_id, node)
             # Should not raise
         except Exception:
             pytest.fail("Workflow compilation failed unexpectedly")
@@ -466,12 +492,34 @@ class TestWorkflowIntegration:
 
     def test_end_to_end_code_review(self, workflow_builder, sample_project):
         """Test end-to-end code review workflow."""
+        from victor.workflows.definition import ParallelNode
+
         workflow = workflow_builder["code_review"]()
 
         # Build and compile
         graph = StateGraph("integration_test")
-        for node in workflow.nodes:
-            graph.add_node(node.id, node)
+
+        # Track nodes that are children of ParallelNodes
+        parallel_children = set()
+        for node in workflow.nodes.values():
+            if isinstance(node, ParallelNode):
+                parallel_children.update(node.parallel_nodes)
+
+        # Add only top-level nodes (not children of ParallelNodes)
+        for node_id, node in workflow.nodes.items():
+            if node_id not in parallel_children:
+                graph.add_node(node_id, node)
+
+        # Add edges based on next_nodes
+        for node_id, node in workflow.nodes.items():
+            if node_id not in parallel_children:
+                for next_node in node.next_nodes:
+                    if next_node not in parallel_children:
+                        graph.add_edge(node_id, next_node)
+
+        # Set entry point
+        if workflow.start_node and workflow.start_node not in parallel_children:
+            graph.set_entry_point(workflow.start_node)
 
         compiled = graph.compile()
 
@@ -526,13 +574,35 @@ class TestWorkflowPerformance:
     def test_workflow_compilation_speed(self, workflow_builder):
         """Test workflow compilation performance."""
         import time
+        from victor.workflows.definition import ParallelNode
 
         workflow = workflow_builder["code_review"]()
 
         start = time.time()
         graph = StateGraph("performance_test")
-        for node in workflow.nodes:
-            graph.add_node(node.id, node)
+
+        # Track nodes that are children of ParallelNodes
+        parallel_children = set()
+        for node in workflow.nodes.values():
+            if isinstance(node, ParallelNode):
+                parallel_children.update(node.parallel_nodes)
+
+        # Add only top-level nodes (not children of ParallelNodes)
+        for node_id, node in workflow.nodes.items():
+            if node_id not in parallel_children:
+                graph.add_node(node_id, node)
+
+        # Add edges based on next_nodes
+        for node_id, node in workflow.nodes.items():
+            if node_id not in parallel_children:
+                for next_node in node.next_nodes:
+                    if next_node not in parallel_children:
+                        graph.add_edge(node_id, next_node)
+
+        # Set entry point
+        if workflow.start_node and workflow.start_node not in parallel_children:
+            graph.set_entry_point(workflow.start_node)
+
         compiled = graph.compile()
         duration = time.time() - start
 

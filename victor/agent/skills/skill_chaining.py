@@ -858,12 +858,7 @@ class SkillChainer:
             description=chain.description,
             goal=chain.goal,
             steps=[self._copy_step(step) for step in chain.steps],
-            data_flows=[DataFlow(
-                source_step_id=df.source_step_id,
-                target_step_id=df.target_step_id,
-                data_mapping=df.data_mapping.copy(),
-                required=df.required,
-            ) for df in chain.data_flows],
+            data_flows=[],  # Clear data_flows - will be rebuilt after optimization
             metadata=chain.metadata.copy(),
             max_parallel_steps=chain.max_parallel_steps,
             execution_strategy=chain.execution_strategy,
@@ -884,13 +879,6 @@ class SkillChainer:
                     removed_step_ids.add(step.id)
 
             optimized.steps = unique_steps
-
-            # Remove data flows involving removed steps
-            optimized.data_flows = [
-                df for df in optimized.data_flows
-                if df.source_step_id not in removed_step_ids and
-                df.target_step_id not in removed_step_ids
-            ]
 
             # Rebuild dependencies
             for i, step in enumerate(optimized.steps):

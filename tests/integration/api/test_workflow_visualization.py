@@ -24,6 +24,7 @@ Tests the complete workflow visualization feature including:
 import asyncio
 import json
 import pytest
+import socket
 from httpx import AsyncClient, ASGITransport
 from datetime import datetime, timezone
 
@@ -41,33 +42,68 @@ from victor.integrations.api.workflow_event_bridge import WorkflowEventBridge
 from victor.core.events import get_observability_bus
 
 
-@pytest.fixture(scope="module")
+def _get_available_port():
+    """Get an available port for testing.
+
+    Uses socket's automatic port allocation to find an available port.
+    This prevents port conflicts when tests run in parallel.
+
+    Returns:
+        int: An available port number
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        s.listen(1)
+        port = s.getsockname()[1]
+    return port
+
+
+@pytest.fixture
 async def fastapi_server():
     """Create a FastAPI server for testing.
 
-    Note: This fixture uses module scope to ensure a single server instance
-    is shared across all tests in the module. This prevents port binding errors
-    when multiple test classes try to create server instances on the same port.
+    This fixture is function-scoped to follow pytest-asyncio best practices.
+    Each test gets its own server instance with a dynamically allocated port
+    to prevent port binding conflicts.
+
+    The function scope ensures:
+    - Compatibility with pytest-asyncio's event loop management
+    - Test isolation (no shared state between tests)
+    - Proper cleanup after each test
+
+    Performance note: Starting/stopping the server for each test adds
+    ~100-200ms overhead, which is acceptable for integration tests.
     """
+    # Allocate a dynamic port to avoid conflicts
+    port = _get_available_port()
+
     server = VictorFastAPIServer(
         host="localhost",
-        port=8765,
+        port=port,
         enable_cors=True,
     )
-    await server.start_async()
 
-    # Manually initialize the event bridge if not already initialized
-    # This is needed because start_async() doesn't trigger the lifespan
-    if server._workflow_event_bridge is None:
-        event_bus = get_observability_bus()
-        await event_bus.connect()
-        server._workflow_event_bridge = WorkflowEventBridge(event_bus)
-        await server._workflow_event_bridge.start()
+    try:
+        await server.start_async()
 
-    yield server
+        # Manually initialize the event bridge if not already initialized
+        # This is needed because start_async() doesn't trigger the lifespan
+        if server._workflow_event_bridge is None:
+            event_bus = get_observability_bus()
+            await event_bus.connect()
+            server._workflow_event_bridge = WorkflowEventBridge(event_bus)
+            await server._workflow_event_bridge.start()
 
-    # Gracefully shutdown the server
-    await server.shutdown()
+        yield server
+
+    finally:
+        # Gracefully shutdown the server
+        # Use try-except to ensure cleanup even if shutdown fails
+        try:
+            await server.shutdown()
+        except Exception as e:
+            # Log but don't raise - cleanup should continue
+            print(f"Warning: Server shutdown error: {e}")
 
 
 @pytest.fixture

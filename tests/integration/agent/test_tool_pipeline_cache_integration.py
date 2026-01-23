@@ -19,6 +19,7 @@ to ensure hot path optimization works correctly.
 """
 import asyncio
 import pytest
+from unittest.mock import Mock
 
 from victor.agent.tool_pipeline import ToolPipeline, ToolPipelineConfig
 from victor.agent.argument_normalizer import ArgumentNormalizer
@@ -251,9 +252,22 @@ class TestToolPipelineCacheCorrectness:
 
     def test_validation_result_correctness(self, pipeline):
         """Test that cached validation results are correct."""
-        # Mock registry
+        # Mock registry - need to mock get() method which is now used
+        # Create a mock tool object for valid_tool
+        from victor.tools.base import BaseTool
+
+        mock_tool = Mock(spec=BaseTool)
+        mock_tool.name = "valid_tool"
+
+        # Mock get() to return the mock tool for valid_tool, None for others
+        original_get = pipeline.tools.get
+        def mock_get(tool_name):
+            if tool_name == "valid_tool":
+                return mock_tool
+            return None
+
+        pipeline.tools.get = mock_get
         pipeline.tools.is_tool_enabled = lambda x: x == "valid_tool"
-        pipeline.tools.has_tool = lambda x: x == "valid_tool"
 
         # Query valid tool
         result1 = pipeline._decision_cache.is_valid_tool("valid_tool", pipeline.tools)

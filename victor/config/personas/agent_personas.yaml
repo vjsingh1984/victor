@@ -18,7 +18,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:48.820055'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.173116'
     version: 1
   security_expert:
     id: security_expert
@@ -38,7 +39,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:48.823069'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.176250'
     version: 1
   mentor:
     id: mentor
@@ -58,7 +60,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:48.826125'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.179654'
     version: 1
   custom_feedback_test:
     id: custom_feedback_test
@@ -78,7 +81,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:48.830199'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.184192'
     version: 2
   custom_multi-user_test:
     id: custom_multi-user_test
@@ -98,7 +102,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:48.835684'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.190039'
     version: 3
   custom_low_rated:
     id: custom_low_rated
@@ -116,7 +121,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:48.842279'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.196876'
     version: 2
   custom_data_scientist:
     id: custom_data_scientist
@@ -133,14 +139,15 @@ personas:
     constraints:
       max_tool_calls: null
       preferred_tools:
-      - visualize
-      - analyze_data
       - train_model
+      - analyze_data
+      - visualize
       forbidden_tools: []
       response_length: long
       explanation_depth: detailed
     prompt_templates: null
-    created_at: '2026-01-22T19:47:48.849972'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.204956'
     version: 1
   custom_devops_engineer:
     id: custom_devops_engineer
@@ -158,13 +165,14 @@ personas:
       max_tool_calls: 40
       preferred_tools:
       - setup_monitoring
-      - configure_ci
       - deploy
+      - configure_ci
       forbidden_tools: []
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:48.858852'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.215260'
     version: 1
   custom_testing_specialist:
     id: custom_testing_specialist
@@ -187,7 +195,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:48.869782'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.226685'
     version: 1
   custom_persona_0:
     id: custom_persona_0
@@ -205,7 +214,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:48.881725'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.239590'
     version: 1
   custom_persona_1:
     id: custom_persona_1
@@ -223,7 +233,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:48.894998'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.253763'
     version: 1
   custom_persona_2:
     id: custom_persona_2
@@ -241,7 +252,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:48.909436'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.269654'
     version: 1
   custom_persona_3:
     id: custom_persona_3
@@ -259,7 +271,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:48.925187'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.286040'
     version: 1
   custom_persona_4:
     id: custom_persona_4
@@ -277,7 +290,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:48.941754'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.303714'
     version: 1
   custom_persona_5:
     id: custom_persona_5
@@ -295,7 +309,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:48.959567'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.323097'
     version: 1
   custom_persona_6:
     id: custom_persona_6
@@ -313,7 +328,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:48.978620'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.343433'
     version: 1
   custom_persona_7:
     id: custom_persona_7
@@ -331,7 +347,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:48.998715'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.365213'
     version: 1
   custom_persona_8:
     id: custom_persona_8
@@ -349,7 +366,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.019981'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.387658'
     version: 1
   custom_persona_9:
     id: custom_persona_9
@@ -367,7 +385,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.042335'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.411225'
     version: 1
   custom_persona_10:
     id: custom_persona_10
@@ -385,7 +404,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.065414'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.436552'
     version: 1
   custom_persona_11:
     id: custom_persona_11
@@ -403,7 +423,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.090039'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.463387'
     version: 1
   custom_persona_12:
     id: custom_persona_12
@@ -421,7 +442,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.115695'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.490661'
     version: 1
   custom_persona_13:
     id: custom_persona_13
@@ -439,7 +461,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.142270'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.519054'
     version: 1
   custom_persona_14:
     id: custom_persona_14
@@ -457,7 +480,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.170561'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.548287'
     version: 1
   custom_persona_15:
     id: custom_persona_15
@@ -475,7 +499,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.199059'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.579284'
     version: 1
   custom_persona_16:
     id: custom_persona_16
@@ -493,7 +518,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.229362'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.611096'
     version: 1
   custom_persona_17:
     id: custom_persona_17
@@ -511,7 +537,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.260395'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.644552'
     version: 1
   custom_persona_18:
     id: custom_persona_18
@@ -529,7 +556,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.292464'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.679306'
     version: 1
   custom_persona_19:
     id: custom_persona_19
@@ -547,7 +575,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.326178'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.714989'
     version: 1
   custom_persona_20:
     id: custom_persona_20
@@ -565,7 +594,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.360907'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.751850'
     version: 1
   custom_persona_21:
     id: custom_persona_21
@@ -583,7 +613,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.396887'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.789958'
     version: 1
   custom_persona_22:
     id: custom_persona_22
@@ -601,7 +632,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.433429'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.828928'
     version: 1
   custom_persona_23:
     id: custom_persona_23
@@ -619,7 +651,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.471617'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.869476'
     version: 1
   custom_persona_24:
     id: custom_persona_24
@@ -637,7 +670,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.510084'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.910635'
     version: 1
   custom_persona_25:
     id: custom_persona_25
@@ -655,7 +689,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.550360'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.953318'
     version: 1
   custom_persona_26:
     id: custom_persona_26
@@ -673,7 +708,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.591739'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:20.996906'
     version: 1
   custom_persona_27:
     id: custom_persona_27
@@ -691,7 +727,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.634195'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:21.041400'
     version: 1
   custom_persona_28:
     id: custom_persona_28
@@ -709,7 +746,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.677673'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:21.087293'
     version: 1
   custom_persona_29:
     id: custom_persona_29
@@ -727,7 +765,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.722667'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:21.134374'
     version: 1
   custom_persona_30:
     id: custom_persona_30
@@ -745,7 +784,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.768368'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:21.182924'
     version: 1
   custom_persona_31:
     id: custom_persona_31
@@ -763,7 +803,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.815798'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:21.233415'
     version: 1
   custom_persona_32:
     id: custom_persona_32
@@ -781,7 +822,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.864569'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:21.284318'
     version: 1
   custom_persona_33:
     id: custom_persona_33
@@ -799,7 +841,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.913773'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:21.337253'
     version: 1
   custom_persona_34:
     id: custom_persona_34
@@ -817,7 +860,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:49.963726'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:21.391806'
     version: 1
   custom_persona_35:
     id: custom_persona_35
@@ -835,7 +879,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:50.015653'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:21.446064'
     version: 1
   custom_persona_36:
     id: custom_persona_36
@@ -853,7 +898,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:50.068316'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:21.501967'
     version: 1
   custom_persona_37:
     id: custom_persona_37
@@ -871,7 +917,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:50.122158'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:21.560189'
     version: 1
   custom_persona_38:
     id: custom_persona_38
@@ -889,7 +936,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:50.177693'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:21.617310'
     version: 1
   custom_persona_39:
     id: custom_persona_39
@@ -907,7 +955,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:50.234422'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:21.676446'
     version: 1
   custom_persona_40:
     id: custom_persona_40
@@ -925,7 +974,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:50.292674'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:21.735979'
     version: 1
   custom_persona_41:
     id: custom_persona_41
@@ -943,7 +993,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:50.352874'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:21.798303'
     version: 1
   custom_persona_42:
     id: custom_persona_42
@@ -961,7 +1012,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:50.414679'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:21.862374'
     version: 1
   custom_persona_43:
     id: custom_persona_43
@@ -979,7 +1031,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:50.477789'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:21.926557'
     version: 1
   custom_persona_44:
     id: custom_persona_44
@@ -997,7 +1050,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:50.541885'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:21.991582'
     version: 1
   custom_persona_45:
     id: custom_persona_45
@@ -1015,7 +1069,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:50.605930'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:22.056929'
     version: 1
   custom_persona_46:
     id: custom_persona_46
@@ -1033,7 +1088,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:50.671579'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:22.123833'
     version: 1
   custom_persona_47:
     id: custom_persona_47
@@ -1051,7 +1107,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:50.739700'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:22.192117'
     version: 1
   custom_persona_48:
     id: custom_persona_48
@@ -1069,7 +1126,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:50.808095'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:22.262366'
     version: 1
   custom_persona_49:
     id: custom_persona_49
@@ -1087,7 +1145,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:50.877084'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:22.334277'
     version: 1
   custom_security_expert_0:
     id: custom_security_expert_0
@@ -1106,7 +1165,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:50.947511'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:22.407332'
     version: 1
   custom_performance_expert_1:
     id: custom_performance_expert_1
@@ -1125,7 +1185,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:51.019249'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:22.480713'
     version: 1
   custom_testing_expert_2:
     id: custom_testing_expert_2
@@ -1144,7 +1205,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:51.089856'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:22.554876'
     version: 1
   custom_debugging_expert_3:
     id: custom_debugging_expert_3
@@ -1163,7 +1225,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:51.162718'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:22.630773'
     version: 1
   custom_architecture_expert_4:
     id: custom_architecture_expert_4
@@ -1182,7 +1245,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:51.235781'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:22.707926'
     version: 1
   custom_design_expert_5:
     id: custom_design_expert_5
@@ -1201,7 +1265,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:51.309705'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:22.787098'
     version: 1
   custom_deployment_expert_6:
     id: custom_deployment_expert_6
@@ -1220,7 +1285,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:51.385281'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:22.867816'
     version: 1
   custom_monitoring_expert_7:
     id: custom_monitoring_expert_7
@@ -1239,7 +1305,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:51.462446'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:22.949248'
     version: 1
   custom_security_expert_8:
     id: custom_security_expert_8
@@ -1258,7 +1325,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:51.541056'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:23.031930'
     version: 1
   custom_performance_expert_9:
     id: custom_performance_expert_9
@@ -1277,7 +1345,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:51.621514'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:23.115868'
     version: 1
   custom_testing_expert_10:
     id: custom_testing_expert_10
@@ -1296,7 +1365,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:51.701656'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:23.201386'
     version: 1
   custom_debugging_expert_11:
     id: custom_debugging_expert_11
@@ -1315,7 +1385,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:51.783378'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:23.287863'
     version: 1
   custom_architecture_expert_12:
     id: custom_architecture_expert_12
@@ -1334,7 +1405,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:51.867257'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:23.375735'
     version: 1
   custom_design_expert_13:
     id: custom_design_expert_13
@@ -1353,7 +1425,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:51.952941'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:23.466295'
     version: 1
   custom_deployment_expert_14:
     id: custom_deployment_expert_14
@@ -1372,7 +1445,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:52.039168'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:23.557132'
     version: 1
   custom_monitoring_expert_15:
     id: custom_monitoring_expert_15
@@ -1391,7 +1465,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:52.125704'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:23.648529'
     version: 1
   custom_security_expert_16:
     id: custom_security_expert_16
@@ -1410,7 +1485,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:52.213377'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:23.742203'
     version: 1
   custom_performance_expert_17:
     id: custom_performance_expert_17
@@ -1429,7 +1505,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:52.302079'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:23.836702'
     version: 1
   custom_testing_expert_18:
     id: custom_testing_expert_18
@@ -1448,7 +1525,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:52.393589'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:23.933702'
     version: 1
   custom_debugging_expert_19:
     id: custom_debugging_expert_19
@@ -1467,7 +1545,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:52.485694'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:24.032350'
     version: 1
   custom_architecture_expert_20:
     id: custom_architecture_expert_20
@@ -1486,7 +1565,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:52.578310'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:24.131533'
     version: 1
   custom_design_expert_21:
     id: custom_design_expert_21
@@ -1505,7 +1585,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:52.672237'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:24.231466'
     version: 1
   custom_deployment_expert_22:
     id: custom_deployment_expert_22
@@ -1524,7 +1605,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:52.766759'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:24.333281'
     version: 1
   custom_monitoring_expert_23:
     id: custom_monitoring_expert_23
@@ -1543,7 +1625,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:52.862521'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:24.435197'
     version: 1
   custom_security_expert_24:
     id: custom_security_expert_24
@@ -1562,7 +1645,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:52.959816'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:24.538745'
     version: 1
   custom_performance_expert_25:
     id: custom_performance_expert_25
@@ -1581,7 +1665,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:53.058799'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:24.643066'
     version: 1
   custom_testing_expert_26:
     id: custom_testing_expert_26
@@ -1600,7 +1685,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:53.158444'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:24.749515'
     version: 1
   custom_debugging_expert_27:
     id: custom_debugging_expert_27
@@ -1619,7 +1705,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:53.260006'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:24.859620'
     version: 1
   custom_architecture_expert_28:
     id: custom_architecture_expert_28
@@ -1638,7 +1725,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:53.363064'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:24.969783'
     version: 1
   custom_design_expert_29:
     id: custom_design_expert_29
@@ -1657,7 +1745,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:53.467485'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:25.079183'
     version: 1
   custom_deployment_expert_30:
     id: custom_deployment_expert_30
@@ -1676,7 +1765,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:53.572842'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:25.188157'
     version: 1
   custom_monitoring_expert_31:
     id: custom_monitoring_expert_31
@@ -1695,7 +1785,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:53.678570'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:25.301926'
     version: 1
   custom_security_expert_32:
     id: custom_security_expert_32
@@ -1714,7 +1805,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:53.787387'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:25.417708'
     version: 1
   custom_performance_expert_33:
     id: custom_performance_expert_33
@@ -1733,7 +1825,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:53.895733'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:25.533146'
     version: 1
   custom_testing_expert_34:
     id: custom_testing_expert_34
@@ -1752,7 +1845,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:54.005027'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:25.649280'
     version: 1
   custom_debugging_expert_35:
     id: custom_debugging_expert_35
@@ -1771,7 +1865,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:54.115849'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:25.767869'
     version: 1
   custom_architecture_expert_36:
     id: custom_architecture_expert_36
@@ -1790,7 +1885,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:54.229891'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:25.887598'
     version: 1
   custom_design_expert_37:
     id: custom_design_expert_37
@@ -1809,7 +1905,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:54.343526'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:26.007216'
     version: 1
   custom_deployment_expert_38:
     id: custom_deployment_expert_38
@@ -1828,7 +1925,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:54.459620'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:26.127238'
     version: 1
   custom_monitoring_expert_39:
     id: custom_monitoring_expert_39
@@ -1847,7 +1945,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:54.576446'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:26.247025'
     version: 1
   custom_security_expert_40:
     id: custom_security_expert_40
@@ -1866,7 +1965,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:54.695283'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:26.368976'
     version: 1
   custom_performance_expert_41:
     id: custom_performance_expert_41
@@ -1885,7 +1985,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:54.816320'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:26.493495'
     version: 1
   custom_testing_expert_42:
     id: custom_testing_expert_42
@@ -1904,7 +2005,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:54.937594'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:26.619050'
     version: 1
   custom_debugging_expert_43:
     id: custom_debugging_expert_43
@@ -1923,7 +2025,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:55.059794'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:26.746914'
     version: 1
   custom_architecture_expert_44:
     id: custom_architecture_expert_44
@@ -1942,7 +2045,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:55.185856'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:26.875335'
     version: 1
   custom_design_expert_45:
     id: custom_design_expert_45
@@ -1961,7 +2065,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:55.312749'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:27.004199'
     version: 1
   custom_deployment_expert_46:
     id: custom_deployment_expert_46
@@ -1980,7 +2085,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:55.440338'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:27.134752'
     version: 1
   custom_monitoring_expert_47:
     id: custom_monitoring_expert_47
@@ -1999,7 +2105,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:55.567515'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:27.267303'
     version: 1
   custom_security_expert_48:
     id: custom_security_expert_48
@@ -2018,7 +2125,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:55.694694'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:27.401514'
     version: 1
   custom_performance_expert_49:
     id: custom_performance_expert_49
@@ -2037,7 +2145,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:55.822781'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:27.536303'
     version: 1
   custom_testing_expert_50:
     id: custom_testing_expert_50
@@ -2056,7 +2165,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:55.952987'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:27.673460'
     version: 1
   custom_debugging_expert_51:
     id: custom_debugging_expert_51
@@ -2075,7 +2185,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:56.084910'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:27.811160'
     version: 1
   custom_architecture_expert_52:
     id: custom_architecture_expert_52
@@ -2094,7 +2205,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:56.217915'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:27.948566'
     version: 1
   custom_design_expert_53:
     id: custom_design_expert_53
@@ -2113,7 +2225,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:56.352719'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:28.088075'
     version: 1
   custom_deployment_expert_54:
     id: custom_deployment_expert_54
@@ -2132,7 +2245,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:56.486708'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:28.228623'
     version: 1
   custom_monitoring_expert_55:
     id: custom_monitoring_expert_55
@@ -2151,7 +2265,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:56.622106'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:28.371867'
     version: 1
   custom_security_expert_56:
     id: custom_security_expert_56
@@ -2170,7 +2285,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:56.758176'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:28.516993'
     version: 1
   custom_performance_expert_57:
     id: custom_performance_expert_57
@@ -2189,7 +2305,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:56.895804'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:28.662416'
     version: 1
   custom_testing_expert_58:
     id: custom_testing_expert_58
@@ -2208,7 +2325,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:57.035560'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:28.812732'
     version: 1
   custom_debugging_expert_59:
     id: custom_debugging_expert_59
@@ -2227,7 +2345,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:57.176759'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:28.962636'
     version: 1
   custom_architecture_expert_60:
     id: custom_architecture_expert_60
@@ -2246,7 +2365,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:57.319129'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:29.112162'
     version: 1
   custom_design_expert_61:
     id: custom_design_expert_61
@@ -2265,7 +2385,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:57.462297'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:29.262466'
     version: 1
   custom_deployment_expert_62:
     id: custom_deployment_expert_62
@@ -2284,7 +2405,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:57.606133'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:29.416662'
     version: 1
   custom_monitoring_expert_63:
     id: custom_monitoring_expert_63
@@ -2303,7 +2425,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:57.751634'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:29.573396'
     version: 1
   custom_security_expert_64:
     id: custom_security_expert_64
@@ -2322,7 +2445,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:57.897537'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:29.729507'
     version: 1
   custom_performance_expert_65:
     id: custom_performance_expert_65
@@ -2341,7 +2465,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:58.046102'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:29.887369'
     version: 1
   custom_testing_expert_66:
     id: custom_testing_expert_66
@@ -2360,7 +2485,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:58.194999'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:30.047296'
     version: 1
   custom_debugging_expert_67:
     id: custom_debugging_expert_67
@@ -2379,7 +2505,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:58.345341'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:30.205591'
     version: 1
   custom_architecture_expert_68:
     id: custom_architecture_expert_68
@@ -2398,7 +2525,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:58.497655'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:30.364732'
     version: 1
   custom_design_expert_69:
     id: custom_design_expert_69
@@ -2417,7 +2545,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:58.649876'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:30.527563'
     version: 1
   custom_deployment_expert_70:
     id: custom_deployment_expert_70
@@ -2436,7 +2565,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:58.804159'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:30.687607'
     version: 1
   custom_monitoring_expert_71:
     id: custom_monitoring_expert_71
@@ -2455,7 +2585,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:58.958710'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:30.849132'
     version: 1
   custom_security_expert_72:
     id: custom_security_expert_72
@@ -2474,7 +2605,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:59.115341'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:31.012608'
     version: 1
   custom_performance_expert_73:
     id: custom_performance_expert_73
@@ -2493,7 +2625,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:59.273453'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:31.178855'
     version: 1
   custom_testing_expert_74:
     id: custom_testing_expert_74
@@ -2512,7 +2645,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:59.431786'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:31.351673'
     version: 1
   custom_debugging_expert_75:
     id: custom_debugging_expert_75
@@ -2531,7 +2665,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:59.591214'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:31.519515'
     version: 1
   custom_architecture_expert_76:
     id: custom_architecture_expert_76
@@ -2550,7 +2685,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:59.752172'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:31.687361'
     version: 1
   custom_design_expert_77:
     id: custom_design_expert_77
@@ -2569,7 +2705,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:47:59.915120'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:31.856475'
     version: 1
   custom_deployment_expert_78:
     id: custom_deployment_expert_78
@@ -2588,7 +2725,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:48:00.088947'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:32.403230'
     version: 1
   custom_monitoring_expert_79:
     id: custom_monitoring_expert_79
@@ -2607,7 +2745,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:48:00.254271'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:32.575991'
     version: 1
   custom_test:
     id: custom_test
@@ -2624,7 +2763,8 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:48:00.419981'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:32.752279'
     version: 1
   test_persona:
     id: test_persona
@@ -2645,5 +2785,6 @@ personas:
       response_length: medium
       explanation_depth: standard
     prompt_templates: null
-    created_at: '2026-01-22T19:48:00.753853'
+    temperature: 0.7
+    created_at: '2026-01-22T20:44:33.106130'
     version: 1

@@ -40,7 +40,7 @@ from pathlib import Path
 # =============================================================================
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 async def legacy_server_app():
     """Load the legacy server app (web/server/main.py)."""
     try:
@@ -52,7 +52,7 @@ async def legacy_server_app():
         pytest.skip(f"Legacy server not available: {e}")
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 async def canonical_server_app():
     """Load the canonical server app."""
     from victor.integrations.api.fastapi_server import create_fastapi_app
