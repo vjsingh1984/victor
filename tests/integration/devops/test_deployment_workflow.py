@@ -107,6 +107,11 @@ def sample_docker_compose():
         "volumes": {
             "postgres_data": {"driver": "local"},
         },
+        "networks": {
+            "default": {
+                "driver": "bridge",
+            },
+        },
     }
 
 
