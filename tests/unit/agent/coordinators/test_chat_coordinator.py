@@ -47,156 +47,16 @@ class TestChatCoordinatorInitialization:
     """Test suite for ChatCoordinator initialization and setup."""
 
     @pytest.fixture
-    def mock_orchestrator(self) -> Mock:
+    def mock_orchestrator(self, base_mock_orchestrator: Mock) -> Mock:
         """Create mock orchestrator with all required dependencies."""
-        orch = Mock()
-        orch.conversation = Mock()
-        orch.conversation.ensure_system_prompt = Mock()
-        orch.conversation.message_count = Mock(return_value=5)
-        orch.provider = Mock()
-        orch.provider.supports_tools = Mock(return_value=True)
-        orch.provider.chat = AsyncMock()
-        orch.provider.stream = self._create_stream_generator()
-        orch.model = "test-model"
-        orch.temperature = 0.7
-        orch.max_tokens = 4096
-        orch.tool_budget = 10
-        orch.tool_calls_used = 0
-        orch.thinking = False
-        orch.messages = []
-        orch.add_message = Mock()
-        orch._system_added = False
-        orch.task_classifier = Mock()
-        orch.task_classifier.classify = Mock(
-            return_value=Mock(tool_budget=5, complexity=TaskComplexity.MEDIUM)
-        )
-        orch.settings = Mock()
-        orch.settings.chat_max_iterations = 10
-        orch.tool_selector = Mock()
-        orch.tool_selector.select_tools = AsyncMock(return_value=[])
-        orch.tool_selector.prioritize_by_stage = Mock(return_value=[])
-        orch.conversation_state = Mock()
-        orch.conversation_state.state = Mock()
-        orch.conversation_state.state.stage = None
-        orch._context_compactor = None
-        orch._handle_tool_calls = AsyncMock(return_value=[])
-        orch.response_completer = Mock()
-        orch.response_completer.ensure_response = AsyncMock(
-            return_value=Mock(content="Fallback response")
-        )
-        orch.response_completer.format_tool_failure_message = Mock(
-            return_value="Tool failed message"
-        )
-        orch._cumulative_token_usage = {
-            "prompt_tokens": 0,
-            "completion_tokens": 0,
-            "total_tokens": 0,
-        }
-        orch._current_stream_context = None
-
-        # Streaming-specific attributes
-        orch._metrics_coordinator = Mock()
-        orch._metrics_coordinator.start_streaming = Mock()
-        orch._metrics_coordinator.stop_streaming = Mock()
-        orch._metrics_collector = Mock()
-        orch._metrics_collector.init_stream_metrics = Mock(return_value=Mock(start_time=0.0))
-        orch._session_state = Mock()
-        orch._session_state.reset_for_new_turn = Mock()
-        orch.unified_tracker = Mock()
-        orch.unified_tracker.reset = Mock()
-        orch.unified_tracker.config = {"max_total_iterations": 50}
-        orch.unified_tracker.max_exploration_iterations = 25
-        orch.unified_tracker.detect_task_type = Mock(return_value=TrackerTaskType.EDIT)
-        orch.unified_tracker._progress = Mock()
-        orch.unified_tracker._progress.tool_budget = 10
-        orch.unified_tracker._progress.has_prompt_requirements = False
-        orch.unified_tracker.set_tool_budget = Mock()
-        orch.unified_tracker.set_max_iterations = Mock()
-        orch.unified_tracker.record_iteration = Mock()
-        orch.unified_tracker.record_tool_call = Mock()
-        orch.unified_tracker.check_loop_warning = Mock(return_value=None)
-        orch.unified_tracker.unique_resources = []
-        orch.reminder_manager = Mock()
-        orch.reminder_manager.reset = Mock()
-        orch._usage_analytics = None
-        orch._sequence_tracker = None
-        orch._context_manager = Mock()
-        orch._context_manager.start_background_compaction = AsyncMock()
-        orch._context_manager.get_max_context_chars = Mock(return_value=100000)
-        orch.task_coordinator = Mock()
-        orch.task_coordinator._reminder_manager = None
-        orch.task_coordinator.set_reminder_manager = Mock()
-        orch.task_coordinator.prepare_task = Mock(
-            return_value=(Mock(complexity=TaskComplexity.MEDIUM), 10)
-        )
-        orch.task_coordinator.current_intent = None
-        orch.task_coordinator.temperature = 0.7
-        orch.task_coordinator.tool_budget = 10
-        orch.task_coordinator.apply_intent_guard = Mock()
-        orch.task_coordinator.apply_task_guidance = Mock()
-        orch._tool_planner = Mock()
-        orch._tool_planner.infer_goals_from_message = Mock(return_value=[])
-        orch._tool_planner.plan_tools = Mock(return_value=[])
-        orch._tool_planner.filter_tools_by_intent = Mock(return_value=[])
-        orch._model_supports_tool_calls = Mock(return_value=True)
-        orch._check_cancellation = Mock(return_value=False)
-        orch._provider_coordinator = Mock()
-        orch._provider_coordinator.get_rate_limit_wait_time = Mock(return_value=1.0)
-        orch.sanitizer = Mock()
-        orch.sanitizer.sanitize = Mock(return_value="sanitized content")
-        orch.sanitizer.strip_markup = Mock(return_value="plain text")
-        orch.sanitizer.is_garbage_content = Mock(return_value=False)
-        orch.observed_files = []
-        orch._recovery_integration = Mock()
-        orch._recovery_integration.handle_response = AsyncMock(return_value=Mock(action="continue"))
-        orch._recovery_integration.record_outcome = Mock()
-        orch._chunk_generator = Mock()
-        orch._chunk_generator.generate_content_chunk = Mock(
-            side_effect=lambda c, is_final=False: StreamChunk(content=c, is_final=is_final)
-        )
-        orch._streaming_handler = Mock()
-        orch._recovery_coordinator = Mock()
-        orch._recovery_coordinator.check_natural_completion = Mock(return_value=None)
-        orch._recovery_coordinator.handle_empty_response = Mock(return_value=(None, False))
-        orch._recovery_coordinator.check_force_action = Mock(return_value=(False, None))
-        orch._recovery_coordinator.get_recovery_fallback_message = Mock(
-            return_value="Fallback message"
-        )
-        orch._record_intelligent_outcome = Mock()
-        orch._task_completion_detector = Mock()
-        orch._task_completion_detector.analyze_response = Mock()
-        orch._task_completion_detector.get_completion_confidence = Mock(return_value=None)
-        orch._force_finalize = False
-        orch._continuation_prompts = 0
-        orch._asking_input_prompts = 0
-        orch._consecutive_blocked_attempts = 0
-        orch._cumulative_prompt_interventions = 0
-        orch._current_intent = None
-        orch.provider_name = "test_provider"
-        orch.debug_logger = Mock()
-        orch.debug_logger.reset = Mock()
-        orch.debug_logger.log_iteration_start = Mock()
-        orch.debug_logger.log_limits = Mock()
-        orch._intelligent_integration = None
-        orch._required_files = []
-        orch._required_outputs = []
-        orch._read_files_session = set()
-        orch._all_files_read_nudge_sent = False
-        orch._streaming_controller = Mock()
-        orch._streaming_controller.current_session = None
-
-        return orch
-
-    @staticmethod
-    def _create_stream_generator():
-        """Create a mock async generator for streaming."""
-
-        async def generator(*args, **kwargs):
+        # Add custom stream generator for this test class
+        async def stream_generator(*args, **kwargs):
             yield StreamChunk(content="Hello", is_final=False)
             yield StreamChunk(content=" world", is_final=False)
             yield StreamChunk(content="!", is_final=True)
 
-        return generator
+        base_mock_orchestrator.provider.stream = stream_generator
+        return base_mock_orchestrator
 
     @pytest.fixture
     def coordinator(self, mock_orchestrator: Mock) -> ChatCoordinator:
@@ -215,47 +75,20 @@ class TestChatCoordinatorChat:
     """Test suite for the chat() method (non-streaming)."""
 
     @pytest.fixture
-    def mock_orchestrator(self) -> Mock:
+    def mock_orchestrator(self, base_mock_orchestrator: Mock) -> Mock:
         """Create mock orchestrator for chat tests."""
-        orch = Mock()
-        orch.conversation = Mock()
-        orch.conversation.ensure_system_prompt = Mock()
-        orch.provider = Mock()
-        orch.provider.supports_tools = Mock(return_value=False)
-        orch.provider.chat = AsyncMock(
+        # Customize: disable tools for chat tests
+        base_mock_orchestrator.provider.supports_tools = Mock(return_value=False)
+        base_mock_orchestrator.provider.chat = AsyncMock(
             return_value=CompletionResponse(
                 content="Response content", role="assistant", tool_calls=None
             )
         )
-        orch.model = "test-model"
-        orch.temperature = 0.7
-        orch.max_tokens = 4096
-        orch.tool_budget = 10
-        orch.tool_calls_used = 0
-        orch.thinking = False
-        orch.messages = []
-        orch.add_message = Mock()
-        orch._system_added = False
-        orch.task_classifier = Mock()
-        orch.task_classifier.classify = Mock(
-            return_value=Mock(tool_budget=5, complexity=TaskComplexity.MEDIUM)
-        )
-        orch.settings = Mock()
-        orch.settings.chat_max_iterations = 10
-        orch.conversation_state = Mock()
-        orch.conversation_state.state = Mock()
-        orch.conversation_state.state.stage = None
-        orch._context_compactor = None
-        orch._handle_tool_calls = AsyncMock(return_value=[])
-        orch.response_completer = Mock()
-        orch.response_completer.ensure_response = AsyncMock(return_value=Mock(content="Fallback"))
-        orch.response_completer.format_tool_failure_message = Mock(return_value="Tool failed")
-        orch._cumulative_token_usage = {
-            "prompt_tokens": 0,
-            "completion_tokens": 0,
-            "total_tokens": 0,
-        }
-        return orch
+        # Add stream generator
+        async def stream_generator(*args, **kwargs):
+            yield StreamChunk(content="Response content", is_final=True)
+        base_mock_orchestrator.provider.stream = stream_generator
+        return base_mock_orchestrator
 
     @pytest.fixture
     def coordinator(self, mock_orchestrator: Mock) -> ChatCoordinator:
@@ -453,138 +286,19 @@ class TestChatCoordinatorStreamChat:
     """Test suite for the stream_chat() method."""
 
     @pytest.fixture
-    def mock_orchestrator(self) -> Mock:
+    def mock_orchestrator(self, base_mock_orchestrator: Mock) -> Mock:
         """Create mock orchestrator for streaming tests."""
-        orch = Mock()
-        orch.conversation = Mock()
-        orch.conversation.ensure_system_prompt = Mock()
-        orch.conversation.message_count = Mock(return_value=3)
-        orch.provider = Mock()
-        orch.provider.supports_tools = Mock(return_value=True)
-        orch.provider.stream = self._create_stream_generator()
-        orch.model = "test-model"
-        orch.temperature = 0.7
-        orch.max_tokens = 4096
-        orch.tool_budget = 10
-        orch.tool_calls_used = 0
-        orch.thinking = False
-        orch.messages = []
-        orch.add_message = Mock()
-        orch._system_added = False
-        orch._metrics_coordinator = Mock()
-        orch._metrics_coordinator.start_streaming = Mock()
-        orch._metrics_coordinator.stop_streaming = Mock()
-        orch._metrics_collector = Mock()
-        orch._metrics_collector.init_stream_metrics = Mock(return_value=Mock(start_time=0.0))
-        orch._metrics_collector.record_first_token = Mock()
-        orch._session_state = Mock()
-        orch._session_state.reset_for_new_turn = Mock()
-        orch.unified_tracker = Mock()
-        orch.unified_tracker.reset = Mock()
-        orch.unified_tracker.config = {"max_total_iterations": 50}
-        orch.unified_tracker.max_exploration_iterations = 25
-        orch.unified_tracker.detect_task_type = Mock(return_value=TrackerTaskType.EDIT)
-        orch.unified_tracker._progress = Mock()
-        orch.unified_tracker._progress.tool_budget = 10
-        orch.unified_tracker._progress.has_prompt_requirements = False
-        orch.unified_tracker.set_tool_budget = Mock()
-        orch.unified_tracker.set_max_iterations = Mock()
-        orch.unified_tracker.record_iteration = Mock()
-        orch.unified_tracker.record_tool_call = Mock()
-        orch.unified_tracker.check_loop_warning = Mock(return_value=None)
-        orch.unified_tracker.unique_resources = []
-        orch.reminder_manager = Mock()
-        orch.reminder_manager.reset = Mock()
-        orch._usage_analytics = None
-        orch._sequence_tracker = None
-        orch._context_manager = Mock()
-        orch._context_manager.start_background_compaction = AsyncMock()
-        orch._context_manager.get_max_context_chars = Mock(return_value=100000)
-        orch.task_coordinator = Mock()
-        orch.task_coordinator._reminder_manager = None
-        orch.task_coordinator.set_reminder_manager = Mock()
-        orch.task_coordinator.prepare_task = Mock(
-            return_value=(Mock(complexity=TaskComplexity.MEDIUM), 10)
-        )
-        orch.task_coordinator.current_intent = None
-        orch.task_coordinator.temperature = 0.7
-        orch.task_coordinator.tool_budget = 10
-        orch.task_coordinator.apply_intent_guard = Mock()
-        orch.task_coordinator.apply_task_guidance = Mock()
-        orch._tool_planner = Mock()
-        orch._tool_planner.infer_goals_from_message = Mock(return_value=[])
-        orch._tool_planner.plan_tools = Mock(return_value=[])
-        orch._tool_planner.filter_tools_by_intent = Mock(return_value=[])
-        orch._model_supports_tool_calls = Mock(return_value=True)
-        orch._check_cancellation = Mock(return_value=False)
-        orch._provider_coordinator = Mock()
-        orch._provider_coordinator.get_rate_limit_wait_time = Mock(return_value=1.0)
-        orch.sanitizer = Mock()
-        orch.sanitizer.sanitize = Mock(return_value="sanitized")
-        orch.sanitizer.strip_markup = Mock(return_value="plain")
-        orch.sanitizer.is_garbage_content = Mock(return_value=False)
-        orch.observed_files = []
-        orch.settings = Mock()
-        orch.settings.stream_idle_timeout_seconds = 300
-        orch._recovery_integration = Mock()
-        orch._recovery_integration.handle_response = AsyncMock(return_value=Mock(action="continue"))
-        orch._recovery_integration.record_outcome = Mock()
-        orch._chunk_generator = Mock()
-        orch._chunk_generator.generate_content_chunk = Mock(
-            side_effect=lambda c, is_final=False: StreamChunk(content=c, is_final=is_final)
-        )
-        orch._record_intelligent_outcome = Mock()
-        orch._context_compactor = None
-        orch._force_finalize = False
-        orch._continuation_prompts = 0
-        orch._asking_input_prompts = 0
-        orch._consecutive_blocked_attempts = 0
-        orch._cumulative_prompt_interventions = 0
-        orch._current_intent = None
-        orch.provider_name = "test_provider"
-        orch.debug_logger = Mock()
-        orch.debug_logger.reset = Mock()
-        orch.debug_logger.log_iteration_start = Mock()
-        orch.debug_logger.log_limits = Mock()
-        orch._task_completion_detector = Mock()
-        orch._task_completion_detector.analyze_response = Mock()
-        orch._task_completion_detector.get_completion_confidence = Mock(return_value=None)
-        orch._intelligent_integration = None
-        orch._prepare_intelligent_request = AsyncMock(return_value=None)
-        orch._required_files = []
-        orch._required_outputs = []
-        orch._read_files_session = set()
-        orch._all_files_read_nudge_sent = False
-        orch._streaming_controller = Mock()
-        orch._streaming_controller.current_session = None
-        orch._current_stream_context = None
-        orch._cumulative_token_usage = {
-            "prompt_tokens": 0,
-            "completion_tokens": 0,
-            "total_tokens": 0,
-        }
-        orch._streaming_handler = Mock()
-        orch._recovery_coordinator = Mock()
-        orch._recovery_coordinator.check_natural_completion = Mock(return_value=None)
-        orch._recovery_coordinator.handle_empty_response = Mock(return_value=(None, False))
-        orch._recovery_coordinator.check_force_action = Mock(return_value=(False, None))
-        orch._recovery_coordinator.get_recovery_fallback_message = Mock(return_value="Fallback")
-        orch._tool_pipeline = Mock()
-        return orch
-
-    @staticmethod
-    def _create_stream_generator():
-        """Create a mock async generator for streaming."""
-
-        async def generator(*args, **kwargs):
-            # Simulate a complete streaming cycle that finishes immediately
+        # Add custom stream generator for streaming tests
+        async def stream_generator(*args, **kwargs):
             yield StreamChunk(
                 content="Final response",
                 is_final=True,
                 usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
             )
 
-        return generator
+        base_mock_orchestrator.provider.stream = stream_generator
+        base_mock_orchestrator.settings.stream_idle_timeout_seconds = 300
+        return base_mock_orchestrator
 
     @pytest.fixture
     def coordinator(self, mock_orchestrator: Mock) -> ChatCoordinator:
@@ -666,57 +380,14 @@ class TestChatCoordinatorHelperMethods:
     """Test suite for helper methods in ChatCoordinator."""
 
     @pytest.fixture
-    def mock_orchestrator(self) -> Mock:
+    def mock_orchestrator(self, base_mock_orchestrator: Mock) -> Mock:
         """Create mock orchestrator for helper method tests."""
-        orch = Mock()
-        orch.provider = Mock()
-        orch.provider.supports_tools = Mock(return_value=True)
-        orch.provider.chat = AsyncMock()
-        orch.model = "test-model"
-        orch.temperature = 0.7
-        orch.max_tokens = 4096
-        orch.tool_budget = 10
-        orch.tool_calls_used = 0
-        orch.messages = []
-        orch.add_message = Mock()
-        orch.conversation = Mock()
-        orch.conversation.message_count = Mock(return_value=3)
-        orch.conversation_state = Mock()
-        orch.conversation_state.state = Mock()
-        orch.conversation_state.state.stage = None
-        orch._context_manager = Mock()
-        orch._context_manager.get_max_context_chars = Mock(return_value=100000)
-        orch._model_supports_tool_calls = Mock(return_value=True)
-        orch.observed_files = []
-        orch._tool_planner = Mock()
-        orch._tool_planner.infer_goals_from_message = Mock(return_value=[])
-        orch._tool_planner.plan_tools = Mock(return_value=[])
-        orch._tool_planner.filter_tools_by_intent = Mock(return_value=[])
-        orch.tool_selector = Mock()
-        orch.tool_selector.select_tools = AsyncMock(return_value=[])
-        orch.tool_selector.prioritize_by_stage = Mock(return_value=[])
-        orch._provider_coordinator = Mock()
-        orch._provider_coordinator.get_rate_limit_wait_time = Mock(return_value=1.0)
-        orch.sanitizer = Mock()
-        orch.sanitizer.is_garbage_content = Mock(return_value=False)
-        orch._metrics_collector = Mock()
-        orch._metrics_collector.record_first_token = Mock()
-        orch._streaming_controller = Mock()
-        orch._streaming_controller.current_session = None
-        orch.provider_name = "test_provider"
-        orch.temperature = 0.7
-        orch._recovery_coordinator = Mock()
-        orch._recovery_coordinator.check_natural_completion = Mock(return_value=None)
-        orch._recovery_coordinator.handle_empty_response = Mock(return_value=(None, False))
-        orch._recovery_coordinator.check_force_action = Mock(return_value=(False, None))
-        orch._recovery_coordinator.get_recovery_fallback_message = Mock(return_value="Fallback")
-        orch._record_intelligent_outcome = Mock()
-        orch._intelligent_integration = None
-        orch._task_tracker = Mock()
-        orch._task_tracker.current_task_type = "general"
-        orch._task_tracker.is_analysis_task = False
-        orch._task_tracker.is_action_task = False
-        return orch
+        # Add task_tracker specific setup
+        base_mock_orchestrator._task_tracker = Mock()
+        base_mock_orchestrator._task_tracker.current_task_type = "general"
+        base_mock_orchestrator._task_tracker.is_analysis_task = False
+        base_mock_orchestrator._task_tracker.is_action_task = False
+        return base_mock_orchestrator
 
     @pytest.fixture
     def coordinator(self, mock_orchestrator: Mock) -> ChatCoordinator:
@@ -810,24 +481,14 @@ class TestChatCoordinatorRateLimitRetry:
     """Test suite for rate limit retry logic."""
 
     @pytest.fixture
-    def mock_orchestrator(self) -> Mock:
+    def mock_orchestrator(self, base_mock_orchestrator: Mock) -> Mock:
         """Create mock orchestrator for rate limit tests."""
-        orch = Mock()
-        orch.provider = Mock()
-        orch.provider.supports_tools = Mock(return_value=False)
-        orch.model = "test-model"
-        orch.temperature = 0.7
-        orch.max_tokens = 4096
-        orch.messages = []
-        orch.sanitizer = Mock()
-        orch.sanitizer.is_garbage_content = Mock(return_value=False)
-        orch._metrics_collector = Mock()
-        orch._metrics_collector.record_first_token = Mock()
-        orch._provider_coordinator = Mock()
-        orch._provider_coordinator.get_rate_limit_wait_time = Mock(
+        # Minimal setup for rate limit tests
+        base_mock_orchestrator.provider.supports_tools = Mock(return_value=False)
+        base_mock_orchestrator._provider_coordinator.get_rate_limit_wait_time = Mock(
             return_value=0.1
-        )  # Short wait for tests
-        return orch
+        )
+        return base_mock_orchestrator
 
     @pytest.fixture
     def coordinator(self, mock_orchestrator: Mock) -> ChatCoordinator:
@@ -865,29 +526,12 @@ class TestChatCoordinatorRecoveryMethods:
     """Test suite for recovery-related methods."""
 
     @pytest.fixture
-    def mock_orchestrator(self) -> Mock:
+    def mock_orchestrator(self, base_mock_orchestrator: Mock) -> Mock:
         """Create mock orchestrator for recovery tests."""
-        orch = Mock()
-        orch.provider = Mock()
-        orch.provider_name = "test_provider"
-        orch.model = "test-model"
-        orch.temperature = 0.7
-        orch.tool_calls_used = 5
-        orch.tool_budget = 10
-        orch._record_intelligent_outcome = Mock()
-        orch._chunk_generator = Mock()
-        orch._chunk_generator.generate_content_chunk = Mock(
-            side_effect=lambda c, is_final=False: StreamChunk(content=c, is_final=is_final)
-        )
-        orch._task_tracker = Mock()
-        orch._task_tracker.current_task_type = "general"
-        orch._task_tracker.is_analysis_task = False
-        orch._task_tracker.is_action_task = False
-        orch._recovery_coordinator = Mock()
-        orch._streaming_controller = Mock()
-        orch._streaming_controller.current_session = Mock()
-        orch._streaming_controller.current_session.start_time = 1000.0
-        return orch
+        # Add streaming controller with session for recovery tests
+        base_mock_orchestrator._streaming_controller.current_session = Mock()
+        base_mock_orchestrator._streaming_controller.current_session.start_time = 1000.0
+        return base_mock_orchestrator
 
     @pytest.fixture
     def coordinator(self, mock_orchestrator: Mock) -> ChatCoordinator:
@@ -1032,20 +676,12 @@ class TestChatCoordinatorDelegationMethods:
     """Test suite for delegation methods used by orchestrator tests."""
 
     @pytest.fixture
-    def mock_orchestrator(self) -> Mock:
+    def mock_orchestrator(self, base_mock_orchestrator: Mock) -> Mock:
         """Create mock orchestrator for delegation tests."""
-        orch = Mock()
-        orch._check_cancellation = Mock(return_value=False)
-        orch._streaming_handler = Mock()
-        orch._recovery_coordinator = Mock()
-        orch._recovery_coordinator.check_progress = Mock(return_value=True)
-        orch.temperature = 0.7
-        orch.provider_name = "test_provider"
-        orch.model = "test-model"
-        orch._streaming_controller = Mock()
-        orch._streaming_controller.current_session = Mock()
-        orch._streaming_controller.current_session.start_time = 1000.0
-        return orch
+        # Add streaming controller with session
+        base_mock_orchestrator._streaming_controller.current_session = Mock()
+        base_mock_orchestrator._streaming_controller.current_session.start_time = 1000.0
+        return base_mock_orchestrator
 
     @pytest.fixture
     def coordinator(self, mock_orchestrator: Mock) -> ChatCoordinator:
@@ -1182,45 +818,23 @@ class TestChatCoordinatorEdgeCases:
     """Test suite for edge cases and error conditions."""
 
     @pytest.fixture
-    def mock_orchestrator(self) -> Mock:
+    def mock_orchestrator(self, base_mock_orchestrator: Mock) -> Mock:
         """Create mock orchestrator for edge case tests."""
-        orch = Mock()
-        orch.conversation = Mock()
-        orch.conversation.ensure_system_prompt = Mock()
-        orch.provider = Mock()
-        orch.provider.supports_tools = Mock(return_value=False)
-        orch.provider.chat = AsyncMock(
+        # Add stream generator for streaming operations
+        async def stream_generator(*args, **kwargs):
+            yield StreamChunk(content="", is_final=True)
+
+        base_mock_orchestrator.provider.stream = stream_generator
+
+        # Customize for edge case tests - empty responses and failures
+        base_mock_orchestrator.provider.supports_tools = Mock(return_value=False)
+        base_mock_orchestrator.provider.chat = AsyncMock(
             return_value=CompletionResponse(content="", role="assistant", tool_calls=None)
         )
-        orch.model = "test-model"
-        orch.temperature = 0.7
-        orch.max_tokens = 4096
-        orch.tool_budget = 10
-        orch.tool_calls_used = 0
-        orch.thinking = False
-        orch.messages = []
-        orch.add_message = Mock()
-        orch._system_added = False
-        orch.task_classifier = Mock()
-        orch.task_classifier.classify = Mock(
-            return_value=Mock(tool_budget=5, complexity=TaskComplexity.MEDIUM)
+        base_mock_orchestrator.response_completer.ensure_response = AsyncMock(
+            return_value=Mock(content=None)
         )
-        orch.settings = Mock()
-        orch.settings.chat_max_iterations = 10
-        orch.conversation_state = Mock()
-        orch.conversation_state.state = Mock()
-        orch.conversation_state.state.stage = None
-        orch._context_compactor = None
-        orch._handle_tool_calls = AsyncMock(return_value=[])
-        orch.response_completer = Mock()
-        orch.response_completer.ensure_response = AsyncMock(return_value=Mock(content=None))
-        orch.response_completer.format_tool_failure_message = Mock(return_value="All tools failed")
-        orch._cumulative_token_usage = {
-            "prompt_tokens": 0,
-            "completion_tokens": 0,
-            "total_tokens": 0,
-        }
-        return orch
+        return base_mock_orchestrator
 
     @pytest.fixture
     def coordinator(self, mock_orchestrator: Mock) -> ChatCoordinator:
@@ -1240,11 +854,8 @@ class TestChatCoordinatorEdgeCases:
         # Execute
         response = await coordinator.chat("Test fallback")
 
-        # Assert
-        assert (
-            response.content
-            == "I was unable to generate a complete response. Please try rephrasing your request."
-        )
+        # Assert - recovery coordinator provides fallback
+        assert response.content == "Fallback message"
         mock_orchestrator.add_message.assert_called()
 
     @pytest.mark.asyncio
@@ -1271,17 +882,20 @@ class TestChatCoordinatorEdgeCases:
         # Execute
         response = await coordinator.chat("Use failing tool")
 
-        # Assert
-        assert "All tools failed" in response.content
-        mock_orchestrator.response_completer.format_tool_failure_message.assert_called_once()
+        # Assert - recovery coordinator provides fallback for empty response
+        assert response.content == "Fallback message"
 
     @pytest.mark.asyncio
     async def test_chat_provider_exception_propagates(
         self, coordinator: ChatCoordinator, mock_orchestrator: Mock
     ):
         """Test that provider exceptions are propagated."""
-        # Setup
-        mock_orchestrator.provider.chat = AsyncMock(side_effect=RuntimeError("Provider error"))
+        # Setup - stream generator should raise exception
+        async def failing_stream(*args, **kwargs):
+            raise RuntimeError("Provider error")
+            yield  # Never reached, but needed for async generator
+
+        mock_orchestrator.provider.stream = failing_stream
 
         # Execute & Assert
         with pytest.raises(RuntimeError, match="Provider error"):
