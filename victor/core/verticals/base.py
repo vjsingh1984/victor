@@ -144,9 +144,9 @@ class VerticalConfig:
         metadata: Additional vertical-specific metadata
     """
 
-    name: str = ""
     tools: ToolSet
     system_prompt: str
+    name: str = ""
     stages: Dict[str, StageDefinition] = field(default_factory=dict)
     provider_hints: Dict[str, Any] = field(default_factory=dict)
     evaluation_criteria: List[str] = field(default_factory=list)
