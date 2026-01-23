@@ -64,8 +64,9 @@ def lsp_config():
     return LSPServerConfig(
         name="test-server",
         command=["echo"],
-        args=[],
         language_id="python",
+        file_extensions=[".py", ".pyi"],
+        args=[],
         install_command="pip install test-server",
     )
 

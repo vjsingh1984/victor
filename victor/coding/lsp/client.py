@@ -302,7 +302,13 @@ class LSPClient:
         content_end = content_start + content_length
 
         if len(buffer) < content_end:
-            return None, buffer
+            # Buffer is incomplete
+            # If we have no content bytes yet (just header), clear the buffer
+            # If we have partial content, keep the buffer to continue accumulation
+            if len(buffer) == content_start:
+                return None, b""
+            else:
+                return None, buffer
 
         content = buffer[content_start:content_end].decode("utf-8")
         remaining = buffer[content_end:]
