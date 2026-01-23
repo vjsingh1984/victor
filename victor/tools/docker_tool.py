@@ -68,12 +68,12 @@ async def docker(
     Unified Docker operations for container and image management.
 
     Provides a single interface for all Docker operations, mirroring the
-    Docker CLI structure. Consolidates 15 separate Docker tools into one.
+    Docker CLI structure. Consolidates 15+ separate Docker tools into one.
 
     Args:
         operation: Docker operation to perform. Options:
             Container ops: "ps", "start", "stop", "restart", "rm", "logs", "stats", "exec", "inspect"
-            Image ops: "images", "pull", "rmi"
+            Image ops: "images", "pull", "build", "rmi"
             Network ops: "networks"
             Volume ops: "volumes"
         resource_id: Container ID, image name, or resource identifier
@@ -83,6 +83,7 @@ async def docker(
             For logs: {"tail": 100, "follow": False}
             For exec: {"command": "ls -la"}
             For pull: {"platform": "linux/amd64"}
+            For build: {"path": ".", "dockerfile": "Dockerfile", "build_args": {}, "target": "stage"}
             For run: {"image": "nginx", "detach": True, "ports": {"80": "8080"}}
 
     Returns:
@@ -113,6 +114,15 @@ async def docker(
 
         # Pull an image
         docker("pull", resource_id="nginx:latest")
+
+        # Build an image
+        docker("build", resource_id="myapp:1.0", options={"path": "."})
+
+        # Build with custom Dockerfile
+        docker("build", resource_id="myapp:1.0", options={"path": ".", "dockerfile": "Dockerfile.prod"})
+
+        # Build with arguments
+        docker("build", resource_id="myapp:1.0", options={"path": ".", "build_args": {"VERSION": "1.0"}})
 
         # Execute command in container
         docker("exec", resource_id="my-container", options={"command": "ls -la"})
@@ -307,6 +317,51 @@ async def docker(
             "message": f"Pulled image: {resource_id}",
         }
 
+    elif operation == "build":
+        """Build a Docker image from a Dockerfile.
+
+        Args:
+            resource_id: Image name and tag (e.g., "myapp:1.0")
+            options:
+                path: Build context path (default: ".")
+                dockerfile: Alternative Dockerfile path (default: "Dockerfile")
+                build_args: Dict of build arguments
+                target: Target stage for multi-stage builds
+        """
+        if not resource_id:
+            return {
+                "success": False,
+                "error": "resource_id (image name:tag) required for build operation",
+            }
+
+        build_path = options.get("path", ".")
+        args = ["build", "-t", resource_id, build_path]
+
+        # Add optional Dockerfile path
+        if "dockerfile" in options:
+            args.extend(["-f", options["dockerfile"]])
+
+        # Add build arguments
+        if "build_args" in options:
+            for key, value in options["build_args"].items():
+                args.extend(["--build-arg", f"{key}={value}"])
+
+        # Add target stage for multi-stage builds
+        if "target" in options:
+            args.extend(["--target", options["target"]])
+
+        # Build operations can take longer, use extended timeout
+        success, stdout, stderr = await _run_docker_command_async(args, timeout=600)
+
+        if not success:
+            return {"success": False, "error": stderr}
+
+        return {
+            "success": True,
+            "result": {"image": resource_id, "build_path": build_path},
+            "message": f"Built image: {resource_id}",
+        }
+
     elif operation == "rmi":
         if not resource_id:
             return {
@@ -376,5 +431,5 @@ async def docker(
     else:
         return {
             "success": False,
-            "error": f"Unknown operation: {operation}. Supported: ps, start, stop, restart, rm, logs, stats, exec, inspect, images, pull, rmi, networks, volumes",
+            "error": f"Unknown operation: {operation}. Supported: ps, start, stop, restart, rm, logs, stats, exec, inspect, images, pull, build, rmi, networks, volumes",
         }
