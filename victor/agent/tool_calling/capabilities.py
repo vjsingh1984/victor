@@ -151,6 +151,12 @@ class ModelCapabilityLoader:
         if self._config is None:
             self._load_config()
 
+    @classmethod
+    def reset_instance(cls) -> None:
+        """Reset the singleton instance for test isolation."""
+        cls._instance = None
+        cls._config = None
+
     def _load_config(self) -> None:
         """Load configuration from YAML file."""
         config_path = Path(__file__).parent.parent.parent / "config" / "model_capabilities.yaml"

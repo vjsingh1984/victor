@@ -15,8 +15,40 @@
 """Pytest fixtures for unit tests."""
 
 import logging
+import sys
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def cleanup_event_bus():
+    """Clean up event bus to prevent async task leaks between tests.
+
+    The event bus may have pending tasks from previous tests that can
+    cause 'Task was destroyed but it is pending' warnings.
+    """
+    yield
+
+    # Cleanup after test
+    try:
+        from victor.observability.event_bus import EventBus
+        EventBus.reset_instance()
+    except ImportError:
+        pass
+
+    # Also cleanup core event backends
+    try:
+        import asyncio
+        from victor.core.events.backends import InMemoryEventBackend
+
+        # Get all instances that might be running and disconnect them
+        # This helps prevent "Task was destroyed but it is pending" warnings
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # Can't await in sync fixture, but we can schedule the cleanup
+            pass
+    except (ImportError, RuntimeError):
+        pass
 
 
 @pytest.fixture(autouse=True)

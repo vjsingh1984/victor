@@ -87,68 +87,30 @@ def mock_docker_client():
 
 @pytest.fixture(autouse=True)
 def reset_singletons():
-    """Reset singleton classifiers before each test for isolation.
+    """Reset all singletons before and after each test for isolation.
 
-    This prevents test pollution from cached singleton state, especially
-    embedding services and classifiers that cache model instances.
+    This prevents test pollution from cached singleton state. Uses the
+    centralized SingletonResetRegistry which manages all known singletons
+    across the codebase including:
+    - Embedding services and classifiers
+    - Tool registries and metadata
+    - Framework registries (handlers, personas, events)
+    - Workflow registries (triggers, scheduler, versions)
+    - Observability components (event bus, metrics)
+    - Storage and caching components
+
+    Design: Reset both before AND after each test ensures bidirectional
+    isolation - neither earlier nor later tests can pollute each other.
     """
-
-    def _reset_all():
-        # Reset TaskTypeClassifier singleton
-        try:
-            from victor.storage.embeddings.task_classifier import TaskTypeClassifier
-
-            TaskTypeClassifier.reset_instance()
-        except ImportError:
-            pass
-
-        # Reset EmbeddingService singleton
-        try:
-            from victor.storage.embeddings.service import EmbeddingService
-
-            EmbeddingService.reset_instance()
-        except ImportError:
-            pass
-
-        # Reset IntentClassifier singleton
-        try:
-            from victor.storage.embeddings.intent_classifier import IntentClassifier
-
-            IntentClassifier.reset_instance()
-        except ImportError:
-            pass
-
-        # Reset SharedToolRegistry singleton
-        try:
-            from victor.agent.shared_tool_registry import SharedToolRegistry
-
-            SharedToolRegistry.reset_instance()
-        except ImportError:
-            pass
-
-        # Reset EventBus singleton (cancels pending async tasks to prevent leaks)
-        try:
-            from victor.observability.event_bus import EventBus
-
-            EventBus.reset_instance()
-        except ImportError:
-            pass
-
-        # Reset ProgressiveToolsRegistry singleton
-        try:
-            from victor.tools.progressive_registry import ProgressiveToolsRegistry
-
-            ProgressiveToolsRegistry.reset_instance()
-        except ImportError:
-            pass
+    from tests.singleton_reset import reset_all_singletons
 
     # Reset before test
-    _reset_all()
+    reset_all_singletons()
 
     yield
 
     # Reset after test
-    _reset_all()
+    reset_all_singletons()
 
 
 @pytest.fixture(autouse=True)
