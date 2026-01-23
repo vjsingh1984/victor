@@ -107,7 +107,7 @@ dependencies = [
 
     # Vector Storage (conversation embeddings, codebase search)
     # LanceDB is the default vector store and always available
-    "lancedb>=0.6.0",
+    "lancedb>=0.15.0",
     "pyarrow>=14.0",
 ]
 
@@ -122,6 +122,8 @@ dev = [
     "pytest-benchmark>=5.0",  # For performance tests
     "respx>=0.21",
     "pandas>=2.0",  # For data analysis handler tests
+    "fastapi>=0.109",  # For API integration tests
+    "uvicorn>=0.27",
 
     # Linting/Formatting
     "ruff>=0.5",
