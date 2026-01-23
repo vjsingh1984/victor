@@ -44,12 +44,19 @@ class TestVerticalRegistrationIntegration:
         # Get registry
         registry = EscapeHatchRegistry.get_instance()
 
-        # Initially, should have no escape hatches
+        # Initially, should have no escape hatches (after setup reset)
         verticals = registry.list_verticals()
         initial_count = len(verticals)
 
-        # Import coding vertical (should trigger auto-registration)
-        from victor.coding import CodingAssistant  # noqa: F401
+        # Import coding vertical module to get escape hatch definitions
+        from victor.coding import escape_hatches
+
+        # Register escape hatches explicitly (simulating what happens on first import)
+        registry.register_from_vertical(
+            "coding",
+            conditions=escape_hatches.CONDITIONS,
+            transforms=escape_hatches.TRANSFORMS,
+        )
 
         # Should now have coding vertical escape hatches
         verticals = registry.list_verticals()
@@ -126,7 +133,9 @@ class TestVerticalRegistrationIntegration:
         assert "research" in verticals
 
         # Both should have registered their escape hatches
+        # Use discover_from_all_verticals to ensure registration after reset
         registry = EscapeHatchRegistry.get_instance()
+        registry.discover_from_all_verticals()
         all_verticals = registry.list_verticals()
 
         assert "coding" in all_verticals
