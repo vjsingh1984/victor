@@ -303,7 +303,7 @@ class TestMultiVerticalWorkflowExecution:
         assert research_config.name == "research"
         assert devops_config.name == "devops"
         assert rag_config.name == "rag"
-        assert dataanalysis_config.name == "dataanalysis"
+        assert dataanalysis_config.name == "data_analysis"
 
     @pytest.mark.asyncio
     async def test_vertical_combinations(self):

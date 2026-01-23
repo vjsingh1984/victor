@@ -350,6 +350,16 @@ class SingletonResetRegistry:
 
         self.register(_reset_container)
 
+        # Reset vertical config cache (important for test isolation)
+        def _reset_vertical_config_cache():
+            try:
+                from victor.core.verticals.base import VerticalBase
+                VerticalBase._config_cache.clear()
+            except ImportError:
+                pass
+
+        self.register(_reset_vertical_config_cache)
+
         self._safe_reset(
             "victor.core.mode_config",
             "ModeConfigRegistry"

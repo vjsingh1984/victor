@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""DevOpsAssistant - YAML Configuration.
-
-DevOps assistant for infrastructure, deployment, and CI/CD automation.
-Competitive with: Docker Desktop AI, Terraform Assistant, Pulumi AI, K8s GPT.
-"""
+# DevOpsAssistant - YAML Configuration
+#
+# DevOps assistant for infrastructure, deployment, and CI/CD automation.
+# Competitive with: Docker Desktop AI, Terraform Assistant, Pulumi AI, K8s GPT.
 
 # =============================================================================
 # Metadata
