@@ -51,9 +51,21 @@ class MockVertical(VerticalBase):
 
     @classmethod
     def get_stages(cls):
+        from victor.core.verticals.base import StageDefinition
+
         return {
-            "INITIAL": {"keywords": ["start"], "tools": []},
-            "TESTING": {"keywords": ["test"], "tools": ["shell"]},
+            "INITIAL": StageDefinition(
+                name="INITIAL",
+                description="Initial stage",
+                keywords=["start"],
+                tools=[],
+            ),
+            "TESTING": StageDefinition(
+                name="TESTING",
+                description="Testing stage",
+                keywords=["test"],
+                tools=["shell"],
+            ),
         }
 
 

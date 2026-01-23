@@ -218,6 +218,59 @@ class VerticalConfig:
         except KeyError:
             return default
 
+    def __contains__(self, key: str) -> bool:
+        """Enable 'in' operator: "key" in config.
+
+        Args:
+            key: Configuration key
+
+        Returns:
+            True if key exists in config
+        """
+        try:
+            self[key]
+            return True
+        except KeyError:
+            return False
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        """Enable item assignment: config["key"] = value.
+
+        Note: This is for compatibility with dict-like access.
+        In practice, VerticalConfig is typically immutable, but this
+        method is needed for MutableVerticalContext which supports
+        dynamic capability application.
+
+        Args:
+            key: Configuration key
+            value: Configuration value
+        """
+        # Store in metadata dict for dynamic keys
+        if not hasattr(self, "_dynamic_values"):
+            self._dynamic_values = {}
+        self._dynamic_values[key] = value
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary including dynamic values.
+
+        Returns:
+            Dictionary representation
+        """
+        d = {
+            "tools": self.tools,
+            "system_prompt": self.system_prompt,
+            "stages": {
+                k: {"name": v.name, "description": v.description} for k, v in self.stages.items()
+            },
+            "provider_hints": self.provider_hints,
+            "evaluation_criteria": self.evaluation_criteria,
+            "metadata": self.metadata,
+        }
+        # Include any dynamically set values
+        if hasattr(self, "_dynamic_values"):
+            d.update(self._dynamic_values)
+        return d
+
 
 class VerticalBase(
     VerticalMetadataProvider,
