@@ -331,7 +331,7 @@ class TestMarkdownFormatter:
 
         assert "# Victor AI Performance Benchmark Report" in output
         assert "Executive Summary" in output
-        assert "Total Benchmarks: 0" in output
+        assert "**Total Benchmarks:** 0" in output
 
     def test_format_report_with_results(self):
         """Test formatting report with results."""
@@ -411,12 +411,20 @@ class TestBenchmarkIntegration:
         # Run benchmarks (with mocking to avoid actual work)
         with patch("benchmark_comprehensive.StartupBenchmark") as mock_startup:
             mock_instance = MagicMock()
-            mock_instance.run_cold_start.return_value = BenchmarkResult(
-                name="Cold Start", category="startup"
-            )
-            mock_instance.run_cold_start.return_value.add_metric(
-                "startup_time", 150.0, "ms", threshold=200.0
-            )
+
+            # Create results with metrics for all three startup benchmarks
+            cold_result = BenchmarkResult(name="Cold Start", category="startup")
+            cold_result.add_metric("startup_time", 150.0, "ms", threshold=200.0)
+
+            warm_result = BenchmarkResult(name="Warm Start", category="startup")
+            warm_result.add_metric("startup_time", 100.0, "ms", threshold=200.0)
+
+            bootstrap_result = BenchmarkResult(name="Bootstrap Time", category="startup")
+            bootstrap_result.add_metric("bootstrap_time", 50.0, "ms", threshold=100.0)
+
+            mock_instance.run_cold_start.return_value = cold_result
+            mock_instance.run_warm_start.return_value = warm_result
+            mock_instance.run_bootstrap_time.return_value = bootstrap_result
             mock_startup.return_value = mock_instance
 
             report = runner.run(scenario="startup", save=False)

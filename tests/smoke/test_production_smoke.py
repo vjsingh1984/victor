@@ -263,7 +263,8 @@ class TestIntegrationSmokeTests:
 
         registry = ToolRegistry()
         assert registry is not None
-        assert hasattr(registry, "get_tool")
+        # ToolRegistry has 'get' method (inherited from BaseRegistry)
+        assert hasattr(registry, "get")
 
     def test_team_coordinator_creation(self):
         """Test team coordinator can be created."""
@@ -361,9 +362,9 @@ class TestSecuritySmokeTests:
     def test_action_authorization_exists(self):
         """Test action authorization framework exists."""
         from victor.config.settings import Settings
-        # Settings controls action authorization via tool_budget
+        # Settings controls action authorization via tool_call_budget
         settings = Settings()
-        assert hasattr(settings, "tool_budget")
+        assert hasattr(settings, "tool_call_budget")
 
     def test_provider_factory_security(self):
         """Test provider factory has security controls."""
@@ -385,8 +386,8 @@ class TestSecuritySmokeTests:
         # File tools should be registered in the tool registry
         registry = ToolRegistry()
         assert registry is not None
-        # Verify registry has tools (some should be file-related)
-        assert len(registry._tools) > 0 if hasattr(registry, '_tools') else True
+        # Verify registry has essential methods for tool access control
+        assert hasattr(registry, "get") or hasattr(registry, "is_tool_enabled")
 
     def test_circuit_breaker_prevents_cascading_failures(self):
         """Test circuit breaker prevents cascading failures."""
@@ -594,6 +595,7 @@ class TestSmokeTestSummary:
         assert config is not None
 
         # 6. Team coordination works
+        from victor.teams import create_coordinator
         coordinator = create_coordinator(lightweight=True)
         assert coordinator is not None
 

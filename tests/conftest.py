@@ -125,6 +125,9 @@ def isolate_environment_variables(monkeypatch):
 
     This ensures tests are deterministic and don't leak credentials.
     """
+    # Import the module to patch it directly
+    from victor.config import api_keys
+
     # Mock env file loading to prevent .env file from being loaded
     monkeypatch.setenv("VICTOR_SKIP_ENV_FILE", "1")
 
@@ -146,7 +149,7 @@ def isolate_environment_variables(monkeypatch):
         monkeypatch.delenv(var, raising=False)
 
     # Mock the API key manager to return None for all providers
-    monkeypatch.setattr("victor.config.api_keys.get_api_key", lambda provider: None)
+    monkeypatch.setattr(api_keys, "get_api_key", lambda provider: None)
 
 
 @pytest.fixture(autouse=True)
