@@ -172,7 +172,7 @@ class ConversationEmbeddingStore:
         self._db = lancedb.connect(str(self._lancedb_path))
 
         # Open or create table
-        existing_tables = self._db.list_tables().tables
+        existing_tables = self._db.table_names()
         if self.TABLE_NAME in existing_tables:
             self._table = self._db.open_table(self.TABLE_NAME)
             logger.info(f"[ConversationEmbeddingStore] Opened existing table '{self.TABLE_NAME}'")
