@@ -48,7 +48,7 @@ class QAResult:
     """Result of a QA validation step."""
 
     name: str
-    passed: bool
+    passed: bool = False
     duration_seconds: float = 0.0
     details: Dict[str, Any] = field(default_factory=dict)
     errors: List[str] = field(default_factory=list)

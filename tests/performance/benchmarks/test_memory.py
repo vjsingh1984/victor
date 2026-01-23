@@ -271,7 +271,7 @@ class TestMemoryLeaks:
 
         # Create cache and perform operations
         for i in range(100):
-            cache = ToolCache(ttl=60, max_size=50)
+            cache = ToolCache(ttl=60)
             # Add items
             cache.set(f"key_{i}", f"value_{i}" * 100)
             # Get items
@@ -342,7 +342,7 @@ class TestCacheEffectiveness:
 
         Expected: > 80% hit rate for repeated operations
         """
-        cache = ToolCache(ttl=60, max_size=100)
+        cache = ToolCache(ttl=60)
 
         # Warm up cache
         for i in range(10):
@@ -530,7 +530,7 @@ class TestMemoryConsolidation:
 
         tracemalloc.start()
 
-        cache = ToolCache(ttl=60, max_size=100)
+        cache = ToolCache(ttl=60)
 
         # Fill cache with large values
         for i in range(100):
