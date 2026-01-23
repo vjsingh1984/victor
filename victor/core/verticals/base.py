@@ -135,6 +135,7 @@ class VerticalConfig:
     This is passed to Agent.create() to configure the agent.
 
     Attributes:
+        name: Vertical identifier
         tools: ToolSet configuration
         system_prompt: System prompt text
         stages: Stage definitions
@@ -143,6 +144,7 @@ class VerticalConfig:
         metadata: Additional vertical-specific metadata
     """
 
+    name: str = ""
     tools: ToolSet
     system_prompt: str
     stages: Dict[str, StageDefinition] = field(default_factory=dict)
@@ -168,6 +170,7 @@ class VerticalConfig:
             Dictionary representation of the configuration.
         """
         return {
+            "name": self.name,
             "tools": self.tools.tools if self.tools else [],
             "system_prompt": self.system_prompt,
             "stages": {

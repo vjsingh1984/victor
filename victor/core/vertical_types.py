@@ -580,6 +580,7 @@ class VerticalConfigBase:
         `victor.core.verticals.base.VerticalConfig` instead.
 
     Attributes:
+        name: Vertical identifier
         system_prompt: System prompt text
         stages: Stage definitions
         provider_hints: Hints for provider selection
@@ -587,6 +588,7 @@ class VerticalConfigBase:
         metadata: Additional vertical-specific metadata
     """
 
+    name: str = ""
     system_prompt: str = ""
     stages: Dict[str, StageDefinition] = field(default_factory=dict)
     provider_hints: Dict[str, Any] = field(default_factory=dict)

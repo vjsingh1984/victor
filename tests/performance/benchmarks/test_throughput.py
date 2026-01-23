@@ -43,7 +43,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from victor.framework.parallel import ParallelExecutor, JoinStrategy
+from victor.framework.parallel import ParallelExecutor, JoinStrategy, ParallelConfig, ResourceLimit
 from victor.framework.graph import StateGraph
 from victor.framework.task import Task
 
@@ -127,11 +127,10 @@ class TestParallelToolExecution:
             await asyncio.sleep(0.01)
             return {"result": "success"}
 
-        executor = ParallelExecutor(
-            tool_executor=MagicMock(),
-            max_concurrent=5,
-            enable=True,
+        config = ParallelConfig(
+            resource_limit=ResourceLimit(max_concurrent=5)
         )
+        executor = ParallelExecutor(config=config)
 
         async def execute_parallel_tools():
             tool_calls = [
@@ -326,7 +325,7 @@ class TestStateGraphThroughput:
         graph.add_node("branch_b", lambda state: {"result": "B"})
 
         graph.add_edge(START, "process")
-        graph.add_conditional_edges("process", route_fn)
+        graph.add_conditional_edge("process", route_fn)
         graph.add_edge("branch_a", END)
         graph.add_edge("branch_b", END)
 

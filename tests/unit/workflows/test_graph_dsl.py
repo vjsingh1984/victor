@@ -270,14 +270,14 @@ class TestWorkflowGraph:
         assert "end" in graph._finish_points
         assert WorkflowGraph.END in graph._edges.get("end", [])
 
-    def test_add_conditional_edges(self):
-        """Test adding conditional edges."""
+    def test_add_conditional_edge(self):
+        """Test adding conditional edge."""
         graph = WorkflowGraph(CodeReviewState)
         graph.add_node("analyze", analyze_code)
         graph.add_node("fix", find_issues)
         graph.add_node("report", generate_report)
 
-        graph.add_conditional_edges(
+        graph.add_conditional_edge(
             "analyze",
             route_by_issues,
             {"has_issues": "fix", "no_issues": "report"},
@@ -512,7 +512,7 @@ class TestIntegration:
         graph.add_node("report", generate_report)
 
         # Add conditional edges
-        graph.add_conditional_edges(
+        graph.add_conditional_edge(
             "analyze",
             route_by_issues,
             {"has_issues": "fix", "no_issues": "report"},
