@@ -1145,6 +1145,32 @@ class TaskDecomposition:
                     if dep_id not in task_graph.nodes:
                         errors.append(f"Missing dependency: {dep_id} for task {task_id}")
 
+            # Check for orphaned tasks (no path from root)
+            if task_graph.root_task_id is not None:
+                for task_id in task_graph.nodes:
+                    if task_id == task_graph.root_task_id:
+                        continue
+
+                    # Check if task is reachable from root using BFS
+                    visited = set()
+                    queue = [task_graph.root_task_id]
+                    visited.add(task_graph.root_task_id)
+
+                    found = False
+                    while queue and not found:
+                        current = queue.pop(0)
+                        if current == task_id:
+                            found = True
+                            break
+
+                        for neighbor in task_graph.edges.get(current, []):
+                            if neighbor not in visited:
+                                visited.add(neighbor)
+                                queue.append(neighbor)
+
+                    if not found:
+                        warnings.append(f"No path from root to task: {task_id}")
+
             is_valid = len(errors) == 0 and not has_cycles
 
             if has_cycles:

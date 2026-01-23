@@ -606,7 +606,7 @@ class TestPlanValidation:
 
         # Should detect missing dependency
         assert result.is_valid is False
-        assert any("non-existent" in error for error in result.errors)
+        assert any("nonexistent" in error for error in result.errors)
 
     def test_validate_plan_warnings_orphaned_tasks(self, planner):
         """Test warning for orphaned tasks."""
@@ -621,7 +621,7 @@ class TestPlanValidation:
         # Should warn about orphan
         assert result.is_valid is True  # Still valid
         assert len(result.warnings) > 0
-        assert any("no path from root" in warning for warning in result.warnings)
+        assert any("No path from root to task" in warning for warning in result.warnings)
 
     def test_validate_plan_no_dependencies_warning(self, planner):
         """Test warning for tasks with no dependencies."""
