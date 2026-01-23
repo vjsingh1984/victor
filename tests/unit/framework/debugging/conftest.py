@@ -34,9 +34,12 @@ from victor.core.events import ObservabilityBus
 
 
 @pytest.fixture
-def event_bus():
+async def event_bus():
     """ObservabilityBus instance for testing."""
-    return ObservabilityBus()
+    bus = ObservabilityBus()
+    yield bus
+    # Cleanup: disconnect to stop the background dispatch loop
+    await bus.disconnect()
 
 
 @pytest.fixture
