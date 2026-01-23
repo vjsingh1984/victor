@@ -284,7 +284,7 @@ def branching_workflow_graph():
     graph.add_node("branch_b", lambda s: s)
     graph.add_node("merge", lambda s: s)
     graph.set_entry_point("start")
-    graph.add_conditional_edge(
+    graph.add_conditional_edges(
         "start", router, {"a": "branch_a", "b": "branch_b", "default": "merge"}
     )
     graph.add_edge("branch_a", "merge")

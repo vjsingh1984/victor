@@ -558,6 +558,10 @@ class TestOrchestratorFactoryE2E:
         ).with_plugins(False).build()
         provider = MockProviderFactory.create_anthropic()
 
+        # Explicitly reset any global container state before test
+        from victor.core.container import reset_container
+        reset_container()
+
         factory = OrchestratorFactory(
             settings=settings,
             provider=provider,

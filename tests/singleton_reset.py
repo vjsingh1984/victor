@@ -340,6 +340,16 @@ class SingletonResetRegistry:
 
     def _register_core_singletons(self) -> None:
         """Reset core module singletons."""
+        # Reset global DI container first (before other singletons that may depend on it)
+        def _reset_container():
+            try:
+                from victor.core.container import reset_container
+                reset_container()
+            except ImportError:
+                pass
+
+        self.register(_reset_container)
+
         self._safe_reset(
             "victor.core.mode_config",
             "ModeConfigRegistry"
