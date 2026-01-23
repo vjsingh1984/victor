@@ -50,7 +50,7 @@ class TestAPILoad:
     under concurrent load.
     """
 
-    async def test_chat_endpoint_single_user_baseline(self):
+    async def test_chat_endpoint_single_user_baseline(self, api_server_available):
         """Establish baseline performance for single user.
 
         Target: P50 <100ms, P95 <300ms, P99 <500ms
@@ -72,7 +72,7 @@ class TestAPILoad:
             assert latency < 500, f"P99 latency exceeded: {latency}ms"
 
     @mark.slow
-    async def test_chat_endpoint_concurrent_load(self):
+    async def test_chat_endpoint_concurrent_load(self, api_server_available):
         """Test chat endpoint with 100 concurrent users.
 
         Target: >100 req/s, error rate <1%
@@ -142,7 +142,7 @@ class TestAPILoad:
         assert p50 < 300, f"P50 latency too high: {p50:.2f}ms"
 
     @mark.slow
-    async def test_streaming_endpoint_concurrent_load(self):
+    async def test_streaming_endpoint_concurrent_load(self, api_server_available):
         """Test streaming endpoint with 50 concurrent users.
 
         Target: Time to first token <200ms
@@ -203,7 +203,7 @@ class TestAPILoad:
         assert error_rate < 5, f"Error rate too high: {error_rate:.2f}%"
         assert avg_ttf < 500, f"Time to first token too high: {avg_ttf:.2f}ms"
 
-    async def test_health_endpoint_performance(self):
+    async def test_health_endpoint_performance(self, api_server_available):
         """Test health endpoint performance under load.
 
         Target: P50 <10ms (should be very fast)
@@ -231,7 +231,7 @@ class TestAPILoad:
         assert p50 < 50, f"Health endpoint too slow: {p50:.2f}ms"
 
     @mark.slow
-    async def test_models_endpoint_concurrent_read(self):
+    async def test_models_endpoint_concurrent_read(self, api_server_available):
         """Test models endpoint with concurrent reads.
 
         Target: Handle 50 concurrent reads without errors
@@ -260,7 +260,7 @@ class TestAPILoad:
         assert error_rate < 1, f"Error rate too high: {error_rate:.2f}%"
 
     @mark.slow
-    async def test_mixed_workload(self):
+    async def test_mixed_workload(self, api_server_available):
         """Test realistic mixed workload pattern.
 
         Simulates realistic usage: 70% chat, 20% streaming, 10% health checks

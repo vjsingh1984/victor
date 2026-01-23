@@ -72,7 +72,7 @@ class TestConcurrentUsers:
     Simulates realistic multi-user scenarios to validate system capacity.
     """
 
-    async def test_single_user_baseline(self):
+    async def test_single_user_baseline(self, api_server_available):
         """Establish baseline for single user with 10-turn conversation.
 
         Target: Average response time <200ms

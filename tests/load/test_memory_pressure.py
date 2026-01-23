@@ -52,7 +52,7 @@ class TestMemoryPressure:
     potential memory leaks.
     """
 
-    async def test_baseline_memory(self):
+    async def test_baseline_memory(self, api_server_available):
         """Establish baseline memory usage.
 
         Target: <200MB for idle system
@@ -67,7 +67,7 @@ class TestMemoryPressure:
         # Baseline should be reasonable
         assert initial_memory < 500, f"Baseline memory too high: {initial_memory:.2f}MB"
 
-    async def test_memory_growth_single_session(self):
+    async def test_memory_growth_single_session(self, api_server_available):
         """Test memory growth during single user session.
 
         Target: <10MB growth over 100 messages
