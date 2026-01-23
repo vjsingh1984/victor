@@ -763,6 +763,7 @@ class VerticalBase(
 
         # Build config
         return VerticalConfig(
+            name=cls.name,
             tools=tools,
             system_prompt=cls.get_system_prompt(),
             stages=cls.get_stages(),

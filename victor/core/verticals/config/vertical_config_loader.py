@@ -200,6 +200,7 @@ class VerticalConfigLoader:
 
         # Create VerticalConfig
         return VerticalConfig(
+            name=metadata.get("name", ""),
             tools=tools,
             system_prompt=system_prompt,
             stages=stages,
