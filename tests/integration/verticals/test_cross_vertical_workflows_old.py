@@ -56,8 +56,8 @@ class TestCrossVerticalWorkflows:
         assert len(coding_tools) > 0
         assert len(research_tools) > 0
 
-        # Verify expected tools are available
-        all_tool_names = [t.name for t in coding_tools + research_tools]
+        # Verify expected tools are available (get_tools returns list of strings)
+        all_tool_names = coding_tools + research_tools  # These are already strings
         for expected_tool in scenario.expected_tools:
             # Some tools might be mocked or not available
             # Just verify the verticals loaded successfully
@@ -105,9 +105,9 @@ class TestCrossVerticalWorkflows:
         assert len(coding_tools) > 0
 
         # Verify RAG-specific tools are present
-        rag_tool_names = [t.name for t in rag_tools]
-        assert "rag_ingest" in rag_tool_names
-        assert "rag_search" in rag_tool_names
+        # Note: RAGAssistant.get_tools() returns list of strings (tool names), not tool objects
+        assert "rag_ingest" in rag_tools
+        assert "rag_search" in rag_tools
 
     @pytest.mark.asyncio
     async def test_dataanalysis_research_workflow_scenario(self):
