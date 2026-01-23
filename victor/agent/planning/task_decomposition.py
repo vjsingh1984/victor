@@ -1287,17 +1287,19 @@ class TaskGraph:
 
     def get_dependencies(self, task_id: str) -> List[str]:
         """Get dependencies for a task (tasks that must complete before this one)."""
-        # Return tasks that this task depends on
-        return self.edges.get(task_id, [])
+        # Return tasks that this task depends on (predecessors)
+        # With edges[dep] = [task], we need to find all dep where task_id in edges[dep]
+        dependencies = []
+        for from_id, to_ids in self.edges.items():
+            if task_id in to_ids:
+                dependencies.append(from_id)
+        return dependencies
 
     def get_dependents(self, task_id: str) -> List[str]:
         """Get tasks that depend on this task (tasks that require this task to complete)."""
-        # Find all tasks that have this task as a dependency
-        dependents = []
-        for from_id, to_ids in self.edges.items():
-            if task_id in to_ids:
-                dependents.append(from_id)
-        return dependents
+        # Return tasks that depend on this task (successors)
+        # With edges[task_id] = [successors], we can return edges[task_id] directly
+        return self.edges.get(task_id, [])
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
