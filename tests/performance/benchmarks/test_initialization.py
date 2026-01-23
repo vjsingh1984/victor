@@ -59,7 +59,7 @@ from victor.providers.anthropic_provider import AnthropicProvider
 @pytest.fixture(autouse=True)
 def reset_singletons():
     """Reset singletons before each test."""
-    from victor.core.bootstrap import reset_container
+    from victor.core.container import reset_container
 
     reset_container()
     yield
