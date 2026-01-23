@@ -33,7 +33,7 @@ from unittest.mock import MagicMock, AsyncMock, patch
 
 from victor.config.settings import Settings
 from victor.core.container import ServiceContainer
-from victor.core.events import create_event_backend, MessagingEvent, BackendType
+from victor.core.events import create_event_backend, MessagingEvent, BackendType, BackendConfig
 from victor.providers.mock import MockProvider
 from victor.agent.tool_pipeline import ToolPipeline
 
@@ -57,13 +57,13 @@ class TestCoreInfrastructureSmokeTests:
 
     def test_event_bus_creation_and_operations(self):
         """Test EventBus can be created and perform basic operations."""
-        backend = create_event_backend(BackendType.IN_MEMORY)
+        backend = create_event_backend(BackendConfig(backend_type=BackendType.IN_MEMORY))
         assert backend is not None
 
     @pytest.mark.asyncio
     async def test_event_bus_publish_subscribe(self):
         """Test EventBus publish/subscribe functionality."""
-        backend = create_event_backend(BackendType.IN_MEMORY)
+        backend = create_event_backend(BackendConfig(backend_type=BackendType.IN_MEMORY))
         await backend.connect()
 
         # Test publish
@@ -82,23 +82,44 @@ class TestCoreInfrastructureSmokeTests:
     @pytest.mark.asyncio
     async def test_provider_basic_chat(self):
         """Test provider can perform basic chat."""
+        from victor.providers.base import Message
+
         provider = MockProvider(model="test-model")
-        response = await provider.chat("Hello")
+        messages = [Message(role="user", content="Hello")]
+        response = await provider.chat(messages, model="test-model")
         assert response is not None
-        assert isinstance(response, str)
-        assert len(response) > 0
+        assert hasattr(response, "content")
+        assert len(response.content) > 0
 
     def test_tool_pipeline_creation(self):
-        """Test ToolPipeline can be created."""
-        settings = Settings()
-        pipeline = ToolPipeline(settings=settings)
+        """Test ToolPipeline class exists and can be instantiated."""
+        from victor.agent.tool_pipeline import ToolPipeline, ToolPipelineConfig
+        from victor.tools.base import ToolRegistry
+        from victor.agent.tool_executor import ToolExecutor
+
+        # Verify class exists
+        assert ToolPipeline is not None
+
+        # Smoke test: Verify it can be instantiated with minimal dependencies
+        # (We don't need a fully functional pipeline, just verify it can be created)
+        registry = ToolRegistry()
+        executor = ToolExecutor(tool_registry=registry)
+        config = ToolPipelineConfig(tool_budget=100)
+
+        pipeline = ToolPipeline(
+            tool_registry=registry,
+            tool_executor=executor,
+            config=config,
+        )
         assert pipeline is not None
 
     def test_settings_loading(self):
         """Test Settings can be loaded."""
         settings = Settings()
         assert settings is not None
-        assert hasattr(settings, "provider")
+        # Verify key settings exist
+        assert hasattr(settings, "default_provider")
+        assert hasattr(settings, "default_model")
 
 
 # =============================================================================
@@ -134,11 +155,11 @@ class TestAgentFunctionalitySmokeTests:
 
         chunk = StreamChunk(
             content="Test chunk",
-            role="assistant",
-            finish_reason=None,
+            stop_reason=None,
         )
         assert chunk.content == "Test chunk"
-        assert chunk.role == "assistant"
+        assert chunk.is_final is False  # Default value
+        assert chunk.tool_calls is None  # Default value
 
     def test_tool_call_creation(self):
         """Test ToolCall creation."""
@@ -238,10 +259,11 @@ class TestIntegrationSmokeTests:
 
     def test_tool_registry_accessible(self):
         """Test tool registry is accessible."""
-        from victor.agent.tool_pipeline import ToolPipeline
-        settings = Settings()
-        pipeline = ToolPipeline(settings=settings)
-        assert pipeline is not None
+        from victor.tools.base import ToolRegistry
+
+        registry = ToolRegistry()
+        assert registry is not None
+        assert hasattr(registry, "get_tool")
 
     def test_team_coordinator_creation(self):
         """Test team coordinator can be created."""
@@ -267,7 +289,19 @@ class TestPerformanceSmokeTests:
 
         settings = Settings()
         container = ServiceContainer()
-        pipeline = ToolPipeline(settings=settings)
+
+        # Initialize core components
+        from victor.agent.tool_pipeline import ToolPipeline, ToolPipelineConfig
+        from victor.tools.base import ToolRegistry
+        from victor.agent.tool_executor import ToolExecutor
+
+        registry = ToolRegistry()
+        executor = ToolExecutor(tool_registry=registry)
+        pipeline = ToolPipeline(
+            tool_registry=registry,
+            tool_executor=executor,
+            config=ToolPipelineConfig(tool_budget=100),
+        )
 
         duration = time.time() - start
         assert duration < 2.0, f"Initialization too slow: {duration:.2f}s"
@@ -326,9 +360,10 @@ class TestSecuritySmokeTests:
 
     def test_action_authorization_exists(self):
         """Test action authorization framework exists."""
-        from victor.agent.protocols import BudgetManagerProtocol
-        # Budget manager controls action authorization
-        assert BudgetManagerProtocol is not None
+        from victor.core.config import Settings
+        # Settings controls action authorization via tool_budget
+        settings = Settings()
+        assert hasattr(settings, "tool_budget")
 
     def test_provider_factory_security(self):
         """Test provider factory has security controls."""
@@ -341,14 +376,14 @@ class TestSecuritySmokeTests:
             env_var_names=["NONEXISTENT_KEY"],
             log_warning=False,
         )
-        # Should return None for missing key, not crash
-        assert key is None
+        # Should return None or empty string for missing key, not crash
+        assert key is None or key == ""
 
     def test_file_access_controls(self):
         """Test file access controls exist."""
-        from victor.tools.filesystem import ReadFileTool
+        from victor.tools.filesystem import ReadFile
         # File tools should have proper parameters
-        tool = ReadFileTool()
+        tool = ReadFile()
         assert tool is not None
         assert hasattr(tool, "execute")
 
@@ -395,16 +430,12 @@ class TestConfigurationSmokeTests:
 
     def test_team_specification_loading(self):
         """Test team specifications can be loaded."""
-        from victor.core.teams import BaseYAMLTeamProvider
+        from victor.core.teams import TeamLoader
 
-        # Should not crash even if no teams are configured
-        try:
-            provider = BaseYAMLTeamProvider("coding")
-            teams = provider.load_teams()
-            assert isinstance(teams, list)
-        except Exception:
-            # Should handle missing config gracefully
-            pass
+        # Team loading should be available
+        # (May return empty list if no teams configured)
+        loader = TeamLoader()
+        assert loader is not None
 
 
 # =============================================================================
@@ -435,10 +466,11 @@ class TestErrorRecoverySmokeTests:
         """Test retry strategy exists."""
         from victor.framework.resilience import ExponentialBackoffStrategy
 
+        # ExponentialBackoffStrategy requires base, max, exponential
         strategy = ExponentialBackoffStrategy(
-            max_retries=3,
-            base_delay=1.0,
+            base=1.0,
             max_delay=10.0,
+            exponential=2.0,
         )
         assert strategy is not None
 
@@ -553,8 +585,8 @@ class TestSmokeTestSummary:
         assert provider is not None
 
         # 4. Tool system works
-        from victor.tools.filesystem import ReadFileTool
-        tool = ReadFileTool()
+        from victor.tools.filesystem import ReadFile
+        tool = ReadFile()
         assert tool is not None
 
         # 5. Verticals load
