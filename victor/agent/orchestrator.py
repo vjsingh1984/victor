@@ -2158,7 +2158,7 @@ class AgentOrchestrator(
     def _apply_post_switch_hooks(self, respect_sticky_budget: bool = False) -> None:
         """Apply post-switch hooks after provider/model switch.
 
-        Delegates to ProviderLifecycleManager (Phase 1.2) for:
+        Delegates to ProviderLifecycleManager for:
         - Apply model-specific exploration settings to unified tracker
         - Get prompt contributors from vertical extensions
         - Create prompt builder with new capabilities
@@ -2171,50 +2171,32 @@ class AgentOrchestrator(
         Note:
             This method assumes self.model, self.provider_name, self.tool_adapter,
             and self._tool_calling_caps_internal are already updated before calling.
+
+        Raises:
+            RuntimeError: If ProviderLifecycleManager is not initialized.
         """
         # Get the provider lifecycle manager (set by ProviderLayerBuilder)
         manager = getattr(self, "_provider_lifecycle_manager", None)
-
-        if manager:
-            # Delegate to ProviderLifecycleManager (Phase 1.2)
-            manager.apply_exploration_settings(
-                self.unified_tracker, self._tool_calling_caps_internal
-            )
-            prompt_contributors = manager.get_prompt_contributors()
-            self.prompt_builder = manager.create_prompt_builder(
-                provider_name=self.provider_name,
-                model=self.model,
-                tool_adapter=self.tool_adapter,
-                capabilities=self._tool_calling_caps_internal,
-                prompt_contributors=prompt_contributors,
-            )
-        else:
-            # Fallback: Direct implementation for backward compatibility
-            self.unified_tracker.set_model_exploration_settings(
-                exploration_multiplier=self._tool_calling_caps_internal.exploration_multiplier,
-                continuation_patience=self._tool_calling_caps_internal.continuation_patience,
-            )
-            prompt_contributors = []
-            try:
-                from victor.core.verticals.protocols import VerticalExtensions
-
-                extensions = self._container.get_optional(VerticalExtensions)
-                if extensions and extensions.prompt_contributors:
-                    prompt_contributors = extensions.prompt_contributors
-            except ImportError:
-                logger.debug("VerticalExtensions module not available")
-            except AttributeError as e:
-                logger.warning(f"VerticalExtensions missing expected attributes: {e}")
-
-            self.prompt_builder = SystemPromptBuilder(
-                provider_name=self.provider_name,
-                model=self.model,
-                tool_adapter=self.tool_adapter,
-                capabilities=self._tool_calling_caps_internal,
-                prompt_contributors=prompt_contributors,
+        if manager is None:
+            raise RuntimeError(
+                "ProviderLifecycleManager not initialized. "
+                "Ensure ProviderLayerBuilder runs before calling this method."
             )
 
-        # Rebuild system prompt with new adapter hints (always local)
+        # Delegate to ProviderLifecycleManager
+        manager.apply_exploration_settings(
+            self.unified_tracker, self._tool_calling_caps_internal
+        )
+        prompt_contributors = manager.get_prompt_contributors()
+        self.prompt_builder = manager.create_prompt_builder(
+            provider_name=self.provider_name,
+            model=self.model,
+            tool_adapter=self.tool_adapter,
+            capabilities=self._tool_calling_caps_internal,
+            prompt_contributors=prompt_contributors,
+        )
+
+        # Rebuild system prompt with new adapter hints
         base_system_prompt = self._build_system_prompt_with_adapter()
         if self.project_context.content:
             self._system_prompt = (
@@ -2223,25 +2205,14 @@ class AgentOrchestrator(
         else:
             self._system_prompt = base_system_prompt
 
-        # Update tool budget (delegate check to manager if available)
-        if respect_sticky_budget:
-            if manager:
-                if manager.should_respect_sticky_budget(self.unified_tracker):
-                    logger.debug("Skipping tool budget reset on provider switch (sticky user override)")
-                    return
-            else:
-                sticky_budget = getattr(self.unified_tracker, "_sticky_user_budget", False)
-                if sticky_budget:
-                    logger.debug("Skipping tool budget reset on provider switch (sticky user override)")
-                    return
+        # Update tool budget
+        if respect_sticky_budget and manager.should_respect_sticky_budget(self.unified_tracker):
+            logger.debug("Skipping tool budget reset on provider switch (sticky user override)")
+            return
 
-        if manager:
-            self.tool_budget = manager.calculate_tool_budget(
-                self._tool_calling_caps_internal, self.settings
-            )
-        else:
-            default_budget = max(self._tool_calling_caps_internal.recommended_tool_budget, 50)
-            self.tool_budget = getattr(self.settings, "tool_call_budget", default_budget)
+        self.tool_budget = manager.calculate_tool_budget(
+            self._tool_calling_caps_internal, self.settings
+        )
 
     def _parse_tool_calls_with_adapter(
         self, content: str, raw_tool_calls: Optional[List[Dict[str, Any]]] = None
