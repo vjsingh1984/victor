@@ -260,7 +260,8 @@ class ProviderCoordinator:
                     f"{self.provider_name}:{new_model}"
                 )
 
-            return result
+            # Return bool from SwitchResult
+            return result.success if hasattr(result, "success") else bool(result)
 
         except Exception as e:
             logger.error(f"Failed to switch provider to {provider_name}: {e}")
@@ -295,7 +296,8 @@ class ProviderCoordinator:
 
                 logger.info(f"Switched model: {old_model} -> {model}")
 
-            return result
+            # Return bool from SwitchResult
+            return result.success if hasattr(result, "success") else bool(result)
 
         except Exception as e:
             logger.error(f"Failed to switch model to {model}: {e}")

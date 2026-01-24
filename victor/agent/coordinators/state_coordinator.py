@@ -62,6 +62,7 @@ from threading import Lock
 if TYPE_CHECKING:
     from victor.agent.session_state_manager import SessionStateManager
     from victor.agent.conversation_state import ConversationStateMachine
+    from victor.core.state import ConversationStage
 
 logger = logging.getLogger(__name__)
 
@@ -260,7 +261,7 @@ class StateCoordinator:
             return False
 
         # Import ConversationStage for validation
-        from victor.agent.conversation_state import ConversationStage
+        from victor.core.state import ConversationStage
 
         # Convert string to enum if needed
         if isinstance(stage, str):
@@ -541,7 +542,7 @@ class StateCoordinator:
         # Restore stage if present
         stage_name = state.get("stage", "INITIAL")
         if self._conversation_state:
-            from victor.agent.conversation_state import ConversationStage
+            from victor.core.state import ConversationStage
 
             try:
                 stage = ConversationStage[stage_name]
@@ -566,7 +567,8 @@ class StateCoordinator:
         }
 
         if self._conversation_state:
-            summary["conversation"] = self._conversation_state.get_state_summary()
+            conv_summary: Dict[str, Any] = self._conversation_state.get_state_summary() if callable(self._conversation_state.get_state_summary) else {}
+            summary["conversation"] = conv_summary
 
         summary["state_changes_count"] = self.get_state_changes_count()
 

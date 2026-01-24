@@ -504,10 +504,11 @@ class SessionCoordinator:
         state = self._get_checkpoint_state()
 
         try:
-            return await self._checkpoint_manager.maybe_auto_checkpoint(
+            checkpoint_id: Optional[str] = await self._checkpoint_manager.maybe_auto_checkpoint(
                 session_id=self._memory_session_id or "default",
                 state=state,
             )
+            return checkpoint_id
         except (OSError, IOError) as e:
             logger.debug(f"Auto-checkpoint failed (I/O error): {e}")
             return None
@@ -643,18 +644,21 @@ class SessionCoordinator:
             # Fall back to provided messages
             if messages:
                 # Convert Message objects to dict if needed
-                return [msg.model_dump() if hasattr(msg, "model_dump") else msg for msg in messages]
+                result_messages: List[Dict[str, Any]] = [msg.model_dump() if hasattr(msg, "model_dump") else msg for msg in messages]
+                return result_messages
             return []
 
         try:
-            return self._memory_manager.get_context_messages(
+            memory_messages: List[Dict[str, Any]] = self._memory_manager.get_context_messages(
                 session_id=self._memory_session_id,
                 max_tokens=max_tokens,
             )
+            return memory_messages
         except Exception as e:
             logger.warning(f"Failed to get memory context: {e}, using fallback")
             if messages:
-                return [msg.model_dump() if hasattr(msg, "model_dump") else msg for msg in messages]
+                fallback_messages: List[Dict[str, Any]] = [msg.model_dump() if hasattr(msg, "model_dump") else msg for msg in messages]
+                return fallback_messages
             return []
 
     # ========================================================================

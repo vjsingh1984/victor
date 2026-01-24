@@ -55,11 +55,12 @@ from typing import Any, Dict, Optional, Set, TYPE_CHECKING
 if TYPE_CHECKING:
     from victor.agent.coordinators.state_coordinator import StateCoordinator
     from victor.agent.coordinators.tool_access_config_coordinator import ToolAccessConfigCoordinator
-    from victor.agent.conversation_state import ConversationStateMachine, ConversationStage
+    from victor.agent.conversation_state import ConversationStateMachine
+    from victor.core.state import ConversationStage
     from victor.agent.mode_controller import AgentModeController
     from victor.agent.unified_tracker import UnifiedTaskTracker
     from victor.tools.registry import ToolRegistry
-    from victor.agent.conversation import Conversation
+    from victor.agent.message_history import MessageHistory
     from victor.core.verticals.vertical_context import VerticalContext
     from victor.agent.tool_selector import ToolSelector
     from victor.agent.protocols import ToolAccessContext
@@ -149,10 +150,10 @@ class OrchestratorProtocolAdapter:
         Note:
             Framework layer converts this to framework.state.Stage
         """
-        from victor.agent.conversation_state import ConversationStage
+        from victor.core.state import ConversationStage
 
         # StateCoordinator returns stage name, convert to enum
-        stage_name = self._state_coordinator.get_stage()
+        stage_name: str = self._state_coordinator.get_stage()
         if stage_name:
             return ConversationStage[stage_name]
         return ConversationStage.INITIAL
@@ -164,8 +165,10 @@ class OrchestratorProtocolAdapter:
             Non-negative count of tool calls in this session
         """
         if self._unified_tracker:
-            return self._unified_tracker.tool_calls_used
-        return getattr(self._orchestrator, "tool_calls_used", 0)
+            tool_calls: int = self._unified_tracker.tool_calls_used
+            return tool_calls
+        fallback: int = getattr(self._orchestrator, "tool_calls_used", 0)
+        return fallback
 
     def get_tool_budget(self) -> int:
         """Get tool call budget (protocol method).
@@ -174,8 +177,10 @@ class OrchestratorProtocolAdapter:
             Maximum allowed tool calls
         """
         if self._unified_tracker:
-            return self._unified_tracker.tool_budget
-        return getattr(self._orchestrator, "tool_budget", 50)
+            budget: int = self._unified_tracker.tool_budget
+            return budget
+        fallback_budget: int = getattr(self._orchestrator, "tool_budget", 50)
+        return fallback_budget
 
     def get_observed_files(self) -> Set[str]:
         """Get files observed/read during conversation (protocol method).
@@ -192,7 +197,8 @@ class OrchestratorProtocolAdapter:
             Set of absolute file paths
         """
         if self._conversation_state and hasattr(self._conversation_state, "state"):
-            return set(getattr(self._conversation_state.state, "modified_files", []))
+            modified: Set[str] = set(getattr(self._conversation_state.state, "modified_files", []))
+            return modified
         return set()
 
     def get_iteration_count(self) -> int:
@@ -202,7 +208,8 @@ class OrchestratorProtocolAdapter:
             Non-negative iteration count
         """
         if self._unified_tracker:
-            return self._unified_tracker.iteration_count
+            iterations: int = self._unified_tracker.iteration_count
+            return iterations
         return 0
 
     def get_max_iterations(self) -> int:
@@ -212,7 +219,8 @@ class OrchestratorProtocolAdapter:
             Max iteration limit
         """
         if self._unified_tracker:
-            return self._unified_tracker.max_iterations
+            max_iter: int = self._unified_tracker.max_iterations
+            return max_iter
         return 25
 
     # ========================================================================
@@ -265,7 +273,8 @@ class OrchestratorProtocolAdapter:
         if result:
             # Sync orchestrator's model attribute with provider manager state
             self._orchestrator.model = self._provider_coordinator._manager.model
-        return result
+        # Return bool from SwitchResult
+        return result.success if hasattr(result, "success") else bool(result)
 
     # ========================================================================
     # ToolsProtocol
@@ -288,9 +297,10 @@ class OrchestratorProtocolAdapter:
             Set of enabled tool names for this session
         """
         if self._tool_access_config_coordinator:
-            return self._tool_access_config_coordinator.get_enabled_tools(
+            enabled: Set[str] = self._tool_access_config_coordinator.get_enabled_tools(
                 session_enabled_tools=getattr(self._orchestrator, "_enabled_tools", None),
             )
+            return enabled
         return set()
 
     def set_enabled_tools(self, tools: Set[str], tiered_config: Any = None) -> None:
@@ -322,10 +332,11 @@ class OrchestratorProtocolAdapter:
             True if tool is enabled
         """
         if self._tool_access_config_coordinator:
-            return self._tool_access_config_coordinator.is_tool_enabled(
+            is_enabled: bool = self._tool_access_config_coordinator.is_tool_enabled(
                 tool_name=tool_name,
                 session_enabled_tools=getattr(self._orchestrator, "_enabled_tools", None),
             )
+            return is_enabled
         enabled = self.get_enabled_tools()
         return tool_name in enabled
 
@@ -340,7 +351,8 @@ class OrchestratorProtocolAdapter:
             Complete system prompt string
         """
         if self._prompt_builder:
-            return self._prompt_builder.build()
+            prompt: str = self._prompt_builder.build()
+            return prompt
         return ""
 
     def set_system_prompt(self, prompt: str) -> None:
@@ -465,7 +477,7 @@ class OrchestratorProtocolAdapter:
         logger.debug(f"Tool selector initialization pending, auto-recovering: {health['message']}")
 
         # Attempt initialization
-        if hasattr(self._tool_selector, "initialize_tool_embeddings"):
+        if self._tool_selector and hasattr(self._tool_selector, "initialize_tool_embeddings"):
             try:
                 await self._tool_selector.initialize_tool_embeddings(self._tools)
                 logger.info("Tool selector auto-recovered successfully")
