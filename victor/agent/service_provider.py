@@ -326,7 +326,7 @@ class OrchestratorServiceProvider:
 
         # ProviderLifecycleManager - singleton for provider lifecycle operations (Phase 1.2)
         container.register(
-            ProviderLifecycleProtocol,
+            ProviderLifecycleProtocol,  # type: ignore[type-abstract]
             lambda c: self._create_provider_lifecycle_manager(c),
             ServiceLifetime.SINGLETON,
         )
@@ -340,7 +340,7 @@ class OrchestratorServiceProvider:
 
         # StageTransitionEngine - singleton for stage transition management (Phase 2.2)
         container.register(
-            StageTransitionProtocol,
+            StageTransitionProtocol,  # type: ignore[type-abstract]
             lambda c: self._create_stage_transition_engine(c),
             ServiceLifetime.SINGLETON,
         )
@@ -492,7 +492,7 @@ class OrchestratorServiceProvider:
 
         # ToolSelector - singleton for tool selection logic
         container.register(
-            IToolSelector,
+            IToolSelector,  # type: ignore[type-abstract]
             lambda c: self._create_tool_selector(),
             ServiceLifetime.SINGLETON,
         )
@@ -624,7 +624,7 @@ class OrchestratorServiceProvider:
         from victor.agent.coordinators.tool_call_protocol import IToolCallCoordinator
 
         container.register(
-            IToolCallCoordinator,
+            IToolCallCoordinator,  # type: ignore[type-abstract]
             lambda c: self._create_tool_call_coordinator(),
             ServiceLifetime.SCOPED,
         )
@@ -633,7 +633,7 @@ class OrchestratorServiceProvider:
         from victor.agent.coordinators.prompt_builder_protocol import IPromptBuilderCoordinator
 
         container.register(
-            IPromptBuilderCoordinator,
+            IPromptBuilderCoordinator,  # type: ignore[type-abstract]
             lambda c: self._create_prompt_builder_coordinator(),
             ServiceLifetime.SCOPED,
         )
@@ -797,14 +797,14 @@ class OrchestratorServiceProvider:
         from victor.tools.base import ToolRegistry  # type: ignore[attr-defined]
 
         container.register(
-            ToolRegistryProtocol,
+            ToolRegistryProtocol,  # type: ignore[type-abstract]
             lambda c: ToolRegistry(),  # type: ignore[arg-type, return-value]
             ServiceLifetime.SINGLETON,
         )
 
         # ToolRegistrar - manages tool registration, plugins, and MCP integration
         container.register(
-            ToolRegistrarProtocol,
+            ToolRegistrarProtocol,  # type: ignore[type-abstract]
             lambda c: self._create_tool_registrar(c),
             ServiceLifetime.SINGLETON,
         )
@@ -828,13 +828,13 @@ class OrchestratorServiceProvider:
         from victor.agent.protocols import ToolRegistryProtocol, ToolDependencyGraphProtocol
 
         # Get ToolRegistry from container
-        tool_registry = container.get(ToolRegistryProtocol)
+        tool_registry = container.get(ToolRegistryProtocol)  # type: ignore[type-abstract]
 
         # Get ToolDependencyGraph from container for tool planning
         tool_graph = None
         if getattr(self._settings, "enable_tool_graph", True):
             try:
-                tool_graph = container.get(ToolDependencyGraphProtocol)
+                tool_graph = container.get(ToolDependencyGraphProtocol)  # type: ignore[type-abstract]
             except Exception:
                 pass  # Tool graph is optional
 
@@ -873,7 +873,7 @@ class OrchestratorServiceProvider:
                 return _NullObservability()
 
         container.register(
-            ObservabilityProtocol,
+            ObservabilityProtocol,  # type: ignore[type-abstract]
             create_observability,
             ServiceLifetime.SINGLETON,
         )
@@ -892,7 +892,7 @@ class OrchestratorServiceProvider:
                 return _NullTaskAnalyzer()
 
         container.register(
-            TaskAnalyzerProtocol,
+            TaskAnalyzerProtocol,  # type: ignore[type-abstract]
             create_task_analyzer,
             ServiceLifetime.SINGLETON,
         )
@@ -976,7 +976,7 @@ class OrchestratorServiceProvider:
                 return _NullRecoveryHandler()
 
         container.register(
-            RecoveryHandlerProtocol,
+            RecoveryHandlerProtocol,  # type: ignore[type-abstract]
             create_recovery_handler,
             ServiceLifetime.SINGLETON,
         )
@@ -1015,7 +1015,7 @@ class OrchestratorServiceProvider:
         from victor.protocols.path_resolver import PathResolver, IPathResolver
 
         container.register(
-            IPathResolver,
+            IPathResolver,  # type: ignore[type-abstract]
             lambda c: PathResolver(),
             ServiceLifetime.SINGLETON,
         )
@@ -1039,7 +1039,7 @@ class OrchestratorServiceProvider:
                 return _NullMemoryCoordinator()
 
         container.register(
-            UnifiedMemoryCoordinatorProtocol,
+            UnifiedMemoryCoordinatorProtocol,  # type: ignore[type-abstract]
             create_memory_coordinator,
             ServiceLifetime.SINGLETON,
         )
@@ -1052,9 +1052,9 @@ class OrchestratorServiceProvider:
         )
 
         container.register(
-            IToolAccessController,
+            IToolAccessController,  # type: ignore[type-abstract]
             lambda c: create_tool_access_controller(
-                registry=c.get_optional(ToolRegistryProtocol),  # type: ignore[arg-type]
+                registry=c.get_optional(ToolRegistryProtocol),  # type: ignore[arg-type, type-abstract]
             ),
             ServiceLifetime.SCOPED,
         )
@@ -1098,7 +1098,7 @@ class OrchestratorServiceProvider:
         )
 
         container.register(
-            IBudgetManager,
+            IBudgetManager,  # type: ignore[type-abstract]
             lambda c: create_budget_manager(config=config),
             ServiceLifetime.SCOPED,
         )
@@ -1627,20 +1627,20 @@ class OrchestratorServiceProvider:
         )
 
         # Get recovery handler from DI container (optional)
-        recovery_handler = self.container.get_optional(RecoveryHandlerProtocol)
+        recovery_handler = self.container.get_optional(RecoveryHandlerProtocol)  # type: ignore[type-abstract]
 
         # Get recovery integration (optional)
         # Note: OrchestratorRecoveryIntegration is not in DI yet, will be None for now
         recovery_integration = None
 
         # Get streaming handler from DI container
-        streaming_handler = self.container.get(StreamingHandlerProtocol)
+        streaming_handler = self.container.get(StreamingHandlerProtocol)  # type: ignore[type-abstract]
 
         # Get context compactor from DI container (optional)
-        context_compactor = self.container.get_optional(ContextCompactorProtocol)
+        context_compactor = self.container.get_optional(ContextCompactorProtocol)  # type: ignore[type-abstract]
 
         # Get unified tracker from DI container (might be scoped)
-        unified_tracker = self.container.get_optional(TaskTrackerProtocol)
+        unified_tracker = self.container.get_optional(TaskTrackerProtocol)  # type: ignore[type-abstract]
         if unified_tracker is None:
             # Create directly if not in scope (will be replaced later when in scope)
             from victor.agent.unified_task_tracker import UnifiedTaskTracker
@@ -1669,7 +1669,7 @@ class OrchestratorServiceProvider:
         from victor.agent.protocols import StreamingHandlerProtocol
 
         # Get streaming handler from DI container
-        streaming_handler = self.container.get(StreamingHandlerProtocol)
+        streaming_handler = self.container.get(StreamingHandlerProtocol)  # type: ignore[type-abstract]
 
         return ChunkGenerator(
             streaming_handler=streaming_handler,  # type: ignore[arg-type]
@@ -1689,7 +1689,7 @@ class OrchestratorServiceProvider:
         from victor.agent.protocols import ToolRegistrarProtocol
 
         # Get tool registrar from DI container
-        tool_registrar = self.container.get(ToolRegistrarProtocol)
+        tool_registrar = self.container.get(ToolRegistrarProtocol)  # type: ignore[type-abstract]
 
         return ToolPlanner(
             tool_registrar=tool_registrar,  # type: ignore[arg-type]
@@ -1716,17 +1716,17 @@ class OrchestratorServiceProvider:
         )
 
         # Get dependencies from DI container
-        task_analyzer = self.container.get(TaskAnalyzerProtocol)
+        task_analyzer = self.container.get(TaskAnalyzerProtocol)  # type: ignore[type-abstract]
 
         # TaskTracker might be scoped
-        unified_tracker = self.container.get_optional(TaskTrackerProtocol)
+        unified_tracker = self.container.get_optional(TaskTrackerProtocol)  # type: ignore[type-abstract]
         if unified_tracker is None:
             # Create directly if not in scope
             from victor.agent.unified_task_tracker import UnifiedTaskTracker
 
             unified_tracker_instance2: Any = UnifiedTaskTracker()
 
-        prompt_builder = self.container.get(SystemPromptBuilderProtocol)
+        prompt_builder = self.container.get(SystemPromptBuilderProtocol)  # type: ignore[type-abstract]
 
         return TaskCoordinator(
             task_analyzer=task_analyzer,  # type: ignore[arg-type]
@@ -1760,11 +1760,11 @@ class OrchestratorServiceProvider:
         )
 
         # Get dependencies from DI container (optional for some)
-        tool_pipeline = self.container.get_optional(ToolPipelineProtocol)
-        tool_registry = self.container.get(ToolRegistryProtocol)
-        tool_selector = self.container.get_optional(IToolSelector)
-        budget_manager = self.container.get_optional(IBudgetManager)
-        tool_cache = self.container.get_optional(ToolCacheProtocol)
+        tool_pipeline = self.container.get_optional(ToolPipelineProtocol)  # type: ignore[type-abstract]
+        tool_registry = self.container.get(ToolRegistryProtocol)  # type: ignore[type-abstract]
+        tool_selector = self.container.get_optional(IToolSelector)  # type: ignore[type-abstract]
+        budget_manager = self.container.get_optional(IBudgetManager)  # type: ignore[type-abstract]
+        tool_cache = self.container.get_optional(ToolCacheProtocol)  # type: ignore[type-abstract]
 
         # Build config from settings
         config = ToolCoordinatorConfig(
@@ -1808,8 +1808,8 @@ class OrchestratorServiceProvider:
         )
 
         # Get dependencies from DI container
-        conversation_controller = self.container.get_optional(ConversationControllerProtocol)
-        state_machine = self.container.get_optional(ConversationStateMachineProtocol)
+        conversation_controller = self.container.get_optional(ConversationControllerProtocol)  # type: ignore[type-abstract]
+        state_machine = self.container.get_optional(ConversationStateMachineProtocol)  # type: ignore[type-abstract]
 
         # Build config from settings
         config = StateCoordinatorConfig(
@@ -1880,8 +1880,8 @@ class OrchestratorServiceProvider:
         from victor.agent.protocols import ToolExecutorProtocol, ToolCacheProtocol
 
         # Get dependencies from DI container
-        tool_executor = self.container.get(ToolExecutorProtocol)
-        tool_cache = self.container.get_optional(ToolCacheProtocol)
+        tool_executor = self.container.get(ToolExecutorProtocol)  # type: ignore[type-abstract]
+        tool_cache = self.container.get_optional(ToolCacheProtocol)  # type: ignore[type-abstract]
 
         # Build config from settings
         retry_enabled = getattr(self._settings, "tool_retry_enabled", True)
@@ -1978,8 +1978,8 @@ class OrchestratorServiceProvider:
         )
 
         # Get dependencies from DI container
-        tool_executor = self.container.get(ToolExecutorProtocol)
-        tool_registry = self.container.get(ToolRegistryProtocol)
+        tool_executor = self.container.get(ToolExecutorProtocol)  # type: ignore[type-abstract]
+        tool_registry = self.container.get(ToolRegistryProtocol)  # type: ignore[type-abstract]
         tool_retry_coordinator = self.container.get_optional(ToolRetryCoordinator)
 
         # Build config from settings
@@ -2057,7 +2057,7 @@ class OrchestratorServiceProvider:
         )
 
         container.register(
-            PresentationProtocol,
+            PresentationProtocol,  # type: ignore[type-abstract]
             lambda c: EmojiPresentationAdapter(),
             ServiceLifetime.SINGLETON,
         )
@@ -2188,7 +2188,7 @@ class OrchestratorServiceProvider:
         from victor.agent.protocols import ToolRegistryProtocol
 
         # Get tool registry from container
-        tool_registry = self.container.get(ToolRegistryProtocol)
+        tool_registry = self.container.get(ToolRegistryProtocol)  # type: ignore[type-abstract]
 
         return SkillDiscoveryEngine(
             tool_registry=tool_registry,
