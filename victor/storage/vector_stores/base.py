@@ -263,5 +263,6 @@ class BaseEmbeddingProvider(ABC):
     def __repr__(self) -> str:
         """String representation."""
         return (
-            f"{self.__class__.__name__}(provider={self.config.provider}, model={self.config.model})"
+            f"{self.__class__.__name__}(vector_store={self.config.vector_store}, "
+            f"embedding_model={self.config.embedding_model})"
         )

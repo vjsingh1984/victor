@@ -110,8 +110,8 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
         # Create embedding model config
         embedding_config = EmbeddingModelConfig(
-            model_type=model_type,
-            model_name=model_name,
+            embedding_type=model_type,
+            embedding_model=model_name,
             dimension=dimension,
             api_key=api_key,
             batch_size=batch_size,
@@ -126,9 +126,9 @@ class LanceDBProvider(BaseEmbeddingProvider):
         print(f"🤖 Embedding Model: {model_name} ({model_type})")
 
         # Setup LanceDB
-        persist_dir = self.config.persist_directory
-        if persist_dir:
-            persist_dir = Path(persist_dir).expanduser()
+        persist_dir_str = self.config.persist_directory
+        if persist_dir_str:
+            persist_dir = Path(persist_dir_str).expanduser()
             persist_dir.mkdir(parents=True, exist_ok=True)
             print(f"📁 Using persistent storage: {persist_dir}")
         else:
@@ -151,13 +151,13 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
                 # Check if table exists
                 try:
-                    existing_tables = self.db.list_tables().tables
+                    existing_tables = self.db.list_tables().tables  # type: ignore[attr-defined]
                 except AttributeError:
                     # Fallback for older LanceDB versions
                     existing_tables = []
                     try:
                         existing_tables = (
-                            self.db.table_names() if hasattr(self.db, "table_names") else []
+                            self.db.table_names() if hasattr(self.db, "table_names") else []  # type: ignore[attr-defined]
                         )
                     except Exception:
                         existing_tables = []
@@ -165,7 +165,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
                 # Try to open the table to verify it's not corrupted
                 if table_name in existing_tables:
                     try:
-                        test_table = self.db.open_table(table_name)
+                        test_table = self.db.open_table(table_name)  # type: ignore[attr-defined]
                         # Try a simple operation to verify integrity
                         _ = test_table.count_rows()
                         self.table = test_table
@@ -183,8 +183,8 @@ class LanceDBProvider(BaseEmbeddingProvider):
                                 self._corrupted_db_cleanup(persist_dir, table_name)
                                 self.db = lancedb.connect(str(persist_dir))
                                 existing_tables = (
-                                    self.db.list_tables().tables
-                                    if hasattr(self.db.list_tables(), "tables")
+                                    self.db.list_tables().tables  # type: ignore[attr-defined]
+                                    if hasattr(self.db.list_tables(), "tables")  # type: ignore[attr-defined]
                                     else []
                                 )
                             else:
@@ -210,8 +210,8 @@ class LanceDBProvider(BaseEmbeddingProvider):
                         self._corrupted_db_cleanup(persist_dir, table_name)
                         self.db = lancedb.connect(str(persist_dir))
                         existing_tables = (
-                            self.db.list_tables().tables
-                            if hasattr(self.db.list_tables(), "tables")
+                            self.db.list_tables().tables  # type: ignore[attr-defined]
+                            if hasattr(self.db.list_tables(), "tables")  # type: ignore[attr-defined]
                             else []
                         )
                     else:
@@ -225,7 +225,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
             # Fresh database
             self.db = lancedb.connect(str(persist_dir))
             existing_tables = (
-                self.db.list_tables().tables if hasattr(self.db.list_tables(), "tables") else []
+                self.db.list_tables().tables if hasattr(self.db.list_tables(), "tables") else []  # type: ignore[attr-defined]
             )
             print(f"📝 Creating new table: {table_name}")
 
@@ -278,6 +278,18 @@ class LanceDBProvider(BaseEmbeddingProvider):
             print(f"🗑️  Removed corrupted files: {', '.join(removed_files)}")
         print("✅ Corrupted database cleaned up, will rebuild on next index")
 
+    def _ensure_db(self) -> Any:
+        """Ensure database connection is initialized."""
+        if self.db is None:
+            raise RuntimeError("LanceDB connection not initialized. Call initialize() first.")
+        return self.db
+
+    def _ensure_table(self) -> Any:
+        """Ensure table is initialized."""
+        if self.table is None:
+            raise RuntimeError("LanceDB table not initialized. Call initialize() first.")
+        return self.table
+
     async def embed_text(self, text: str) -> List[float]:
         """Generate embedding for single text.
 
@@ -290,6 +302,8 @@ class LanceDBProvider(BaseEmbeddingProvider):
         if not self._initialized:
             await self.initialize()
 
+        if self.embedding_model is None:
+            raise RuntimeError("Embedding model not initialized")
         return await self.embedding_model.embed_text(text)
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
@@ -304,6 +318,8 @@ class LanceDBProvider(BaseEmbeddingProvider):
         if not self._initialized:
             await self.initialize()
 
+        if self.embedding_model is None:
+            raise RuntimeError("Embedding model not initialized")
         return await self.embedding_model.embed_batch(texts)
 
     async def index_document(
@@ -335,10 +351,12 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
         # Add to table (create if doesn't exist)
         table_name = self.config.extra_config.get("table_name", "embeddings")
+        db = self._ensure_db()
         if self.table is None:
-            self.table = self.db.create_table(table_name, data=[document])
+            self.table = db.create_table(table_name, data=[document])
         else:
-            self.table.add([document])
+            table = self._ensure_table()
+            table.add([document])
 
     async def index_documents(self, documents: List[Dict[str, Any]]) -> None:
         """Index multiple documents in batch.
@@ -369,10 +387,12 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
         # Add to table (create if doesn't exist)
         table_name = self.config.extra_config.get("table_name", "embeddings")
+        db = self._ensure_db()
         if self.table is None:
-            self.table = self.db.create_table(table_name, data=lance_docs)
+            self.table = db.create_table(table_name, data=lance_docs)
         else:
-            self.table.add(lance_docs)
+            table = self._ensure_table()
+            table.add(lance_docs)
 
     async def search_similar(
         self,
@@ -400,7 +420,8 @@ class LanceDBProvider(BaseEmbeddingProvider):
         query_embedding = await self.embed_text(query)
 
         # Search in LanceDB
-        results = self.table.search(query_embedding).limit(limit)
+        table = self._ensure_table()
+        results = table.search(query_embedding).limit(limit)
 
         # Apply metadata filters if provided
         if filter_metadata:
@@ -468,7 +489,8 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
         # Delete documents with matching file_path
         # LanceDB uses SQL-like predicates
-        self.table.delete(f"file_path = '{file_path}'")
+        table = self._ensure_table()
+        table.delete(f"file_path = '{file_path}'")
 
         # Count documents after deletion
         try:
@@ -485,8 +507,9 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
         # Drop and recreate table
         table_name = self.config.extra_config.get("table_name", "embeddings")
-        if table_name in self.db.list_tables().tables:
-            self.db.drop_table(table_name)
+        db = self._ensure_db()
+        if table_name in db.list_tables().tables:
+            db.drop_table(table_name)
 
         self.table = None
         print("🗑️  Cleared index")
@@ -513,7 +536,9 @@ class LanceDBProvider(BaseEmbeddingProvider):
             "embedding_model_type": self.config.embedding_model_type,
             "embedding_model": self.config.embedding_model,
             "embedding_model_name": self.config.embedding_model,
-            "dimension": self.embedding_model.get_dimension() if self.embedding_model else 4096,
+            "dimension": (
+                self.embedding_model.get_dimension() if self.embedding_model is not None else 4096
+            ),
             "distance_metric": self.config.distance_metric,
             "table_name": self.config.extra_config.get("table_name", "embeddings"),
             "persist_directory": self.config.persist_directory,

@@ -106,8 +106,8 @@ class ProximaDBProvider(BaseEmbeddingProvider):
 
         # Create embedding model config
         embedding_config = EmbeddingModelConfig(
-            model_type=model_type,
-            model_name=model_name,
+            embedding_type=model_type,
+            embedding_model=model_name,
             dimension=dimension,
             api_key=api_key,
             batch_size=batch_size,
@@ -122,9 +122,9 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         print(f"Embedding Model: {model_name} ({model_type})")
 
         # Setup data directory
-        persist_dir = self.config.persist_directory
-        if persist_dir:
-            persist_dir = Path(persist_dir).expanduser()
+        persist_dir_str = self.config.persist_directory
+        if persist_dir_str:
+            persist_dir = Path(persist_dir_str).expanduser()
             persist_dir.mkdir(parents=True, exist_ok=True)
             print(f"Using persistent storage: {persist_dir}")
         else:
@@ -175,9 +175,9 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             )
 
             self._db = EmbeddedProximaDB(config=config)
-            await self._db.start()
+            await self._db.start()  # type: ignore[attr-defined]
             self._started = True
-            self._server_url = self._db.rest_url
+            self._server_url = self._db.rest_url  # type: ignore[attr-defined]
             print(f"Started embedded ProximaDB: {self._server_url}")
 
         except ImportError:
@@ -212,7 +212,8 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         self._dimension = dimension
 
         try:
-            response = await self._client.post(
+            client = self._ensure_client()
+            response = await client.post(
                 "/api/v1/collections",
                 json={
                     "operation": 1,  # CREATE
@@ -275,6 +276,12 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         """Extract Python values from SqlValue metadata."""
         return {k: self._extract_sql_value(v) for k, v in metadata.items()}
 
+    def _ensure_client(self) -> httpx.AsyncClient:
+        """Ensure HTTP client is initialized."""
+        if self._client is None:
+            raise RuntimeError("HTTP client not initialized. Call initialize() first.")
+        return self._client
+
     async def embed_text(self, text: str) -> List[float]:
         """Generate embedding for single text.
 
@@ -287,6 +294,8 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         if not self._initialized:
             await self.initialize()
 
+        if self.embedding_model is None:
+            raise RuntimeError("Embedding model not initialized")
         return await self.embedding_model.embed_text(text)
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
@@ -301,6 +310,8 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         if not self._initialized:
             await self.initialize()
 
+        if self.embedding_model is None:
+            raise RuntimeError("Embedding model not initialized")
         return await self.embedding_model.embed_batch(texts)
 
     async def index_document(
@@ -323,7 +334,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         embedding = await self.embed_text(content)
 
         # Prepare vector with metadata
-        vector_data = {
+        vector_data: Dict[str, Any] = {
             "id": doc_id,
             "vector": embedding,
         }
@@ -333,7 +344,8 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         vector_data["metadata"] = self._convert_metadata(full_metadata)
 
         # Insert into collection
-        response = await self._client.post(
+        client = self._ensure_client()
+        response = await client.post(
             "/api/v1/vectors/batch",
             json={
                 "collection_id": self._collection_name,
@@ -376,7 +388,8 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             )
 
         # Batch insert
-        response = await self._client.post(
+        client = self._ensure_client()
+        response = await client.post(
             "/api/v1/vectors/batch",
             json={
                 "collection_id": self._collection_name,
@@ -411,12 +424,13 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         query_embedding = await self.embed_text(query)
 
         # Prepare search request
-        search_query = {"vector": query_embedding}
+        search_query: Dict[str, Any] = {"vector": query_embedding}
         if filter_metadata:
             search_query["filters"] = self._convert_metadata(filter_metadata)
 
         # Execute search
-        response = await self._client.post(
+        client = self._ensure_client()
+        response = await client.post(
             "/api/v1/search",
             json={
                 "collection_id": self._collection_name,
@@ -425,10 +439,10 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             },
         )
 
-        data = response.json()
+        data: Dict[str, Any] = response.json()
 
         # Parse results (handle nested structure)
-        results = []
+        results: List[EmbeddingSearchResult] = []
         if data.get("success") and data.get("results"):
             inner = data["results"]
             if isinstance(inner, dict) and "results" in inner:
@@ -473,7 +487,8 @@ class ProximaDBProvider(BaseEmbeddingProvider):
 
         # ProximaDB delete endpoint (if available)
         try:
-            await self._client.delete(
+            client = self._ensure_client()
+            await client.delete(
                 f"/api/v1/vectors/{self._collection_name}/{doc_id}",
             )
         except Exception:
@@ -504,7 +519,8 @@ class ProximaDBProvider(BaseEmbeddingProvider):
 
         # Delete and recreate collection
         try:
-            await self._client.delete(
+            client = self._ensure_client()
+            await client.delete(
                 f"/api/v1/collections/{self._collection_name}",
             )
         except Exception:
@@ -525,7 +541,8 @@ class ProximaDBProvider(BaseEmbeddingProvider):
 
         count = 0
         try:
-            response = await self._client.get(
+            client = self._ensure_client()
+            response = await client.get(
                 f"/api/v1/collections/{self._collection_name}",
             )
             if response.status_code == 200:
@@ -543,7 +560,9 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             "total_documents": count,
             "embedding_model_type": self.config.embedding_model_type,
             "embedding_model": self.config.embedding_model,
-            "dimension": self.embedding_model.get_dimension() if self.embedding_model else 384,
+            "dimension": (
+                self.embedding_model.get_dimension() if self.embedding_model is not None else 384
+            ),
             "distance_metric": self.config.distance_metric,
             "collection_name": self._collection_name,
             "persist_directory": str(self._data_dir),

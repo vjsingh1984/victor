@@ -28,7 +28,11 @@ For embedding models:
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+if TYPE_CHECKING:
+    import chromadb
+    from chromadb.config import Settings
 
 try:
     import chromadb
@@ -78,8 +82,9 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         if not CHROMADB_AVAILABLE:
             raise ImportError("ChromaDB not available. Install with: pip install chromadb")
 
-        self.client: Optional[chromadb.Client] = None
-        self.collection: Optional[chromadb.Collection] = None
+        # Type stubs for ChromaDB (not available as proper types)
+        self.client: Optional[Any] = None
+        self.collection: Optional[Any] = None
         self.embedding_model: Optional[BaseEmbeddingModel] = None
 
     async def initialize(self) -> None:
@@ -126,8 +131,8 @@ class ChromaDBProvider(BaseEmbeddingProvider):
 
         # Create embedding model config
         embedding_config = EmbeddingModelConfig(
-            model_type=model_type,
-            model_name=model_name,
+            embedding_type=model_type,
+            embedding_model=model_name,
             dimension=self.config.extra_config.get("dimension", 4096),  # Default to 4096 for Qwen3
             api_key=self.config.embedding_api_key,  # For OpenAI/Cohere API key, or Ollama base_url
             batch_size=self.config.extra_config.get(
@@ -142,6 +147,18 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         self._initialized = True
         print("✅ ChromaDB provider initialized!")
 
+    def _ensure_client(self) -> Any:
+        """Ensure ChromaDB client is initialized."""
+        if self.client is None:
+            raise RuntimeError("ChromaDB client not initialized. Call initialize() first.")
+        return self.client
+
+    def _ensure_collection(self) -> Any:
+        """Ensure ChromaDB collection is initialized."""
+        if self.collection is None:
+            raise RuntimeError("ChromaDB collection not initialized. Call initialize() first.")
+        return self.collection
+
     async def embed_text(self, text: str) -> List[float]:
         """Generate embedding for single text.
 
@@ -154,6 +171,8 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         if not self._initialized:
             await self.initialize()
 
+        if self.embedding_model is None:
+            raise RuntimeError("Embedding model not initialized")
         return await self.embedding_model.embed_text(text)
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
@@ -168,6 +187,8 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         if not self._initialized:
             await self.initialize()
 
+        if self.embedding_model is None:
+            raise RuntimeError("Embedding model not initialized")
         return await self.embedding_model.embed_batch(texts)
 
     async def index_document(self, doc_id: str, content: str, metadata: Dict[str, Any]) -> None:
@@ -185,7 +206,8 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         embedding = await self.embed_text(content)
 
         # Add to ChromaDB
-        self.collection.add(
+        collection = self._ensure_collection()
+        collection.add(
             ids=[doc_id],
             embeddings=[embedding],
             documents=[content],
@@ -223,7 +245,8 @@ class ChromaDBProvider(BaseEmbeddingProvider):
             batch_contents = contents[i : i + batch_size]
             batch_metadatas = metadatas[i : i + batch_size]
 
-            self.collection.add(
+            collection = self._ensure_collection()
+            collection.add(
                 ids=batch_ids,
                 embeddings=batch_embeddings,
                 documents=batch_contents,
@@ -255,7 +278,8 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         query_embedding = await self.embed_text(query)
 
         # Search in ChromaDB
-        results = self.collection.query(
+        collection = self._ensure_collection()
+        results = collection.query(
             query_embeddings=[query_embedding],
             n_results=limit,
             where=filter_metadata,
@@ -263,25 +287,39 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         )
 
         # Convert to EmbeddingSearchResult objects
-        search_results = []
-        if results["ids"] and results["ids"][0]:
-            for i in range(len(results["ids"][0])):
-                content = results["documents"][0][i]
-                metadata = results["metadatas"][0][i]
-                distance = results["distances"][0][i]
+        search_results: List[EmbeddingSearchResult] = []
+        ids = results.get("ids")
+        documents = results.get("documents")
+        metadatas = results.get("metadatas")
+        distances = results.get("distances")
+
+        if ids and documents and metadatas and distances and ids[0]:
+            for i in range(len(ids[0])):
+                content = documents[0][i]
+                metadata = metadatas[0][i]
+                distance = distances[0][i]
 
                 # Convert distance to similarity score (0-1, higher is better)
                 # For cosine distance: similarity = 1 - distance
                 score = 1.0 - distance
 
+                # Safely extract values with type checking
+                file_path_val = metadata.get("file_path")
+                symbol_name_val = metadata.get("symbol_name")
+                line_number_val = metadata.get("line_number")
+
                 search_results.append(
                     EmbeddingSearchResult(
-                        file_path=metadata.get("file_path", ""),
-                        symbol_name=metadata.get("symbol_name"),
-                        content=content,
-                        score=score,
-                        line_number=metadata.get("line_number"),
-                        metadata=metadata,
+                        file_path=str(file_path_val) if isinstance(file_path_val, str) else "",
+                        symbol_name=(
+                            str(symbol_name_val) if isinstance(symbol_name_val, str) else None
+                        ),
+                        content=str(content),
+                        score=float(score),
+                        line_number=(
+                            int(line_number_val) if isinstance(line_number_val, int) else None
+                        ),
+                        metadata=dict(metadata) if isinstance(metadata, dict) else {},
                     )
                 )
 
@@ -296,7 +334,8 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         if not self._initialized:
             await self.initialize()
 
-        self.collection.delete(ids=[doc_id])
+        collection = self._ensure_collection()
+        collection.delete(ids=[doc_id])
 
     async def delete_by_file(self, file_path: str) -> int:
         """Delete all documents from a specific file.
@@ -313,14 +352,15 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         if not self._initialized:
             await self.initialize()
 
+        collection = self._ensure_collection()
         # Count documents before deletion
-        count_before = self.collection.count()
+        count_before = int(collection.count())
 
         # ChromaDB uses where clause for metadata filtering
-        self.collection.delete(where={"file_path": file_path})
+        collection.delete(where={"file_path": file_path})
 
         # Count documents after deletion
-        count_after = self.collection.count()
+        count_after = int(collection.count())
 
         return count_before - count_after
 
@@ -330,10 +370,12 @@ class ChromaDBProvider(BaseEmbeddingProvider):
             await self.initialize()
 
         # Delete collection and recreate
-        collection_name = self.collection.name
-        self.client.delete_collection(name=collection_name)
+        collection = self._ensure_collection()
+        client = self._ensure_client()
+        collection_name = collection.name
+        client.delete_collection(name=collection_name)
 
-        self.collection = self.client.create_collection(
+        self.collection = client.create_collection(
             name=collection_name,
             metadata={"hnsw:space": self.config.distance_metric},
         )
@@ -349,16 +391,19 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         if not self._initialized:
             await self.initialize()
 
-        count = self.collection.count()
+        collection = self._ensure_collection()
+        count = collection.count()
 
         return {
             "provider": "chromadb",
             "total_documents": count,
             "embedding_model_type": self.config.embedding_model_type,
             "embedding_model": self.config.embedding_model,
-            "dimension": self.embedding_model.get_dimension() if self.embedding_model else 4096,
+            "dimension": (
+                self.embedding_model.get_dimension() if self.embedding_model is not None else 4096
+            ),
             "distance_metric": self.config.distance_metric,
-            "collection_name": self.collection.name,
+            "collection_name": collection.name,
             "persist_directory": self.config.persist_directory,
         }
 

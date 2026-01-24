@@ -41,6 +41,8 @@ Example:
 This is a core framework module available to all verticals, not just coding.
 """
 
+from typing import Any, Dict
+
 from victor.storage.vector_stores.base import (
     BaseEmbeddingProvider,
     EmbeddingConfig,
@@ -86,7 +88,7 @@ def reset_embedding_registry() -> None:
     EmbeddingRegistry.reset()
 
 
-def get_embedding_registry_stats() -> dict:
+def get_embedding_registry_stats() -> Dict[str, Any]:
     """Get statistics about the embedding provider cache.
 
     Returns:

@@ -17,7 +17,7 @@
 import hashlib
 import logging
 import threading
-from typing import Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type
 
 from victor.storage.vector_stores.base import BaseEmbeddingProvider, EmbeddingConfig
 
@@ -219,14 +219,14 @@ class EmbeddingRegistry:
             logger.info("[EmbeddingRegistry] Provider cache cleared")
 
     @classmethod
-    def get_cache_stats(cls) -> Dict[str, int]:
+    def get_cache_stats(cls) -> Dict[str, Any]:
         """Get statistics about the provider cache.
 
         Returns:
             Dictionary with cache size and provider breakdown
         """
         with cls._cache_lock:
-            provider_types = {}
+            provider_types: Dict[str, int] = {}
             for provider in cls._provider_cache.values():
                 provider_type = provider.__class__.__name__
                 provider_types[provider_type] = provider_types.get(provider_type, 0) + 1
