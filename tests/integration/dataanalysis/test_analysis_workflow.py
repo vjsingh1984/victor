@@ -49,10 +49,8 @@ try:
 except ImportError:
     HAS_MATPLOTLIB = False
 
-from victor.dataanalysis.handlers import (
-    HANDLERS,
-    StatsComputeHandler,
-)
+from victor.dataanalysis.handlers import StatsComputeHandler
+from victor.framework.handler_registry import HandlerRegistry
 
 
 class MockToolResult:
@@ -652,12 +650,17 @@ class TestHandlersRegistration:
     """Tests for handler registration."""
 
     def test_handlers_dict_exists(self):
-        """Test that HANDLERS dict exists and contains expected handlers."""
-        assert isinstance(HANDLERS, dict)
-        assert len(HANDLERS) > 0
+        """Test that HandlerRegistry contains expected handlers."""
+        registry = HandlerRegistry.get_instance()
+        handlers = registry.list_handlers("dataanalysis")
+        assert isinstance(handlers, list)
+        assert len(handlers) > 0
 
     def test_expected_handlers_present(self):
         """Test that expected handlers are present."""
+        registry = HandlerRegistry.get_instance()
+        handlers = registry.list_handlers("dataanalysis")
+
         expected_handlers = [
             "stats_compute",
             "ml_training",
@@ -667,20 +670,22 @@ class TestHandlersRegistration:
         ]
 
         for handler_name in expected_handlers:
-            assert handler_name in HANDLERS, f"Handler '{handler_name}' not found"
-            assert HANDLERS[handler_name] is not None
+            assert handler_name in handlers, f"Handler '{handler_name}' not found"
 
     def test_stats_handler_instance(self):
-        """Test that stats_compute handler is properly instantiated."""
+        """Test that stats_compute handler is properly registered."""
         from victor.dataanalysis.handlers import StatsComputeHandler
 
-        assert "stats_compute" in HANDLERS
-        assert isinstance(HANDLERS["stats_compute"], StatsComputeHandler)
+        registry = HandlerRegistry.get_instance()
+        handler = registry.get_handler("dataanalysis", "stats_compute")
+        assert handler is not None
+        assert isinstance(handler, StatsComputeHandler)
 
     def test_handler_callable_methods(self):
         """Test that handlers have callable execute method."""
         from victor.dataanalysis.handlers import StatsComputeHandler
 
-        handler = HANDLERS["stats_compute"]
+        registry = HandlerRegistry.get_instance()
+        handler = registry.get_handler("dataanalysis", "stats_compute")
         assert hasattr(handler, "execute")
         assert callable(handler.execute)

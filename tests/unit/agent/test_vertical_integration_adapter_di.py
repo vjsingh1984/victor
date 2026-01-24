@@ -24,6 +24,7 @@ from unittest.mock import MagicMock, Mock, patch
 from victor.core.errors import CapabilityRegistryRequiredError
 from victor.agent.vertical_integration_adapter import VerticalIntegrationAdapter
 from victor.core.verticals.protocols.middleware import MiddlewareProtocol
+from victor.security.safety.types import SafetyPattern
 
 
 class MockMiddleware(MiddlewareProtocol):
@@ -88,17 +89,15 @@ class TestAdapterCapabilityRegistryRequired:
         assert len(error.required_methods) > 0
 
     def test_adapter_uses_capability_registry_for_middleware(self):
-        """Adapter should use capability registry methods when available.
+        """Adapter should use internal storage setters when available.
 
-        When orchestrator supports capability operations, adapter should use
-        has_capability, get_capability, and set_capability methods instead of
-        writing to private fields.
+        The adapter uses internal storage setters (_set_*_storage) as the
+        DIP-compliant approach for storing capabilities. These are controlled
+        methods provided by the orchestrator, not direct attribute access.
         """
-        # Create orchestrator mock WITH capability support
+        # Create orchestrator mock with internal storage setter
         mock_orchestrator = Mock()
-        mock_orchestrator.has_capability = Mock(return_value=True)
-        mock_orchestrator.get_capability = Mock(return_value=Mock())
-        mock_orchestrator.set_capability = Mock()
+        mock_orchestrator._set_vertical_middleware_storage = Mock()
 
         adapter = VerticalIntegrationAdapter(mock_orchestrator)
 
@@ -106,11 +105,8 @@ class TestAdapterCapabilityRegistryRequired:
         middleware = [MockMiddleware()]
         adapter.apply_middleware(middleware)
 
-        # Verify capability methods were called
-        mock_orchestrator.has_capability.assert_called()
-        # set_capability should be called instead of private field write
-        assert not hasattr(mock_orchestrator, '_vertical_middleware') or \
-               mock_orchestrator._vertical_middleware is None
+        # Verify internal storage setter was called
+        mock_orchestrator._set_vertical_middleware_storage.assert_called_once_with(middleware)
 
     def test_adapter_no_private_field_write_for_middleware(self):
         """Adapter should NOT write to _vertical_middleware private field.
@@ -165,8 +161,6 @@ class TestAdapterCapabilityRegistryRequired:
 
     def test_adapter_no_private_field_write_for_safety_patterns(self):
         """Adapter should NOT write to _vertical_safety_patterns private field."""
-        from victor.core.verticals.base import SafetyPattern
-
         mock_orchestrator = Mock()
         mock_orchestrator.has_capability = Mock(return_value=True)
         mock_orchestrator.get_capability = Mock(return_value=None)
@@ -195,46 +189,43 @@ class TestAdapterCapabilityRegistryIntegration:
     """Tests for adapter integration with capability registry."""
 
     def test_adapter_stores_via_capability_not_private(self):
-        """Adapter should store middleware via capability registry, not private fields.
+        """Adapter should store via internal storage setters, not private fields.
 
-        This test verifies the DIP compliance - adapter depends on abstraction
-        (capability registry) rather than concrete implementation (private fields).
+        This test verifies the DIP compliance - adapter uses controlled methods
+        (_set_*_storage) provided by orchestrator instead of writing to private fields.
         """
-        # Create orchestrator with full capability support
+        # Create orchestrator with internal storage setters and capability support
         mock_orchestrator = Mock()
-        mock_orchestrator.has_capability = Mock(return_value=True)
-        mock_orchestrator.set_capability = Mock()
-        mock_orchestrator.get_capability = Mock(return_value=None)
+        mock_orchestrator._set_vertical_middleware_storage = Mock()
 
         # Mock vertical context
         mock_context = Mock()
         mock_context.apply_middleware = Mock()
-        mock_orchestrator.get_capability.return_value = mock_context
+
+        # Make get_capability_value return the context (adapter uses this method)
+        mock_orchestrator.get_capability_value = Mock(return_value=mock_context)
 
         adapter = VerticalIntegrationAdapter(mock_orchestrator)
         middleware = [MockMiddleware("test1"), MockMiddleware("test2")]
 
         adapter.apply_middleware(middleware)
 
-        # Verify capability methods were used
-        mock_orchestrator.has_capability.assert_called()
-        mock_orchestrator.set_capability.assert_called()
+        # Verify internal storage setter was used
+        mock_orchestrator._set_vertical_middleware_storage.assert_called_once_with(middleware)
+        # Verify vertical context was used
         mock_context.apply_middleware.assert_called_once_with(middleware)
-
-        # Verify no private field writes occurred
-        assert not hasattr(mock_orchestrator, '_vertical_middleware_written')
 
     def test_adapter_with_vertical_context_capability(self):
         """Adapter should use vertical_context capability when available."""
         mock_orchestrator = Mock()
-        mock_orchestrator.has_capability = Mock(return_value=True)
-        mock_orchestrator.get_capability = Mock()
-        mock_orchestrator.set_capability = Mock()
+        mock_orchestrator._set_vertical_middleware_storage = Mock()
 
         # Mock vertical context
         mock_context = Mock()
         mock_context.apply_middleware = Mock()
-        mock_orchestrator.get_capability.return_value = mock_context
+
+        # Make get_capability_value return the context (adapter uses this method)
+        mock_orchestrator.get_capability_value = Mock(return_value=mock_context)
 
         adapter = VerticalIntegrationAdapter(mock_orchestrator)
         middleware = [MockMiddleware()]
@@ -267,23 +258,16 @@ class TestAdapterBackwardCompatibility:
     """Tests for backward compatibility with existing code."""
 
     def test_adapter_works_with_capability_less_orchestrator_strict_mode(self):
-        """In strict mode, adapter should require capability registry."""
-        # This test documents current behavior - adapter falls back to private writes
-        # After Phase 2, this should raise CapabilityRegistryRequiredError
+        """In strict mode, adapter should require capability registry and raise error.
 
+        Phase 2 implementation: Adapter now enforces capability registry requirement
+        and raises CapabilityRegistryRequiredError when orchestrator doesn't support it.
+        """
         mock_orchestrator = Mock(spec=[])  # No methods at all
 
         adapter = VerticalIntegrationAdapter(mock_orchestrator)
-
-        # Current behavior: Falls back to private field writes
-        # Expected behavior after Phase 2: Raises CapabilityRegistryRequiredError
-
         middleware = [MockMiddleware()]
 
-        # This will currently use fallback (private field write)
-        # After fix, this should raise CapabilityRegistryRequiredError
-        adapter.apply_middleware(middleware)
-
-        # After Phase 2 implementation, uncomment this:
-        # with pytest.raises(CapabilityRegistryRequiredError):
-        #     adapter.apply_middleware(middleware)
+        # Should raise CapabilityRegistryRequiredError (strict mode)
+        with pytest.raises(CapabilityRegistryRequiredError):
+            adapter.apply_middleware(middleware)

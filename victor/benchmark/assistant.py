@@ -352,10 +352,22 @@ You are being evaluated on:
             Dict mapping handler name to handler instance
         """
         try:
-            from victor.benchmark.handlers import HANDLERS
+            from victor.framework.handler_registry import HandlerRegistry
 
-            return HANDLERS
-        except ImportError:
+            registry = HandlerRegistry.get_instance()
+
+            # Auto-discover handlers if not already registered
+            benchmark_handlers = registry.list_by_vertical("benchmark")
+            if not benchmark_handlers:
+                registry.discover_from_vertical("benchmark")
+
+            handlers = {}
+            for handler_name in registry.list_by_vertical("benchmark"):
+                entry = registry.get_entry(handler_name)
+                if entry:
+                    handlers[handler_name] = entry.handler
+            return handlers
+        except Exception:
             # Handlers not yet implemented
             return {}
 

@@ -261,9 +261,21 @@ You: [Use rag_query tool with query="authentication"]
         Returns:
             Dict mapping handler names to handler instances
         """
-        from victor.rag.handlers import HANDLERS
+        from victor.framework.handler_registry import HandlerRegistry
 
-        return HANDLERS
+        registry = HandlerRegistry.get_instance()
+
+        # Auto-discover handlers if not already registered
+        rag_handlers = registry.list_by_vertical("rag")
+        if not rag_handlers:
+            registry.discover_from_vertical("rag")
+
+        handlers = {}
+        for handler_name in registry.list_by_vertical("rag"):
+            entry = registry.get_entry(handler_name)
+            if entry:
+                handlers[handler_name] = entry.handler
+        return handlers
 
     @classmethod
     def get_capability_configs(cls) -> Dict[str, Any]:

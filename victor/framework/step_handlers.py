@@ -1099,7 +1099,40 @@ class FrameworkStepHandler(BaseStepHandler):
 
     Applies framework-level integrations from the vertical
     including workflows, reinforcement learning, and multi-agent teams.
+
+    Phase 2 DI Support:
+    - Registries can be injected via constructor for DIP compliance
+    - Falls back to hard-coded imports for backward compatibility
+    - Allows testing with mock registries without import side effects
     """
+
+    def __init__(
+        self,
+        workflow_registry: Optional[Any] = None,
+        trigger_registry: Optional[Any] = None,
+        team_registry: Optional[Any] = None,
+        chain_registry: Optional[Any] = None,
+        persona_registry: Optional[Any] = None,
+        handler_registry: Optional[Any] = None,
+    ):
+        """Initialize handler with optional registries (DI support).
+
+        Args:
+            workflow_registry: Optional workflow registry for DIP compliance
+            trigger_registry: Optional trigger registry for DIP compliance
+            team_registry: Optional team registry for DIP compliance
+            chain_registry: Optional chain registry for DIP compliance
+            persona_registry: Optional persona registry for DIP compliance
+            handler_registry: Optional handler registry for DIP compliance
+
+        When None, handlers will fall back to hard-coded imports (backward compatible).
+        """
+        self._workflow_registry = workflow_registry
+        self._trigger_registry = trigger_registry
+        self._team_registry = team_registry
+        self._chain_registry = chain_registry
+        self._persona_registry = persona_registry
+        self._handler_registry = handler_registry
 
     @property
     def name(self) -> str:
@@ -1174,9 +1207,13 @@ class FrameworkStepHandler(BaseStepHandler):
 
         # Register with workflow registry if available
         try:
-            from victor.workflows.registry import get_workflow_registry
+            # Phase 2 DI: Use injected registry or fall back to import
+            if self._workflow_registry is not None:
+                registry = self._workflow_registry
+            else:
+                from victor.workflows.registry import get_workflow_registry
+                registry = get_workflow_registry()
 
-            registry = get_workflow_registry()
             for name, workflow in workflows.items():
                 registry.register(
                     f"{vertical.name}:{name}",
@@ -1193,9 +1230,12 @@ class FrameworkStepHandler(BaseStepHandler):
 
         # NEW: Register workflow triggers with global WorkflowTriggerRegistry
         try:
-            from victor.workflows.trigger_registry import get_trigger_registry
-
-            trigger_registry = get_trigger_registry()
+            # Phase 2 DI: Use injected registry or fall back to import
+            if self._trigger_registry is not None:
+                trigger_registry = self._trigger_registry
+            else:
+                from victor.workflows.trigger_registry import get_trigger_registry
+                trigger_registry = get_trigger_registry()
 
             # Get auto_workflows from provider if available
             if hasattr(workflow_provider, "get_auto_workflows"):
@@ -1334,9 +1374,13 @@ class FrameworkStepHandler(BaseStepHandler):
 
         # NEW: Register with global TeamSpecRegistry for cross-vertical discovery
         try:
-            from victor.framework.team_registry import get_team_registry
+            # Phase 2 DI: Use injected registry or fall back to import
+            if self._team_registry is not None:
+                team_registry = self._team_registry
+            else:
+                from victor.framework.team_registry import get_team_registry
+                team_registry = get_team_registry()
 
-            team_registry = get_team_registry()
             team_registry.register_from_vertical(vertical.name, team_specs, replace=True)
             logger.debug(f"Registered {team_count} teams with global registry for {vertical.name}")
         except ImportError:
@@ -1388,9 +1432,13 @@ class FrameworkStepHandler(BaseStepHandler):
 
         # Register with ChainRegistry
         try:
-            from victor.framework.chain_registry import get_chain_registry
+            # Phase 2 DI: Use injected registry or fall back to import
+            if self._chain_registry is not None:
+                registry = self._chain_registry
+            else:
+                from victor.framework.chain_registry import get_chain_registry
+                registry = get_chain_registry()
 
-            registry = get_chain_registry()
             for name, chain in chains.items():
                 full_name = f"{vertical.name}:{name}"
                 registry.register(
@@ -1437,9 +1485,13 @@ class FrameworkStepHandler(BaseStepHandler):
 
         # Register with PersonaRegistry
         try:
-            from victor.framework.persona_registry import get_persona_registry
+            # Phase 2 DI: Use injected registry or fall back to import
+            if self._persona_registry is not None:
+                registry = self._persona_registry
+            else:
+                from victor.framework.persona_registry import get_persona_registry
+                registry = get_persona_registry()
 
-            registry = get_persona_registry()
             for name, persona in personas.items():
                 # Convert to PersonaSpec if needed
                 if hasattr(persona, "to_persona_spec"):
@@ -1624,9 +1676,12 @@ class FrameworkStepHandler(BaseStepHandler):
         handler_count = len(handlers)
 
         try:
-            from victor.framework.handler_registry import get_handler_registry
-
-            registry = get_handler_registry()
+            # Phase 2 DI: Use injected registry or fall back to import
+            if self._handler_registry is not None:
+                registry = self._handler_registry
+            else:
+                from victor.framework.handler_registry import get_handler_registry
+                registry = get_handler_registry()
 
             for name, handler in handlers.items():
                 registry.register(name, handler, vertical=vertical.name, replace=True)

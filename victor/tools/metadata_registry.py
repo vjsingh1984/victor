@@ -1466,6 +1466,113 @@ class ToolMetadataRegistry:
             "tools_requiring_configuration": len(self.get_tools_requiring_configuration()),
         }
 
+    def get_statistics(self) -> Dict[str, Any]:
+        """Get registry statistics for monitoring and diagnostics.
+
+        Phase 3 implementation: Provides comprehensive statistics about
+        the registry state for performance monitoring and debugging.
+
+        Returns:
+            Dictionary with registry metrics including:
+            - total_tools: Total number of registered tools
+            - total_categories: Number of unique categories
+            - total_keywords: Number of unique keywords
+            - total_stages: Number of unique stages
+            - indexed_by_priority: Tools indexed by priority level
+            - indexed_by_access_mode: Tools indexed by access mode
+        """
+        stats = self.summary()
+
+        # Add additional metrics for Phase 3
+        stats.update({
+            "total_tools": len(self._entries),
+            "total_categories": len(self._by_category),
+            "total_keywords": len(self._by_keyword),
+            "total_stages": len(self._by_stage),
+            "indexed_by_priority": {
+                p.name: len(names) for p, names in self._by_priority.items()
+            },
+            "indexed_by_access_mode": {
+                a.name: len(names) for a, names in self._by_access_mode.items()
+            },
+        })
+
+        return stats
+
+    def refresh_from_tools(self, tools: List[Any]) -> bool:
+        """Refresh registry from tool list with hash-based change detection.
+
+        Phase 3 implementation: Uses hash-based change detection to skip
+        reindexing when tools haven't changed, significantly improving
+        startup performance.
+
+        This method:
+        1. Calculates hash of current tool definitions
+        2. Compares with cached hash from previous call
+        3. Skips reindexing if hash matches (tools unchanged)
+        4. Reindexes if hash differs (tools changed)
+
+        Args:
+            tools: List of tool instances to register
+
+        Returns:
+            True if reindexing was performed, False if skipped (cache hit)
+        """
+        import hashlib
+        import json
+
+        # Calculate hash of current tool definitions
+        tool_list = sorted(tools, key=lambda t: t.name if hasattr(t, 'name') else str(t))
+        tool_count = len(tool_list)
+        tool_names = sorted([
+            t.name if hasattr(t, 'name') else str(t) for t in tool_list
+        ])
+
+        # Create hash from tool definitions
+        tool_strings = []
+        for tool in tool_list:
+            name = tool.name if hasattr(tool, 'name') else str(tool)
+            description = tool.description if hasattr(tool, 'description') else ""
+            parameters = tool.parameters if hasattr(tool, 'parameters') else {}
+            tool_strings.append(f"{name}:{description}:{parameters}")
+
+        combined = (
+            f"count:{tool_count}|names:{','.join(tool_names)}|"
+            + "|".join(tool_strings)
+        )
+        current_hash = hashlib.sha256(combined.encode()).hexdigest()
+
+        # Check if we have a cached hash
+        if not hasattr(self, '_tools_hash'):
+            self._tools_hash = None
+
+        # If hash matches, skip reindexing (performance win!)
+        if self._tools_hash == current_hash:
+            return False
+
+        # Hash differs - reindex all tools
+        # Clear existing entries
+        self._entries.clear()
+        self._by_priority = {p: set() for p in self._by_priority.keys()} if self._by_priority else {p: set() for p in Priority}
+        self._by_access_mode = {a: set() for a in self._by_access_mode.keys()} if self._by_access_mode else {a: set() for a in AccessMode}
+        self._by_danger_level = {d: set() for d in self._by_danger_level.keys()} if self._by_danger_level else {d: set() for d in DangerLevel}
+        self._by_category.clear()
+        self._by_keyword.clear()
+        self._by_stage.clear()
+        self._alias_map.clear()
+        self._by_mandatory_keyword.clear()
+        self._by_task_type.clear()
+        self._by_execution_category = {ec: set() for ec in self._by_execution_category} if self._by_execution_category else {ec: set() for ec in ExecutionCategory}
+
+        # Re-register all tools
+        for tool in tools:
+            self.register(tool)
+
+        # Cache the new hash
+        self._tools_hash = current_hash
+
+        return True
+
 
 # Global singleton instance
 _global_registry: Optional[ToolMetadataRegistry] = None
@@ -1481,6 +1588,17 @@ def get_global_registry() -> ToolMetadataRegistry:
     if _global_registry is None:
         _global_registry = ToolMetadataRegistry()
     return _global_registry
+
+
+# Phase 3: Alias for get_global_registry() for API consistency
+# ToolMetadataRegistry.get_instance() is set below to avoid circular reference
+def _get_instance_impl() -> ToolMetadataRegistry:
+    """Implementation for ToolMetadataRegistry.get_instance()."""
+    return get_global_registry()
+
+
+# Add get_instance as a class method after the class is fully defined
+ToolMetadataRegistry.get_instance = classmethod(lambda cls: _get_instance_impl())
 
 
 def register_tool_metadata(tool: BaseTool) -> None:
