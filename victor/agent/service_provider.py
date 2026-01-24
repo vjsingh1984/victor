@@ -798,7 +798,7 @@ class OrchestratorServiceProvider:
 
         container.register(
             ToolRegistryProtocol,
-            lambda c: ToolRegistry(),  # type: ignore[arg-type, return-value, attr-defined]
+            lambda c: ToolRegistry(),  # type: ignore[arg-type, return-value]
             ServiceLifetime.SINGLETON,
         )
 
@@ -1054,7 +1054,7 @@ class OrchestratorServiceProvider:
         container.register(
             IToolAccessController,
             lambda c: create_tool_access_controller(
-                registry=c.get_optional(ToolRegistryProtocol),  # type: ignore[attr-defined, arg-type]
+                registry=c.get_optional(ToolRegistryProtocol),  # type: ignore[arg-type]
             ),
             ServiceLifetime.SCOPED,
         )

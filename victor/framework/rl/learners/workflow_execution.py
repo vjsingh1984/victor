@@ -203,11 +203,13 @@ class WorkflowExecutionLearner(BaseLearner):
         )
 
         row = cursor.fetchone()
-        if row:
+        if row and isinstance(row[0], str):
             return row[0]
 
         # No Q-values yet - return first available
-        return available_workflows[0]
+        if available_workflows:
+            return available_workflows[0]
+        return None
 
     def get_workflow_q_values(
         self,
@@ -293,8 +295,18 @@ class WorkflowExecutionLearner(BaseLearner):
             ),
         )
 
-        # Compute reward
-        reward = self._compute_reward(success, duration_seconds, quality_score)
+        # Compute reward - build outcome object
+        outcome = RLOutcome(
+            provider=provider,
+            model=model,
+            task_type=task_type,
+            success=success,
+            quality_score=quality_score,
+            metadata={
+                "duration_seconds": duration_seconds,
+            },
+        )
+        reward = self._compute_reward(outcome)
 
         # Get current Q-value
         cursor.execute(
