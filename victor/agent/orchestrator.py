@@ -774,12 +774,12 @@ class AgentOrchestrator(
             self._prompt_coordinator.set_tool_calling_caps(value)
 
     @property
-    def usage_analytics(self) -> "UsageAnalytics":
+    def usage_analytics(self) -> Optional["UsageAnalytics"]:
         """Usage analytics for data-driven optimization."""
         return self._evaluation_coordinator.usage_analytics
 
     @property
-    def sequence_tracker(self) -> "ToolSequenceTracker":
+    def sequence_tracker(self) -> Optional["ToolSequenceTracker"]:
         """Tool sequence tracker for intelligent next-tool suggestions."""
         return self._sequence_tracker
 
@@ -789,17 +789,17 @@ class AgentOrchestrator(
         return self._recovery_handler
 
     @property
-    def chunk_generator(self) -> "ChunkGenerator":
+    def chunk_generator(self) -> Optional["ChunkGenerator"]:
         """Chunk generator for streaming output."""
         return self._chunk_generator
 
     @property
-    def tool_planner(self) -> "ToolPlanner":
+    def tool_planner(self) -> Optional["ToolPlanner"]:
         """Tool planner for planning operations."""
         return self._tool_planner
 
     @property
-    def task_coordinator(self) -> "TaskCoordinator":
+    def task_coordinator(self) -> Optional["TaskCoordinator"]:
         """Task coordinator for task preparation and guidance."""
         return self._task_coordinator
 
@@ -813,7 +813,7 @@ class AgentOrchestrator(
     # =====================================================================
 
     @property
-    def state_coordinator(self) -> StateCoordinator:
+    def state_coordinator(self) -> Optional[StateCoordinator]:
         """State coordinator for unified state management (SessionStateManager, ConversationStateMachine, checkpoints)."""
         return self._state_coordinator
 
@@ -823,7 +823,7 @@ class AgentOrchestrator(
     # =====================================================================
 
     @property
-    def session_state(self) -> SessionStateManager:
+    def session_state(self) -> Optional[SessionStateManager]:
         """Session state manager for consolidated state tracking."""
         return self._session_state
 
