@@ -56,6 +56,7 @@ class MockVerticalConfig:
         self.name = name
         self.tools = ["read", "write", "shell"]
         self.system_prompt = "You are a mock assistant."
+        self.stages = {"INITIAL": {}, "READING": {}, "WRITING": {}}
 
 
 class MockVerticalExtensions:
