@@ -63,7 +63,7 @@ try:
     )
 
     _NATIVE_AVAILABLE = is_native_available()
-    _native_is_stdlib_module: Optional[callable[[str], bool]] = native_is_stdlib_module
+    _native_is_stdlib_module: Optional[Callable[[str], bool]] = native_is_stdlib_module
 except ImportError:
     _NATIVE_AVAILABLE = False
     _native_is_stdlib_module = None
