@@ -119,42 +119,16 @@ class ResearchAssistant(VerticalBase):
 
         Returns:
             PromptBuilder with research-specific configuration
+
+        Note:
+            Uses ResearchPromptTemplate for consistent prompt structure
+            following the Template Method pattern.
         """
-        from victor.framework.prompt_builder import PromptBuilder
+        from victor.research.research_prompt_template import ResearchPromptTemplate
 
-        # Start with base builder
-        builder = super().get_prompt_builder()
-
-        # Add research-specific grounding
-        builder.add_grounding(
-            "Context: You are conducting research on {topic}.",
-            topic="a research question",
-            priority=10,
-        )
-
-        # Add research-specific rules
-        builder.add_rules(
-            [
-                "Use multiple sources to verify information",
-                "Distinguish between facts and opinions",
-                "Cite sources appropriately",
-                "Consider potential biases",
-                "Update knowledge based on new evidence",
-            ],
-            priority=20,
-        )
-
-        # Add research-specific checklist
-        builder.add_checklist(
-            [
-                "Information is from credible sources",
-                "Multiple perspectives considered",
-                "Claims are evidence-based",
-                "Sources are properly cited",
-                "Conclusions are well-supported",
-            ],
-            priority=30,
-        )
+        # Use template for consistent structure
+        template = ResearchPromptTemplate()
+        builder = template.get_prompt_builder()
 
         return builder
 

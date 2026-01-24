@@ -256,46 +256,16 @@ You excel at:
 
         Returns:
             PromptBuilder with coding-specific configuration
+
+        Note:
+            Uses CodingPromptTemplate for consistent prompt structure
+            following the Template Method pattern.
         """
-        from victor.framework.prompt_builder import PromptBuilder
+        from victor.coding.coding_prompt_template import CodingPromptTemplate
 
-        # Start with base builder
-        builder = super().get_prompt_builder()
-
-        # Add coding-specific grounding
-        builder.add_grounding(
-            "Context: You are assisting with software development for {project}.",
-            project="a coding project",
-            priority=10,
-        )
-
-        # Add coding-specific rules
-        builder.add_rules(
-            [
-                "Always read existing files before making changes",
-                "Understand the broader codebase context",
-                "Follow existing code style and conventions",
-                "Add appropriate error handling",
-                "Write or update tests for new code",
-                "Consider edge cases and potential issues",
-                "Document non-obvious code",
-                "Ensure changes don't break existing functionality",
-            ],
-            priority=20,
-        )
-
-        # Add coding-specific checklist
-        builder.add_checklist(
-            [
-                "Code compiles without errors",
-                "Tests pass (add tests if needed)",
-                "Code follows project style",
-                "No obvious bugs or issues",
-                "Error handling is appropriate",
-                "Changes are minimal and focused",
-            ],
-            priority=30,
-        )
+        # Use template for consistent structure
+        template = CodingPromptTemplate()
+        builder = template.get_prompt_builder()
 
         return builder
 
