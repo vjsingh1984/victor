@@ -323,7 +323,7 @@ class NodeExecutorFactory:
                         f"No orchestrator available for agent node '{node.id}' with profile '{getattr(node, 'profile', None)}', "
                         "using placeholder execution"
                     )
-                    output = {
+                    output: Dict[str, Any] = {
                         "node_id": node.id,
                         "role": node.role,
                         "goal": goal,
@@ -350,7 +350,7 @@ class NodeExecutorFactory:
                     role = role_map.get(node.role.lower(), SubAgentRole.EXECUTOR)
 
                     # Create and execute sub-agent
-                    sub_orchestrator = SubAgentOrchestrator(node_orchestrator)
+                    sub_orchestrator = SubAgentOrchestrator(node_orchestrator)  # type: ignore[arg-type]
                     logger.debug(
                         f"   {_get_icon('gear')}  Spawning sub-agent with role: {role.value}"
                     )
@@ -364,11 +364,11 @@ class NodeExecutorFactory:
                         disable_embeddings=getattr(node, "disable_embeddings", False),
                     )
 
-                    output: Dict[str, Any] = {
+                    output = {
                         "response": result.summary if result else "",
-                        "success": result.success if result else False,  # type: ignore[dict-item]
-                        "tool_calls": result.tool_calls_used if result else 0,  # type: ignore[dict-item]
-                        "error": result.error if result else None,  # type: ignore[dict-item]
+                        "success": result.success if result else False,
+                        "tool_calls": result.tool_calls_used if result else 0,
+                        "error": result.error if result else None,
                     }
 
                     # Log result summary
@@ -386,7 +386,7 @@ class NodeExecutorFactory:
                     logger.debug(f"{'='*80}\n")
 
                 # Store output in state
-                output_key = node.output_key or node.id  # type: ignore[attr-defined]
+                output_key = node.output_key or node.id
                 state[output_key] = output  # type: ignore[literal-required]
                 logger.debug(f"   Stored result in state key: {output_key}")
 
@@ -513,7 +513,7 @@ class NodeExecutorFactory:
                     output = outputs
 
                 # Store output in state
-                output_key = node.output_key or node.id  # type: ignore[attr-defined]
+                output_key = node.output_key or node.id
                 state[output_key] = output  # type: ignore[literal-required]
 
                 # Update node results
@@ -820,7 +820,7 @@ class YAMLToStateGraphCompiler:
         try:
             from victor.tools.registry import ToolRegistry
 
-            return ToolRegistry()  # type: ignore[no-any-return]
+            return ToolRegistry()
         except Exception:
             return None
 
@@ -828,7 +828,7 @@ class YAMLToStateGraphCompiler:
         self,
         workflow: WorkflowDefinition,
         config_override: Optional[CompilerConfig] = None,
-    ) -> CompiledGraph[Any]:  # type: ignore[type-var]
+    ) -> CompiledGraph[Any]:
         """Compile a WorkflowDefinition to a StateGraph.
 
         Args:
@@ -990,7 +990,7 @@ class YAMLToStateGraphCompiler:
 
             # Execute all nodes (can be parallelized with asyncio.gather)
             tasks = [executor(copy.deepcopy(state)) for executor in executors]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            results = await asyncio.gather(*tasks, return_exceptions=True)  # type: ignore[call-overload]
 
             # Merge results
             for i, (node_def, result) in enumerate(zip(parallel_node_defs, results)):
@@ -1003,10 +1003,11 @@ class YAMLToStateGraphCompiler:
                     # Merge state changes from parallel execution
                     for key, value in result.items():
                         if not key.startswith("_"):
-                            state[key] = value
+                            state[key] = value  # type: ignore[literal-required]
+                    output_key = getattr(node_def, "output_key", None) or node_def.id
                     state["_parallel_results"][node_def.id] = {
                         "success": True,
-                        "output": result.get(node_def.output_key or node_def.id),
+                        "output": result.get(output_key),
                     }
 
             # Record parallel node result
@@ -1035,7 +1036,7 @@ class YAMLToStateGraphCompiler:
         workflow: WorkflowDefinition,
         initial_state: Optional[Dict[str, Any]] = None,
         thread_id: Optional[str] = None,
-    ) -> GraphExecutionResult[WorkflowState]:
+    ) -> GraphExecutionResult[Any]:
         """Convenience method to compile and execute in one step.
 
         Args:
@@ -1063,7 +1064,7 @@ class YAMLToStateGraphCompiler:
         # Merge user-provided initial state
         if initial_state:
             for key, value in initial_state.items():
-                state[key] = value
+                state[key] = value  # type: ignore[literal-required]
 
         return await compiled.invoke(state, thread_id=thread_id)
 
@@ -1076,9 +1077,9 @@ class YAMLToStateGraphCompiler:
 def compile_yaml_workflow(
     workflow: WorkflowDefinition,
     orchestrator: Optional["WorkflowAgentProtocol"] = None,
-    tool_registry: Optional["ToolRegistry"] = None,
+    orchestrators: Optional[Dict[str, "WorkflowAgentProtocol"]] = None,
     config: Optional[CompilerConfig] = None,
-) -> CompiledGraph[WorkflowState]:
+) -> CompiledGraph[Any]:
     """Compile a YAML workflow to a StateGraph.
 
     Convenience function for one-off compilation.
@@ -1086,13 +1087,13 @@ def compile_yaml_workflow(
     Args:
         workflow: The workflow definition to compile
         orchestrator: Agent orchestrator for agent nodes
-        tool_registry: Tool registry for compute nodes
+        orchestrators: Dict mapping profile names to orchestrators
         config: Compiler configuration
 
     Returns:
         CompiledGraph ready for execution
     """
-    compiler = YAMLToStateGraphCompiler(orchestrator, tool_registry, config)
+    compiler = YAMLToStateGraphCompiler(orchestrator, orchestrators, None, config)
     return compiler.compile(workflow)
 
 
@@ -1100,10 +1101,10 @@ async def execute_yaml_workflow(
     workflow: WorkflowDefinition,
     initial_state: Optional[Dict[str, Any]] = None,
     orchestrator: Optional["WorkflowAgentProtocol"] = None,
-    tool_registry: Optional["ToolRegistry"] = None,
+    orchestrators: Optional[Dict[str, "WorkflowAgentProtocol"]] = None,
     thread_id: Optional[str] = None,
     config: Optional[CompilerConfig] = None,
-) -> GraphExecutionResult[WorkflowState]:
+) -> GraphExecutionResult[Any]:
     """Compile and execute a YAML workflow.
 
     Convenience function for one-off execution.
@@ -1112,14 +1113,14 @@ async def execute_yaml_workflow(
         workflow: The workflow definition to execute
         initial_state: Initial state data
         orchestrator: Agent orchestrator for agent nodes
-        tool_registry: Tool registry for compute nodes
+        orchestrators: Dict mapping profile names to orchestrators
         thread_id: Thread ID for checkpointing
         config: Compiler configuration
 
     Returns:
         ExecutionResult with final state
     """
-    compiler = YAMLToStateGraphCompiler(orchestrator, tool_registry, config)
+    compiler = YAMLToStateGraphCompiler(orchestrator, orchestrators, None, config)
     return await compiler.compile_and_execute(workflow, initial_state, thread_id)
 
 
