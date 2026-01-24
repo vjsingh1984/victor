@@ -56,6 +56,9 @@ from victor.core.verticals.protocols.providers import (
     ToolProvider,
 )
 
+# Phase 2.1: Protocol auto-registration decorator
+from victor.core.verticals.protocol_decorators import register_protocols
+
 # Phase 3: Import framework capabilities
 from victor.framework.capabilities import (
     FileOperationsCapability,
@@ -63,6 +66,7 @@ from victor.framework.capabilities import (
 )
 
 
+@register_protocols
 class CodingAssistant(VerticalBase):
     """Software development assistant vertical.
 
@@ -573,20 +577,18 @@ You excel at:
 __all__ = ["CodingAssistant"]
 
 
-# Register protocols at module level after class definition
-# This ensures protocols are registered when the module is loaded
-CodingAssistant.register_protocol(ToolProvider)
-CodingAssistant.register_protocol(PromptContributorProvider)
-CodingAssistant.register_protocol(MiddlewareProvider)
-CodingAssistant.register_protocol(ToolDependencyProvider)
-CodingAssistant.register_protocol(HandlerProvider)
-# Note: WorkflowProvider NOT registered - missing get_workflows() method
-CodingAssistant.register_protocol(CapabilityProvider)
-CodingAssistant.register_protocol(ModeConfigProvider)
-CodingAssistant.register_protocol(ServiceProvider)
-CodingAssistant.register_protocol(TieredToolConfigProvider)
-
+# Protocol registration is now handled by @register_protocols decorator
+# which auto-detects implemented protocols:
+# - ToolProvider (get_tools)
+# - PromptContributorProvider (get_prompt_contributor)
+# - MiddlewareProvider (get_middleware)
+# - ToolDependencyProvider (get_tool_dependency_provider)
+# - HandlerProvider (get_handlers)
+# - CapabilityProvider (get_capability_configs)
+# - ModeConfigProvider (get_mode_config_provider)
+# - ServiceProvider (get_service_provider)
+# - TieredToolConfigProvider (get_tiered_tools)
+#
 # ISP Compliance Note:
-# This vertical explicitly declares protocol conformance through registration
-# rather than inheriting from all protocol interfaces. The framework can check
-# capabilities via isinstance(vertical, ToolProvider).
+# This vertical implements only the protocols it needs. The @register_protocols
+# decorator auto-detects and registers these protocols at class decoration time.

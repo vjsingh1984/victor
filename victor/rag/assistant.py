@@ -52,7 +52,11 @@ from victor.core.verticals.protocols.providers import (
     WorkflowProvider,
 )
 
+# Phase 2.1: Protocol auto-registration decorator
+from victor.core.verticals.protocol_decorators import register_protocols
 
+
+@register_protocols
 class RAGAssistant(VerticalBase):
     """Retrieval-Augmented Generation assistant vertical.
 
@@ -283,16 +287,16 @@ You: [Use rag_query tool with query="authentication"]
     # To clear all caches, use cls.clear_config_cache().
 
 
-# Register protocols at module level after class definition
-RAGAssistant.register_protocol(ToolProvider)
-RAGAssistant.register_protocol(PromptContributorProvider)
-RAGAssistant.register_protocol(ToolDependencyProvider)
-RAGAssistant.register_protocol(HandlerProvider)
-RAGAssistant.register_protocol(CapabilityProvider)
-RAGAssistant.register_protocol(TieredToolConfigProvider)
-RAGAssistant.register_protocol(WorkflowProvider)
-
+# Protocol registration is now handled by @register_protocols decorator
+# which auto-detects implemented protocols:
+# - ToolProvider (get_tools)
+# - PromptContributorProvider (get_prompt_contributor)
+# - ToolDependencyProvider (get_tool_dependency_provider)
+# - HandlerProvider (get_handlers)
+# - CapabilityProvider (get_capability_configs)
+# - TieredToolConfigProvider (get_tiered_tools)
+# - WorkflowProvider (get_workflows)
+#
 # ISP Compliance Note:
-# This vertical explicitly declares protocol conformance through registration
-# rather than inheriting from all protocol interfaces. The framework can check
-# capabilities via isinstance(vertical, ToolProvider).
+# This vertical implements only the protocols it needs. The @register_protocols
+# decorator auto-detects and registers these protocols at class decoration time.

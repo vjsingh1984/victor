@@ -18,7 +18,11 @@ from victor.core.verticals.protocols.providers import (
     ToolProvider,
 )
 
+# Phase 2.1: Protocol auto-registration decorator
+from victor.core.verticals.protocol_decorators import register_protocols
 
+
+@register_protocols
 class DataAnalysisAssistant(VerticalBase):
     """Data analysis assistant for exploration, visualization, and insights.
 
@@ -253,16 +257,12 @@ When presenting analysis:
     # To clear all caches, use cls.clear_config_cache().
 
 
-# Register protocols at module level after class definition
-# Only register protocols with explicit implementations (ISP compliance)
-DataAnalysisAssistant.register_protocol(ToolProvider)
-DataAnalysisAssistant.register_protocol(ToolDependencyProvider)
-DataAnalysisAssistant.register_protocol(HandlerProvider)
-
-# ISP Compliance Note:
-# This vertical explicitly declares protocol conformance through registration
-# rather than inheriting from all protocol interfaces. The framework can check
-# capabilities via isinstance(vertical, ToolProvider).
+# Protocol registration is now handled by @register_protocols decorator
+# which auto-detects implemented protocols:
+# - ToolProvider (get_tools)
+# - ToolDependencyProvider (get_tool_dependency_provider)
+# - HandlerProvider (get_handlers)
 #
-# Other protocols are inherited from VerticalBase and auto-registered by the
-# VerticalExtensionLoaderMeta metaclass.
+# ISP Compliance Note:
+# This vertical implements only the protocols it needs. The @register_protocols
+# decorator auto-detects and registers these protocols at class decoration time.

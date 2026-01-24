@@ -27,7 +27,11 @@ from victor.core.verticals.protocols.providers import (
     ToolProvider,
 )
 
+# Phase 2.1: Protocol auto-registration decorator
+from victor.core.verticals.protocol_decorators import register_protocols
 
+
+@register_protocols
 class DevOpsAssistant(VerticalBase):
     """DevOps assistant for infrastructure, deployment, and CI/CD automation.
 
@@ -297,17 +301,17 @@ When creating configurations:
     # To clear all caches, use cls.clear_config_cache().
 
 
-# Register protocols at module level after class definition
-DevOpsAssistant.register_protocol(ToolProvider)
-DevOpsAssistant.register_protocol(PromptContributorProvider)
-DevOpsAssistant.register_protocol(MiddlewareProvider)
-DevOpsAssistant.register_protocol(ToolDependencyProvider)
-DevOpsAssistant.register_protocol(HandlerProvider)
-DevOpsAssistant.register_protocol(ModeConfigProvider)
-DevOpsAssistant.register_protocol(SafetyProvider)
-DevOpsAssistant.register_protocol(TieredToolConfigProvider)
-
+# Protocol registration is now handled by @register_protocols decorator
+# which auto-detects implemented protocols:
+# - ToolProvider (get_tools)
+# - PromptContributorProvider (get_prompt_contributor)
+# - MiddlewareProvider (get_middleware)
+# - ToolDependencyProvider (get_tool_dependency_provider)
+# - HandlerProvider (get_handlers)
+# - ModeConfigProvider (get_mode_config_provider)
+# - SafetyProvider (get_safety_extension)
+# - TieredToolConfigProvider (get_tiered_tools)
+#
 # ISP Compliance Note:
-# This vertical explicitly declares protocol conformance through registration
-# rather than inheriting from all protocol interfaces. The framework can check
-# capabilities via isinstance(vertical, ToolProvider).
+# This vertical implements only the protocols it needs. The @register_protocols
+# decorator auto-detects and registers these protocols at class decoration time.

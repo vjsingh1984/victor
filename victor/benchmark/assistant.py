@@ -36,11 +36,15 @@ from victor.core.verticals.protocols.providers import (
 # Phase 3: Import framework capabilities
 from victor.framework.capabilities import FileOperationsCapability
 
+# Phase 2.1: Protocol auto-registration decorator
+from victor.core.verticals.protocol_decorators import register_protocols
+
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import ModeConfigProviderProtocol
     from victor.core.vertical_types import TieredToolConfig
 
 
+@register_protocols
 class BenchmarkVertical(VerticalBase):
     """Vertical for AI coding benchmark evaluation.
 
@@ -369,14 +373,14 @@ You are being evaluated on:
     # To clear all caches, use cls.clear_config_cache().
 
 
-# Register protocols at module level after class definition
-BenchmarkVertical.register_protocol(ToolProvider)
-BenchmarkVertical.register_protocol(WorkflowProvider)
-BenchmarkVertical.register_protocol(ModeConfigProvider)
-BenchmarkVertical.register_protocol(HandlerProvider)
-BenchmarkVertical.register_protocol(TieredToolConfigProvider)
-
+# Protocol registration is now handled by @register_protocols decorator
+# which auto-detects implemented protocols:
+# - ToolProvider (get_tools)
+# - WorkflowProvider (get_workflows)
+# - ModeConfigProvider (get_mode_config_provider)
+# - HandlerProvider (get_handlers)
+# - TieredToolConfigProvider (get_tiered_tool_config)
+#
 # ISP Compliance Note:
-# This vertical explicitly declares protocol conformance through registration
-# rather than inheriting from all protocol interfaces. The framework can check
-# capabilities via isinstance(vertical, ToolProvider).
+# This vertical implements only the protocols it needs. The @register_protocols
+# decorator auto-detects and registers these protocols at class decoration time.
