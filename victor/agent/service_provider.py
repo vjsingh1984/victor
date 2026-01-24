@@ -180,6 +180,9 @@ class OrchestratorServiceProvider:
             ToolSequenceTrackerProtocol,
             ContextCompactorProtocol,
             ModeControllerProtocol,
+            ProviderLifecycleProtocol,
+            FileOperationsCapabilityProtocol,
+            StageTransitionProtocol,
             ToolDeduplicationTrackerProtocol,
             # Utility service protocols
             DebugLoggerProtocol,
@@ -318,6 +321,27 @@ class OrchestratorServiceProvider:
         container.register(
             ModeControllerProtocol,
             lambda c: self._create_mode_controller(),
+            ServiceLifetime.SINGLETON,
+        )
+
+        # ProviderLifecycleManager - singleton for provider lifecycle operations (Phase 1.2)
+        container.register(
+            ProviderLifecycleProtocol,
+            lambda c: self._create_provider_lifecycle_manager(c),
+            ServiceLifetime.SINGLETON,
+        )
+
+        # FileOperationsCapability - singleton for shared file operations (Phase 1.4)
+        container.register(
+            FileOperationsCapabilityProtocol,
+            lambda c: self._create_file_operations_capability(),
+            ServiceLifetime.SINGLETON,
+        )
+
+        # StageTransitionEngine - singleton for stage transition management (Phase 2.2)
+        container.register(
+            StageTransitionProtocol,
+            lambda c: self._create_stage_transition_engine(c),
             ServiceLifetime.SINGLETON,
         )
 
@@ -1135,8 +1159,14 @@ class OrchestratorServiceProvider:
         return None
 
     def _create_mode_controller(self) -> Any:
-        """Create AgentModeController instance."""
+        """Create ModeControllerAdapter wrapping AgentModeController.
+
+        Phase 1.1: Uses ModeControllerAdapter for DI integration.
+        The adapter wraps AgentModeController and implements the protocol
+        interface for clean orchestrator integration.
+        """
         from victor.agent.mode_controller import AgentModeController, AgentMode
+        from victor.agent.coordinators.mode_adapter import ModeControllerAdapter
 
         initial_mode_str = getattr(self._settings, "default_agent_mode", "build")
         try:
@@ -1144,7 +1174,43 @@ class OrchestratorServiceProvider:
         except ValueError:
             initial_mode = AgentMode.BUILD
 
-        return AgentModeController(initial_mode=initial_mode)
+        controller = AgentModeController(initial_mode=initial_mode)
+        return ModeControllerAdapter(controller)
+
+    def _create_provider_lifecycle_manager(self, container: ServiceContainer) -> Any:
+        """Create ProviderLifecycleManager instance.
+
+        Phase 1.2: Provider lifecycle management for post-switch hooks.
+        """
+        from victor.agent.provider_lifecycle_manager import ProviderLifecycleManager
+
+        return ProviderLifecycleManager(container)
+
+    def _create_file_operations_capability(self) -> Any:
+        """Create FileOperationsCapability instance.
+
+        Phase 1.4: Shared file operations capability for verticals.
+        """
+        from victor.framework.capabilities import FileOperationsCapability
+
+        return FileOperationsCapability()
+
+    def _create_stage_transition_engine(self, container: ServiceContainer) -> Any:
+        """Create StageTransitionEngine instance.
+
+        Phase 2.2: Stage transition management for conversation flow.
+        """
+        from victor.agent.stage_transition_engine import StageTransitionEngine
+
+        # Get event bus if available
+        try:
+            from victor.core.events import ObservabilityBus
+
+            event_bus = container.get(ObservabilityBus)
+        except Exception:
+            event_bus = None
+
+        return StageTransitionEngine(event_bus=event_bus)
 
     def _create_tool_deduplication_tracker(self) -> Any:
         """Create ToolDeduplicationTracker instance."""

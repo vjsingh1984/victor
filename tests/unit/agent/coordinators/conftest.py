@@ -16,6 +16,106 @@ from types import SimpleNamespace
 from victor.providers.base import CompletionResponse, StreamChunk
 from victor.framework.task import TaskComplexity
 from victor.agent.unified_task_tracker import TrackerTaskType
+from victor.core.state import ConversationStage
+
+
+# =============================================================================
+# Mock Factory Functions (Phase 3.2)
+# =============================================================================
+
+
+def create_mock_mode_controller(initial_mode: str = "build") -> Mock:
+    """Create a mock mode controller.
+
+    Args:
+        initial_mode: Initial mode name (build, plan, explore)
+
+    Returns:
+        Mock ModeControllerProtocol implementation
+    """
+    from types import SimpleNamespace
+
+    controller = Mock()
+    controller.current_mode = SimpleNamespace(
+        name=initial_mode.upper(),
+        tool_whitelist=None,
+        tool_blacklist=set(),
+        exploration_multiplier=1.0 if initial_mode == "build" else 2.5,
+    )
+    controller.config = Mock()
+    controller.switch_mode = Mock(return_value=True)
+    controller.is_tool_allowed = Mock(return_value=True)
+    controller.get_tool_priority = Mock(return_value=1.0)
+    controller.get_exploration_multiplier = Mock(
+        return_value=1.0 if initial_mode == "build" else 2.5
+    )
+    controller.get_system_prompt_addition = Mock(return_value="")
+
+    return controller
+
+
+def create_mock_provider_lifecycle_manager() -> Mock:
+    """Create a mock provider lifecycle manager.
+
+    Returns:
+        Mock ProviderLifecycleProtocol implementation
+    """
+    manager = Mock()
+    manager.apply_exploration_settings = Mock()
+    manager.get_prompt_contributors = Mock(return_value=[])
+    manager.create_prompt_builder = Mock(return_value=Mock())
+    manager.calculate_tool_budget = Mock(return_value=50)
+    manager.should_respect_sticky_budget = Mock(return_value=False)
+
+    return manager
+
+
+def create_mock_handler_registry() -> Mock:
+    """Create a mock handler registry.
+
+    Returns:
+        Mock HandlerRegistry
+    """
+    registry = Mock()
+    registry.register = Mock()
+    registry.unregister = Mock(return_value=True)
+    registry.get = Mock(return_value=None)
+    registry.get_all = Mock(return_value={})
+    registry.get_by_vertical = Mock(return_value=[])
+    registry.list_handlers = Mock(return_value=[])
+    registry.reset = Mock()
+
+    return registry
+
+
+def create_mock_stage_transition_engine(
+    initial_stage: ConversationStage = ConversationStage.INITIAL,
+) -> Mock:
+    """Create a mock stage transition engine.
+
+    Args:
+        initial_stage: Initial conversation stage
+
+    Returns:
+        Mock StageTransitionProtocol implementation
+    """
+    engine = Mock()
+    engine.current_stage = initial_stage
+    engine.cooldown_seconds = 2.0
+    engine.transition_history = []
+
+    engine.can_transition = Mock(return_value=True)
+    engine.transition_to = Mock(return_value=True)
+    engine.get_valid_transitions = Mock(return_value=[
+        ConversationStage.PLANNING,
+        ConversationStage.READING,
+    ])
+    engine.get_tool_priority_multiplier = Mock(return_value=1.0)
+    engine.register_callback = Mock()
+    engine.unregister_callback = Mock()
+    engine.reset = Mock()
+
+    return engine
 
 
 def create_base_mock_orchestrator(supports_tools: bool = True) -> Mock:
@@ -42,6 +142,12 @@ def create_base_mock_orchestrator(supports_tools: bool = True) -> Mock:
             content="Response content", role="assistant", tool_calls=None
         )
     )
+    # Set up default async stream generator
+    async def default_stream(*args, **kwargs):
+        from victor.providers.base import StreamChunk
+        yield StreamChunk(content="Response content", is_final=True)
+    # Use a property to return the generator function directly
+    orch.provider.stream = default_stream
 
     # Model settings
     orch.model = "test-model"
@@ -50,6 +156,7 @@ def create_base_mock_orchestrator(supports_tools: bool = True) -> Mock:
     orch.tool_budget = 10
     orch.tool_calls_used = 0
     orch.thinking = False
+    orch.provider_name = "test_provider"
 
     # Messages
     orch.messages = []
@@ -61,16 +168,31 @@ def create_base_mock_orchestrator(supports_tools: bool = True) -> Mock:
     orch.task_classifier.classify = Mock(
         return_value=Mock(tool_budget=5, complexity=TaskComplexity.MEDIUM)
     )
+    # Intent classifier needs to return a proper object with confidence attribute
+    orch.intent_classifier = Mock()
+    # Use SimpleNamespace with nested intent.name
+    mock_intent = SimpleNamespace()
+    mock_intent.name = "unknown"
+    orch.intent_classifier.classify_intent_sync = Mock(
+        return_value=SimpleNamespace(
+            intent=mock_intent,
+            confidence=0.5,
+            top_matches=[]
+        )
+    )
 
     # Settings
     orch.settings = Mock()
     orch.settings.chat_max_iterations = 10
     orch.settings.stream_idle_timeout_seconds = 300
+    orch.settings.continuation_medium_max_interventions = 5
+    orch.settings.continuation_medium_max_iterations = 50
 
     # Tool selector
     orch.tool_selector = Mock()
     orch.tool_selector.select_tools = AsyncMock(return_value=[])
     orch.tool_selector.prioritize_by_stage = Mock(return_value=[])
+    orch.tool_selector.initialize_tool_embeddings = AsyncMock(return_value=None)
 
     # Conversation state
     orch.conversation_state = Mock()
@@ -78,8 +200,8 @@ def create_base_mock_orchestrator(supports_tools: bool = True) -> Mock:
     orch.conversation_state.state.stage = None
     orch._context_compactor = None
 
-    # Tool handling
-    orch._handle_tool_calls = AsyncMock(return_value=[])
+    # Tool handling - return success by default so tool execution continues
+    orch._handle_tool_calls = AsyncMock(return_value=[{"success": True}])
     orch._prepare_intelligent_request = AsyncMock(return_value=None)
 
     # Response completer
@@ -131,9 +253,20 @@ def create_base_mock_orchestrator(supports_tools: bool = True) -> Mock:
     orch.unified_tracker.check_loop_warning = Mock(return_value=None)
     orch.unified_tracker.unique_resources = []
 
+    # Task tracker (for recovery context)
+    orch._task_tracker = Mock()
+    orch._task_tracker.current_task_type = TrackerTaskType.EDIT
+    orch._task_tracker.is_analysis_task = False
+    orch._task_tracker.is_action_task = False
+
     # Reminder manager
     orch.reminder_manager = Mock()
     orch.reminder_manager.reset = Mock()
+    orch.reminder_manager.update_state = Mock()
+    orch.reminder_manager.get_consolidated_reminder = Mock(return_value=None)  # No reminder by default
+
+    # Message adder
+    orch.add_message = Mock()
 
     # Usage analytics
     orch._usage_analytics = None
@@ -173,9 +306,19 @@ def create_base_mock_orchestrator(supports_tools: bool = True) -> Mock:
     orch._provider_coordinator = Mock()
     orch._provider_coordinator.get_rate_limit_wait_time = Mock(return_value=1.0)
 
-    # Sanitizer
+    # Recovery context creator
+    orch._create_recovery_context = Mock(
+        return_value=SimpleNamespace(
+            elapsed_time=0.0,
+            iteration=1,
+            tool_calls_used=0,
+            consecutive_empty=0,
+        )
+    )
+
+    # Sanitizer - pass through by default (identity function)
     orch.sanitizer = Mock()
-    orch.sanitizer.sanitize = Mock(return_value="sanitized content")
+    orch.sanitizer.sanitize = Mock(side_effect=lambda x: x)  # Return original content
     orch.sanitizer.strip_markup = Mock(return_value="plain text")
     orch.sanitizer.is_garbage_content = Mock(return_value=False)
 
@@ -192,6 +335,13 @@ def create_base_mock_orchestrator(supports_tools: bool = True) -> Mock:
     orch._chunk_generator.generate_content_chunk = Mock(
         side_effect=lambda c, is_final=False: StreamChunk(content=c, is_final=is_final)
     )
+    # Don't generate extra chunks by default - return empty chunks
+    orch._chunk_generator.generate_metrics_chunk = Mock(return_value=StreamChunk(content="", is_final=False))
+    orch._chunk_generator.generate_final_marker_chunk = Mock(return_value=StreamChunk(content="", is_final=False))
+    # Tool execution chunks
+    orch._chunk_generator.generate_tool_start_chunk = Mock(return_value=StreamChunk(content="", is_final=False))
+    orch._chunk_generator.generate_tool_result_chunks = Mock(return_value=[])
+    orch._chunk_generator.generate_thinking_status_chunk = Mock(return_value=StreamChunk(content="", is_final=False))
 
     # Streaming handler
     orch._streaming_handler = Mock()
@@ -201,12 +351,48 @@ def create_base_mock_orchestrator(supports_tools: bool = True) -> Mock:
     orch._recovery_coordinator.check_natural_completion = Mock(return_value=None)
     orch._recovery_coordinator.handle_empty_response = Mock(return_value=(None, False))
     orch._recovery_coordinator.check_force_action = Mock(return_value=(False, None))
+    orch._recovery_coordinator.check_tool_budget = Mock(return_value=None)  # No budget warning
+    # truncate_tool_calls: return (tool_calls, num_truncated) - pass through tool_calls unchanged
+    orch._recovery_coordinator.truncate_tool_calls = Mock(side_effect=lambda ctx, calls, remaining: (calls, 0))
+    # filter_blocked_tool_calls: return (filtered_calls, blocked_chunks, blocked_count) - pass through unchanged
+    orch._recovery_coordinator.filter_blocked_tool_calls = Mock(side_effect=lambda ctx, calls: (calls, [], 0))
+    orch._recovery_coordinator.check_blocked_threshold = Mock(return_value=None)  # No blocked threshold issue
     orch._recovery_coordinator.get_recovery_fallback_message = Mock(
         return_value="Fallback message"
     )
 
+    # Budget exhausted handler - async generator that yields nothing
+    async def handle_budget_exhausted(*args, **kwargs):
+        # Empty generator - never yield, just return
+        if False:
+            yield  # This makes it an async generator but never executes
+        return
+    orch._handle_budget_exhausted = handle_budget_exhausted
+
+    # Check progress handler
+    orch._check_progress_with_handler = Mock()
+
+    # Tool status message generator
+    orch._get_tool_status_message = Mock(return_value="Tool status")
+
+    # Observed files set
+    orch.observed_files = []
+
+    # Force completion handler
+    orch._handle_force_completion_with_handler = Mock(
+        return_value=StreamChunk(content="", is_final=False)
+    )
+
     # Intelligent outcome
     orch._record_intelligent_outcome = Mock()
+
+    # Force final response handler - async generator that yields nothing
+    async def handle_force_final_response(*args, **kwargs):
+        # Empty generator - never yield, just return
+        if False:
+            yield  # This makes it an async generator but never executes
+        return
+    orch._handle_force_final_response = handle_force_final_response
 
     # Task completion detector
     orch._task_completion_detector = Mock()
@@ -232,6 +418,26 @@ def create_base_mock_orchestrator(supports_tools: bool = True) -> Mock:
     )
     orch._streaming_controller.start_session = Mock(return_value=mock_session)
 
+    # Continuation tracking
+    orch._cumulative_prompt_interventions = 0
+    orch._continuation_prompts = 0
+    orch._asking_input_prompts = 0
+    orch._consecutive_blocked_attempts = 0
+    orch._current_intent = None
+
+    # ==========================================================================
+    # New components from Phase 1 & 2 refactoring
+    # ==========================================================================
+
+    # Mode controller (Phase 1.1)
+    orch._mode_controller = create_mock_mode_controller()
+
+    # Provider lifecycle manager (Phase 1.2)
+    orch._provider_lifecycle_manager = create_mock_provider_lifecycle_manager()
+
+    # Stage transition engine (Phase 2.2)
+    orch._stage_transition_engine = create_mock_stage_transition_engine()
+
     return orch
 
 
@@ -239,3 +445,27 @@ def create_base_mock_orchestrator(supports_tools: bool = True) -> Mock:
 def base_mock_orchestrator() -> Mock:
     """Base mock orchestrator fixture that all tests can use."""
     return create_base_mock_orchestrator()
+
+
+@pytest.fixture
+def mock_mode_controller() -> Mock:
+    """Mock mode controller fixture."""
+    return create_mock_mode_controller()
+
+
+@pytest.fixture
+def mock_provider_lifecycle_manager() -> Mock:
+    """Mock provider lifecycle manager fixture."""
+    return create_mock_provider_lifecycle_manager()
+
+
+@pytest.fixture
+def mock_handler_registry() -> Mock:
+    """Mock handler registry fixture."""
+    return create_mock_handler_registry()
+
+
+@pytest.fixture
+def mock_stage_transition_engine() -> Mock:
+    """Mock stage transition engine fixture."""
+    return create_mock_stage_transition_engine()

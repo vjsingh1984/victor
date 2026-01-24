@@ -1234,8 +1234,225 @@ class ModeControllerProtocol(Protocol):
         """
         ...
 
+    def get_exploration_multiplier(self) -> float:
+        """Get exploration limit multiplier for current mode.
+
+        Higher multipliers allow more exploration iterations.
+        - BUILD: 5.0x (reading before writing)
+        - PLAN: 10.0x (thorough analysis)
+        - EXPLORE: 20.0x (exploration is primary goal)
+
+        Returns:
+            Multiplier value
+        """
+        ...
+
     def get_system_prompt_addition(self) -> str:
         """Get additional system prompt text for current mode."""
+        ...
+
+
+# =============================================================================
+# Provider Lifecycle Protocols (Phase 1.2)
+# =============================================================================
+
+
+@runtime_checkable
+class ProviderLifecycleProtocol(Protocol):
+    """Protocol for provider lifecycle management.
+
+    This protocol defines operations needed after provider/model switches:
+    - Applying exploration settings to task tracker
+    - Retrieving prompt contributors from verticals
+    - Creating/reinitializing prompt builder
+    - Calculating appropriate tool budgets
+    """
+
+    def apply_exploration_settings(self, tracker: Any, capabilities: Any) -> None:
+        """Apply model-specific exploration settings to tracker.
+
+        Args:
+            tracker: UnifiedTaskTracker instance
+            capabilities: ToolCallingCapabilities with exploration settings
+        """
+        ...
+
+    def get_prompt_contributors(self) -> List[Any]:
+        """Get prompt contributors from vertical extensions.
+
+        Returns:
+            List of IPromptContributor instances (empty if none available)
+        """
+        ...
+
+    def create_prompt_builder(
+        self,
+        provider_name: str,
+        model: str,
+        tool_adapter: Any,
+        capabilities: Any,
+        prompt_contributors: List[Any],
+    ) -> Any:
+        """Create a new SystemPromptBuilder with given parameters.
+
+        Returns:
+            Configured SystemPromptBuilder instance
+        """
+        ...
+
+    def calculate_tool_budget(self, capabilities: Any, settings: Any) -> int:
+        """Calculate the appropriate tool budget.
+
+        Returns:
+            Tool budget value (minimum 50)
+        """
+        ...
+
+    def should_respect_sticky_budget(self, tracker: Any) -> bool:
+        """Check if sticky budget should be respected.
+
+        Returns:
+            True if sticky budget is set and should be respected
+        """
+        ...
+
+
+# =============================================================================
+# Capability Provider Protocols (Phase 1.4)
+# =============================================================================
+
+
+@runtime_checkable
+class FileOperationsCapabilityProtocol(Protocol):
+    """Protocol for file operations capability.
+
+    This protocol defines the interface for providing common file
+    operation tools (read, write, edit, grep) that are used across
+    multiple verticals.
+    """
+
+    def get_tools(self) -> Set[str]:
+        """Get tool names for this capability.
+
+        Returns:
+            Set of required tool names
+        """
+        ...
+
+    def get_tool_list(self) -> List[str]:
+        """Get tool names as a list.
+
+        Returns:
+            List of required tool names
+        """
+        ...
+
+
+# =============================================================================
+# Stage Transition Protocols (Phase 2.2)
+# =============================================================================
+
+
+@runtime_checkable
+class StageTransitionProtocol(Protocol):
+    """Protocol for stage transition management.
+
+    This protocol defines the interface for managing conversation stage
+    transitions with validated transition graphs, tool priority multipliers,
+    and transition callbacks.
+
+    Stages: INITIAL → PLANNING → READING → ANALYSIS → EXECUTION → VERIFICATION → COMPLETION
+    """
+
+    @property
+    def current_stage(self) -> "ConversationStage":
+        """Get the current conversation stage."""
+        ...
+
+    def transition_to(
+        self,
+        new_stage: "ConversationStage",
+        confidence: float = 0.5,
+    ) -> bool:
+        """Transition to a new stage.
+
+        Args:
+            new_stage: Stage to transition to
+            confidence: Confidence in this transition (0.0-1.0)
+
+        Returns:
+            True if transition was successful
+        """
+        ...
+
+    def can_transition(
+        self,
+        target_stage: "ConversationStage",
+        confidence: float = 0.5,
+    ) -> bool:
+        """Check if transition to target stage is valid.
+
+        Args:
+            target_stage: Stage to check
+            confidence: Confidence level for backward transitions
+
+        Returns:
+            True if transition is valid
+        """
+        ...
+
+    def get_valid_transitions(self) -> List["ConversationStage"]:
+        """Get list of valid transition targets from current stage.
+
+        Returns:
+            List of stages that can be transitioned to
+        """
+        ...
+
+    def get_tool_priority_multiplier(self, tool_name: str) -> float:
+        """Get priority multiplier for a tool based on current stage.
+
+        Args:
+            tool_name: Name of the tool
+
+        Returns:
+            Multiplier value (1.0 = no change)
+        """
+        ...
+
+    def register_callback(
+        self,
+        callback: Callable[["ConversationStage", "ConversationStage"], None],
+    ) -> None:
+        """Register a callback to be called on stage transitions.
+
+        Args:
+            callback: Function taking (old_stage, new_stage)
+        """
+        ...
+
+    def unregister_callback(
+        self,
+        callback: Callable[["ConversationStage", "ConversationStage"], None],
+    ) -> None:
+        """Unregister a previously registered callback.
+
+        Args:
+            callback: Function to unregister
+        """
+        ...
+
+    @property
+    def transition_history(self) -> List[Dict[str, Any]]:
+        """Get the transition history.
+
+        Returns:
+            List of transition records
+        """
+        ...
+
+    def reset(self) -> None:
+        """Reset the engine to initial state."""
         ...
 
 
@@ -2495,6 +2712,12 @@ __all__ = [
     "ContextCompactorProtocol",
     # Mode controller protocols
     "ModeControllerProtocol",
+    # Provider lifecycle protocols (Phase 1.2)
+    "ProviderLifecycleProtocol",
+    # Capability provider protocols (Phase 1.4)
+    "FileOperationsCapabilityProtocol",
+    # Stage transition protocols (Phase 2.2)
+    "StageTransitionProtocol",
     # Deduplication protocols
     "ToolDeduplicationTrackerProtocol",
     # Embedding store protocols

@@ -106,6 +106,7 @@ from victor.framework.prompt_builder import (
     create_devops_prompt_builder,
     create_research_prompt_builder,
 )
+from victor.framework.prompt_builder_template import PromptBuilderTemplate
 from victor.framework.prompt_sections import (
     GroundingSection,
     RuleSection,
@@ -471,6 +472,7 @@ __all__ = (
         "create_data_analysis_prompt_builder",
         "create_devops_prompt_builder",
         "create_research_prompt_builder",
+        "PromptBuilderTemplate",
         # Protocols (Phase 7 - Framework-Orchestrator Interface)
         "OrchestratorProtocol",
         "ConversationStateProtocol",
