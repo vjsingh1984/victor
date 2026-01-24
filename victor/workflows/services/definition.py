@@ -355,7 +355,7 @@ class PortMapping:
     host_ip: str = "0.0.0.0"
 
     @classmethod
-    def parse(cls, spec: Union[str, int, Dict, "PortMapping"]) -> "PortMapping":
+    def parse(cls, spec: Union[str, int, Dict[str, Any], "PortMapping"]) -> "PortMapping":
         """Parse port specification.
 
         Formats:

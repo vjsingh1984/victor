@@ -58,7 +58,7 @@ class MemoryStats:
 
     total_objects: int = 0
     total_size: int = 0
-    gc_counts: tuple = field(default_factory=lambda: (0, 0, 0))
+    gc_counts: tuple[int, int, int] = field(default_factory=lambda: (0, 0, 0))
     pool_stats: Dict[str, Dict[str, int]] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -192,7 +192,7 @@ class MemoryProfiler:
         self._sample_interval = sample_interval
         self._running = False
         self._thread: Optional[threading.Thread] = None
-        self._samples: List[tuple] = []
+        self._samples: List[tuple[Any, ...]] = []
         self._object_refs: List[Any] = []
 
     def start(self) -> None:
@@ -230,7 +230,7 @@ class MemoryProfiler:
             except Exception as e:
                 logger.error(f"Error profiling memory: {e}")
 
-    def _get_current_stats(self) -> tuple:
+    def _get_current_stats(self) -> tuple[float, int, tuple[int, int, int]]:
         """Get current memory statistics."""
         # Get GC counts
         gc_counts = gc.get_count()

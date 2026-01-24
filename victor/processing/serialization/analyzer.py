@@ -407,7 +407,7 @@ class DataAnalyzer:
         field_types: Dict[str, str] = {}
 
         for field in fields:
-            types: Counter = Counter()
+            types: Counter[str] = Counter()
             for item in sample:
                 if field in item:
                     value = item[field]

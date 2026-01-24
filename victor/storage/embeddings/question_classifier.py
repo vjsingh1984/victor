@@ -34,7 +34,7 @@ import logging
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, Tuple
+from typing import List, Optional, Pattern, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ class QuestionClassificationResult:
 
 # Compiled patterns for efficient matching
 # Pattern format: (regex, question_type, confidence)
-QUESTION_PATTERNS: List[Tuple[re.Pattern, QuestionType, float]] = [
+QUESTION_PATTERNS: List[Tuple[Pattern[str], QuestionType, float]] = [
     # RHETORICAL/CONTINUATION - auto-continue
     (
         re.compile(r"\bshould\s+i\s+(?:continue|proceed|go\s+ahead)\b", re.IGNORECASE),
