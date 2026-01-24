@@ -74,9 +74,6 @@ class BenchmarkVertical(VerticalBase):
     description = "AI coding benchmark evaluation and performance testing"
     version = "1.0.0"
 
-    # Phase 3: Framework file operations capability (read, write, edit, grep)
-    _file_ops = FileOperationsCapability()
-
     # Benchmark-specific stages
     STAGE_UNDERSTANDING = "UNDERSTANDING"
     STAGE_ANALYSIS = "ANALYSIS"
@@ -87,7 +84,7 @@ class BenchmarkVertical(VerticalBase):
     def get_tools(cls) -> List[str]:
         """Tools optimized for benchmark task execution.
 
-        Phase 3: Uses framework FileOperationsCapability for common file operations
+        Uses framework FileOperationsCapability via DI for common file operations
         to reduce code duplication and maintain consistency across verticals.
 
         Returns a curated set of tools for:
@@ -98,8 +95,11 @@ class BenchmarkVertical(VerticalBase):
 
         This method is part of the ToolProvider protocol.
         """
-        # Start with framework file operations (read, write, edit, grep)
-        tools = cls._file_ops.get_tool_list()
+        from victor.core.verticals.capability_injector import get_capability_injector
+
+        # Get file operations from shared capability injector (DI singleton)
+        file_ops = get_capability_injector().get_file_operations_capability()
+        tools = file_ops.get_tool_list()
 
         # Add benchmark-specific tools
         tools.extend(

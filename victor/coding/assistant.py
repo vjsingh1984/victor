@@ -128,11 +128,6 @@ class CodingAssistant(VerticalBase):
     # =========================================================================
     # Phase 3: Framework Capabilities
     # =========================================================================
-    # Reuse framework capabilities to reduce code duplication
-
-    # Framework file operations capability (read, write, edit, grep)
-    _file_ops = FileOperationsCapability()
-
     # Framework prompt contributions (common hints like read_first, verify_changes)
     _prompt_contrib = PromptContributionCapability()
 
@@ -156,10 +151,11 @@ class CodingAssistant(VerticalBase):
             List of tool names including filesystem, git, shell, and code tools.
         """
         from victor.tools.tool_names import ToolNames
+        from victor.core.verticals.capability_injector import get_capability_injector
 
-        # Phase 3: Start with framework file operations (read, write, edit, grep)
-        # This reduces duplication and ensures consistency across verticals
-        tools = cls._file_ops.get_tool_list()
+        # Get file operations from shared capability injector (DI singleton)
+        file_ops = get_capability_injector().get_file_operations_capability()
+        tools = file_ops.get_tool_list()
 
         # Add coding-specific tools
         tools.extend(

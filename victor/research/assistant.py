@@ -56,14 +56,11 @@ class ResearchAssistant(VerticalBase):
     description = "Web research, fact-checking, literature synthesis, and report generation"
     version = "1.0.0"
 
-    # Phase 3: Framework file operations capability (read, write, edit, grep)
-    _file_ops = FileOperationsCapability()
-
     @classmethod
     def get_tools(cls) -> List[str]:
         """Get the list of tools for research tasks.
 
-        Phase 3: Uses framework FileOperationsCapability for common file operations
+        Uses framework FileOperationsCapability via DI for common file operations
         to reduce code duplication and maintain consistency across verticals.
 
         Uses canonical tool names from victor.tools.tool_names.
@@ -71,9 +68,11 @@ class ResearchAssistant(VerticalBase):
         This method is part of the ToolProvider protocol.
         """
         from victor.tools.tool_names import ToolNames
+        from victor.core.verticals.capability_injector import get_capability_injector
 
-        # Start with framework file operations (read, write, edit, grep)
-        tools = cls._file_ops.get_tool_list()
+        # Get file operations from shared capability injector (DI singleton)
+        file_ops = get_capability_injector().get_file_operations_capability()
+        tools = file_ops.get_tool_list()
 
         # Add research-specific tools
         tools.extend(
