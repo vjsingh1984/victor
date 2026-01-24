@@ -302,16 +302,16 @@ class HandlerRegistry:
     ) -> int:
         """Auto-discover and register handlers from a vertical module.
 
-        Attempts to import victor.{vertical_name}.handlers and register
-        all handlers from its HANDLERS dictionary.
+        Imports and reloads victor.{vertical_name}.handlers to trigger
+        @handler_decorator auto-registration, then returns count.
 
         Args:
             vertical_name: Name of the vertical (e.g., "coding", "research")
-            replace: If True, replace existing handlers
-            sync_to_executor: If True, sync new handlers to executor
+            replace: If True, replace existing handlers before discovery
+            sync_to_executor: If True, sync handlers to executor
 
         Returns:
-            Number of handlers registered
+            Number of handlers registered for this vertical
 
         Raises:
             ImportError: If the handlers module cannot be imported
@@ -328,22 +328,39 @@ class HandlerRegistry:
         module_name = get_vertical_module_name(vertical_name)
         module_path = f"victor.{module_name}.handlers"
 
+        # Clear existing handlers for this vertical if replace=True
+        if replace:
+            to_remove = [name for name, entry in self._handlers.items() if entry.vertical == vertical_name]
+            for name in to_remove:
+                del self._handlers[name]
+
+        # Get singleton registry to check if handlers already exist
+        singleton = HandlerRegistry.get_instance()
+
+        # Import and reload module to trigger @handler_decorator auto-registration
+        # We temporarily enable replace mode in singleton to avoid duplicate errors
         try:
             module = importlib.import_module(module_path)
+
+            # Clear handlers for this vertical from singleton to avoid duplicate errors on reload
+            to_remove_singleton = [name for name, entry in singleton._handlers.items() if entry.vertical == vertical_name]
+            for name in to_remove_singleton:
+                del singleton._handlers[name]
+
+            # Force reload to re-trigger decorators even if module was cached
+            importlib.reload(module)
         except ImportError as e:
             logger.warning(f"Could not import handlers from {module_path}: {e}")
             raise
 
-        handlers_dict = getattr(module, "HANDLERS", None)
-        if handlers_dict is None:
-            logger.warning(f"No HANDLERS dict found in {module_path}")
-            return 0
+        # Copy handlers from singleton to this instance if different
+        if self is not singleton:
+            for name, entry in singleton._handlers.items():
+                if entry.vertical == vertical_name and name not in self._handlers:
+                    self._handlers[name] = entry
 
-        count = self.register_from_vertical(
-            vertical_name=vertical_name,
-            handlers=handlers_dict,
-            replace=replace,
-        )
+        # Count handlers registered for this vertical
+        count = sum(1 for entry in self._handlers.values() if entry.vertical == vertical_name)
 
         # Optionally sync to executor
         if sync_to_executor and count > 0:
@@ -460,6 +477,121 @@ def discover_handlers_from_vertical(
     )
 
 
+# =============================================================================
+# Phase 1.3: @handler_decorator Class Decorator
+# =============================================================================
+
+# Known vertical names for auto-detection
+KNOWN_VERTICALS = {"coding", "research", "devops", "dataanalysis", "rag", "benchmark"}
+
+
+def get_vertical_from_module(module_name: str) -> Optional[str]:
+    """Extract vertical name from module path.
+
+    Attempts to detect the vertical name from a module path like
+    'victor.coding.handlers' -> 'coding'.
+
+    Args:
+        module_name: Full module path (e.g., 'victor.coding.handlers')
+
+    Returns:
+        Vertical name if detected, None otherwise
+
+    Example:
+        >>> get_vertical_from_module('victor.coding.handlers')
+        'coding'
+        >>> get_vertical_from_module('victor.framework.handlers')
+        None
+    """
+    if not module_name or not module_name.startswith("victor."):
+        return None
+
+    parts = module_name.split(".")
+    if len(parts) < 3:
+        return None
+
+    # Second part should be the vertical name
+    potential_vertical = parts[1]
+
+    if potential_vertical in KNOWN_VERTICALS:
+        return potential_vertical
+
+    return None
+
+
+def handler_decorator(
+    name: str,
+    *,
+    vertical: Optional[str] = None,
+    description: Optional[str] = None,
+    replace: bool = False,
+):
+    """Class decorator for automatic handler registration.
+
+    Phase 1.3: Provides decorator-based auto-registration for handlers,
+    replacing the HANDLERS dict pattern in verticals.
+
+    Usage:
+        @handler_decorator("code_validation", vertical="coding")
+        @dataclass
+        class CodeValidationHandler(BaseHandler):
+            async def execute(self, node, context, tool_registry) -> Tuple[Any, int]:
+                ...
+
+    Args:
+        name: Handler name for registration (e.g., "code_validation")
+        vertical: Optional vertical name. If not provided, attempts to
+                  auto-detect from the module path.
+        description: Optional handler description
+        replace: If True, replace existing handler with same name
+
+    Returns:
+        Decorator function that registers the handler and returns the class
+
+    Example:
+        # With explicit vertical
+        @handler_decorator("my_handler", vertical="coding")
+        class MyHandler:
+            pass
+
+        # Auto-detect vertical from module path
+        # In victor/coding/handlers.py:
+        @handler_decorator("code_validation")  # vertical="coding" inferred
+        class CodeValidationHandler:
+            pass
+    """
+    def decorator(cls):
+        # Determine vertical (explicit or auto-detect)
+        final_vertical = vertical
+        if final_vertical is None:
+            # Try to auto-detect from module
+            module_name = cls.__module__
+            final_vertical = get_vertical_from_module(module_name)
+
+        # Create handler instance
+        try:
+            handler_instance = cls()
+        except Exception as e:
+            logger.warning(f"Could not instantiate handler {name}: {e}. Registering class instead.")
+            handler_instance = cls
+
+        # Register with global registry
+        get_handler_registry().register(
+            name=name,
+            handler=handler_instance,
+            vertical=final_vertical,
+            description=description,
+            replace=replace,
+        )
+
+        logger.debug(f"Decorated handler registered: {name} (vertical={final_vertical})")
+
+        # Return class unchanged
+        return cls
+
+    return decorator
+
+
 __all__ = [
     "HandlerEntry",
     "HandlerRegistry",
@@ -468,4 +600,8 @@ __all__ = [
     "get_handler",
     "sync_handlers_with_executor",
     "discover_handlers_from_vertical",
+    # Phase 1.3: Class decorator
+    "handler_decorator",
+    "get_vertical_from_module",
+    "KNOWN_VERTICALS",
 ]
