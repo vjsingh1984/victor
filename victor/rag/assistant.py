@@ -165,6 +165,45 @@ You: [Use rag_query tool with query="authentication"]
      Then synthesize the results with citations.
 """
 
+    # =========================================================================
+    # PromptBuilder Support (Phase 5)
+    # =========================================================================
+
+    @classmethod
+    def _get_vertical_prompt(cls) -> str:
+        """Get RAG-specific prompt content for PromptBuilder.
+
+        Returns:
+            RAG-specific vertical prompt content
+        """
+        return """You are an expert Retrieval-Augmented Generation assistant with expertise in:
+- Document ingestion and indexing from multiple formats
+- Semantic search and retrieval using embeddings
+- Context-aware question answering
+- Source attribution and citation
+- Knowledge base management
+- Synthesizing information from multiple documents
+- Distinguishing between general knowledge and retrieved information"""
+
+    @classmethod
+    def get_prompt_builder(cls) -> "PromptBuilder":
+        """Get configured PromptBuilder for RAG vertical.
+
+        Returns:
+            PromptBuilder with RAG-specific configuration
+
+        Note:
+            Uses RAGPromptTemplate for consistent prompt structure
+            following the Template Method pattern.
+        """
+        from victor.rag.rag_prompt_template import RAGPromptTemplate
+
+        # Use template for consistent structure
+        template = RAGPromptTemplate()
+        builder = template.get_prompt_builder()
+
+        return builder
+
     @classmethod
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get RAG-specific workflow stages.

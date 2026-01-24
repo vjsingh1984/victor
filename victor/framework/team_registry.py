@@ -120,6 +120,7 @@ class TeamSpecRegistry:
         """Initialize the registry."""
         self._teams: Dict[str, TeamSpecEntry] = {}
         self._lock = threading.RLock()
+        self._team_hashes: Dict[str, str] = {}  # Phase 4: Hash-based idempotence
 
     def register(
         self,
@@ -389,6 +390,9 @@ class TeamSpecRegistry:
         Tool names in team member specs are automatically canonicalized
         to ensure consistency across verticals.
 
+        Phase 4 implementation: Hash-based idempotence skips processing
+        when team specs haven't changed since last registration.
+
         Args:
             vertical_name: Vertical name for namespace
             team_specs: Dict mapping team names to specs
@@ -397,6 +401,34 @@ class TeamSpecRegistry:
         Returns:
             Number of specs registered
         """
+        # Phase 4: Compute hash of team specs for change detection
+        import hashlib
+        import json
+
+        # Create deterministic hash from team specs
+        sorted_names = sorted(team_specs.keys())
+        spec_strings = []
+        for name in sorted_names:
+            spec = team_specs[name]
+            # Convert spec to string representation
+            if hasattr(spec, 'to_dict'):
+                spec_str = json.dumps(spec.to_dict(), sort_keys=True, default=str)
+            else:
+                spec_str = str(spec)
+            spec_strings.append(f"{name}:{spec_str}")
+
+        combined = f"{vertical_name}|{','.join(sorted_names)}|{'|'.join(spec_strings)}"
+        current_hash = hashlib.sha256(combined.encode()).hexdigest()
+
+        # Check if specs have changed (hash-based idempotence)
+        cache_key = f"{vertical_name}_team_specs"
+        cached_hash = self._team_hashes.get(cache_key)
+
+        if cached_hash == current_hash and not replace:
+            logger.debug(f"Team specs for '{vertical_name}' unchanged, skipping processing")
+            return len(team_specs)
+
+        # Process team specs (changed or first time)
         count = 0
         for name, spec in team_specs.items():
             full_name = f"{vertical_name}:{name}"
@@ -413,6 +445,9 @@ class TeamSpecRegistry:
                 count += 1
             except Exception as e:
                 logger.warning(f"Failed to register {full_name}: {e}")
+
+        # Cache the hash for future idempotence checks
+        self._team_hashes[cache_key] = current_hash
 
         logger.info(f"Registered {count} team specs from vertical '{vertical_name}'")
         return count

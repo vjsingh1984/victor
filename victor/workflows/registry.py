@@ -109,6 +109,7 @@ class WorkflowRegistry:
         self._factories: Dict[str, Callable[[], WorkflowDefinition]] = {}
         self._metadata: Dict[str, WorkflowMetadata] = {}
         self._loaded_modules: Set[str] = set()
+        self._workflow_hashes: Dict[str, str] = {}  # Phase 4: Hash-based idempotence
 
     def register(
         self,
@@ -131,6 +132,19 @@ class WorkflowRegistry:
         if workflow.name in self._definitions and not replace:
             raise ValueError(f"Workflow '{workflow.name}' already registered")
 
+        # Phase 4: Hash-based idempotence
+        # Check if workflow definition has changed before validating
+        if hasattr(workflow, 'to_hash'):
+            workflow_hash = workflow.to_hash()
+            cached_hash = self._workflow_hashes.get(workflow.name)
+
+            # If hash matches and workflow exists, skip validation (idempotence)
+            if workflow.name in self._definitions and cached_hash == workflow_hash:
+                logger.debug(f"Workflow '{workflow.name}' unchanged, skipping validation")
+                return
+        else:
+            workflow_hash = None
+
         # Canonicalize tool names in workflow nodes
         self._canonicalize_workflow_tools(workflow)
 
@@ -140,6 +154,11 @@ class WorkflowRegistry:
 
         self._definitions[workflow.name] = workflow
         self._metadata[workflow.name] = WorkflowMetadata.from_definition(workflow)
+
+        # Phase 4: Cache hash for future idempotence checks
+        if workflow_hash:
+            self._workflow_hashes[workflow.name] = workflow_hash
+
         logger.info(f"Registered workflow: {workflow.name}")
 
     def _canonicalize_workflow_tools(self, workflow: WorkflowDefinition) -> None:

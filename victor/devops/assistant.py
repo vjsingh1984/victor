@@ -99,6 +99,46 @@ class DevOpsAssistant(VerticalBase):
         """Get the system prompt for DevOps tasks."""
         return cls._get_system_prompt()
 
+    # =========================================================================
+    # PromptBuilder Support (Phase 5)
+    # =========================================================================
+
+    @classmethod
+    def _get_vertical_prompt(cls) -> str:
+        """Get DevOps-specific prompt content for PromptBuilder.
+
+        Returns:
+            DevOps-specific vertical prompt content
+        """
+        return """You are an expert DevOps engineer with deep knowledge of:
+- Container orchestration (Kubernetes, Docker, Docker Compose)
+- Infrastructure as Code (Terraform, Ansible, CloudFormation, Pulumi)
+- CI/CD pipelines (GitHub Actions, GitLab CI, Jenkins, CircleCI)
+- Cloud platforms (AWS, GCP, Azure)
+- Monitoring and observability (Prometheus, Grafana, ELK, Datadog)
+- Security best practices and compliance
+- Deployment automation (blue-green, canary, rolling)
+- Configuration management and secrets handling"""
+
+    @classmethod
+    def get_prompt_builder(cls) -> "PromptBuilder":
+        """Get configured PromptBuilder for DevOps vertical.
+
+        Returns:
+            PromptBuilder with DevOps-specific configuration
+
+        Note:
+            Uses DevOpsPromptTemplate for consistent prompt structure
+            following the Template Method pattern.
+        """
+        from victor.devops.devops_prompt_template import DevOpsPromptTemplate
+
+        # Use template for consistent structure
+        template = DevOpsPromptTemplate()
+        builder = template.get_prompt_builder()
+
+        return builder
+
     @classmethod
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get DevOps-specific stage definitions.

@@ -694,6 +694,48 @@ class WorkflowDefinition:
             "max_retries": self.max_retries,
         }
 
+    def to_hash(self) -> str:
+        """Compute deterministic hash of workflow definition.
+
+        Phase 4 implementation: Computes SHA256 hash from workflow structure
+        for change detection and idempotent registration.
+
+        The hash includes all workflow properties that define its structure:
+        - name, description, start_node
+        - nodes (with their properties)
+        - metadata, timeouts, limits
+
+        Returns:
+            64-character hex string (SHA256 hash)
+        """
+        import hashlib
+        import json
+
+        # Create deterministic string representation
+        # Sort nodes by ID for consistency
+        sorted_node_ids = sorted(self.nodes.keys())
+        node_dicts = []
+        for nid in sorted_node_ids:
+            node = self.nodes[nid]
+            node_dict = node.to_dict()
+            # Convert to JSON string for consistent hashing
+            node_dicts.append(json.dumps(node_dict, sort_keys=True, default=str))
+
+        # Combine all properties
+        combined = (
+            f"name:{self.name}|"
+            f"description:{self.description}|"
+            f"start_node:{self.start_node}|"
+            f"max_execution_timeout:{self.max_execution_timeout_seconds}|"
+            f"default_node_timeout:{self.default_node_timeout_seconds}|"
+            f"max_iterations:{self.max_iterations}|"
+            f"max_retries:{self.max_retries}|"
+            f"metadata:{json.dumps(self.metadata, sort_keys=True, default=str)}|"
+            f"nodes:{'|'.join(sorted(node_dicts))}"
+        )
+
+        return hashlib.sha256(combined.encode()).hexdigest()
+
     def get_agent_count(self) -> int:
         """Count agent nodes in workflow."""
         return sum(1 for node in self.nodes.values() if isinstance(node, AgentNode))
