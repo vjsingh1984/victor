@@ -371,7 +371,7 @@ class State:
 
     def subscribe_to_state_changes(
         self,
-        callback: Callable[[str, str, Dict[str, Any]], None],
+        callback: Callable[[str, str, Dict[str, Any, Any]], None],
     ) -> Optional[Callable[[], None]]:
         """Subscribe to state machine transitions via ObservabilityBus.
 

@@ -664,7 +664,7 @@ class OrchestratorCapability:
     deprecated: bool = False
     deprecated_message: str = ""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate capability declaration."""
         # Validate access method
         if not any([self.setter, self.getter, self.attribute]):

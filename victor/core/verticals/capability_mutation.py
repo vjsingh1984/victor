@@ -78,7 +78,7 @@ class CapabilityMutation:
     timestamp: float
     source: str = "vertical_integration"
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate mutation on creation.
 
         Raises:

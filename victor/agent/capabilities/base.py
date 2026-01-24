@@ -76,7 +76,7 @@ class CapabilitySpec:
     version: str = "1.0"
     description: str = ""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate capability specification."""
         if not self.name:
             raise ValueError("Capability name cannot be empty")

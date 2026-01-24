@@ -69,7 +69,7 @@ class GroundingSection:
             rendered_content = rendered_content.replace(placeholder, str(value))
         return rendered_content
 
-    def with_variables(self, **kwargs) -> "GroundingSection":
+    def with_variables(self, **kwargs: Any) -> "GroundingSection":
         """Create new section with additional variables.
 
         Existing variables are preserved, and new variables are added.
