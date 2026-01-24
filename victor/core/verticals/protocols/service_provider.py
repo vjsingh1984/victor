@@ -34,7 +34,7 @@ Usage:
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING, List, Protocol, Type, runtime_checkable
+from typing import TYPE_CHECKING, Any, List, Protocol, Type, runtime_checkable
 
 if TYPE_CHECKING:
     from victor.core.container import ServiceContainer
