@@ -278,6 +278,26 @@ class TestFrameworkShimVertical:
             def set_vertical_context(self, context):
                 self._vertical_context = context
 
+            def get_capabilities(self):
+                """Get all registered capabilities (CapabilityRegistryProtocol)."""
+                return {
+                    "enabled_tools": None,
+                    "custom_prompt": None,
+                    "vertical_context": None,
+                }
+
+            def get_capability(self, name):
+                """Get a specific capability declaration."""
+                if name in ["enabled_tools", "custom_prompt", "vertical_context"]:
+                    return None
+                return None
+
+            def get_capability_version(self, name):
+                """Get the version of a registered capability."""
+                if name in ["enabled_tools", "custom_prompt", "vertical_context"]:
+                    return "1.0"
+                return None
+
             def has_capability(self, name, min_version=None):
                 return name in ["enabled_tools", "custom_prompt", "vertical_context"]
 
@@ -286,7 +306,7 @@ class TestFrameworkShimVertical:
                     self.set_enabled_tools(args[0])
                     return True
                 elif name == "custom_prompt" and args:
-                    self._custom_prompt_calls.append(args[0])
+                    self.set_custom_prompt_calls.append(args[0])
                     self.set_custom_prompt(args[0])
                     return True
                 elif name == "vertical_context" and args:

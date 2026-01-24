@@ -160,6 +160,13 @@ COMMON_REQUIRED_TOOLS: Set[str] = {
     ToolNames.LS,
 }
 
+# Read-only tools for analysis-focused verticals (e.g., RAG, Research)
+# These verticals don't modify files, only read and analyze them
+COMMON_READONLY_TOOLS: Set[str] = {
+    ToolNames.READ,
+    ToolNames.LS,
+}
+
 # Optional tools applicable to most verticals
 COMMON_OPTIONAL_TOOLS: Set[str] = {
     ToolNames.GREP,
@@ -285,6 +292,7 @@ __all__ = [
     "COMMON_TOOL_DEPENDENCIES",
     "COMMON_TOOL_TRANSITIONS",
     "COMMON_REQUIRED_TOOLS",
+    "COMMON_READONLY_TOOLS",
     "COMMON_OPTIONAL_TOOLS",
     "merge_clusters",
     "merge_dependencies",

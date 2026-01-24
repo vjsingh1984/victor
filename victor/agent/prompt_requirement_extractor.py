@@ -164,7 +164,7 @@ class RequirementPattern:
     patterns: List[str]
     priority: int = 50
 
-    def compile(self) -> List[Pattern]:
+    def compile(self) -> List[Pattern[str]]:
         """Compile all patterns."""
         return [re.compile(p, re.IGNORECASE) for p in self.patterns]
 

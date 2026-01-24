@@ -27,7 +27,7 @@ from victor.framework.capabilities.base_vertical_capability_provider import (
     CapabilityDefinition,
     _map_capability_type,
 )
-from victor.framework.protocols import CapabilityType
+from victor.framework.protocols import CapabilityType as FrameworkCapabilityType
 from victor.framework.capability_loader import CapabilityEntry
 
 
@@ -42,7 +42,7 @@ class MockCapabilityProvider(BaseVerticalCapabilityProvider):
         return {
             "test_capability": CapabilityDefinition(
                 name="test_capability",
-                type=CapabilityType.TOOL,
+                type=FrameworkCapabilityType.TOOL,
                 description="Test capability",
                 version="1.0",
                 configure_fn="configure_test_capability",
@@ -52,7 +52,7 @@ class MockCapabilityProvider(BaseVerticalCapabilityProvider):
             ),
             "disabled_capability": CapabilityDefinition(
                 name="disabled_capability",
-                type=CapabilityType.TOOL,
+                type=FrameworkCapabilityType.TOOL,
                 description="Disabled capability",
                 version="1.0",
                 configure_fn="configure_disabled_capability",
@@ -61,13 +61,13 @@ class MockCapabilityProvider(BaseVerticalCapabilityProvider):
             ),
             "capability_with_deps": CapabilityDefinition(
                 name="capability_with_deps",
-                type=CapabilityType.WORKFLOW,
+                type=FrameworkCapabilityType.PROMPT,
                 description="Capability with dependencies",
                 version="1.0",
                 configure_fn="configure_capability_with_deps",
                 default_config={"dep_config": True},
                 dependencies=["test_capability"],
-                tags=["workflow", "test"],
+                tags=["prompt", "test"],
             ),
         }
 
@@ -97,7 +97,7 @@ class TestCapabilityDefinition:
         """Test creating a capability definition."""
         definition = CapabilityDefinition(
             name="test",
-            type=CapabilityType.TOOL,
+            type=FrameworkCapabilityType.TOOL,
             description="Test capability",
             version="2.0",
             configure_fn="configure_test",
@@ -109,7 +109,7 @@ class TestCapabilityDefinition:
         )
 
         assert definition.name == "test"
-        assert definition.type == CapabilityType.TOOL
+        assert definition.type == FrameworkCapabilityType.TOOL
         assert definition.description == "Test capability"
         assert definition.version == "2.0"
         assert definition.configure_fn == "configure_test"
@@ -123,7 +123,7 @@ class TestCapabilityDefinition:
         """Test default values."""
         definition = CapabilityDefinition(
             name="test",
-            type=CapabilityType.TOOL,
+            type=FrameworkCapabilityType.TOOL,
             description="Test",
         )
 
@@ -140,7 +140,7 @@ class TestCapabilityDefinition:
         """Test converting to CapabilityMetadata."""
         definition = CapabilityDefinition(
             name="test",
-            type=CapabilityType.TOOL,
+            type=FrameworkCapabilityType.TOOL,
             description="Test capability",
             version="1.5",
             dependencies=["dep1"],
@@ -159,9 +159,9 @@ class TestCapabilityDefinition:
         """Test converting to core Capability."""
         definition = CapabilityDefinition(
             name="test",
-            type=CapabilityType.TOOL,
+            type=FrameworkCapabilityType.TOOL,
             description="Test capability",
-            handler="test_handler",
+            configure_fn="test_handler",
             default_config={"key": "value"},
         )
 
@@ -176,28 +176,32 @@ class TestCapabilityDefinition:
         assert core_cap.config == {"key": "value"}
 
 
-class TestMapCapabilityType:
-    """Test capability type mapping."""
+class TestMapFrameworkCapabilityType:
+    """Test capability type mapping.
+
+    Note: FrameworkCapabilityType has TOOL, PROMPT, MODE, SAFETY, RL.
+    The mapping function converts these to core CapabilityType values.
+    """
 
     def test_map_tool(self):
         """Test mapping TOOL type."""
-        assert _map_capability_type(CapabilityType.TOOL) == "tool"
-
-    def test_map_workflow(self):
-        """Test mapping WORKFLOW type."""
-        assert _map_capability_type(CapabilityType.WORKFLOW) == "workflow"
-
-    def test_map_middleware(self):
-        """Test mapping MIDDLEWARE type."""
-        assert _map_capability_type(CapabilityType.MIDDLEWARE) == "middleware"
+        assert _map_capability_type(FrameworkCapabilityType.TOOL) == "tool"
 
     def test_map_mode(self):
         """Test mapping MODE to TOOL."""
-        assert _map_capability_type(CapabilityType.MODE) == "tool"
+        assert _map_capability_type(FrameworkCapabilityType.MODE) == "tool"
 
     def test_map_safety(self):
         """Test mapping SAFETY to MIDDLEWARE."""
-        assert _map_capability_type(CapabilityType.SAFETY) == "middleware"
+        assert _map_capability_type(FrameworkCapabilityType.SAFETY) == "middleware"
+
+    def test_map_prompt(self):
+        """Test mapping PROMPT type."""
+        assert _map_capability_type(FrameworkCapabilityType.PROMPT) == "tool"
+
+    def test_map_rl(self):
+        """Test mapping RL type."""
+        assert _map_capability_type(FrameworkCapabilityType.RL) == "tool"
 
 
 class TestBaseVerticalCapabilityProvider:
@@ -283,11 +287,11 @@ class TestBaseVerticalCapabilityProvider:
         """Test listing capabilities by type."""
         provider = MockCapabilityProvider()
 
-        tools = provider.list_capabilities(CapabilityType.TOOL)
+        tools = provider.list_capabilities(FrameworkCapabilityType.TOOL)
         assert "test_capability" in tools
         assert "capability_with_deps" not in tools
 
-        workflows = provider.list_capabilities(CapabilityType.WORKFLOW)
+        workflows = provider.list_capabilities(FrameworkCapabilityType.WORKFLOW)
         assert "capability_with_deps" in workflows
         assert "test_capability" not in workflows
 
@@ -305,7 +309,7 @@ class TestBaseVerticalCapabilityProvider:
 
         assert definition is not None
         assert definition.name == "test_capability"
-        assert definition.type == CapabilityType.TOOL
+        assert definition.type == FrameworkCapabilityType.TOOL
         assert definition.default_config == {"key": "value"}
 
     def test_apply_capability(self):
@@ -334,7 +338,7 @@ class TestBaseVerticalCapabilityProvider:
         # Create definition without configure_fn
         definition = CapabilityDefinition(
             name="no_configure",
-            type=CapabilityType.TOOL,
+            type=FrameworkCapabilityType.TOOL,
             description="No configure function",
         )
 
@@ -553,7 +557,7 @@ class TestCapabilityRegistry:
         all_caps = registry.list_capabilities("mock")
         assert "test_capability" in all_caps
 
-        tools = registry.list_capabilities("mock", CapabilityType.TOOL)
+        tools = registry.list_capabilities("mock", FrameworkCapabilityType.TOOL)
         assert "test_capability" in tools
         assert "capability_with_deps" not in tools
 

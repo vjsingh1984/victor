@@ -30,7 +30,7 @@ import logging
 import re
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Deque, Dict, List, Optional, Set
+from typing import Deque, Dict, List, Optional, Pattern, Set
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ class PromptNormalizer:
     }
 
     # Patterns for continuation messages that can be collapsed
-    CONTINUATION_PATTERNS: List[re.Pattern] = [
+    CONTINUATION_PATTERNS: List[Pattern[str]] = [
         re.compile(r"^continue\.?$", re.IGNORECASE),
         re.compile(r"^go on\.?$", re.IGNORECASE),
         re.compile(r"^proceed\.?$", re.IGNORECASE),

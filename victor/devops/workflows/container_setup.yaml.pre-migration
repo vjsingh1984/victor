@@ -59,9 +59,6 @@
 # │   - investigate_failure: ANALYZING logs for root cause                      │
 # │   All require interpretation, judgment, or creative writing.                │
 # └─────────────────────────────────────────────────────────────────────────────┘
-#
-# MIGRATION: This version uses stage template references to reduce duplication.
-# Original file backed up as container_setup.yaml.pre-migration
 
 workflows:
   container_setup:
@@ -90,36 +87,35 @@ workflows:
       # Stage 1: Requirements Analysis
       # =====================================================================
       - id: analyze_requirements
-        stage: analyze_stage
-        overrides:
-          name: "Analyze Container Requirements"
-          goal: |
-            Analyze application requirements for containerization:
+        type: agent
+        name: "Analyze Container Requirements"
+        role: analyst
+        goal: |
+          Analyze application requirements for containerization:
 
-            1. **Application Analysis**
-               - Detect language/runtime (Python, Node, Go, etc.)
-               - Identify dependencies (package managers, libraries)
-               - Find configuration files
+          1. **Application Analysis**
+             - Detect language/runtime (Python, Node, Go, etc.)
+             - Identify dependencies (package managers, libraries)
+             - Find configuration files
 
-            2. **Resource Requirements**
-               - Estimate CPU/memory needs
-               - Identify storage requirements
-               - Note network dependencies
+          2. **Resource Requirements**
+             - Estimate CPU/memory needs
+             - Identify storage requirements
+             - Note network dependencies
 
-            3. **Environment Variables**
-               - Find required env vars
-               - Identify secrets management needs
+          3. **Environment Variables**
+             - Find required env vars
+             - Identify secrets management needs
 
-            4. **Base Image Selection**
-               - Recommend appropriate base image
-               - Consider security vs. size trade-offs
-          tools: [read, shell, grep]
-          tool_budget: 20
-          llm_config:
-            temperature: 0.2
-          input_mapping:
-            app_path: application_path
-          timeout: 120
+          4. **Base Image Selection**
+             - Recommend appropriate base image
+             - Consider security vs. size trade-offs
+        tool_budget: 20
+        tools: [read, shell, grep]
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          app_path: application_path
         output: requirements
         next: [create_dockerfile]
 
@@ -127,62 +123,58 @@ workflows:
       # Stage 2: Dockerfile Creation
       # =====================================================================
       - id: create_dockerfile
-        stage: modify_stage
-        overrides:
-          name: "Create Dockerfile"
-          role: executor
-          goal: |
-            Create an optimized Dockerfile:
+        type: agent
+        name: "Create Dockerfile"
+        role: executor
+        goal: |
+          Create an optimized Dockerfile:
 
-            **Best Practices:**
-            1. Use specific base image tags (not :latest)
-            2. Implement multi-stage builds for smaller images
-            3. Order layers for optimal caching
-            4. Minimize layer count
-            5. Use .dockerignore
+          **Best Practices:**
+          1. Use specific base image tags (not :latest)
+          2. Implement multi-stage builds for smaller images
+          3. Order layers for optimal caching
+          4. Minimize layer count
+          5. Use .dockerignore
 
-            **Security Considerations:**
-            - Run as non-root user
-            - Remove build dependencies
-            - No secrets in image
+          **Security Considerations:**
+          - Run as non-root user
+          - Remove build dependencies
+          - No secrets in image
 
-            **Performance:**
-            - Copy dependency files first
-            - Install dependencies before code
-            - Clean up apt/npm caches
-          tools: [read, write]
-          tool_budget: 25
-          llm_config:
-            temperature: 0.2
-          input_mapping:
-            reqs: requirements
-            app_path: application_path
-          timeout: 300
+          **Performance:**
+          - Copy dependency files first
+          - Install dependencies before code
+          - Clean up apt/npm caches
+        tool_budget: 25
+        tools: [read, write]
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          reqs: requirements
+          app_path: application_path
         output: dockerfile_path
         next: [create_compose]
 
       - id: create_compose
-        stage: modify_stage
-        overrides:
-          name: "Create Docker Compose"
-          role: executor
-          goal: |
-            Create docker-compose.yml for development:
+        type: agent
+        name: "Create Docker Compose"
+        role: executor
+        goal: |
+          Create docker-compose.yml for development:
 
-            - Service definition
-            - Volume mounts for live reload
-            - Environment variables
-            - Network configuration
-            - Health checks
-            - Depends_on for service ordering
-          tools: [read, write]
-          tool_budget: 15
-          llm_config:
-            temperature: 0.2
-          input_mapping:
-            dockerfile: dockerfile_path
-            requirements: requirements
-          timeout: 180
+          - Service definition
+          - Volume mounts for live reload
+          - Environment variables
+          - Network configuration
+          - Health checks
+          - Depends_on for service ordering
+        tool_budget: 15
+        tools: [read, write]
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          dockerfile: dockerfile_path
+          requirements: requirements
         output: compose_path
         next: [build_image]
 
@@ -222,53 +214,51 @@ workflows:
           "default": security_scan
 
       - id: fix_dockerfile
-        stage: modify_stage
-        overrides:
-          name: "Fix Dockerfile Issues"
-          role: executor
-          goal: |
-            Fix Dockerfile build errors:
-            {build_error}
+        type: agent
+        name: "Fix Dockerfile Issues"
+        role: executor
+        goal: |
+          Fix Dockerfile build errors:
+          {build_error}
 
-            Common fixes:
-            - Missing dependencies
-            - Wrong base image
-            - Permission issues
-            - Path errors
-          tools: [read, edit]
-          tool_budget: 15
-          llm_config:
-            temperature: 0.1
-          input_mapping:
-            error: build_result.error
-          timeout: 180
+          Common fixes:
+          - Missing dependencies
+          - Wrong base image
+          - Permission issues
+          - Path errors
+        tool_budget: 15
+        tools: [read, edit]
+        llm_config:
+          temperature: 0.1
+        input_mapping:
+          error: build_result.error
         output: fixed_dockerfile
         next: [build_image]
 
       - id: review_size
-        stage: approval_stage
-        overrides:
-          name: "Review Image Size"
-          prompt: |
-            ## Image Size Warning
+        type: hitl
+        name: "Review Image Size"
+        hitl_type: approval
+        prompt: |
+          ## Image Size Warning
 
-            The built image is larger than recommended.
+          The built image is larger than recommended.
 
-            **Image Size:** {image_size} MB
-            **Recommended Maximum:** {max_size} MB
+          **Image Size:** {image_size} MB
+          **Recommended Maximum:** {max_size} MB
 
-            **Optimization Suggestions:**
-            - Use multi-stage builds
-            - Choose a smaller base image (alpine)
-            - Remove unnecessary files
-            - Combine RUN commands
+          **Optimization Suggestions:**
+          - Use multi-stage builds
+          - Choose a smaller base image (alpine)
+          - Remove unnecessary files
+          - Combine RUN commands
 
-            Proceed anyway?
-          context_keys:
-            - image_size
-            - max_size
-          timeout: 600
-          fallback: continue
+          Proceed anyway?
+        context_keys:
+          - image_size
+          - max_size
+        timeout: 600
+        fallback: continue
         next: [security_scan]
 
       # =====================================================================
@@ -304,30 +294,29 @@ workflows:
           "fail": block_push
 
       - id: review_vulnerabilities
-        stage: input_stage
-        overrides:
-          name: "Review Vulnerabilities"
-          hitl_type: review
-          prompt: |
-            ## Security Vulnerabilities Found
+        type: hitl
+        name: "Review Vulnerabilities"
+        hitl_type: review
+        prompt: |
+          ## Security Vulnerabilities Found
 
-            **Critical:** {critical_count}
-            **High:** {high_count}
-            **Medium:** {medium_count}
-            **Low:** {low_count}
+          **Critical:** {critical_count}
+          **High:** {high_count}
+          **Medium:** {medium_count}
+          **Low:** {low_count}
 
-            **Top Vulnerabilities:**
-            {vulnerability_summary}
+          **Top Vulnerabilities:**
+          {vulnerability_summary}
 
-            Review and decide whether to proceed.
-          context_keys:
-            - critical_count
-            - high_count
-            - medium_count
-            - low_count
-            - vulnerability_summary
-          timeout: 900
-          fallback: abort
+          Review and decide whether to proceed.
+        context_keys:
+          - critical_count
+          - high_count
+          - medium_count
+          - low_count
+          - vulnerability_summary
+        timeout: 900
+        fallback: abort
         next: [test_container]
 
       - id: block_push
@@ -378,24 +367,22 @@ workflows:
           "default": push_approval
 
       - id: investigate_failure
-        stage: analyze_stage
-        overrides:
-          name: "Investigate Test Failure"
-          role: analyst
-          goal: |
-            Investigate why container tests failed:
-            {test_error}
+        type: agent
+        name: "Investigate Test Failure"
+        role: analyst
+        goal: |
+          Investigate why container tests failed:
+          {test_error}
 
-            Check:
-            - Container logs
-            - Startup sequence
-            - Port bindings
-            - Environment variables
-          tools: [shell, read]
-          tool_budget: 15
-          llm_config:
-            temperature: 0.2
-          timeout: 180
+          Check:
+          - Container logs
+          - Startup sequence
+          - Port bindings
+          - Environment variables
+        tool_budget: 15
+        tools: [shell, read]
+        llm_config:
+          temperature: 0.2
         output: investigation
         next: [fix_dockerfile]
 
@@ -403,24 +390,24 @@ workflows:
       # Stage 6: Push to Registry
       # =====================================================================
       - id: push_approval
-        stage: approval_stage
-        overrides:
-          name: "Push Approval"
-          prompt: |
-            ## Ready to Push to Registry
+        type: hitl
+        name: "Push Approval"
+        hitl_type: approval
+        prompt: |
+          ## Ready to Push to Registry
 
-            **Image:** {image_tag}
-            **Size:** {image_size} MB
-            **Security:** {security_status}
-            **Tests:** Passed
+          **Image:** {image_tag}
+          **Size:** {image_size} MB
+          **Security:** {security_status}
+          **Tests:** Passed
 
-            Push to registry?
-          context_keys:
-            - image_tag
-            - image_size
-            - security_status
-          timeout: 600
-          fallback: continue
+          Push to registry?
+        context_keys:
+          - image_tag
+          - image_size
+          - security_status
+        timeout: 600
+        fallback: continue
         next: [push_image]
 
       # COMPUTE: docker push is subprocess with network I/O
@@ -444,17 +431,16 @@ workflows:
         next: [complete]
 
       - id: complete
-        stage: complete_stage
-        overrides:
-          name: "Container Setup Complete"
-          transform: |
-            workflow_status = "completed"
-            outputs = {
-              "dockerfile": dockerfile_path,
-              "compose": compose_path,
-              "image": image_tag,
-              "pushed": push_result.success
-            }
+        type: transform
+        name: "Container Setup Complete"
+        transform: |
+          workflow_status = "completed"
+          outputs = {
+            "dockerfile": dockerfile_path,
+            "compose": compose_path,
+            "image": image_tag,
+            "pushed": push_result.success
+          }
 
 
   # =========================================================================
@@ -471,19 +457,16 @@ workflows:
     nodes:
       # Agent node (type defaults to 'agent', so omitted)
       - id: quick_analyze
-        stage: analyze_stage
-        overrides:
-          name: "Quick Analysis"
-          role: analyst
-          goal: |
-            Quickly analyze application and create Dockerfile.
-            Focus on getting it working, optimize later.
-          tools: [read, write]
-          tool_budget: 15
-          llm_config:
-            temperature: 0.3
-            model_hint: claude-3-sonnet
-          timeout: 120
+        name: "Quick Analysis"
+        role: analyst
+        goal: |
+          Quickly analyze application and create Dockerfile.
+          Focus on getting it working, optimize later.
+        tool_budget: 15
+        tools: [read, write]
+        llm_config:
+          temperature: 0.3
+          model_hint: claude-3-sonnet
         output: dockerfile
         next: [quick_build]
 

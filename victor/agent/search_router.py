@@ -30,7 +30,7 @@ import logging
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Optional, Pattern, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -167,8 +167,8 @@ class SearchRouter:
         self.custom_routers = custom_routers or []
 
         # Compile patterns
-        self._keyword_patterns: List[Tuple[re.Pattern, float, str]] = []
-        self._semantic_patterns: List[Tuple[re.Pattern, float, str]] = []
+        self._keyword_patterns: List[Tuple[Pattern[str], float, str]] = []
+        self._semantic_patterns: List[Tuple[Pattern[str], float, str]] = []
 
         self._compile_patterns(KEYWORD_SIGNALS, self._keyword_patterns)
         self._compile_patterns(SEMANTIC_SIGNALS, self._semantic_patterns)
@@ -183,7 +183,7 @@ class SearchRouter:
     def _compile_patterns(
         self,
         signals: List[Tuple[str, float, str, bool]],
-        target: List[Tuple[re.Pattern, float, str]],
+        target: List[Tuple[Pattern[str], float, str]],
     ) -> None:
         """Compile regex patterns.
 

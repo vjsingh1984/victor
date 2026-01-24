@@ -29,7 +29,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Pattern, Tuple
 
 from victor.classification.pattern_registry import (
     PATTERNS,
@@ -57,7 +57,7 @@ class NudgeRule:
     """
 
     name: str
-    pattern: re.Pattern
+    pattern: Pattern[str]
     target_type: TaskType
     min_confidence_boost: float = 0.1
     override: bool = False

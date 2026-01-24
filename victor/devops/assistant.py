@@ -6,6 +6,10 @@ Competitive positioning: Docker Desktop AI, Terraform Assistant, Pulumi AI, K8s 
 from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.core.verticals.base import StageDefinition, VerticalBase
+from victor.core.verticals.defaults.tool_defaults import (
+    COMMON_REQUIRED_TOOLS,
+    merge_required_tools,
+)
 from victor.core.verticals.protocols import (
     MiddlewareProtocol,
     ModeConfigProviderProtocol,
@@ -63,15 +67,14 @@ class DevOpsAssistant(VerticalBase):
         """Get the list of tools for DevOps tasks.
 
         Uses canonical tool names from victor.tools.tool_names.
+
+        Extends COMMON_REQUIRED_TOOLS with DevOps-specific tools using
+        merge_required_tools() to eliminate code duplication.
         """
         from victor.tools.tool_names import ToolNames
 
-        return [
-            # Core filesystem
-            ToolNames.READ,  # read_file → read
-            ToolNames.WRITE,  # write_file → write
-            ToolNames.EDIT,  # edit_files → edit
-            ToolNames.LS,  # list_directory → ls
+        # DevOps-specific tools beyond common required tools
+        devops_tools = [
             # Shell for infrastructure commands
             ToolNames.SHELL,  # bash → shell
             # Git for version control
@@ -87,6 +90,9 @@ class DevOpsAssistant(VerticalBase):
             ToolNames.WEB_SEARCH,  # Web search (internet search)
             ToolNames.WEB_FETCH,  # Fetch URL content
         ]
+
+        # Merge common required tools with DevOps-specific tools
+        return merge_required_tools(COMMON_REQUIRED_TOOLS, devops_tools)
 
     @classmethod
     def get_system_prompt(cls) -> str:

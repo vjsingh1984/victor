@@ -30,6 +30,10 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Type
 
 from victor.core.verticals.base import StageDefinition, VerticalBase, VerticalConfig
+from victor.core.verticals.defaults.tool_defaults import (
+    COMMON_READONLY_TOOLS,
+    merge_required_tools,
+)
 from victor.core.verticals.protocols import (
     MiddlewareProtocol,
     SafetyExtensionProtocol,
@@ -101,10 +105,14 @@ class RAGAssistant(VerticalBase):
 
         Uses canonical tool names from victor.tools.tool_names.
 
+        RAG is a read-only vertical for document analysis, so it uses
+        COMMON_READONLY_TOOLS instead of COMMON_REQUIRED_TOOLS.
+
         Returns:
-            List of RAG-specific tool names
+            List of RAG-specific tool names merged with common readonly tools
         """
-        return [
+        # RAG-specific tools beyond common readonly tools
+        rag_tools = [
             # RAG-specific tools
             "rag_ingest",  # Ingest documents into the store
             "rag_search",  # Search for relevant chunks
@@ -112,14 +120,14 @@ class RAGAssistant(VerticalBase):
             "rag_list",  # List indexed documents
             "rag_delete",  # Delete documents
             "rag_stats",  # Get store statistics
-            # Filesystem for document access (canonical names)
-            ToolNames.READ,
-            ToolNames.LS,
             # Web for fetching web content
             ToolNames.WEB_FETCH,
             # Shell for document processing
             ToolNames.SHELL,
         ]
+
+        # Merge common readonly tools with RAG-specific tools
+        return merge_required_tools(COMMON_READONLY_TOOLS, rag_tools)
 
     @classmethod
     def get_system_prompt(cls) -> str:
