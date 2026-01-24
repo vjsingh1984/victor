@@ -548,7 +548,7 @@ class AgentOrchestrator(
         self._conversation_controller: "ConversationController"
         self._tool_pipeline: "ToolPipeline"
         self._streaming_controller: "StreamingController"
-        self._streaming_handler: Any  # ChunkGenerator or similar
+        self._streaming_handler: "StreamingChatHandler"  # Created by create_streaming_handler()
         self._provider_manager: "ProviderManager"
         self._context_compactor: "ContextCompactor"
         self._tool_output_formatter: "ToolOutputFormatter"
@@ -669,9 +669,11 @@ class AgentOrchestrator(
 
                         # Emit nudge event
                         from victor.core.events import get_observability_bus
+                        from victor.core.events.emit_helper import emit_event_sync
 
                         event_bus = get_observability_bus()
-                        event_bus.emit(
+                        emit_event_sync(
+                            event_bus,
                             topic="state.task.all_files_read_nudge",
                             data={
                                 "required_files": list(self._required_files),
@@ -860,97 +862,126 @@ class AgentOrchestrator(
     @property
     def tool_calls_used(self) -> int:
         """Number of tool calls used in this session."""
+        if self._session_state is None:
+            return 0
         return self._session_state.tool_calls_used
 
     @tool_calls_used.setter
     def tool_calls_used(self, value: int) -> None:
         """Set tool calls used (for backward compatibility)."""
-        self._session_state.execution_state.tool_calls_used = value
+        if self._session_state is not None:
+            self._session_state.execution_state.tool_calls_used = value
 
     @property
     def observed_files(self) -> Set[str]:
         """Files observed/read during this session."""
+        if self._session_state is None:
+            return set()
         return self._session_state.execution_state.observed_files
 
     @observed_files.setter
     def observed_files(self, value: Set[str]) -> None:
         """Set observed files (for checkpoint restore)."""
-        self._session_state.execution_state.observed_files = set(value) if value else set()
+        if self._session_state is not None:
+            self._session_state.execution_state.observed_files = set(value) if value else set()
 
     @property
     def executed_tools(self) -> List[str]:
         """Executed tool names in order."""
+        if self._session_state is None:
+            return []
         return self._session_state.execution_state.executed_tools
 
     @executed_tools.setter
     def executed_tools(self, value: List[str]) -> None:
         """Set executed tools (for checkpoint restore)."""
-        self._session_state.execution_state.executed_tools = list(value) if value else []
+        if self._session_state is not None:
+            self._session_state.execution_state.executed_tools = list(value) if value else []
 
     @property
     def failed_tool_signatures(self) -> Set[Tuple[str, str]]:
         """Failed tool call signatures (tool_name, args_hash)."""
+        if self._session_state is None:
+            return set()
         return self._session_state.execution_state.failed_tool_signatures
 
     @failed_tool_signatures.setter
     def failed_tool_signatures(self, value: Set[Tuple[str, str]]) -> None:
         """Set failed tool signatures (for checkpoint restore)."""
-        self._session_state.execution_state.failed_tool_signatures = set(value) if value else set()
+        if self._session_state is not None:
+            self._session_state.execution_state.failed_tool_signatures = set(value) if value else set()
 
     @property
     def _tool_capability_warned(self) -> bool:
         """Whether we've warned about tool capability limitations."""
+        if self._session_state is None:
+            return False
         return self._session_state.session_flags.tool_capability_warned
 
     @_tool_capability_warned.setter
     def _tool_capability_warned(self, value: bool) -> None:
         """Set tool capability warning flag."""
-        self._session_state.session_flags.tool_capability_warned = value
+        if self._session_state is not None:
+            self._session_state.session_flags.tool_capability_warned = value
 
     @property
     def _read_files_session(self) -> Set[str]:
         """Files read during this session for task completion detection."""
+        if self._session_state is None:
+            return set()
         return self._session_state.execution_state.read_files_session
 
     @property
     def _required_files(self) -> List[str]:
         """Required files extracted from user prompts."""
+        if self._session_state is None:
+            return []
         return self._session_state.execution_state.required_files
 
     @_required_files.setter
     def _required_files(self, value: List[str]) -> None:
         """Set required files list."""
-        self._session_state.execution_state.required_files = list(value)
+        if self._session_state is not None:
+            self._session_state.execution_state.required_files = list(value)
 
     @property
     def _required_outputs(self) -> List[str]:
         """Required outputs extracted from user prompts."""
+        if self._session_state is None:
+            return []
         return self._session_state.execution_state.required_outputs
 
     @_required_outputs.setter
     def _required_outputs(self, value: List[str]) -> None:
         """Set required outputs list."""
-        self._session_state.execution_state.required_outputs = list(value)
+        if self._session_state is not None:
+            self._session_state.execution_state.required_outputs = list(value)
 
     @property
     def _all_files_read_nudge_sent(self) -> bool:
         """Whether we've sent a nudge that all required files are read."""
+        if self._session_state is None:
+            return False
         return self._session_state.session_flags.all_files_read_nudge_sent
 
     @_all_files_read_nudge_sent.setter
     def _all_files_read_nudge_sent(self, value: bool) -> None:
         """Set all files read nudge flag."""
-        self._session_state.session_flags.all_files_read_nudge_sent = value
+        if self._session_state is not None:
+            self._session_state.session_flags.all_files_read_nudge_sent = value
 
     @property
     def _cumulative_token_usage(self) -> Dict[str, int]:
         """Cumulative token usage for evaluation/benchmarking."""
+        if self._session_state is None:
+            return {}
         return self._session_state.get_token_usage()
 
     @_cumulative_token_usage.setter
     def _cumulative_token_usage(self, value: Dict[str, int]) -> None:
         """Set cumulative token usage (for backward compatibility)."""
-        self._session_state.execution_state.token_usage = dict(value)
+        if self._session_state is not None:
+            self._session_state.execution_state.token_usage = dict(value)
 
     @property
     def intelligent_integration(self) -> Optional["OrchestratorIntegration"]:
@@ -967,8 +998,7 @@ class AgentOrchestrator(
 
                 # Determine project root for grounding verification
                 # Context file is at .victor/init.md, so project root is grandparent
-                from victor.config.settings import get_project_paths
-                from victor.context.project_context import VICTOR_DIR_NAME
+                from victor.config.settings import get_project_paths, VICTOR_DIR_NAME
 
                 if self.project_context.context_file:
                     # Context file: /project/.victor/init.md
