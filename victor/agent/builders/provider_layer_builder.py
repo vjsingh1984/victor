@@ -100,5 +100,14 @@ class ProviderLayerBuilder(FactoryAwareBuilder):
         )
         components["provider_switch_coordinator"] = orchestrator._provider_switch_coordinator
 
+        # ProviderLifecycleManager: Handles post-switch hooks (Phase 1.2)
+        from victor.agent.protocols import ProviderLifecycleProtocol
+
+        if hasattr(orchestrator, "_container") and orchestrator._container:
+            manager = orchestrator._container.get_optional(ProviderLifecycleProtocol)
+            if manager:
+                orchestrator._provider_lifecycle_manager = manager
+                components["provider_lifecycle_manager"] = manager
+
         self._register_components(components)
         return components
