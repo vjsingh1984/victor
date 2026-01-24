@@ -146,52 +146,47 @@ class CodingAssistant(VerticalBase):
     def get_tools(cls) -> List[str]:
         """Get tools optimized for software development.
 
-        Phase 3: Uses framework FileOperationsCapability for common file operations
-        to reduce code duplication and maintain consistency across verticals.
-
         Uses canonical tool names from victor.tools.tool_names.
+
+        Extends COMMON_REQUIRED_TOOLS with coding-specific tools using
+        merge_required_tools() to eliminate code duplication and maintain
+        consistency across verticals.
 
         Returns:
             List of tool names including filesystem, git, shell, and code tools.
         """
         from victor.tools.tool_names import ToolNames
-        from victor.core.verticals.capability_injector import get_capability_injector
 
-        # Get file operations from shared capability injector (DI singleton)
-        file_ops = get_capability_injector().get_file_operations_capability()
-        tools = file_ops.get_tool_list()
+        # Coding-specific tools beyond common required tools
+        coding_tools = [
+            # Core filesystem (beyond framework basics)
+            ToolNames.LS,  # list_directory -> ls
+            ToolNames.OVERVIEW,  # get_project_overview -> overview
+            # Search
+            ToolNames.CODE_SEARCH,  # semantic_code_search -> code_search
+            ToolNames.PLAN,  # plan_files -> plan
+            # Git (unified git tool handles all operations)
+            ToolNames.GIT,  # Git operations
+            # Shell
+            ToolNames.SHELL,  # execute_bash -> shell
+            # Code intelligence
+            ToolNames.LSP,  # lsp operations
+            ToolNames.SYMBOL,  # find_symbol -> symbol
+            ToolNames.REFS,  # find_references -> refs
+            # Refactoring
+            ToolNames.RENAME,  # refactor_rename_symbol -> rename
+            ToolNames.EXTRACT,  # refactor_extract_function -> extract
+            # Testing
+            ToolNames.TEST,  # run_tests -> test
+            # Docker
+            ToolNames.DOCKER,  # docker operations
+            # Web (for documentation)
+            ToolNames.WEB_SEARCH,  # web_search
+            ToolNames.WEB_FETCH,  # web_fetch
+        ]
 
-        # Add coding-specific tools
-        tools.extend(
-            [
-                # Core filesystem (beyond framework basics)
-                ToolNames.LS,  # list_directory -> ls
-                ToolNames.OVERVIEW,  # get_project_overview -> overview
-                # Search
-                ToolNames.CODE_SEARCH,  # semantic_code_search -> code_search
-                ToolNames.PLAN,  # plan_files -> plan
-                # Git (unified git tool handles all operations)
-                ToolNames.GIT,  # Git operations
-                # Shell
-                ToolNames.SHELL,  # execute_bash -> shell
-                # Code intelligence
-                ToolNames.LSP,  # lsp operations
-                ToolNames.SYMBOL,  # find_symbol -> symbol
-                ToolNames.REFS,  # find_references -> refs
-                # Refactoring
-                ToolNames.RENAME,  # refactor_rename_symbol -> rename
-                ToolNames.EXTRACT,  # refactor_extract_function -> extract
-                # Testing
-                ToolNames.TEST,  # run_tests -> test
-                # Docker
-                ToolNames.DOCKER,  # docker operations
-                # Web (for documentation)
-                ToolNames.WEB_SEARCH,  # web_search
-                ToolNames.WEB_FETCH,  # web_fetch
-            ]
-        )
-
-        return tools
+        # Merge common required tools with coding-specific tools
+        return merge_required_tools(COMMON_REQUIRED_TOOLS, coding_tools)
 
     @classmethod
     def get_system_prompt(cls) -> str:

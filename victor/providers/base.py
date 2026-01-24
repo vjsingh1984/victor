@@ -227,7 +227,7 @@ class StreamChunk(BaseModel):
         default=None,
         description="Token usage stats (typically on final chunk). Keys: prompt_tokens, completion_tokens, total_tokens, cache_creation_input_tokens, cache_read_input_tokens",
     )
-    model_name: Optional[str] = Field(None, description="Model used")
+    model_name: Optional[str] = Field(default=None, description="Model used")
 
 
 # Provider error classes - re-exported from victor/core/errors for backward compatibility

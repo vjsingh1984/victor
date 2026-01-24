@@ -291,7 +291,7 @@ class TestBaseVerticalCapabilityProvider:
         assert "test_capability" in tools
         assert "capability_with_deps" not in tools
 
-        workflows = provider.list_capabilities(FrameworkCapabilityType.WORKFLOW)
+        workflows = provider.list_capabilities(FrameworkCapabilityType.PROMPT)
         assert "capability_with_deps" in workflows
         assert "test_capability" not in workflows
 

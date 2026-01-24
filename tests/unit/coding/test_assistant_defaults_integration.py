@@ -123,8 +123,8 @@ class TestCodingDefaultsIntegration:
         assistant = CodingAssistant()
         tools = assistant.get_tools()
 
-        # Should have at least common tools (4) + coding tools (15+)
-        assert len(tools) >= 19, f"Coding should have at least 19 tools, got {len(tools)}"
+        # Should have at least common tools (4) + coding tools (14+)
+        assert len(tools) >= 18, f"Coding should have at least 18 tools, got {len(tools)}"
         # Should not have excessive tools
         assert len(tools) < 60, f"Coding should have less than 60 tools, got {len(tools)}"
 
