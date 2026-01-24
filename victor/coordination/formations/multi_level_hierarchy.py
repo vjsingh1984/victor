@@ -87,7 +87,7 @@ class HierarchyNode:
     parent: Optional["HierarchyNode"] = None
     level: int = 0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Set parent references and level for children."""
         for child in self.children:
             child.parent = self

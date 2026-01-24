@@ -82,7 +82,7 @@ class EnhancedQuery:
     hypothetical_doc: Optional[str] = None
     metadata: Dict[str, Any] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.variants is None:
             self.variants = []
         if self.metadata is None:

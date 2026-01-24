@@ -395,7 +395,7 @@ class TeamMember:
         default=None, repr=False, compare=False
     )
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Generate ID if not provided."""
         if not self.id:
             self.id = f"{self.role.value}_{uuid.uuid4().hex[:8]}"
@@ -702,7 +702,7 @@ class TeamConfig:
     allow_dynamic_membership: bool = False
     timeout_seconds: int = 600
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate team configuration."""
         if not self.members:
             raise ValueError("Team must have at least one member")

@@ -210,7 +210,7 @@ class TeamTemplate:
     metadata: Dict[str, Any] = field(default_factory=dict)
     examples: List[Dict[str, Any]] = field(default_factory=list)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate template configuration."""
         if not self.members:
             raise ValueError(f"Template '{self.name}' must have at least one member")

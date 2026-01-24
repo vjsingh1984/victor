@@ -590,7 +590,7 @@ class WorkflowDefinition:
     max_iterations: int = 25
     max_retries: int = 0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate workflow structure."""
         if self.nodes and not self.start_node:
             # Find first node added as start

@@ -102,7 +102,7 @@ class BatchTask:
     retry_count: int = 0
     dependencies: List[str] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.dependencies is None:
             self.dependencies = []
 

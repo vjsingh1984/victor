@@ -164,7 +164,7 @@ class AgenticTimeoutConfig:
     min_turn_timeout: int = 180  # Minimum per-turn timeout
     policy: TimeoutPolicy = field(default_factory=SafeTimeoutPolicy)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize policy if needed."""
         if self.policy is None:
             self.policy = SafeTimeoutPolicy(min_turn_timeout=self.min_turn_timeout)

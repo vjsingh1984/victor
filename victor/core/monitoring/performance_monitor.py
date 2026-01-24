@@ -100,7 +100,7 @@ class OperationMetrics:
     # Track recent execution times for percentiles
     _samples: deque = field(default_factory=lambda: deque(maxlen=1000))
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize thread lock."""
         self._lock = threading.Lock()
 

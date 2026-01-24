@@ -215,7 +215,7 @@ class CodingTeamSpec:
     total_tool_budget: int = 100
     max_iterations: int = 50
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Emit deprecation warning on instantiation."""
         warnings.warn(
             "CodingTeamSpec is deprecated. Use TeamSpec from "

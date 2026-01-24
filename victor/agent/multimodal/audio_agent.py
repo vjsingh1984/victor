@@ -112,7 +112,7 @@ class SpeakerSegment:
     confidence: float
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate segment data."""
         if self.start_time < 0:
             raise ValidationError(f"Start time must be non-negative, got {self.start_time}")
@@ -166,7 +166,7 @@ class TranscriptionResult:
     segments: List[SpeakerSegment]
     duration: float
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate transcription data."""
         if not 0 <= self.confidence <= 1:
             raise ValidationError(f"Confidence must be between 0 and 1, got {self.confidence}")
@@ -217,7 +217,7 @@ class AudioQualityMetrics:
     volume_level: float = 0.7
     speech_ratio: float = 0.8
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate metrics."""
         for score_name in ["clarity_score", "noise_level", "volume_level", "speech_ratio"]:
             score = getattr(self, score_name)
@@ -259,7 +259,7 @@ class AudioAnalysis:
     bitrate: Optional[int] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate analysis data."""
         if self.duration < 0:
             raise ValidationError(f"Duration must be non-negative, got {self.duration}")

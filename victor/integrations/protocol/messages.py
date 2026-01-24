@@ -223,7 +223,7 @@ class UnifiedMessage:
     tool_calls: List[ToolCall] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Generate ID if not provided."""
         if not self.id:
             self.id = f"msg-{uuid.uuid4().hex[:12]}"

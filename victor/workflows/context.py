@@ -255,7 +255,7 @@ class ExecutionContextWrapper:
     state: ExecutionContext = field(default_factory=create_execution_context)
     _manager: Any = field(default=None, init=False, repr=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize WorkflowStateManager on first use."""
         from victor.state.managers import WorkflowStateManager
 

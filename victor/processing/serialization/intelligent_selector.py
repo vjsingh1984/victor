@@ -46,7 +46,7 @@ class FormatScore:
     context_score: float  # From current context
     final_score: float = 0.0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # Weighted combination
         self.final_score = (
             self.base_score * 0.4 + self.historical_score * 0.35 + self.context_score * 0.25

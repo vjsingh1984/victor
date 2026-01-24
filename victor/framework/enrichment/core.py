@@ -190,7 +190,7 @@ class ContextEnrichment:
     token_estimate: int = 0
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Estimate token count if not provided."""
         if self.token_estimate == 0 and self.content:
             # Rough estimate: ~4 chars per token

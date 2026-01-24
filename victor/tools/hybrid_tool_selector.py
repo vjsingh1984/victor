@@ -70,7 +70,7 @@ class HybridSelectorConfig:
     rl_boost_weight: float = HybridSelectorDefaults.RL_BOOST_WEIGHT
     enable_cache: bool = True  # Enable caching by default
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate configuration."""
         if not 0.0 <= self.semantic_weight <= 1.0:
             raise ValueError(f"semantic_weight must be in [0.0, 1.0], got {self.semantic_weight}")

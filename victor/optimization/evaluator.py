@@ -73,7 +73,7 @@ class EvaluationResult:
     metrics: Dict[str, float] = None
     recommendation: bool = False
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.metrics is None:
             self.metrics = {}
 

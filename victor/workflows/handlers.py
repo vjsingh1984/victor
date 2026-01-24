@@ -715,7 +715,7 @@ class DataTransformHandler:
     # Registry of transform functions
     _transforms: Dict[str, Callable[[Any], Any]] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # Register default transforms
         self._transforms = {
             "normalize": self._normalize,

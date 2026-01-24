@@ -86,7 +86,7 @@ class SecretMatch:
     severity: SecretSeverity
     suggestion: str = ""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # Redact the matched text for safety
         if len(self.matched_text) > 8:
             visible = min(4, len(self.matched_text) // 4)

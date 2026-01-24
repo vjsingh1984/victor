@@ -121,7 +121,7 @@ class BatchStats:
         default_factory=lambda: dict.fromkeys(BatchPriority, 0)
     )
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize thread lock."""
         self._lock = threading.Lock()
 

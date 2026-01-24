@@ -916,7 +916,7 @@ class YAMLWorkflowConfig:
     # Custom transform functions
     transform_registry: Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.condition_registry is None:
             self.condition_registry = {}
         if self.transform_registry is None:

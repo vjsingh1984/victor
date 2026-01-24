@@ -116,7 +116,7 @@ class CacheStats:
     total_entries: int = 0
     total_size_bytes: int = 0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize thread lock."""
         self._lock = threading.Lock()
 

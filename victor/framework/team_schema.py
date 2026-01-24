@@ -69,7 +69,7 @@ class RoleConfig:
     tool_budget: int
     description: str = ""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Canonicalize tool names on creation."""
         if self.tools:
             self.tools = canonicalize_tool_list(self.tools)
@@ -107,7 +107,7 @@ class TeamSpec:
     task_types: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Canonicalize tool names in members on creation."""
         for member in self.members:
             if hasattr(member, "tools") and member.tools:

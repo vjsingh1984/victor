@@ -129,7 +129,7 @@ class DetectedObject:
     attributes: Dict[str, Any] = field(default_factory=dict)
     label: Optional[str] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate confidence is in valid range."""
         if not 0 <= self.confidence <= 1:
             raise ValidationError(f"Confidence must be between 0 and 1, got {self.confidence}")
@@ -163,7 +163,7 @@ class ColorInfo:
     percentage: float
     name: Optional[str] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate hex color format."""
         if not self.hex_color.startswith("#") or len(self.hex_color) != 7:
             raise ValidationError(f"Invalid hex color format: {self.hex_color}")
@@ -210,7 +210,7 @@ class VisionAnalysisResult:
     faces: List[FaceDetection]
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate confidence range."""
         if not 0 <= self.confidence <= 1:
             raise ValidationError(f"Confidence must be between 0 and 1, got {self.confidence}")
@@ -344,7 +344,7 @@ class ComparisonResult:
     common_elements: List[str]
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate diff_score range."""
         if not 0 <= self.diff_score <= 1:
             raise ValidationError(f"diff_score must be between 0 and 1, got {self.diff_score}")

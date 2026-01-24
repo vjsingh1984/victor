@@ -117,7 +117,7 @@ class LazyVerticalExtensions:
     _load_lock: threading.Lock = field(default_factory=threading.Lock)
     _loading: bool = False
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize based on load trigger."""
         # Resolve AUTO trigger based on environment
         if self.trigger == ExtensionLoadTrigger.AUTO:

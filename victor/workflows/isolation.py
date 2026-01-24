@@ -754,7 +754,7 @@ class IsolationConfig:
     docker_image: Optional[str] = None
     docker_volumes: Dict[str, str] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.resource_limits is None:
             self.resource_limits = ResourceLimits()
 

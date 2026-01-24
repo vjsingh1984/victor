@@ -136,7 +136,7 @@ class CronSchedule:
         repr=False,
     )
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Parse the cron expression."""
         expr = self.ALIASES.get(self.expression, self.expression)
         self._parse_expression(expr)
@@ -323,7 +323,7 @@ class ScheduledWorkflow:
     active_runs: int = 0
     run_count: int = 0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Calculate initial next_run."""
         if self.next_run is None and self.enabled:
             start = self.start_date or datetime.now(timezone.utc)

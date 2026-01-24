@@ -58,7 +58,7 @@ class OptimizationResult:
     converged: bool
     score_history: List[float] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.score_history is None:
             self.score_history = []
 

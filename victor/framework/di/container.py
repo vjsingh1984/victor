@@ -140,7 +140,7 @@ class ServiceDescriptor(Generic[T]):
     _resolved: bool = field(default=False, repr=False)
     use_auto_resolution: bool = field(default=True, repr=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate descriptor configuration."""
         if self.factory is None:
             # Use service_type as factory if no factory provided

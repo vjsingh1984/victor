@@ -126,7 +126,7 @@ class MemoryResult:
     metadata: Dict[str, Any] = field(default_factory=dict)
     timestamp: Optional[float] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Generate ID if not provided."""
         if not self.id:
             content_str = str(self.content)[:100]

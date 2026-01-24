@@ -174,7 +174,7 @@ class ResourceLimit:
     memory_limit: Optional[int] = None
     cpu_limit: Optional[float] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate resource limits."""
         if self.max_concurrent is not None and self.max_concurrent <= 0:
             raise ValueError("max_concurrent must be positive or None")
@@ -222,7 +222,7 @@ class ParallelConfig:
     resource_limit: ResourceLimit = field(default_factory=ResourceLimit)
     n_of_m: Optional[int] = None  # Required for N_OF_M strategy
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate configuration."""
         if self.join_strategy == JoinStrategy.N_OF_M and self.n_of_m is None:
             raise ValueError("n_of_m must be specified for N_OF_M join strategy")
@@ -366,7 +366,7 @@ class NOfMJoinStrategy:
 
     required: int
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate required count."""
         if self.required <= 0:
             raise ValueError("required must be positive")

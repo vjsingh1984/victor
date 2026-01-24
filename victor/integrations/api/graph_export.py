@@ -193,7 +193,7 @@ class GraphSchema:
     total_nodes: int = 0
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Calculate total nodes after initialization."""
         self.total_nodes = len(self.nodes)
 

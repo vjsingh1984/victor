@@ -89,7 +89,7 @@ class RAGEnrichmentConfig:
     llm_provider: Optional[str] = None
     llm_model: Optional[str] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.enhancement_techniques is None:
             # Default: rewrite + entity_expand for RAG
             self.enhancement_techniques = ["rewrite", "entity_expand"]

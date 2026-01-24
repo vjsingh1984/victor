@@ -146,7 +146,7 @@ class ExecutionMetrics:
     tool_counts: Dict[str, int] = field(default_factory=dict)
     tool_errors: Dict[str, int] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize the lock after dataclass initialization."""
         self._lock = threading.Lock()
 

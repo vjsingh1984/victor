@@ -80,7 +80,7 @@ class ToolMetadata:
     # NEW: Execution category for parallel execution
     execution_category: Optional["ExecutionCategory"] = None  # Default: READ_ONLY when None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Apply defaults for None values to support backward compatibility."""
         if self.priority is None:
             self.priority = Priority.MEDIUM
