@@ -65,6 +65,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from victor.framework.workflows.base_handler import BaseHandler, HandlerError
+from victor.framework.handler_registry import handler_decorator
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
@@ -74,6 +75,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@handler_decorator("stats_compute", description="Compute statistical measures on datasets")
 @dataclass
 class StatsComputeHandler(BaseHandler):
     """Compute statistical measures on datasets.
@@ -154,6 +156,7 @@ class StatsComputeHandler(BaseHandler):
         return None
 
 
+@handler_decorator("ml_training", description="Orchestrate ML model training")
 @dataclass
 class MLTrainingHandler(BaseHandler):
     """Orchestrate ML model training.
@@ -200,6 +203,7 @@ class MLTrainingHandler(BaseHandler):
         return output, 1
 
 
+@handler_decorator("pycaret_automl", description="Automated ML using PyCaret")
 @dataclass
 class PyCaretHandler(BaseHandler):
     """Automated ML using PyCaret.
@@ -438,6 +442,7 @@ class PyCaretHandler(BaseHandler):
             }
 
 
+@handler_decorator("autosklearn_automl", description="Automated ML using Auto-sklearn")
 @dataclass
 class AutoSklearnHandler(BaseHandler):
     """Automated ML using Auto-sklearn.
@@ -640,6 +645,7 @@ class AutoSklearnHandler(BaseHandler):
             }
 
 
+@handler_decorator("rl_training", description="Reinforcement Learning training with Stable-Baselines3")
 @dataclass
 class RLTrainingHandler(BaseHandler):
     """Reinforcement Learning training handler.
@@ -810,7 +816,8 @@ class RLTrainingHandler(BaseHandler):
             }
 
 
-# Handler instances
+# HANDLERS dict deprecated - handlers are now auto-registered via @handler_decorator
+# Kept for backward compatibility
 HANDLERS = {
     "stats_compute": StatsComputeHandler(),
     "ml_training": MLTrainingHandler(),
@@ -821,12 +828,13 @@ HANDLERS = {
 
 
 def register_handlers() -> None:
-    """Register DataAnalysis handlers with the workflow executor."""
-    from victor.workflows.executor import register_compute_handler
+    """Register DataAnalysis handlers with the workflow executor.
 
-    for name, handler in HANDLERS.items():
-        register_compute_handler(name, handler)
-        logger.debug(f"Registered DataAnalysis handler: {name}")
+    DEPRECATED: Handlers are now auto-registered via @handler_decorator.
+    This function is kept for backward compatibility but is now a no-op.
+    """
+    # No-op: handlers are auto-registered via @handler_decorator
+    logger.debug("register_handlers() called but handlers are auto-registered")
 
 
 __all__ = [

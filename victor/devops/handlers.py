@@ -52,6 +52,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, Tuple
 
 from victor.framework.workflows.base_handler import BaseHandler
+from victor.framework.handler_registry import handler_decorator
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
@@ -61,6 +62,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@handler_decorator("container_ops", description="Docker/Podman container operations")
 @dataclass
 class ContainerOpsHandler(BaseHandler):
     """Docker/Podman container operations.
@@ -121,6 +123,7 @@ class ContainerOpsHandler(BaseHandler):
         return output, 1
 
 
+@handler_decorator("terraform_apply", description="Terraform/OpenTofu IaC operations")
 @dataclass
 class TerraformHandler(BaseHandler):
     """Terraform/OpenTofu IaC operations.
@@ -194,6 +197,7 @@ class TerraformHandler(BaseHandler):
         return output, tool_calls
 
 
+@handler_decorator("mlops", description="MLOps pipeline operations with MLflow")
 @dataclass
 class MLOpsHandler(BaseHandler):
     """MLOps pipeline operations handler.
@@ -488,6 +492,8 @@ class MLOpsHandler(BaseHandler):
         }
 
 
+# HANDLERS dict deprecated - handlers are now auto-registered via @handler_decorator
+# Kept for backward compatibility
 HANDLERS = {
     "container_ops": ContainerOpsHandler(),
     "terraform_apply": TerraformHandler(),
@@ -496,12 +502,13 @@ HANDLERS = {
 
 
 def register_handlers() -> None:
-    """Register DevOps handlers with the workflow executor."""
-    from victor.workflows.executor import register_compute_handler
+    """Register DevOps handlers with the workflow executor.
 
-    for name, handler in HANDLERS.items():
-        register_compute_handler(name, handler)
-        logger.debug(f"Registered DevOps handler: {name}")
+    DEPRECATED: Handlers are now auto-registered via @handler_decorator.
+    This function is kept for backward compatibility but is now a no-op.
+    """
+    # No-op: handlers are auto-registered via @handler_decorator
+    logger.debug("register_handlers() called but handlers are auto-registered")
 
 
 __all__ = [

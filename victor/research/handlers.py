@@ -19,8 +19,8 @@ Domain-specific handlers for research workflows:
 - citation_formatter: Reference formatting
 
 Usage:
-    from victor.research import handlers
-    handlers.register_handlers()
+    # Handlers are auto-registered via @handler_decorator
+    # Just import this module to register them
 
     # In YAML workflow:
     - id: scrape_page
@@ -41,6 +41,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Tuple
 
 from victor.framework.workflows.base_handler import BaseHandler
+from victor.framework.handler_registry import handler_decorator
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
@@ -50,6 +51,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@handler_decorator("web_scraper", description="Structured web content extraction")
 @dataclass
 class WebScraperHandler(BaseHandler):
     """Structured web content extraction.
@@ -101,6 +103,7 @@ class WebScraperHandler(BaseHandler):
         return output, 1
 
 
+@handler_decorator("citation_formatter", description="Format references and citations")
 @dataclass
 class CitationFormatterHandler(BaseHandler):
     """Format references and citations.
@@ -164,6 +167,8 @@ class CitationFormatterHandler(BaseHandler):
             return f"{authors[0] if authors else 'Unknown'} ({year}). {title}"
 
 
+# HANDLERS dict deprecated - handlers are now auto-registered via @handler_decorator
+# Kept for backward compatibility
 HANDLERS = {
     "web_scraper": WebScraperHandler(),
     "citation_formatter": CitationFormatterHandler(),
@@ -171,12 +176,13 @@ HANDLERS = {
 
 
 def register_handlers() -> None:
-    """Register Research handlers with the workflow executor."""
-    from victor.workflows.executor import register_compute_handler
+    """Register Research handlers with the workflow executor.
 
-    for name, handler in HANDLERS.items():
-        register_compute_handler(name, handler)
-        logger.debug(f"Registered Research handler: {name}")
+    DEPRECATED: Handlers are now auto-registered via @handler_decorator.
+    This function is kept for backward compatibility but is now a no-op.
+    """
+    # No-op: handlers are auto-registered via @handler_decorator
+    logger.debug("register_handlers() called but handlers are auto-registered")
 
 
 __all__ = [

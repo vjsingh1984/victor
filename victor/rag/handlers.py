@@ -37,20 +37,23 @@ from __future__ import annotations
 
 import logging
 import re
-import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, Tuple
+
+from victor.framework.workflows.base_handler import BaseHandler
+from victor.framework.handler_registry import handler_decorator
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
+    from victor.workflows.executor import WorkflowContext
 
 logger = logging.getLogger(__name__)
 
 
+@handler_decorator("vector_search", description="Vector similarity search in vector stores")
 @dataclass
-class VectorSearchHandler:
+class VectorSearchHandler(BaseHandler):
     """Execute vector similarity search.
 
     Searches vector store for similar documents.
@@ -66,16 +69,13 @@ class VectorSearchHandler:
           output: search_results
     """
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
-        start_time = time.time()
-
+    ) -> Tuple[Any, int]:
+        """Execute vector search."""
         query = node.input_mapping.get("query", "")
         if isinstance(query, str) and query.startswith("$ctx."):
             query = context.get(query[5:]) or query
@@ -83,44 +83,29 @@ class VectorSearchHandler:
         top_k = node.input_mapping.get("top_k", 5)
         collection = node.input_mapping.get("collection", "default")
 
-        try:
-            result = await tool_registry.execute(
-                "vector_search",
-                query=query,
-                top_k=top_k,
-                collection=collection,
-            )
+        result = await tool_registry.execute(
+            "vector_search",
+            query=query,
+            top_k=top_k,
+            collection=collection,
+        )
 
-            output = {
-                "query": query,
-                "results": result.output if result.success else [],
-                "count": len(result.output) if result.success and result.output else 0,
-            }
+        # Raise exception if search failed
+        if not result.success:
+            raise Exception(result.error or "Vector search failed")
 
-            output_key = node.output_key or node.id
-            context.set(output_key, output)
+        output = {
+            "query": query,
+            "results": result.output if result.success else [],
+            "count": len(result.output) if result.success and result.output else 0,
+        }
 
-            return NodeResult(
-                node_id=node.id,
-                status=(
-                    ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED
-                ),
-                output=output,
-                error=result.error if not result.success else None,
-                duration_seconds=time.time() - start_time,
-                tool_calls_used=1,
-            )
-        except Exception as e:
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
-            )
+        return output, 1
 
 
+@handler_decorator("chunk_processor", description="Document chunking for embedding")
 @dataclass
-class ChunkProcessorHandler:
+class ChunkProcessorHandler(BaseHandler):
     """Process documents into chunks for embedding.
 
     Splits documents using configurable strategies.
@@ -137,52 +122,33 @@ class ChunkProcessorHandler:
           output: chunks
     """
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
-        start_time = time.time()
-
+    ) -> Tuple[Any, int]:
+        """Execute document chunking."""
         docs_key = node.input_mapping.get("documents")
         documents = context.get(docs_key) if docs_key else []
         strategy = node.input_mapping.get("strategy", "fixed")
         chunk_size = node.input_mapping.get("chunk_size", 512)
         overlap = node.input_mapping.get("overlap", 50)
 
-        try:
-            chunks = []
-            doc_list = documents if isinstance(documents, list) else [documents]
-            for doc in doc_list:
-                doc_chunks = self._chunk_document(doc, strategy, chunk_size, overlap)
-                chunks.extend(doc_chunks)
+        chunks = []
+        doc_list = documents if isinstance(documents, list) else [documents]
+        for doc in doc_list:
+            doc_chunks = self._chunk_document(doc, strategy, chunk_size, overlap)
+            chunks.extend(doc_chunks)
 
-            output = {
-                "strategy": strategy,
-                "chunk_size": chunk_size,
-                "total_chunks": len(chunks),
-                "chunks": chunks,
-            }
+        output = {
+            "strategy": strategy,
+            "chunk_size": chunk_size,
+            "total_chunks": len(chunks),
+            "chunks": chunks,
+        }
 
-            output_key = node.output_key or node.id
-            context.set(output_key, output)
-
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.COMPLETED,
-                output=output,
-                duration_seconds=time.time() - start_time,
-            )
-        except Exception as e:
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
-            )
+        return output, 0
 
     def _chunk_document(
         self, document: Any, strategy: str, chunk_size: int, overlap: int
@@ -234,6 +200,8 @@ class ChunkProcessorHandler:
         return chunks
 
 
+# HANDLERS dict deprecated - handlers are now auto-registered via @handler_decorator
+# Kept for backward compatibility
 HANDLERS = {
     "vector_search": VectorSearchHandler(),
     "chunk_processor": ChunkProcessorHandler(),
@@ -241,12 +209,13 @@ HANDLERS = {
 
 
 def register_handlers() -> None:
-    """Register RAG handlers with the workflow executor."""
-    from victor.workflows.executor import register_compute_handler
+    """Register RAG handlers with the workflow executor.
 
-    for name, handler in HANDLERS.items():
-        register_compute_handler(name, handler)
-        logger.debug(f"Registered RAG handler: {name}")
+    DEPRECATED: Handlers are now auto-registered via @handler_decorator.
+    This function is kept for backward compatibility but is now a no-op.
+    """
+    # No-op: handlers are auto-registered via @handler_decorator
+    logger.debug("register_handlers() called but handlers are auto-registered")
 
 
 __all__ = [
