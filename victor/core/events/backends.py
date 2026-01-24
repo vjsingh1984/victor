@@ -44,6 +44,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import queue
+import random
 import threading
 import uuid
 from dataclasses import dataclass, field
@@ -121,6 +122,8 @@ class InMemoryEventBackend:
         queue_maxsize: int = 10000,
         critical_reserve: int = 0,
         auto_start_dispatcher: bool = True,
+        sampling_rate: float = 1.0,
+        sampling_whitelist: Optional[Set[str]] = None,
     ) -> None:
         """Initialize the in-memory backend.
 
@@ -129,6 +132,8 @@ class InMemoryEventBackend:
             queue_maxsize: Maximum queue size (0 for unbounded)
             critical_reserve: Reserved slots for critical events (future feature)
             auto_start_dispatcher: If False, don't start dispatcher on connect (for testing)
+            sampling_rate: Probability of accepting events (0.0-1.0, default 1.0 = all)
+            sampling_whitelist: Event topics that are never sampled (always accepted)
         """
         self._config = config or BackendConfig()
         self._queue_maxsize = queue_maxsize
@@ -146,6 +151,12 @@ class InMemoryEventBackend:
         # AT_LEAST_ONCE delivery tracking
         self._pending_events: Dict[str, MessagingEvent] = {}  # event_id -> event
         self._delivery_guarantee = self._config.delivery_guarantee
+
+        # Event sampling (Phase 4: Observability Backpressure)
+        self._sampling_rate = max(0.0, min(1.0, sampling_rate))
+        self._sampling_whitelist = sampling_whitelist or set()
+        self._sampled_event_count = 0
+        self._total_event_count = 0
 
     @property
     def backend_type(self) -> BackendType:
@@ -226,6 +237,29 @@ class InMemoryEventBackend:
         if not self._is_connected:
             raise EventPublishError(event, "Backend not connected", retryable=True)
 
+        # Phase 4: Event sampling (observability backpressure)
+        # Apply sampling to reduce event volume under load
+        self._total_event_count += 1
+
+        # Check if event is whitelisted (never sampled)
+        is_whitelisted = any(
+            event.topic.startswith(pattern)
+            for pattern in self._sampling_whitelist
+        )
+
+        # Apply sampling rate (unless whitelisted or sampling is disabled)
+        if not is_whitelisted and self._sampling_rate < 1.0:
+            if random.random() > self._sampling_rate:
+                # Event sampled out (dropped)
+                self._sampled_event_count += 1
+                logger.debug(
+                    f"Event sampled out: {event.topic} "
+                    f"(sampling_rate={self._sampling_rate:.2%}, "
+                    f"total={self._total_event_count}, "
+                    f"sampled={self._sampled_event_count})"
+                )
+                return True  # Return True to indicate no error (event was processed by sampling)
+
         try:
             # Non-blocking put (thread-safe)
             self._event_queue.put_nowait(event)
@@ -233,7 +267,12 @@ class InMemoryEventBackend:
         except queue.Full:
             # Queue full - drop event (AT_MOST_ONCE semantics)
             self._dropped_event_count += 1
-            logger.warning(f"Event queue full, dropping event: {event.topic}")
+            logger.warning(
+                f"Event queue full, dropping event: {event.topic} "
+                f"(queue_size={self._queue_maxsize}, "
+                f"dropped={self._dropped_event_count}, "
+                f"sampled={self._sampled_event_count})"
+            )
             return False
 
     async def publish_batch(self, events: List[MessagingEvent]) -> int:
@@ -486,6 +525,37 @@ class InMemoryEventBackend:
         """Get number of events dropped due to queue overflow."""
         return self._dropped_event_count
 
+    def get_sampling_rate(self) -> float:
+        """Get the current sampling rate (0.0 to 1.0)."""
+        return self._sampling_rate
+
+    def get_sampled_event_count(self) -> int:
+        """Get number of events sampled out (dropped due to sampling)."""
+        return self._sampled_event_count
+
+    def get_total_event_count(self) -> int:
+        """Get total number of events published (including sampled)."""
+        return self._total_event_count
+
+    def get_sampling_statistics(self) -> Dict[str, Any]:
+        """Get comprehensive sampling statistics.
+
+        Returns:
+            Dict with sampling_rate, sampled_count, total_count, and effective_rate
+        """
+        if self._total_event_count == 0:
+            effective_rate = 1.0
+        else:
+            effective_rate = 1.0 - (self._sampled_event_count / self._total_event_count)
+
+        return {
+            "sampling_rate": self._sampling_rate,
+            "sampled_count": self._sampled_event_count,
+            "total_count": self._total_event_count,
+            "effective_rate": effective_rate,
+            "whitelisted_patterns": list(self._sampling_whitelist),
+        }
+
     def get_queue_utilization(self) -> float:
         """Get queue utilization as a percentage (0.0 to 100.0)."""
         if self._queue_maxsize == 0:
@@ -578,6 +648,38 @@ register_backend_factory(
     BackendType.IN_MEMORY,
     lambda config: InMemoryEventBackend(config),
 )
+
+
+# Register distributed backends if available
+def _register_distributed_backends() -> None:
+    """Register Redis and Kafka backends if their dependencies are available."""
+    # Redis backend
+    try:
+        from victor.core.events.redis_backend import RedisEventBackend
+
+        register_backend_factory(
+            BackendType.REDIS,
+            lambda config: RedisEventBackend(config),
+        )
+        logger.debug("Registered RedisEventBackend")
+    except ImportError:
+        pass
+
+    # Kafka backend
+    try:
+        from victor.core.events.kafka_backend import KafkaEventBackend
+
+        register_backend_factory(
+            BackendType.KAFKA,
+            lambda config: KafkaEventBackend(config),
+        )
+        logger.debug("Registered KafkaEventBackend")
+    except ImportError:
+        pass
+
+
+# Auto-register distributed backends on module load
+_register_distributed_backends()
 
 
 # =============================================================================

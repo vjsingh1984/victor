@@ -534,5 +534,266 @@ class TestProtocolCompliance:
         assert isinstance(backend, IEventBackend)
 
 
+# =============================================================================
+# Event Sampling Tests (Phase 4: Observability Backpressure)
+# =============================================================================
+
+
+@pytest.mark.unit
+class TestEventSampling:
+    """Tests for event sampling mechanism."""
+
+    @pytest.mark.asyncio
+    async def test_sampling_rate_validation(self):
+        """Sampling rate should be clamped between 0.0 and 1.0."""
+        # Test with valid rate
+        backend = InMemoryEventBackend(sampling_rate=0.5)
+        await backend.connect()
+        assert backend.get_sampling_rate() == 0.5
+        await backend.disconnect()
+
+        # Test with rate > 1.0 (should clamp to 1.0)
+        backend = InMemoryEventBackend(sampling_rate=1.5)
+        await backend.connect()
+        assert backend.get_sampling_rate() == 1.0
+        await backend.disconnect()
+
+        # Test with rate < 0.0 (should clamp to 0.0)
+        backend = InMemoryEventBackend(sampling_rate=-0.1)
+        await backend.connect()
+        assert backend.get_sampling_rate() == 0.0
+        await backend.disconnect()
+
+    @pytest.mark.asyncio
+    async def test_no_sampling_by_default(self):
+        """Backend should not sample events by default (sampling_rate=1.0)."""
+        backend = InMemoryEventBackend()
+        await backend.connect()
+
+        received = []
+
+        async def handler(event):
+            received.append(event)
+
+        await backend.subscribe("test.*", handler)
+
+        # Publish many events
+        for i in range(100):
+            await backend.publish(MessagingEvent(topic=f"test.event{i}", data={"i": i}))
+
+        await asyncio.sleep(0.2)
+
+        # All events should be delivered
+        assert len(received) == 100
+        assert backend.get_sampled_event_count() == 0
+        assert backend.get_total_event_count() == 100
+
+        await backend.disconnect()
+
+    @pytest.mark.asyncio
+    async def test_sampling_with_zero_rate(self):
+        """All events should be sampled out when rate is 0.0."""
+        backend = InMemoryEventBackend(sampling_rate=0.0)
+        await backend.connect()
+
+        received = []
+
+        async def handler(event):
+            received.append(event)
+
+        await backend.subscribe("test.*", handler)
+
+        # Publish many events
+        for i in range(100):
+            await backend.publish(MessagingEvent(topic=f"test.event{i}", data={"i": i}))
+
+        await asyncio.sleep(0.1)
+
+        # No events should be delivered (all sampled out)
+        assert len(received) == 0
+        assert backend.get_sampled_event_count() == 100
+        assert backend.get_total_event_count() == 100
+
+        await backend.disconnect()
+
+    @pytest.mark.asyncio
+    async def test_sampling_with_half_rate(self):
+        """Approximately half of events should be sampled out when rate is 0.5."""
+        backend = InMemoryEventBackend(sampling_rate=0.5)
+        await backend.connect()
+
+        received = []
+
+        async def handler(event):
+            received.append(event)
+
+        await backend.subscribe("test.*", handler)
+
+        # Publish many events for statistical significance
+        for i in range(1000):
+            await backend.publish(MessagingEvent(topic=f"test.event{i}", data={"i": i}))
+
+        await asyncio.sleep(0.2)
+
+        # Approximately half should be delivered (with tolerance for randomness)
+        delivered_ratio = len(received) / 1000
+        assert 0.4 < delivered_ratio < 0.6  # Allow 40-60% range
+
+        assert backend.get_total_event_count() == 1000
+        assert backend.get_sampled_event_count() + len(received) == 1000
+
+        await backend.disconnect()
+
+    @pytest.mark.asyncio
+    async def test_sampling_whitelist(self):
+        """Whitelisted events should never be sampled."""
+        backend = InMemoryEventBackend(
+            sampling_rate=0.1,  # 90% of events sampled out
+            sampling_whitelist={"critical.", "system.shutdown"},
+        )
+        await backend.connect()
+
+        received = []
+
+        async def handler(event):
+            received.append(event)
+
+        await backend.subscribe("*", handler)
+
+        # Publish whitelisted events
+        for i in range(100):
+            await backend.publish(MessagingEvent(topic=f"critical.alert{i}", data={"i": i}))
+
+        # Publish non-whitelisted events
+        for i in range(100):
+            await backend.publish(MessagingEvent(topic=f"normal.event{i}", data={"i": i}))
+
+        await asyncio.sleep(0.2)
+
+        # Count received events by type
+        critical_received = [e for e in received if e.topic.startswith("critical.")]
+        normal_received = [e for e in received if e.topic.startswith("normal.")]
+
+        # All critical events should be delivered (not sampled)
+        assert len(critical_received) == 100
+
+        # Most normal events should be sampled out
+        assert len(normal_received) < 100
+
+        await backend.disconnect()
+
+    @pytest.mark.asyncio
+    async def test_sampling_statistics(self):
+        """get_sampling_statistics should return comprehensive metrics."""
+        backend = InMemoryEventBackend(sampling_rate=0.5)
+        await backend.connect()
+
+        async def handler(event):
+            pass
+
+        await backend.subscribe("test.*", handler)
+
+        # Publish events
+        for i in range(100):
+            await backend.publish(MessagingEvent(topic=f"test.event{i}", data={"i": i}))
+
+        await asyncio.sleep(0.2)
+
+        stats = backend.get_sampling_statistics()
+
+        assert "sampling_rate" in stats
+        assert stats["sampling_rate"] == 0.5
+
+        assert "sampled_count" in stats
+        assert stats["sampled_count"] >= 0
+
+        assert "total_count" in stats
+        assert stats["total_count"] == 100
+
+        assert "effective_rate" in stats
+        # effective_rate should be close to 0.5 (within tolerance)
+        assert 0.3 < stats["effective_rate"] < 0.7
+
+        assert "whitelisted_patterns" in stats
+        assert stats["whitelisted_patterns"] == []
+
+        await backend.disconnect()
+
+    @pytest.mark.asyncio
+    async def test_sampling_with_whitelist_in_statistics(self):
+        """Statistics should include whitelisted patterns."""
+        backend = InMemoryEventBackend(
+            sampling_rate=0.5,
+            sampling_whitelist={"critical.", "system.shutdown"},
+        )
+        await backend.connect()
+
+        stats = backend.get_sampling_statistics()
+
+        assert "critical." in stats["whitelisted_patterns"]
+        assert "system.shutdown" in stats["whitelisted_patterns"]
+
+        await backend.disconnect()
+
+    @pytest.mark.asyncio
+    async def test_sampling_respects_backend_connection(self):
+        """Sampling should only work when backend is connected."""
+        backend = InMemoryEventBackend(sampling_rate=0.5)
+
+        # Try to publish when not connected
+        with pytest.raises(Exception):  # EventPublishError
+            await backend.publish(MessagingEvent(topic="test.event", data={}))
+
+    @pytest.mark.asyncio
+    async def test_sampling_rate_getter(self):
+        """get_sampling_rate should return the configured rate."""
+        backend = InMemoryEventBackend(sampling_rate=0.25)
+        await backend.connect()
+        assert backend.get_sampling_rate() == 0.25
+        await backend.disconnect()
+
+    @pytest.mark.asyncio
+    async def test_sampled_count_getter(self):
+        """get_sampled_event_count should return number of sampled events."""
+        backend = InMemoryEventBackend(sampling_rate=0.0)
+        await backend.connect()
+
+        async def handler(event):
+            pass
+
+        await backend.subscribe("test.*", handler)
+
+        # Publish events (all will be sampled out)
+        for i in range(50):
+            await backend.publish(MessagingEvent(topic=f"test.event{i}", data={}))
+
+        await asyncio.sleep(0.1)
+
+        assert backend.get_sampled_event_count() == 50
+
+        await backend.disconnect()
+
+    @pytest.mark.asyncio
+    async def test_total_count_getter(self):
+        """get_total_event_count should return total events published."""
+        backend = InMemoryEventBackend(sampling_rate=0.5)
+        await backend.connect()
+
+        async def handler(event):
+            pass
+
+        await backend.subscribe("test.*", handler)
+
+        # Publish events
+        for i in range(75):
+            await backend.publish(MessagingEvent(topic=f"test.event{i}", data={}))
+
+        await asyncio.sleep(0.1)
+
+        assert backend.get_total_event_count() == 75
+
+        await backend.disconnect()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
