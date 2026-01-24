@@ -15,7 +15,7 @@
 """Benchmark vertical compute handlers.
 
 Domain-specific handlers for benchmark workflows:
-- test_runner: Execute tests and parse results
+- benchmark_test_runner: Execute tests and parse results
 - environment_setup: Set up execution environment
 - live_executor: Execute code with real-time feedback
 - language_detector: Detect programming language
@@ -31,7 +31,7 @@ Usage:
     # In YAML workflow:
     - id: run_tests
       type: compute
-      handler: test_runner
+      handler: benchmark_test_runner
       inputs:
         test_file: tests/test_solution.py
         timeout: 60
@@ -65,9 +65,9 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-@handler_decorator("test_runner", description="Execute tests and return results")
+@handler_decorator("benchmark_test_runner", description="Execute tests in benchmark context")
 @dataclass
-class TestRunnerHandler(BaseHandler):
+class BenchmarkTestRunnerHandler(BaseHandler):
     """Execute tests and return results.
 
     Runs the test suite against generated solutions.
@@ -75,7 +75,7 @@ class TestRunnerHandler(BaseHandler):
     Example YAML:
         - id: run_tests
           type: compute
-          handler: test_runner
+          handler: benchmark_test_runner
           inputs:
             test_file: tests/test_solution.py
             test_command: pytest tests/ -v
@@ -730,7 +730,7 @@ class SyntaxCheckHandler(BaseHandler):
 
 __all__ = [
     # Handlers
-    "TestRunnerHandler",
+    "BenchmarkTestRunnerHandler",
     "EnvironmentSetupHandler",
     "LiveExecutorHandler",
     "LanguageDetectorHandler",
