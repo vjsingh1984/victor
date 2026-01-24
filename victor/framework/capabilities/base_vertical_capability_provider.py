@@ -106,14 +106,15 @@ def _map_capability_type(framework_type: FrameworkCapabilityType) -> str:
     Returns:
         Core capability type string
     """
+    # Map framework capability types to core capability types
+    # FrameworkCapabilityType has: TOOL, PROMPT, MODE, SAFETY, RL
+    # Core CapabilityType has: TOOL, WORKFLOW, MIDDLEWARE, VALIDATOR, OBSERVER
     mapping = {
         FrameworkCapabilityType.TOOL: CapabilityType.TOOL,
-        FrameworkCapabilityType.WORKFLOW: CapabilityType.WORKFLOW,
-        FrameworkCapabilityType.MIDDLEWARE: CapabilityType.MIDDLEWARE,
-        FrameworkCapabilityType.VALIDATOR: CapabilityType.VALIDATOR,
-        FrameworkCapabilityType.OBSERVER: CapabilityType.OBSERVER,
+        FrameworkCapabilityType.PROMPT: CapabilityType.TOOL,  # Map PROMPT to TOOL
         FrameworkCapabilityType.MODE: CapabilityType.TOOL,  # Map MODE to TOOL
         FrameworkCapabilityType.SAFETY: CapabilityType.MIDDLEWARE,  # Map SAFETY to MIDDLEWARE
+        FrameworkCapabilityType.RL: CapabilityType.TOOL,  # Map RL to TOOL
     }
     return mapping.get(framework_type, CapabilityType.TOOL)
 

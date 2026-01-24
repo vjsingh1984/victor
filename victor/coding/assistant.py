@@ -31,6 +31,10 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Type
 
 from victor.core.verticals.base import StageDefinition, VerticalBase, VerticalConfig
+from victor.core.verticals.defaults.tool_defaults import (
+    COMMON_REQUIRED_TOOLS,
+    merge_required_tools,
+)
 from victor.core.verticals.protocols import (
     MiddlewareProtocol,
     SafetyExtensionProtocol,

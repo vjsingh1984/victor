@@ -135,7 +135,7 @@ class ResourceManager:
 
     def _init(self) -> None:
         """Initialize the resource manager."""
-        self._cleanup_callbacks: List[Callable] = []
+        self._cleanup_callbacks: List[tuple[int, Callable[..., Any]]] = []
         self._resources: Dict[str, ManagedResource] = {}
         self._callback_lock = threading.Lock()
         self._resource_lock = threading.Lock()

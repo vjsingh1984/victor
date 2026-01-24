@@ -521,7 +521,7 @@ def get_memory_optimizer() -> MemoryOptimizer:
     return _global_optimizer
 
 
-def memory_efficient(maxsize: int = 128) -> Callable:
+def memory_efficient(maxsize: int = 128) -> Callable[..., Any]:
     """Decorator to make functions more memory-efficient.
 
     Uses object pooling for frequently allocated return types.
