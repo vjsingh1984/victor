@@ -99,7 +99,7 @@ class WSMessage:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
-        result = {
+        result: Dict[str, Any] = {
             "type": self.type.value,
             "timestamp": self.timestamp,
             "id": self.id,
@@ -172,7 +172,7 @@ class WorkflowEventBridge:
         self._event_bus = event_bus
         self._subscriptions: Dict[tuple[str, str], WorkflowSubscription] = {}
         self._running = False
-        self._event_handlers: Dict[str, List[Callable]] = {}
+        self._event_handlers: Dict[str, List[Callable[..., Any]]] = {}
         self._event_subscriptions: List[SubscriptionHandle] = []
 
     async def start(self) -> None:
@@ -439,10 +439,16 @@ class WorkflowEventBridge:
 
         # Add event-specific data
         if "node" in topic:
-            message_data["node_id"] = event.data.get("node_id")
-            message_data["node_name"] = event.data.get("node_name")
+            node_id = event.data.get("node_id")
+            node_name = event.data.get("node_name")
+            if node_id is not None:
+                message_data["node_id"] = node_id
+            if node_name is not None:
+                message_data["node_name"] = node_name
         elif "progress" in topic:
-            message_data["progress"] = event.data.get("progress", 0.0)
+            progress = event.data.get("progress", 0.0)
+            if progress is not None:
+                message_data["progress"] = progress
 
         # Merge in additional event data
         message_data.update(event.data)
@@ -454,9 +460,9 @@ class WorkflowEventBridge:
 
         return WSMessage(
             type=WSMessageType.EVENT,
-            workflow_id=event.data.get("workflow_id"),
+            workflow_id=str(event.data.get("workflow_id", "")),
             data=message_data,
-            timestamp=event.timestamp or time.time(),
+            timestamp=float(event.timestamp or time.time()),
         )
 
     async def broadcast_workflow_event(
@@ -568,6 +574,6 @@ def workflow_stream_chunk_to_ws_event(
 
     # Add progress if available
     if chunk.progress is not None:
-        event_data["progress"] = chunk.progress
+        event_data["progress"] = str(chunk.progress)
 
     return event_data

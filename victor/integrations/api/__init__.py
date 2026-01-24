@@ -43,7 +43,7 @@ if TYPE_CHECKING:
     )
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> object:
     """Lazy import for optional dependencies."""
     if name == "VictorAPIServer":
         from victor.integrations.api.server import VictorAPIServer

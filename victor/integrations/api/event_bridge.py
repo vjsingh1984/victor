@@ -123,6 +123,7 @@ class EventBroadcaster:
     """
 
     _instance: Optional["EventBroadcaster"] = None
+    _initialized: bool = False
 
     def __new__(cls) -> "EventBroadcaster":
         """Ensure singleton instance."""
@@ -131,14 +132,14 @@ class EventBroadcaster:
             cls._instance._initialized = False
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the broadcaster."""
         if self._initialized:
             return
 
         self._clients: Dict[str, ClientConnection] = {}
         self._event_queue: asyncio.Queue[BridgeEvent] = asyncio.Queue()
-        self._broadcast_task: Optional[asyncio.Task] = None
+        self._broadcast_task: Optional[asyncio.Task[None]] = None
         self._running = False
         self._initialized = True
 
@@ -170,7 +171,7 @@ class EventBroadcaster:
     def add_client(
         self,
         client_id: str,
-        send_func: Callable[[str], None],
+        send_func: Callable[[str], Any],
         subscriptions: Optional[Set[str]] = None,
     ) -> None:
         """Add a connected client."""
@@ -212,7 +213,7 @@ class EventBroadcaster:
         """Main broadcast loop."""
         while self._running:
             try:
-                event = await asyncio.wait_for(self._event_queue.get(), timeout=1.0)
+                event = await asyncio.wait_for(self._event_queue.get(), timeout=1.0)  # type: ignore[arg-type]
                 await self._send_to_clients(event)
             except asyncio.TimeoutError:
                 continue
@@ -227,10 +228,10 @@ class EventBroadcaster:
         for client_id, client in self._clients.items():
             if client.is_subscribed(event.type.value):
                 try:
-                    await asyncio.wait_for(
-                        asyncio.coroutine(client.send)(event_json),
-                        timeout=5.0,
-                    )
+                    # Call send if it's a coroutine function
+                    result = client.send(event_json)
+                    if asyncio.iscoroutine(result):
+                        await asyncio.wait_for(result, timeout=5.0)
                     client.last_activity = time.time()
                 except Exception as e:
                     logger.warning(f"Failed to send to {client_id}: {e}")
@@ -254,7 +255,7 @@ class WebSocketEventHandler:
 
     async def handle_connection(
         self,
-        websocket,  # WebSocket connection object
+        websocket: Any,  # WebSocket connection object
         client_id: Optional[str] = None,
     ) -> None:
         """Handle a new WebSocket connection.
@@ -370,9 +371,11 @@ class EventBusAdapter:
     def disconnect(self) -> None:
         """Disconnect from the EventBus."""
         if self._event_bus:
-            for event_type in self._subscriptions:
+            for sub_handle in self._subscriptions:
                 try:
-                    self._event_bus.unsubscribe(event_type, self._on_event)
+                    # New API uses subscription handles
+                    if hasattr(self._event_bus, "unsubscribe"):
+                        self._event_bus.unsubscribe(sub_handle)  # type: ignore[call-arg]
                 except Exception:
                     pass
             self._subscriptions.clear()

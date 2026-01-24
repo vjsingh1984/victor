@@ -103,7 +103,7 @@ class GraphNode:
         Returns:
             Dictionary compatible with Cytoscape.js element format
         """
-        element = {
+        element: Dict[str, Any] = {
             "data": {
                 "id": self.id,
                 "label": self.name,
@@ -333,7 +333,7 @@ def _export_from_compiled_graph(
                 GraphEdge(
                     id=f"edge_{edge_id}",
                     source=source,
-                    target=target,
+                    target=str(target) if target is not None else "",
                     label=label,
                     conditional=conditional,
                 )

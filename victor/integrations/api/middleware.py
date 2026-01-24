@@ -30,7 +30,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import lru_cache, wraps
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
 
 from aiohttp import web
 from aiohttp.web import Request, Response
@@ -76,7 +76,7 @@ class TokenBucket:
         """
         self.rate = rate
         self.capacity = capacity
-        self.tokens = capacity
+        self.tokens: float = capacity
         self.last_update = time.monotonic()
         self._lock = asyncio.Lock()
 
@@ -95,7 +95,7 @@ class TokenBucket:
             self.last_update = now
 
             # Refill tokens based on elapsed time
-            self.tokens = min(self.capacity, self.tokens + elapsed * self.rate)
+            self.tokens = float(min(self.capacity, self.tokens + elapsed * self.rate))
 
             if self.tokens >= tokens:
                 self.tokens -= tokens
@@ -144,7 +144,7 @@ class RateLimiter:
         Uses X-Forwarded-For if behind proxy, falls back to peername.
         """
         forwarded = request.headers.get("X-Forwarded-For")
-        peername = request.transport.get_extra_info("peername")
+        peername = request.transport.get_extra_info("peername") if request.transport else None
         return self._get_client_id_cached(forwarded, tuple(peername) if peername else None)
 
     def _get_bucket(self, key: str, is_endpoint: bool = False) -> TokenBucket:
@@ -291,7 +291,7 @@ class APIKeyAuthenticator:
 
 def create_auth_middleware(
     config: Optional[AuthConfig] = None,
-) -> Callable:
+) -> Callable[[Request, Callable[..., Any]], Awaitable[Response]]:
     """Create authentication middleware.
 
     Args:
@@ -315,16 +315,17 @@ def create_auth_middleware(
             )
 
         # Attach client_id to request for downstream use
-        request["client_id"] = client_id
+        request["client_id"] = client_id  # type: ignore[index]
 
-        return await handler(request)
+        result = await handler(request)
+        return result
 
     return auth_middleware
 
 
 def create_rate_limit_middleware(
     config: Optional[RateLimitConfig] = None,
-) -> Callable:
+) -> Callable[[Request, Callable[..., Any]], Awaitable[Response]]:
     """Create rate limiting middleware.
 
     Args:
@@ -342,22 +343,24 @@ def create_rate_limit_middleware(
 
         if not allowed:
             retry_after = info.get("retry_after", 1.0) if info else 1.0
+            reason = info.get('reason', 'unknown') if info else 'unknown'
             return web.json_response(
                 {
                     "error": "Too Many Requests",
-                    "message": f"Rate limit exceeded: {info.get('reason', 'unknown')}",
+                    "message": f"Rate limit exceeded: {reason}",
                     "retry_after": retry_after,
                 },
                 status=429,
                 headers={"Retry-After": str(int(retry_after))},
             )
 
-        return await handler(request)
+        result = await handler(request)
+        return result
 
     return rate_limit_middleware
 
 
-def create_request_logging_middleware() -> Callable:
+def create_request_logging_middleware() -> Callable[[Request, Callable[..., Any]], Awaitable[Response]]:
     """Create request logging middleware.
 
     Returns:
@@ -400,9 +403,9 @@ class APIMiddlewareStack:
         app = web.Application(middlewares=stack.build())
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize middleware stack."""
-        self._middlewares: List[Callable] = []
+        self._middlewares: List[Callable[[Request, Callable[..., Any]], Awaitable[Response]]] = []
 
     def add_cors(
         self,
@@ -432,9 +435,9 @@ class APIMiddlewareStack:
                     }
                 )
 
-            response = await handler(request)
-            response.headers["Access-Control-Allow-Origin"] = origins
-            return response
+            result = await handler(request)
+            result.headers["Access-Control-Allow-Origin"] = origins
+            return result
 
         self._middlewares.append(cors_middleware)
         return self
@@ -496,7 +499,7 @@ class APIMiddlewareStack:
         self._middlewares.append(create_request_logging_middleware())
         return self
 
-    def build(self) -> List[Callable]:
+    def build(self) -> List[Callable[[Request, Callable[..., Any]], Awaitable[Response]]]:
         """Build middleware list for aiohttp Application.
 
         Returns:
