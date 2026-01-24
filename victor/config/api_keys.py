@@ -650,7 +650,7 @@ class APIKeyManager:
             self.keys_file.parent.mkdir(parents=True, exist_ok=True)
 
             # Load existing keys
-            existing_data: Dict = {}
+            existing_data: Dict[str, Any] = {}
             if self.keys_file.exists():
                 with open(self.keys_file, "r") as f:
                     existing_data = yaml.safe_load(f) or {}
@@ -979,7 +979,7 @@ def set_service_key(service: str, key: str, use_keyring: bool = False) -> bool:
     try:
         _manager.keys_file.parent.mkdir(parents=True, exist_ok=True)
 
-        existing_data: Dict = {}
+        existing_data: Dict[str, Any] = {}
         if _manager.keys_file.exists():
             with open(_manager.keys_file, "r") as f:
                 existing_data = yaml.safe_load(f) or {}

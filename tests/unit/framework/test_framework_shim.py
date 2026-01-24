@@ -54,10 +54,33 @@ class MockVertical(VerticalBase):
 
     @classmethod
     def get_stages(cls):
+        from victor.core.vertical_types import StageDefinition
+
         return {
-            "INITIAL": {"allowed_tools": ["read"], "next": ["PLANNING"]},
-            "PLANNING": {"allowed_tools": ["read", "write"], "next": ["EXECUTION"]},
-            "EXECUTION": {"allowed_tools": ["read", "write", "edit"], "next": ["INITIAL"]},
+            "INITIAL": StageDefinition(
+                name="INITIAL",
+                description="Initial stage",
+                tools={"read"},
+                keywords=["initial", "start"],
+                next_stages={"PLANNING"},
+                min_confidence=0.5,
+            ),
+            "PLANNING": StageDefinition(
+                name="PLANNING",
+                description="Planning stage",
+                tools={"read", "write"},
+                keywords=["plan", "design"],
+                next_stages={"EXECUTION"},
+                min_confidence=0.5,
+            ),
+            "EXECUTION": StageDefinition(
+                name="EXECUTION",
+                description="Execution stage",
+                tools={"read", "write", "edit"},
+                keywords=["execute", "run"],
+                next_stages=set(),
+                min_confidence=0.5,
+            ),
         }
 
 
@@ -243,18 +266,14 @@ class TestFrameworkShimVertical:
             def __init__(self):
                 self._enabled_tools = set()
                 self._vertical_context = None
-                self.prompt_builder = MagicMock()
-                self.prompt_builder.set_custom_prompt = MagicMock()
-                self._custom_prompt_calls = []
+                self.set_custom_prompt = MagicMock()
+                self.set_custom_prompt_calls = []
 
             def set_enabled_tools(self, tools):
                 self._enabled_tools = set(tools) if tools else set()
 
             def get_enabled_tools(self):
                 return self._enabled_tools
-
-            def set_custom_prompt(self, prompt):
-                self._custom_prompt_calls.append(prompt)
 
             def set_vertical_context(self, context):
                 self._vertical_context = context
@@ -267,6 +286,7 @@ class TestFrameworkShimVertical:
                     self.set_enabled_tools(args[0])
                     return True
                 elif name == "custom_prompt" and args:
+                    self._custom_prompt_calls.append(args[0])
                     self.set_custom_prompt(args[0])
                     return True
                 elif name == "vertical_context" and args:

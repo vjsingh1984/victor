@@ -244,6 +244,42 @@ def merge_transitions(
     return result
 
 
+def merge_required_tools(
+    base: Set[str],
+    vertical_tools: List[str],
+) -> List[str]:
+    """Merge common required tools with vertical-specific tools.
+
+    Combines base required tools (as set) with vertical-specific tools (as list),
+    preserving order while eliminating duplicates.
+
+    Args:
+        base: Base required tools set (e.g., COMMON_REQUIRED_TOOLS)
+        vertical_tools: Vertical-specific tools list
+
+    Returns:
+        Combined tools list with base tools first, then vertical-specific tools,
+        with duplicates removed while preserving order.
+
+    Example:
+        >>> base = {"read", "write", "edit"}
+        >>> vertical = ["read", "grep", "test"]
+        >>> merge_required_tools(base, vertical)
+        ["read", "write", "edit", "grep", "test"]
+    """
+    # Start with base tools (order from set)
+    result = list(base)
+
+    # Add vertical tools, skipping duplicates
+    seen = set(base)
+    for tool in vertical_tools:
+        if tool not in seen:
+            result.append(tool)
+            seen.add(tool)
+
+    return result
+
+
 __all__ = [
     "COMMON_TOOL_CLUSTERS",
     "COMMON_TOOL_DEPENDENCIES",
@@ -253,4 +289,5 @@ __all__ = [
     "merge_clusters",
     "merge_dependencies",
     "merge_transitions",
+    "merge_required_tools",
 ]

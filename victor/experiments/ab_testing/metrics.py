@@ -75,7 +75,7 @@ class MetricsCollector:
         )
 
         # Event subscription handles
-        self._subscription_handles: List = []
+        self._subscription_handles: List[Any] = []
 
     async def start(self) -> None:
         """Start collecting metrics from ObservabilityBus."""
