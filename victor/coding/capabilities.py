@@ -90,12 +90,13 @@ def configure_git_safety(
     if block_main_push:
         safety.add_dangerous_pattern(r"git\s+push\s+.*\b(main|master)\b")
 
-    # Store config for commit hook
-    if hasattr(orchestrator, "safety_config"):
-        orchestrator.safety_config["git"] = {
-            "require_tests_before_commit": require_tests_before_commit,
-            "allowed_branches": allowed_branches or [],
-        }
+    # SOLID DIP: Store config in VerticalContext instead of direct attribute write
+    context = orchestrator.vertical_context
+    git_safety_config = {
+        "require_tests_before_commit": require_tests_before_commit,
+        "allowed_branches": allowed_branches or [],
+    }
+    context.set_capability_config("git_safety", git_safety_config)
 
     logger.info("Configured git safety rules")
 
@@ -117,13 +118,15 @@ def configure_code_style(
         max_line_length: Maximum line length
         enforce_type_hints: Whether to enforce type hints
     """
-    if hasattr(orchestrator, "code_style"):
-        orchestrator.code_style = {
-            "formatter": formatter,
-            "linter": linter,
-            "max_line_length": max_line_length,
-            "enforce_type_hints": enforce_type_hints,
-        }
+    # SOLID DIP: Store config in VerticalContext instead of direct attribute write
+    context = orchestrator.vertical_context
+    code_style_config = {
+        "formatter": formatter,
+        "linter": linter,
+        "max_line_length": max_line_length,
+        "enforce_type_hints": enforce_type_hints,
+    }
+    context.set_capability_config("code_style", code_style_config)
 
     logger.info(f"Configured code style: formatter={formatter}, linter={linter}")
 
@@ -137,8 +140,9 @@ def get_code_style(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Code style configuration dict
     """
-    return getattr(
-        orchestrator,
+    # SOLID DIP: Read from VerticalContext instead of direct attribute access
+    context = orchestrator.vertical_context
+    return context.get_capability_config(
         "code_style",
         {
             "formatter": "black",
@@ -166,13 +170,15 @@ def configure_test_requirements(
         test_framework: Test framework to use
         run_tests_on_edit: Automatically run tests after edits
     """
-    if hasattr(orchestrator, "test_config"):
-        orchestrator.test_config = {
-            "min_coverage": min_coverage,
-            "required_patterns": required_test_patterns or [],
-            "framework": test_framework,
-            "run_on_edit": run_tests_on_edit,
-        }
+    # SOLID DIP: Store config in VerticalContext instead of direct attribute write
+    context = orchestrator.vertical_context
+    test_config = {
+        "min_coverage": min_coverage,
+        "required_patterns": required_test_patterns or [],
+        "framework": test_framework,
+        "run_on_edit": run_tests_on_edit,
+    }
+    context.set_capability_config("test_requirements", test_config)
 
     logger.info(f"Configured test requirements: framework={test_framework}")
 
@@ -196,15 +202,17 @@ def configure_language_server(
     """
     default_languages = ["python", "typescript", "javascript", "rust", "go"]
 
-    if hasattr(orchestrator, "lsp_config"):
-        orchestrator.lsp_config = {
-            "languages": languages or default_languages,
-            "features": {
-                "hover": enable_hover,
-                "references": enable_references,
-                "symbols": enable_symbols,
-            },
-        }
+    # SOLID DIP: Store config in VerticalContext instead of direct attribute write
+    context = orchestrator.vertical_context
+    lsp_config = {
+        "languages": languages or default_languages,
+        "features": {
+            "hover": enable_hover,
+            "references": enable_references,
+            "symbols": enable_symbols,
+        },
+    }
+    context.set_capability_config("language_server", lsp_config)
 
     logger.info(f"Configured LSP for languages: {languages or default_languages}")
 
@@ -226,15 +234,17 @@ def configure_refactoring(
         enable_inline: Enable inline refactoring
         require_tests: Require tests before refactoring
     """
-    if hasattr(orchestrator, "refactor_config"):
-        orchestrator.refactor_config = {
-            "operations": {
-                "rename": enable_rename,
-                "extract": enable_extract,
-                "inline": enable_inline,
-            },
-            "require_tests": require_tests,
-        }
+    # SOLID DIP: Store config in VerticalContext instead of direct attribute write
+    context = orchestrator.vertical_context
+    refactor_config = {
+        "operations": {
+            "rename": enable_rename,
+            "extract": enable_extract,
+            "inline": enable_inline,
+        },
+        "require_tests": require_tests,
+    }
+    context.set_capability_config("refactoring", refactor_config)
 
     logger.info("Configured refactoring capabilities")
 

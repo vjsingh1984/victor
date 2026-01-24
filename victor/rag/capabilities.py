@@ -80,24 +80,16 @@ def configure_indexing(
         embedding_dimensions: Dimension of embedding vectors
         store_backend: Vector store backend (lancedb, chromadb, etc.)
     """
-    if hasattr(orchestrator, "rag_config"):
-        orchestrator.rag_config["indexing"] = {
-            "chunk_size": chunk_size,
-            "chunk_overlap": chunk_overlap,
-            "embedding_model": embedding_model,
-            "embedding_dimensions": embedding_dimensions,
-            "store_backend": store_backend,
-        }
-    else:
-        orchestrator.rag_config = {
-            "indexing": {
-                "chunk_size": chunk_size,
-                "chunk_overlap": chunk_overlap,
-                "embedding_model": embedding_model,
-                "embedding_dimensions": embedding_dimensions,
-                "store_backend": store_backend,
-            }
-        }
+    # SOLID DIP: Store config in VerticalContext instead of direct attribute write
+    context = orchestrator.vertical_context
+    indexing_config = {
+        "chunk_size": chunk_size,
+        "chunk_overlap": chunk_overlap,
+        "embedding_model": embedding_model,
+        "embedding_dimensions": embedding_dimensions,
+        "store_backend": store_backend,
+    }
+    context.set_capability_config("rag_indexing", indexing_config)
 
     logger.info(f"Configured RAG indexing: chunk_size={chunk_size}, model={embedding_model}")
 
@@ -111,15 +103,18 @@ def get_indexing_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Indexing configuration dict
     """
-    if hasattr(orchestrator, "rag_config") and orchestrator.rag_config.get("indexing"):
-        return orchestrator.rag_config.get("indexing", {})
-    return {
-        "chunk_size": 512,
-        "chunk_overlap": 50,
-        "embedding_model": "text-embedding-3-small",
-        "embedding_dimensions": 1536,
-        "store_backend": "lancedb",
-    }
+    # SOLID DIP: Read from VerticalContext instead of direct attribute access
+    context = orchestrator.vertical_context
+    return context.get_capability_config(
+        "rag_indexing",
+        {
+            "chunk_size": 512,
+            "chunk_overlap": 50,
+            "embedding_model": "text-embedding-3-small",
+            "embedding_dimensions": 1536,
+            "store_backend": "lancedb",
+        },
+    )
 
 
 def configure_retrieval(
@@ -141,24 +136,16 @@ def configure_retrieval(
         rerank_enabled: Whether to rerank retrieved results
         max_context_tokens: Maximum tokens in context window
     """
-    if hasattr(orchestrator, "rag_config"):
-        orchestrator.rag_config["retrieval"] = {
-            "top_k": top_k,
-            "similarity_threshold": similarity_threshold,
-            "search_type": search_type,
-            "rerank_enabled": rerank_enabled,
-            "max_context_tokens": max_context_tokens,
-        }
-    else:
-        orchestrator.rag_config = {
-            "retrieval": {
-                "top_k": top_k,
-                "similarity_threshold": similarity_threshold,
-                "search_type": search_type,
-                "rerank_enabled": rerank_enabled,
-                "max_context_tokens": max_context_tokens,
-            }
-        }
+    # SOLID DIP: Store config in VerticalContext instead of direct attribute write
+    context = orchestrator.vertical_context
+    retrieval_config = {
+        "top_k": top_k,
+        "similarity_threshold": similarity_threshold,
+        "search_type": search_type,
+        "rerank_enabled": rerank_enabled,
+        "max_context_tokens": max_context_tokens,
+    }
+    context.set_capability_config("rag_retrieval", retrieval_config)
 
     logger.info(f"Configured RAG retrieval: top_k={top_k}, search_type={search_type}")
 
@@ -172,15 +159,18 @@ def get_retrieval_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Retrieval configuration dict
     """
-    if hasattr(orchestrator, "rag_config") and orchestrator.rag_config.get("retrieval"):
-        return orchestrator.rag_config.get("retrieval", {})
-    return {
-        "top_k": 5,
-        "similarity_threshold": 0.7,
-        "search_type": "hybrid",
-        "rerank_enabled": True,
-        "max_context_tokens": 4000,
-    }
+    # SOLID DIP: Read from VerticalContext instead of direct attribute access
+    context = orchestrator.vertical_context
+    return context.get_capability_config(
+        "rag_retrieval",
+        {
+            "top_k": 5,
+            "similarity_threshold": 0.7,
+            "search_type": "hybrid",
+            "rerank_enabled": True,
+            "max_context_tokens": 4000,
+        },
+    )
 
 
 def configure_synthesis(
@@ -202,24 +192,16 @@ def configure_synthesis(
         temperature: LLM temperature for synthesis
         require_verification: Whether to verify answer against sources
     """
-    if hasattr(orchestrator, "rag_config"):
-        orchestrator.rag_config["synthesis"] = {
-            "citation_style": citation_style,
-            "include_sources": include_sources,
-            "max_answer_tokens": max_answer_tokens,
-            "temperature": temperature,
-            "require_verification": require_verification,
-        }
-    else:
-        orchestrator.rag_config = {
-            "synthesis": {
-                "citation_style": citation_style,
-                "include_sources": include_sources,
-                "max_answer_tokens": max_answer_tokens,
-                "temperature": temperature,
-                "require_verification": require_verification,
-            }
-        }
+    # SOLID DIP: Store config in VerticalContext instead of direct attribute write
+    context = orchestrator.vertical_context
+    synthesis_config = {
+        "citation_style": citation_style,
+        "include_sources": include_sources,
+        "max_answer_tokens": max_answer_tokens,
+        "temperature": temperature,
+        "require_verification": require_verification,
+    }
+    context.set_capability_config("rag_synthesis", synthesis_config)
 
     logger.info(f"Configured RAG synthesis: citation_style={citation_style}")
 
@@ -233,15 +215,18 @@ def get_synthesis_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Synthesis configuration dict
     """
-    if hasattr(orchestrator, "rag_config") and orchestrator.rag_config.get("synthesis"):
-        return orchestrator.rag_config.get("synthesis", {})
-    return {
-        "citation_style": "inline",
-        "include_sources": True,
-        "max_answer_tokens": 2000,
-        "temperature": 0.3,
-        "require_verification": True,
-    }
+    # SOLID DIP: Read from VerticalContext instead of direct attribute access
+    context = orchestrator.vertical_context
+    return context.get_capability_config(
+        "rag_synthesis",
+        {
+            "citation_style": "inline",
+            "include_sources": True,
+            "max_answer_tokens": 2000,
+            "temperature": 0.3,
+            "require_verification": True,
+        },
+    )
 
 
 def configure_safety(
@@ -263,22 +248,15 @@ def configure_safety(
     """
     default_types = ["pdf", "docx", "txt", "md", "py", "js", "ts", "html"]
 
-    if hasattr(orchestrator, "rag_config"):
-        orchestrator.rag_config["safety"] = {
-            "filter_sensitive_data": filter_sensitive_data,
-            "max_document_size_mb": max_document_size_mb,
-            "allowed_file_types": allowed_file_types or default_types,
-            "validate_sources": validate_sources,
-        }
-    else:
-        orchestrator.rag_config = {
-            "safety": {
-                "filter_sensitive_data": filter_sensitive_data,
-                "max_document_size_mb": max_document_size_mb,
-                "allowed_file_types": allowed_file_types or default_types,
-                "validate_sources": validate_sources,
-            }
-        }
+    # SOLID DIP: Store config in VerticalContext instead of direct attribute write
+    context = orchestrator.vertical_context
+    safety_config = {
+        "filter_sensitive_data": filter_sensitive_data,
+        "max_document_size_mb": max_document_size_mb,
+        "allowed_file_types": allowed_file_types or default_types,
+        "validate_sources": validate_sources,
+    }
+    context.set_capability_config("rag_safety", safety_config)
 
     logger.info(f"Configured RAG safety: filter_sensitive={filter_sensitive_data}")
 
@@ -300,22 +278,15 @@ def configure_query_enhancement(
         max_query_variants: Maximum number of query variants to generate
         use_synonyms: Whether to use synonym expansion
     """
-    if hasattr(orchestrator, "rag_config"):
-        orchestrator.rag_config["query_enhancement"] = {
-            "enable_expansion": enable_expansion,
-            "enable_decomposition": enable_decomposition,
-            "max_query_variants": max_query_variants,
-            "use_synonyms": use_synonyms,
-        }
-    else:
-        orchestrator.rag_config = {
-            "query_enhancement": {
-                "enable_expansion": enable_expansion,
-                "enable_decomposition": enable_decomposition,
-                "max_query_variants": max_query_variants,
-                "use_synonyms": use_synonyms,
-            }
-        }
+    # SOLID DIP: Store config in VerticalContext instead of direct attribute write
+    context = orchestrator.vertical_context
+    query_enhancement_config = {
+        "enable_expansion": enable_expansion,
+        "enable_decomposition": enable_decomposition,
+        "max_query_variants": max_query_variants,
+        "use_synonyms": use_synonyms,
+    }
+    context.set_capability_config("rag_query_enhancement", query_enhancement_config)
 
     logger.info(f"Configured query enhancement: expansion={enable_expansion}")
 

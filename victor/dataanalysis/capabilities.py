@@ -78,13 +78,15 @@ def configure_data_quality(
         require_type_validation: Require data type validation
         handle_missing: Strategy for missing values: "impute", "drop", "flag"
     """
-    if hasattr(orchestrator, "data_quality_config"):
-        orchestrator.data_quality_config = {
-            "min_completeness": min_completeness,
-            "max_outlier_ratio": max_outlier_ratio,
-            "require_type_validation": require_type_validation,
-            "handle_missing": handle_missing,
-        }
+    # SOLID DIP: Store config in VerticalContext instead of direct attribute write
+    context = orchestrator.vertical_context
+    data_quality_config = {
+        "min_completeness": min_completeness,
+        "max_outlier_ratio": max_outlier_ratio,
+        "require_type_validation": require_type_validation,
+        "handle_missing": handle_missing,
+    }
+    context.set_capability_config("data_quality", data_quality_config)
 
     logger.info(
         f"Configured data quality: completeness>={min_completeness:.0%}, "
@@ -101,9 +103,10 @@ def get_data_quality(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Data quality configuration dict
     """
-    return getattr(
-        orchestrator,
-        "data_quality_config",
+    # SOLID DIP: Read from VerticalContext instead of direct attribute access
+    context = orchestrator.vertical_context
+    return context.get_capability_config(
+        "data_quality",
         {
             "min_completeness": 0.9,
             "max_outlier_ratio": 0.05,
@@ -132,14 +135,16 @@ def configure_visualization_style(
         dpi: Resolution in dots per inch
         save_format: Default save format (png, svg, pdf)
     """
-    if hasattr(orchestrator, "visualization_config"):
-        orchestrator.visualization_config = {
-            "backend": default_backend,
-            "theme": theme,
-            "figure_size": figure_size,
-            "dpi": dpi,
-            "save_format": save_format,
-        }
+    # SOLID DIP: Store config in VerticalContext instead of direct attribute write
+    context = orchestrator.vertical_context
+    visualization_config = {
+        "backend": default_backend,
+        "theme": theme,
+        "figure_size": figure_size,
+        "dpi": dpi,
+        "save_format": save_format,
+    }
+    context.set_capability_config("visualization_style", visualization_config)
 
     logger.info(f"Configured visualization: backend={default_backend}, theme={theme}")
 
@@ -153,9 +158,10 @@ def get_visualization_style(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Visualization configuration dict
     """
-    return getattr(
-        orchestrator,
-        "visualization_config",
+    # SOLID DIP: Read from VerticalContext instead of direct attribute access
+    context = orchestrator.vertical_context
+    return context.get_capability_config(
+        "visualization_style",
         {
             "backend": "matplotlib",
             "theme": "seaborn-v0_8-whitegrid",
@@ -183,13 +189,15 @@ def configure_statistical_analysis(
         multiple_testing_correction: Correction method (bonferroni, holm, fdr_bh)
         effect_size_threshold: Minimum effect size for practical significance
     """
-    if hasattr(orchestrator, "statistics_config"):
-        orchestrator.statistics_config = {
-            "significance_level": significance_level,
-            "confidence_interval": confidence_interval,
-            "multiple_testing_correction": multiple_testing_correction,
-            "effect_size_threshold": effect_size_threshold,
-        }
+    # SOLID DIP: Store config in VerticalContext instead of direct attribute write
+    context = orchestrator.vertical_context
+    statistics_config = {
+        "significance_level": significance_level,
+        "confidence_interval": confidence_interval,
+        "multiple_testing_correction": multiple_testing_correction,
+        "effect_size_threshold": effect_size_threshold,
+    }
+    context.set_capability_config("statistical_analysis", statistics_config)
 
     logger.info(
         f"Configured statistics: alpha={significance_level}, " f"CI={confidence_interval:.0%}"
@@ -205,9 +213,10 @@ def get_statistical_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Statistical configuration dict
     """
-    return getattr(
-        orchestrator,
-        "statistics_config",
+    # SOLID DIP: Read from VerticalContext instead of direct attribute access
+    context = orchestrator.vertical_context
+    return context.get_capability_config(
+        "statistical_analysis",
         {
             "significance_level": 0.05,
             "confidence_interval": 0.95,
@@ -238,15 +247,17 @@ def configure_ml_pipeline(
         enable_hyperparameter_tuning: Enable hyperparameter optimization
         tuning_method: Tuning method (grid, random, bayesian)
     """
-    if hasattr(orchestrator, "ml_config"):
-        orchestrator.ml_config = {
-            "framework": default_framework,
-            "cv_folds": cross_validation_folds,
-            "test_size": test_size,
-            "random_state": random_state,
-            "hyperparameter_tuning": enable_hyperparameter_tuning,
-            "tuning_method": tuning_method,
-        }
+    # SOLID DIP: Store config in VerticalContext instead of direct attribute write
+    context = orchestrator.vertical_context
+    ml_config = {
+        "framework": default_framework,
+        "cv_folds": cross_validation_folds,
+        "test_size": test_size,
+        "random_state": random_state,
+        "hyperparameter_tuning": enable_hyperparameter_tuning,
+        "tuning_method": tuning_method,
+    }
+    context.set_capability_config("ml_pipeline", ml_config)
 
     logger.info(
         f"Configured ML pipeline: framework={default_framework}, "
@@ -263,9 +274,10 @@ def get_ml_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         ML configuration dict
     """
-    return getattr(
-        orchestrator,
-        "ml_config",
+    # SOLID DIP: Read from VerticalContext instead of direct attribute access
+    context = orchestrator.vertical_context
+    return context.get_capability_config(
+        "ml_pipeline",
         {
             "framework": "sklearn",
             "cv_folds": 5,

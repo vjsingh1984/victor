@@ -78,13 +78,15 @@ def configure_source_verification(
         require_diverse_sources: Require source diversity (domains, types)
         validate_urls: Validate URL accessibility and format
     """
-    if hasattr(orchestrator, "source_verification_config"):
-        orchestrator.source_verification_config = {
-            "min_credibility": min_credibility,
-            "min_source_count": min_source_count,
-            "require_diverse_sources": require_diverse_sources,
-            "validate_urls": validate_urls,
-        }
+    # SOLID DIP: Store config in VerticalContext instead of direct attribute write
+    context = orchestrator.vertical_context
+    source_verification_config = {
+        "min_credibility": min_credibility,
+        "min_source_count": min_source_count,
+        "require_diverse_sources": require_diverse_sources,
+        "validate_urls": validate_urls,
+    }
+    context.set_capability_config("source_verification", source_verification_config)
 
     logger.info(
         f"Configured source verification: credibility>={min_credibility:.0%}, "
@@ -101,9 +103,10 @@ def get_source_verification(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Source verification configuration dict
     """
-    return getattr(
-        orchestrator,
-        "source_verification_config",
+    # SOLID DIP: Read from VerticalContext instead of direct attribute access
+    context = orchestrator.vertical_context
+    return context.get_capability_config(
+        "source_verification",
         {
             "min_credibility": 0.7,
             "min_source_count": 3,
@@ -130,13 +133,15 @@ def configure_citation_management(
         include_authors: Include author names in citations
         include_dates: Include publication dates
     """
-    if hasattr(orchestrator, "citation_config"):
-        orchestrator.citation_config = {
-            "default_style": default_style,
-            "require_urls": require_urls,
-            "include_authors": include_authors,
-            "include_dates": include_dates,
-        }
+    # SOLID DIP: Store config in VerticalContext instead of direct attribute write
+    context = orchestrator.vertical_context
+    citation_config = {
+        "default_style": default_style,
+        "require_urls": require_urls,
+        "include_authors": include_authors,
+        "include_dates": include_dates,
+    }
+    context.set_capability_config("citation_management", citation_config)
 
     logger.info(f"Configured citation management: style={default_style}")
 
@@ -150,9 +155,10 @@ def get_citation_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Citation configuration dict
     """
-    return getattr(
-        orchestrator,
-        "citation_config",
+    # SOLID DIP: Read from VerticalContext instead of direct attribute access
+    context = orchestrator.vertical_context
+    return context.get_capability_config(
+        "citation_management",
         {
             "default_style": "apa",
             "require_urls": True,
@@ -179,13 +185,15 @@ def configure_research_quality(
         check_recency: Check source recency for time-sensitive topics
         max_source_age_days: Maximum acceptable source age in days
     """
-    if hasattr(orchestrator, "research_quality_config"):
-        orchestrator.research_quality_config = {
-            "min_coverage_score": min_coverage_score,
-            "min_source_diversity": min_source_diversity,
-            "check_recency": check_recency,
-            "max_source_age_days": max_source_age_days,
-        }
+    # SOLID DIP: Store config in VerticalContext instead of direct attribute write
+    context = orchestrator.vertical_context
+    research_quality_config = {
+        "min_coverage_score": min_coverage_score,
+        "min_source_diversity": min_source_diversity,
+        "check_recency": check_recency,
+        "max_source_age_days": max_source_age_days,
+    }
+    context.set_capability_config("research_quality", research_quality_config)
 
     logger.info(
         f"Configured research quality: coverage>={min_coverage_score:.0%}, "
@@ -202,9 +210,10 @@ def get_research_quality(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Research quality configuration dict
     """
-    return getattr(
-        orchestrator,
-        "research_quality_config",
+    # SOLID DIP: Read from VerticalContext instead of direct attribute access
+    context = orchestrator.vertical_context
+    return context.get_capability_config(
+        "research_quality",
         {
             "min_coverage_score": 0.75,
             "min_source_diversity": 2,
@@ -231,13 +240,15 @@ def configure_literature_analysis(
         prefer_recent_papers: Prioritize recent publications
         recent_paper_years: Years considered "recent"
     """
-    if hasattr(orchestrator, "literature_config"):
-        orchestrator.literature_config = {
-            "min_relevance_score": min_relevance_score,
-            "weight_citation_count": weight_citation_count,
-            "prefer_recent_papers": prefer_recent_papers,
-            "recent_paper_years": recent_paper_years,
-        }
+    # SOLID DIP: Store config in VerticalContext instead of direct attribute write
+    context = orchestrator.vertical_context
+    literature_config = {
+        "min_relevance_score": min_relevance_score,
+        "weight_citation_count": weight_citation_count,
+        "prefer_recent_papers": prefer_recent_papers,
+        "recent_paper_years": recent_paper_years,
+    }
+    context.set_capability_config("literature_analysis", literature_config)
 
     logger.info(
         f"Configured literature analysis: relevance>={min_relevance_score:.0%}, "
@@ -254,9 +265,10 @@ def get_literature_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Literature configuration dict
     """
-    return getattr(
-        orchestrator,
-        "literature_config",
+    # SOLID DIP: Read from VerticalContext instead of direct attribute access
+    context = orchestrator.vertical_context
+    return context.get_capability_config(
+        "literature_analysis",
         {
             "min_relevance_score": 0.6,
             "weight_citation_count": True,
@@ -283,13 +295,15 @@ def configure_fact_checking(
         min_source_count_for_claim: Minimum sources to verify a claim
         track_supporting_refuting: Track supporting vs refuting evidence
     """
-    if hasattr(orchestrator, "fact_checking_config"):
-        orchestrator.fact_checking_config = {
-            "min_confidence_threshold": min_confidence_threshold,
-            "require_multiple_sources": require_multiple_sources,
-            "min_source_count_for_claim": min_source_count_for_claim,
-            "track_supporting_refuting": track_supporting_refuting,
-        }
+    # SOLID DIP: Store config in VerticalContext instead of direct attribute write
+    context = orchestrator.vertical_context
+    fact_checking_config = {
+        "min_confidence_threshold": min_confidence_threshold,
+        "require_multiple_sources": require_multiple_sources,
+        "min_source_count_for_claim": min_source_count_for_claim,
+        "track_supporting_refuting": track_supporting_refuting,
+    }
+    context.set_capability_config("fact_checking", fact_checking_config)
 
     logger.info(
         f"Configured fact checking: confidence>={min_confidence_threshold:.0%}, "
@@ -306,9 +320,10 @@ def get_fact_checking_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Fact-checking configuration dict
     """
-    return getattr(
-        orchestrator,
-        "fact_checking_config",
+    # SOLID DIP: Read from VerticalContext instead of direct attribute access
+    context = orchestrator.vertical_context
+    return context.get_capability_config(
+        "fact_checking",
         {
             "min_confidence_threshold": 0.5,
             "require_multiple_sources": True,
