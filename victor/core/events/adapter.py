@@ -139,26 +139,26 @@ class EventBusAdapter:
         self._unsubscribe_handle: Optional[SubscriptionHandle] = None
         self._enabled = False
 
-    def enable_forwarding(self) -> None:
+    async def enable_forwarding(self) -> None:
         """Enable event forwarding between buses."""
         if self._enabled:
             return
 
         if self._forward_to_new:
-            # Subscribe to all legacy events
-            self._unsubscribe_legacy = self._legacy_bus.subscribe_all(self._on_legacy_event)
+            # Subscribe to all legacy events using wildcard pattern
+            self._unsubscribe_handle = await self._legacy_bus.subscribe("*", self._on_legacy_event_async)
 
         self._enabled = True
         logger.debug("EventBusAdapter forwarding enabled")
 
-    def disable_forwarding(self) -> None:
+    async def disable_forwarding(self) -> None:
         """Disable event forwarding."""
         if not self._enabled:
             return
 
-        if self._unsubscribe_legacy:
-            self._unsubscribe_legacy()
-            self._unsubscribe_legacy = None
+        if self._unsubscribe_handle:
+            await self._legacy_bus.unsubscribe(self._unsubscribe_handle)
+            self._unsubscribe_handle = None
 
         self._enabled = False
         logger.debug("EventBusAdapter forwarding disabled")
@@ -189,6 +189,10 @@ class EventBusAdapter:
                 pass
         except Exception as e:
             logger.warning(f"Failed to forward event to new backend: {e}")
+
+    async def _on_legacy_event_async(self, victor_event: MessagingEvent) -> None:
+        """Async wrapper for handling events from legacy bus."""
+        self._on_legacy_event(victor_event)
 
 
 class TeamMessageBusAdapter:

@@ -68,7 +68,7 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
 
 try:
     import redis.asyncio as aioredis
@@ -100,6 +100,24 @@ class _RedisSubscription:
     handler: EventHandler
     is_active: bool = True
     stream_keys: List[str] = field(default_factory=list)
+
+
+class _BoundSubscriptionHandle(SubscriptionHandle):
+    """SubscriptionHandle with bound unsubscribe method."""
+
+    def __init__(
+        self,
+        subscription_id: str,
+        pattern: str,
+        unsubscribe_func: Callable[[], Awaitable[None]],
+    ):
+        super().__init__(subscription_id=subscription_id, pattern=pattern, is_active=True)
+        self._unsubscribe_func = unsubscribe_func
+
+    async def unsubscribe(self) -> None:
+        """Unsubscribe using the bound function."""
+        await self._unsubscribe_func()
+        self.is_active = False
 
 
 class RedisEventBackend:
@@ -167,7 +185,7 @@ class RedisEventBackend:
 
         # Subscription management
         self._subscriptions: Dict[str, _RedisSubscription] = {}
-        self._consumer_task: Optional[asyncio.Task] = None
+        self._consumer_task: Optional[asyncio.Task[None]] = None
         self._known_streams: Set[str] = set()
         self._lock = asyncio.Lock()
 
@@ -199,13 +217,13 @@ class RedisEventBackend:
             return
 
         try:
-            self._redis = await aioredis.from_url(
+            self._redis = await aioredis.from_url(  # type: ignore[no-untyped-call]
                 self._redis_url,
                 decode_responses=True,
             )
 
             # Verify connection
-            await self._redis.ping()
+            await self._redis.ping()  # type: ignore[misc]
 
             self._is_connected = True
             logger.info(f"RedisEventBackend connected to {self._redis_url}")
@@ -249,7 +267,7 @@ class RedisEventBackend:
             return False
 
         try:
-            await self._redis.ping()
+            await self._redis.ping()  # type: ignore[misc]
             return True
         except Exception:
             return False
@@ -327,12 +345,12 @@ class RedisEventBackend:
             if self._max_stream_length > 0:
                 await self._redis.xadd(
                     stream_name,
-                    event_data,
+                    event_data,  # type: ignore[arg-type]
                     maxlen=self._max_stream_length,
                     approximate=True,
                 )
             else:
-                await self._redis.xadd(stream_name, event_data)
+                await self._redis.xadd(stream_name, event_data)  # type: ignore[arg-type]
 
             # Track stream for subscriptions
             async with self._lock:
@@ -403,17 +421,21 @@ class RedisEventBackend:
         if self._consumer_task is None or self._consumer_task.done():
             self._consumer_task = asyncio.create_task(self._consume_loop())
 
-        # Create handle
-        handle = SubscriptionHandle(
+        # Create handle with bound unsubscribe capability
+        async def bound_unsubscribe() -> None:
+            # Create a temporary handle for unsubscription
+            temp_handle = SubscriptionHandle(
+                subscription_id=subscription_id,
+                pattern=pattern,
+                is_active=True,
+            )
+            await self.unsubscribe(temp_handle)
+
+        handle = _BoundSubscriptionHandle(
             subscription_id=subscription_id,
             pattern=pattern,
-            is_active=True,
+            unsubscribe_func=bound_unsubscribe,
         )
-
-        async def bound_unsubscribe() -> None:
-            await self.unsubscribe(handle)
-
-        handle.unsubscribe = bound_unsubscribe
 
         logger.debug(f"Subscribed to pattern '{pattern}' (id: {subscription_id})")
         return handle
@@ -471,7 +493,7 @@ class RedisEventBackend:
                     messages = await self._redis.xreadgroup(
                         self._consumer_group,
                         self._consumer_name,
-                        streams=stream_dict,
+                        streams=stream_dict,  # type: ignore[arg-type]
                         count=self._batch_size,
                         block=self._block_timeout_ms,
                     )

@@ -55,7 +55,7 @@ import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
 
 from victor.core.events.protocols import (
     BackendConfig,
@@ -85,6 +85,24 @@ class _SQLiteSubscription:
     handler: EventHandler
     is_active: bool = True
     last_event_id: int = 0
+
+
+class _BoundSubscriptionHandle(SubscriptionHandle):
+    """SubscriptionHandle with bound unsubscribe method."""
+
+    def __init__(
+        self,
+        subscription_id: str,
+        pattern: str,
+        unsubscribe_func: Callable[[], Awaitable[None]],
+    ):
+        super().__init__(subscription_id=subscription_id, pattern=pattern, is_active=True)
+        self._unsubscribe_func = unsubscribe_func
+
+    async def unsubscribe(self) -> None:
+        """Unsubscribe using the bound function."""
+        await self._unsubscribe_func()
+        self.is_active = False
 
 
 class SQLiteEventBackend:
@@ -140,7 +158,7 @@ class SQLiteEventBackend:
         self._conn: Optional[sqlite3.Connection] = None
         self._is_connected = False
         self._subscriptions: Dict[str, _SQLiteSubscription] = {}
-        self._poller_task: Optional[asyncio.Task] = None
+        self._poller_task: Optional[asyncio.Task[None]] = None
         self._lock = threading.Lock()
 
     @property
@@ -340,16 +358,21 @@ class SQLiteEventBackend:
         if self._is_connected and not self._poller_task:
             self._start_poller()
 
-        handle = SubscriptionHandle(
+        # Create handle with bound unsubscribe capability
+        async def bound_unsubscribe() -> None:
+            # Create a temporary handle for unsubscription
+            temp_handle = SubscriptionHandle(
+                subscription_id=subscription_id,
+                pattern=pattern,
+                is_active=True,
+            )
+            await self.unsubscribe(temp_handle)
+
+        handle = _BoundSubscriptionHandle(
             subscription_id=subscription_id,
             pattern=pattern,
-            is_active=True,
+            unsubscribe_func=bound_unsubscribe,
         )
-
-        async def bound_unsubscribe() -> None:
-            await self.unsubscribe(handle)
-
-        handle.unsubscribe = bound_unsubscribe
         return handle
 
     async def unsubscribe(self, handle: SubscriptionHandle) -> bool:

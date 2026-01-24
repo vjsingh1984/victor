@@ -48,7 +48,7 @@ import random
 import threading
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
 
 from victor.core.events.protocols import (
     BackendConfig,
@@ -78,6 +78,42 @@ class _Subscription:
     pattern: str
     handler: EventHandler
     is_active: bool = True
+
+
+class _BoundSubscriptionHandle(SubscriptionHandle):
+    """SubscriptionHandle with bound unsubscribe method."""
+
+    def __init__(
+        self,
+        subscription_id: str,
+        pattern: str,
+        unsubscribe_func: Callable[[], Awaitable[None]],
+    ):
+        super().__init__(subscription_id=subscription_id, pattern=pattern, is_active=True)
+        self._unsubscribe_func = unsubscribe_func
+
+    async def unsubscribe(self) -> None:
+        """Unsubscribe using the bound function."""
+        await self._unsubscribe_func()
+        self.is_active = False
+
+
+class _CombinedSubscriptionHandle(SubscriptionHandle):
+    """SubscriptionHandle that combines multiple subscriptions."""
+
+    def __init__(
+        self,
+        subscription_id: str,
+        pattern: str,
+        unsubscribe_func: Callable[[], Awaitable[None]],
+    ):
+        super().__init__(subscription_id=subscription_id, pattern=pattern, is_active=True)
+        self._unsubscribe_func = unsubscribe_func
+
+    async def unsubscribe(self) -> None:
+        """Unsubscribe all combined subscriptions."""
+        await self._unsubscribe_func()
+        self.is_active = False
 
 
 class InMemoryEventBackend:
@@ -142,11 +178,11 @@ class InMemoryEventBackend:
         # Use thread-safe queue.Queue for cross-thread publishing
         self._event_queue: queue.Queue[MessagingEvent] = queue.Queue(maxsize=queue_maxsize)
         self._is_connected = False
-        self._dispatcher_task: Optional[asyncio.Task] = None
+        self._dispatcher_task: Optional[asyncio.Task[None]] = None
         self._auto_start_dispatcher = auto_start_dispatcher
         # Use threading.Lock for thread-safe subscription management
         self._lock: threading.Lock = threading.Lock()
-        self._pending_tasks: Set[asyncio.Task] = set()
+        self._pending_tasks: Set[asyncio.Task[None]] = set()
         self._dropped_event_count = 0
         # AT_LEAST_ONCE delivery tracking
         self._pending_events: Dict[str, MessagingEvent] = {}  # event_id -> event
@@ -321,19 +357,21 @@ class InMemoryEventBackend:
         with self._lock:
             self._subscriptions[subscription_id] = subscription
 
-        # Create handle with unsubscribe capability
-        handle = SubscriptionHandle(
+        # Create handle with bound unsubscribe capability
+        async def bound_unsubscribe() -> None:
+            # Create a temporary handle for unsubscription
+            temp_handle = SubscriptionHandle(
+                subscription_id=subscription_id,
+                pattern=pattern,
+                is_active=True,
+            )
+            await self.unsubscribe(temp_handle)
+
+        handle = _BoundSubscriptionHandle(
             subscription_id=subscription_id,
             pattern=pattern,
-            is_active=True,
+            unsubscribe_func=bound_unsubscribe,
         )
-
-        # Bind unsubscribe method
-
-        async def bound_unsubscribe() -> None:
-            await self.unsubscribe(handle)
-
-        handle.unsubscribe = bound_unsubscribe
 
         logger.debug(f"Subscribed to pattern '{pattern}' (id: {subscription_id})")
         return handle
@@ -739,7 +777,7 @@ class ObservabilityBus:
 
         # Track exporters (for compatibility with old EventBus API)
         self._exporters: List[Any] = []
-        self._exporter_handles: List[SubscriptionHandle] = []
+        self._exporter_handles: List[tuple[Any, SubscriptionHandle]] = []
         self._pending_exporters: List[tuple[Any, EventHandler]] = (
             []
         )  # (exporter, handler) awaiting subscription
@@ -770,7 +808,7 @@ class ObservabilityBus:
         """
 
         # Create handler for this exporter
-        async def _export_handler(event):
+        async def _export_handler(event: MessagingEvent) -> None:
             try:
                 if hasattr(exporter, "export"):
                     await exporter.export(event)
@@ -871,7 +909,7 @@ class ObservabilityBus:
 
         try:
             # Auto-connect backend if not connected (lazy initialization)
-            if not self._backend._is_connected:
+            if not self._backend.is_connected:
                 await self._backend.connect()
 
             return await self._backend.publish(event)
@@ -1051,7 +1089,7 @@ class AgentMessageBus:
         )
 
         # Auto-connect backend if not connected (lazy initialization)
-        if not self._backend._is_connected:
+        if not self._backend.is_connected:
             await self._backend.connect()
 
         return await self._backend.publish(event)
@@ -1088,7 +1126,7 @@ class AgentMessageBus:
         )
 
         # Auto-connect backend if not connected (lazy initialization)
-        if not self._backend._is_connected:
+        if not self._backend.is_connected:
             await self._backend.connect()
 
         return await self._backend.publish(event)
@@ -1118,18 +1156,15 @@ class AgentMessageBus:
         )
 
         # Create combined handle
-        combined = SubscriptionHandle(
-            subscription_id=f"{directed_handle.subscription_id}+{broadcast_handle.subscription_id}",
-            pattern=f"agent.{agent_id}.* + agent.broadcast.*",
-            is_active=True,
-        )
-
         async def unsubscribe_both() -> None:
             await directed_handle.unsubscribe()
             await broadcast_handle.unsubscribe()
-            combined.is_active = False
 
-        combined.unsubscribe = unsubscribe_both
+        combined = _CombinedSubscriptionHandle(
+            subscription_id=f"{directed_handle.subscription_id}+{broadcast_handle.subscription_id}",
+            pattern=f"agent.{agent_id}.* + agent.broadcast.*",
+            unsubscribe_func=unsubscribe_both,
+        )
         return combined
 
 
@@ -1165,7 +1200,7 @@ def get_observability_bus() -> ObservabilityBus:
     # Auto-register if not exists
     if not container.is_registered(ObservabilityBus):
 
-        def create_bus(container):
+        def create_bus(container: Any) -> ObservabilityBus:
             # Read settings to determine backend
             settings = get_settings()
             backend_type_str = settings.event_backend_type.lower()
@@ -1232,7 +1267,7 @@ def get_agent_message_bus() -> AgentMessageBus:
     # Auto-register if not exists
     if not container.is_registered(AgentMessageBus):
 
-        def create_bus(container):
+        def create_bus(container: Any) -> AgentMessageBus:
             # Read settings to determine backend
             settings = get_settings()
             backend_type_str = settings.event_backend_type.lower()
@@ -1281,7 +1316,13 @@ def get_event_backend() -> IEventBackend:
     from victor.core.container import get_container
 
     container = get_container()
-    return container.get(IEventBackend)
+    # IEventBackend is a protocol, so we need to get a concrete implementation
+    # Prefer InMemoryEventBackend if registered, otherwise try to get any backend
+    if container.is_registered(InMemoryEventBackend):
+        return container.get(InMemoryEventBackend)
+    else:
+        # Create and return a default backend
+        return create_event_backend()
 
 
 # =============================================================================

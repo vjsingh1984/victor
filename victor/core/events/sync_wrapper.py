@@ -125,7 +125,7 @@ class SyncEventWrapper:
             import threading
 
             result = [None]
-            exception = [None]
+            exception: list[Exception | None] = [None]
 
             def run_in_thread() -> None:
                 try:
@@ -163,7 +163,7 @@ class SyncEventWrapper:
             >>> wrapper.publish(event)
             True
         """
-        return self._run_async_synchronous(self._backend.publish(event))
+        return cast(bool, self._run_async_synchronous(self._backend.publish(event)))
 
     def publish_batch(self, events: list[MessagingEvent]) -> int:
         """Publish multiple events synchronously.
@@ -174,7 +174,7 @@ class SyncEventWrapper:
         Returns:
             Number of events successfully published
         """
-        return self._run_async_synchronous(self._backend.publish_batch(events))
+        return cast(int, self._run_async_synchronous(self._backend.publish_batch(events)))
 
     def subscribe(
         self,
@@ -211,7 +211,7 @@ class SyncEventWrapper:
             except Exception as e:
                 logger.error(f"[SyncEventWrapper] Handler error for {event.topic}: {e}")
 
-        return self._run_async_synchronous(self._backend.subscribe(pattern, async_wrapper))
+        return cast(SubscriptionHandle, self._run_async_synchronous(self._backend.subscribe(pattern, async_wrapper)))
 
     def unsubscribe(self, handle: SubscriptionHandle) -> bool:
         """Unsubscribe from events synchronously.
@@ -222,7 +222,7 @@ class SyncEventWrapper:
         Returns:
             True if unsubscribed successfully
         """
-        return self._run_async_synchronous(self._backend.unsubscribe(handle))
+        return cast(bool, self._run_async_synchronous(self._backend.unsubscribe(handle)))
 
     def health_check(self) -> bool:
         """Check backend health synchronously.
@@ -230,7 +230,7 @@ class SyncEventWrapper:
         Returns:
             True if backend is healthy
         """
-        return self._run_async_synchronous(self._backend.health_check())
+        return cast(bool, self._run_async_synchronous(self._backend.health_check()))
 
 
 class SyncObservabilityBus:

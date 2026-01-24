@@ -67,7 +67,7 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
 
 try:
     from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
@@ -102,6 +102,24 @@ class _KafkaSubscription:
     handler: EventHandler
     is_active: bool = True
     topics: List[str] = field(default_factory=list)
+
+
+class _BoundSubscriptionHandle(SubscriptionHandle):
+    """SubscriptionHandle with bound unsubscribe method."""
+
+    def __init__(
+        self,
+        subscription_id: str,
+        pattern: str,
+        unsubscribe_func: Callable[[], Awaitable[None]],
+    ):
+        super().__init__(subscription_id=subscription_id, pattern=pattern, is_active=True)
+        self._unsubscribe_func = unsubscribe_func
+
+    async def unsubscribe(self) -> None:
+        """Unsubscribe using the bound function."""
+        await self._unsubscribe_func()
+        self.is_active = False
 
 
 class KafkaEventBackend:
@@ -187,7 +205,7 @@ class KafkaEventBackend:
 
         # Subscription management
         self._subscriptions: Dict[str, _KafkaSubscription] = {}
-        self._consumer_task: Optional[asyncio.Task] = None
+        self._consumer_task: Optional[asyncio.Task[None]] = None
         self._subscribed_topics: Set[str] = set()
         self._lock = asyncio.Lock()
 
@@ -475,17 +493,21 @@ class KafkaEventBackend:
         # Start or update consumer
         await self._ensure_consumer()
 
-        # Create handle
-        handle = SubscriptionHandle(
+        # Create handle with bound unsubscribe capability
+        async def bound_unsubscribe() -> None:
+            # Create a temporary handle for unsubscription
+            temp_handle = SubscriptionHandle(
+                subscription_id=subscription_id,
+                pattern=pattern,
+                is_active=True,
+            )
+            await self.unsubscribe(temp_handle)
+
+        handle = _BoundSubscriptionHandle(
             subscription_id=subscription_id,
             pattern=pattern,
-            is_active=True,
+            unsubscribe_func=bound_unsubscribe,
         )
-
-        async def bound_unsubscribe() -> None:
-            await self.unsubscribe(handle)
-
-        handle.unsubscribe = bound_unsubscribe
 
         logger.debug(f"Subscribed to pattern '{pattern}' (id: {subscription_id})")
         return handle
