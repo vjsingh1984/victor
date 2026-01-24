@@ -646,6 +646,82 @@ class ConfigurationValidationError(ConfigurationError):
         return result
 
 
+class CapabilityRegistryRequiredError(ConfigurationError):
+    """Raised when capability registry is required but not available.
+
+    This exception is raised when a component requires a capability registry
+    to be present on the orchestrator, but the orchestrator doesn't have one.
+    This enforces dependency inversion and prevents fallback to private field writes.
+
+    Attributes:
+        component: The name of the component that requires the capability registry
+        capability_name: The name of the capability being accessed
+        required_methods: List of required methods that were expected
+
+    Example:
+        raise CapabilityRegistryRequiredError(
+            component="VerticalIntegrationAdapter",
+            capability_name="vertical_middleware",
+            required_methods=["has_capability", "get_capability", "set_capability"]
+        )
+    """
+
+    def __init__(
+        self,
+        message: Optional[str] = None,
+        component: Optional[str] = None,
+        capability_name: Optional[str] = None,
+        required_methods: Optional[List[str]] = None,
+        **kwargs: Any,
+    ):
+        # Build message if not provided
+        if message is None:
+            if component and capability_name:
+                message = (
+                    f"{component} requires capability registry for '{capability_name}', "
+                    f"but orchestrator does not support capability operations. "
+                    f"Required methods: {', '.join(required_methods or [])}"
+                )
+            elif component:
+                message = (
+                    f"{component} requires capability registry, "
+                    f"but orchestrator does not support capability operations."
+                )
+            else:
+                message = (
+                    "Capability registry is required but not available on orchestrator. "
+                    "Ensure orchestrator supports capability operations."
+                )
+
+        # Build recovery hint if not provided
+        if kwargs.get("recovery_hint") is None:
+            if component:
+                kwargs["recovery_hint"] = (
+                    f"Update {component} to use capability registry methods instead of "
+                    f"direct attribute access. Ensure orchestrator is properly initialized "
+                    f"with capability support."
+                )
+            else:
+                kwargs["recovery_hint"] = (
+                    "Use capability registry methods (has_capability, get_capability, "
+                    "set_capability) instead of direct attribute access."
+                )
+
+        super().__init__(message, **kwargs)
+
+        self.component = component or "Unknown"
+        self.capability_name = capability_name
+        self.required_methods = required_methods or []
+
+        # Add to details for logging/tracking
+        if self.component:
+            self.details["component"] = self.component
+        if self.capability_name:
+            self.details["capability_name"] = self.capability_name
+        if self.required_methods:
+            self.details["required_methods"] = self.required_methods
+
+
 class ValidationError(VictorError):
     """Input validation errors."""
 
