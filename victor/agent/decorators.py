@@ -153,7 +153,7 @@ def deprecated_property(
                 replacement="new_attribute",
                 remove_version="0.7.0"
             )
-            def old_attribute(self):
+            def old_attribute(self): -> Any:
                 return self._old_value
         ```
     """
@@ -161,7 +161,7 @@ def deprecated_property(
     def decorator(func: F) -> F:
         @property  # type: ignore
         @functools.wraps(func)
-        def wrapper(self):  # type: ignore
+        def wrapper(self):  # type: ignore -> Any:
             # Build deprecation message
             parts = [f"Property '{func.__name__}' is deprecated"]
 
@@ -224,7 +224,7 @@ def deprecated_class(
             reason="Replaced with more efficient implementation"
         )
         class OldClass:
-            def __init__(self):
+            def __init__(self): -> None:
                 pass
         ```
     """
