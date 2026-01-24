@@ -1,0 +1,241 @@
+# Copyright 2025 Vijaykumar Singh <singhvijd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# DevOps Investigation Workflow
+# =============================
+# Root cause analysis and incident investigation with:
+# - Systematic evidence gathering
+# - Log analysis and pattern detection
+# - Multi-dimensional analysis (performance, security, quality)
+# - Root cause identification
+# - Resolution recommendations
+#
+# MIGRATION: This version uses stage template references to reduce duplication.
+# Original file backed up as investigate.yaml.pre-migration
+
+workflows:
+  investigate_incident:
+    description: "Investigate incidents and identify root causes"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: devops
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Gather Initial Context
+      # =====================================================================
+      - id: gather_context
+        stage: read_stage
+        overrides:
+          name: "Gather Incident Context"
+          goal: |
+            Gather initial context about the incident:
+            - Read incident reports and tickets
+            - Check system status and health
+            - Identify affected services/components
+            - Collect initial error messages
+          tools: [read, search, grep]
+          tool_budget: 20
+          timeout: 180
+        next: [check_evidence]
+
+      - id: check_evidence
+        stage: check_errors_stage
+        overrides:
+          name: "Check Evidence Collected"
+          condition: "evidence_count > 0"
+          branches:
+            "true": analyze_logs
+            "false": request_more_info
+
+      - id: request_more_info
+        stage: input_stage
+        overrides:
+          name: "Request Incident Details"
+          prompt: |
+            ## Need More Information
+
+            Insufficient evidence collected for investigation.
+
+            Please provide:
+            1. Incident description
+            2. Error messages or symptoms
+            3. Affected services/components
+            4. Time of occurrence
+          context_keys:
+            - incident_description
+            - error_messages
+            - affected_services
+            - incident_time
+          timeout: 600
+        next: [gather_context]
+
+      # =====================================================================
+      # Stage 2: Log Analysis
+      # =====================================================================
+      - id: analyze_logs
+        stage: analyze_stage
+        overrides:
+          name: "Analyze Logs and Events"
+          role: analyst
+          goal: |
+            Analyze logs and events for the incident:
+            - Extract error patterns and exceptions
+            - Identify timeline of events
+            - Correlate logs across services
+            - Note anomalies and deviations
+          tools: [read, grep, code_search, shell]
+          tool_budget: 30
+          llm_config:
+            temperature: 0.2
+          timeout: 300
+        next: [performance_analysis]
+
+      # =====================================================================
+      # Stage 3: Multi-Dimensional Analysis (Parallel)
+      # =====================================================================
+      - id: performance_analysis
+        stage: performance_analysis_stage
+        overrides:
+          name: "Performance Analysis"
+          goal: |
+            Analyze performance aspects:
+            {performance_context}
+
+            Check for:
+            - Resource exhaustion
+            - Slow queries/operations
+            - Memory leaks
+            - Connection pool issues
+          tools: [read, grep, shell]
+          tool_budget: 25
+          timeout: 240
+        next: [security_analysis]
+
+      - id: security_analysis
+        stage: security_analysis_stage
+        overrides:
+          name: "Security Analysis"
+          goal: |
+            Analyze for security-related causes:
+            {security_context}
+
+            Check for:
+            - Authentication/authorization failures
+            - Rate limiting or blocking
+            - Injection attacks or exploits
+            - Data access anomalies
+          tools: [read, grep, code_search]
+          tool_budget: 25
+          timeout: 240
+        next: [quality_analysis]
+
+      - id: quality_analysis
+        stage: quality_analysis_stage
+        overrides:
+          name: "Quality Analysis"
+          goal: |
+            Analyze code/configuration quality:
+            {quality_context}
+
+            Check for:
+            - Race conditions
+            - Edge cases not handled
+            - Configuration errors
+            - Dependency issues
+          tools: [read, grep, code_search]
+          tool_budget: 25
+          timeout: 240
+        next: [aggregate_findings]
+
+      # =====================================================================
+      # Stage 4: Aggregate and Synthesize
+      # =====================================================================
+      - id: aggregate_findings
+        stage: aggregate_results_stage
+        overrides:
+          name: "Aggregate Analysis Results"
+          description: "Combine findings from all analysis dimensions"
+          timeout: 60
+        next: [synthesis]
+
+      - id: synthesis
+        stage: synthesis_stage
+        overrides:
+          name: "Synthesize Investigation Findings"
+          role: synthesizer
+          goal: |
+            Synthesize all investigation findings into comprehensive report:
+
+            1. **Executive Summary**
+               - What happened
+               - Impact severity
+               - Current status
+
+            2. **Timeline of Events**
+               - Chronological sequence
+               - Key timestamps
+               - Causal relationships
+
+            3. **Root Cause Analysis**
+               - Primary root cause
+               - Contributing factors
+               - Evidence supporting conclusions
+
+            4. **Impact Assessment**
+               - Affected components/services
+               - User impact
+               - Data/cosmetic impact
+
+            5. **Recommendations**
+               - Immediate fixes
+               - Long-term improvements
+               - Prevention measures
+          tools: [read, write]
+          tool_budget: 40
+          llm_config:
+            temperature: 0.3
+          timeout: 600
+        next: [review_findings]
+
+      # =====================================================================
+      # Stage 5: Review and Validation
+      # =====================================================================
+      - id: review_findings
+        stage: review_stage
+        overrides:
+          name: "Review Investigation Report"
+          role: reviewer
+          goal: |
+            Review the investigation report for:
+            - Logical consistency
+            - Sufficient evidence
+            - Clear causal links
+            - Actionable recommendations
+
+            Identify gaps or areas needing deeper investigation.
+          tools: [read, grep]
+          tool_budget: 20
+          llm_config:
+            temperature: 0.4
+          timeout: 300
+        next: [complete]
+
+      - id: complete
+        stage: complete_stage
+        overrides:
+          name: "Complete Investigation"
+          description: "Mark investigation as complete"

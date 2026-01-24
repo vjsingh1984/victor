@@ -1,0 +1,732 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# DevOps Scaling Workflow
+# =======================
+# Infrastructure scaling operations with:
+# - Performance analysis and capacity planning
+# - Horizontal pod autoscaling (HPA) configuration
+# - Vertical scaling (resource adjustments)
+# - Rollback capabilities
+# - Health verification after scaling
+#
+# MIGRATION: This version uses stage template references to reduce duplication.
+# Templates: analyze_stage, performance_analysis_stage, approval_stage,
+#            deploy_stage, verify_stage, check_success_stage, review_stage
+
+workflows:
+  # =========================================================================
+  # Horizontal Scaling Workflow
+  # =========================================================================
+  scale_horizontal:
+    description: "Horizontal scaling with replica adjustments and HPA configuration"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: devops
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Performance Analysis
+      # =====================================================================
+      - id: analyze_current_state
+        stage: performance_analysis_stage
+        overrides:
+          name: "Analyze Current Performance"
+          goal: |
+            Analyze current system performance and scaling needs:
+            - Current resource utilization (CPU, memory, network)
+            - Request patterns and load trends
+            - Bottleneck identification
+            - Recommended replica count
+          tools: [read, shell, grep]
+          tool_budget: 25
+        next: [capacity_planning]
+
+      - id: capacity_planning
+        stage: analyze_stage
+        overrides:
+          name: "Capacity Planning"
+          role: analyst
+          goal: |
+            Calculate optimal replica configuration:
+            - Target utilization percentage
+            - Minimum/maximum replica bounds
+            - HPA thresholds and metrics
+            - Cost implications
+          tools: [read, code_search]
+          tool_budget: 20
+          llm_config:
+            temperature: 0.2
+        next: [approval_gate]
+
+      # =====================================================================
+      # Stage 2: Approval
+      # =====================================================================
+      - id: approval_gate
+        stage: approval_stage
+        overrides:
+          name: "Scaling Approval"
+          prompt: |
+            ## Scaling Plan
+
+            **Current Replicas:** {current_replicas}
+            **Target Replicas:** {target_replicas}
+            **Scaling Strategy:** {scaling_strategy}
+
+            **Performance Analysis:**
+            {performance_summary}
+
+            **Cost Impact:** {cost_estimate}
+
+            Approve scaling operation?
+          context_keys:
+            - current_replicas
+            - target_replicas
+            - scaling_strategy
+            - performance_summary
+            - cost_estimate
+          timeout: 900
+        next: [execute_scaling]
+
+      # =====================================================================
+      # Stage 3: Execute Scaling
+      # =====================================================================
+      - id: execute_scaling
+        type: compute
+        name: "Apply Scaling Configuration"
+        tools: [shell]
+        inputs:
+          scaling_type: horizontal
+          target_replicas: $ctx.target_replicas
+          namespace: $ctx.namespace
+          deployment: $ctx.deployment_name
+          enable_hpa: $ctx.enable_hpa
+          hpa_config: $ctx.hpa_config
+        output: scaling_result
+        constraints:
+          llm_allowed: false
+          write_allowed: true
+          timeout: 300
+        next: [verify_scaling]
+
+      - id: verify_scaling
+        type: condition
+        name: "Check Scaling Status"
+        condition: "scaling_succeeded"
+        branches:
+          "true": health_verification
+          "false": rollback
+
+      # =====================================================================
+      # Stage 4: Health Verification
+      # =====================================================================
+      - id: health_verification
+        stage: verify_stage
+        overrides:
+          name: "Verify Scaled Deployment"
+          description: "Run health checks after scaling operation"
+          inputs:
+            commands:
+              - kubectl get pods -n $ctx.namespace
+              - kubectl top pods -n $ctx.namespace
+              - $ctx.health_check_command
+          timeout: 180
+        next: [check_health]
+
+      - id: check_health
+        stage: check_success_stage
+        overrides:
+          name: "Check Health Status"
+          condition: "all_pods_healthy"
+          branches:
+            "true": monitor_performance
+            "false": investigate_issues
+
+      - id: investigate_issues
+        stage: analyze_stage
+        overrides:
+          name: "Investigate Scaling Issues"
+          goal: |
+            Investigate scaling issues:
+            {scaling_errors}
+
+            Determine:
+            1. Root cause of failures
+            2. Whether to rollback or retry
+            3. Potential fixes
+          tools: [shell, read, grep]
+          tool_budget: 20
+        next: [issue_decision]
+
+      - id: issue_decision
+        stage: choice_stage
+        overrides:
+          name: "Issue Resolution Decision"
+          prompt: |
+            ## Scaling Issues Detected
+
+            **Investigation:**
+            {investigation}
+
+            **Options:**
+          context_keys:
+            - investigation
+        next: [handle_issue]
+
+      - id: handle_issue
+        type: condition
+        name: "Handle Issue Decision"
+        condition: "issue_decision"
+        branches:
+          "Retry": execute_scaling
+          "Rollback": rollback
+          "Continue": monitor_performance
+
+      # =====================================================================
+      # Stage 5: Rollback (if needed)
+      # =====================================================================
+      - id: rollback
+        type: compute
+        name: "Rollback Scaling"
+        tools: [shell]
+        inputs:
+          previous_replicas: $ctx.previous_replicas
+          namespace: $ctx.namespace
+          deployment: $ctx.deployment_name
+        output: rollback_result
+        constraints:
+          llm_allowed: false
+          write_allowed: true
+          timeout: 300
+        next: [notify_rollback]
+
+      - id: notify_rollback
+        stage: review_stage
+        overrides:
+          name: "Generate Rollback Report"
+          goal: |
+            Generate a rollback incident report:
+            - What scaling operation was attempted
+            - Why it failed
+            - Rollback status
+            - Next steps
+          tool_budget: 10
+        next: [failed]
+
+      - id: failed
+        type: transform
+        name: "Scaling Failed"
+        transform: |
+          status = "failed"
+          rollback_performed = true
+
+      # =====================================================================
+      # Stage 6: Monitor Performance
+      # =====================================================================
+      - id: monitor_performance
+        stage: performance_analysis_stage
+        overrides:
+          name: "Monitor Post-Scale Performance"
+          goal: |
+            Monitor performance after scaling:
+            - Resource utilization across new replicas
+            - Response times and throughput
+            - Error rates
+            - Compare against baseline
+          tools: [shell, grep, code_search]
+          tool_budget: 20
+          timeout: 300
+        next: [complete]
+
+      - id: complete
+        stage: complete_stage
+        overrides:
+          transform: |
+            status = "completed"
+            scaled_replicas = target_replicas
+            scaling_type = "horizontal"
+
+
+  # =========================================================================
+  # Vertical Scaling Workflow
+  # =========================================================================
+  scale_vertical:
+    description: "Vertical scaling with CPU/memory resource adjustments"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: devops
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Resource Analysis
+      # =====================================================================
+      - id: analyze_resources
+        stage: performance_analysis_stage
+        overrides:
+          name: "Analyze Resource Usage"
+          goal: |
+            Analyze current resource utilization:
+            - CPU usage patterns and spikes
+            - Memory usage and leaks
+            - I/O patterns
+            - Resource limits vs. requests
+            - Recommended resource adjustments
+          tools: [read, shell, grep]
+          tool_budget: 25
+        next: [calculate_resources]
+
+      - id: calculate_resources
+        stage: analyze_stage
+        overrides:
+          name: "Calculate Resource Requirements"
+          role: analyst
+          goal: |
+            Calculate optimal resource configuration:
+            - New CPU requests/limits
+            - New memory requests/limits
+            - Headroom for growth
+            - Node capacity considerations
+          tools: [read, code_search]
+          tool_budget: 20
+          llm_config:
+            temperature: 0.2
+        next: [approval_gate]
+
+      # =====================================================================
+      # Stage 2: Approval
+      # =====================================================================
+      - id: approval_gate
+        stage: approval_stage
+        overrides:
+          name: "Resource Scaling Approval"
+          prompt: |
+            ## Vertical Scaling Plan
+
+            **Component:** {component_name}
+            **Current CPU:** {current_cpu}
+            **New CPU:** {new_cpu}
+            **Current Memory:** {current_memory}
+            **New Memory:** {new_memory}
+
+            **Analysis:**
+            {resource_analysis}
+
+            **Impact:** {scaling_impact}
+
+            Approve resource scaling?
+          context_keys:
+            - component_name
+            - current_cpu
+            - new_cpu
+            - current_memory
+            - new_memory
+            - resource_analysis
+            - scaling_impact
+          timeout: 900
+        next: [apply_resources]
+
+      # =====================================================================
+      # Stage 3: Apply Resources
+      # =====================================================================
+      - id: apply_resources
+        type: compute
+        name: "Apply Resource Configuration"
+        tools: [shell]
+        inputs:
+          namespace: $ctx.namespace
+          deployment: $ctx.deployment_name
+          cpu_request: $ctx.cpu_request
+          cpu_limit: $ctx.cpu_limit
+          memory_request: $ctx.memory_request
+          memory_limit: $ctx.memory_limit
+        output: apply_result
+        constraints:
+          llm_allowed: false
+          write_allowed: true
+          timeout: 300
+        next: [restart_pods]
+
+      - id: restart_pods
+        type: compute
+        name: "Restart Pods with New Resources"
+        tools: [shell]
+        inputs:
+          namespace: $ctx.namespace
+          deployment: $ctx.deployment_name
+          strategy: rolling
+        output: restart_result
+        constraints:
+          llm_allowed: false
+          write_allowed: true
+          timeout: 600
+        next: [verify_restart]
+
+      - id: verify_restart
+        type: condition
+        name: "Check Restart Status"
+        condition: "restart_succeeded"
+        branches:
+          "true": health_verification
+          "false": rollback
+
+      # =====================================================================
+      # Stage 4: Health Verification
+      # =====================================================================
+      - id: health_verification
+        stage: verify_stage
+        overrides:
+          name: "Verify Resource Application"
+          description: "Verify new resources are applied and working"
+          inputs:
+            commands:
+              - kubectl describe pod -n $ctx.namespace -l app=$ctx.deployment_name
+              - kubectl top pods -n $ctx.namespace
+              - $ctx.health_check_command
+          timeout: 240
+        next: [check_health]
+
+      - id: check_health
+        stage: check_success_stage
+        overrides:
+          name: "Check Health Status"
+          condition: "pods_healthy_with_new_resources"
+          branches:
+            "true": monitor_performance
+            "false": investigate_issues
+
+      - id: investigate_issues
+        stage: analyze_stage
+        overrides:
+          name: "Investigate Resource Issues"
+          goal: |
+            Investigate resource issues:
+            {resource_errors}
+
+            Check for:
+            1. OOMKilled events
+            2. CPU throttling
+            3. Resource constraints
+            4. Node capacity issues
+          tools: [shell, read, grep]
+          tool_budget: 20
+        next: [issue_decision]
+
+      - id: issue_decision
+        stage: choice_stage
+        overrides:
+          name: "Issue Resolution Decision"
+          prompt: |
+            ## Resource Issues Detected
+
+            **Investigation:**
+            {investigation}
+
+            **Options:**
+          context_keys:
+            - investigation
+        next: [handle_issue]
+
+      - id: handle_issue
+        type: condition
+        name: "Handle Issue Decision"
+        condition: "issue_decision"
+        branches:
+          "Retry": apply_resources
+          "Rollback": rollback
+          "Continue": monitor_performance
+
+      # =====================================================================
+      # Stage 5: Rollback (if needed)
+      # =====================================================================
+      - id: rollback
+        type: compute
+        name: "Rollback Resources"
+        tools: [shell]
+        inputs:
+          previous_cpu_request: $ctx.previous_cpu_request
+          previous_cpu_limit: $ctx.previous_cpu_limit
+          previous_memory_request: $ctx.previous_memory_request
+          previous_memory_limit: $ctx.previous_memory_limit
+          namespace: $ctx.namespace
+          deployment: $ctx.deployment_name
+        output: rollback_result
+        constraints:
+          llm_allowed: false
+          write_allowed: true
+          timeout: 300
+        next: [notify_rollback]
+
+      - id: notify_rollback
+        stage: review_stage
+        overrides:
+          name: "Generate Rollback Report"
+          goal: |
+            Generate a rollback incident report:
+            - What resource changes were attempted
+            - Why they failed
+            - Rollback status
+            - Next steps
+          tool_budget: 10
+        next: [failed]
+
+      - id: failed
+        type: transform
+        name: "Scaling Failed"
+        transform: |
+          status = "failed"
+          rollback_performed = true
+
+      # =====================================================================
+      # Stage 6: Monitor Performance
+      # =====================================================================
+      - id: monitor_performance
+        stage: performance_analysis_stage
+        overrides:
+          name: "Monitor Post-Scale Performance"
+          goal: |
+            Monitor performance with new resources:
+            - CPU utilization within limits
+            - Memory usage stable
+            - No OOMKilled events
+            - Performance improvements
+          tools: [shell, grep, code_search]
+          tool_budget: 20
+          timeout: 300
+        next: [complete]
+
+      - id: complete
+        stage: complete_stage
+        overrides:
+          transform: |
+            status = "completed"
+            new_cpu = cpu_limit
+            new_memory = memory_limit
+            scaling_type = "vertical"
+
+
+  # =========================================================================
+  # Auto-Scaling Configuration Workflow
+  # =========================================================================
+  configure_autoscaling:
+    description: "Configure horizontal pod autoscaling (HPA) policies"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: devops
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Analysis and Planning
+      # =====================================================================
+      - id: analyze_workload
+        stage: performance_analysis_stage
+        overrides:
+          name: "Analyze Workload Patterns"
+          goal: |
+            Analyze workload patterns for autoscaling:
+            - Peak and trough usage patterns
+            - Response time requirements
+            - Resource utilization trends
+            - Recommended scaling metrics
+            - Optimal min/max replica bounds
+          tools: [read, shell, grep]
+          tool_budget: 25
+        next: [design_hpa]
+
+      - id: design_hpa
+        stage: analyze_stage
+        overrides:
+          name: "Design HPA Configuration"
+          role: analyst
+          goal: |
+            Design HPA configuration:
+            - Scaling metrics (CPU, memory, custom)
+            - Target utilization thresholds
+            - Scale-up/scale-down policies
+            - Stabilization windows
+            - Behavior configuration
+          tools: [read, code_search]
+          tool_budget: 20
+          llm_config:
+            temperature: 0.2
+        next: [approval_gate]
+
+      # =====================================================================
+      # Stage 2: Approval
+      # =====================================================================
+      - id: approval_gate
+        stage: approval_stage
+        overrides:
+          name: "HPA Configuration Approval"
+          prompt: |
+            ## HPA Configuration Plan
+
+            **Target:** {target_deployment}
+            **Min Replicas:** {min_replicas}
+            **Max Replicas:** {max_replicas}
+
+            **Metrics:**
+            {scaling_metrics}
+
+            **Policies:**
+            {scaling_policies}
+
+            Approve HPA configuration?
+          context_keys:
+            - target_deployment
+            - min_replicas
+            - max_replicas
+            - scaling_metrics
+            - scaling_policies
+          timeout: 900
+        next: [apply_hpa]
+
+      # =====================================================================
+      # Stage 3: Apply HPA Configuration
+      # =====================================================================
+      - id: apply_hpa
+        type: compute
+        name: "Apply HPA Configuration"
+        tools: [shell]
+        inputs:
+          namespace: $ctx.namespace
+          deployment: $ctx.deployment_name
+          min_replicas: $ctx.min_replicas
+          max_replicas: $ctx.max_replicas
+          metrics: $ctx.hpa_metrics
+          behavior: $ctx.hpa_behavior
+        output: hpa_result
+        constraints:
+          llm_allowed: false
+          write_allowed: true
+          timeout: 180
+        next: [verify_hpa]
+
+      - id: verify_hpa
+        type: condition
+        name: "Check HPA Status"
+        condition: "hpa_created"
+        branches:
+          "true": test_scaling
+          "false": rollback
+
+      # =====================================================================
+      # Stage 4: Test Autoscaling
+      # =====================================================================
+      - id: test_scaling
+        type: compute
+        name: "Trigger Test Scaling"
+        tools: [shell]
+        inputs:
+          test_type: load_test
+          duration: 300
+          namespace: $ctx.namespace
+          target: $ctx.deployment_name
+        output: test_result
+        constraints:
+          llm_allowed: false
+          network_allowed: true
+          timeout: 600
+        next: [verify_scaling_behavior]
+
+      - id: verify_scaling_behavior
+        stage: analyze_stage
+        overrides:
+          name: "Verify Scaling Behavior"
+          goal: |
+            Verify HPA scaled correctly:
+            - Did replicas increase during load?
+            - Did replicas decrease after load?
+            - Was scaling within min/max bounds?
+            - Were stabilization windows respected?
+          tools: [shell, read, grep]
+          tool_budget: 20
+        next: [check_scaling]
+
+      - id: check_scaling
+        type: condition
+        name: "Check Scaling Results"
+        condition: "scaling_works_as_expected"
+        branches:
+          "true": complete
+          "false": adjust_hpa
+
+      - id: adjust_hpa
+        stage: analyze_stage
+        overrides:
+          name: "Adjust HPA Configuration"
+          goal: |
+            Adjust HPA configuration based on test results:
+            {scaling_issues}
+
+            Modify:
+            1. Metrics or thresholds
+            2. Stabilization windows
+            3. Min/max replica bounds
+          tools: [read, edit]
+          tool_budget: 15
+        next: [approval_gate]
+
+      # =====================================================================
+      # Stage 5: Rollback (if needed)
+      # =====================================================================
+      - id: rollback
+        type: compute
+        name: "Remove HPA Configuration"
+        tools: [shell]
+        inputs:
+          namespace: $ctx.namespace
+          hpa_name: $ctx.hpa_name
+        output: rollback_result
+        constraints:
+          llm_allowed: false
+          write_allowed: true
+          timeout: 120
+        next: [notify_rollback]
+
+      - id: notify_rollback
+        stage: review_stage
+        overrides:
+          name: "Generate Rollback Report"
+          goal: |
+            Generate an HPA rollback report:
+            - What HPA configuration was attempted
+            - Why it failed
+            - Rollback status
+            - Recommendations
+          tool_budget: 10
+        next: [failed]
+
+      - id: failed
+        type: transform
+        name: "HPA Configuration Failed"
+        transform: |
+          status = "failed"
+          hpa_removed = true
+
+      # =====================================================================
+      # Stage 6: Completion
+      # =====================================================================
+      - id: complete
+        stage: complete_stage
+        overrides:
+          transform: |
+            status = "completed"
+            hpa_configured = true
+            scaling_type = "autoscaling"

@@ -202,7 +202,7 @@ class DomainConfig:
     term_expansions: Dict[str, str] = field(default_factory=dict)
     prompt_hints: str = ""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Set default techniques if not provided."""
         if not self.default_techniques:
             self.default_techniques = [

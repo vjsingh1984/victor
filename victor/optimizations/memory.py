@@ -331,7 +331,7 @@ class MemoryOptimizer:
     # Conservative GC thresholds (for better CPU performance)
     CONSERVATIVE_GC_THRESHOLDS = (1000, 15, 15)
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize memory optimizer."""
         self._pools: Dict[str, ObjectPool] = {}
         self._profiler: Optional[MemoryProfiler] = None

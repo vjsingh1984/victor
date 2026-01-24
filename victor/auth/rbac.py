@@ -63,11 +63,11 @@ class User:
 class RBAC:
     """Provides the main interface for checking permissions."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.roles: Dict[str, Role] = {}
         self.users: Dict[str, User] = {}
 
-    def add_role(self, role: Role):
+    def add_role(self, role: Role) -> None:
         """Adds a role to the RBAC system."""
         self.roles[role.name] = role
 
@@ -75,7 +75,7 @@ class RBAC:
         """Gets a role by name."""
         return self.roles.get(name)
 
-    def add_user(self, user: User):
+    def add_user(self, user: User) -> None:
         """Adds a user to the RBAC system."""
         self.users[user.name] = user
 

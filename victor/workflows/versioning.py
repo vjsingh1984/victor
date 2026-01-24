@@ -343,7 +343,7 @@ class VersionedWorkflow:
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     checksum: str = ""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Calculate checksum if not provided."""
         if not self.checksum and self.definition:
             self.checksum = self._calculate_checksum()
@@ -405,7 +405,7 @@ class WorkflowVersionRegistry:
         migrated = registry.migrate_state("pipeline", state, "0.5.0", "2.0.0")
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the registry."""
         self._versions: Dict[str, Dict[str, VersionedWorkflow]] = {}
         self._migrations: Dict[str, Dict[str, WorkflowMigration]] = {}

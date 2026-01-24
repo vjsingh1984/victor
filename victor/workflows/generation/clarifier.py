@@ -434,7 +434,7 @@ class AmbiguityDetector:
         rec_stack = set()
         path = []
 
-        def dfs(node: str):
+        def dfs(node: str) -> bool:
             visited.add(node)
             rec_stack.add(node)
             path.append(node)

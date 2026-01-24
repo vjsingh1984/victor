@@ -205,7 +205,7 @@ class IaCScanResult:
     low_count: int = 0
     info_count: int = 0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Calculate summary counts."""
         for finding in self.findings:
             if finding.severity == IaCSeverity.CRITICAL:

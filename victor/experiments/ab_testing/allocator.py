@@ -148,7 +148,7 @@ class StickyAllocator(TrafficAllocator):
         - Can lead to imbalance if few users
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize sticky allocator."""
         # Cache for allocations to avoid recomputation
         self._allocation_cache: Dict[str, Dict[str, str]] = {}
@@ -243,7 +243,7 @@ class RoundRobinAllocator(TrafficAllocator):
         - Less suitable for statistical testing
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize round-robin allocator."""
         # Counter for each experiment
         self._counters: Dict[str, int] = {}

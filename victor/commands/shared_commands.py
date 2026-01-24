@@ -420,7 +420,7 @@ class CommandRegistry:
     Provides lookup, validation, and execution of commands.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize registry with built-in commands."""
         self._commands: Dict[str, CommandDefinition] = {}
         self._aliases: Dict[str, str] = {}
@@ -560,10 +560,10 @@ command_registry = CommandRegistry()
 
 
 # Decorator for registering command handlers
-def command_handler(name: str):
+def command_handler(name: str) -> Any:
     """Decorator to register a function as a command handler."""
 
-    def decorator(func: Callable[..., Any]):
+    def decorator(func: Callable[..., Any]) -> Any:
         command_registry.register_handler(name, func)
         return func
 

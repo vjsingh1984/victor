@@ -108,7 +108,7 @@ class DelegationRequest:
     parent_goal: Optional[str] = None
     delegation_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate request parameters."""
         if not self.task or not self.task.strip():
             raise ValueError("Delegation task cannot be empty")

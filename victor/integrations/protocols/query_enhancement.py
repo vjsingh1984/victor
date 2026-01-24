@@ -162,7 +162,7 @@ class QueryEnhancementConfig:
     model: Optional[str] = None
     temperature: float = 0.3
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Ensure techniques is a list of EnhancementTechnique."""
         if self.techniques:
             self.techniques = [

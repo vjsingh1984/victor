@@ -215,11 +215,11 @@ class FormatRegistry:
         encoder = registry.select_best_encoder(characteristics, config)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize empty registry."""
         self._encoders: Dict[SerializationFormat, FormatEncoder] = {}
         self._priority_order: List[SerializationFormat] = []
-        self._hooks: Dict[str, List[Callable]] = {
+        self._hooks: Dict[str, List[Callable[..., Any]]] = {
             "pre_encode": [],
             "post_encode": [],
             "on_register": [],

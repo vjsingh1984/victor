@@ -920,7 +920,7 @@ class ExecutionReplayer:
         return False
 
     @contextmanager
-    def replay_from_event(self, event_id: str):
+    def replay_from_event(self, event_id: str) -> Any:
         """Context manager for replaying from a specific event.
 
         Args:
