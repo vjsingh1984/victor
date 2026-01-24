@@ -148,6 +148,7 @@ import logging
 from typing import TYPE_CHECKING, Any, List, Optional
 
 from victor.agent.capability_registry import CAPABILITY_METHOD_MAPPINGS, get_method_for_capability
+from victor.core.errors import CapabilityRegistryRequiredError
 
 if TYPE_CHECKING:
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
@@ -307,8 +308,13 @@ class VerticalIntegrationAdapter:
         if hasattr(self._orchestrator, "_set_vertical_middleware_storage"):
             self._orchestrator._set_vertical_middleware_storage(middleware)
         else:
-            # Fallback for backward compatibility
-            self._orchestrator._vertical_middleware = middleware
+            # Enforce capability registry - no private field writes allowed
+            raise CapabilityRegistryRequiredError(
+                component="VerticalIntegrationAdapter",
+                capability_name="vertical_middleware",
+                required_methods=["has_capability", "get_capability_value", "set_capability_value",
+                                  "_set_vertical_middleware_storage"],
+            )
 
         # Get middleware chain via capability (DIP-compliant read)
         chain = self._get_capability_value("middleware_chain")
@@ -321,8 +327,14 @@ class VerticalIntegrationAdapter:
                 # Store via internal setter (DIP-compliant)
                 if hasattr(self._orchestrator, "_set_middleware_chain_storage"):
                     self._orchestrator._set_middleware_chain_storage(chain)
-                elif hasattr(self._orchestrator, "_middleware_chain"):
-                    self._orchestrator._middleware_chain = chain
+                else:
+                    # Enforce capability registry - no private field writes allowed
+                    raise CapabilityRegistryRequiredError(
+                        component="VerticalIntegrationAdapter",
+                        capability_name="middleware_chain",
+                        required_methods=["has_capability", "get_capability_value", "set_capability_value",
+                                          "_set_middleware_chain_storage"],
+                    )
             except ImportError:
                 logger.warning("MiddlewareChain not available")
                 return
@@ -370,18 +382,21 @@ class VerticalIntegrationAdapter:
         if hasattr(self._orchestrator, "_set_safety_patterns_storage"):
             self._orchestrator._set_safety_patterns_storage(patterns)
         else:
-            # Fallback for backward compatibility
-            self._orchestrator._vertical_safety_patterns = patterns
+            # Enforce capability registry - no private field writes allowed
+            raise CapabilityRegistryRequiredError(
+                component="VerticalIntegrationAdapter",
+                capability_name="vertical_safety_patterns",
+                required_methods=["has_capability", "get_capability_value", "set_capability_value",
+                                  "_set_safety_patterns_storage"],
+            )
 
-        # Get safety checker via capability or public method
+        # Get safety checker via capability or public method (DIP-compliant reads only)
         checker = None
         if self._has_capability("safety_checker"):
             checker = self._get_capability_value("safety_checker")
         elif hasattr(self._orchestrator, "get_safety_checker"):
             checker = self._orchestrator.get_safety_checker()
-        elif hasattr(self._orchestrator, "_safety_checker"):
-            # Last resort fallback for testing
-            checker = self._orchestrator._safety_checker
+        # Note: Removed private field read fallback (_safety_checker) for DIP compliance
 
         if checker is None:
             logger.debug("No safety checker available for pattern application")
