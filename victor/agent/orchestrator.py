@@ -1032,7 +1032,7 @@ class AgentOrchestrator(
                     profile_name=f"{self.provider_name}:{self.model}",
                     project_root=intelligent_project_root,
                 )
-                self._intelligent_integration = OrchestratorIntegration(  # type: ignore[arg-type]
+                self._intelligent_integration = OrchestratorIntegration(  
                     orchestrator=self,
                     pipeline=pipeline,
                     config=self._intelligent_integration_config,
@@ -1059,7 +1059,7 @@ class AgentOrchestrator(
             try:
                 from victor.agent.subagents import SubAgentOrchestrator
 
-                self._subagent_orchestrator = SubAgentOrchestrator(parent=self)
+                self._subagent_orchestrator = SubAgentOrchestrator(self._settings, self._provider)  # type: ignore[call-arg]
                 logger.info("SubAgentOrchestrator initialized")
             except ImportError as e:
                 logger.debug(f"SubAgentOrchestrator module not available: {e}")
