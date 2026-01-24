@@ -463,9 +463,12 @@ class ObservabilityToCQRSBridge:
             return
 
         # Subscribe to all observability events using wildcard pattern
-        handle = await self._event_bus.subscribe("*", self._handle_event)
+        handle = await self._event_bus.subscribe("*", self._handle_event_async)
         # Store unsubscribe function
-        self._unsubscribe = lambda: asyncio.create_task(self._event_bus.unsubscribe(handle))
+        def unsubscribe() -> None:
+            asyncio.create_task(self._event_bus.unsubscribe(handle))
+
+        self._unsubscribe = unsubscribe
         self._is_running = True
         logger.debug("ObservabilityToCQRSBridge started")
 
@@ -480,6 +483,14 @@ class ObservabilityToCQRSBridge:
 
         self._is_running = False
         logger.debug(f"ObservabilityToCQRSBridge stopped ({self._event_count} events)")
+
+    async def _handle_event_async(self, event: Any) -> None:
+        """Handle an observability event (MessagingEvent format)."""
+        # Extract topic and data from MessagingEvent
+        topic = getattr(event, 'topic', '')
+        data = getattr(event, 'data', {})
+        metadata = getattr(event, 'headers', {})
+        self._handle_event(topic, data, **metadata)
 
     def _handle_event(self, topic: str, data: Dict[str, Any], **metadata: Any) -> None:
         """Handle an observability event (topic-based)."""
@@ -655,7 +666,7 @@ class CQRSBridge:
 
         # Create the pre-configured command bus which includes
         # its own event_store, dispatcher, and projection
-        command_bus = AgentCommandBus()
+        command_bus: AgentCommandBus = AgentCommandBus()  # type: ignore[no-untyped-call]
 
         # Extract components from the command bus
         event_dispatcher = command_bus.dispatcher
@@ -684,7 +695,7 @@ class CQRSBridge:
                 event_bus=event_bus,
                 event_dispatcher=event_dispatcher,
             )
-            bridge._obs_bridge.start()
+            await bridge._obs_bridge.start()
 
         return bridge
 
@@ -837,6 +848,10 @@ class CQRSBridge:
             Command result with tool output.
         """
         from victor.core.agent_commands import ExecuteToolCommand
+        from victor.core.cqrs import CommandResult, QueryResult
+
+        if self._command_bus is None:
+            raise RuntimeError("Command bus not initialized")
 
         command = ExecuteToolCommand(
             session_id=session_id,
@@ -845,7 +860,13 @@ class CQRSBridge:
         )
 
         result = await self._command_bus.execute(command)
-        return result.result if result.success else {"error": result.error}
+        # Handle both CommandResult and QueryResult
+        if isinstance(result, CommandResult):
+            return result.result if result.result is not None else {"error": result.error}
+        elif isinstance(result, QueryResult):
+            return result.data if result.data is not None else {"error": result.error}
+        else:
+            return {"error": "Unknown result type"}
 
     async def send_chat(
         self,
@@ -864,6 +885,10 @@ class CQRSBridge:
             Command result.
         """
         from victor.core.agent_commands import ChatCommand
+        from victor.core.cqrs import CommandResult, QueryResult
+
+        if self._command_bus is None:
+            raise RuntimeError("Command bus not initialized")
 
         # Note: ChatCommand doesn't have a role field - it's derived from the message flow
         command = ChatCommand(
@@ -872,7 +897,13 @@ class CQRSBridge:
         )
 
         result = await self._command_bus.execute(command)
-        return result.result if result.success else {"error": result.error}
+        # Handle both CommandResult and QueryResult
+        if isinstance(result, CommandResult):
+            return result.result if result.result is not None else {"error": result.error}
+        elif isinstance(result, QueryResult):
+            return result.data if result.data is not None else {"error": result.error}
+        else:
+            return {"error": "Unknown result type"}
 
     # =========================================================================
     # Queries
@@ -888,10 +919,20 @@ class CQRSBridge:
             Session details.
         """
         from victor.core.agent_commands import GetSessionQuery
+        from victor.core.cqrs import CommandResult, QueryResult
+
+        if self._command_bus is None:
+            raise RuntimeError("Command bus not initialized")
 
         query = GetSessionQuery(session_id=session_id)
         result = await self._command_bus.execute(query)
-        return result.data if result.success else {"error": result.error}
+        # Handle both CommandResult and QueryResult
+        if isinstance(result, QueryResult):
+            return result.data if result.data is not None else {"error": result.error}
+        elif isinstance(result, CommandResult):
+            return result.result if result.result is not None else {"error": result.error}
+        else:
+            return {"error": "Unknown result type"}
 
     async def get_conversation_history(
         self,
@@ -908,10 +949,20 @@ class CQRSBridge:
             Conversation history.
         """
         from victor.core.agent_commands import GetConversationHistoryQuery
+        from victor.core.cqrs import CommandResult, QueryResult
+
+        if self._command_bus is None:
+            raise RuntimeError("Command bus not initialized")
 
         query = GetConversationHistoryQuery(session_id=session_id, limit=limit)
         result = await self._command_bus.execute(query)
-        return result.data if result.success else {"error": result.error}
+        # Handle both CommandResult and QueryResult
+        if isinstance(result, QueryResult):
+            return result.data if result.data is not None else {"error": result.error}
+        elif isinstance(result, CommandResult):
+            return result.result if result.result is not None else {"error": result.error}
+        else:
+            return {"error": "Unknown result type"}
 
     async def get_tools(
         self,
@@ -928,10 +979,20 @@ class CQRSBridge:
             Tool list.
         """
         from victor.core.agent_commands import GetToolsQuery
+        from victor.core.cqrs import CommandResult, QueryResult
+
+        if self._command_bus is None:
+            raise RuntimeError("Command bus not initialized")
 
         query = GetToolsQuery(session_id=session_id, category=filter_category)
         result = await self._command_bus.execute(query)
-        return result.data if result.success else {"error": result.error}
+        # Handle both CommandResult and QueryResult
+        if isinstance(result, QueryResult):
+            return result.data if result.data is not None else {"error": result.error}
+        elif isinstance(result, CommandResult):
+            return result.result if result.result is not None else {"error": result.error}
+        else:
+            return {"error": "Unknown result type"}
 
     async def get_metrics(self, session_id: str) -> Dict[str, Any]:
         """Get session metrics via CQRS query.
@@ -943,10 +1004,20 @@ class CQRSBridge:
             Session metrics.
         """
         from victor.core.agent_commands import GetSessionMetricsQuery
+        from victor.core.cqrs import CommandResult, QueryResult
+
+        if self._command_bus is None:
+            raise RuntimeError("Command bus not initialized")
 
         query = GetSessionMetricsQuery(session_id=session_id)
         result = await self._command_bus.execute(query)
-        return result.data if result.success else {"error": result.error}
+        # Handle both CommandResult and QueryResult
+        if isinstance(result, QueryResult):
+            return result.data if result.data is not None else {"error": result.error}
+        elif isinstance(result, CommandResult):
+            return result.result if result.result is not None else {"error": result.error}
+        else:
+            return {"error": "Unknown result type"}
 
     # =========================================================================
     # Direct Projection Access
@@ -994,7 +1065,7 @@ class CQRSBridge:
         Returns:
             Unsubscribe function.
         """
-        if not self._event_dispatcher:
+        if self._event_dispatcher is None:
             return lambda: None
 
         if event_types:
@@ -1005,11 +1076,17 @@ class CQRSBridge:
 
             self._event_dispatcher.subscribe_all(filtered_handler)
             # Return an unsubscribe function
-            return lambda: self._event_dispatcher._all_handlers.remove(filtered_handler)
+            def unsubscribe() -> None:
+                if self._event_dispatcher is not None:
+                    self._event_dispatcher._all_handlers.remove(filtered_handler)
+            return unsubscribe
         else:
             self._event_dispatcher.subscribe_all(handler)
             # Return an unsubscribe function
-            return lambda: self._event_dispatcher._all_handlers.remove(handler)
+            def unsubscribe() -> None:
+                if self._event_dispatcher is not None:
+                    self._event_dispatcher._all_handlers.remove(handler)
+            return unsubscribe
 
     # =========================================================================
     # Lifecycle
