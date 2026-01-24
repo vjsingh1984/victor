@@ -40,7 +40,8 @@ from victor.agent.decorators import deprecated
 if TYPE_CHECKING:
     from victor.core.state import ConversationStage
     from victor.core.events.vertical_context import VerticalContext
-    from victor.providers.base import StreamMetrics, TokenUsage
+    from victor.agent.stream_handler import StreamMetrics
+    from victor.evaluation.protocol import TokenUsage
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,73 @@ class LegacyAPIMixin:
     making the main orchestrator class cleaner and more maintainable.
 
     All methods issue deprecation warnings and provide clear migration paths.
+
+    Type Attributes:
+        The following attributes are expected to be provided by classes using this mixin:
+        - _mode_workflow_team_coordinator: Optional[ModeWorkflowTeamCoordinator]
+        - _configuration_manager: Optional[ConfigurationManager]
+        - _tool_access_controller: Optional[ToolAccessController]
+        - _project_context: Optional[ProjectContext]
+        - _vertical_integration_adapter: Optional[VerticalIntegrationAdapter]
+        - _team_coordinator: Optional[TeamCoordinator]
+        - _metrics_coordinator: Optional[MetricsCoordinator]
+        - _cumulative_token_usage: Dict[str, int]
+        - _state_coordinator: Optional[StateCoordinator]
+        - _context_compactor: Optional[ContextCompactor]
+        - _usage_analytics: Optional[UsageAnalytics]
+        - _sequence_tracker: Optional[SequenceTracker]
+        - _code_correction_middleware: Optional[CodeCorrectionMiddleware]
+        - _safety_checker: Optional[SafetyChecker]
+        - _auto_committer: Optional[AutoCommitter]
+        - search_router: Optional[SearchRouter]
+        - unified_tracker: Optional[UnifiedTaskTracker]
+        - provider_name: str
+        - model: str
+        - _provider_manager: Optional[ProviderManager]
+        - _tool_access_coordinator: Optional[ToolAccessConfigCoordinator]
+        - prompt_builder: Optional[SystemPromptBuilder]
+        - tools: Optional[ToolRegistryProtocol]
+        - conversation: Optional[ConversationStore]
+        - _search_coordinator: Optional[SearchCoordinator]
+        - tool_selector: Optional[ToolSelector]
+        - conversation_state: Optional[ConversationState]
+        - _vertical_context: Optional[VerticalContext]
+        - mode_workflow_team_coordinator: Optional[ModeWorkflowTeamCoordinator]
     """
+
+    # Type stubs for attributes expected on classes using this mixin
+    # These are annotated but not initialized, as the owning class provides them
+    _mode_workflow_team_coordinator: Optional[Any]
+    _configuration_manager: Optional[Any]
+    _tool_access_controller: Optional[Any]
+    _project_context: Optional[Any]
+    _vertical_integration_adapter: Optional[Any]
+    _team_coordinator: Optional[Any]
+    _metrics_coordinator: Optional[Any]
+    _cumulative_token_usage: Dict[str, int]
+    _state_coordinator: Optional[Any]
+    _context_compactor: Optional[Any]
+    _usage_analytics: Optional[Any]
+    _sequence_tracker: Optional[Any]
+    _code_correction_middleware: Optional[Any]
+    _safety_checker: Optional[Any]
+    _auto_committer: Optional[Any]
+    search_router: Optional[Any]
+    unified_tracker: Optional[Any]
+    provider_name: str
+    model: str
+    _provider_manager: Optional[Any]
+    _tool_access_coordinator: Optional[Any]
+    prompt_builder: Optional[Any]
+    tools: Optional[Any]
+    conversation: Optional[Any]
+    _search_coordinator: Optional[Any]
+    tool_selector: Optional[Any]
+    conversation_state: Optional[Any]
+    _vertical_context: Optional[Any]
+    _vertical_middleware: List[Any]
+    _vertical_safety_patterns: List[Any]
+    mode_workflow_team_coordinator: Optional[Any]
 
     # =========================================================================
     # Category 1: Vertical Configuration Methods (Deprecated)
@@ -100,12 +167,13 @@ class LegacyAPIMixin:
             config: TieredToolConfig from the active vertical
         """
         # Delegate to ConfigurationManager for centralized management
-        self._configuration_manager.set_tiered_tool_config(
-            config=config,
-            vertical_context=self._vertical_context,
-            tool_access_controller=self._tool_access_controller,
-        )
-        logger.debug("Tiered tool config set via ConfigurationManager")
+        if self._configuration_manager is not None:
+            self._configuration_manager.set_tiered_tool_config(
+                config=config,
+                vertical_context=self._vertical_context,
+                tool_access_controller=self._tool_access_controller,
+            )
+            logger.debug("Tiered tool config set via ConfigurationManager")
 
     @deprecated(
         version="0.5.1",
@@ -131,7 +199,7 @@ class LegacyAPIMixin:
         if hasattr(self, "_project_context") and self._project_context:
             from victor.context.project_context import ProjectContext
 
-            self._project_context = ProjectContext(workspace_dir)
+            self._project_context = ProjectContext(str(workspace_dir))
             logger.debug(f"Project context updated: {workspace_dir}")
 
     # =========================================================================
@@ -153,7 +221,8 @@ class LegacyAPIMixin:
         Args:
             middleware_list: List of MiddlewareProtocol implementations.
         """
-        self._vertical_integration_adapter.apply_middleware(middleware_list)
+        if self._vertical_integration_adapter is not None:
+            self._vertical_integration_adapter.apply_middleware(middleware_list)
 
     @deprecated(
         version="0.5.1",
@@ -169,7 +238,8 @@ class LegacyAPIMixin:
         Args:
             patterns: List of SafetyPattern objects.
         """
-        self._vertical_integration_adapter.apply_safety_patterns(patterns)
+        if self._vertical_integration_adapter is not None:
+            self._vertical_integration_adapter.apply_safety_patterns(patterns)
 
     @deprecated(
         version="0.5.1",
@@ -269,7 +339,8 @@ class LegacyAPIMixin:
         if self._team_coordinator is None:
             _ = self.mode_workflow_team_coordinator
 
-        self._team_coordinator.set_team_specs(specs)
+        if self._team_coordinator is not None:
+            self._team_coordinator.set_team_specs(specs)
 
     @deprecated(
         version="0.5.1",
@@ -289,7 +360,9 @@ class LegacyAPIMixin:
         if self._team_coordinator is None:
             _ = self.mode_workflow_team_coordinator
 
-        return self._team_coordinator.get_team_specs()
+        if self._team_coordinator is not None:
+            return self._team_coordinator.get_team_specs()  # type: ignore[no-any-return]
+        return {}
 
     # =========================================================================
     # Category 3: Metrics and Analytics Methods (Deprecated)
@@ -310,9 +383,11 @@ class LegacyAPIMixin:
         Returns:
             Dictionary with usage analytics
         """
-        return self._metrics_coordinator.get_tool_usage_stats(
-            conversation_state_summary=self.conversation_state.get_state_summary()
-        )
+        if self._metrics_coordinator is not None and self.conversation_state is not None:
+            return self._metrics_coordinator.get_tool_usage_stats(  # type: ignore[no-any-return]
+                conversation_state_summary=self.conversation_state.get_state_summary()
+            )
+        return {}
 
     @deprecated(
         version="0.5.1",
@@ -328,7 +403,12 @@ class LegacyAPIMixin:
         Returns:
             TokenUsage dataclass with input/output/total token counts
         """
-        return self._metrics_coordinator.get_token_usage()
+        if self._metrics_coordinator is not None:
+            return self._metrics_coordinator.get_token_usage()  # type: ignore[no-any-return]
+        # Return default TokenUsage if coordinator not available
+        from victor.evaluation.protocol import TokenUsage
+
+        return TokenUsage(input_tokens=0, output_tokens=0, total_tokens=0)
 
     @deprecated(
         version="0.5.1",
@@ -359,7 +439,9 @@ class LegacyAPIMixin:
         Returns:
             StreamMetrics from the last session or None
         """
-        return self._metrics_coordinator.get_last_stream_metrics()
+        if self._metrics_coordinator is not None:
+            return self._metrics_coordinator.get_last_stream_metrics()  # type: ignore[no-any-return]
+        return None
 
     @deprecated(
         version="0.5.1",
@@ -375,7 +457,9 @@ class LegacyAPIMixin:
         Returns:
             Dictionary with aggregated metrics or None
         """
-        return self._metrics_coordinator.get_streaming_metrics_summary()
+        if self._metrics_coordinator is not None:
+            return self._metrics_coordinator.get_streaming_metrics_summary()  # type: ignore[no-any-return]
+        return None
 
     @deprecated(
         version="0.5.1",
@@ -394,7 +478,9 @@ class LegacyAPIMixin:
         Returns:
             List of recent metrics dictionaries
         """
-        return self._metrics_coordinator.get_streaming_metrics_history(limit)
+        if self._metrics_coordinator is not None:
+            return self._metrics_coordinator.get_streaming_metrics_history(limit)  # type: ignore[no-any-return]
+        return []
 
     @deprecated(
         version="0.5.1",
@@ -410,7 +496,9 @@ class LegacyAPIMixin:
         Returns:
             Dictionary with session cost statistics
         """
-        return self._metrics_coordinator.get_session_cost_summary()
+        if self._metrics_coordinator is not None:
+            return self._metrics_coordinator.get_session_cost_summary()  # type: ignore[no-any-return]
+        return {}
 
     @deprecated(
         version="0.5.1",
@@ -426,7 +514,9 @@ class LegacyAPIMixin:
         Returns:
             Cost string like "$0.0123" or "cost n/a"
         """
-        return self._metrics_coordinator.get_session_cost_formatted()
+        if self._metrics_coordinator is not None:
+            return self._metrics_coordinator.get_session_cost_formatted()  # type: ignore[no-any-return]
+        return "cost n/a"
 
     @deprecated(
         version="0.5.1",
@@ -443,7 +533,8 @@ class LegacyAPIMixin:
             path: Output file path
             format: Export format ("json" or "csv")
         """
-        self._metrics_coordinator.export_session_costs(path, format)
+        if self._metrics_coordinator is not None:
+            self._metrics_coordinator.export_session_costs(path, format)
 
     # =========================================================================
     # Category 4: State and Conversation Methods (Deprecated)
@@ -466,10 +557,11 @@ class LegacyAPIMixin:
         """
         from victor.core.state import ConversationStage
 
-        # StateCoordinator returns stage name, convert to enum
-        stage_name = self._state_coordinator.get_stage()
-        if stage_name:
-            return ConversationStage[stage_name]
+        if self._state_coordinator is not None:
+            # StateCoordinator returns stage name, convert to enum
+            stage_name = self._state_coordinator.get_stage()
+            if stage_name:
+                return ConversationStage[stage_name]
         return ConversationStage.INITIAL
 
     @deprecated(
@@ -486,7 +578,9 @@ class LegacyAPIMixin:
         Returns:
             Set of tool names recommended for current stage
         """
-        return self._state_coordinator.get_stage_tools()
+        if self._state_coordinator is not None:
+            return self._state_coordinator.get_stage_tools()  # type: ignore[no-any-return]
+        return set()
 
     @deprecated(
         version="0.5.1",
@@ -529,7 +623,9 @@ class LegacyAPIMixin:
         Returns:
             Set of absolute file paths
         """
-        return self._state_coordinator.observed_files
+        if self._state_coordinator is not None:
+            return self._state_coordinator.observed_files
+        return set()
 
     @deprecated(
         version="0.5.1",
@@ -678,7 +774,9 @@ class LegacyAPIMixin:
             Dictionary with provider/model info and capabilities
         """
         # Get base info from ProviderManager
-        info = self._provider_manager.get_info()
+        info = {}
+        if self._provider_manager is not None:
+            info = self._provider_manager.get_info()
 
         # Add orchestrator-specific runtime state
         info["tool_budget"] = self.get_tool_budget()
@@ -726,7 +824,9 @@ class LegacyAPIMixin:
         Returns:
             True if tool is enabled
         """
-        return self._tool_access_coordinator.is_tool_enabled(tool_name)
+        if self._tool_access_coordinator is not None:
+            return self._tool_access_coordinator.is_tool_enabled(tool_name)
+        return False
 
     # =========================================================================
     # Category 8: System Prompt Methods (Deprecated)
@@ -804,7 +904,9 @@ class LegacyAPIMixin:
         Returns:
             List of message dictionaries
         """
-        return [{"role": m.role, "content": m.content} for m in self.conversation.messages]
+        if self.conversation is not None:
+            return [{"role": m.role, "content": m.content} for m in self.conversation.messages]
+        return []
 
     @deprecated(
         version="0.5.1",
@@ -820,7 +922,9 @@ class LegacyAPIMixin:
         Returns:
             Number of messages in conversation
         """
-        return len(self.conversation.messages)
+        if self.conversation is not None:
+            return len(self.conversation.messages)
+        return 0
 
     # =========================================================================
     # Category 10: Search Routing Methods (Deprecated)
@@ -844,7 +948,9 @@ class LegacyAPIMixin:
         Returns:
             Dictionary with routing recommendation
         """
-        return self._search_coordinator.route_search_query(query)
+        if self._search_coordinator is not None:
+            return self._search_coordinator.route_search_query(query)
+        return {"tool": "unknown", "confidence": 0.0}
 
     @deprecated(
         version="0.5.1",
@@ -863,7 +969,9 @@ class LegacyAPIMixin:
         Returns:
             Tool name: "code_search", "semantic_code_search", or "both"
         """
-        return self._search_coordinator.get_recommended_search_tool(query)
+        if self._search_coordinator is not None:
+            return self._search_coordinator.get_recommended_search_tool(query)
+        return "code_search"
 
     # =========================================================================
     # Category 11: Health Check Methods (Deprecated)
@@ -897,7 +1005,9 @@ class LegacyAPIMixin:
             )
 
         # Check embeddings initialization status
-        if hasattr(self.tool_selector, "_embeddings_initialized"):
+        if self.tool_selector is not None and hasattr(
+            self.tool_selector, "_embeddings_initialized"
+        ):
             health["embeddings_initialized"] = self.tool_selector._embeddings_initialized
         elif hasattr(self, "_semantic_selector"):
             health["embeddings_initialized"] = getattr(

@@ -61,7 +61,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.framework.rl.coordinator import RLCoordinator
@@ -224,7 +224,7 @@ class RLHookRegistry:
         self._event_counts: Dict[RLEventType, int] = {}
         self._exploration_counts: Dict[str, int] = {}  # learner -> exploration count
         self._exploitation_counts: Dict[str, int] = {}  # learner -> exploitation count
-        self._epsilon_history: List[tuple] = []  # (timestamp, learner, epsilon)
+        self._epsilon_history: List[Tuple[str, str, float]] = []  # (timestamp, learner, epsilon)
 
         # Track whether we've warned about missing coordinator (only warn once)
         self._warned_no_coordinator = False
@@ -375,7 +375,8 @@ class RLHookRegistry:
         )
 
         # Record outcome via coordinator
-        self._coordinator.record_outcome(learner_name, outcome, event.vertical)
+        if self._coordinator is not None:
+            self._coordinator.record_outcome(learner_name, outcome, event.vertical)
 
     def get_exploration_rate(self, learner_name: str) -> float:
         """Get current exploration rate for a learner.
@@ -416,7 +417,7 @@ class RLHookRegistry:
             },
         }
 
-    def get_epsilon_trend(self, learner_name: str, limit: int = 100) -> List[tuple]:
+    def get_epsilon_trend(self, learner_name: str, limit: int = 100) -> List[Tuple[str, float]]:
         """Get epsilon value trend for a learner.
 
         Args:

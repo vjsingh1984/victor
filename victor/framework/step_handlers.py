@@ -1212,6 +1212,7 @@ class FrameworkStepHandler(BaseStepHandler):
                 registry = self._workflow_registry
             else:
                 from victor.workflows.registry import get_workflow_registry
+
                 registry = get_workflow_registry()
 
             for name, workflow in workflows.items():
@@ -1235,6 +1236,7 @@ class FrameworkStepHandler(BaseStepHandler):
                 trigger_registry = self._trigger_registry
             else:
                 from victor.workflows.trigger_registry import get_trigger_registry
+
                 trigger_registry = get_trigger_registry()
 
             # Get auto_workflows from provider if available
@@ -1379,6 +1381,7 @@ class FrameworkStepHandler(BaseStepHandler):
                 team_registry = self._team_registry
             else:
                 from victor.framework.team_registry import get_team_registry
+
                 team_registry = get_team_registry()
 
             team_registry.register_from_vertical(vertical.name, team_specs, replace=True)
@@ -1437,6 +1440,7 @@ class FrameworkStepHandler(BaseStepHandler):
                 registry = self._chain_registry
             else:
                 from victor.framework.chain_registry import get_chain_registry
+
                 registry = get_chain_registry()
 
             for name, chain in chains.items():
@@ -1490,6 +1494,7 @@ class FrameworkStepHandler(BaseStepHandler):
                 registry = self._persona_registry
             else:
                 from victor.framework.persona_registry import get_persona_registry
+
                 registry = get_persona_registry()
 
             for name, persona in personas.items():
@@ -1681,6 +1686,7 @@ class FrameworkStepHandler(BaseStepHandler):
                 registry = self._handler_registry
             else:
                 from victor.framework.handler_registry import get_handler_registry
+
                 registry = get_handler_registry()
 
             for name, handler in handlers.items():

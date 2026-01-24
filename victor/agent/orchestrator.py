@@ -921,7 +921,9 @@ class AgentOrchestrator(
     def failed_tool_signatures(self, value: Set[Tuple[str, str]]) -> None:
         """Set failed tool signatures (for checkpoint restore)."""
         if self._session_state is not None:
-            self._session_state.execution_state.failed_tool_signatures = set(value) if value else set()
+            self._session_state.execution_state.failed_tool_signatures = (
+                set(value) if value else set()
+            )
 
     @property
     def _tool_capability_warned(self) -> bool:
@@ -1032,7 +1034,7 @@ class AgentOrchestrator(
                     profile_name=f"{self.provider_name}:{self.model}",
                     project_root=intelligent_project_root,
                 )
-                self._intelligent_integration = OrchestratorIntegration(  
+                self._intelligent_integration = OrchestratorIntegration(
                     orchestrator=self,
                     pipeline=pipeline,
                     config=self._intelligent_integration_config,
@@ -3468,26 +3470,26 @@ class AgentOrchestrator(
         """
         return self._protocol_adapter.current_model
 
-# DUPLICATE:     async def switch_provider(
-#         self,
-#         provider: str,
-#         model: Optional[str] = None,
-#         on_switch: Optional[Any] = None,
-#     ) -> bool:
-#         """Switch to a different provider/model (protocol method).
+    # DUPLICATE:     async def switch_provider(
+    #         self,
+    #         provider: str,
+    #         model: Optional[str] = None,
+    #         on_switch: Optional[Any] = None,
+    #     ) -> bool:
+    #         """Switch to a different provider/model (protocol method).
 
-#         Args:
-#             provider: Target provider name
-#             model: Optional specific model
-#             on_switch: Optional callback(provider, model) after switch
+    #         Args:
+    #             provider: Target provider name
+    #             model: Optional specific model
+    #             on_switch: Optional callback(provider, model) after switch
 
-#         Returns:
-#             True if switch was successful, False otherwise
+    #         Returns:
+    #             True if switch was successful, False otherwise
 
-#         Raises:
-#             ProviderNotFoundError: If provider not found
-#         """
-#         return await self._protocol_adapter.switch_provider(provider, model, on_switch)
+    #         Raises:
+    #             ProviderNotFoundError: If provider not found
+    #         """
+    #         return await self._protocol_adapter.switch_provider(provider, model, on_switch)
 
     # --- ToolsProtocol ---
 

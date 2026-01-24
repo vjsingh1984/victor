@@ -162,6 +162,7 @@ class TaskWithPriority:
     priority: int
     task_id: int
     task: TaskInput[Any]
+
     def __lt__(self, other: "TaskWithPriority") -> bool:
         """Compare for priority queue ordering."""
         return self.priority < other.priority

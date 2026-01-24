@@ -77,6 +77,9 @@ if TYPE_CHECKING:
     from victor.agent.response_sanitizer import ResponseSanitizer
     from victor.agent.tool_output_formatter import ToolOutputFormatter
 
+    # Type alias for convenience
+    ToolCallingAdapter = BaseToolCallingAdapter
+
 from victor.agent.coordinators.base_config import BaseCoordinatorConfig
 
 logger = logging.getLogger(__name__)

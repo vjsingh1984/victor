@@ -247,11 +247,14 @@ class GroundingThresholdLearner(BaseLearner):
             logger.debug("RL: grounding_threshold outcome missing result info, skipping")
             return
 
+        # Store result_type in outcome metadata for _compute_reward
+        outcome.metadata["result_type"] = result_type
+
         # Build context key
         context_key = self._build_context_key(provider, response_type)
 
         # Compute reward
-        reward = self._compute_reward(result_type)
+        reward = self._compute_reward(outcome)
 
         # Update Beta parameters (Thompson Sampling update)
         self._update_beta_params(context_key, threshold_used, result_type)
@@ -276,22 +279,25 @@ class GroundingThresholdLearner(BaseLearner):
             response_type = "general"
         return f"{provider}:{response_type}"
 
-    def _compute_reward(self, result_type: str) -> float:
+    def _compute_reward(self, outcome: RLOutcome) -> float:
         """Compute reward from verification result.
 
         Args:
-            result_type: tp, tn, fp, or fn
+            outcome: Outcome with result_type in metadata
 
         Returns:
             Reward value
         """
+        result_type = outcome.metadata.get("result_type", "unknown")
         rewards = {
             "tp": 0.1,  # True positive: correctly detected hallucination
             "tn": 0.1,  # True negative: correctly passed good response
             "fp": -1.0,  # False positive: wrongly flagged good response
             "fn": -2.0,  # False negative: missed hallucination (worst)
         }
-        return rewards.get(result_type, 0.0)
+        if isinstance(result_type, str):
+            return rewards.get(result_type, 0.0)
+        return 0.0
 
     def _update_beta_params(self, context_key: str, threshold: float, result_type: str) -> None:
         """Update Beta distribution parameters for Thompson Sampling.

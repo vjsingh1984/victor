@@ -810,7 +810,9 @@ class BranchManager:
         target_branch: str,
         session_id: str,
         strategy: MergeStrategy = MergeStrategy.THREE_WAY,
-        state_merger: Optional[Callable[[Dict[Any, Any], Dict[Any, Any], Dict[Any, Any]], Dict[Any, Any]]] = None,
+        state_merger: Optional[
+            Callable[[Dict[Any, Any], Dict[Any, Any], Dict[Any, Any]], Dict[Any, Any]]
+        ] = None,
     ) -> MergeResult:
         """Merge one branch into another.
 

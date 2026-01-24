@@ -738,7 +738,11 @@ class ExperimentCoordinator:
         Returns:
             List of experiment summaries
         """
-        return [self.get_experiment_status(exp_id) for exp_id in self._experiments]
+        return [
+            exp_status
+            for exp_id in self._experiments
+            if (exp_status := self.get_experiment_status(exp_id)) is not None
+        ]
 
     def _save_experiment(self, config: ExperimentConfig) -> None:
         """Save experiment to database."""

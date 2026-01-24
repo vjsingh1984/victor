@@ -77,7 +77,7 @@ class FeedbackIntegration:
             cls._instance = cls()
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize feedback integration."""
         self._collector = get_feedback_collector()
         self._rl_coordinator: Optional["RLCoordinator"] = None
@@ -383,7 +383,7 @@ class FeedbackIntegration:
             learner = coordinator.get_learner("quality_weights")
             if learner:
                 rec = learner.get_recommendation("", "", task_type)
-                if rec and not rec.is_baseline:
+                if rec and not rec.is_baseline and isinstance(rec.value, dict):
                     return rec.value
         except Exception as e:
             logger.debug(f"Failed to get quality weights: {e}")

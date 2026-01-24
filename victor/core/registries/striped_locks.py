@@ -219,7 +219,9 @@ class StripedLockManager:
 
         # Return a wrapped lock that records metrics
         class MetricLock:
-            def __init__(self, inner_lock: threading.RLock, manager: Any, stripe_idx: int, start: float) -> None:
+            def __init__(
+                self, inner_lock: threading.RLock, manager: Any, stripe_idx: int, start: float
+            ) -> None:
                 self._inner = inner_lock
                 self._manager = manager
                 self._stripe_idx = stripe_idx
@@ -229,7 +231,9 @@ class StripedLockManager:
                 self._inner.acquire()
                 wait_time = (time.time() - self._start) * 1000
                 if self._manager._metrics:
-                    self._manager._metrics.record_acquire(self._stripe_idx, wait_time, was_contended)
+                    self._manager._metrics.record_acquire(
+                        self._stripe_idx, wait_time, was_contended
+                    )
                 return self
 
             def __exit__(self, *args: Any) -> None:

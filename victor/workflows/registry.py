@@ -134,7 +134,7 @@ class WorkflowRegistry:
 
         # Phase 4: Hash-based idempotence
         # Check if workflow definition has changed before validating
-        if hasattr(workflow, 'to_hash'):
+        if hasattr(workflow, "to_hash"):
             workflow_hash = workflow.to_hash()
             cached_hash = self._workflow_hashes.get(workflow.name)
 

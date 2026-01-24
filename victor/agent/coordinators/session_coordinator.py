@@ -644,7 +644,9 @@ class SessionCoordinator:
             # Fall back to provided messages
             if messages:
                 # Convert Message objects to dict if needed
-                result_messages: List[Dict[str, Any]] = [msg.model_dump() if hasattr(msg, "model_dump") else msg for msg in messages]
+                result_messages: List[Dict[str, Any]] = [
+                    msg.model_dump() if hasattr(msg, "model_dump") else msg for msg in messages
+                ]
                 return result_messages
             return []
 
@@ -657,7 +659,9 @@ class SessionCoordinator:
         except Exception as e:
             logger.warning(f"Failed to get memory context: {e}, using fallback")
             if messages:
-                fallback_messages: List[Dict[str, Any]] = [msg.model_dump() if hasattr(msg, "model_dump") else msg for msg in messages]
+                fallback_messages: List[Dict[str, Any]] = [
+                    msg.model_dump() if hasattr(msg, "model_dump") else msg for msg in messages
+                ]
                 return fallback_messages
             return []
 

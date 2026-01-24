@@ -343,7 +343,7 @@ def create_rate_limit_middleware(
 
         if not allowed:
             retry_after = info.get("retry_after", 1.0) if info else 1.0
-            reason = info.get('reason', 'unknown') if info else 'unknown'
+            reason = info.get("reason", "unknown") if info else "unknown"
             return web.json_response(
                 {
                     "error": "Too Many Requests",
@@ -360,7 +360,9 @@ def create_rate_limit_middleware(
     return rate_limit_middleware
 
 
-def create_request_logging_middleware() -> Callable[[Request, Callable[..., Any]], Awaitable[Response]]:
+def create_request_logging_middleware() -> (
+    Callable[[Request, Callable[..., Any]], Awaitable[Response]]
+):
     """Create request logging middleware.
 
     Returns:

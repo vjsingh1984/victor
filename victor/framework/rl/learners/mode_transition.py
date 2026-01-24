@@ -261,6 +261,12 @@ class ModeTransitionLearner(BaseLearner):
             logger.debug("RL: mode_transition outcome missing required fields, skipping")
             return
 
+        # Type narrowing: assert all are strings
+        assert isinstance(from_mode, str)
+        assert isinstance(to_mode, str)
+        assert isinstance(state_key, str)
+        assert isinstance(action_key, str)
+
         task_type = outcome.task_type or "default"
         next_state_key = outcome.metadata.get("next_state_key")
 
@@ -519,10 +525,11 @@ class ModeTransitionLearner(BaseLearner):
             Optimal tool budget (learned or default)
         """
         if task_type in self._task_stats:
-            return self._task_stats[task_type]["optimal_tool_budget"]
+            budget = self._task_stats[task_type].get("optimal_tool_budget", 10)
+            return int(budget) if isinstance(budget, (int, float)) else 10
 
         # Default budgets by task type
-        defaults = {
+        defaults: Dict[str, int] = {
             "code_generation": 8,
             "create_simple": 5,
             "create": 10,
@@ -580,15 +587,16 @@ class ModeTransitionLearner(BaseLearner):
                 reward -= 0.2 * 0.5  # Penalize failure regardless of efficiency
 
         # Transition validity (10% weight)
-        from_mode = outcome.metadata.get("from_mode", "explore")
-        to_mode = outcome.metadata.get("to_mode", "explore")
-        try:
-            from_mode_enum = AgentMode(from_mode)
-            to_mode_enum = AgentMode(to_mode)
-            valid = to_mode_enum in self.VALID_TRANSITIONS.get(from_mode_enum, [])
-            reward += 0.1 * (1.0 if valid else -1.0)
-        except (ValueError, KeyError):
-            pass  # Invalid modes, no reward adjustment
+        from_mode_val = outcome.metadata.get("from_mode", "explore")
+        to_mode_val = outcome.metadata.get("to_mode", "explore")
+        if isinstance(from_mode_val, str) and isinstance(to_mode_val, str):
+            try:
+                from_mode_enum = AgentMode(from_mode_val)
+                to_mode_enum = AgentMode(to_mode_val)
+                valid = to_mode_enum in self.VALID_TRANSITIONS.get(from_mode_enum, [])
+                reward += 0.1 * (1.0 if valid else -1.0)
+            except (ValueError, KeyError):
+                pass  # Invalid modes, no reward adjustment
 
         return max(-1.0, min(1.0, reward))
 

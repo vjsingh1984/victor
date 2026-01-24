@@ -312,8 +312,12 @@ class VerticalIntegrationAdapter:
             raise CapabilityRegistryRequiredError(
                 component="VerticalIntegrationAdapter",
                 capability_name="vertical_middleware",
-                required_methods=["has_capability", "get_capability_value", "set_capability_value",
-                                  "_set_vertical_middleware_storage"],
+                required_methods=[
+                    "has_capability",
+                    "get_capability_value",
+                    "set_capability_value",
+                    "_set_vertical_middleware_storage",
+                ],
             )
 
         # Get middleware chain via capability (DIP-compliant read)
@@ -332,8 +336,12 @@ class VerticalIntegrationAdapter:
                     raise CapabilityRegistryRequiredError(
                         component="VerticalIntegrationAdapter",
                         capability_name="middleware_chain",
-                        required_methods=["has_capability", "get_capability_value", "set_capability_value",
-                                          "_set_middleware_chain_storage"],
+                        required_methods=[
+                            "has_capability",
+                            "get_capability_value",
+                            "set_capability_value",
+                            "_set_middleware_chain_storage",
+                        ],
                     )
             except ImportError:
                 logger.warning("MiddlewareChain not available")
@@ -386,8 +394,12 @@ class VerticalIntegrationAdapter:
             raise CapabilityRegistryRequiredError(
                 component="VerticalIntegrationAdapter",
                 capability_name="vertical_safety_patterns",
-                required_methods=["has_capability", "get_capability_value", "set_capability_value",
-                                  "_set_safety_patterns_storage"],
+                required_methods=[
+                    "has_capability",
+                    "get_capability_value",
+                    "set_capability_value",
+                    "_set_safety_patterns_storage",
+                ],
             )
 
         # Get safety checker via capability or public method (DIP-compliant reads only)

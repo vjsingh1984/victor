@@ -148,10 +148,13 @@ class StreamMetrics:
     def p95_chunk_interval_ms(self) -> Optional[float]:
         """95th percentile chunk interval in milliseconds."""
         if len(self.chunk_intervals) >= 20:
-            sorted_intervals = sorted(self.chunk_intervals)
-            idx = int(len(sorted_intervals) * 0.95)
-            return sorted_intervals[idx] * 1000
+            return statistics.quantiles(self.chunk_intervals, n=20, method='inclusive')[18] * 1000
         return None
+
+    @property
+    def total_tool_calls(self) -> int:
+        """Alias for tool_calls_count for backward compatibility."""
+        return self.tool_calls_count
 
     @property
     def p99_chunk_interval_ms(self) -> Optional[float]:

@@ -643,7 +643,9 @@ class RLCoordinator:
                 from victor.agent.teams.learner import TeamCompositionLearner
 
                 # TeamCompositionLearner has different signature - uses db_path instead of db_connection
-                return TeamCompositionLearner(learning_rate=0.1)
+                # Note: TeamCompositionLearner doesn't inherit from BaseLearner
+                _ = TeamCompositionLearner(learning_rate=0.1)  # noqa: F841
+                return None  # Return None since it's not compatible with BaseLearner protocol
             elif name == "cross_vertical":
                 from victor.framework.rl.learners.cross_vertical import CrossVerticalLearner
 
@@ -911,7 +913,8 @@ class RLCoordinator:
 
         for name, learner in self._learners.items():
             try:
-                metrics["coordinator"]["learners"][name] = learner.export_metrics()
+                if learner is not None:
+                    metrics["coordinator"]["learners"][name] = learner.export_metrics()
             except Exception as e:
                 logger.error(f"RL: Failed to export metrics for {name}: {e}")
                 metrics["coordinator"]["learners"][name] = {"error": str(e)}

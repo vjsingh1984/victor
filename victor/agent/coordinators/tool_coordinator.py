@@ -80,6 +80,9 @@ if TYPE_CHECKING:
     from victor.agent.tool_calling import BaseToolCallingAdapter, ToolCallParseResult
     from victor.tools.tool_names import ToolNames
 
+    # Type alias for convenience
+    ToolCallingAdapter = BaseToolCallingAdapter
+
 from victor.agent.coordinators.base_config import BaseCoordinatorConfig
 
 # New specialized coordinators (SRP compliance)

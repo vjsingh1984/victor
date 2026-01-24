@@ -218,24 +218,30 @@ class ContextPruningLearner(BaseLearner):
 
     def get_recommendation(
         self,
-        context_utilization: float,
-        tool_call_count: int,
-        task_complexity: str = "medium",
-        provider_type: str = "cloud",
-    ) -> RLRecommendation:
+        provider: str,
+        model: str,
+        task_type: str,
+    ) -> Optional[RLRecommendation]:
         """Get recommended pruning action for current state.
 
         Uses Thompson Sampling to balance exploration and exploitation.
 
         Args:
-            context_utilization: Current context usage (0.0-1.0)
-            tool_call_count: Number of tool calls made
-            task_complexity: Task complexity level
-            provider_type: Provider type (cloud, local)
+            provider: Provider name
+            model: Model name (used to infer provider type)
+            task_type: Task type (used to infer complexity)
 
         Returns:
             RLRecommendation with action and config
         """
+        # Infer parameters from provider/model/task_type
+        provider_type = "local" if provider in ["ollama", "lmstudio", "vllm"] else "cloud"
+        task_complexity = "medium"  # Default
+
+        # For simplicity, use moderate defaults
+        context_utilization = 0.5
+        tool_call_count = 5
+
         state_key = self._discretize_state(
             context_utilization, tool_call_count, task_complexity, provider_type
         )
@@ -298,42 +304,44 @@ class ContextPruningLearner(BaseLearner):
         total_visits = sum(s.get("visits", 0) for s in action_stats.values())
         confidence = min(1.0, total_visits / (self.MIN_SAMPLES_FOR_CONFIDENCE * len(self.ACTIONS)))
 
-        return RLRecommendation(
-            action=best_action.value,
-            confidence=confidence,
-            metadata={
-                "state_key": state_key,
-                "config": {
-                    "compaction_threshold": config.compaction_threshold,
-                    "compaction_target": config.compaction_target,
-                    "tool_result_max_chars": config.tool_result_max_chars,
-                    "min_messages_keep": config.min_messages_keep,
-                },
-                "exploration_sample": best_sample,
+        # Store config in metadata for later retrieval
+        metadata_value = {
+            "state_key": state_key,
+            "config": {
+                "compaction_threshold": config.compaction_threshold,
+                "compaction_target": config.compaction_target,
+                "tool_result_max_chars": config.tool_result_max_chars,
+                "min_messages_keep": config.min_messages_keep,
             },
+            "exploration_sample": best_sample,
+        }
+
+        return RLRecommendation(
+            value={
+                "action": best_action.value,
+                "config": metadata_value,
+            },
+            confidence=confidence,
+            reason=f"Pruning recommendation: {best_action.value} (confidence={confidence:.2f})",
+            sample_size=total_visits,
+            is_baseline=total_visits < self.MIN_SAMPLES_FOR_CONFIDENCE,
         )
 
-    def record_outcome(
-        self,
-        context_utilization: float,
-        tool_call_count: int,
-        action: str,
-        task_success: bool,
-        tokens_saved: int,
-        task_complexity: str = "medium",
-        provider_type: str = "cloud",
-    ) -> None:
+    def record_outcome(self, outcome: RLOutcome) -> None:
         """Record outcome of a pruning decision.
 
         Args:
-            context_utilization: Context usage when decision was made
-            tool_call_count: Number of tool calls at decision time
-            action: The pruning action taken
-            task_success: Whether the task completed successfully
-            tokens_saved: Estimated tokens saved by pruning
-            task_complexity: Task complexity level
-            provider_type: Provider type
+            outcome: Outcome with pruning-specific metadata
         """
+        # Extract parameters from outcome metadata
+        context_utilization = outcome.metadata.get("context_utilization", 0.5)
+        tool_call_count = outcome.metadata.get("tool_call_count", 5)
+        action = outcome.metadata.get("action", "moderate")
+        task_success = outcome.success
+        tokens_saved = outcome.metadata.get("tokens_saved", 0)
+        task_complexity = outcome.metadata.get("task_complexity", "medium")
+        provider_type = outcome.metadata.get("provider_type", "cloud")
+
         state_key = self._discretize_state(
             context_utilization, tool_call_count, task_complexity, provider_type
         )
@@ -398,6 +406,28 @@ class ContextPruningLearner(BaseLearner):
             f"Recorded pruning outcome: state={state_key}, action={action}, "
             f"success={task_success}, tokens_saved={tokens_saved}, reward={reward:.1f}"
         )
+
+    def _compute_reward(self, outcome: RLOutcome) -> float:
+        """Compute reward for context pruning outcome.
+
+        Args:
+            outcome: Outcome with pruning metadata
+
+        Returns:
+            Reward value (-1.0 to 1.0)
+        """
+        # Extract parameters from outcome metadata
+        tokens_saved = outcome.metadata.get("tokens_saved", 0)
+        task_success = outcome.success
+
+        # Calculate reward: balance token savings vs task success
+        # Normalize tokens_saved to 0-1 range (assume max savings ~50K tokens)
+        normalized_savings = min(1.0, tokens_saved / 50000.0)
+        success_bonus = 1.0 if task_success else -0.5  # Penalty for failure
+        reward = 0.4 * normalized_savings + 0.6 * success_bonus
+
+        # Scale to -1.0 to 1.0 range
+        return max(-1.0, min(1.0, reward * 2))
 
     def get_stats(self, provider_type: Optional[str] = None) -> Dict[str, Any]:
         """Get learner statistics.

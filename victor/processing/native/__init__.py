@@ -127,7 +127,9 @@ def rolling_hash_blocks(content: str, min_block_length: int = 50) -> List[Tuple[
         List of tuples: (hash string, original block, is_duplicate boolean)
     """
     if _NATIVE_AVAILABLE:
-        return cast(List[Tuple[str, str, bool]], _native.rolling_hash_blocks(content, min_block_length))
+        return cast(
+            List[Tuple[str, str, bool]], _native.rolling_hash_blocks(content, min_block_length)
+        )
 
     # Pure Python fallback
     blocks = _split_into_blocks(content)
@@ -353,7 +355,9 @@ def batch_cosine_similarity_normalized(
         List of similarity scores, one per corpus vector
     """
     if _NATIVE_AVAILABLE:
-        return cast(List[float], _native.batch_cosine_similarity_normalized(query, normalized_corpus))
+        return cast(
+            List[float], _native.batch_cosine_similarity_normalized(query, normalized_corpus)
+        )
 
     # Pure Python fallback using NumPy
     if not normalized_corpus:
@@ -387,7 +391,9 @@ def top_k_similar_normalized(
         List of (index, similarity) tuples, sorted by similarity descending
     """
     if _NATIVE_AVAILABLE:
-        return cast(List[Tuple[int, float]], _native.top_k_similar_normalized(query, normalized_corpus, k))
+        return cast(
+            List[Tuple[int, float]], _native.top_k_similar_normalized(query, normalized_corpus, k)
+        )
 
     # Pure Python fallback using heap for efficiency
     import heapq
@@ -1644,7 +1650,9 @@ def get_matched_pattern_indices(
         List of matched pattern indices
     """
     if _NATIVE_AVAILABLE:
-        return cast(List[int], _native.get_matched_pattern_indices(text, patterns, case_insensitive))
+        return cast(
+            List[int], _native.get_matched_pattern_indices(text, patterns, case_insensitive)
+        )
 
     matcher = PatternMatcherFallback(patterns, case_insensitive)
     return matcher.matched_patterns(text)
@@ -1685,7 +1693,9 @@ def weighted_pattern_score(
         Sum of weights for matched patterns
     """
     if _NATIVE_AVAILABLE:
-        return cast(float, _native.weighted_pattern_score(text, patterns, weights, case_insensitive))
+        return cast(
+            float, _native.weighted_pattern_score(text, patterns, weights, case_insensitive)
+        )
 
     if len(patterns) != len(weights):
         raise ValueError(

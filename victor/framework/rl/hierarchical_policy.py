@@ -259,7 +259,7 @@ class HierarchicalPolicy(BaseLearner):
         else:
             # Exploit: select best Q-value
             q_values = {name: self._q_table[state_key][name] for name in available_names}
-            selected = max(q_values, key=q_values.get)
+            selected = max(q_values.keys(), key=lambda k: q_values[k])
             reason = f"Exploitation (Q={q_values[selected]:.2f})"
 
         # Update visit count
@@ -334,7 +334,7 @@ class HierarchicalPolicy(BaseLearner):
         """
         result = self._option_registry.terminate_active_option(success)
 
-        if result and self._current_option_name:
+        if result and self._current_option_name and self._current_option_start_state:
             # Update Q-value
             self._update_q_value(
                 self._current_option_start_state,

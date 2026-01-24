@@ -254,9 +254,7 @@ def export_graph_schema(
         return _export_from_compiled_graph(graph, workflow_id, name, description)
     elif hasattr(graph, "nodes"):
         # WorkflowDefinition
-        return _export_from_workflow_definition(
-            graph, workflow_id, name, description
-        )
+        return _export_from_workflow_definition(graph, workflow_id, name, description)
     elif hasattr(graph, "_nodes") and hasattr(graph, "_edges"):
         # WorkflowVisualizer
         return _export_from_visualizer(graph, workflow_id, name, description)

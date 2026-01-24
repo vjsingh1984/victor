@@ -1484,18 +1484,20 @@ class ToolMetadataRegistry:
         stats = self.summary()
 
         # Add additional metrics for Phase 3
-        stats.update({
-            "total_tools": len(self._entries),
-            "total_categories": len(self._by_category),
-            "total_keywords": len(self._by_keyword),
-            "total_stages": len(self._by_stage),
-            "indexed_by_priority": {
-                p.name: len(names) for p, names in self._by_priority.items()
-            },
-            "indexed_by_access_mode": {
-                a.name: len(names) for a, names in self._by_access_mode.items()
-            },
-        })
+        stats.update(
+            {
+                "total_tools": len(self._entries),
+                "total_categories": len(self._by_category),
+                "total_keywords": len(self._by_keyword),
+                "total_stages": len(self._by_stage),
+                "indexed_by_priority": {
+                    p.name: len(names) for p, names in self._by_priority.items()
+                },
+                "indexed_by_access_mode": {
+                    a.name: len(names) for a, names in self._by_access_mode.items()
+                },
+            }
+        )
 
         return stats
 
@@ -1522,28 +1524,23 @@ class ToolMetadataRegistry:
         import json
 
         # Calculate hash of current tool definitions
-        tool_list = sorted(tools, key=lambda t: t.name if hasattr(t, 'name') else str(t))
+        tool_list = sorted(tools, key=lambda t: t.name if hasattr(t, "name") else str(t))
         tool_count = len(tool_list)
-        tool_names = sorted([
-            t.name if hasattr(t, 'name') else str(t) for t in tool_list
-        ])
+        tool_names = sorted([t.name if hasattr(t, "name") else str(t) for t in tool_list])
 
         # Create hash from tool definitions
         tool_strings = []
         for tool in tool_list:
-            name = tool.name if hasattr(tool, 'name') else str(tool)
-            description = tool.description if hasattr(tool, 'description') else ""
-            parameters = tool.parameters if hasattr(tool, 'parameters') else {}
+            name = tool.name if hasattr(tool, "name") else str(tool)
+            description = tool.description if hasattr(tool, "description") else ""
+            parameters = tool.parameters if hasattr(tool, "parameters") else {}
             tool_strings.append(f"{name}:{description}:{parameters}")
 
-        combined = (
-            f"count:{tool_count}|names:{','.join(tool_names)}|"
-            + "|".join(tool_strings)
-        )
+        combined = f"count:{tool_count}|names:{','.join(tool_names)}|" + "|".join(tool_strings)
         current_hash = hashlib.sha256(combined.encode()).hexdigest()
 
         # Check if we have a cached hash
-        if not hasattr(self, '_tools_hash'):
+        if not hasattr(self, "_tools_hash"):
             self._tools_hash = None
 
         # If hash matches, skip reindexing (performance win!)
@@ -1553,16 +1550,32 @@ class ToolMetadataRegistry:
         # Hash differs - reindex all tools
         # Clear existing entries
         self._entries.clear()
-        self._by_priority = {p: set() for p in self._by_priority.keys()} if self._by_priority else {p: set() for p in Priority}
-        self._by_access_mode = {a: set() for a in self._by_access_mode.keys()} if self._by_access_mode else {a: set() for a in AccessMode}
-        self._by_danger_level = {d: set() for d in self._by_danger_level.keys()} if self._by_danger_level else {d: set() for d in DangerLevel}
+        self._by_priority = (
+            {p: set() for p in self._by_priority.keys()}
+            if self._by_priority
+            else {p: set() for p in Priority}
+        )
+        self._by_access_mode = (
+            {a: set() for a in self._by_access_mode.keys()}
+            if self._by_access_mode
+            else {a: set() for a in AccessMode}
+        )
+        self._by_danger_level = (
+            {d: set() for d in self._by_danger_level.keys()}
+            if self._by_danger_level
+            else {d: set() for d in DangerLevel}
+        )
         self._by_category.clear()
         self._by_keyword.clear()
         self._by_stage.clear()
         self._alias_map.clear()
         self._by_mandatory_keyword.clear()
         self._by_task_type.clear()
-        self._by_execution_category = {ec: set() for ec in self._by_execution_category} if self._by_execution_category else {ec: set() for ec in ExecutionCategory}
+        self._by_execution_category = (
+            {ec: set() for ec in self._by_execution_category}
+            if self._by_execution_category
+            else {ec: set() for ec in ExecutionCategory}
+        )
 
         # Re-register all tools
         for tool in tools:

@@ -166,7 +166,9 @@ class ToolBudgetCoordinator:
         """Get the total tool budget."""
         if self._budget_manager:
             # TODO: Fix this to use get_status(BudgetType.TOOL_CALLS)
-            max_calls: int = getattr(self._budget_manager, "get_max_tool_calls", lambda: self._total_budget)()
+            max_calls: int = getattr(
+                self._budget_manager, "get_max_tool_calls", lambda: self._total_budget
+            )()
             return max_calls
         return self._total_budget
 
@@ -187,7 +189,9 @@ class ToolBudgetCoordinator:
         """Get the number of budget units used."""
         if self._budget_manager:
             # TODO: Fix this to use get_status(BudgetType.TOOL_CALLS)
-            used: int = getattr(self._budget_manager, "get_used_tool_calls", lambda: self._budget_used)()
+            used: int = getattr(
+                self._budget_manager, "get_used_tool_calls", lambda: self._budget_used
+            )()
             return used
         return self._budget_used
 
@@ -204,7 +208,11 @@ class ToolBudgetCoordinator:
         """
         if self._budget_manager:
             # TODO: Fix this to use get_status(BudgetType.TOOL_CALLS)
-            remaining: int = getattr(self._budget_manager, "get_remaining_tool_calls", lambda: max(0, self._total_budget - self._budget_used))()
+            remaining: int = getattr(
+                self._budget_manager,
+                "get_remaining_tool_calls",
+                lambda: max(0, self._total_budget - self._budget_used),
+            )()
             return remaining
         return max(0, self._total_budget - self._budget_used)
 

@@ -335,7 +335,7 @@ class PolicyManager:
         Returns:
             Serializable state dictionary
         """
-        state = {"name": learner.name}
+        state: Dict[str, Any] = {"name": learner.name}
 
         # Export Q-values if available
         if hasattr(learner, "_q_values"):

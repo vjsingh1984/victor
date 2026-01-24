@@ -365,22 +365,19 @@ class WorkflowExecutionLearner(BaseLearner):
             f"Q: {current_q:.3f} → {new_q:.3f}"
         )
 
-    def _compute_reward(
-        self,
-        success: bool,
-        duration_seconds: float,
-        quality_score: float,
-    ) -> float:
+    def _compute_reward(self, outcome: RLOutcome) -> float:
         """Compute reward for a workflow execution.
 
         Args:
-            success: Whether execution succeeded
-            duration_seconds: Execution duration
-            quality_score: Quality score
+            outcome: Outcome with success, duration, and quality in metadata
 
         Returns:
             Reward value (0.0-1.0)
         """
+        success = outcome.success
+        duration_seconds = outcome.metadata.get("duration_seconds", 60.0)
+        quality_score = outcome.quality_score
+
         if not success:
             return 0.2  # Partial reward for attempting
 
@@ -400,11 +397,15 @@ class WorkflowExecutionLearner(BaseLearner):
 
     def get_recommendation(
         self,
+        provider: str,
+        model: str,
         task_type: str,
-    ) -> RLRecommendation:
+    ) -> Optional[RLRecommendation]:
         """Get workflow recommendation for a task type.
 
         Args:
+            provider: Provider name (unused but required by base class)
+            model: Model name (unused but required by base class)
             task_type: Type of task
 
         Returns:
@@ -414,7 +415,7 @@ class WorkflowExecutionLearner(BaseLearner):
 
         # Get best workflow
         cursor.execute(
-            """
+            f"""
             SELECT workflow_name, q_value, execution_count, success_count, avg_quality
             FROM {Tables.AGENT_WORKFLOW_Q}
             WHERE task_type = ?
@@ -427,9 +428,10 @@ class WorkflowExecutionLearner(BaseLearner):
         row = cursor.fetchone()
         if not row:
             return RLRecommendation(
-                value=0.5,
+                value="",
                 confidence=0.1,
                 reason=f"No workflow data for task type '{task_type}'",
+                sample_size=0,
                 is_baseline=True,
             )
 
@@ -444,17 +446,15 @@ class WorkflowExecutionLearner(BaseLearner):
         success_rate = success_count / execution_count if execution_count > 0 else 0.0
 
         return RLRecommendation(
-            value=q_value,
+            value=workflow_name,
             confidence=confidence,
             reason=(
                 f"Workflow '{workflow_name}' recommended for {task_type} tasks: "
                 f"Q={q_value:.2f}, success_rate={success_rate:.0%}, "
                 f"avg_quality={avg_quality:.2f} ({execution_count} executions)"
             ),
+            sample_size=execution_count,
             is_baseline=execution_count < self.MIN_SAMPLES_FOR_CONFIDENCE,
-            formation=None,
-            suggested_budget=None,
-            role_distribution=None,
         )
 
     def get_workflow_stats(
@@ -504,7 +504,7 @@ class WorkflowExecutionLearner(BaseLearner):
             """
             )
 
-        stats = {}
+        stats: Dict[str, Dict[str, Any]] = {}
         for row in cursor.fetchall():
             wf_name = row[0]
             if wf_name not in stats:
@@ -514,13 +514,15 @@ class WorkflowExecutionLearner(BaseLearner):
             execution_count = row[3]
             success_count = row[4]
 
-            stats[wf_name]["task_types"][task_type] = {
-                "q_value": row[2],
-                "execution_count": execution_count,
-                "success_rate": success_count / execution_count if execution_count > 0 else 0.0,
-                "avg_duration": row[5],
-                "avg_quality": row[6],
-            }
+            task_types_dict = stats[wf_name]["task_types"]
+            if isinstance(task_types_dict, dict):
+                task_types_dict[task_type] = {
+                    "q_value": row[2],
+                    "execution_count": execution_count,
+                    "success_rate": success_count / execution_count if execution_count > 0 else 0.0,
+                    "avg_duration": row[5],
+                    "avg_quality": row[6],
+                }
             stats[wf_name]["total_executions"] += execution_count
 
         return stats

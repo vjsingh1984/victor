@@ -27,7 +27,10 @@ Features:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Type
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type
+
+if TYPE_CHECKING:
+    from victor.framework.prompt_builder import PromptBuilder
 
 from victor.core.verticals.base import StageDefinition, VerticalBase, VerticalConfig
 from victor.core.verticals.defaults.tool_defaults import (

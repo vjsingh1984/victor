@@ -65,6 +65,7 @@ if TYPE_CHECKING:
     from victor.agent.tool_selector import ToolSelector
     from victor.agent.protocols import ToolAccessContext
     from victor.agent.prompts.system import SystemPromptBuilder
+    from victor.agent.conversation import Conversation
 
 logger = logging.getLogger(__name__)
 

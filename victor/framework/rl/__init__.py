@@ -373,13 +373,20 @@ class RLManager:
             RLRecommendation or None if no recommendation available
         """
         learner_name = learner.value if isinstance(learner, LearnerType) else learner
+
+        # Ensure required parameters are not None
+        if provider is None:
+            provider = "anthropic"  # Default provider
+        if model is None:
+            model = "default"  # Default model
+        if task_type is None:
+            task_type = "default"  # Default task type
+
         return self._coordinator.get_recommendation(
             learner_name=learner_name,
             provider=provider,
             model=model,
             task_type=task_type,
-            vertical=vertical,
-            **context,
         )
 
     def get_tool_recommendation(

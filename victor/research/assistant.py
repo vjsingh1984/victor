@@ -7,7 +7,10 @@ protocols actually implemented by the vertical are registered, rather than
 inheriting from all possible protocol interfaces.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from victor.framework.prompt_builder import PromptBuilder
 
 from victor.core.verticals.base import StageDefinition, VerticalBase
 from victor.core.verticals.protocols import (

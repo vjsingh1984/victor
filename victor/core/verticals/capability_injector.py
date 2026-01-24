@@ -179,7 +179,9 @@ class CapabilityInjector:
         self._file_ops_override: Optional["FileOperationsCapability"] = file_operations
 
         # Auto-register built-in capabilities
-        if auto_register_builtins and not self._registry.has_provider(self.CAPABILITY_FILE_OPERATIONS):
+        if auto_register_builtins and not self._registry.has_provider(
+            self.CAPABILITY_FILE_OPERATIONS
+        ):
             self._register_builtin_capabilities()
 
         logger.debug("CapabilityInjector initialized")

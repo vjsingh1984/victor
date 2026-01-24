@@ -1848,13 +1848,15 @@ class VictorAPIServer:
 
             # Get provider rankings - using internal attributes
             rankings = []
-            if hasattr(learner, '_q_table'):
+            if hasattr(learner, "_q_table"):
                 for provider, q_value in learner._q_table.items():  # type: ignore[attr-defined]
-                    rankings.append({
-                        "provider": provider,
-                        "q_value": q_value,
-                        "selection_count": getattr(learner, '_total_selections', {}).get(provider, 0),  # type: ignore[attr-defined]
-                    })
+                    rankings.append(
+                        {
+                            "provider": provider,
+                            "q_value": q_value,
+                            "selection_count": getattr(learner, "_total_selections", {}).get(provider, 0),  # type: ignore[attr-defined]
+                        }
+                    )
 
             # Build task-specific Q-table summary from database
             import sqlite3
@@ -1871,9 +1873,9 @@ class VictorAPIServer:
             conn.close()
 
             stats = {
-                "strategy": getattr(learner, 'strategy', 'epsilon_greedy'),  # type: ignore[attr-defined]
-                "epsilon": round(getattr(learner, 'epsilon', 0.0), 3),  # type: ignore[attr-defined]
-                "total_selections": getattr(learner, '_total_selections', 0),  # type: ignore[attr-defined]
+                "strategy": getattr(learner, "strategy", "epsilon_greedy"),  # type: ignore[attr-defined]
+                "epsilon": round(getattr(learner, "epsilon", 0.0), 3),  # type: ignore[attr-defined]
+                "total_selections": getattr(learner, "_total_selections", 0),  # type: ignore[attr-defined]
                 "provider_rankings": [
                     {
                         "provider": r["provider"],

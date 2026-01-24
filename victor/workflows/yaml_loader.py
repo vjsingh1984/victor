@@ -890,7 +890,9 @@ def _resolve_stage_templates(
                 )
 
             resolved.append(resolved_node)
-            logger.debug(f"Resolved stage template '{stage_name}' for node '{resolved_node.get('id')}'")
+            logger.debug(
+                f"Resolved stage template '{stage_name}' for node '{resolved_node.get('id')}'"
+            )
         else:
             # No stage template reference, use node as-is
             resolved.append(node_data)

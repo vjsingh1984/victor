@@ -638,7 +638,8 @@ class QueryBus:
         for middleware in reversed(self._middleware):
 
             def create_next(
-                mw: QueryMiddleware, next_fn: Callable[..., Any]) -> Callable[[Query[TResult]], Awaitable[TResult]]:
+                mw: QueryMiddleware, next_fn: Callable[..., Any]
+            ) -> Callable[[Query[TResult]], Awaitable[TResult]]:
                 async def wrapped(q: Query[TResult]) -> TResult:
                     result = await mw.execute(q, next_fn)
                     return cast(TResult, result)

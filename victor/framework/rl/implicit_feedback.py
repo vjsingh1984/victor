@@ -202,7 +202,7 @@ class ImplicitFeedbackCollector:
         "general": 30.0,
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the feedback collector."""
         self._active_sessions: Dict[str, SessionContext] = {}
         self._completed_feedback: List[ImplicitFeedback] = []

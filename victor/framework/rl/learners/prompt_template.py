@@ -420,9 +420,9 @@ class PromptTemplateLearner(BaseLearner):
                 f"{len(self._enrichment_posteriors)} enrichment contexts"
             )
 
-    def _get_context_key(self, task_type: str, provider: str) -> Tuple[str, str]:
-        """Get context key for lookup."""
-        return (task_type.lower(), provider.lower())
+    def _get_context_key(self, provider: str, model: str, task_type: str) -> str:
+        """Get context key for lookup (override base class)."""
+        return f"{provider.lower()}:{model.lower()}:{task_type.lower()}"
 
     def _get_style_posterior(
         self, task_type: str, provider: str, style: PromptStyle
@@ -510,10 +510,11 @@ class PromptTemplateLearner(BaseLearner):
 
         grounding_score = outcome.metadata.get("grounding_score", 0.5)
         if isinstance(grounding_score, dict):
-            grounding_score = grounding_score.get("overall", 0.5)
+            overall_val = grounding_score.get("overall", 0.5)
+            grounding_score = float(overall_val) if isinstance(overall_val, (int, float)) else 0.5
 
         # Weighted combination
-        return 0.4 * task_success + 0.4 * quality_score + 0.2 * grounding_score
+        return float(0.4 * task_success + 0.4 * quality_score + 0.2 * grounding_score)
 
     def _save_to_db(
         self,
@@ -617,12 +618,12 @@ class PromptTemplateLearner(BaseLearner):
             reason = "Exploration: random template"
         else:
             # Thompson Sampling for style
-            style_samples = {}
+            style_samples: Dict[PromptStyle, float] = {}
             for style in self.ALL_STYLES:
                 posterior = self._get_style_posterior(task_type, provider, style)
                 style_samples[style] = posterior.sample()
 
-            best_style = max(style_samples, key=style_samples.get)
+            best_style = max(style_samples.keys(), key=lambda k: style_samples[k])
 
             # Thompson Sampling for elements
             selected_elements = []
@@ -634,13 +635,13 @@ class PromptTemplateLearner(BaseLearner):
             # Limit elements to avoid overwhelming prompts
             if len(selected_elements) > 4:
                 # Keep highest-sampled elements
-                element_samples = {
+                element_samples: Dict[PromptElement, float] = {
                     e: self._get_element_posterior(task_type, provider, e).sample()
                     for e in selected_elements
                 }
-                selected_elements = sorted(element_samples, key=element_samples.get, reverse=True)[
-                    :4
-                ]
+                selected_elements = sorted(
+                    element_samples.keys(), key=lambda k: element_samples[k], reverse=True
+                )[:4]
 
             template = PromptTemplate(
                 style=best_style,
@@ -971,7 +972,7 @@ class PromptTemplateLearner(BaseLearner):
 
         return recommendations
 
-    def create_enrichment_callback(self):
+    def create_enrichment_callback(self) -> Any:
         """Create a callback function for PromptEnrichmentService.
 
         Returns:
@@ -1009,13 +1010,13 @@ class PromptTemplateLearner(BaseLearner):
 
             if context not in seen_contexts:
                 seen_contexts.add(context)
-                context_styles = {
+                context_styles: Dict[str, float] = {
                     k[2]: v.mean()
                     for k, v in self._style_posteriors.items()
                     if k[0] == task_type and k[1] == provider
                 }
                 if context_styles:
-                    best = max(context_styles, key=context_styles.get)
+                    best = max(context_styles.keys(), key=lambda k: context_styles[k])
                     top_styles[context] = {
                         "best_style": best,
                         "probability": context_styles[best],

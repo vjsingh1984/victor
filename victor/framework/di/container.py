@@ -52,6 +52,7 @@ Migration Path:
 from __future__ import annotations
 
 import inspect
+from inspect import Parameter
 import logging
 import threading
 from dataclasses import dataclass, field
@@ -61,6 +62,7 @@ from typing import (
     Callable,
     Dict,
     Generic,
+    Mapping,
     Optional,
     Type,
     TypeVar,

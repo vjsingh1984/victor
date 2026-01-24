@@ -229,8 +229,11 @@ class StateDelegationMixin:
             # Only create if not already defined on the class
             if prop_name not in cls.__dict__:
                 comp_attr, prop_name_on_comp, doc = delegation_info
+                # Skip if property name is None (can't delegate to None property)
                 if prop_name_on_comp is None:
-                    continue  # Skip if property name is None
+                    continue
+                # At this point, prop_name_on_comp is guaranteed to be str
+                assert isinstance(prop_name_on_comp, str), "Property name must be string"
                 descriptor = StateDelegationDescriptor(
                     component_attr=comp_attr,
                     property_name=prop_name_on_comp,

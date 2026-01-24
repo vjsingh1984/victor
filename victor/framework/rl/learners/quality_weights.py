@@ -493,7 +493,7 @@ class QualityWeightLearner(BaseLearner):
         if task_type not in self._recent_outcomes:
             return dict.fromkeys(QualityDimension.ALL, 0.0)
 
-        outcomes = self._recent_outcomes[task_type]
+        outcomes: List[Dict[str, Any]] = self._recent_outcomes[task_type]
         if len(outcomes) < 5:
             return dict.fromkeys(QualityDimension.ALL, 0.0)
 
@@ -501,13 +501,19 @@ class QualityWeightLearner(BaseLearner):
 
         for dim in QualityDimension.ALL:
             # Extract dimension scores and success values
-            dim_scores = []
-            successes = []
+            dim_scores: List[float] = []
+            successes: List[float] = []
 
             for o in outcomes:
-                if dim in o["dimension_scores"]:
-                    dim_scores.append(o["dimension_scores"][dim])
-                    successes.append(o["success"])
+                dim_scores_dict = o.get("dimension_scores", {})
+                if isinstance(dim_scores_dict, dict) and dim in dim_scores_dict:
+                    dim_score = dim_scores_dict[dim]
+                    success_val = o.get("success")
+                    if isinstance(dim_score, (int, float)) and isinstance(
+                        success_val, (int, float)
+                    ):
+                        dim_scores.append(float(dim_score))
+                        successes.append(float(success_val))
 
             if len(dim_scores) < 5:
                 correlations[dim] = 0.0

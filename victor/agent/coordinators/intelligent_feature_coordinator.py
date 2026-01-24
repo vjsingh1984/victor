@@ -101,7 +101,9 @@ class IntelligentFeatureCoordinator:
             return None
 
         try:
-            result: Optional[Dict[str, Any]] = await self._qlearning_coordinator.prepare_request(task, task_type)
+            result: Optional[Dict[str, Any]] = await self._qlearning_coordinator.prepare_request(
+                task, task_type
+            )
             return result
         except Exception as e:
             logger.warning(f"Failed to prepare intelligent request: {e}")
@@ -131,9 +133,11 @@ class IntelligentFeatureCoordinator:
             return {"validated": False, "reason": "Evaluation coordinator not available"}
 
         try:
-            validation_result: Dict[str, Any] = await self._evaluation_coordinator.validate_response(
-                response,
-                expected_outcomes=expected_outcomes,
+            validation_result: Dict[str, Any] = (
+                await self._evaluation_coordinator.validate_response(
+                    response,
+                    expected_outcomes=expected_outcomes,
+                )
             )
             return validation_result
         except Exception as e:

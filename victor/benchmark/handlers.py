@@ -452,12 +452,10 @@ class PolyglotVerifierHandler(BaseHandler):
                 command=test_command,
                 timeout=180,
             )
-            output["tests_pass"] = (
-                test_result.success if hasattr(test_result, "success") else False
-            )
-            output["test_output"] = (
-                test_result.output if hasattr(test_result, "output") else ""
-            )[:2000]
+            output["tests_pass"] = test_result.success if hasattr(test_result, "success") else False
+            output["test_output"] = (test_result.output if hasattr(test_result, "output") else "")[
+                :2000
+            ]
 
         tool_calls = 2 if test_command else 1
         return output, tool_calls
@@ -691,9 +689,7 @@ class SyntaxCheckHandler(BaseHandler):
                 )
         else:
             # For other languages, try to use the language's syntax checker
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=f".{language}", delete=False
-            ) as f:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=f".{language}", delete=False) as f:
                 f.write(code)
                 code_file = f.name
 

@@ -301,7 +301,9 @@ class CrossVerticalLearner(BaseLearner):
                 import json
 
                 metadata = json.loads(row[0])
-                return metadata.get("mode")
+                mode = metadata.get("mode")
+                if isinstance(mode, str):
+                    return mode
             except Exception:
                 pass
 
@@ -339,17 +341,19 @@ class CrossVerticalLearner(BaseLearner):
 
     def get_recommendation(
         self,
+        provider: str,
+        model: str,
         task_type: str,
-        target_vertical: str,
-    ) -> RLRecommendation:
-        """Get recommendation for a task type in a target vertical.
+    ) -> Optional[RLRecommendation]:
+        """Get recommendation for a task type using cross-vertical patterns.
 
         Uses cross-vertical patterns to provide recommendations, especially
         useful for cold-start scenarios in new verticals.
 
         Args:
+            provider: Provider name (used to determine vertical context)
+            model: Model name (unused but kept for base class compatibility)
             task_type: Type of task
-            target_vertical: Target vertical
 
         Returns:
             RLRecommendation with cross-vertical insights
@@ -362,7 +366,7 @@ class CrossVerticalLearner(BaseLearner):
             FROM {Tables.RL_OUTCOME}
             WHERE vertical = ? AND task_type = ?
         """,
-            (target_vertical, task_type),
+            (provider, task_type),
         )
 
         local_count = cursor.fetchone()[0]
@@ -379,7 +383,7 @@ class CrossVerticalLearner(BaseLearner):
 
         # Get cross-vertical patterns
         patterns = self.get_shared_patterns(
-            target_vertical=target_vertical,
+            target_vertical=provider,
             min_confidence=0.5,
         )
 

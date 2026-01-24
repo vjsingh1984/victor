@@ -404,7 +404,9 @@ class ASGIMonitoringMiddleware:
             tracer=tracer,
         )
 
-    async def __call__(self, scope: Dict[str, Any], receive: Callable[..., Any], send: Callable[..., Any]) -> None:
+    async def __call__(
+        self, scope: Dict[str, Any], receive: Callable[..., Any], send: Callable[..., Any]
+    ) -> None:
         """ASGI entry point.
 
         Args:

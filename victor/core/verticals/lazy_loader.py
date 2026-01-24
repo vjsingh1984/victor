@@ -43,6 +43,7 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
+
 class LoadTrigger(str, Enum):
     """When to load vertical.
 

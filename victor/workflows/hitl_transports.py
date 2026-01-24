@@ -306,7 +306,9 @@ class CustomHookConfig(BaseTransportConfig):
     """Configuration for custom hook-based approvals."""
 
     send_hook: Optional[Callable[..., Any]] = None  # async def send(request) -> str
-    poll_hook: Optional[Callable[..., Any]] = None  # async def poll(request_id) -> Optional[Response]
+    poll_hook: Optional[Callable[..., Any]] = (
+        None  # async def poll(request_id) -> Optional[Response]
+    )
     cancel_hook: Optional[Callable[..., Any]] = None  # async def cancel(request_id) -> bool
 
 

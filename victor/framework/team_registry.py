@@ -411,7 +411,7 @@ class TeamSpecRegistry:
         for name in sorted_names:
             spec = team_specs[name]
             # Convert spec to string representation
-            if hasattr(spec, 'to_dict'):
+            if hasattr(spec, "to_dict"):
                 spec_str = json.dumps(spec.to_dict(), sort_keys=True, default=str)
             else:
                 spec_str = str(spec)

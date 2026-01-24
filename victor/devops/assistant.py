@@ -5,6 +5,9 @@ Competitive positioning: Docker Desktop AI, Terraform Assistant, Pulumi AI, K8s 
 
 from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from victor.framework.prompt_builder import PromptBuilder
+
 from victor.core.verticals.base import StageDefinition, VerticalBase
 from victor.core.verticals.defaults.tool_defaults import (
     COMMON_REQUIRED_TOOLS,
