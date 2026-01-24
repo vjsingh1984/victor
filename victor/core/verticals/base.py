@@ -1345,9 +1345,9 @@ class VerticalRegistry:
 
         if reregister_builtins:
             # Re-register built-in verticals to prevent test pollution
-            from victor.core.verticals import _register_builtin_verticals
+            from victor.core.verticals import _register_and_discover_verticals
 
-            _register_builtin_verticals()
+            _register_and_discover_verticals()
 
     @classmethod
     def discover_external_verticals(cls) -> Dict[str, Type[VerticalBase]]:
