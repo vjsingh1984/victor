@@ -643,9 +643,23 @@ def create_event_backend(
 
 
 # Register built-in backend
+def _create_in_memory_backend(config: BackendConfig) -> InMemoryEventBackend:
+    """Create in-memory backend with optional sampling configuration."""
+    extra = config.extra or {}
+    sampling_rate = extra.get("sampling_rate", 1.0)
+    sampling_whitelist = extra.get("sampling_whitelist")
+    if sampling_whitelist is not None:
+        sampling_whitelist = set(sampling_whitelist)
+    return InMemoryEventBackend(
+        config,
+        sampling_rate=sampling_rate,
+        sampling_whitelist=sampling_whitelist,
+    )
+
+
 register_backend_factory(
     BackendType.IN_MEMORY,
-    lambda config: InMemoryEventBackend(config),
+    _create_in_memory_backend,
 )
 
 
@@ -1171,7 +1185,16 @@ def get_observability_bus() -> ObservabilityBus:
             backend_type = backend_type_map.get(backend_type_str, BackendType.IN_MEMORY)
 
             # Create backend from settings
-            backend = create_event_backend(backend_type=backend_type)
+            cfg = BackendConfig.for_observability()
+            if settings.eventbus_sampling_enabled:
+                sampling_rate = max(0.0, min(1.0, settings.eventbus_sampling_default_rate))
+                cfg.extra["sampling_rate"] = sampling_rate
+                # Always keep critical events
+                cfg.extra["sampling_whitelist"] = {
+                    "error.*",
+                    "lifecycle.*",
+                }
+            backend = create_event_backend(cfg, backend_type=backend_type)
 
             return ObservabilityBus(backend=backend)
 

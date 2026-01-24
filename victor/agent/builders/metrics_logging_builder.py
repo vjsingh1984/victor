@@ -22,7 +22,6 @@ import logging
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
 from victor.agent.builders.base import FactoryAwareBuilder
-from victor.tools.base import CostTier
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -67,19 +66,23 @@ class MetricsLoggingBuilder(FactoryAwareBuilder):
         components["debug_logger"] = orchestrator.debug_logger
 
         # Background task tracking for graceful shutdown
-        orchestrator._background_tasks: set[asyncio.Task] = set()
-        orchestrator._embedding_preload_task: Optional[asyncio.Task] = None
+        if not hasattr(orchestrator, "_background_tasks"):
+            orchestrator._background_tasks: set[asyncio.Task[Any]] = set()  # type: ignore[misc]
+        if not hasattr(orchestrator, "_embedding_preload_task"):
+            orchestrator._embedding_preload_task: Optional[asyncio.Task[Any]] = None  # type: ignore[misc]
         components["background_tasks"] = orchestrator._background_tasks
         components["embedding_preload_task"] = orchestrator._embedding_preload_task
 
         # Metrics collection (via factory)
+        from victor.tools.base import CostTier  # type: ignore[attr-defined]
+
         orchestrator._metrics_collector = factory.create_metrics_collector(
             streaming_metrics_collector=orchestrator.streaming_metrics_collector,
             usage_logger=orchestrator.usage_logger,
             debug_logger=orchestrator.debug_logger,
             tool_cost_lookup=lambda name: (
-                orchestrator.tools.get_tool_cost(name)
-                if hasattr(orchestrator, "tools")
+                orchestrator.tools.get_tool_cost(name)  # type: ignore[union-attr]
+                if hasattr(orchestrator, "tools") and orchestrator.tools is not None
                 else CostTier.FREE
             ),
         )

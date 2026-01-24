@@ -110,7 +110,11 @@ class RecoveryObservabilityBuilder(FactoryAwareBuilder):
         components["checkpoint_coordinator"] = orchestrator._checkpoint_coordinator
 
         # Initialize ChatCoordinator for chat and streaming operations (SOLID refactoring)
-        orchestrator._chat_coordinator = ChatCoordinator(orchestrator=orchestrator)
+        from victor.protocols.agent import IAgentOrchestrator
+
+        orchestrator._chat_coordinator = ChatCoordinator(
+            orchestrator=orchestrator  # type: ignore[arg-type]
+        )
         components["chat_coordinator"] = orchestrator._chat_coordinator
 
         # Initialize ValidationCoordinator for validation logic (SOLID refactoring)

@@ -139,6 +139,11 @@ class StreamMetrics:
             return self.effective_total_tokens / duration
         return 0.0
 
+    @property
+    def total_tool_calls(self) -> int:
+        """Alias for tool_calls_count for backward compatibility."""
+        return self.tool_calls_count
+
     def format_cost(self) -> str:
         """Format cost for display.
 

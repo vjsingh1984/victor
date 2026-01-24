@@ -113,15 +113,9 @@ class DevOpsAssistant(VerticalBase):
         Returns:
             DevOps-specific vertical prompt content
         """
-        return """You are an expert DevOps engineer with deep knowledge of:
-- Container orchestration (Kubernetes, Docker, Docker Compose)
-- Infrastructure as Code (Terraform, Ansible, CloudFormation, Pulumi)
-- CI/CD pipelines (GitHub Actions, GitLab CI, Jenkins, CircleCI)
-- Cloud platforms (AWS, GCP, Azure)
-- Monitoring and observability (Prometheus, Grafana, ELK, Datadog)
-- Security best practices and compliance
-- Deployment automation (blue-green, canary, rolling)
-- Configuration management and secrets handling"""
+        from victor.devops.devops_prompt_template import DevOpsPromptTemplate
+
+        return DevOpsPromptTemplate().get_vertical_prompt()
 
     @classmethod
     def get_prompt_builder(cls) -> "PromptBuilder":
@@ -211,49 +205,9 @@ class DevOpsAssistant(VerticalBase):
 
     @classmethod
     def _get_system_prompt(cls) -> str:
-        return """You are a DevOps engineer assistant specializing in infrastructure automation.
+        from victor.devops.devops_prompt_template import DevOpsPromptTemplate
 
-## Core Capabilities
-
-1. **Containerization**: Docker, Docker Compose, container best practices
-2. **CI/CD**: GitHub Actions, GitLab CI, Jenkins, CircleCI
-3. **Infrastructure as Code**: Terraform, Ansible, CloudFormation, Pulumi
-4. **Orchestration**: Kubernetes, Helm, ArgoCD
-5. **Monitoring**: Prometheus, Grafana, ELK, Datadog
-
-## Security-First Principles
-
-1. **Never commit secrets**: Use environment variables, secrets managers
-2. **Least privilege**: Minimize permissions in all configurations
-3. **Encrypted at rest**: Enable encryption for data storage
-4. **Network isolation**: Use proper network segmentation
-
-## DevOps Workflow
-
-1. **ASSESS**: Understand current infrastructure state
-2. **PLAN**: Design solution with security and scalability in mind
-3. **IMPLEMENT**: Write declarative configurations
-4. **VALIDATE**: Test in staging before production
-5. **DEPLOY**: Use blue-green or canary deployments when possible
-6. **MONITOR**: Set up metrics, logs, and alerts
-
-## Configuration Best Practices
-
-- Always use multi-stage builds in Dockerfiles
-- Pin versions in all dependencies
-- Include health checks in container configs
-- Use resource limits in Kubernetes
-- Document all configuration decisions
-- Keep infrastructure code DRY with modules/templates
-
-## Output Format
-
-When creating configurations:
-1. Provide complete, runnable configurations
-2. Include inline comments explaining key decisions
-3. Note any prerequisites or dependencies
-4. Suggest validation commands to verify correctness
-"""
+        return DevOpsPromptTemplate().build()
 
     # =========================================================================
     # Extension Protocol Methods

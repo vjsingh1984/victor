@@ -167,8 +167,11 @@ class Agent:
             agent = await Agent.create(tools=ToolSet.coding())
 
             # With vertical (domain-specific assistant)
-            from victor.coding import CodingAssistant
-            agent = await Agent.create(vertical=CodingAssistant)
+            # from victor.coding import CodingAssistant
+            # agent = await Agent.create(vertical=CodingAssistant)
+            #
+            # Any vertical inheriting from VerticalBase works:
+            # agent = await Agent.create(vertical=YourVerticalAssistant)
 
             # With observability events
             agent = await Agent.create(session_id="my-session")

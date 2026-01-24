@@ -588,8 +588,8 @@ class AgentOrchestrator(
         self._mode_workflow_team_coordinator: Optional[Any] = None
         self._team_coordinator: Optional[Any] = None
         self._embedding_preload_task: Optional[asyncio.Task[Any]] = None
-        self._continuation_prompts: Dict[str, str] = {}
-        self._asking_input_prompts: Dict[str, str] = {}
+        self._continuation_prompts: int = 0
+        self._asking_input_prompts: int = 0
 
         # Create factory for component initialization (composition root)
         self._factory = OrchestratorFactory(

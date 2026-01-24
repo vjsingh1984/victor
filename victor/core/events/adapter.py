@@ -40,17 +40,21 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Callable, Optional
 
-from victor.core.events.protocols import MessagingEvent, DeliveryGuarantee
+from victor.core.events.protocols import MessagingEvent, DeliveryGuarantee, SubscriptionHandle
 
 if TYPE_CHECKING:
-    from victor.core.events import ObservabilityBus as EventBus, VictorEvent, EventCategory
     from victor.core.events.backends import ObservabilityBus, AgentMessageBus
     from victor.agent.teams.communication import TeamMessageBus
+
+    # Type aliases for compatibility
+    EventBus = ObservabilityBus
+    VictorEvent = MessagingEvent
+    EventCategory = str
 
 logger = logging.getLogger(__name__)
 
 
-def victor_event_to_event(victor_event: "VictorEvent") -> MessagingEvent:
+def victor_event_to_event(victor_event: MessagingEvent) -> MessagingEvent:
     """Convert VictorEvent (legacy) to MessagingEvent (protocol-based).
 
     Args:
@@ -59,13 +63,15 @@ def victor_event_to_event(victor_event: "VictorEvent") -> MessagingEvent:
     Returns:
         Protocol-based MessagingEvent
     """
+    # Since VictorEvent has been removed, this now just returns the event as-is
+    # with adjusted delivery guarantee for observability
     return MessagingEvent(
         id=victor_event.id,
-        topic=f"{victor_event.category.value}.{victor_event.name}",
+        topic=victor_event.topic,
         data=victor_event.data,
-        timestamp=victor_event.timestamp.timestamp(),
+        timestamp=victor_event.timestamp,
         source=victor_event.source,
-        correlation_id=victor_event.trace_id,
+        correlation_id=victor_event.correlation_id,
         delivery_guarantee=DeliveryGuarantee.AT_MOST_ONCE,
     )
 
@@ -130,8 +136,7 @@ class EventBusAdapter:
         self._new_backend = new_backend
         self._forward_to_new = forward_to_new
         self._forward_to_legacy = forward_to_legacy
-        self._unsubscribe_legacy: Optional[Callable[[], None]] = None
-        self._unsubscribe_new: Optional[object] = None
+        self._unsubscribe_handle: Optional[SubscriptionHandle] = None
         self._enabled = False
 
     def enable_forwarding(self) -> None:
@@ -158,7 +163,7 @@ class EventBusAdapter:
         self._enabled = False
         logger.debug("EventBusAdapter forwarding disabled")
 
-    def _on_legacy_event(self, victor_event: "VictorEvent") -> None:
+    def _on_legacy_event(self, victor_event: MessagingEvent) -> None:
         """Handle event from legacy bus."""
         if not self._forward_to_new:
             return

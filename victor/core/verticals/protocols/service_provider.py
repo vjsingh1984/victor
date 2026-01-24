@@ -80,7 +80,7 @@ class ServiceProviderProtocol(Protocol):
         """
         ...
 
-    def get_required_services(self) -> List[Type]:
+    def get_required_services(self) -> List[Type[Any]]:
         """Get list of required service types.
 
         Used for validation that all dependencies are registered.
@@ -90,7 +90,7 @@ class ServiceProviderProtocol(Protocol):
         """
         return []
 
-    def get_optional_services(self) -> List[Type]:
+    def get_optional_services(self) -> List[Type[Any]]:
         """Get list of optional service types.
 
         These are used if available but not required.

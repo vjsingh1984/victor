@@ -27,6 +27,7 @@ from __future__ import annotations
 from typing import Dict
 
 from victor.core.verticals.protocols import PromptContributorProtocol, TaskTypeHint
+from victor.core.vertical_types import StandardTaskHints
 from victor.framework.prompts import (
     GroundingRulesBuilder,
     SystemPromptBuilder,
@@ -182,6 +183,9 @@ ANTI-PATTERNS TO AVOID:
         priority_tools=["read", "edit", "test", "shell"],
     ),
 }
+
+# Merge with standard task hints to provide common defaults across verticals
+CODING_TASK_TYPE_HINTS = StandardTaskHints.merge_with(CODING_TASK_TYPE_HINTS)
 
 
 # Coding-specific grounding rules (now using framework builders)

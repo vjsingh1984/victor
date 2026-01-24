@@ -101,6 +101,12 @@ from victor.framework.events import (
     tool_error_event,
     tool_result_event,
 )
+from victor.core.events.taxonomy import (
+    UnifiedEventType,
+    map_framework_event,
+    map_tool_event,
+    map_system_event,
+)
 
 if TYPE_CHECKING:
     from victor.core.event_sourcing import DomainEvent as CQRSEvent
@@ -124,6 +130,31 @@ class EventTarget(str, Enum):
 
     STREAM_CHUNK = "stream_chunk"
     """Protocol StreamChunk format."""
+
+
+def _map_unified_type(event: AgentExecutionEvent) -> UnifiedEventType:
+    """Map framework event to unified taxonomy."""
+    if event.type == EventType.CONTENT:
+        return map_framework_event("content")
+    if event.type == EventType.THINKING:
+        return map_framework_event("thinking")
+    if event.type == EventType.TOOL_CALL:
+        return map_tool_event("call")
+    if event.type == EventType.TOOL_RESULT:
+        return map_tool_event("result")
+    if event.type == EventType.TOOL_ERROR:
+        return map_tool_event("error")
+    if event.type == EventType.STAGE_CHANGE:
+        return UnifiedEventType.STATE_TRANSITION
+    if event.type in (EventType.STREAM_START, EventType.STREAM_END):
+        return UnifiedEventType.SYSTEM_LIFECYCLE
+    if event.type == EventType.ERROR:
+        return map_system_event("error")
+    if event.type == EventType.PROGRESS:
+        return UnifiedEventType.SYSTEM_METRICS
+    if event.type == EventType.MILESTONE:
+        return UnifiedEventType.SYSTEM_LIFECYCLE
+    return UnifiedEventType.UNKNOWN
 
 
 # =============================================================================
@@ -225,9 +256,11 @@ class BaseEventConverter(ABC):
 
     def _base_data(self, event: AgentExecutionEvent) -> Dict[str, Any]:
         """Extract common base data from event."""
+        metadata = event.metadata.copy() if event.metadata else {}
+        metadata.setdefault("unified_type", _map_unified_type(event).value)
         return {
             "timestamp": event.timestamp,
-            "metadata": event.metadata.copy() if event.metadata else {},
+            "metadata": metadata,
         }
 
 

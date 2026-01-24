@@ -141,4 +141,31 @@ class TeamCoordinator:
             ["review_team", "refactor_team"]
         """
         # Get from orchestrator instance
-        return getattr(self._orchestrator, "_team_specs", {})
+        specs = getattr(self._orchestrator, "_team_specs", {})
+        if specs:
+            return specs
+
+        # Fall back to vertical context if available
+        vertical_context = getattr(self._orchestrator, "vertical_context", None)
+        if vertical_context is not None:
+            context_specs = getattr(vertical_context, "team_specs", None)
+            if context_specs:
+                return context_specs
+
+        # Final fallback: global team registry by vertical name
+        vertical_name = None
+        if vertical_context is not None:
+            vertical_name = getattr(vertical_context, "vertical_name", None)
+        if vertical_name:
+            from victor.framework.team_registry import get_team_registry
+
+            registry_specs = get_team_registry().find_by_vertical(vertical_name)
+            # Strip namespace prefix for compatibility with local team names
+            normalized: Dict[str, Any] = {}
+            for name, spec in registry_specs.items():
+                short_name = name.split(":", 1)[-1] if ":" in name else name
+                normalized[short_name] = spec
+            if normalized:
+                return normalized
+
+        return {}

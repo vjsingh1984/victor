@@ -113,6 +113,10 @@ _lazy_init = get_initializer_for_vertical("coding", _register_escape_hatches)
 # Note: Registration happens on first call to _lazy_init.get_or_initialize()
 # This eliminates import-time side effects while maintaining backward compatibility
 
+# Trigger escape hatch registration on module import for backward compatibility
+# OCP Note: This is a temporary measure. Future versions should use pure discovery.
+_lazy_init.get_or_initialize()
+
 __all__ = [
     # Main vertical
     "CodingAssistant",

@@ -1505,7 +1505,7 @@ class ChatCoordinator:
             if chunk.tool_calls:
                 logger.debug(f"Received tool_calls in chunk: {chunk.tool_calls}")
                 tool_calls = chunk.tool_calls
-                stream_ctx.stream_metrics.total_tool_calls += len(chunk.tool_calls)
+                stream_ctx.stream_metrics.tool_calls_count += len(chunk.tool_calls)
 
             if chunk.usage:
                 for key in stream_ctx.cumulative_usage:

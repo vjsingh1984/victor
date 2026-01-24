@@ -77,12 +77,11 @@ class WorkflowMemoryBuilder(FactoryAwareBuilder):
 
         # Persistent conversation memory with SQLite backing (via factory)
         # Provides session recovery, token-aware pruning, and multi-turn context retention
-        orchestrator.memory_manager, orchestrator._memory_session_id = (
-            factory.create_memory_components(
-                orchestrator.provider_name,
-                orchestrator._tool_calling_caps_internal.native_tool_calls,
-            )
+        memory_result = factory.create_memory_components(
+            orchestrator.provider_name,
+            orchestrator._tool_calling_caps_internal.native_tool_calls,
         )
+        orchestrator.memory_manager, orchestrator._memory_session_id = memory_result
         components["memory_manager"] = orchestrator.memory_manager
         components["memory_session_id"] = orchestrator._memory_session_id
 
@@ -111,7 +110,7 @@ class WorkflowMemoryBuilder(FactoryAwareBuilder):
         # Consolidates access to SessionStateManager, ConversationStateMachine, and checkpoint state
         # Provides state change notifications (Observer pattern) and state history tracking
         orchestrator._state_coordinator = factory.create_state_coordinator(
-            session_state_manager=orchestrator._session_state,
+            session_state_manager=orchestrator._session_state if orchestrator._session_state else None,  # type: ignore[arg-type]
             conversation_state_machine=orchestrator.conversation_state,
         )
         components["state_coordinator"] = orchestrator._state_coordinator

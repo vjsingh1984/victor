@@ -54,7 +54,7 @@ import os
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
 
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import (
@@ -110,7 +110,7 @@ class LazyVerticalExtensions:
     """
 
     vertical_name: str
-    loader: callable[[], "VerticalExtensions"]
+    loader: Callable[[], "VerticalExtensions"]
     trigger: ExtensionLoadTrigger = field(default_factory=lambda: ExtensionLoadTrigger.ON_DEMAND)
     _loaded: bool = False
     _extensions: Optional["VerticalExtensions"] = None
@@ -149,12 +149,14 @@ class LazyVerticalExtensions:
         """
         # Fast path: already loaded
         if self._loaded:
+            assert self._extensions is not None
             return self._extensions
 
         # Slow path: need to load
         with self._load_lock:
             # Double-check: another thread may have loaded it
             if self._loaded:
+                assert self._extensions is not None
                 return self._extensions
 
             # Check for recursive loading
@@ -166,7 +168,8 @@ class LazyVerticalExtensions:
             try:
                 self._loading = True
                 logger.debug(f"Lazy loading extensions for vertical: {self.vertical_name}")
-                self._extensions = self.loader()
+                loaded_extensions = self.loader()
+                self._extensions = loaded_extensions
                 self._loaded = True
                 logger.debug(f"Successfully loaded extensions for vertical: {self.vertical_name}")
                 return self._extensions
@@ -313,7 +316,7 @@ class LazyVerticalExtensions:
 
 def create_lazy_extensions(
     vertical_name: str,
-    loader: callable[[], "VerticalExtensions"],
+    loader: Callable[[], "VerticalExtensions"],
     trigger: ExtensionLoadTrigger = ExtensionLoadTrigger.ON_DEMAND,
 ) -> LazyVerticalExtensions:
     """Create a lazy extensions wrapper.

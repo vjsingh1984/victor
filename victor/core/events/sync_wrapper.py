@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, TYPE_CHECKING, Awaitable, Callable
+from typing import Any, TYPE_CHECKING, Awaitable, Callable, cast
 
 from victor.core.events.protocols import (
     EventHandler,
@@ -95,7 +95,7 @@ class SyncEventWrapper:
         self._backend = backend
         logger.debug(f"[SyncEventWrapper] Created wrapper for {type(backend).__name__}")
 
-    def _run_async_synchronous(self, coro: Awaitable[Any]) -> any:
+    def _run_async_synchronous(self, coro: Awaitable[Any]) -> Any:
         """Run an async coroutine in a synchronous context.
 
         This method handles both cases:
@@ -127,9 +127,9 @@ class SyncEventWrapper:
             result = [None]
             exception = [None]
 
-            def run_in_thread():
+            def run_in_thread() -> None:
                 try:
-                    result[0] = asyncio.run(coro)
+                    result[0] = asyncio.run(cast(Any, coro))
                 except Exception as e:
                     exception[0] = e
 
@@ -144,7 +144,7 @@ class SyncEventWrapper:
             return result[0]
         except RuntimeError:
             # No running loop, safe to use asyncio.run()
-            return asyncio.run(coro)
+            return asyncio.run(cast(Any, coro))
 
     def publish(self, event: MessagingEvent) -> bool:
         """Publish an event synchronously.

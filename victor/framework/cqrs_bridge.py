@@ -336,6 +336,8 @@ class FrameworkEventAdapter:
             aggregate_id = self.aggregate_id or self.session_id or "unknown"
 
             # Map framework event types to CQRS event classes
+            # Use a union type for cqrs_event to handle different event types
+            cqrs_event: CQRSEvent
             if event_type == "tool_called":
                 cqrs_event = ToolCalledEvent(
                     task_id=aggregate_id,
@@ -371,15 +373,16 @@ class FrameworkEventAdapter:
                 )
 
             # Dispatch to handlers (async dispatch, handle sync/async context)
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    asyncio.create_task(self.event_dispatcher.dispatch(cqrs_event))
-                else:
-                    loop.run_until_complete(self.event_dispatcher.dispatch(cqrs_event))
-            except RuntimeError:
-                # No event loop available, create a new one
-                asyncio.run(self.event_dispatcher.dispatch(cqrs_event))
+            if self.event_dispatcher is not None:
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        asyncio.create_task(self.event_dispatcher.dispatch(cqrs_event))
+                    else:
+                        loop.run_until_complete(self.event_dispatcher.dispatch(cqrs_event))
+                except RuntimeError:
+                    # No event loop available, create a new one
+                    asyncio.run(self.event_dispatcher.dispatch(cqrs_event))
 
         except Exception as e:
             logger.warning(f"Failed to forward event to CQRS: {e}")
@@ -454,13 +457,15 @@ class ObservabilityToCQRSBridge:
         self._is_running = False
         self._event_count = 0
 
-    def start(self) -> None:
+    async def start(self) -> None:
         """Start forwarding events."""
         if self._is_running:
             return
 
-        # Subscribe to all observability events
-        self._unsubscribe = self._event_bus.subscribe_all(self._handle_event)
+        # Subscribe to all observability events using wildcard pattern
+        handle = await self._event_bus.subscribe("*", self._handle_event)
+        # Store unsubscribe function
+        self._unsubscribe = lambda: asyncio.create_task(self._event_bus.unsubscribe(handle))
         self._is_running = True
         logger.debug("ObservabilityToCQRSBridge started")
 
@@ -497,6 +502,8 @@ class ObservabilityToCQRSBridge:
             # Extract topic prefix for metadata
             topic_prefix = topic.split(".", 1)[0] if "." in topic else topic
 
+            # Use a union type for cqrs_event to handle different event types
+            cqrs_event: CQRSEvent
             if event_type == "tool_called":
                 cqrs_event = ToolCalledEvent(
                     task_id=self._aggregate_id,
@@ -768,6 +775,10 @@ class CQRSBridge:
             Command result with session_id.
         """
         from victor.core.agent_commands import StartSessionCommand
+        from victor.core.cqrs import CommandResult, QueryResult
+
+        if self._command_bus is None:
+            raise RuntimeError("Command bus not initialized")
 
         session_id = session_id or f"session-{uuid4().hex[:8]}"
         command = StartSessionCommand(
@@ -776,7 +787,13 @@ class CQRSBridge:
         )
 
         result = await self._command_bus.execute(command)
-        return result.result if result.success else {"error": result.error}
+        # Handle both CommandResult and QueryResult
+        if isinstance(result, CommandResult):
+            return result.result if result.result is not None else {"error": result.error}
+        elif isinstance(result, QueryResult):
+            return result.data if result.data is not None else {"error": result.error}
+        else:
+            return {"error": "Unknown result type"}
 
     async def end_session(self, session_id: str) -> Dict[str, Any]:
         """End a session via CQRS command.
@@ -788,10 +805,20 @@ class CQRSBridge:
             Command result.
         """
         from victor.core.agent_commands import EndSessionCommand
+        from victor.core.cqrs import CommandResult, QueryResult
+
+        if self._command_bus is None:
+            raise RuntimeError("Command bus not initialized")
 
         command = EndSessionCommand(session_id=session_id)
         result = await self._command_bus.execute(command)
-        return result.result if result.success else {"error": result.error}
+        # Handle both CommandResult and QueryResult
+        if isinstance(result, CommandResult):
+            return result.result if result.result is not None else {"error": result.error}
+        elif isinstance(result, QueryResult):
+            return result.data if result.data is not None else {"error": result.error}
+        else:
+            return {"error": "Unknown result type"}
 
     async def execute_tool(
         self,

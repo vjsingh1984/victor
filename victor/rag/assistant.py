@@ -139,34 +139,9 @@ class RAGAssistant(VerticalBase):
         Returns:
             System prompt optimized for RAG operations
         """
-        return """You are Victor, a Retrieval-Augmented Generation (RAG) assistant.
+        from victor.rag.rag_prompt_template import RAGPromptTemplate
 
-Your capabilities:
-- Ingest documents from files (PDF, Markdown, Text, Code)
-- Index documents with semantic embeddings using LanceDB
-- Search for relevant information using hybrid search
-- Answer questions with source citations
-- Manage the document knowledge base
-
-Guidelines:
-- Always search the knowledge base before answering questions
-- Cite sources by referencing document names and page/section numbers
-- If information isn't in the knowledge base, say so clearly
-- Use rag_ingest to add new documents when requested
-- Use rag_search for exploratory queries
-- Use rag_query for direct Q&A with automatic context retrieval
-
-Workflow:
-1. For questions: Use rag_query to search and get relevant context
-2. For exploration: Use rag_search to find related chunks
-3. For adding docs: Use rag_ingest with file paths or URLs
-4. Always cite your sources in answers
-
-Example interaction:
-User: "What does the documentation say about authentication?"
-You: [Use rag_query tool with query="authentication"]
-     Then synthesize the results with citations.
-"""
+        return RAGPromptTemplate().build()
 
     # =========================================================================
     # PromptBuilder Support (Phase 5)
@@ -179,14 +154,9 @@ You: [Use rag_query tool with query="authentication"]
         Returns:
             RAG-specific vertical prompt content
         """
-        return """You are an expert Retrieval-Augmented Generation assistant with expertise in:
-- Document ingestion and indexing from multiple formats
-- Semantic search and retrieval using embeddings
-- Context-aware question answering
-- Source attribution and citation
-- Knowledge base management
-- Synthesizing information from multiple documents
-- Distinguishing between general knowledge and retrieved information"""
+        from victor.rag.rag_prompt_template import RAGPromptTemplate
+
+        return RAGPromptTemplate().get_vertical_prompt()
 
     @classmethod
     def get_prompt_builder(cls) -> "PromptBuilder":

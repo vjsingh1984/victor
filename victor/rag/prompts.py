@@ -16,7 +16,7 @@
 
 from typing import Any, Dict, List, Optional
 
-from victor.core.vertical_types import TaskTypeHint
+from victor.core.vertical_types import TaskTypeHint, StandardTaskHints
 from victor.core.verticals.protocols import PromptContributorProtocol
 
 
@@ -32,7 +32,7 @@ class RAGPromptContributor(PromptContributorProtocol):
         Returns:
             Dictionary of task type to hints
         """
-        return {
+        hints = {
             "document_ingestion": TaskTypeHint(
                 task_type="document_ingestion",
                 description="Ingesting documents into the knowledge base",
@@ -78,6 +78,7 @@ class RAGPromptContributor(PromptContributorProtocol):
                 ],
             ),
         }
+        return StandardTaskHints.merge_with(hints)
 
     def get_system_prompt_section(self) -> str:
         """Get system prompt section for RAG.

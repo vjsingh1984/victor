@@ -651,7 +651,10 @@ def ensure_bootstrapped(
             _ensure_vertical_activated(container, settings or container.get(Settings), vertical)
         return container
 
-    return bootstrap_container(settings, vertical=vertical)
+    container = bootstrap_container(settings, vertical=vertical)
+    if vertical is not None:
+        _ensure_vertical_activated(container, settings or container.get(Settings), vertical)
+    return container
 
 
 def _ensure_vertical_activated(

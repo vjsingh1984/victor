@@ -3,6 +3,7 @@
 from typing import Dict, Optional
 
 from victor.core.verticals.protocols import PromptContributorProtocol, TaskTypeHint
+from victor.core.vertical_types import StandardTaskHints
 
 
 # Research-specific task type hints
@@ -84,6 +85,9 @@ RESEARCH_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
         priority_tools=["web_search", "web_fetch", "read"],
     ),
 }
+
+# Merge with standard task hints to provide common defaults across verticals
+RESEARCH_TASK_TYPE_HINTS = StandardTaskHints.merge_with(RESEARCH_TASK_TYPE_HINTS)
 
 
 class ResearchPromptContributor(PromptContributorProtocol):

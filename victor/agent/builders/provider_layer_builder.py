@@ -70,7 +70,7 @@ class ProviderLayerBuilder(FactoryAwareBuilder):
             orchestrator.provider_name,
             orchestrator.tool_adapter,
             orchestrator._tool_calling_caps_internal,
-        ) = factory.create_provider_manager_with_adapter(provider, model, provider_name)
+        ) = factory.create_provider_manager_with_adapter(provider, model, provider_name or "")
         components["provider_manager"] = orchestrator._provider_manager
         components["provider"] = orchestrator.provider
         components["model"] = orchestrator.model

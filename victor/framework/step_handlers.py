@@ -1357,18 +1357,6 @@ class FrameworkStepHandler(BaseStepHandler):
         # Store in context
         context.apply_team_specs(team_specs)
 
-        # Attach via capability (SOLID compliant)
-        if _check_capability(orchestrator, "team_specs"):
-            _invoke_capability(orchestrator, "team_specs", team_specs)
-            logger.debug("Applied team specs via capability")
-        elif hasattr(orchestrator, "set_team_specs"):
-            orchestrator.set_team_specs(team_specs)
-            logger.debug("Applied team specs via set_team_specs")
-        else:
-            result.add_warning(
-                "Orchestrator lacks set_team_specs method; " "specs stored in context only"
-            )
-
         result.add_info(f"Registered {team_count} team specs: " f"{', '.join(team_specs.keys())}")
         # Log each team spec registration (matching workflow DEBUG logging pattern)
         for team_name in team_specs.keys():

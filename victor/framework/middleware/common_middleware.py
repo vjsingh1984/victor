@@ -43,8 +43,9 @@ Example:
     create_pii_safety_rules(enforcer)
 
     # Use vertical-specific extensions if needed
-    from victor.coding.safety import create_all_coding_safety_rules
-    create_all_coding_safety_rules(enforcer)
+    # Each vertical can provide their own safety rules
+    # Example: from my_vertical.safety import create_my_vertical_safety_rules
+    #         create_my_vertical_safety_rules(enforcer)
 """
 
 from __future__ import annotations

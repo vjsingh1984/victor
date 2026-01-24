@@ -43,7 +43,7 @@ class SessionServicesBuilder(FactoryAwareBuilder):
         """
         super().__init__(settings, factory)
 
-    def build(self, orchestrator: "AgentOrchestrator", **_kwargs) -> Dict[str, Any]:
+    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> Dict[str, Any]:
         """Build session state and core services and attach them to orchestrator."""
         factory = self._ensure_factory()
         components: Dict[str, Any] = {}

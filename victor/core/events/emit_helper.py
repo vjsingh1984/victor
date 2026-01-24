@@ -54,7 +54,7 @@ def emit_event_sync(
         >>> emit_event_sync(bus, "tool.start", {"tool": "read_file"})
     """
 
-    async def _emit_and_handle_errors():
+    async def _emit_and_handle_errors() -> None:
         """Emit event and handle any errors."""
         try:
             await event_bus.emit(

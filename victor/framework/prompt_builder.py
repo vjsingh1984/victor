@@ -36,12 +36,24 @@ The PromptBuilder uses a fluent API pattern for ergonomic construction:
         .build()
     )
 
-Integration with verticals:
+Integration with verticals (using VerticalDiscovery for OCP compliance):
 
-    from victor.coding.prompts import CodingPromptContributor
+    from victor.framework.discovery import VerticalDiscovery
+    from victor.framework.prompt_sections import VerticalPromptSection
 
+    # Dynamically discover vertical prompt contributors
+    discovery = VerticalDiscovery()
     builder = PromptBuilder()
-    builder.add_from_contributor(CodingPromptContributor())
+
+    # Add vertical-specific sections
+    builder.add_section(
+        "vertical_content",
+        VerticalPromptSection(
+            vertical="coding",
+            content="You are an expert software developer..."
+        ),
+        priority=40
+    )
     prompt = builder.build()
 """
 
@@ -746,6 +758,9 @@ class PromptBuilder:
 
 def create_coding_prompt_builder() -> PromptBuilder:
     """Create a PromptBuilder pre-configured for coding tasks.
+
+    BACKWARD COMPATIBILITY: This function uses hardcoded imports for backward
+    compatibility. New code should use VerticalDiscovery or CodingAssistant.get_prompt_builder().
 
     Returns:
         A PromptBuilder with coding-specific defaults

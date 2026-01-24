@@ -144,7 +144,7 @@ class FactoryAwareBuilder(ComponentBuilder):
     def _ensure_factory(
         self,
         provider: Any = None,
-        model: str = None,
+        model: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
         provider_name: Optional[str] = None,

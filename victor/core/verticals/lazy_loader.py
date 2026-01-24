@@ -106,12 +106,14 @@ class LazyVerticalProxy:
         """
         # Fast path: already loaded
         if self._loaded:
+            assert self._instance is not None
             return self._instance
 
         # Slow path: need to load
         with self._load_lock:
             # Double-check: another thread may have loaded it
             if self._loaded:
+                assert self._instance is not None
                 return self._instance
 
             # Check for recursive loading
@@ -123,7 +125,8 @@ class LazyVerticalProxy:
             try:
                 self._loading = True
                 logger.debug(f"Lazy loading vertical: {self.vertical_name}")
-                self._instance = self.loader()
+                loaded_instance = self.loader()
+                self._instance = loaded_instance
                 self._loaded = True
                 logger.debug(f"Successfully loaded vertical: {self.vertical_name}")
                 return self._instance
@@ -279,7 +282,8 @@ class LazyVerticalLoader:
             return None
 
         vertical: type[Any] = proxy.load()
-        self._loaded_verticals.add(vertical_name)
+        if vertical is not None:
+            self._loaded_verticals.add(vertical_name)
         return vertical
 
     def unload_vertical(self, vertical_name: str) -> bool:

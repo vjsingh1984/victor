@@ -129,15 +129,20 @@ class EscapeHatchRegistry:
 
     _instance: Optional["EscapeHatchRegistry"] = None
 
+    # Class-level storage to persist registrations across instance resets
+    # This ensures escape hatches survive singleton resets during tests
+    _class_conditions: Dict[str, Dict[str, ConditionFunction]] = {}
+    _class_transforms: Dict[str, Dict[str, TransformFunction]] = {}
+    _class_global_conditions: Dict[str, ConditionFunction] = {}
+    _class_global_transforms: Dict[str, TransformFunction] = {}
+
     def __init__(self) -> None:
-        """Initialize empty escape hatch registry."""
-        # Conditions organized by vertical
-        self._conditions: Dict[str, Dict[str, ConditionFunction]] = {}
-        # Transforms organized by vertical
-        self._transforms: Dict[str, Dict[str, TransformFunction]] = {}
-        # Global namespace (no vertical)
-        self._global_conditions: Dict[str, ConditionFunction] = {}
-        self._global_transforms: Dict[str, TransformFunction] = {}
+        """Initialize escape hatch registry with persisted registrations."""
+        # Copy from class-level storage (persists across instance resets)
+        self._conditions = {k: dict(v) for k, v in self._class_conditions.items()}
+        self._transforms = {k: dict(v) for k, v in self._class_transforms.items()}
+        self._global_conditions = dict(self._class_global_conditions)
+        self._global_transforms = dict(self._class_global_transforms)
 
     @classmethod
     def get_instance(cls) -> "EscapeHatchRegistry":
@@ -177,9 +182,13 @@ class EscapeHatchRegistry:
         if vertical:
             if vertical not in self._conditions:
                 self._conditions[vertical] = {}
+            if vertical not in self._class_conditions:
+                self._class_conditions[vertical] = {}
             registry = self._conditions[vertical]
+            class_registry = self._class_conditions[vertical]
         else:
             registry = self._global_conditions
+            class_registry = self._class_global_conditions
 
         if name in registry and not replace:
             raise ValueError(
@@ -189,6 +198,7 @@ class EscapeHatchRegistry:
             )
 
         registry[name] = fn
+        class_registry[name] = fn  # Also store at class level
         logger.debug(f"Registered condition: {name} (vertical={vertical})")
 
     def register_transform(
@@ -213,9 +223,13 @@ class EscapeHatchRegistry:
         if vertical:
             if vertical not in self._transforms:
                 self._transforms[vertical] = {}
+            if vertical not in self._class_transforms:
+                self._class_transforms[vertical] = {}
             registry = self._transforms[vertical]
+            class_registry = self._class_transforms[vertical]
         else:
             registry = self._global_transforms
+            class_registry = self._class_global_transforms
 
         if name in registry and not replace:
             raise ValueError(
@@ -225,6 +239,7 @@ class EscapeHatchRegistry:
             )
 
         registry[name] = fn
+        class_registry[name] = fn  # Also store at class level
         logger.debug(f"Registered transform: {name} (vertical={vertical})")
 
     def register_from_vertical(
@@ -250,10 +265,13 @@ class EscapeHatchRegistry:
             Tuple of (conditions_registered, transforms_registered)
 
         Example:
-            from victor.coding.escape_hatches import CONDITIONS, TRANSFORMS
-
+            # In your vertical's escape_hatches.py module:
+            # CONDITIONS = {"my_condition": my_condition_func}
+            # TRANSFORMS = {"my_transform": my_transform_func}
+            #
+            # Then register:
             registry.register_from_vertical(
-                "coding",
+                "my_vertical",
                 conditions=CONDITIONS,
                 transforms=TRANSFORMS,
             )

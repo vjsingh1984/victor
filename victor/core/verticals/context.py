@@ -624,7 +624,9 @@ class VerticalContext:
 
         config = self.mode_configs.get(mode_name)
         if config and hasattr(config, "tool_budget"):
-            return config.tool_budget
+            budget = config.tool_budget
+            if isinstance(budget, int):
+                return budget
 
         return self.default_budget
 

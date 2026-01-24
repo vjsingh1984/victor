@@ -62,7 +62,11 @@ class FinalizationBuilder(FactoryAwareBuilder):
         components["vertical_context"] = orchestrator._vertical_context
 
         # Initialize VerticalIntegrationAdapter for single-source vertical methods
-        orchestrator._vertical_integration_adapter = VerticalIntegrationAdapter(orchestrator)
+        from victor.protocols.agent import IAgentOrchestrator
+
+        orchestrator._vertical_integration_adapter = VerticalIntegrationAdapter(
+            orchestrator  # type: ignore[arg-type]
+        )
         components["vertical_integration_adapter"] = orchestrator._vertical_integration_adapter
 
         # Initialize ModeWorkflowTeamCoordinator for intelligent team/workflow suggestions

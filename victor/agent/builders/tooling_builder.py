@@ -100,7 +100,8 @@ class ToolingBuilder(FactoryAwareBuilder):
         components["safety_checker"] = orchestrator._safety_checker
 
         # Initialize AutoCommitter for AI-assisted commits (via factory)
-        orchestrator._auto_committer = factory.create_auto_committer()
+        auto_committer = factory.create_auto_committer()
+        orchestrator._auto_committer = auto_committer if auto_committer is not None else None  # type: ignore[assignment]
         components["auto_committer"] = orchestrator._auto_committer
 
         # Tool executor for centralized tool execution with retry, caching, and metrics (via factory)

@@ -17,6 +17,7 @@
 import multiprocessing
 import socket
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -61,6 +62,50 @@ if sys.platform == "darwin":
         multiprocessing.set_start_method("spawn", force=False)
     except RuntimeError:
         pass  # Already set
+
+
+def _coverage_db_is_valid(path: Path) -> bool:
+    """Check whether a coverage SQLite DB has the expected schema."""
+    try:
+        import sqlite3
+
+        conn = sqlite3.connect(str(path))
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='coverage_schema'"
+        )
+        if cursor.fetchone() is None:
+            conn.close()
+            return False
+        cursor.execute("SELECT version FROM coverage_schema")
+        row = cursor.fetchone()
+        conn.close()
+        return row is not None
+    except Exception:
+        return False
+
+
+def _clean_invalid_coverage_db(project_root: Path) -> None:
+    """Remove malformed coverage data files so pytest-cov can regenerate cleanly."""
+    coverage_db = project_root / ".coverage"
+    if coverage_db.exists() and not _coverage_db_is_valid(coverage_db):
+        for candidate in project_root.glob(".coverage*"):
+            if candidate.is_file():
+                candidate.unlink()
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """Ensure stale coverage DBs don't poison pytest-cov reporting."""
+    config = session.config
+    if not config.pluginmanager.hasplugin("pytest_cov"):
+        return
+    if getattr(config.option, "no_cov", False):
+        return
+    if not getattr(config.option, "cov_source", None):
+        return
+    if getattr(config.option, "cov_append", False):
+        return
+    _clean_invalid_coverage_db(Path(config.rootpath))
 
 
 @pytest.fixture
