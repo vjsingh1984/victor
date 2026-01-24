@@ -298,6 +298,9 @@ class BaseVerticalCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
             self._capabilities_cache = {}
 
             for name, definition in definitions.items():
+                # Skip disabled capabilities
+                if not definition.enabled:
+                    continue
                 if definition.configure_fn:
                     # Get the configure_* method from this instance
                     configure_fn = getattr(self, definition.configure_fn, None)
@@ -499,6 +502,9 @@ class BaseVerticalCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
         definitions = self._get_definitions()
 
         for name, definition in definitions.items():
+            # Skip disabled capabilities
+            if not definition.enabled:
+                continue
             if not definition.configure_fn:
                 continue
 

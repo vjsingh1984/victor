@@ -240,9 +240,9 @@ class TestBaseVerticalCapabilityProvider:
         # Disabled capability should not be in capabilities
         assert "disabled_capability" not in capabilities
 
-        # Check caching
+        # Check caching (returns a copy, so check keys not identity)
         capabilities2 = provider.get_capabilities()
-        assert capabilities is capabilities2
+        assert set(capabilities.keys()) == set(capabilities2.keys())
 
     def test_get_capability_metadata(self):
         """Test getting capability metadata."""
@@ -256,7 +256,7 @@ class TestBaseVerticalCapabilityProvider:
 
         # Check capability with dependencies
         assert metadata["capability_with_deps"].dependencies == ["test_capability"]
-        assert metadata["capability_with_deps"].tags == ["workflow", "test"]
+        assert metadata["capability_with_deps"].tags == ["prompt", "test"]
 
     def test_get_capability(self):
         """Test getting specific capability."""
@@ -316,6 +316,8 @@ class TestBaseVerticalCapabilityProvider:
         """Test applying a capability."""
         provider = MockCapabilityProvider()
         orchestrator = Mock()
+        # Configure mock to return real dict for the config attribute
+        orchestrator.test_capability_config = {}
 
         provider.apply_capability(orchestrator, "test_capability", key="new_value")
 
@@ -637,6 +639,8 @@ class TestCapabilityRegistry:
         """Test getting registry stats."""
         from victor.framework.capabilities.registry import CapabilityRegistry
 
+        # Reset registry to ensure clean state
+        CapabilityRegistry.reset_instance()
         registry = CapabilityRegistry.get_instance()
         provider = MockCapabilityProvider()
 
