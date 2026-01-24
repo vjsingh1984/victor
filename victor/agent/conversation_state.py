@@ -630,6 +630,7 @@ class ConversationStateMachine:
         import time
 
         old_stage = self.state.stage
+        current_time: float  # Will be set in both engine and legacy paths
 
         # Use StageTransitionEngine for validation if enabled
         if self._transition_engine:
@@ -654,6 +655,8 @@ class ConversationStateMachine:
             self.state._stage_confidence = confidence
             self._last_transition_time = self._transition_engine._last_transition_time
             self._transition_count = self._transition_engine.transition_count
+            # Get timestamp from engine for history recording
+            current_time = self._transition_engine._last_transition_time
         else:
             # Legacy transition logic (without engine)
             # Don't transition backwards unless confidence is high

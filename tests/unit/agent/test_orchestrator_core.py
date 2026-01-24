@@ -46,11 +46,16 @@ def orchestrator_settings():
 def orchestrator(mock_provider, orchestrator_settings):
     """Create an orchestrator for testing."""
     with patch("victor.agent.orchestrator.UsageLogger"):
-        return AgentOrchestrator(
+        orchestrator = AgentOrchestrator(
             settings=orchestrator_settings,
             provider=mock_provider,
             model="test-model",
         )
+        # Add mock tool_registrar for tests that expect it
+        # In production, this is set by factory.initialize_orchestrator()
+        orchestrator.tool_registrar = MagicMock()
+        orchestrator.tool_registrar._register_tool_dependencies = MagicMock()
+        return orchestrator
 
 
 class TestStreamMetrics:

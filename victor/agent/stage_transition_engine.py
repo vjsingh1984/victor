@@ -198,6 +198,11 @@ class StageTransitionEngine(StageTransitionProtocol):
         return list(self._transition_history)
 
     @property
+    def transition_count(self) -> int:
+        """Get the total number of transitions."""
+        return self._transition_count
+
+    @property
     def transition_graph(self) -> Dict[ConversationStage, Set[ConversationStage]]:
         """Get the transition graph (for testing/inspection)."""
         return TRANSITION_GRAPH

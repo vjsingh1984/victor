@@ -63,24 +63,26 @@ class ToolingBuilder(FactoryAwareBuilder):
         orchestrator._response_coordinator._tool_enabled_checker = orchestrator
 
         # Initialize ToolRegistrar (via factory) - tool registration, plugins, MCP integration
+        # Note: ComponentAccessorMixin maps tool_registrar -> _tool_registrar via __setattr__
         orchestrator.tool_registrar = factory.create_tool_registrar(
             orchestrator.tools, orchestrator.tool_graph, provider, model
         )
-        orchestrator.tool_registrar.set_background_task_callback(
+        # Use _tool_registrar directly to avoid __getattr__ issues
+        orchestrator._tool_registrar.set_background_task_callback(
             orchestrator._create_background_task
         )
-        components["tool_registrar"] = orchestrator.tool_registrar
+        components["tool_registrar"] = orchestrator._tool_registrar
 
         # Register tool dependencies for planning (delegates to ToolRegistrar)
-        orchestrator.tool_registrar._register_tool_dependencies()
+        orchestrator._tool_registrar._register_tool_dependencies()
 
         # Synchronous registration (dynamic tools, configs)
         orchestrator._register_default_tools()  # Delegates to ToolRegistrar
-        orchestrator.tool_registrar._load_tool_configurations()  # Delegates to ToolRegistrar
+        orchestrator._tool_registrar._load_tool_configurations()  # Delegates to ToolRegistrar
         orchestrator.tools.register_before_hook(orchestrator._log_tool_call)
 
         # Plugin system for extensible tools (via factory, delegates to ToolRegistrar)
-        orchestrator.plugin_manager = factory.initialize_plugin_system(orchestrator.tool_registrar)
+        orchestrator.plugin_manager = factory.initialize_plugin_system(orchestrator._tool_registrar)
         components["plugin_manager"] = orchestrator.plugin_manager
 
         # Argument normalizer for handling malformed tool arguments (via factory, DI with fallback)

@@ -1137,15 +1137,16 @@ class AgentOrchestrator(
         Delegates to:
         - _chat_coordinator for chat/streaming methods
         - _state_coordinator for state management methods
+        - ComponentAccessorMixin for component access (via super())
 
         Args:
             name: Attribute name being accessed
 
         Returns:
-            The attribute from the appropriate coordinator
+            The attribute from the appropriate coordinator or component
 
         Raises:
-            AttributeError: If attribute not found in any coordinator
+            AttributeError: If attribute not found in any coordinator or component
         """
         # Prevent infinite recursion during __init__
         if name.startswith("_") and not name.startswith("__"):
@@ -1164,8 +1165,13 @@ class AgentOrchestrator(
             if hasattr(state_coordinator, name):
                 return getattr(state_coordinator, name)
 
-        # Not found in any coordinator
-        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+        # Delegate to ComponentAccessorMixin for component access
+        # This handles the component_map (e.g., tool_registrar -> _tool_registrar)
+        try:
+            return super().__getattr__(name)
+        except AttributeError:
+            # Component not found in mixin either, raise final error
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
     # =====================================================================
     # Mode-Workflow-Team Coordination
@@ -3462,26 +3468,26 @@ class AgentOrchestrator(
         """
         return self._protocol_adapter.current_model
 
-    async def switch_provider(
-        self,
-        provider: str,
-        model: Optional[str] = None,
-        on_switch: Optional[Any] = None,
-    ) -> bool:
-        """Switch to a different provider/model (protocol method).
+# DUPLICATE:     async def switch_provider(
+#         self,
+#         provider: str,
+#         model: Optional[str] = None,
+#         on_switch: Optional[Any] = None,
+#     ) -> bool:
+#         """Switch to a different provider/model (protocol method).
 
-        Args:
-            provider: Target provider name
-            model: Optional specific model
-            on_switch: Optional callback(provider, model) after switch
+#         Args:
+#             provider: Target provider name
+#             model: Optional specific model
+#             on_switch: Optional callback(provider, model) after switch
 
-        Returns:
-            True if switch was successful, False otherwise
+#         Returns:
+#             True if switch was successful, False otherwise
 
-        Raises:
-            ProviderNotFoundError: If provider not found
-        """
-        return await self._protocol_adapter.switch_provider(provider, model, on_switch)
+#         Raises:
+#             ProviderNotFoundError: If provider not found
+#         """
+#         return await self._protocol_adapter.switch_provider(provider, model, on_switch)
 
     # --- ToolsProtocol ---
 
