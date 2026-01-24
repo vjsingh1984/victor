@@ -28,7 +28,7 @@ import pytest
 @pytest.mark.real_execution
 @pytest.mark.asyncio
 async def test_conversation_context_preservation(
-    ollama_provider, temp_workspace
+    ollama_provider, ollama_model_name, temp_workspace
 ):
     """Test conversation context is preserved across turns.
 
@@ -42,7 +42,7 @@ async def test_conversation_context_preservation(
 
     settings = Settings()
     settings.provider = "ollama"
-    settings.model = "qwen3-coder-tools:30b"
+    settings.model = ollama_model_name
     settings.working_dir = temp_workspace
     settings.airgapped_mode = True
 
@@ -79,7 +79,7 @@ async def test_conversation_context_preservation(
 @pytest.mark.real_execution
 @pytest.mark.asyncio
 async def test_conversation_stage_transitions(
-    ollama_provider, sample_code_file, temp_workspace
+    ollama_provider, ollama_model_name, sample_code_file, temp_workspace
 ):
     """Test stage transitions based on conversation flow.
 
@@ -93,7 +93,7 @@ async def test_conversation_stage_transitions(
 
     settings = Settings()
     settings.provider = "ollama"
-    settings.model = "qwen3-coder-tools:30b"
+    settings.model = ollama_model_name
     settings.working_dir = temp_workspace
     settings.airgapped_mode = True
 
@@ -129,7 +129,7 @@ async def test_conversation_stage_transitions(
 @pytest.mark.real_execution
 @pytest.mark.asyncio
 async def test_conversation_error_recovery(
-    ollama_provider, temp_workspace
+    ollama_provider, ollama_model_name, temp_workspace
 ):
     """Test conversation continues after tool failure.
 
@@ -143,7 +143,7 @@ async def test_conversation_error_recovery(
 
     settings = Settings()
     settings.provider = "ollama"
-    settings.model = "qwen3-coder-tools:30b"
+    settings.model = ollama_model_name
     settings.working_dir = temp_workspace
     settings.airgapped_mode = True
 
@@ -181,7 +181,7 @@ async def test_conversation_error_recovery(
 @pytest.mark.real_execution
 @pytest.mark.asyncio
 async def test_conversation_multi_turn_task_completion(
-    ollama_provider, temp_workspace
+    ollama_provider, ollama_model_name, temp_workspace
 ):
     """Test complex multi-turn task completion.
 
@@ -195,7 +195,7 @@ async def test_conversation_multi_turn_task_completion(
 
     settings = Settings()
     settings.provider = "ollama"
-    settings.model = "qwen3-coder-tools:30b"
+    settings.model = ollama_model_name
     settings.working_dir = temp_workspace
     settings.airgapped_mode = True
 
@@ -255,7 +255,7 @@ async def test_conversation_multi_turn_task_completion(
 @pytest.mark.real_execution
 @pytest.mark.asyncio
 async def test_conversation_tool_calling_accuracy(
-    ollama_provider, sample_code_file, temp_workspace
+    ollama_provider, ollama_model_name, sample_code_file, temp_workspace
 ):
     """Test tool calling accuracy in multi-turn conversations.
 
@@ -269,7 +269,7 @@ async def test_conversation_tool_calling_accuracy(
 
     settings = Settings()
     settings.provider = "ollama"
-    settings.model = "qwen3-coder-tools:30b"
+    settings.model = ollama_model_name
     settings.working_dir = temp_workspace
     settings.airgapped_mode = True
 
@@ -303,7 +303,7 @@ async def test_conversation_tool_calling_accuracy(
 @pytest.mark.real_execution
 @pytest.mark.asyncio
 async def test_conversation_memory_efficiency(
-    ollama_provider, temp_workspace
+    ollama_provider, ollama_model_name, temp_workspace
 ):
     """Test conversation memory usage is efficient.
 
@@ -317,7 +317,7 @@ async def test_conversation_memory_efficiency(
 
     settings = Settings()
     settings.provider = "ollama"
-    settings.model = "qwen3-coder-tools:30b"
+    settings.model = ollama_model_name
     settings.working_dir = temp_workspace
     settings.airgapped_mode = True
 

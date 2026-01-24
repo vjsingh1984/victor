@@ -186,7 +186,7 @@ class ExtensionRegistry(IExtensionRegistry):
         """
         if extension_type is None:
             # Return all extension names from all types
-            all_names = []
+            all_names: list[str] = []
             for type_dict in self._extensions_by_type.values():
                 all_names.extend(type_dict.keys())
             return all_names

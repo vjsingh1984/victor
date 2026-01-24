@@ -286,7 +286,7 @@ class VerticalLoader:
             except Exception as e:
                 logger.warning("Failed to load vertical entry point '%s': %s", name, e)
 
-    def _load_entry_point(self, name: str, value: str) -> Type:
+    def _load_entry_point(self, name: str, value: str) -> Type[Any]:
         """Load an entry point by its value string.
 
         Args:
@@ -305,7 +305,9 @@ class VerticalLoader:
             module_name, attr_name = value.rsplit(".", 1)
 
         module = importlib.import_module(module_name)
-        return getattr(module, attr_name)
+        result = getattr(module, attr_name)
+        # Type: ignore because getattr returns Any
+        return result  # type: ignore[return-value]
 
     def discover_tools(
         self,

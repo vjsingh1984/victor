@@ -162,7 +162,7 @@ class BaseVerticalServiceProvider(ServiceProviderProtocol):
         if mode_config_provider is None:
             return
 
-        def create_mode_config(_):
+        def create_mode_config(_: Any) -> Any:
             return mode_config_provider
 
         container.register(
@@ -185,7 +185,7 @@ class BaseVerticalServiceProvider(ServiceProviderProtocol):
         if tool_dep_provider is None:
             return
 
-        def create_tool_deps(_):
+        def create_tool_deps(_: Any) -> Any:
             return tool_dep_provider
 
         container.register(
@@ -207,7 +207,7 @@ class BaseVerticalServiceProvider(ServiceProviderProtocol):
         if prompt_contributor is None:
             return
 
-        def create_prompts(_):
+        def create_prompts(_: Any) -> Any:
             return prompt_contributor
 
         container.register(
@@ -229,7 +229,7 @@ class BaseVerticalServiceProvider(ServiceProviderProtocol):
         if safety_extension is None:
             return
 
-        def create_safety(_):
+        def create_safety(_: Any) -> Any:
             return safety_extension
 
         container.register(
@@ -279,7 +279,7 @@ class BaseVerticalServiceProvider(ServiceProviderProtocol):
         """
         return None
 
-    def get_required_services(self) -> List[Type]:
+    def get_required_services(self) -> List[Type[Any]]:
         """Get list of required service types.
 
         Returns:
@@ -287,7 +287,7 @@ class BaseVerticalServiceProvider(ServiceProviderProtocol):
         """
         return []
 
-    def get_optional_services(self) -> List[Type]:
+    def get_optional_services(self) -> List[Type[Any]]:
         """Get list of optional service types.
 
         Returns:

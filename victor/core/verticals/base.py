@@ -98,12 +98,12 @@ from typing import (
     KeysView,
     List,
     Optional,
-    Protocol,
     Set,
     Type,
     TYPE_CHECKING,
     Union,
 )
+from typing import Protocol as TypingProtocol
 
 from victor.framework.tools import ToolSet
 
@@ -252,7 +252,7 @@ class VerticalConfig:
             self._dynamic_values = {}
         self._dynamic_values[key] = value
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict_with_dynamic(self) -> Dict[str, Any]:
         """Convert to dictionary including dynamic values.
 
         Returns:
@@ -1288,7 +1288,15 @@ class VerticalRegistry:
                 from importlib import import_module
 
                 module = import_module(module_path)
-                vertical_class = getattr(module, class_name)
+                vertical_class_any = getattr(module, class_name)
+
+                # Validate it's actually a VerticalBase subclass
+                if not isinstance(vertical_class_any, type):
+                    return None
+
+                vertical_class: Optional[Type[VerticalBase]] = vertical_class_any
+                if not issubclass(vertical_class, VerticalBase):
+                    return None
 
                 # Register it now that it's loaded
                 cls.register(vertical_class)

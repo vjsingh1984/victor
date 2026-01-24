@@ -88,7 +88,7 @@ def deprecated_direct_instantiation(
     def decorator(cls: type[T]) -> type[T]:
         original_init = cls.__init__
 
-        def new_init(self, *args: Any, **kwargs: Any) -> None:
+        def new_init(self: Any, *args: Any, **kwargs: Any) -> None:
             # Issue deprecation warning
             message = (
                 f"Direct instantiation of {capability_name} is deprecated. "
@@ -101,7 +101,7 @@ def deprecated_direct_instantiation(
             # Call original init
             original_init(self, *args, **kwargs)
 
-        cls.__init__ = new_init
+        cls.__init__ = new_init  # type: ignore[method-assign]
         return cls
 
     return decorator
@@ -161,7 +161,7 @@ def migrate_capability_property(
 
 def migrate_to_injector(
     vertical_class: Type[Any],
-    capability_mappings: dict[str, str],
+    capability_mappings: Dict[str, str],
     injector: Optional["CapabilityInjector"] = None,
 ) -> None:
     """Migrate a vertical class to use CapabilityInjector.
@@ -246,9 +246,10 @@ def get_capability_or_create(
     if capability is None:
         logger.debug(f"Capability '{capability_name}' not in injector, creating with factory")
         capability = factory()
-        # Optionally register it for future use
-        # injector.register_provider(CapabilityProvider(...))
-    return capability
+        # Type: ignore because factory() returns Any but we need T
+        return capability  # type: ignore[return-value]
+    # Type: ignore because injector returns Any but we need T
+    return capability  # type: ignore[return-value]
 
 
 # =============================================================================

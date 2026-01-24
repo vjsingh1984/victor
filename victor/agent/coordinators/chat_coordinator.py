@@ -1899,8 +1899,9 @@ class ChatCoordinator:
         # Extract files read (if any)
         files_read = set()
         for msg in messages:
-            if msg.get("role") == "assistant":
-                content = msg.get("content", "")
+            # Messages are Message objects, not dicts
+            if hasattr(msg, "role") and msg.role == MessageRole.ASSISTANT:
+                content = msg.content if hasattr(msg, "content") else ""
                 # Try to extract file mentions
                 import re
 

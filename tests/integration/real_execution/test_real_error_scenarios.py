@@ -27,7 +27,7 @@ import pytest
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-async def test_missing_file_error_handling(ollama_provider, temp_workspace):
+async def test_missing_file_error_handling(ollama_provider, ollama_model_name, temp_workspace):
     """Test handling of missing file errors.
 
     Verifies:
@@ -40,7 +40,7 @@ async def test_missing_file_error_handling(ollama_provider, temp_workspace):
 
     settings = Settings()
     settings.provider = "ollama"
-    settings.model = "qwen3-coder-tools:30b"
+    settings.model = ollama_model_name
     settings.working_dir = temp_workspace
     settings.airgapped_mode = True
 
@@ -78,7 +78,7 @@ async def test_missing_file_error_handling(ollama_provider, temp_workspace):
 @pytest.mark.real_execution
 @pytest.mark.asyncio
 async def test_invalid_syntax_error_recovery(
-    ollama_provider, temp_workspace
+    ollama_provider, ollama_model_name, temp_workspace
 ):
     """Test recovery from invalid Python syntax.
 
@@ -93,7 +93,7 @@ async def test_invalid_syntax_error_recovery(
 
     settings = Settings()
     settings.provider = "ollama"
-    settings.model = "qwen3-coder-tools:30b"
+    settings.model = ollama_model_name
     settings.working_dir = temp_workspace
     settings.airgapped_mode = True
 
@@ -129,7 +129,7 @@ async def test_invalid_syntax_error_recovery(
 @pytest.mark.real_execution
 @pytest.mark.asyncio
 async def test_permission_denied_error_handling(
-    ollama_provider, temp_workspace
+    ollama_provider, ollama_model_name, temp_workspace
 ):
     """Test handling of permission denied errors.
 
@@ -143,7 +143,7 @@ async def test_permission_denied_error_handling(
 
     settings = Settings()
     settings.provider = "ollama"
-    settings.model = "qwen3-coder-tools:30b"
+    settings.model = ollama_model_name
     settings.working_dir = temp_workspace
     settings.airgapped_mode = True
 
@@ -170,7 +170,7 @@ async def test_permission_denied_error_handling(
 @pytest.mark.real_execution
 @pytest.mark.asyncio
 async def test_timeout_on_long_operation(
-    ollama_provider, temp_workspace
+    ollama_provider, ollama_model_name, temp_workspace
 ):
     """Test timeout handling on potentially long operations.
 
@@ -188,7 +188,7 @@ async def test_timeout_on_long_operation(
 
     settings = Settings()
     settings.provider = "ollama"
-    settings.model = "qwen3-coder-tools:30b"
+    settings.model = ollama_model_name
     settings.working_dir = temp_workspace
     settings.airgapped_mode = True
 
@@ -227,7 +227,7 @@ async def test_timeout_on_long_operation(
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-async def test_empty_file_handling(ollama_provider, temp_workspace):
+async def test_empty_file_handling(ollama_provider, ollama_model_name, temp_workspace):
     """Test handling of empty files.
 
     Verifies:
@@ -241,7 +241,7 @@ async def test_empty_file_handling(ollama_provider, temp_workspace):
 
     settings = Settings()
     settings.provider = "ollama"
-    settings.model = "qwen3-coder-tools:30b"
+    settings.model = ollama_model_name
     settings.working_dir = temp_workspace
     settings.airgapped_mode = True
 
@@ -276,7 +276,7 @@ async def test_empty_file_handling(ollama_provider, temp_workspace):
 @pytest.mark.real_execution
 @pytest.mark.asyncio
 async def test_special_characters_in_content(
-    ollama_provider, temp_workspace
+    ollama_provider, ollama_model_name, temp_workspace
 ):
     """Test handling of files with special characters.
 
@@ -291,7 +291,7 @@ async def test_special_characters_in_content(
 
     settings = Settings()
     settings.provider = "ollama"
-    settings.model = "qwen3-coder-tools:30b"
+    settings.model = ollama_model_name
     settings.working_dir = temp_workspace
     settings.airgapped_mode = True
 
@@ -326,7 +326,7 @@ Math: x² + y² = z²
 @pytest.mark.real_execution
 @pytest.mark.asyncio
 async def test_very_long_response_handling(
-    ollama_provider, temp_workspace
+    ollama_provider, ollama_model_name, temp_workspace
 ):
     """Test handling of very long LLM responses.
 
@@ -340,7 +340,7 @@ async def test_very_long_response_handling(
 
     settings = Settings()
     settings.provider = "ollama"
-    settings.model = "qwen3-coder-tools:30b"
+    settings.model = ollama_model_name
     settings.working_dir = temp_workspace
     settings.airgapped_mode = True
 
@@ -375,7 +375,7 @@ async def test_very_long_response_handling(
 @pytest.mark.real_execution
 @pytest.mark.asyncio
 async def test_concurrent_operations_stability(
-    ollama_provider, temp_workspace
+    ollama_provider, ollama_model_name, temp_workspace
 ):
     """Test system stability under multiple rapid operations.
 
@@ -390,7 +390,7 @@ async def test_concurrent_operations_stability(
 
     settings = Settings()
     settings.provider = "ollama"
-    settings.model = "qwen3-coder-tools:30b"
+    settings.model = ollama_model_name
     settings.working_dir = temp_workspace
     settings.airgapped_mode = True
 

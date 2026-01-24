@@ -30,7 +30,7 @@ import pytest
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-async def test_real_read_tool_execution(ollama_provider, sample_code_file, temp_workspace):
+async def test_real_read_tool_execution(ollama_provider, ollama_model_name, sample_code_file, temp_workspace):
     """Test Read tool executes with real LLM.
 
     Verifies:
@@ -88,7 +88,7 @@ async def test_real_read_tool_execution(ollama_provider, sample_code_file, temp_
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-async def test_real_edit_tool_execution(ollama_provider, sample_code_file, temp_workspace):
+async def test_real_edit_tool_execution(ollama_provider, ollama_model_name, sample_code_file, temp_workspace):
     """Test Edit tool executes real file modifications.
 
     Verifies:
@@ -101,7 +101,7 @@ async def test_real_edit_tool_execution(ollama_provider, sample_code_file, temp_
 
     settings = Settings()
     settings.provider = "ollama"
-    settings.model = "qwen3-coder-tools:30b"
+    settings.model = ollama_model_name
     settings.working_dir = temp_workspace
     settings.airgapped_mode = True
 
@@ -141,7 +141,7 @@ async def test_real_edit_tool_execution(ollama_provider, sample_code_file, temp_
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-async def test_real_shell_tool_execution(ollama_provider, temp_workspace):
+async def test_real_shell_tool_execution(ollama_provider, ollama_model_name, temp_workspace):
     """Test Shell tool executes real commands.
 
     Verifies:
@@ -154,7 +154,7 @@ async def test_real_shell_tool_execution(ollama_provider, temp_workspace):
 
     settings = Settings()
     settings.provider = "ollama"
-    settings.model = "qwen3-coder-tools:30b"
+    settings.model = ollama_model_name
     settings.working_dir = temp_workspace
     settings.airgapped_mode = True
 
@@ -191,7 +191,7 @@ async def test_real_shell_tool_execution(ollama_provider, temp_workspace):
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-async def test_real_multi_tool_execution(ollama_provider, sample_code_file, temp_workspace):
+async def test_real_multi_tool_execution(ollama_provider, ollama_model_name, sample_code_file, temp_workspace):
     """Test multiple tools execute in sequence.
 
     Verifies:
@@ -204,7 +204,7 @@ async def test_real_multi_tool_execution(ollama_provider, sample_code_file, temp
 
     settings = Settings()
     settings.provider = "ollama"
-    settings.model = "qwen3-coder-tools:30b"
+    settings.model = ollama_model_name
     settings.working_dir = temp_workspace
     settings.airgapped_mode = True
 
@@ -257,7 +257,7 @@ async def test_real_multi_tool_execution(ollama_provider, sample_code_file, temp
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-async def test_real_grep_tool_execution(ollama_provider, sample_code_file, temp_workspace):
+async def test_real_grep_tool_execution(ollama_provider, ollama_model_name, sample_code_file, temp_workspace):
     """Test Grep tool executes real searches.
 
     Verifies:
@@ -270,7 +270,7 @@ async def test_real_grep_tool_execution(ollama_provider, sample_code_file, temp_
 
     settings = Settings()
     settings.provider = "ollama"
-    settings.model = "qwen3-coder-tools:30b"
+    settings.model = ollama_model_name
     settings.working_dir = temp_workspace
     settings.airgapped_mode = True
 
@@ -304,7 +304,7 @@ async def test_real_grep_tool_execution(ollama_provider, sample_code_file, temp_
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-async def test_real_write_tool_execution(ollama_provider, temp_workspace):
+async def test_real_write_tool_execution(ollama_provider, ollama_model_name, temp_workspace):
     """Test Write tool creates new files.
 
     Verifies:
@@ -317,7 +317,7 @@ async def test_real_write_tool_execution(ollama_provider, temp_workspace):
 
     settings = Settings()
     settings.provider = "ollama"
-    settings.model = "qwen3-coder-tools:30b"
+    settings.model = ollama_model_name
     settings.working_dir = temp_workspace
     settings.airgapped_mode = True
 

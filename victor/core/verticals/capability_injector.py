@@ -89,9 +89,8 @@ class _WebOperationsProvider(BaseCapabilityProvider):
         super().__init__("web_operations", container)
 
     def _create_instance(self) -> Any:
-        from victor.framework.capabilities import WebOperationsCapability
-
-        return WebOperationsCapability()
+        # WebOperationsCapability doesn't exist yet, return None
+        return None
 
 
 class _GitOperationsProvider(BaseCapabilityProvider):
@@ -104,9 +103,8 @@ class _GitOperationsProvider(BaseCapabilityProvider):
         super().__init__("git_operations", container)
 
     def _create_instance(self) -> Any:
-        from victor.framework.capabilities import GitOperationsCapability
-
-        return GitOperationsCapability()
+        # GitOperationsCapability doesn't exist yet, return None
+        return None
 
 
 class _TestOperationsProvider(BaseCapabilityProvider):
@@ -119,9 +117,8 @@ class _TestOperationsProvider(BaseCapabilityProvider):
         super().__init__("test_operations", container)
 
     def _create_instance(self) -> Any:
-        from victor.framework.capabilities import TestOperationsCapability
-
-        return TestOperationsCapability()
+        # TestOperationsCapability doesn't exist yet, return None
+        return None
 
 
 class CapabilityInjector:
@@ -234,7 +231,7 @@ class CapabilityInjector:
 
         return provider.get_instance()
 
-    def get_file_operations_capability(self) -> "FileOperationsCapability":
+    def get_file_operations_capability(self) -> Any:
         """Get the FileOperationsCapability instance.
 
         Returns a singleton instance of FileOperationsCapability.
@@ -254,7 +251,7 @@ class CapabilityInjector:
         instance = self.get_capability(self.CAPABILITY_FILE_OPERATIONS)
         if instance is None:
             # Fallback to direct creation if registry not initialized
-            from victor.framework.capabilities import FileOperationsCapability
+            from victor.framework.capabilities.file_operations import FileOperationsCapability
 
             instance = FileOperationsCapability()
             logger.warning("FileOperationsCapability created directly (registry unavailable)")

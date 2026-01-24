@@ -86,7 +86,7 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set, Type
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, List, Optional, Set, Type
 
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import VerticalExtensions
@@ -222,7 +222,7 @@ class VerticalExtensionLoader(ABC):
         "personas",
     }
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, **kwargs: Any) -> None:
         """Auto-generate extension getter methods for subclasses.
 
         This hook is called when a subclass of VerticalExtensionLoader is created.
@@ -238,10 +238,10 @@ class VerticalExtensionLoader(ABC):
             # Only add if not already defined in the class
             if method_name not in cls.__dict__:
 
-                def _make_getter(ext_type, mod_suffix, cls_suffix):
+                def _make_getter(ext_type: str, mod_suffix: str, cls_suffix: str) -> classmethod:
                     """Factory to create getter methods with proper closure."""
 
-                    def _getter(subcls):
+                    def _getter(subcls: type) -> Any:
                         """Auto-generated getter method."""
                         # Build import path from vertical name
                         from victor.core.verticals.naming import get_vertical_module_name
@@ -273,10 +273,10 @@ class VerticalExtensionLoader(ABC):
             # Only add if not already defined in the class
             if method_name not in cls.__dict__:
 
-                def _make_cached_getter(ext_type):
+                def _make_cached_getter(ext_type: str) -> classmethod:
                     """Factory to create cached getter methods with proper closure."""
 
-                    def _getter(subcls):
+                    def _getter(subcls: type) -> Any:
                         """Auto-generated cached getter method."""
                         # Skip if vertical name is empty (abstract base class)
                         from victor.core.verticals.naming import get_vertical_module_name
@@ -289,7 +289,7 @@ class VerticalExtensionLoader(ABC):
                         # Special handling for middleware
                         if ext_type == "middleware":
 
-                            def _create_middleware():
+                            def _create_middleware() -> list:
                                 # Try to import from vertical.middleware
                                 try:
                                     module = __import__(
@@ -347,7 +347,7 @@ class VerticalExtensionLoader(ABC):
     # =========================================================================
 
     @classmethod
-    def _get_cached_extension(cls, key: str, factory: callable, ttl: Optional[int] = None) -> Any:
+    def _get_cached_extension(cls, key: str, factory: Callable[[], Any], ttl: Optional[int] = None) -> Any:
         """Get extension from cache or create and cache it with TTL support.
 
         This helper enables fine-grained caching of individual extension
@@ -871,8 +871,11 @@ class VerticalExtensionLoader(ABC):
             # Handle both ExtensionCacheEntry (new) and raw VerticalExtensions (old for compatibility)
             cached = cls._extensions_cache[cache_key]
             if isinstance(cached, ExtensionCacheEntry):
-                return cached.value
-            return cached
+                result: Any = cached.value
+            else:
+                result = cached
+            # Type: ignore because we're handling cached values that may be Any
+            return result  # type: ignore[return-value]
 
         # Determine strict mode
         is_strict = strict if strict is not None else cls.strict_extension_loading
@@ -882,7 +885,7 @@ class VerticalExtensionLoader(ABC):
 
         def _load_extension(
             extension_type: str,
-            loader: callable,
+            loader: Callable[[], Any],
             is_list: bool = False,
         ) -> Any:
             """Load an extension with error handling.

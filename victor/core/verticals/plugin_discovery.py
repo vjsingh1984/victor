@@ -61,9 +61,9 @@ from pathlib import Path
 from typing import Dict, Type, Optional, Any, TYPE_CHECKING
 
 try:
-    from importlib.metadata import entry_points
+    from importlib.metadata import entry_points as _entry_points
 except ImportError:
-    from importlib_metadata import entry_points
+    from importlib_metadata import entry_points as _entry_points
 
 try:
     import yaml
@@ -234,7 +234,7 @@ class PluginDiscovery:
         try:
             # Handle both old and new entry_points API
             # Python 3.10+: entry_points(group=...) returns iterable directly
-            # Python <3.10: entry_points().group(...) returns iterable
+            # Python <3.10: _entry_points().group(...) returns iterable
             eps_result = entry_points(group=self.ENTRY_POINT_GROUP)
 
             # Check if eps_result has .group() method (old API)
@@ -406,7 +406,7 @@ class PluginDiscovery:
             # Discover from all sources
             builtin_result = self.discover_builtin_verticals()
             entry_point_result = (
-                self.discover_from_entry_points() if self.enable_entry_points else DiscoveryResult()
+                self.discover_from__entry_points() if self.enable_entry_points else DiscoveryResult()
             )
             yaml_result = (
                 self.discover_from_yaml() if self.enable_yaml_fallback else DiscoveryResult()

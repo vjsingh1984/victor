@@ -102,14 +102,14 @@ class MutableVerticalContext(VerticalContext):
             print(f"{mutation.capability}: {mutation.args}")
     """
 
-    def __init__(self, name: str, config: Dict[str, Any]):
+    def __init__(self, name: str, config: Dict[str, Any] | None):
         """Initialize mutable context.
 
         Args:
             name: Vertical name
             config: Vertical configuration dict
         """
-        super().__init__(name=name, config=config)
+        super().__init__(name=name, config=config if config is not None else {})
         self._mutations: List[CapabilityMutation] = []
         self._capability_values: Dict[str, Any] = {}
         self._rollback_stack: List[CapabilityRollback] = []
@@ -155,9 +155,13 @@ class MutableVerticalContext(VerticalContext):
         self._capability_values[capability_name] = kwargs
 
         # Update config (but don't mutate orchestrator directly)
-        if "_applied_capabilities" not in self.config:
-            self.config["_applied_capabilities"] = {}
-        self.config["_applied_capabilities"][capability_name] = kwargs
+        if self.config is not None:
+            if "_applied_capabilities" not in self.config:
+                self.config["_applied_capabilities"] = {}
+            self.config["_applied_capabilities"][capability_name] = kwargs
+        else:
+            # Initialize config if it's None
+            self.config = {"_applied_capabilities": {capability_name: kwargs}}
 
     def get_capability(self, capability_name: str) -> Optional[Any]:
         """Get applied capability value.
@@ -237,7 +241,7 @@ class MutableVerticalContext(VerticalContext):
             self._capability_values.pop(mutation.capability, None)
 
             # Remove from config
-            if "_applied_capabilities" in self.config:
+            if self.config is not None and "_applied_capabilities" in self.config:
                 self.config["_applied_capabilities"].pop(mutation.capability, None)
 
         # Truncate mutations list
@@ -262,7 +266,7 @@ class MutableVerticalContext(VerticalContext):
         self._capability_values.pop(last_mutation.capability, None)
 
         # Remove from config
-        if "_applied_capabilities" in self.config:
+        if self.config is not None and "_applied_capabilities" in self.config:
             self.config["_applied_capabilities"].pop(last_mutation.capability, None)
 
         # Pop from rollback stack
@@ -283,7 +287,7 @@ class MutableVerticalContext(VerticalContext):
         self._mutations.clear()
         self._capability_values.clear()
         self._rollback_stack.clear()
-        if "_applied_capabilities" in self.config:
+        if self.config is not None and "_applied_capabilities" in self.config:
             del self.config["_applied_capabilities"]
 
     def get_mutations_by_capability(self, capability_name: str) -> List[CapabilityMutation]:

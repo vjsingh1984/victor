@@ -38,7 +38,7 @@ def is_ollama_running() -> bool:
         return False
 
 
-def is_ollama_model_available(model: str = "qwen3-coder:30b") -> bool:
+def is_ollama_model_available(model: str = "qwen2.5-coder:14b") -> bool:
     """Check if Ollama model is available."""
     if not is_ollama_running():
         return False
@@ -73,9 +73,9 @@ def ollama_available() -> bool:
 @pytest.fixture(scope="session")
 def ollama_model_available() -> bool:
     """Check if Ollama model is available for testing."""
-    return is_ollama_model_available("qwen3-coder:30b") or is_ollama_model_available(
-        "qwen2.5-coder:7b"
-    )
+    return is_ollama_model_available("qwen2.5-coder:14b") or is_ollama_model_available(
+        "gpt-oss-tools:20b-64K"
+    ) or is_ollama_model_available("qwen2.5-coder:7b")
 
 
 @pytest.fixture(scope="session")
@@ -88,21 +88,28 @@ def zai_available() -> bool:
 async def ollama_provider() -> AsyncGenerator[OllamaProvider, None]:
     """Create Ollama provider for testing.
 
-    Uses qwen3-coder-tools:30b if available, falls back to qwen2.5-coder:7b.
+    Uses smaller models for faster execution:
+    - qwen2.5-coder:14b (preferred, fast and capable)
+    - gpt-oss-tools:20b-64K (alternative, good tool support)
+    - qwen2.5-coder:7b (fallback, fastest)
     """
     if not is_ollama_running():
         pytest.skip("Ollama not available at localhost:11434")
 
-    # Try to find an available model
+    # Try to find an available model (prioritize speed over size)
     model = None
-    for candidate_model in ["qwen3-coder-tools:30b", "qwen2.5-coder:7b"]:
+    for candidate_model in [
+        "qwen2.5-coder:14b",  # Fast and capable
+        "gpt-oss-tools:20b-64K",  # Alternative with good tool support
+        "qwen2.5-coder:7b",  # Fastest fallback
+    ]:
         if is_ollama_model_available(candidate_model):
             model = candidate_model
             break
 
     if not model:
         pytest.skip(
-            "No suitable Ollama model found. Run: ollama pull qwen3-coder-tools:30b"
+            "No suitable Ollama model found. Run: ollama pull qwen2.5-coder:14b"
         )
 
     provider = OllamaProvider(
@@ -110,11 +117,27 @@ async def ollama_provider() -> AsyncGenerator[OllamaProvider, None]:
         timeout=120,  # 2 minutes for commodity hardware
     )
 
+    # Store the selected model for tests to use
+    provider._selected_model = model
+
     yield provider
 
     # Cleanup
     if hasattr(provider, "client"):
         await provider.client.aclose()
+
+
+@pytest.fixture
+def ollama_model_name(ollama_provider: OllamaProvider) -> str:
+    """Get the selected Ollama model name for testing.
+
+    Uses the same model selection logic as ollama_provider fixture.
+    Tests should use this fixture instead of hardcoding model names.
+
+    Example:
+        settings.model = ollama_model_name
+    """
+    return getattr(ollama_provider, "_selected_model", "qwen2.5-coder:14b")
 
 
 @pytest.fixture
@@ -225,14 +248,14 @@ def pytest_collection_modifyitems(items, config):
                 item.add_marker(
                     pytest.mark.skip(
                         reason=f"Ollama not available at localhost:11434. "
-                        f"Install: brew install ollama && ollama serve && ollama pull qwen3-coder-tools:30b"
+                        f"Install: brew install ollama && ollama serve && ollama pull qwen2.5-coder:14b"
                     )
                 )
-            elif not is_ollama_model_available("qwen3-coder-tools:30b") and not is_ollama_model_available("qwen2.5-coder:7b"):
+            elif not is_ollama_model_available("qwen2.5-coder:14b") and not is_ollama_model_available("gpt-oss-tools:20b-64K") and not is_ollama_model_available("qwen2.5-coder:7b"):
                 item.add_marker(
                     pytest.mark.skip(
                         reason=f"Ollama model not available. "
-                        f"Run: ollama pull qwen3-coder-tools:30b"
+                        f"Run: ollama pull qwen2.5-coder:14b"
                     )
                 )
 

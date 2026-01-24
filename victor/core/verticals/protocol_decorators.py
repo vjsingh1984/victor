@@ -38,13 +38,16 @@ import logging
 from typing import TYPE_CHECKING, Any, List, Optional, Type
 
 if TYPE_CHECKING:
-    from typing import Protocol
+    from typing import Protocol as TypingProtocol
+else:
+    # For runtime, we need a placeholder
+    TypingProtocol = Type[object]  # type: ignore
 
 logger = logging.getLogger(__name__)
 
 # Known vertical protocols that can be auto-detected
 # These are the protocols commonly implemented by verticals
-KNOWN_VERTICAL_PROTOCOLS: List[Type["Protocol"]] = []
+KNOWN_VERTICAL_PROTOCOLS: List[Type[object]] = []
 
 
 def _load_known_protocols() -> None:
@@ -88,8 +91,8 @@ def _load_known_protocols() -> None:
 
 def get_implemented_protocols(
     cls: Type[Any],
-    protocols: List[Type["Protocol"]],
-) -> List[Type["Protocol"]]:
+    protocols: List[Type[object]],
+) -> List[Type[object]]:
     """Detect which protocols a class implements.
 
     Uses isinstance checking with runtime_checkable protocols to
@@ -116,7 +119,7 @@ def get_implemented_protocols(
     return implemented
 
 
-def _class_implements_protocol(cls: Type[Any], protocol: Type["Protocol"]) -> bool:
+def _class_implements_protocol(cls: Type[Any], protocol: Type[object]) -> bool:
     """Check if a class implements a protocol.
 
     This performs a structural check to see if the class has the
@@ -150,7 +153,7 @@ def _class_implements_protocol(cls: Type[Any], protocol: Type["Protocol"]) -> bo
 def register_protocols(
     cls: Optional[Type[Any]] = None,
     *,
-    protocols: Optional[List[Type["Protocol"]]] = None,
+    protocols: Optional[List[Type[object]]] = None,
     auto_detect: bool = True,
 ):
     """Class decorator for automatic protocol registration.
@@ -188,7 +191,7 @@ def register_protocols(
         _load_known_protocols()
 
         # Determine protocols to register
-        protocols_to_register: List[Type["Protocol"]] = []
+        protocols_to_register: List[Type[object]] = []
 
         # Add explicit protocols
         if protocols:
