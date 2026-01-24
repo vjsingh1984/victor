@@ -1351,7 +1351,7 @@ class AgentOrchestrator(
         # Delegate to coordinator
         return await self._checkpoint_coordinator.maybe_auto_checkpoint()
 
-    def _get_checkpoint_state(self) -> dict:
+    def _get_checkpoint_state(self) -> dict[str, Any]:
         """Build a dictionary representing current conversation state for checkpointing."""
         return self._coordinator_adapter.get_checkpoint_state()
 
@@ -1817,7 +1817,7 @@ class AgentOrchestrator(
 
     def _create_background_task(
         self, coro: Any, name: str = "background_task"
-    ) -> Optional[asyncio.Task]:
+    ) -> Optional[asyncio.Task[Any]]:
         """Create and track a background task for graceful shutdown.
 
         Args:
