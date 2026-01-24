@@ -3,7 +3,10 @@
 Competitive positioning: ChatGPT Data Analysis, Claude Artifacts, Jupyter AI.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from victor.framework.prompt_builder import PromptBuilder
 
 from victor.core.verticals.base import StageDefinition, VerticalBase
 from victor.core.verticals.protocols import ToolDependencyProviderProtocol
@@ -88,6 +91,26 @@ class DataAnalysisAssistant(VerticalBase):
         """Get the system prompt for data analysis tasks."""
         return cls._get_system_prompt()
 
+    # =========================================================================
+    # PromptBuilder Support
+    # =========================================================================
+
+    @classmethod
+    def get_prompt_builder(cls) -> "PromptBuilder":
+        """Get configured PromptBuilder for data analysis vertical.
+
+        Returns:
+            PromptBuilder with data analysis-specific configuration
+
+        Note:
+            Uses DataAnalysisPromptTemplate for consistent prompt structure
+            following the Template Method pattern.
+        """
+        from victor.dataanalysis.dataanalysis_prompt_template import DataAnalysisPromptTemplate
+
+        template = DataAnalysisPromptTemplate()
+        return template.get_prompt_builder()
+
     @classmethod
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get Data Analysis-specific stage definitions.
@@ -157,51 +180,9 @@ class DataAnalysisAssistant(VerticalBase):
 
     @classmethod
     def _get_system_prompt(cls) -> str:
-        return """You are a data analysis assistant specializing in exploration, statistics, and visualization.
+        from victor.dataanalysis.dataanalysis_prompt_template import DataAnalysisPromptTemplate
 
-## Core Capabilities
-
-1. **Data Loading**: CSV, Excel, JSON, Parquet, SQL databases
-2. **Exploration**: Profiling, summary statistics, distribution analysis
-3. **Cleaning**: Missing values, outliers, type conversion, normalization
-4. **Analysis**: Correlation, regression, hypothesis testing, clustering
-5. **Visualization**: matplotlib, seaborn, plotly for charts and dashboards
-6. **ML**: scikit-learn for classification, regression, clustering
-
-## Analysis Workflow
-
-1. **LOAD**: Read data, check structure, identify types
-2. **EXPLORE**: Summary stats, distributions, missing values
-3. **CLEAN**: Handle nulls, outliers, type issues
-4. **ANALYZE**: Apply statistical methods, test hypotheses
-5. **VISUALIZE**: Create informative charts
-6. **REPORT**: Summarize insights with evidence
-
-## Code Standards
-
-- Always use pandas for data manipulation
-- Include comments explaining methodology
-- Handle missing data explicitly
-- Use descriptive variable names
-- Save intermediate results for reproducibility
-
-## Output Format
-
-When presenting analysis:
-1. Start with data overview (shape, types, missing)
-2. Show key statistics with context
-3. Include visualizations with captions
-4. State insights with supporting evidence
-5. Note limitations and assumptions
-6. Provide reproducible code
-
-## Privacy and Ethics
-
-- Never expose personally identifiable information (PII)
-- Anonymize sensitive columns before analysis
-- Note potential biases in data
-- Be transparent about limitations
-"""
+        return DataAnalysisPromptTemplate().build()
 
     # =========================================================================
     # Extension Protocol Methods

@@ -408,8 +408,12 @@ class PolicyManager:
         if mid < 10:
             return False
 
-        early_successes = sum(1 for o in outcomes[:mid] if isinstance(o.get("success"), bool) and o["success"])
-        recent_successes = sum(1 for o in outcomes[mid:] if isinstance(o.get("success"), bool) and o["success"])
+        early_successes = sum(
+            1 for o in outcomes[:mid] if isinstance(o.get("success"), bool) and o["success"]
+        )
+        recent_successes = sum(
+            1 for o in outcomes[mid:] if isinstance(o.get("success"), bool) and o["success"]
+        )
 
         early_rate = early_successes / mid
         recent_rate = recent_successes / (len(outcomes) - mid)

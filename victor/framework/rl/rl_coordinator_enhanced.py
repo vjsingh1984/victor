@@ -1146,7 +1146,12 @@ class EnhancedRLCoordinator:
             time_penalty = -min(0.2, outcome.duration_seconds / 300.0)  # 5 min max penalty
 
         # Combine components
-        reward = float(base_reward) * 0.5 + float(quality_modifier) * 0.3 + float(efficiency_modifier) + float(time_penalty)
+        reward = (
+            float(base_reward) * 0.5
+            + float(quality_modifier) * 0.3
+            + float(efficiency_modifier)
+            + float(time_penalty)
+        )
 
         logger.debug(f"Computed reward: {reward:.3f} from outcome")
         return reward

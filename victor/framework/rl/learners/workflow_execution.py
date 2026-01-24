@@ -258,6 +258,8 @@ class WorkflowExecutionLearner(BaseLearner):
         quality_score: float = 0.5,
         vertical: str = "coding",
         mode: str = "build",
+        provider: str = "unknown",
+        model: str = "unknown",
     ) -> None:
         """Record a workflow execution outcome.
 
@@ -271,6 +273,8 @@ class WorkflowExecutionLearner(BaseLearner):
             quality_score: Quality score (0.0-1.0)
             vertical: Vertical context
             mode: Agent mode
+            provider: Provider name (for RL outcome tracking)
+            model: Model name (for RL outcome tracking)
         """
         cursor = self.db.cursor()
         now = datetime.now().isoformat()
