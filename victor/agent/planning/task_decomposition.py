@@ -1100,10 +1100,10 @@ class TaskDecomposition:
 
             # Check for cycles
             try:
-                visited = set()
-                rec_stack = set()
+                visited: set[str] = set()
+                rec_stack: set[str] = set()
 
-                def _detect_cycles(node_id, visited, rec_stack):
+                def _detect_cycles(node_id: str, visited: set[str], rec_stack: set[str]) -> bool:
                     visited.add(node_id)
                     rec_stack.add(node_id)
 
