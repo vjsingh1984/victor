@@ -129,9 +129,7 @@ x=1+2  # Bad style
         file_path = create_sample_file(tmp_path, "simple.py", code)
 
         # Mock the provider response to simulate workflow execution
-        with patch.object(
-            workflow_orchestrator, "chat", new_callable=AsyncMock
-        ) as mock_chat:
+        with patch.object(workflow_orchestrator, "chat", new_callable=AsyncMock) as mock_chat:
             mock_chat.return_value = {
                 "content": "Review complete: Found 2 minor style issues.",
                 "tool_calls": [],
@@ -176,9 +174,7 @@ def calculate(data):
         file_path = create_sample_file(tmp_path, "calculate.py", code)
 
         # Mock workflow execution with feedback
-        with patch.object(
-            workflow_orchestrator, "chat", new_callable=AsyncMock
-        ) as mock_chat:
+        with patch.object(workflow_orchestrator, "chat", new_callable=AsyncMock) as mock_chat:
             mock_chat.return_value = {
                 "content": """
 ## Code Review Feedback
@@ -221,9 +217,7 @@ class User:
 """
         file_path = create_sample_file(tmp_path, "user.py", code)
 
-        with patch.object(
-            workflow_orchestrator, "chat", new_callable=AsyncMock
-        ) as mock_chat:
+        with patch.object(workflow_orchestrator, "chat", new_callable=AsyncMock) as mock_chat:
             mock_chat.return_value = {
                 "content": """
 ## Review Suggestions
@@ -269,9 +263,7 @@ class TestMultiFileReview:
     """Integration tests for multi-file code review workflows."""
 
     @pytest.mark.asyncio
-    async def test_review_multiple_files(
-        self, workflow_provider, workflow_orchestrator, tmp_path
-    ):
+    async def test_review_multiple_files(self, workflow_provider, workflow_orchestrator, tmp_path):
         """Test reviewing multiple Python files in a single workflow."""
         project_files = create_sample_project(
             tmp_path,
@@ -282,9 +274,7 @@ class TestMultiFileReview:
             },
         )
 
-        with patch.object(
-            workflow_orchestrator, "chat", new_callable=AsyncMock
-        ) as mock_chat:
+        with patch.object(workflow_orchestrator, "chat", new_callable=AsyncMock) as mock_chat:
             mock_chat.return_value = {
                 "content": """
 ## Multi-File Review Summary
@@ -325,9 +315,7 @@ Code is well-organized. Minor documentation improvements recommended.
             assert "config.py" in result["content"]
 
     @pytest.mark.asyncio
-    async def test_cross_file_analysis(
-        self, workflow_provider, workflow_orchestrator, tmp_path
-    ):
+    async def test_cross_file_analysis(self, workflow_provider, workflow_orchestrator, tmp_path):
         """Test detecting issues that span multiple files."""
         project_files = create_sample_project(
             tmp_path,
@@ -354,9 +342,7 @@ def process_user(user_id: int):
             },
         )
 
-        with patch.object(
-            workflow_orchestrator, "chat", new_callable=AsyncMock
-        ) as mock_chat:
+        with patch.object(workflow_orchestrator, "chat", new_callable=AsyncMock) as mock_chat:
             mock_chat.return_value = {
                 "content": """
 ## Cross-File Analysis
@@ -418,9 +404,7 @@ def get_user(user_id: int) -> User:
             },
         )
 
-        with patch.object(
-            workflow_orchestrator, "chat", new_callable=AsyncMock
-        ) as mock_chat:
+        with patch.object(workflow_orchestrator, "chat", new_callable=AsyncMock) as mock_chat:
             mock_chat.return_value = {
                 "content": """
 ## Consolidated Code Review Report
@@ -485,9 +469,7 @@ class TestSecurityScanningIntegration:
         code = SAMPLE_PYTHON_WITH_SECURITY_ISSUES
         file_path = create_sample_file(tmp_path, "security.py", code)
 
-        with patch.object(
-            workflow_orchestrator, "chat", new_callable=AsyncMock
-        ) as mock_chat:
+        with patch.object(workflow_orchestrator, "chat", new_callable=AsyncMock) as mock_chat:
             mock_chat.return_value = {
                 "content": """
 ## Security Review Report
@@ -562,9 +544,7 @@ def execute(cmd):
 """
         file_path = create_sample_file(tmp_path, "vulnerabilities.py", code)
 
-        with patch.object(
-            workflow_orchestrator, "chat", new_callable=AsyncMock
-        ) as mock_chat:
+        with patch.object(workflow_orchestrator, "chat", new_callable=AsyncMock) as mock_chat:
             mock_chat.return_value = {
                 "content": """
 ## Common Vulnerability Patterns Detected
@@ -625,9 +605,7 @@ def validate_input(data: str) -> bool:
 """
         file_path = create_sample_file(tmp_path, "secure.py", code)
 
-        with patch.object(
-            workflow_orchestrator, "chat", new_callable=AsyncMock
-        ) as mock_chat:
+        with patch.object(workflow_orchestrator, "chat", new_callable=AsyncMock) as mock_chat:
             mock_chat.return_value = {
                 "content": """
 ## Security Best Practices Assessment
@@ -702,9 +680,7 @@ def complex_function(data):
 """
         file_path = create_sample_file(tmp_path, "complex.py", code)
 
-        with patch.object(
-            workflow_orchestrator, "chat", new_callable=AsyncMock
-        ) as mock_chat:
+        with patch.object(workflow_orchestrator, "chat", new_callable=AsyncMock) as mock_chat:
             mock_chat.return_value = {
                 "content": """
 ## Complexity Analysis Report
@@ -791,9 +767,7 @@ def validate_product(product):
             },
         )
 
-        with patch.object(
-            workflow_orchestrator, "chat", new_callable=AsyncMock
-        ) as mock_chat:
+        with patch.object(workflow_orchestrator, "chat", new_callable=AsyncMock) as mock_chat:
             mock_chat.return_value = {
                 "content": """
 ## Code Duplication Analysis
@@ -854,9 +828,7 @@ def validate_required(obj, fields):
             assert "Recommendation" in result["content"]
 
     @pytest.mark.asyncio
-    async def test_code_coverage_analysis(
-        self, workflow_provider, workflow_orchestrator, tmp_path
-    ):
+    async def test_code_coverage_analysis(self, workflow_provider, workflow_orchestrator, tmp_path):
         """Test code coverage analysis integration."""
         # Create source and test files
         source_code = """
@@ -884,9 +856,7 @@ def test_regular_discount():
         source_path = create_sample_file(tmp_path, "discount.py", source_code)
         test_path = create_sample_file(tmp_path, "test_discount.py", test_code)
 
-        with patch.object(
-            workflow_orchestrator, "chat", new_callable=AsyncMock
-        ) as mock_chat:
+        with patch.object(workflow_orchestrator, "chat", new_callable=AsyncMock) as mock_chat:
             mock_chat.return_value = {
                 "content": """
 ## Code Coverage Analysis
@@ -960,9 +930,7 @@ def f( ):  # E201: Whitespace inside parentheses
 """
         file_path = create_sample_file(tmp_path, "bad_style.py", code)
 
-        with patch.object(
-            workflow_orchestrator, "chat", new_callable=AsyncMock
-        ) as mock_chat:
+        with patch.object(workflow_orchestrator, "chat", new_callable=AsyncMock) as mock_chat:
             mock_chat.return_value = {
                 "content": """
 ## PEP8 Style Check Report
@@ -1026,9 +994,7 @@ def anotherBadFunction():  # C0103: Invalid function name
 """
         file_path = create_sample_file(tmp_path, "naming.py", code)
 
-        with patch.object(
-            workflow_orchestrator, "chat", new_callable=AsyncMock
-        ) as mock_chat:
+        with patch.object(workflow_orchestrator, "chat", new_callable=AsyncMock) as mock_chat:
             mock_chat.return_value = {
                 "content": """
 ## Naming Convention Analysis
@@ -1122,9 +1088,7 @@ class DocumentedClass:
 """
         file_path = create_sample_file(tmp_path, "docs.py", code)
 
-        with patch.object(
-            workflow_orchestrator, "chat", new_callable=AsyncMock
-        ) as mock_chat:
+        with patch.object(workflow_orchestrator, "chat", new_callable=AsyncMock) as mock_chat:
             mock_chat.return_value = {
                 "content": """
 ## Docstring Coverage Analysis
@@ -1213,9 +1177,7 @@ class TestAdditionalReviewScenarios:
         self, workflow_provider, workflow_orchestrator, tmp_path
     ):
         """Test code review workflow with git diff integration."""
-        with patch.object(
-            workflow_orchestrator, "chat", new_callable=AsyncMock
-        ) as mock_chat:
+        with patch.object(workflow_orchestrator, "chat", new_callable=AsyncMock) as mock_chat:
             mock_chat.return_value = {
                 "content": """
 ## Git Diff-Based Code Review
@@ -1271,9 +1233,7 @@ class TestAdditionalReviewScenarios:
         """Test incremental review as code is being developed."""
         code_v1 = "def add(a, b):\n    return a + b"
 
-        with patch.object(
-            workflow_orchestrator, "chat", new_callable=AsyncMock
-        ) as mock_chat:
+        with patch.object(workflow_orchestrator, "chat", new_callable=AsyncMock) as mock_chat:
             # First review
             mock_chat.return_value = {
                 "content": "Add type hints and docstring",
@@ -1292,9 +1252,7 @@ class TestAdditionalReviewScenarios:
             assert "type hints" in result_v1["content"].lower()
 
     @pytest.mark.asyncio
-    async def test_review_prioritization(
-        self, workflow_provider, workflow_orchestrator, tmp_path
-    ):
+    async def test_review_prioritization(self, workflow_provider, workflow_orchestrator, tmp_path):
         """Test that review findings are properly prioritized."""
         code = """
 import subprocess
@@ -1311,9 +1269,7 @@ def f():pass
 """
         file_path = create_sample_file(tmp_path, "mixed_issues.py", code)
 
-        with patch.object(
-            workflow_orchestrator, "chat", new_callable=AsyncMock
-        ) as mock_chat:
+        with patch.object(workflow_orchestrator, "chat", new_callable=AsyncMock) as mock_chat:
             mock_chat.return_value = {
                 "content": """
 ## Prioritized Code Review Findings

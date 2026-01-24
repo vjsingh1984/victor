@@ -1455,9 +1455,7 @@ class ParallelBranchExecutor:
         # Check for failures
         failed_branches = [r for r in results if not r.success]
         if failed_branches:
-            errors = "; ".join(
-                f"{r.branch_id}: {r.error}" for r in failed_branches
-            )
+            errors = "; ".join(f"{r.branch_id}: {r.error}" for r in failed_branches)
             return False, f"Parallel branch failures: {errors}", state, []
 
         # Merge states from all branches
@@ -1614,9 +1612,7 @@ class ParallelBranchExecutor:
 
         return result
 
-    def _deep_merge_dicts(
-        self, base: Dict[str, Any], override: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _deep_merge_dicts(self, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
         """Recursively merge two dictionaries.
 
         Args:
@@ -1834,9 +1830,7 @@ class GraphEventEmitter:
         except Exception as e:
             logger.debug(f"Failed to emit graph_error event: {e}")
 
-    def emit_parallel_start(
-        self, source_node: str, branch_count: int, branch_targets: List[str]
-    ):
+    def emit_parallel_start(self, source_node: str, branch_count: int, branch_targets: List[str]):
         """Emit parallel execution start event."""
         if not self.emit_events:
             return

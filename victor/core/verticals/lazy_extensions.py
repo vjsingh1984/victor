@@ -57,7 +57,12 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.core.verticals.protocols import VerticalExtensions, SafetyPattern, TaskTypeHint, ModeConfig
+    from victor.core.verticals.protocols import (
+        VerticalExtensions,
+        SafetyPattern,
+        TaskTypeHint,
+        ModeConfig,
+    )
 
 logger = logging.getLogger(__name__)
 

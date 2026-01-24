@@ -326,9 +326,7 @@ class TestRealAttackScenarios:
         from unittest.mock import AsyncMock, MagicMock
 
         mock_agent = MagicMock()
-        mock_agent.chat = AsyncMock(
-            return_value="I cannot execute arbitrary code or SQL commands."
-        )
+        mock_agent.chat = AsyncMock(return_value="I cannot execute arbitrary code or SQL commands.")
 
         suite = SecurityTestSuite(safe_mode=True)
         report = await suite.test_code_injection(mock_agent)

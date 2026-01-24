@@ -95,7 +95,8 @@ def sample_codebase(tmp_path):
     (tmp_path / "docs").mkdir()
 
     # Create sample Python file
-    (tmp_path / "src" / "app.py").write_text("""
+    (tmp_path / "src" / "app.py").write_text(
+        """
 from flask import Flask
 
 app = Flask(__name__)
@@ -106,7 +107,8 @@ def home():
 
 if __name__ == '__main__':
     app.run(debug=True)
-""")
+"""
+    )
 
     # Create requirements.txt
     (tmp_path / "requirements.txt").write_text("flask==3.0.0\\npytest==7.4.0\\n")
@@ -127,18 +129,18 @@ def sample_document_store(tmp_path):
         {
             "id": "doc1",
             "content": "Python best practices: Use type hints, write docstrings, follow PEP 8.",
-            "metadata": {"source": "internal", "category": "coding_standards"}
+            "metadata": {"source": "internal", "category": "coding_standards"},
         },
         {
             "id": "doc2",
             "content": "Docker multi-stage builds optimize image size by separating build and runtime environments.",
-            "metadata": {"source": "internal", "category": "devops"}
+            "metadata": {"source": "internal", "category": "devops"},
         },
         {
             "id": "doc3",
             "content": "REST API design principles: stateless, cacheable, consistent interface.",
-            "metadata": {"source": "internal", "category": "api_design"}
-        }
+            "metadata": {"source": "internal", "category": "api_design"},
+        },
     ]
 
     for i, doc in enumerate(docs):
@@ -153,13 +155,13 @@ def sample_dataset(tmp_path):
     import csv
 
     data_file = tmp_path / "sales_data.csv"
-    with open(data_file, 'w', newline='') as f:
+    with open(data_file, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(['date', 'product', 'sales', 'region'])
-        writer.writerow(['2024-01-01', 'Widget A', 1000, 'North'])
-        writer.writerow(['2024-01-01', 'Widget B', 1500, 'South'])
-        writer.writerow(['2024-01-02', 'Widget A', 1200, 'North'])
-        writer.writerow(['2024-01-02', 'Widget B', 1600, 'South'])
+        writer.writerow(["date", "product", "sales", "region"])
+        writer.writerow(["2024-01-01", "Widget A", 1000, "North"])
+        writer.writerow(["2024-01-01", "Widget B", 1500, "South"])
+        writer.writerow(["2024-01-02", "Widget A", 1200, "North"])
+        writer.writerow(["2024-01-02", "Widget B", 1600, "South"])
 
     return str(data_file)
 
@@ -171,9 +173,7 @@ def sample_dataset(tmp_path):
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_code_review_and_dockerfile_generation(
-    sample_codebase
-):
+async def test_code_review_and_dockerfile_generation(sample_codebase):
     """Test workflow: Code review -> Dockerfile generation.
 
     Scenario:
@@ -198,7 +198,7 @@ async def test_code_review_and_dockerfile_generation(
             {"line": 6, "severity": "info", "message": "Consider adding port configuration"}
         ],
         "score": 85,
-        "recommendations": ["Add environment variable configuration"]
+        "recommendations": ["Add environment variable configuration"],
     }
 
     # Mock Dockerfile generation
@@ -223,9 +223,7 @@ CMD ["python", "src/app.py"]
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_test_generation_and_deployment_workflow(
-    sample_codebase
-):
+async def test_test_generation_and_deployment_workflow(sample_codebase):
     """Test workflow: Test generation -> CI/CD configuration.
 
     Scenario:
@@ -323,7 +321,7 @@ async def test_coding_devops_tool_coordination():
         ("code_search", "Analyze code structure"),
         ("write", "Generate Dockerfile"),
         ("docker_build", "Build container"),
-        ("kubernetes_deploy", "Deploy to cluster")
+        ("kubernetes_deploy", "Deploy to cluster"),
     ]
 
     # Verify sequence makes sense
@@ -356,12 +354,9 @@ async def test_research_to_implementation_workflow():
             "Use async/await for I/O operations",
             "Implement dependency injection",
             "Add proper error handling",
-            "Use Pydantic for validation"
+            "Use Pydantic for validation",
         ],
-        "sources": [
-            "https://fastapi.tiangolo.com/",
-            "https://docs.pytest.org/"
-        ]
+        "sources": ["https://fastapi.tiangolo.com/", "https://docs.pytest.org/"],
     }
 
     # Mock implementation based on research
@@ -396,9 +391,7 @@ async def create_item(item: Item):
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_documentation_generation_from_research(
-    sample_codebase
-):
+async def test_documentation_generation_from_research(sample_codebase):
     """Test workflow: Research -> Code documentation.
 
     Scenario:
@@ -415,12 +408,12 @@ async def test_documentation_generation_from_research(
         "purpose": "Retrieve list of users",
         "parameters": [
             {"name": "limit", "type": "int", "description": "Max results"},
-            {"name": "offset", "type": "int", "description": "Pagination offset"}
+            {"name": "offset", "type": "int", "description": "Pagination offset"},
         ],
         "responses": {
             "200": "Success - Returns user list",
-            "400": "Bad Request - Invalid parameters"
-        }
+            "400": "Bad Request - Invalid parameters",
+        },
     }
 
     # Mock generated documentation
@@ -481,12 +474,12 @@ async def test_research_coding_context_sharing():
         "findings": [
             "Use functools.lru_cache for simple cases",
             "Consider Redis for distributed caching",
-            "Implement cache invalidation strategy"
+            "Implement cache invalidation strategy",
         ],
         "code_examples": [
             "from functools import lru_cache\\n\\n@lru_cache(maxsize=128)\\ndef fetch_data(key):"
         ],
-        "sources": ["Python docs", "Real Python blog"]
+        "sources": ["Python docs", "Real Python blog"],
     }
 
     # Mock coding implementation using research context
@@ -517,7 +510,9 @@ class RedisCache:
     # Verify context is used
     assert "lru_cache" in implementation
     assert "redis" in implementation
-    assert research_context["findings"][0] in implementation.lower() or "lru" in implementation.lower()
+    assert (
+        research_context["findings"][0] in implementation.lower() or "lru" in implementation.lower()
+    )
 
 
 # ============================================================================
@@ -527,9 +522,7 @@ class RedisCache:
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_rag_context_aware_code_generation(
-    sample_document_store
-):
+async def test_rag_context_aware_code_generation(sample_document_store):
     """Test workflow: RAG retrieval -> Context-aware code generation.
 
     Scenario:
@@ -552,13 +545,13 @@ async def test_rag_context_aware_code_generation(
         {
             "content": "Use type hints for all function parameters and return values.",
             "score": 0.95,
-            "metadata": {"source": "coding_standards"}
+            "metadata": {"source": "coding_standards"},
         },
         {
             "content": "Write docstrings in Google style format.",
             "score": 0.89,
-            "metadata": {"source": "documentation_guide"}
-        }
+            "metadata": {"source": "documentation_guide"},
+        },
     ]
 
     # Mock context-aware code generation
@@ -591,16 +584,14 @@ def process_data(
 
     # Verify RAG context is used
     assert "from typing" in generated_code
-    assert '\"\"\"' in generated_code
+    assert '"""' in generated_code
     assert "Args:" in generated_code
     assert "Returns:" in generated_code
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_code_documentation_from_knowledge_base(
-    sample_document_store, sample_codebase
-):
+async def test_code_documentation_from_knowledge_base(sample_document_store, sample_codebase):
     """Test workflow: Knowledge base -> Code documentation.
 
     Scenario:
@@ -617,11 +608,9 @@ async def test_code_documentation_from_knowledge_base(
             "Document all public APIs",
             "Include usage examples",
             "Document error conditions",
-            "Keep documentation up-to-date"
+            "Keep documentation up-to-date",
         ],
-        "examples": [
-            'def example():\\n    """Example function with docstring."""'
-        ]
+        "examples": ['def example():\\n    """Example function with docstring."""'],
     }
 
     # Mock generated documentation
@@ -660,9 +649,7 @@ print(total)  # Output: 30.0
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_rag_coding_semantic_search_integration(
-    sample_document_store
-):
+async def test_rag_coding_semantic_search_integration(sample_document_store):
     """Test semantic search integration between RAG and Coding.
 
     Scenario:
@@ -681,13 +668,13 @@ async def test_rag_coding_semantic_search_integration(
         {
             "content": "JWT tokens should be validated with HS256 or RS256 algorithms",
             "score": 0.92,
-            "concepts": ["jwt", "security"]
+            "concepts": ["jwt", "security"],
         },
         {
             "content": "Always validate token expiration before processing",
             "score": 0.88,
-            "concepts": ["authentication", "token"]
-        }
+            "concepts": ["authentication", "token"],
+        },
     ]
 
     # Mock improved code based on semantic search
@@ -739,9 +726,7 @@ def validate_token(token: str, secret: str) -> dict:
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_research_data_analysis_workflow(
-    sample_dataset
-):
+async def test_research_data_analysis_workflow(sample_dataset):
     """Test workflow: Research -> Data analysis.
 
     Scenario:
@@ -758,9 +743,9 @@ async def test_research_data_analysis_workflow(
         "methods": [
             "Descriptive statistics (mean, median, std)",
             "Time series analysis",
-            "Regional comparison"
+            "Regional comparison",
         ],
-        "tools": ["pandas", "numpy", "matplotlib"]
+        "tools": ["pandas", "numpy", "matplotlib"],
     }
 
     # Mock data analysis code
@@ -792,9 +777,7 @@ daily_sales = df.groupby('date')['sales'].sum()
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_data_driven_research_report(
-    sample_dataset
-):
+async def test_data_driven_research_report(sample_dataset):
     """Test workflow: Data analysis -> Research report.
 
     Scenario:
@@ -815,8 +798,8 @@ async def test_data_driven_research_report(
         "insights": [
             "South region outperforms North by 36%",
             "Widget B consistently outsells Widget A",
-            "Daily sales show upward trend"
-        ]
+            "Daily sales show upward trend",
+        ],
     }
 
     # Mock research report
@@ -861,9 +844,7 @@ Analysis of sales data reveals key insights into product performance and regiona
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_research_dataanalysis_visualization_workflow(
-    sample_dataset
-):
+async def test_research_dataanalysis_visualization_workflow(sample_dataset):
     """Test workflow: Research question -> Data visualization.
 
     Scenario:
@@ -879,7 +860,7 @@ async def test_research_dataanalysis_visualization_workflow(
         "question": "How do sales compare between regions?",
         "hypothesis": "South region has higher sales than North",
         "visualization_type": "bar_chart",
-        "metrics": ["total_sales", "average_sale", "product_mix"]
+        "metrics": ["total_sales", "average_sale", "product_mix"],
     }
 
     # Mock visualization specification
@@ -888,16 +869,8 @@ async def test_research_dataanalysis_visualization_workflow(
         "title": "Regional Sales Comparison",
         "x_axis": "Region",
         "y_axis": "Total Sales ($)",
-        "data": {
-            "North": 1750,
-            "South": 2850
-        },
-        "annotations": [
-            {
-                "text": "South leads by 36%",
-                "position": "top"
-            }
-        ]
+        "data": {"North": 1750, "South": 2850},
+        "annotations": [{"text": "South leads by 36%", "position": "top"}],
     }
 
     # Verify visualization addresses research question
@@ -914,9 +887,7 @@ async def test_research_dataanalysis_visualization_workflow(
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_three_vertical_research_coding_devops_workflow(
-    sample_codebase
-):
+async def test_three_vertical_research_coding_devops_workflow(sample_codebase):
     """Test complex workflow spanning Research -> Coding -> DevOps.
 
     Scenario:
@@ -934,9 +905,9 @@ async def test_three_vertical_research_coding_devops_workflow(
         "best_practices": {
             "api": "Use FastAPI for async REST APIs",
             "testing": "Implement pytest with fixtures",
-            "deployment": "Use Docker multi-stage builds"
+            "deployment": "Use Docker multi-stage builds",
         },
-        "sources": ["FastAPI docs", "Real Python", "Docker best practices"]
+        "sources": ["FastAPI docs", "Real Python", "Docker best practices"],
     }
 
     # Stage 2: Implementation based on research
@@ -1001,13 +972,16 @@ spec:
         image: user-api:latest
         ports:
         - containerPort: 8000
-"""
+""",
     }
 
     # Verify workflow integration
     assert "FastAPI" in implementation
     assert "async def" in implementation
-    assert "multi-stage" in deployment_config["dockerfile"].lower() or "FROM" in deployment_config["dockerfile"]
+    assert (
+        "multi-stage" in deployment_config["dockerfile"].lower()
+        or "FROM" in deployment_config["dockerfile"]
+    )
     assert "Deployment" in deployment_config["kubernetes"]
     assert research_output["best_practices"]["api"] in implementation or "FastAPI" in implementation
 
@@ -1035,9 +1009,9 @@ async def test_vertical_handoff_state_management():
             "files_analyzed": 15,
             "issues_found": 3,
             "complexity_score": 7.2,
-            "recommendations": ["Add error handling", "Improve test coverage"]
+            "recommendations": ["Add error handling", "Improve test coverage"],
         },
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
 
     # Handoff to Research - state enriched
@@ -1049,12 +1023,12 @@ async def test_vertical_handoff_state_management():
             **coding_state["data"],
             "research_findings": [
                 "Use circuit breaker pattern for error handling",
-                "Aim for 80%+ test coverage"
+                "Aim for 80%+ test coverage",
             ],
-            "sources": ["Microsoft practices", "Google SRE book"]
+            "sources": ["Microsoft practices", "Google SRE book"],
         },
         "previous_vertical": "coding",
-        "handoff_timestamp": datetime.now().isoformat()
+        "handoff_timestamp": datetime.now().isoformat(),
     }
 
     # Handoff to DevOps - final state
@@ -1066,10 +1040,10 @@ async def test_vertical_handoff_state_management():
             **research_state["data"],
             "deployment_strategy": "Blue-green deployment",
             "infrastructure": ["Kubernetes", "Docker", "Istio"],
-            "monitoring": ["Prometheus", "Grafana", "ELK"]
+            "monitoring": ["Prometheus", "Grafana", "ELK"],
         },
         "previous_vertical": "research",
-        "final_handoff_timestamp": datetime.now().isoformat()
+        "final_handoff_timestamp": datetime.now().isoformat(),
     }
 
     # Verify state consistency
@@ -1103,7 +1077,7 @@ async def test_complex_four_vertical_workflow(
     research_output = {
         "problem": "API performance degradation under load",
         "hypothesis": "Database queries not optimized",
-        "investigation": "Need to analyze query patterns and implement caching"
+        "investigation": "Need to analyze query patterns and implement caching",
     }
 
     # Stage 2: RAG - Retrieve relevant documentation
@@ -1111,10 +1085,10 @@ async def test_complex_four_vertical_workflow(
         "retrieved_docs": [
             "Implement Redis caching for frequently accessed data",
             "Use database connection pooling",
-            "Add query result caching with TTL"
+            "Add query result caching with TTL",
         ],
         "confidence_scores": [0.94, 0.89, 0.87],
-        "sources": ["internal_docs", "best_practices"]
+        "sources": ["internal_docs", "best_practices"],
     }
 
     # Stage 3: Coding - Implement solution
@@ -1164,20 +1138,20 @@ async def fetch_user_with_cache(user_id: int, cache: CacheManager):
             "before_optimization": {
                 "avg_response_time_ms": 450,
                 "queries_per_second": 50,
-                "cache_hit_rate": 0
+                "cache_hit_rate": 0,
             },
             "after_optimization": {
                 "avg_response_time_ms": 85,
                 "queries_per_second": 450,
-                "cache_hit_rate": 0.82
-            }
+                "cache_hit_rate": 0.82,
+            },
         },
         "improvement": {
             "response_time_reduction": "81%",
             "throughput_increase": "800%",
-            "overall_success": True
+            "overall_success": True,
         },
-        "recommendation": "Solution validated - deploy to production"
+        "recommendation": "Solution validated - deploy to production",
     }
 
     # Verify end-to-end workflow
@@ -1201,11 +1175,7 @@ async def test_cross_vertical_error_handling():
     error_scenario = {
         "vertical": "coding",
         "error": "SyntaxError: invalid syntax",
-        "context": {
-            "file": "app.py",
-            "line": 42,
-            "code": "print('missing quote)"
-        }
+        "context": {"file": "app.py", "line": 42, "code": "print('missing quote)"},
     }
 
     # Verify error propagation
@@ -1217,6 +1187,7 @@ async def test_cross_vertical_error_handling():
 @pytest.mark.asyncio
 async def test_concurrent_vertical_execution():
     """Test concurrent execution across multiple verticals."""
+
     # Mock concurrent tasks
     async def mock_coding_task():
         await asyncio.sleep(0.1)
@@ -1231,11 +1202,7 @@ async def test_concurrent_vertical_execution():
         return {"status": "devops_complete", "configs": 3}
 
     # Execute concurrently
-    results = await asyncio.gather(
-        mock_coding_task(),
-        mock_research_task(),
-        mock_devops_task()
-    )
+    results = await asyncio.gather(mock_coding_task(), mock_research_task(), mock_devops_task())
 
     # Verify all completed
     assert len(results) == 3

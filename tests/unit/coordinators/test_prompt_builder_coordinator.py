@@ -262,12 +262,7 @@ class TestPromptBuilderCoordinator:
 
     def test_build_thinking_disabled_prompt(self, prompt_builder_coordinator):
         """Test building thinking disabled prompt."""
-        base = (
-            "You are helpful.\n\n"
-            "Thinking process:\n"
-            "Step 1: Analyze\n"
-            "Step 2: Solve\n"
-        )
+        base = "You are helpful.\n\n" "Thinking process:\n" "Step 1: Analyze\n" "Step 2: Solve\n"
 
         modified = prompt_builder_coordinator.build_thinking_disabled_prompt(base)
 

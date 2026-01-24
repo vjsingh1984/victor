@@ -351,9 +351,7 @@ class InvalidationDependencyGraph:
             return {
                 "resources": len(self._dependencies),
                 "dependent_entries": len(self._dependents),
-                "total_dependencies": sum(
-                    len(deps) for deps in self._dependencies.values()
-                ),
+                "total_dependencies": sum(len(deps) for deps in self._dependencies.values()),
             }
 
 
@@ -458,9 +456,7 @@ class CacheInvalidator:
             f"dependencies={self.config.enable_dependencies}"
         )
 
-    async def invalidate(
-        self, key: str, namespace: str = "default"
-    ) -> bool:
+    async def invalidate(self, key: str, namespace: str = "default") -> bool:
         """Invalidate a specific cache entry.
 
         Args:
@@ -502,9 +498,7 @@ class CacheInvalidator:
         if self._tag_manager:
             with self._tag_manager._lock:
                 entries_to_remove = [
-                    (key, ns)
-                    for key, ns in self._tag_manager._entry_tags.keys()
-                    if ns == namespace
+                    (key, ns) for key, ns in self._tag_manager._entry_tags.keys() if ns == namespace
                 ]
                 for key, ns in entries_to_remove:
                     self._tag_manager.remove_entry(key, ns)

@@ -24,13 +24,17 @@ class TestCapabilityContainerProtocolInvariants:
     """Property-based tests for CapabilityContainerProtocol invariants."""
 
     @given(
-        capability_name=st.text(min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=('L', 'N'))),
+        capability_name=st.text(
+            min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=("L", "N"))
+        ),
         capabilities=st.dictionaries(
-            keys=st.text(min_size=1, max_size=15, alphabet=st.characters(whitelist_categories=('L', 'N'))),
+            keys=st.text(
+                min_size=1, max_size=15, alphabet=st.characters(whitelist_categories=("L", "N"))
+            ),
             values=st.integers(min_value=0, max_value=100),
             min_size=0,
             max_size=15,
-        )
+        ),
     )
     @settings(max_examples=100, phases=[Phase.generate])
     def test_has_capability_reflects_get_capability(
@@ -54,11 +58,15 @@ class TestCapabilityContainerProtocolInvariants:
         has_it = container.has_capability(capability_name)
         gets_it = container.get_capability(capability_name) is not None
 
-        assert has_it == gets_it, f"Inconsistent: has_capability={has_it}, get_capability non-None={gets_it}"
+        assert (
+            has_it == gets_it
+        ), f"Inconsistent: has_capability={has_it}, get_capability non-None={gets_it}"
 
     @given(
         capabilities=st.dictionaries(
-            keys=st.text(min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=('L', 'N'))),
+            keys=st.text(
+                min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=("L", "N"))
+            ),
             values=st.integers(min_value=0, max_value=1000),
             min_size=1,
             max_size=50,
@@ -90,20 +98,26 @@ class TestCapabilityContainerProtocolInvariants:
 
     @given(
         capabilities=st.dictionaries(
-            keys=st.text(min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=('L', 'N'))),
+            keys=st.text(
+                min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=("L", "N"))
+            ),
             values=st.integers(min_value=0, max_value=1000),
             min_size=0,
             max_size=30,
         ),
         queries=st.lists(
-            st.text(min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=('L', 'N'))),
+            st.text(
+                min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=("L", "N"))
+            ),
             min_size=0,
             max_size=50,
             unique=True,
-        )
+        ),
     )
     @settings(max_examples=100, phases=[Phase.generate])
-    def test_nonexistent_capabilities_return_none(self, capabilities: Dict[str, int], queries: List[str]):
+    def test_nonexistent_capabilities_return_none(
+        self, capabilities: Dict[str, int], queries: List[str]
+    ):
         """get_capability should return None for nonexistent capabilities."""
 
         class TestContainer:
@@ -121,7 +135,9 @@ class TestCapabilityContainerProtocolInvariants:
         for query in queries:
             if query not in capabilities:
                 result = container.get_capability(query)
-                assert result is None, f"Expected None for nonexistent capability '{query}', got {result}"
+                assert (
+                    result is None
+                ), f"Expected None for nonexistent capability '{query}', got {result}"
 
 
 class TestWorkflowProviderProtocolInvariants:
@@ -129,7 +145,9 @@ class TestWorkflowProviderProtocolInvariants:
 
     @given(
         workflow_names=st.lists(
-            st.text(min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=('L', 'N'))),
+            st.text(
+                min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=("L", "N"))
+            ),
             min_size=0,
             max_size=20,
             unique=True,
@@ -141,6 +159,7 @@ class TestWorkflowProviderProtocolInvariants:
 
         class MockStateGraph:
             """Minimal StateGraph mock for testing."""
+
             pass
 
         class TestWorkflowProvider:
@@ -164,7 +183,9 @@ class TestWorkflowProviderProtocolInvariants:
 
     @given(
         workflow_names=st.lists(
-            st.text(min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=('L', 'N'))),
+            st.text(
+                min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=("L", "N"))
+            ),
             min_size=1,
             max_size=10,
             unique=True,
@@ -176,7 +197,7 @@ class TestWorkflowProviderProtocolInvariants:
 
         class TestWorkflowProvider:
             def __init__(self, names: List[str]):
-                self._workflows = {name: None for name in names}
+                self._workflows = dict.fromkeys(names)
 
             def get_workflows(self) -> Dict[str, Any]:
                 return self._workflows.copy()
@@ -196,7 +217,9 @@ class TestTieredConfigProviderProtocolInvariants:
 
     @given(
         tool_pool=st.sets(
-            st.text(min_size=1, max_size=15, alphabet=st.characters(whitelist_categories=('L', 'N'))),
+            st.text(
+                min_size=1, max_size=15, alphabet=st.characters(whitelist_categories=("L", "N"))
+            ),
             min_size=0,
             max_size=30,
         )
@@ -212,9 +235,9 @@ class TestTieredConfigProviderProtocolInvariants:
             def __init__(self, tools: List[str]):
                 # Partition into 3 disjoint sets
                 n = len(tools)
-                self._mandatory = set(tools[:n//3])
-                self._core = set(tools[n//3:2*n//3])
-                self._optional = set(tools[2*n//3:])
+                self._mandatory = set(tools[: n // 3])
+                self._core = set(tools[n // 3 : 2 * n // 3])
+                self._optional = set(tools[2 * n // 3 :])
 
             @property
             def mandatory(self) -> Set[str]:
@@ -241,7 +264,9 @@ class TestTieredConfigProviderProtocolInvariants:
 
     @given(
         tool_names=st.lists(
-            st.text(min_size=1, max_size=15, alphabet=st.characters(whitelist_categories=('L', 'N'))),
+            st.text(
+                min_size=1, max_size=15, alphabet=st.characters(whitelist_categories=("L", "N"))
+            ),
             min_size=1,
             max_size=30,
             unique=True,
@@ -250,7 +275,9 @@ class TestTieredConfigProviderProtocolInvariants:
         core_ratio=st.floats(min_value=0.0, max_value=0.4),
     )
     @settings(max_examples=100, phases=[Phase.generate])
-    def test_tiered_config_hierarchy(self, tool_names: List[str], mandatory_ratio: float, core_ratio: float):
+    def test_tiered_config_hierarchy(
+        self, tool_names: List[str], mandatory_ratio: float, core_ratio: float
+    ):
         """Tiered config should maintain hierarchical constraints."""
 
         import math
@@ -261,8 +288,8 @@ class TestTieredConfigProviderProtocolInvariants:
                 n_core = math.floor(len(tools) * c_ratio)
 
                 self._mandatory = set(tools[:n_mandatory])
-                self._core = set(tools[n_mandatory:n_mandatory + n_core])
-                self._optional = set(tools[n_mandatory + n_core:])
+                self._core = set(tools[n_mandatory : n_mandatory + n_core])
+                self._optional = set(tools[n_mandatory + n_core :])
 
             @property
             def mandatory(self) -> Set[str]:
@@ -336,10 +363,12 @@ class TestExtensionProviderProtocolInvariants:
             st.functions(returns=st.none(), pure=True),
             min_size=0,
             max_size=10,
-        )
+        ),
     )
     @settings(max_examples=100, phases=[Phase.generate])
-    def test_extension_registration_is_additive(self, initial_extensions: List[Callable[[], None]], new_extensions: List[Callable[[], None]]):
+    def test_extension_registration_is_additive(
+        self, initial_extensions: List[Callable[[], None]], new_extensions: List[Callable[[], None]]
+    ):
         """Adding extensions should be additive and idempotent."""
 
         class TestExtensionProvider:
@@ -372,7 +401,9 @@ class TestExtensionProviderProtocolInvariants:
 
         # Property: Final count should be at most initial + new (no duplicates)
         expected_max = len(set(initial_extensions) | set(new_extensions))
-        assert final_count <= expected_max, f"Extension count {final_count} exceeds expected {expected_max}"
+        assert (
+            final_count <= expected_max
+        ), f"Extension count {final_count} exceeds expected {expected_max}"
 
 
 class TestProtocolCompositionInvariants:
@@ -380,20 +411,26 @@ class TestProtocolCompositionInvariants:
 
     @given(
         capability_names=st.lists(
-            st.text(min_size=1, max_size=15, alphabet=st.characters(whitelist_categories=('L', 'N'))),
+            st.text(
+                min_size=1, max_size=15, alphabet=st.characters(whitelist_categories=("L", "N"))
+            ),
             min_size=1,
             max_size=15,
             unique=True,
         ),
         workflow_names=st.lists(
-            st.text(min_size=1, max_size=15, alphabet=st.characters(whitelist_categories=('L', 'N'))),
+            st.text(
+                min_size=1, max_size=15, alphabet=st.characters(whitelist_categories=("L", "N"))
+            ),
             min_size=1,
             max_size=15,
             unique=True,
-        )
+        ),
     )
     @settings(max_examples=100, phases=[Phase.generate])
-    def test_object_can_implement_multiple_protocols(self, capability_names: List[str], workflow_names: List[str]):
+    def test_object_can_implement_multiple_protocols(
+        self, capability_names: List[str], workflow_names: List[str]
+    ):
         """An object can implement multiple protocols simultaneously."""
 
         class MockStateGraph:
@@ -423,8 +460,12 @@ class TestProtocolCompositionInvariants:
         obj = MultiProtocolObject(capability_names, workflow_names)
 
         # Property: Should conform to both protocols
-        assert isinstance(obj, CapabilityContainerProtocol), "Should conform to CapabilityContainerProtocol"
-        assert isinstance(obj, WorkflowProviderProtocol), "Should conform to WorkflowProviderProtocol"
+        assert isinstance(
+            obj, CapabilityContainerProtocol
+        ), "Should conform to CapabilityContainerProtocol"
+        assert isinstance(
+            obj, WorkflowProviderProtocol
+        ), "Should conform to WorkflowProviderProtocol"
 
         # Property: Both protocol interfaces should work
         assert all(obj.has_capability(cap) for cap in capability_names)

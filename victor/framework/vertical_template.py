@@ -714,7 +714,9 @@ class VerticalTemplate:
         merged_tools = list(set(parent.tools + self.tools))
 
         # Use child's system prompt if provided, otherwise parent's
-        merged_system_prompt = self.system_prompt if self.system_prompt.strip() else parent.system_prompt
+        merged_system_prompt = (
+            self.system_prompt if self.system_prompt.strip() else parent.system_prompt
+        )
 
         # Merge stages (child overrides parent stages with same name)
         merged_stages = {**parent.stages}
@@ -727,7 +729,9 @@ class VerticalTemplate:
 
         # Extend middleware
         if "middleware" in child_extensions_dict and child_extensions_dict["middleware"]:
-            merged_extensions_dict.setdefault("middleware", []).extend(child_extensions_dict["middleware"])
+            merged_extensions_dict.setdefault("middleware", []).extend(
+                child_extensions_dict["middleware"]
+            )
 
         # Extend safety patterns
         if "safety_patterns" in child_extensions_dict and child_extensions_dict["safety_patterns"]:
@@ -737,12 +741,17 @@ class VerticalTemplate:
 
         # Extend prompt hints
         if "prompt_hints" in child_extensions_dict and child_extensions_dict["prompt_hints"]:
-            merged_extensions_dict.setdefault("prompt_hints", []).extend(child_extensions_dict["prompt_hints"])
+            merged_extensions_dict.setdefault("prompt_hints", []).extend(
+                child_extensions_dict["prompt_hints"]
+            )
 
         # Update handlers, personas, composed_chains (child overrides parent)
         for key in ["handlers", "personas", "composed_chains"]:
             if key in child_extensions_dict and child_extensions_dict[key]:
-                merged_extensions_dict[key] = {**merged_extensions_dict.get(key, {}), **child_extensions_dict[key]}
+                merged_extensions_dict[key] = {
+                    **merged_extensions_dict.get(key, {}),
+                    **child_extensions_dict[key],
+                }
 
         merged_extensions = ExtensionSpecs.from_dict(merged_extensions_dict)
 

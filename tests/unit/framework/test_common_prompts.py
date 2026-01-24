@@ -201,7 +201,9 @@ class TestChecklistBuilder:
 
     def test_custom_title(self):
         """Test building checklist with custom title."""
-        checklist = ChecklistBuilder().with_title("Security Checklist").add_item("No secrets").build()
+        checklist = (
+            ChecklistBuilder().with_title("Security Checklist").add_item("No secrets").build()
+        )
         assert "## Security Checklist" in checklist
 
     def test_empty_checklist(self):

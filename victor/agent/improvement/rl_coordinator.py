@@ -248,8 +248,12 @@ class Hyperparameters:
                 0.5,
                 0.99,
             ),
-            reward_scale=max(0.1, self.reward_scale + np.random.uniform(-mutation_rate, mutation_rate)),
-            penalty_scale=max(0.1, self.penalty_scale + np.random.uniform(-mutation_rate, mutation_rate)),
+            reward_scale=max(
+                0.1, self.reward_scale + np.random.uniform(-mutation_rate, mutation_rate)
+            ),
+            penalty_scale=max(
+                0.1, self.penalty_scale + np.random.uniform(-mutation_rate, mutation_rate)
+            ),
         )
 
 
@@ -403,7 +407,9 @@ class EnhancedRLCoordinator:
             },
         )
 
-    def _baseline_reward(self, outcome: RLOutcome, base_reward: float) -> Tuple[float, Dict[str, float]]:
+    def _baseline_reward(
+        self, outcome: RLOutcome, base_reward: float
+    ) -> Tuple[float, Dict[str, float]]:
         """Baseline reward (success/failure only)."""
         return base_reward, {"base": base_reward}
 
@@ -411,7 +417,9 @@ class EnhancedRLCoordinator:
         self, outcome: RLOutcome, base_reward: float
     ) -> Tuple[float, Dict[str, float]]:
         """Quality-adjusted reward."""
-        quality_multiplier = outcome.quality_score if outcome.success else (1.0 - outcome.quality_score)
+        quality_multiplier = (
+            outcome.quality_score if outcome.success else (1.0 - outcome.quality_score)
+        )
         shaped_value = base_reward * quality_multiplier
         return shaped_value, {"base": base_reward, "quality_multiplier": quality_multiplier}
 
@@ -692,7 +700,9 @@ class EnhancedRLCoordinator:
         cursor = self._base_coordinator.db.cursor()
 
         try:
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='rl_policies'")
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='rl_policies'"
+            )
             if not cursor.fetchone():
                 # Table doesn't exist, create it
                 cursor.execute(
@@ -710,7 +720,9 @@ class EnhancedRLCoordinator:
                 return
 
             # Load policies
-            cursor.execute("SELECT task_type, q_table, action_space, last_updated, total_updates FROM rl_policies")
+            cursor.execute(
+                "SELECT task_type, q_table, action_space, last_updated, total_updates FROM rl_policies"
+            )
             rows = cursor.fetchall()
 
             import json
@@ -727,7 +739,7 @@ class EnhancedRLCoordinator:
 
             logger.debug("EnhancedRLCoordinator: Loaded %d policies", len(self._policies))
 
-        except Exception as e:
+        except Exception:
             logger.error("EnhancedRLCoordinator: Failed to load policies: %e")
 
     def _save_policy(self, task_type: str) -> None:
@@ -791,7 +803,7 @@ class EnhancedRLCoordinator:
             )
             self._base_coordinator.db.commit()
 
-        except Exception as e:
+        except Exception:
             logger.error("EnhancedRLCoordinator: Failed to save hyperparameters: %e")
 
     def _load_hyperparameters(self) -> None:
@@ -820,7 +832,7 @@ class EnhancedRLCoordinator:
                 self._hyperparameters = Hyperparameters.from_dict(params_dict)
                 logger.debug("EnhancedRLCoordinator: Loaded hyperparameters from database")
 
-        except Exception as e:
+        except Exception:
             logger.debug("EnhancedRLCoordinator: No saved hyperparameters found, using defaults")
 
     def export_metrics(self) -> Dict[str, Any]:

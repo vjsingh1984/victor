@@ -125,9 +125,7 @@ def extract_output_requirements_from_text(text: str) -> List[str]:
 
     # Clean up requirements
     cleaned = [
-        req.strip().strip("'\"`")
-        for req in requirements
-        if req.strip() and len(req.strip()) > 2
+        req.strip().strip("'\"`") for req in requirements if req.strip() and len(req.strip()) > 2
     ]
 
     return sorted(set(cleaned))

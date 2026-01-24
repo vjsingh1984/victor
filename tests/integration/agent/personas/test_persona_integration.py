@@ -335,9 +335,7 @@ class TestPersonaCustomization:
             "expertise": original.expertise + ["performance_testing", "load_testing"],
         }
 
-        modified = persona_manager.create_custom_persona(
-            "Testing Specialist", modified_traits
-        )
+        modified = persona_manager.create_custom_persona("Testing Specialist", modified_traits)
 
         # Should have additional expertise
         assert "performance_testing" in modified.expertise
@@ -361,9 +359,7 @@ class TestPersonaScalability:
         ]
 
         # Adapt to all contexts
-        adapted_personas = [
-            persona_manager.adapt_persona(persona, ctx) for ctx in contexts
-        ]
+        adapted_personas = [persona_manager.adapt_persona(persona, ctx) for ctx in contexts]
 
         # Should create distinct adaptations
         assert len(adapted_personas) == len(contexts)

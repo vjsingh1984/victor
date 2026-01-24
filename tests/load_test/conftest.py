@@ -27,9 +27,7 @@ def api_server_available():
     """
     try:
         # Try to connect to the API server with a short timeout
-        response = asyncio.run(
-            httpx.AsyncClient(timeout=2.0).get("http://localhost:8000/health")
-        )
+        response = asyncio.run(httpx.AsyncClient(timeout=2.0).get("http://localhost:8000/health"))
         if response.status_code == 200:
             return True
     except Exception:

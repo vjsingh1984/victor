@@ -173,7 +173,7 @@ class TelemetryConfig:
         resource_attrs = {}
         for key, value in os.environ.items():
             if key.startswith("OTEL_RESOURCE_ATTRIBUTE_"):
-                attr_name = key[len("OTEL_RESOURCE_ATTRIBUTE_"):].lower()
+                attr_name = key[len("OTEL_RESOURCE_ATTRIBUTE_") :].lower()
                 resource_attrs[attr_name] = value
 
         return cls(
@@ -253,7 +253,7 @@ def get_telemetry_config() -> TelemetryConfig:
         if errors:
             logger.warning(f"Telemetry configuration errors: {errors}")
         get_telemetry_config._config = config  # type: ignore
-    return getattr(get_telemetry_config, "_config")
+    return get_telemetry_config._config
 
 
 def setup_telemetry(config: Optional[TelemetryConfig] = None):

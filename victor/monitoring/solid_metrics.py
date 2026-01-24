@@ -329,8 +329,9 @@ class SolidMetricsCollector:
         """
         with self._lock:
             self._errors.total_errors += 1
-            self._errors.errors_by_type[error_type] = \
+            self._errors.errors_by_type[error_type] = (
                 self._errors.errors_by_type.get(error_type, 0) + 1
+            )
             self._errors.last_error = error_message
             self._errors.last_error_time = datetime.now()
 
@@ -403,35 +404,41 @@ class SolidMetricsCollector:
         lines = []
 
         # Startup metrics
-        lines.append(f"# HELP solid_startup_time_seconds Total startup time")
-        lines.append(f"# TYPE solid_startup_time_seconds gauge")
+        lines.append("# HELP solid_startup_time_seconds Total startup time")
+        lines.append("# TYPE solid_startup_time_seconds gauge")
         lines.append(f"solid_startup_time_seconds {metrics['startup']['total_time_seconds']}")
 
         # Cache metrics
         for cache_name, cache_metrics in metrics["caches"].items():
             safe_name = cache_name.replace(".", "_").replace("-", "_")
-            lines.append(f"# HELP solid_cache_hits_total Cache hits")
-            lines.append(f"# TYPE solid_cache_hits_total counter")
+            lines.append("# HELP solid_cache_hits_total Cache hits")
+            lines.append("# TYPE solid_cache_hits_total counter")
             lines.append(f"solid_cache_hits_total{{cache=\"{safe_name}\"}} {cache_metrics['hits']}")
 
-            lines.append(f"# HELP solid_cache_misses_total Cache misses")
-            lines.append(f"# TYPE solid_cache_misses_total counter")
-            lines.append(f"solid_cache_misses_total{{cache=\"{safe_name}\"}} {cache_metrics['misses']}")
+            lines.append("# HELP solid_cache_misses_total Cache misses")
+            lines.append("# TYPE solid_cache_misses_total counter")
+            lines.append(
+                f"solid_cache_misses_total{{cache=\"{safe_name}\"}} {cache_metrics['misses']}"
+            )
 
-            lines.append(f"# HELP solid_cache_hit_rate Cache hit rate percentage")
-            lines.append(f"# TYPE solid_cache_hit_rate gauge")
-            lines.append(f"solid_cache_hit_rate{{cache=\"{safe_name}\"}} {cache_metrics['hit_rate']}")
+            lines.append("# HELP solid_cache_hit_rate Cache hit rate percentage")
+            lines.append("# TYPE solid_cache_hit_rate gauge")
+            lines.append(
+                f"solid_cache_hit_rate{{cache=\"{safe_name}\"}} {cache_metrics['hit_rate']}"
+            )
 
         # Feature flag metrics
         for flag_name, flag_metrics in metrics["feature_flags"].items():
             safe_name = flag_name.replace(".", "_").replace("-", "_").lower()
-            lines.append(f"# HELP solid_feature_flag_enabled Feature flag status")
-            lines.append(f"# TYPE solid_feature_flag_enabled gauge")
-            lines.append(f"solid_feature_flag_enabled{{flag=\"{safe_name}\"}} {1 if flag_metrics['enabled'] else 0}")
+            lines.append("# HELP solid_feature_flag_enabled Feature flag status")
+            lines.append("# TYPE solid_feature_flag_enabled gauge")
+            lines.append(
+                f"solid_feature_flag_enabled{{flag=\"{safe_name}\"}} {1 if flag_metrics['enabled'] else 0}"
+            )
 
         # Error metrics
-        lines.append(f"# HELP solid_errors_total Total errors")
-        lines.append(f"# TYPE solid_errors_total counter")
+        lines.append("# HELP solid_errors_total Total errors")
+        lines.append("# TYPE solid_errors_total counter")
         lines.append(f"solid_errors_total {metrics['errors']['total_errors']}")
 
         return "\n".join(lines)

@@ -114,17 +114,13 @@ class SpeakerSegment:
     def __post_init__(self):
         """Validate segment data."""
         if self.start_time < 0:
-            raise ValidationError(
-                f"Start time must be non-negative, got {self.start_time}"
-            )
+            raise ValidationError(f"Start time must be non-negative, got {self.start_time}")
         if self.end_time <= self.start_time:
             raise ValidationError(
                 f"End time ({self.end_time}) must be greater than start time ({self.start_time})"
             )
         if not 0 <= self.confidence <= 1:
-            raise ValidationError(
-                f"Confidence must be between 0 and 1, got {self.confidence}"
-            )
+            raise ValidationError(f"Confidence must be between 0 and 1, got {self.confidence}")
 
     @property
     def duration(self) -> float:
@@ -172,9 +168,7 @@ class TranscriptionResult:
     def __post_init__(self):
         """Validate transcription data."""
         if not 0 <= self.confidence <= 1:
-            raise ValidationError(
-                f"Confidence must be between 0 and 1, got {self.confidence}"
-            )
+            raise ValidationError(f"Confidence must be between 0 and 1, got {self.confidence}")
         if self.duration < 0:
             raise ValidationError(f"Duration must be non-negative, got {self.duration}")
 
@@ -227,9 +221,7 @@ class AudioQualityMetrics:
         for score_name in ["clarity_score", "noise_level", "volume_level", "speech_ratio"]:
             score = getattr(self, score_name)
             if not 0 <= score <= 1:
-                raise ValidationError(
-                    f"{score_name} must be between 0 and 1, got {score}"
-                )
+                raise ValidationError(f"{score_name} must be between 0 and 1, got {score}")
 
 
 @dataclass
@@ -271,9 +263,7 @@ class AudioAnalysis:
         if self.duration < 0:
             raise ValidationError(f"Duration must be non-negative, got {self.duration}")
         if self.sample_rate <= 0:
-            raise ValidationError(
-                f"Sample rate must be positive, got {self.sample_rate}"
-            )
+            raise ValidationError(f"Sample rate must be positive, got {self.sample_rate}")
         if self.channels <= 0:
             raise ValidationError(f"Channels must be positive, got {self.channels}")
 
@@ -660,15 +650,13 @@ class AudioAgent:
                 timestamp=datetime.now(),
                 language=result.get("language", language or "unknown"),
                 segments=segments,
-                duration=len(model.audio) / model.audio.sample_rate
-                if hasattr(model, "audio")
-                else 0.0,
+                duration=(
+                    len(model.audio) / model.audio.sample_rate if hasattr(model, "audio") else 0.0
+                ),
             )
 
         except ImportError:
-            raise ImportError(
-                "Whisper package required: pip install openai-whisper"
-            )
+            raise ImportError("Whisper package required: pip install openai-whisper")
         except Exception as e:
             logger.error(f"Local Whisper transcription failed: {e}")
             raise RuntimeError(f"Local transcription failed: {e}")
@@ -879,10 +867,7 @@ class AudioAgent:
                 # Find corresponding transcript segments
                 for trans_seg in transcription.segments:
                     # Check for overlap
-                    if (
-                        turn.start <= trans_seg.end_time
-                        and turn.end >= trans_seg.start_time
-                    ):
+                    if turn.start <= trans_seg.end_time and turn.end >= trans_seg.start_time:
                         if turn.end - turn.start >= min_segment_length:
                             segments.append(
                                 SpeakerSegment(

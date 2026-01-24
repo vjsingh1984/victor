@@ -358,7 +358,9 @@ class AdaptiveTTLCache:
                     "hits": self._hits,
                     "misses": self._misses,
                     "evictions": self._evictions,
-                    "hit_rate": self._hits / self._total_accesses if self._total_accesses > 0 else 0.0,
+                    "hit_rate": (
+                        self._hits / self._total_accesses if self._total_accesses > 0 else 0.0
+                    ),
                     "ttl_adjustments": self._ttl_adjustments,
                 },
             }
@@ -389,9 +391,7 @@ class AdaptiveTTLCache:
         # Shorter interval = higher score
         if entry.ttl_stats.avg_access_interval > 0:
             # Normalize: 1s interval = 1.0, 1h interval = 0.0
-            interval_score = max(
-                0.0, 1.0 - (entry.ttl_stats.avg_access_interval / self._max_ttl)
-            )
+            interval_score = max(0.0, 1.0 - (entry.ttl_stats.avg_access_interval / self._max_ttl))
         else:
             interval_score = 0.5  # Default
 

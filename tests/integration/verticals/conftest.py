@@ -35,10 +35,9 @@ def mock_settings():
 def mock_provider():
     """Mock provider for testing."""
     provider = MagicMock()
-    provider.chat = MagicMock(return_value=MagicMock(
-        content="Test response",
-        usage=MagicMock(total_tokens=100)
-    ))
+    provider.chat = MagicMock(
+        return_value=MagicMock(content="Test response", usage=MagicMock(total_tokens=100))
+    )
     provider.stream_chat = MagicMock()
     provider.supports_tools = MagicMock(return_value=True)
     provider.name = "test_provider"

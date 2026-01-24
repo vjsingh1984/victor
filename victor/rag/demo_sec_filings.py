@@ -760,7 +760,7 @@ def main():
         "--no-verify-ssl",
         action="store_true",
         help="DISABLE SSL certificate verification (INSECURE, for demo only). "
-             "Alternatively, set SEC_VERIFY_SSL=false environment variable.",
+        "Alternatively, set SEC_VERIFY_SSL=false environment variable.",
     )
 
     args = parser.parse_args()

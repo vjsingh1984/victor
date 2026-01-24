@@ -109,10 +109,7 @@ def _register_escape_hatches() -> None:
 
 
 # Create lazy initializer (no import side-effect)
-_lazy_init = get_initializer_for_vertical(
-    "coding",
-    _register_escape_hatches
-)
+_lazy_init = get_initializer_for_vertical("coding", _register_escape_hatches)
 # Note: Registration happens on first call to _lazy_init.get_or_initialize()
 # This eliminates import-time side effects while maintaining backward compatibility
 

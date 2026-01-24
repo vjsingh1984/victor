@@ -250,7 +250,7 @@ class TestToolPriorityMultipliers:
         multiplier = engine.get_tool_priority_multiplier("search")
 
         assert multiplier >= 1.0  # Should be at least 1.0 (no reduction)
-        assert multiplier > 1.0   # Prefer boost
+        assert multiplier > 1.0  # Prefer boost
 
     def test_reading_stage_boosts_read_tool(self):
         """READING stage should boost read tool."""

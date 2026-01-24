@@ -69,9 +69,7 @@ def real_tool_registry():
     read_tool.description = "Read file content from disk"
     read_tool.parameters = {
         "type": "object",
-        "properties": {
-            "path": {"type": "string", "description": "File path"}
-        }
+        "properties": {"path": {"type": "string", "description": "File path"}},
     }
     read_tool.cost_tier = CostTier.FREE
     read_tool.enabled = True
@@ -84,10 +82,7 @@ def real_tool_registry():
     write_tool.description = "Write content to file"
     write_tool.parameters = {
         "type": "object",
-        "properties": {
-            "path": {"type": "string"},
-            "content": {"type": "string"}
-        }
+        "properties": {"path": {"type": "string"}, "content": {"type": "string"}},
     }
     write_tool.cost_tier = CostTier.LOW
     write_tool.enabled = True
@@ -100,10 +95,7 @@ def real_tool_registry():
     search_tool.description = "Search for code patterns"
     search_tool.parameters = {
         "type": "object",
-        "properties": {
-            "query": {"type": "string"},
-            "path": {"type": "string"}
-        }
+        "properties": {"query": {"type": "string"}, "path": {"type": "string"}},
     }
     search_tool.cost_tier = CostTier.FREE
     search_tool.enabled = True
@@ -116,10 +108,7 @@ def real_tool_registry():
     test_tool.description = "Run test suite"
     test_tool.parameters = {
         "type": "object",
-        "properties": {
-            "path": {"type": "string"},
-            "verbose": {"type": "boolean"}
-        }
+        "properties": {"path": {"type": "string"}, "verbose": {"type": "boolean"}},
     }
     test_tool.cost_tier = CostTier.MEDIUM
     test_tool.enabled = True
@@ -130,12 +119,7 @@ def real_tool_registry():
     lint_tool = Mock(spec=BaseTool)
     lint_tool.name = "lint_code"
     lint_tool.description = "Lint code for quality issues"
-    lint_tool.parameters = {
-        "type": "object",
-        "properties": {
-            "path": {"type": "string"}
-        }
-    }
+    lint_tool.parameters = {"type": "object", "properties": {"path": {"type": "string"}}}
     lint_tool.cost_tier = CostTier.LOW
     lint_tool.enabled = True
     lint_tool.category = "coding"
@@ -158,6 +142,7 @@ def mock_embedding_service():
     async def embed_text(text: str) -> list[float]:
         # Return deterministic mock embeddings
         import hashlib
+
         hash_val = int(hashlib.md5(text.encode()).hexdigest()[:8], 16)
         return [(hash_val >> i) & 1 for i in range(128)]
 
@@ -237,9 +222,7 @@ class TestEndToEndSkillDiscovery:
     """Integration tests for end-to-end skill discovery (2 tests)."""
 
     @pytest.mark.asyncio
-    async def test_discover_to_skill_composition_workflow(
-        self, discovery_engine
-    ):
+    async def test_discover_to_skill_composition_workflow(self, discovery_engine):
         """Test complete workflow from tool discovery to skill composition."""
         # Step 1: Discover tools
         tools = await discovery_engine.discover_tools(include_disabled=True)
@@ -276,9 +259,7 @@ class TestEndToEndSkillDiscovery:
         assert len(retrieved.tools) >= 1  # At least one tool
 
     @pytest.mark.asyncio
-    async def test_multi_skill_discovery_and_ranking(
-        self, discovery_engine
-    ):
+    async def test_multi_skill_discovery_and_ranking(self, discovery_engine):
         """Test discovering and ranking multiple skills for different tasks."""
         # Discover all tools
         tools = await discovery_engine.discover_tools(include_disabled=True)
@@ -343,9 +324,7 @@ class TestSkillChainPlanningAndExecution:
     """Integration tests for skill chain planning and execution (3 tests)."""
 
     @pytest.mark.asyncio
-    async def test_plan_and_execute_simple_chain(
-        self, skill_chainer, sample_skills
-    ):
+    async def test_plan_and_execute_simple_chain(self, skill_chainer, sample_skills):
         """Test planning and executing a simple skill chain."""
         # Plan chain
         chain = await skill_chainer.plan_chain(
@@ -380,9 +359,7 @@ class TestSkillChainPlanningAndExecution:
         assert len(result.step_results) >= 1  # At least some steps should execute
 
     @pytest.mark.asyncio
-    async def test_plan_chain_with_dependencies(
-        self, skill_chainer, sample_skills
-    ):
+    async def test_plan_chain_with_dependencies(self, skill_chainer, sample_skills):
         """Test chain planning respects skill dependencies."""
         # Plan chain for a task that requires dependencies
         chain = await skill_chainer.plan_chain(
@@ -401,9 +378,7 @@ class TestSkillChainPlanningAndExecution:
         # Later steps should have dependencies
         if len(chain.steps) > 1:
             later_steps = chain.steps[1:]
-            has_dependencies = any(
-                len(step.dependencies) > 0 for step in later_steps
-            )
+            has_dependencies = any(len(step.dependencies) > 0 for step in later_steps)
             # At least some steps should have dependencies (but this is OK if not)
             # The dependency analysis is heuristic and may not always add deps
             # assert has_dependencies or len(chain.steps) <= 2  # Removed strict check
@@ -413,9 +388,7 @@ class TestSkillChainPlanningAndExecution:
         assert validation.valid, f"Validation failed: {validation.errors}"
 
     @pytest.mark.asyncio
-    async def test_execute_chain_with_parallel_steps(
-        self, skill_chainer, sample_skills
-    ):
+    async def test_execute_chain_with_parallel_steps(self, skill_chainer, sample_skills):
         """Test executing chain with parallelizable steps."""
         # Create a chain that can be parallelized
         chain = await skill_chainer.plan_chain(
@@ -463,9 +436,7 @@ class TestSkillChainWithRealTools:
     """Integration tests with real tool execution (3 tests)."""
 
     @pytest.mark.asyncio
-    async def test_chain_with_real_tool_execution(
-        self, skill_chainer, discovery_engine
-    ):
+    async def test_chain_with_real_tool_execution(self, skill_chainer, discovery_engine):
         """Test chain execution with real tool-like behavior."""
         # Create a custom skill executor that mimics real tool execution
         execution_log = []
@@ -532,9 +503,7 @@ class TestSkillChainWithRealTools:
             assert "skill" in skill_name.lower()
 
     @pytest.mark.asyncio
-    async def test_chain_with_stategraph_execution(
-        self, skill_chainer, sample_skills
-    ):
+    async def test_chain_with_stategraph_execution(self, skill_chainer, sample_skills):
         """Test chain execution using StateGraph backend."""
         # Plan chain
         chain = await skill_chainer.plan_chain(
@@ -564,9 +533,7 @@ class TestSkillChainWithRealTools:
             assert result.metrics["graph_iterations"] >= 0
 
     @pytest.mark.asyncio
-    async def test_chain_with_error_recovery(
-        self, skill_chainer, discovery_engine
-    ):
+    async def test_chain_with_error_recovery(self, skill_chainer, discovery_engine):
         """Test chain execution with error recovery and retries."""
         # Create executor that fails sometimes
         attempt_count = {"value": 0}
@@ -633,9 +600,7 @@ class TestSkillChainingPerformance:
     """Performance benchmarks for skill chaining (2 tests)."""
 
     @pytest.mark.asyncio
-    async def test_skill_discovery_performance(
-        self, discovery_engine
-    ):
+    async def test_skill_discovery_performance(self, discovery_engine):
         """Benchmark skill discovery operations."""
         # Benchmark 1: Tool discovery
         start_time = time.time()
@@ -671,16 +636,14 @@ class TestSkillChainingPerformance:
         assert compose_time < 0.3, f"Skill composition too slow: {compose_time:.3f}s"
 
         # Print benchmark results
-        print(f"\nSkill Discovery Performance:")
+        print("\nSkill Discovery Performance:")
         print(f"  Discovery: {discovery_time:.4f}s ({len(tools)} tools)")
         print(f"  Matching:  {match_time:.4f}s ({len(matched)} matched)")
         print(f"  Compose:   {compose_time:.4f}s")
         print(f"  Total:     {discovery_time + match_time + compose_time:.4f}s")
 
     @pytest.mark.asyncio
-    async def test_chain_execution_performance(
-        self, skill_chainer, sample_skills
-    ):
+    async def test_chain_execution_performance(self, skill_chainer, sample_skills):
         """Benchmark chain planning and execution."""
         # Benchmark 1: Chain planning
         start_time = time.time()
@@ -724,7 +687,7 @@ class TestSkillChainingPerformance:
 
         # Skip parallel execution if no steps matched
         if len(chain_parallel.steps) == 0:
-            print(f"\n  (Skipped parallel execution - no steps matched)")
+            print("\n  (Skipped parallel execution - no steps matched)")
             execution_par_time = 0.0
         else:
             # Mark steps as parallelizable
@@ -745,7 +708,7 @@ class TestSkillChainingPerformance:
             ]
 
         # Print benchmark results
-        print(f"\nChain Execution Performance:")
+        print("\nChain Execution Performance:")
         print(f"  Planning:    {planning_time:.4f}s ({len(chain.steps)} steps)")
         print(f"  Validation:  {validation_time:.4f}s")
         print(f"  Exec (seq):  {execution_seq_time:.4f}s")
@@ -781,9 +744,7 @@ class TestSkillChainingEdgeCases:
         assert chain is not None
 
     @pytest.mark.asyncio
-    async def test_large_chain_performance(
-        self, skill_chainer, discovery_engine
-    ):
+    async def test_large_chain_performance(self, skill_chainer, discovery_engine):
         """Test performance with larger skill set."""
         # Create many skills
         tools = await discovery_engine.discover_tools()

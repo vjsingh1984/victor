@@ -127,7 +127,8 @@ def create_test_tool_definition(
         "function": {
             "name": name,
             "description": description,
-            "parameters": parameters or {
+            "parameters": parameters
+            or {
                 "type": "object",
                 "properties": {
                     "param1": {
@@ -170,9 +171,7 @@ def create_mock_provider(
     # Mock stream method
     async def mock_stream(*args, **kwargs):
         yield create_test_stream_chunk(content=response_content, is_final=False)
-        yield create_test_stream_chunk(
-            content="", is_final=True, stop_reason="stop"
-        )
+        yield create_test_stream_chunk(content="", is_final=True, stop_reason="stop")
 
     provider.stream = mock_stream
 
@@ -219,7 +218,9 @@ def create_mock_orchestrator(
     return orchestrator
 
 
-def create_mock_tool_result(tool_name: str = "test_tool", result: Any = "success") -> Dict[str, Any]:
+def create_mock_tool_result(
+    tool_name: str = "test_tool", result: Any = "success"
+) -> Dict[str, Any]:
     """Create a mock tool execution result.
 
     Args:

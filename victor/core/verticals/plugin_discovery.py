@@ -238,7 +238,7 @@ class PluginDiscovery:
             eps_result = entry_points(group=self.ENTRY_POINT_GROUP)
 
             # Check if eps_result has .group() method (old API)
-            if hasattr(eps_result, 'group') and callable(eps_result.group):
+            if hasattr(eps_result, "group") and callable(eps_result.group):
                 # Old API: call .group() to get entry points
                 eps = eps_result.group(self.ENTRY_POINT_GROUP)
             else:
@@ -405,8 +405,12 @@ class PluginDiscovery:
         try:
             # Discover from all sources
             builtin_result = self.discover_builtin_verticals()
-            entry_point_result = self.discover_from_entry_points() if self.enable_entry_points else DiscoveryResult()
-            yaml_result = self.discover_from_yaml() if self.enable_yaml_fallback else DiscoveryResult()
+            entry_point_result = (
+                self.discover_from_entry_points() if self.enable_entry_points else DiscoveryResult()
+            )
+            yaml_result = (
+                self.discover_from_yaml() if self.enable_yaml_fallback else DiscoveryResult()
+            )
 
             # Merge results (entry points override built-in, YAML overrides both)
             all_results = [builtin_result, entry_point_result, yaml_result]
@@ -430,7 +434,9 @@ class PluginDiscovery:
                     else:
                         # Already present, check precedence
                         existing_source = result.sources.get(name, PluginSource.BUILTIN)
-                        if precedence_order.get(source, 0) > precedence_order.get(existing_source, 0):
+                        if precedence_order.get(source, 0) > precedence_order.get(
+                            existing_source, 0
+                        ):
                             # Higher precedence source, override
                             result.verticals[name] = vertical_class
                             result.sources[name] = source
@@ -473,10 +479,7 @@ class PluginDiscovery:
                 return isinstance(vertical_class, VerticalBase)
 
             # It's a class, check if it's a subclass of VerticalBase (but not VerticalBase itself)
-            return (
-                issubclass(vertical_class, VerticalBase)
-                and vertical_class is not VerticalBase
-            )
+            return issubclass(vertical_class, VerticalBase) and vertical_class is not VerticalBase
         except (TypeError, AttributeError):
             return False
 
@@ -529,7 +532,10 @@ def get_plugin_discovery(
                 enable_cache=enable_cache,
                 cache_size=cache_size,
             )
-        elif not use_plugin_discovery and (_plugin_discovery_cache.enable_entry_points or _plugin_discovery_cache.enable_yaml_fallback):
+        elif not use_plugin_discovery and (
+            _plugin_discovery_cache.enable_entry_points
+            or _plugin_discovery_cache.enable_yaml_fallback
+        ):
             _plugin_discovery_cache = PluginDiscovery(
                 enable_entry_points=False,
                 enable_yaml_fallback=False,

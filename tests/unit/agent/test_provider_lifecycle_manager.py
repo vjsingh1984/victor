@@ -33,6 +33,7 @@ from dataclasses import dataclass
 @dataclass
 class MockCapabilities:
     """Mock for tool calling capabilities."""
+
     exploration_multiplier: float = 5.0
     continuation_patience: int = 3
     recommended_tool_budget: int = 100
@@ -41,6 +42,7 @@ class MockCapabilities:
 @dataclass
 class MockPromptContributor:
     """Mock prompt contributor."""
+
     name: str = "test_contributor"
 
     def contribute(self, context: Any) -> str:

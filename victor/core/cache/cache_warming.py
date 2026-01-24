@@ -223,9 +223,7 @@ class AccessTracker:
                     break
             return recent_keys
 
-    def get_top_hybrid(
-        self, n: int = 100, recency_weight: float = 0.5
-    ) -> List[tuple[str, str]]:
+    def get_top_hybrid(self, n: int = 100, recency_weight: float = 0.5) -> List[tuple[str, str]]:
         """Get top keys using hybrid frequency + recency scoring.
 
         Args:
@@ -250,9 +248,7 @@ class AccessTracker:
 
             # Normalize frequency scores
             max_freq = max(self._frequency.values()) if self._frequency else 1
-            frequency_scores = {
-                key: count / max_freq for key, count in self._frequency.items()
-            }
+            frequency_scores = {key: count / max_freq for key, count in self._frequency.items()}
 
             # Calculate hybrid scores
             hybrid_scores: Dict[tuple[str, str], float] = {}
@@ -261,14 +257,14 @@ class AccessTracker:
             for key in all_keys:
                 recency = recency_scores.get(key, 0)
                 frequency = frequency_scores.get(key, 0)
-                hybrid_scores[key] = (
-                    recency_weight * recency + (1 - recency_weight) * frequency
-                )
+                hybrid_scores[key] = recency_weight * recency + (1 - recency_weight) * frequency
 
             # Sort by hybrid score
             return sorted(hybrid_scores.keys(), key=lambda k: hybrid_scores[k], reverse=True)[:n]
 
-    def get_time_based_predictions(self, hour: Optional[int] = None, n: int = 100) -> List[tuple[str, str]]:
+    def get_time_based_predictions(
+        self, hour: Optional[int] = None, n: int = 100
+    ) -> List[tuple[str, str]]:
         """Get predicted keys for a specific time.
 
         Args:
@@ -323,7 +319,10 @@ class AccessTracker:
 
             # Clean user patterns
             for user_id in list(self._user_patterns.keys()):
-                while self._user_patterns[user_id] and self._user_patterns[user_id][0].timestamp < cutoff_time:
+                while (
+                    self._user_patterns[user_id]
+                    and self._user_patterns[user_id][0].timestamp < cutoff_time
+                ):
                     self._user_patterns[user_id].popleft()
 
                 # Remove empty user patterns
@@ -483,7 +482,11 @@ class CacheWarmer:
             keys = self.tracker.get_top_hybrid(n, self.config.recency_weight)
         elif strategy == WarmingStrategy.TIME_BASED and self.config.enable_time_based:
             keys = self.tracker.get_time_based_predictions(n=n)
-        elif strategy == WarmingStrategy.USER_SPECIFIC and self.config.enable_user_specific and user_id:
+        elif (
+            strategy == WarmingStrategy.USER_SPECIFIC
+            and self.config.enable_user_specific
+            and user_id
+        ):
             keys = self.tracker.get_user_specific(user_id, n)
         else:
             keys = []

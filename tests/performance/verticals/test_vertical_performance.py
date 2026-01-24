@@ -31,11 +31,14 @@ from typing import Any, Generator
 
 import pytest
 
+
 # Type hint for benchmark fixture (provided by pytest-benchmark)
 class BenchmarkFixture:
     """Type hint for pytest-benchmark fixture."""
+
     def __call__(self, func): ...
     def __getattr__(self, name): ...
+
 
 from victor.coding import CodingAssistant
 from victor.dataanalysis import DataAnalysisAssistant
@@ -49,6 +52,7 @@ from victor.core.capabilities import CapabilityLoader
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def sample_python_file(tmp_path: Path) -> Path:
@@ -111,21 +115,21 @@ def large_python_file(tmp_path: Path) -> Path:
     # Generate multiple classes with methods
     for i in range(50):
         lines.append(f"@dataclass\nclass Class{i}:\n")
-        lines.append(f"    name: str\n")
-        lines.append(f"    value: int\n\n")
+        lines.append("    name: str\n")
+        lines.append("    value: int\n\n")
 
         lines.append(f"class Processor{i}:\n")
-        lines.append(f"    def __init__(self, config: dict = None):\n")
-        lines.append(f"        self.config = config or {{}}\n\n")
+        lines.append("    def __init__(self, config: dict = None):\n")
+        lines.append("        self.config = config or {}\n\n")
 
-        lines.append(f"    def process(self, data: List[Any]) -> Dict[str, Any]:\n")
-        lines.append(f"        result = {{}}\n")
-        lines.append(f"        for item in data:\n")
-        lines.append(f"            result[item] = self._compute(item)\n")
-        lines.append(f"        return result\n\n")
+        lines.append("    def process(self, data: List[Any]) -> Dict[str, Any]:\n")
+        lines.append("        result = {}\n")
+        lines.append("        for item in data:\n")
+        lines.append("            result[item] = self._compute(item)\n")
+        lines.append("        return result\n\n")
 
-        lines.append(f"    def _compute(self, value: Any) -> float:\n")
-        lines.append(f"        return float(value) * 1.5\n\n")
+        lines.append("    def _compute(self, value: Any) -> float:\n")
+        lines.append("        return float(value) * 1.5\n\n")
 
     file_path = tmp_path / "large_file.py"
     file_path.write_text("".join(lines))
@@ -186,11 +190,13 @@ result = function_0(10)
 # Test Suite 1: Initialization Performance (4 tests)
 # =============================================================================
 
+
 class TestVerticalInitialization:
     """Test vertical initialization performance."""
 
     def test_coding_vertical_load_time(self, benchmark: BenchmarkFixture):
         """Benchmark CodingAssistant initialization time."""
+
         # Force fresh initialization
         def init_coding():
             CodingAssistant._instance = None
@@ -202,6 +208,7 @@ class TestVerticalInitialization:
 
     def test_all_verticals_load_time(self, benchmark: BenchmarkFixture):
         """Benchmark loading all verticals."""
+
         def load_all_verticals():
             CodingAssistant._instance = None
             DataAnalysisAssistant._instance = None
@@ -228,8 +235,8 @@ class TestVerticalInitialization:
 
         def load_modes():
             registry = ModeConfigRegistry.get_instance()
-            config = registry.load_config('coding')
-            return config.get_mode('build')
+            config = registry.load_config("coding")
+            return config.get_mode("build")
 
         mode = benchmark(load_modes)
         assert mode is not None
@@ -237,9 +244,10 @@ class TestVerticalInitialization:
 
     def test_capability_loading_performance(self, benchmark: BenchmarkFixture):
         """Benchmark capability loading for verticals."""
+
         def load_capabilities():
-            loader = CapabilityLoader.from_vertical('coding')
-            return loader.load_capabilities('coding')
+            loader = CapabilityLoader.from_vertical("coding")
+            return loader.load_capabilities("coding")
 
         capability_set = benchmark(load_capabilities)
         assert capability_set is not None
@@ -248,6 +256,7 @@ class TestVerticalInitialization:
 # =============================================================================
 # Test Suite 2: Execution Performance (3 tests)
 # =============================================================================
+
 
 class TestVerticalExecution:
     """Test vertical execution performance."""
@@ -265,11 +274,7 @@ class TestVerticalExecution:
         assert ast_result is not None
         assert ast_result.root is not None
 
-    def test_semantic_search_indexing(
-        self,
-        benchmark: BenchmarkFixture,
-        sample_codebase: Path
-    ):
+    def test_semantic_search_indexing(self, benchmark: BenchmarkFixture, sample_codebase: Path):
         """Benchmark codebase indexing for semantic search."""
         from victor.coding.codebase.indexer import CodebaseIndexer
 
@@ -283,11 +288,7 @@ class TestVerticalExecution:
         # Verify indexing worked
         assert len(indexer.documents) > 0
 
-    def test_code_search_performance(
-        self,
-        benchmark: BenchmarkFixture,
-        sample_codebase: Path
-    ):
+    def test_code_search_performance(self, benchmark: BenchmarkFixture, sample_codebase: Path):
         """Benchmark code search query performance."""
         from victor.coding.codebase.searcher import CodebaseSearcher
 
@@ -304,6 +305,7 @@ class TestVerticalExecution:
 # =============================================================================
 # Test Suite 3: Memory Efficiency (3 tests)
 # =============================================================================
+
 
 class TestVerticalMemory:
     """Test vertical memory efficiency."""
@@ -334,9 +336,7 @@ class TestVerticalMemory:
         assert peak_memory < 50 * 1024 * 1024  # 50 MB
 
     def test_memory_cleanup_after_operation(
-        self,
-        benchmark: BenchmarkFixture,
-        sample_python_file: Path
+        self, benchmark: BenchmarkFixture, sample_python_file: Path
     ):
         """Benchmark memory cleanup after AST parsing."""
         import tracemalloc
@@ -368,11 +368,7 @@ class TestVerticalMemory:
         # Memory growth should be minimal after cleanup (< 5MB)
         assert memory_growth < 5 * 1024 * 1024  # 5 MB
 
-    def test_large_file_memory_usage(
-        self,
-        benchmark: BenchmarkFixture,
-        large_python_file: Path
-    ):
+    def test_large_file_memory_usage(self, benchmark: BenchmarkFixture, large_python_file: Path):
         """Benchmark memory usage for large file operations."""
         import tracemalloc
         from victor.coding.ast.parser import ASTParser
@@ -404,6 +400,7 @@ class TestVerticalMemory:
 # =============================================================================
 # Test Suite 4: Concurrent Operations
 # =============================================================================
+
 
 class TestConcurrentOperations:
     """Test concurrent vertical operations performance."""
@@ -438,6 +435,7 @@ class TestConcurrentOperations:
 # Test Suite 5: Scalability Tests
 # =============================================================================
 
+
 class TestVerticalScalability:
     """Test vertical scalability with increasing workload sizes."""
 
@@ -453,7 +451,9 @@ class TestVerticalScalability:
         def benchmark_selection():
             tools = setup_large_registry()
             # Simulate selection filtering
-            coding_tools = [t for t in tools if "coding" in t.name.lower() or "file" in t.name.lower()]
+            coding_tools = [
+                t for t in tools if "coding" in t.name.lower() or "file" in t.name.lower()
+            ]
             return len(coding_tools)
 
         count = benchmark(benchmark_selection)
@@ -480,18 +480,22 @@ class TestVerticalScalability:
 # Performance Regression Thresholds
 # =============================================================================
 
-@pytest.mark.parametrize("test_name,threshold_max", [
-    ("test_coding_vertical_load_time", 0.5),  # 500ms
-    ("test_all_verticals_load_time", 1.0),  # 1s
-    ("test_mode_config_initialization", 0.1),  # 100ms
-    ("test_capability_loading_performance", 0.2),  # 200ms
-    ("test_ast_parsing_speed", 0.1),  # 100ms
-])
+
+@pytest.mark.parametrize(
+    "test_name,threshold_max",
+    [
+        ("test_coding_vertical_load_time", 0.5),  # 500ms
+        ("test_all_verticals_load_time", 1.0),  # 1s
+        ("test_mode_config_initialization", 0.1),  # 100ms
+        ("test_capability_loading_performance", 0.2),  # 200ms
+        ("test_ast_parsing_speed", 0.1),  # 100ms
+    ],
+)
 def test_performance_regression_thresholds(
     benchmark: BenchmarkFixture,
     test_name: str,
     threshold_max: float,
-    request: pytest.FixtureRequest
+    request: pytest.FixtureRequest,
 ):
     """
     Meta-test to ensure performance thresholds are met.
@@ -520,17 +524,16 @@ def test_performance_regression_thresholds(
 # Benchmark Configuration
 # =============================================================================
 
+
 def pytest_configure(config):
     """Configure pytest-benchmark settings."""
-    config.addinivalue_line(
-        "markers",
-        "benchmark: mark test as a benchmark test"
-    )
+    config.addinivalue_line("markers", "benchmark: mark test as a benchmark test")
 
 
 # =============================================================================
 # Helper Functions
 # =============================================================================
+
 
 def get_memory_usage() -> int:
     """Get current process memory usage in bytes."""
@@ -543,7 +546,7 @@ def get_memory_usage() -> int:
 
 def format_bytes(bytes_value: int) -> str:
     """Format bytes to human-readable string."""
-    for unit in ['B', 'KB', 'MB', 'GB']:
+    for unit in ["B", "KB", "MB", "GB"]:
         if bytes_value < 1024.0:
             return f"{bytes_value:.2f} {unit}"
         bytes_value /= 1024.0

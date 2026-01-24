@@ -35,6 +35,7 @@ except ImportError:
     # When running as script
     import sys
     from pathlib import Path
+
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
     from tests.mocks import (
         FailingProvider,
@@ -83,9 +84,7 @@ async def example_streaming_test():
     messages = ProviderTestHelpers.create_test_messages("Tell me a story")
 
     # Collect all chunks
-    chunks = await ProviderTestHelpers.collect_stream_chunks(
-        provider, messages, model="test"
-    )
+    chunks = await ProviderTestHelpers.collect_stream_chunks(provider, messages, model="test")
 
     # Verify chunks
     assert len(chunks) > 0
@@ -172,11 +171,7 @@ async def example_multi_turn_conversation():
     conversation = [
         {
             "content": "I'll search for that information.",
-            "tool_calls": [
-                ProviderTestHelpers.create_test_tool_call(
-                    "search", {"query": "test"}
-                )
-            ],
+            "tool_calls": [ProviderTestHelpers.create_test_tool_call("search", {"query": "test"})],
         },
         {
             "content": "Based on the search results, here's what I found...",
@@ -332,9 +327,7 @@ async def example_response_validation():
     ProviderTestHelpers.assert_valid_response(response)
 
     # For streaming
-    streaming_provider = ProviderTestHelpers.create_streaming_mock(
-        chunks=["a", "b", "c"]
-    )
+    streaming_provider = ProviderTestHelpers.create_streaming_mock(chunks=["a", "b", "c"])
 
     chunks = await ProviderTestHelpers.collect_stream_chunks(
         streaming_provider, messages, model="test"

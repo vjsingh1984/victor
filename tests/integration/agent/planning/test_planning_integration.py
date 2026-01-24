@@ -237,9 +237,7 @@ class TestTaskDecompositionE2E:
     """End-to-end tests for task decomposition."""
 
     @pytest.mark.asyncio
-    async def test_decompose_simple_task_e2e(
-        self, integration_planner, sample_task_hierarchy
-    ):
+    async def test_decompose_simple_task_e2e(self, integration_planner, sample_task_hierarchy):
         """Test end-to-end decomposition of a simple task."""
         # Mock LLM response
         integration_planner._orchestrator._provider_manager.chat = AsyncMock(
@@ -247,9 +245,7 @@ class TestTaskDecompositionE2E:
         )
 
         # Decompose task
-        graph = await integration_planner.decompose_task(
-            "Implement user authentication system"
-        )
+        graph = await integration_planner.decompose_task("Implement user authentication system")
 
         # Verify decomposition structure
         assert len(graph.nodes) == 5
@@ -266,9 +262,7 @@ class TestTaskDecompositionE2E:
         assert all(node.status == "pending" for node in graph.nodes.values())
 
     @pytest.mark.asyncio
-    async def test_decompose_complex_task_e2e(
-        self, integration_planner, complex_task_hierarchy
-    ):
+    async def test_decompose_complex_task_e2e(self, integration_planner, complex_task_hierarchy):
         """Test end-to-end decomposition of a complex task with multiple levels."""
         integration_planner._orchestrator._provider_manager.chat = AsyncMock(
             return_value=Mock(content=json.dumps(complex_task_hierarchy))
@@ -295,9 +289,7 @@ class TestTaskDecompositionE2E:
         assert validation.has_cycles is False
 
     @pytest.mark.asyncio
-    async def test_decompose_with_context_e2e(
-        self, integration_planner, sample_task_hierarchy
-    ):
+    async def test_decompose_with_context_e2e(self, integration_planner, sample_task_hierarchy):
         """Test end-to-end decomposition with rich context."""
         integration_planner._orchestrator._provider_manager.chat = AsyncMock(
             return_value=Mock(content=json.dumps(sample_task_hierarchy))
@@ -341,9 +333,7 @@ class TestPlanExecutionWithOrchestrator:
     """Tests for plan execution integrated with orchestrator."""
 
     @pytest.mark.asyncio
-    async def test_execute_sequential_plan(
-        self, integration_planner, sample_task_hierarchy
-    ):
+    async def test_execute_sequential_plan(self, integration_planner, sample_task_hierarchy):
         """Test executing a plan sequentially through orchestrator."""
         integration_planner._orchestrator._provider_manager.chat = AsyncMock(
             return_value=Mock(content=json.dumps(sample_task_hierarchy))
@@ -361,9 +351,7 @@ class TestPlanExecutionWithOrchestrator:
             execution_order.append(task.id)
 
             # Update plan
-            updated = await integration_planner.update_plan(
-                graph, completed_tasks=[task.id]
-            )
+            updated = await integration_planner.update_plan(graph, completed_tasks=[task.id])
             graph = updated.graph
 
             ready_tasks = await integration_planner.suggest_next_tasks(graph)
@@ -377,9 +365,7 @@ class TestPlanExecutionWithOrchestrator:
         assert all(node.status == "completed" for node in graph.nodes.values())
 
     @pytest.mark.asyncio
-    async def test_execute_parallel_plan(
-        self, integration_planner, parallel_task_hierarchy
-    ):
+    async def test_execute_parallel_plan(self, integration_planner, parallel_task_hierarchy):
         """Test executing a plan with parallel tasks."""
         integration_planner._orchestrator._provider_manager.chat = AsyncMock(
             return_value=Mock(content=json.dumps(parallel_task_hierarchy))
@@ -451,9 +437,7 @@ class TestReplanningAfterFailures:
     """Tests for dynamic replanning after task failures."""
 
     @pytest.mark.asyncio
-    async def test_replan_after_single_failure(
-        self, integration_planner, sample_task_hierarchy
-    ):
+    async def test_replan_after_single_failure(self, integration_planner, sample_task_hierarchy):
         """Test replanning after a single task failure."""
         integration_planner._orchestrator._provider_manager.chat = AsyncMock(
             return_value=Mock(content=json.dumps(sample_task_hierarchy))
@@ -502,18 +486,14 @@ class TestReplanningAfterFailures:
         assert updated.graph.nodes["task_3"].status == "blocked"
 
         # Complete remaining parallel task
-        updated = await integration_planner.update_plan(
-            updated.graph, completed_tasks=["task_2c"]
-        )
+        updated = await integration_planner.update_plan(updated.graph, completed_tasks=["task_2c"])
 
         # Task 3 should still be blocked due to failures
         assert updated.graph.nodes["task_3"].status == "blocked"
         assert updated.can_proceed is False
 
     @pytest.mark.asyncio
-    async def test_replan_with_recovery(
-        self, integration_planner, sample_task_hierarchy
-    ):
+    async def test_replan_with_recovery(self, integration_planner, sample_task_hierarchy):
         """Test replanning after failure recovery."""
         integration_planner._orchestrator._provider_manager.chat = AsyncMock(
             return_value=Mock(content=json.dumps(sample_task_hierarchy))
@@ -523,9 +503,7 @@ class TestReplanningAfterFailures:
         graph = await integration_planner.decompose_task("Implement authentication")
 
         # Complete tasks
-        updated = await integration_planner.update_plan(
-            graph, completed_tasks=["task_1", "task_2"]
-        )
+        updated = await integration_planner.update_plan(graph, completed_tasks=["task_1", "task_2"])
 
         # Fail task_3
         updated = await integration_planner.update_plan(
@@ -543,9 +521,7 @@ class TestReplanningAfterFailures:
         updated.graph.nodes["task_5"].status = "pending"
 
         # Complete recovered task
-        updated = await integration_planner.update_plan(
-            updated.graph, completed_tasks=["task_3"]
-        )
+        updated = await integration_planner.update_plan(updated.graph, completed_tasks=["task_3"])
 
         # Verify tasks unblocked
         assert updated.graph.nodes["task_3"].status == "completed"
@@ -562,9 +538,7 @@ class TestMultiAgentCoordination:
     """Tests for multi-agent coordination in planning."""
 
     @pytest.mark.asyncio
-    async def test_coordinate_specialized_agents(
-        self, integration_planner, sample_task_hierarchy
-    ):
+    async def test_coordinate_specialized_agents(self, integration_planner, sample_task_hierarchy):
         """Test coordinating multiple specialized agents."""
         integration_planner._orchestrator._provider_manager.chat = AsyncMock(
             return_value=Mock(content=json.dumps(sample_task_hierarchy))
@@ -594,9 +568,7 @@ class TestMultiAgentCoordination:
         assert agent_assignments["task_5"] == "tester_agent"
 
     @pytest.mark.asyncio
-    async def test_parallel_agent_execution(
-        self, integration_planner, parallel_task_hierarchy
-    ):
+    async def test_parallel_agent_execution(self, integration_planner, parallel_task_hierarchy):
         """Test parallel execution by multiple agents."""
         integration_planner._orchestrator._provider_manager.chat = AsyncMock(
             return_value=Mock(content=json.dumps(parallel_task_hierarchy))
@@ -629,9 +601,7 @@ class TestMultiAgentCoordination:
             assert updated.graph.nodes[task_id].status == "completed"
 
     @pytest.mark.asyncio
-    async def test_agent_handoff_workflow(
-        self, integration_planner, complex_task_hierarchy
-    ):
+    async def test_agent_handoff_workflow(self, integration_planner, complex_task_hierarchy):
         """Test workflow with agent handoffs."""
         integration_planner._orchestrator._provider_manager.chat = AsyncMock(
             return_value=Mock(content=json.dumps(complex_task_hierarchy))
@@ -656,9 +626,7 @@ class TestMultiAgentCoordination:
         handoff_chain.append(("developers", ["task_4", "task_5", "task_6"]))
 
         # DevOps agent sets up infrastructure
-        updated = await integration_planner.update_plan(
-            updated.graph, completed_tasks=["task_7"]
-        )
+        updated = await integration_planner.update_plan(updated.graph, completed_tasks=["task_7"])
         handoff_chain.append(("devops", ["task_7"]))
 
         # Verify handoff sequence
@@ -677,9 +645,7 @@ class TestPerformanceBenchmarks:
     """Performance and scalability benchmarks for planning."""
 
     @pytest.mark.asyncio
-    async def test_large_graph_decomposition_performance(
-        self, integration_planner
-    ):
+    async def test_large_graph_decomposition_performance(self, integration_planner):
         """Test decomposition performance with large task graphs."""
         # Create large task hierarchy (50 tasks)
         large_hierarchy = {
@@ -721,9 +687,7 @@ class TestPerformanceBenchmarks:
         assert validation_time < 0.5, f"Validation took {validation_time:.2f}s"
 
     @pytest.mark.asyncio
-    async def test_cache_performance_benefit(
-        self, integration_planner, sample_task_hierarchy
-    ):
+    async def test_cache_performance_benefit(self, integration_planner, sample_task_hierarchy):
         """Test performance benefit of decomposition caching."""
         integration_planner._orchestrator._provider_manager.chat = AsyncMock(
             return_value=Mock(content=json.dumps(sample_task_hierarchy))
@@ -744,9 +708,7 @@ class TestPerformanceBenchmarks:
         cached_time = time.time() - start_time
 
         # Verify LLM called only once
-        assert (
-            integration_planner._orchestrator._provider_manager.chat.call_count == 1
-        )
+        assert integration_planner._orchestrator._provider_manager.chat.call_count == 1
 
         # Verify cache hit
         cache_stats = integration_planner.get_cache_stats()
@@ -862,12 +824,8 @@ class TestPlanningEdgeCases:
         """Test detection of circular dependencies."""
         # Create circular dependency manually
         graph = TaskGraph()
-        graph.add_node(
-            Task(id="task_1", description="Task 1", depends_on=["task_2"])
-        )
-        graph.add_node(
-            Task(id="task_2", description="Task 2", depends_on=["task_1"])
-        )
+        graph.add_node(Task(id="task_1", description="Task 1", depends_on=["task_2"]))
+        graph.add_node(Task(id="task_2", description="Task 2", depends_on=["task_1"]))
         graph.add_edge("task_1", "task_2")
         graph.add_edge("task_2", "task_1")
 
@@ -877,12 +835,12 @@ class TestPlanningEdgeCases:
         assert validation.is_valid is False
         assert validation.has_cycles is True
         assert len(validation.errors) > 0
-        assert any("cycle" in error.lower() or "circular" in error.lower() for error in validation.errors)
+        assert any(
+            "cycle" in error.lower() or "circular" in error.lower() for error in validation.errors
+        )
 
     @pytest.mark.asyncio
-    async def test_complexity_estimation_consistency(
-        self, integration_planner
-    ):
+    async def test_complexity_estimation_consistency(self, integration_planner):
         """Test consistency of complexity estimation."""
         task1 = "Implement simple feature"
         task2 = "Refactor entire system architecture"

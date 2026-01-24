@@ -113,9 +113,7 @@ class TestDeprecatedProperty:
         """Test that @deprecated_property issues warning on access."""
 
         class TestClass:
-            @deprecated_property(
-                version="0.5.0", replacement="new_attr", remove_version="0.7.0"
-            )
+            @deprecated_property(version="0.5.0", replacement="new_attr", remove_version="0.7.0")
             def old_attr(self):
                 return "value"
 
@@ -139,9 +137,7 @@ class TestDeprecatedClass:
     def test_deprecated_class_issues_warning_on_instantiation(self):
         """Test that @deprecated_class issues warning when instantiated."""
 
-        @deprecated_class(
-            version="0.5.0", replacement="NewClass", remove_version="0.7.0"
-        )
+        @deprecated_class(version="0.5.0", replacement="NewClass", remove_version="0.7.0")
         class OldClass:
             def __init__(self):
                 self.value = "initialized"

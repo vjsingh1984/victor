@@ -146,9 +146,7 @@ class TestTaskDecomposition:
             }
         )
 
-        mock_provider_manager.chat = AsyncMock(
-            return_value=Mock(content=decomposition_response)
-        )
+        mock_provider_manager.chat = AsyncMock(return_value=Mock(content=decomposition_response))
 
         # Decompose task
         graph = await planner.decompose_task("Implement a simple feature")
@@ -187,9 +185,7 @@ class TestTaskDecomposition:
             }
         )
 
-        mock_provider_manager.chat = AsyncMock(
-            return_value=Mock(content=decomposition_response)
-        )
+        mock_provider_manager.chat = AsyncMock(return_value=Mock(content=decomposition_response))
 
         # Decompose task
         graph = await planner.decompose_task("Implement user authentication")
@@ -217,9 +213,7 @@ class TestTaskDecomposition:
             }
         )
 
-        mock_provider_manager.chat = AsyncMock(
-            return_value=Mock(content=decomposition_response)
-        )
+        mock_provider_manager.chat = AsyncMock(return_value=Mock(content=decomposition_response))
 
         # First call - should hit LLM
         graph1 = await planner.decompose_task("Test task", use_cache=True)
@@ -249,9 +243,7 @@ class TestTaskDecomposition:
             }
         )
 
-        mock_provider_manager.chat = AsyncMock(
-            return_value=Mock(content=decomposition_response)
-        )
+        mock_provider_manager.chat = AsyncMock(return_value=Mock(content=decomposition_response))
 
         # First call
         await planner.decompose_task("Test task", use_cache=True)
@@ -279,9 +271,7 @@ class TestTaskDecomposition:
             }
         )
 
-        mock_provider_manager.chat = AsyncMock(
-            return_value=Mock(content=decomposition_response)
-        )
+        mock_provider_manager.chat = AsyncMock(return_value=Mock(content=decomposition_response))
 
         # Decompose with context
         context = {"file_count": 5, "domains": ["coding"]}
@@ -297,9 +287,7 @@ class TestTaskDecomposition:
     async def test_decompose_invalid_json_response(self, planner, mock_provider_manager):
         """Test handling of invalid JSON in LLM response."""
         # Mock invalid JSON response
-        mock_provider_manager.chat = AsyncMock(
-            return_value=Mock(content="This is not valid JSON")
-        )
+        mock_provider_manager.chat = AsyncMock(return_value=Mock(content="This is not valid JSON"))
 
         # Should raise ValueError
         with pytest.raises(ValueError, match="No JSON found"):
@@ -339,9 +327,7 @@ class TestTaskDecomposition:
         Let me know if you need adjustments!
         """
 
-        mock_provider_manager.chat = AsyncMock(
-            return_value=Mock(content=decomposition_response)
-        )
+        mock_provider_manager.chat = AsyncMock(return_value=Mock(content=decomposition_response))
 
         # Should successfully extract and parse
         graph = await planner.decompose_task("Test task")
@@ -403,9 +389,7 @@ class TestPlanUpdate:
         graph.add_node(Task(id="task_1", description="Only task"))
 
         # Mark as failed
-        result = await planner.update_plan(
-            graph, completed_tasks=[], failed_tasks=["task_1"]
-        )
+        result = await planner.update_plan(graph, completed_tasks=[], failed_tasks=["task_1"])
 
         # Verify
         assert result.can_proceed is False
@@ -509,9 +493,7 @@ class TestComplexityEstimation:
 
     def test_estimate_complexity_complex_task(self, planner):
         """Test estimating complexity of a complex task."""
-        score = planner.estimate_complexity(
-            "Refactor the authentication system to use OAuth2"
-        )
+        score = planner.estimate_complexity("Refactor the authentication system to use OAuth2")
 
         # Should be high complexity
         assert score.score >= 6
@@ -598,9 +580,7 @@ class TestPlanValidation:
         """Test detecting missing dependencies."""
         # Create task with non-existent dependency
         graph = TaskGraph()
-        graph.add_node(
-            Task(id="task_1", description="Task 1", depends_on=["nonexistent"])
-        )
+        graph.add_node(Task(id="task_1", description="Task 1", depends_on=["nonexistent"]))
 
         result = planner.validate_plan(graph)
 
@@ -910,15 +890,9 @@ class TestEdgeCases:
     async def test_suggest_next_tasks_priority_ordering(self, planner):
         """Test that higher complexity tasks are suggested first."""
         graph = TaskGraph()
-        graph.add_node(
-            Task(id="simple", description="Simple", estimated_complexity=2)
-        )
-        graph.add_node(
-            Task(id="complex", description="Complex", estimated_complexity=9)
-        )
-        graph.add_node(
-            Task(id="medium", description="Medium", estimated_complexity=5)
-        )
+        graph.add_node(Task(id="simple", description="Simple", estimated_complexity=2))
+        graph.add_node(Task(id="complex", description="Complex", estimated_complexity=9))
+        graph.add_node(Task(id="medium", description="Medium", estimated_complexity=5))
 
         tasks = await planner.suggest_next_tasks(graph)
 
@@ -974,9 +948,7 @@ class TestEdgeCases:
 
     def test_estimate_complexity_keyword_combinations(self, planner):
         """Test complexity with multiple keyword types."""
-        score = planner.estimate_complexity(
-            "Refactor system to show what needs design"
-        )
+        score = planner.estimate_complexity("Refactor system to show what needs design")
 
         # Should have both positive and negative adjustments
         factors_str = " ".join(score.factors)
@@ -987,10 +959,7 @@ class TestEdgeCases:
 
     def test_estimate_complexity_large_file_count(self, planner):
         """Test complexity adjustment for many files."""
-        score = planner.estimate_complexity(
-            "Implement feature",
-            context={"file_count": 100}
-        )
+        score = planner.estimate_complexity("Implement feature", context={"file_count": 100})
 
         # Should cap file count adjustment
         assert any("files" in factor.lower() for factor in score.factors)
@@ -998,21 +967,18 @@ class TestEdgeCases:
 
     def test_estimate_complexity_large_codebase(self, planner):
         """Test complexity adjustment for large codebase."""
-        score = planner.estimate_complexity(
-            "Implement feature",
-            context={"lines_of_code": 50000}
-        )
+        score = planner.estimate_complexity("Implement feature", context={"lines_of_code": 50000})
 
         # Should cap LOC adjustment
-        assert any("loc" in factor.lower() or "codebase" in factor.lower()
-                   for factor in score.factors)
+        assert any(
+            "loc" in factor.lower() or "codebase" in factor.lower() for factor in score.factors
+        )
         assert score.score > 5
 
     def test_estimate_complexity_multiple_domains(self, planner):
         """Test complexity adjustment for multiple domains."""
         score = planner.estimate_complexity(
-            "Implement feature",
-            context={"domains": ["coding", "devops", "testing"]}
+            "Implement feature", context={"domains": ["coding", "devops", "testing"]}
         )
 
         # Multiple domains should increase complexity
@@ -1052,9 +1018,7 @@ class TestEdgeCases:
     def test_validate_plan_multiple_missing_deps(self, planner):
         """Test detecting multiple missing dependencies."""
         graph = TaskGraph()
-        graph.add_node(
-            Task(id="task_1", description="Task 1", depends_on=["missing1", "missing2"])
-        )
+        graph.add_node(Task(id="task_1", description="Task 1", depends_on=["missing1", "missing2"]))
 
         result = planner.validate_plan(graph)
 
@@ -1086,8 +1050,7 @@ class TestEdgeCases:
 
         # Should emit failure event
         failure_calls = [
-            call for call in mock_event_bus.publish.call_args_list
-            if "failed" in str(call).lower()
+            call for call in mock_event_bus.publish.call_args_list if "failed" in str(call).lower()
         ]
         assert len(failure_calls) > 0
 
@@ -1106,7 +1069,8 @@ class TestEdgeCases:
 
         # Check for cache hit event
         cache_hit_calls = [
-            call for call in mock_event_bus.publish.call_args_list
+            call
+            for call in mock_event_bus.publish.call_args_list
             if "cache_hit" in str(call).lower()
         ]
         assert len(cache_hit_calls) == 1
@@ -1195,10 +1159,9 @@ class TestEdgeCases:
 
     def test_estimate_complexity_all_keywords(self, planner):
         """Test complexity with all complex keywords."""
-        task = " ".join([
-            "refactor", "migrate", "restructure", "architecture",
-            "implement", "design", "system"
-        ])
+        task = " ".join(
+            ["refactor", "migrate", "restructure", "architecture", "implement", "design", "system"]
+        )
 
         score = planner.estimate_complexity(task)
 
@@ -1223,7 +1186,7 @@ class TestEdgeCases:
         context = {
             "file_count": 1000,
             "lines_of_code": 1000000,
-            "domains": ["a", "b", "c", "d", "e"]
+            "domains": ["a", "b", "c", "d", "e"],
         }
 
         score = planner.estimate_complexity(task, context)

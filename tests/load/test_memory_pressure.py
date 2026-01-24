@@ -97,8 +97,8 @@ class TestMemoryPressure:
         final_memory = get_memory_usage()
         total_growth = final_memory - initial_memory
 
-        print(f"\nMemory Growth - Single Session:")
-        print(f"  Messages: 100")
+        print("\nMemory Growth - Single Session:")
+        print("  Messages: 100")
         print(f"  Initial Memory: {initial_memory:.2f}MB")
         print(f"  Final Memory: {final_memory:.2f}MB")
         print(f"  Total Growth: {total_growth:.2f}MB")
@@ -137,7 +137,7 @@ class TestMemoryPressure:
         final_memory = get_memory_usage()
         total_growth = final_memory - initial_memory
 
-        print(f"\nMemory Growth - Multiple Sessions:")
+        print("\nMemory Growth - Multiple Sessions:")
         print(f"  Sessions: {num_sessions}")
         print(f"  Messages per Session: {messages_per_session}")
         print(f"  Initial Memory: {initial_memory:.2f}MB")
@@ -183,7 +183,7 @@ class TestMemoryPressure:
             growth = memory_samples[-1] - memory_samples[0]
             growth_per_request = growth / (num_iterations * requests_per_iteration)
 
-            print(f"\nMemory Leak Detection Test:")
+            print("\nMemory Leak Detection Test:")
             print(f"  Total Requests: {num_iterations * requests_per_iteration}")
             print(f"  Initial Memory: {memory_samples[0]:.2f}MB")
             print(f"  Final Memory: {memory_samples[-1]:.2f}MB")
@@ -200,7 +200,9 @@ class TestMemoryPressure:
                 pytest.fail(f"Potential memory leak detected: {growth:.2f}MB growth")
 
             # Growth per request should be minimal
-            assert growth_per_request < 0.1, f"Memory leak detected: {growth_per_request:.4f}MB per request"
+            assert (
+                growth_per_request < 0.1
+            ), f"Memory leak detected: {growth_per_request:.4f}MB per request"
 
     @mark.slow
     async def test_large_context_memory(self):
@@ -240,7 +242,7 @@ class TestMemoryPressure:
         total_growth = final_memory - initial_memory
         growth_per_turn = total_growth / num_turns
 
-        print(f"\nLarge Context Memory Test:")
+        print("\nLarge Context Memory Test:")
         print(f"  Conversation Turns: {num_turns}")
         print(f"  Initial Memory: {initial_memory:.2f}MB")
         print(f"  Final Memory: {final_memory:.2f}MB")
@@ -248,7 +250,9 @@ class TestMemoryPressure:
         print(f"  Growth per Turn: {growth_per_turn:.4f}MB")
 
         # Each turn should add minimal memory
-        assert growth_per_turn < 0.5, f"Context memory growth too high: {growth_per_turn:.4f}MB/turn"
+        assert (
+            growth_per_turn < 0.5
+        ), f"Context memory growth too high: {growth_per_turn:.4f}MB/turn"
 
     @mark.slow
     async def test_memory_under_load(self):
@@ -308,7 +312,7 @@ class TestMemoryPressure:
             memory_variance = max(memory_samples) - min(memory_samples)
             avg_latency = statistics.mean(latencies)
 
-            print(f"\nMemory Under Load Test:")
+            print("\nMemory Under Load Test:")
             print(f"  Total Requests: {num_requests}")
             print(f"  Memory Samples: {len(memory_samples)}")
             print(f"  Min Memory: {min(memory_samples):.2f}MB")
@@ -365,7 +369,7 @@ class TestMemoryPressure:
         final_memory = get_memory_usage()
         total_growth = final_memory - initial_memory
 
-        print(f"\nMemory Cleanup Test:")
+        print("\nMemory Cleanup Test:")
         print(f"  Sessions: {num_sessions}")
         print(f"  Initial Memory: {initial_memory:.2f}MB")
         print(f"  Final Memory: {final_memory:.2f}MB")
@@ -413,7 +417,7 @@ class TestMemoryPressure:
         final_memory = get_memory_usage()
         total_growth = final_memory - initial_memory
 
-        print(f"\nTool Execution Memory Test:")
+        print("\nTool Execution Memory Test:")
         print(f"  Tool Executions: {len(tool_requests) * 10}")
         print(f"  Initial Memory: {initial_memory:.2f}MB")
         print(f"  Final Memory: {final_memory:.2f}MB")

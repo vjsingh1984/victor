@@ -255,6 +255,7 @@ class TestIntegrationSmokeTests:
     def test_orchestrator_class_exists(self):
         """Test AgentOrchestrator class can be imported."""
         from victor.agent.orchestrator import AgentOrchestrator
+
         assert AgentOrchestrator is not None
 
     def test_tool_registry_accessible(self):
@@ -362,6 +363,7 @@ class TestSecuritySmokeTests:
     def test_action_authorization_exists(self):
         """Test action authorization framework exists."""
         from victor.config.settings import Settings
+
         # Settings controls action authorization via tool_call_budget
         settings = Settings()
         assert hasattr(settings, "tool_call_budget")
@@ -383,6 +385,7 @@ class TestSecuritySmokeTests:
     def test_file_access_controls(self):
         """Test file access controls exist."""
         from victor.tools.base import ToolRegistry
+
         # File tools should be registered in the tool registry
         registry = ToolRegistry()
         assert registry is not None
@@ -586,26 +589,31 @@ class TestSmokeTestSummary:
 
         # 4. Tool system works
         from victor.tools.base import ToolRegistry
+
         registry = ToolRegistry()
         assert registry is not None
 
         # 5. Verticals load
         from victor.coding import CodingAssistant
+
         config = CodingAssistant.get_config()
         assert config is not None
 
         # 6. Team coordination works
         from victor.teams import create_coordinator
+
         coordinator = create_coordinator(lightweight=True)
         assert coordinator is not None
 
         # 7. Error handling exists
         from victor.providers.circuit_breaker import CircuitBreaker
+
         breaker = CircuitBreaker(failure_threshold=5, name="test")
         assert breaker is not None
 
         # 8. Observability exists
         from victor.agent.usage_analytics import UsageAnalytics
+
         analytics = UsageAnalytics.get_instance()
         assert analytics is not None
 

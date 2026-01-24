@@ -34,7 +34,9 @@ class TestProtocolTypeChecking:
             )
 
             # mypy should pass (exit code 0) or have only non-error warnings
-            assert result.returncode == 0, f"mypy failed for {file_path}:\n{result.stdout}\n{result.stderr}"
+            assert (
+                result.returncode == 0
+            ), f"mypy failed for {file_path}:\n{result.stdout}\n{result.stderr}"
 
     def test_protocol_imports_are_typed(self):
         """Protocol imports should be properly typed."""
@@ -80,7 +82,9 @@ class TestProtocolTypeChecking:
         )
 
         # Should pass type checking
-        assert result.returncode == 0, f"mypy failed for test file:\n{result.stdout}\n{result.stderr}"
+        assert (
+            result.returncode == 0
+        ), f"mypy failed for test file:\n{result.stdout}\n{result.stderr}"
 
 
 class TestProtocolTypeSafetyExamples:

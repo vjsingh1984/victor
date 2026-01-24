@@ -297,8 +297,7 @@ class ToolCallCoordinator(IToolCallCoordinator):
 
                 if attempt < self._config.max_retries - 1:
                     delay = min(
-                        self._config.retry_delay
-                        * (self._config.retry_backoff_multiplier**attempt),
+                        self._config.retry_delay * (self._config.retry_backoff_multiplier**attempt),
                         self._config.retry_delay * 10,
                     )
                     logger.warning(

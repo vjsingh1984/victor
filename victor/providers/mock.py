@@ -219,12 +219,14 @@ class MockProvider(BaseProvider):
             await asyncio.sleep(self._simulate_latency)
 
         for i, word in enumerate(words):
-            is_final = (i == len(words) - 1)
+            is_final = i == len(words) - 1
             yield StreamChunk(
                 content=word + " ",
                 is_final=is_final,
                 stop_reason="stop" if is_final else None,
-                usage=None if not is_final else {"prompt_tokens": 10, "completion_tokens": len(words)},
+                usage=(
+                    None if not is_final else {"prompt_tokens": 10, "completion_tokens": len(words)}
+                ),
             )
 
             # Small delay between chunks
@@ -265,9 +267,7 @@ class MockProvider(BaseProvider):
         """
         self._responses.append(response)
 
-    def configure_error(
-        self, error: Exception, after_calls: int = 0
-    ) -> None:
+    def configure_error(self, error: Exception, after_calls: int = 0) -> None:
         """Configure the provider to raise an error.
 
         Args:

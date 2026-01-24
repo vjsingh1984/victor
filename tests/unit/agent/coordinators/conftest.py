@@ -106,10 +106,12 @@ def create_mock_stage_transition_engine(
 
     engine.can_transition = Mock(return_value=True)
     engine.transition_to = Mock(return_value=True)
-    engine.get_valid_transitions = Mock(return_value=[
-        ConversationStage.PLANNING,
-        ConversationStage.READING,
-    ])
+    engine.get_valid_transitions = Mock(
+        return_value=[
+            ConversationStage.PLANNING,
+            ConversationStage.READING,
+        ]
+    )
     engine.get_tool_priority_multiplier = Mock(return_value=1.0)
     engine.register_callback = Mock()
     engine.unregister_callback = Mock()
@@ -142,10 +144,13 @@ def create_base_mock_orchestrator(supports_tools: bool = True) -> Mock:
             content="Response content", role="assistant", tool_calls=None
         )
     )
+
     # Set up default async stream generator
     async def default_stream(*args, **kwargs):
         from victor.providers.base import StreamChunk
+
         yield StreamChunk(content="Response content", is_final=True)
+
     # Use a property to return the generator function directly
     orch.provider.stream = default_stream
 
@@ -174,11 +179,7 @@ def create_base_mock_orchestrator(supports_tools: bool = True) -> Mock:
     mock_intent = SimpleNamespace()
     mock_intent.name = "unknown"
     orch.intent_classifier.classify_intent_sync = Mock(
-        return_value=SimpleNamespace(
-            intent=mock_intent,
-            confidence=0.5,
-            top_matches=[]
-        )
+        return_value=SimpleNamespace(intent=mock_intent, confidence=0.5, top_matches=[])
     )
 
     # Settings
@@ -209,9 +210,7 @@ def create_base_mock_orchestrator(supports_tools: bool = True) -> Mock:
     orch.response_completer.ensure_response = AsyncMock(
         return_value=Mock(content="Fallback response")
     )
-    orch.response_completer.format_tool_failure_message = Mock(
-        return_value="Tool failed message"
-    )
+    orch.response_completer.format_tool_failure_message = Mock(return_value="Tool failed message")
 
     # Token usage
     orch._cumulative_token_usage = {
@@ -228,6 +227,7 @@ def create_base_mock_orchestrator(supports_tools: bool = True) -> Mock:
     orch._metrics_collector = Mock()
     # Create a proper StreamMetrics object for init_stream_metrics
     from victor.providers.stream_adapter import StreamMetrics
+
     orch._metrics_collector.init_stream_metrics = Mock(return_value=StreamMetrics(start_time=0.0))
     orch._metrics_collector.record_first_token = Mock()
 
@@ -263,7 +263,9 @@ def create_base_mock_orchestrator(supports_tools: bool = True) -> Mock:
     orch.reminder_manager = Mock()
     orch.reminder_manager.reset = Mock()
     orch.reminder_manager.update_state = Mock()
-    orch.reminder_manager.get_consolidated_reminder = Mock(return_value=None)  # No reminder by default
+    orch.reminder_manager.get_consolidated_reminder = Mock(
+        return_value=None
+    )  # No reminder by default
 
     # Message adder
     orch.add_message = Mock()
@@ -336,12 +338,20 @@ def create_base_mock_orchestrator(supports_tools: bool = True) -> Mock:
         side_effect=lambda c, is_final=False: StreamChunk(content=c, is_final=is_final)
     )
     # Don't generate extra chunks by default - return empty chunks
-    orch._chunk_generator.generate_metrics_chunk = Mock(return_value=StreamChunk(content="", is_final=False))
-    orch._chunk_generator.generate_final_marker_chunk = Mock(return_value=StreamChunk(content="", is_final=False))
+    orch._chunk_generator.generate_metrics_chunk = Mock(
+        return_value=StreamChunk(content="", is_final=False)
+    )
+    orch._chunk_generator.generate_final_marker_chunk = Mock(
+        return_value=StreamChunk(content="", is_final=False)
+    )
     # Tool execution chunks
-    orch._chunk_generator.generate_tool_start_chunk = Mock(return_value=StreamChunk(content="", is_final=False))
+    orch._chunk_generator.generate_tool_start_chunk = Mock(
+        return_value=StreamChunk(content="", is_final=False)
+    )
     orch._chunk_generator.generate_tool_result_chunks = Mock(return_value=[])
-    orch._chunk_generator.generate_thinking_status_chunk = Mock(return_value=StreamChunk(content="", is_final=False))
+    orch._chunk_generator.generate_thinking_status_chunk = Mock(
+        return_value=StreamChunk(content="", is_final=False)
+    )
 
     # Streaming handler
     orch._streaming_handler = Mock()
@@ -353,13 +363,17 @@ def create_base_mock_orchestrator(supports_tools: bool = True) -> Mock:
     orch._recovery_coordinator.check_force_action = Mock(return_value=(False, None))
     orch._recovery_coordinator.check_tool_budget = Mock(return_value=None)  # No budget warning
     # truncate_tool_calls: return (tool_calls, num_truncated) - pass through tool_calls unchanged
-    orch._recovery_coordinator.truncate_tool_calls = Mock(side_effect=lambda ctx, calls, remaining: (calls, 0))
-    # filter_blocked_tool_calls: return (filtered_calls, blocked_chunks, blocked_count) - pass through unchanged
-    orch._recovery_coordinator.filter_blocked_tool_calls = Mock(side_effect=lambda ctx, calls: (calls, [], 0))
-    orch._recovery_coordinator.check_blocked_threshold = Mock(return_value=None)  # No blocked threshold issue
-    orch._recovery_coordinator.get_recovery_fallback_message = Mock(
-        return_value="Fallback message"
+    orch._recovery_coordinator.truncate_tool_calls = Mock(
+        side_effect=lambda ctx, calls, remaining: (calls, 0)
     )
+    # filter_blocked_tool_calls: return (filtered_calls, blocked_chunks, blocked_count) - pass through unchanged
+    orch._recovery_coordinator.filter_blocked_tool_calls = Mock(
+        side_effect=lambda ctx, calls: (calls, [], 0)
+    )
+    orch._recovery_coordinator.check_blocked_threshold = Mock(
+        return_value=None
+    )  # No blocked threshold issue
+    orch._recovery_coordinator.get_recovery_fallback_message = Mock(return_value="Fallback message")
 
     # Budget exhausted handler - async generator that yields nothing
     async def handle_budget_exhausted(*args, **kwargs):
@@ -367,6 +381,7 @@ def create_base_mock_orchestrator(supports_tools: bool = True) -> Mock:
         if False:
             yield  # This makes it an async generator but never executes
         return
+
     orch._handle_budget_exhausted = handle_budget_exhausted
 
     # Check progress handler
@@ -392,6 +407,7 @@ def create_base_mock_orchestrator(supports_tools: bool = True) -> Mock:
         if False:
             yield  # This makes it an async generator but never executes
         return
+
     orch._handle_force_final_response = handle_force_final_response
 
     # Task completion detector

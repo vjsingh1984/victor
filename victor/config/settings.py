@@ -676,44 +676,29 @@ class Settings(BaseSettings):
 
     enable_provider_pool: bool = Field(
         default=False,
-        description="Enable provider pool for load balancing across multiple provider instances"
+        description="Enable provider pool for load balancing across multiple provider instances",
     )
     pool_size: int = Field(
-        default=3,
-        ge=1,
-        le=10,
-        description="Maximum number of provider instances in the pool"
+        default=3, ge=1, le=10, description="Maximum number of provider instances in the pool"
     )
     pool_load_balancer: str = Field(
         default="adaptive",
-        description="Load balancing strategy: round_robin, least_connections, adaptive, random"
+        description="Load balancing strategy: round_robin, least_connections, adaptive, random",
     )
     pool_enable_warmup: bool = Field(
-        default=True,
-        description="Warm up provider connections to reduce first-request latency"
+        default=True, description="Warm up provider connections to reduce first-request latency"
     )
     pool_warmup_concurrency: int = Field(
-        default=3,
-        ge=1,
-        le=10,
-        description="Number of concurrent warmup requests"
+        default=3, ge=1, le=10, description="Number of concurrent warmup requests"
     )
     pool_health_check_interval: int = Field(
-        default=30,
-        ge=5,
-        le=300,
-        description="Health check interval in seconds"
+        default=30, ge=5, le=300, description="Health check interval in seconds"
     )
     pool_max_retries: int = Field(
-        default=3,
-        ge=1,
-        le=10,
-        description="Maximum retry attempts across providers"
+        default=3, ge=1, le=10, description="Maximum retry attempts across providers"
     )
     pool_min_instances: int = Field(
-        default=1,
-        ge=1,
-        description="Minimum number of healthy instances required"
+        default=1, ge=1, description="Minimum number of healthy instances required"
     )
 
     @field_validator("pool_load_balancer")

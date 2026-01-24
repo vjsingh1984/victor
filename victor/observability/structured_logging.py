@@ -192,8 +192,11 @@ class PerformanceLogger:
             with perf_logger.track_operation("database_query", {"table": "users"}):
                 result = db.query("SELECT * FROM users")
         """
+
         class OperationTimer:
-            def __init__(self, perf_logger: PerformanceLogger, name: str, meta: Optional[Dict[str, Any]]):
+            def __init__(
+                self, perf_logger: PerformanceLogger, name: str, meta: Optional[Dict[str, Any]]
+            ):
                 self.perf_logger = perf_logger
                 self.name = name
                 self.meta = meta or {}

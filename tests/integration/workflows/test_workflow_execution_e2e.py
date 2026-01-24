@@ -35,9 +35,9 @@ workflows:
         # Define handler
         handlers = {
             "identity": lambda inputs: inputs,
-            "double_value": lambda inputs: {"data": inputs["data"] * 2}
+            "double_value": lambda inputs: {"data": inputs["data"] * 2},
         }
-        
+
         compiler = UnifiedWorkflowCompiler()
         compiled = compiler.compile_yaml_content(yaml_content, "linear_test", handlers=handlers)
         # Note: Actual execution would require orchestrator
@@ -73,9 +73,9 @@ workflows:
 """
         handlers = {
             "identity": lambda inputs: inputs,
-            "combine_results": lambda inputs: f"{inputs['a']}-{inputs['b']}"
+            "combine_results": lambda inputs: f"{inputs['a']}-{inputs['b']}",
         }
-        
+
         compiler = UnifiedWorkflowCompiler()
         compiled = compiler.compile_yaml_content(yaml_content, "parallel_test", handlers=handlers)
         assert compiled is not None
@@ -105,16 +105,16 @@ workflows:
         inputs:
           status: "improving"
 """
+
         def check_score(inputs):
             return "high_quality" if inputs["score"] >= 70 else "low_quality"
-        
-        handlers = {
-            "identity": lambda inputs: inputs,
-            "check_score": check_score
-        }
-        
+
+        handlers = {"identity": lambda inputs: inputs, "check_score": check_score}
+
         compiler = UnifiedWorkflowCompiler()
-        compiled = compiler.compile_yaml_content(yaml_content, "conditional_test", handlers=handlers)
+        compiled = compiler.compile_yaml_content(
+            yaml_content, "conditional_test", handlers=handlers
+        )
         assert compiled is not None
 
 
@@ -154,7 +154,7 @@ workflows:
         compiler = UnifiedWorkflowCompiler()
         compiled_v1 = compiler.compile_yaml_content(yaml_content_v1, "cached")
         compiled_v2 = compiler.compile_yaml_content(yaml_content_v2, "cached")
-        
+
         assert compiled_v1 is not None
         assert compiled_v2 is not None
         # Different workflows should compile independently
@@ -178,14 +178,12 @@ workflows:
         type: transform
         handler: identity
 """
+
         def failing_handler(inputs):
             raise ValueError("Handler failed!")
-        
-        handlers = {
-            "failing_handler": failing_handler,
-            "identity": lambda inputs: inputs
-        }
-        
+
+        handlers = {"failing_handler": failing_handler, "identity": lambda inputs: inputs}
+
         compiler = UnifiedWorkflowCompiler()
         compiled = compiler.compile_yaml_content(yaml_content, "error_test", handlers=handlers)
         # Compilation should succeed, execution would fail

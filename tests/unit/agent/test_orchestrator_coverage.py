@@ -47,6 +47,7 @@ class TestOrchestratorImports:
             AgentOrchestrator,
             OrchestratorFactory,
         )
+
         assert AgentOrchestrator is not None
         assert OrchestratorFactory is not None
 
@@ -58,6 +59,7 @@ class TestOrchestratorImports:
                 ToolExecutorProtocol,
                 ConversationControllerProtocol,
             )
+
             assert ToolExecutorProtocol is not None
             assert ConversationControllerProtocol is not None
         except ImportError:
@@ -68,6 +70,7 @@ class TestOrchestratorImports:
         """Test that coordinator classes are importable."""
         from victor.agent.coordinators.state_coordinator import StateCoordinator
         from victor.agent.coordinators.prompt_coordinator import PromptCoordinator
+
         assert StateCoordinator is not None
         assert PromptCoordinator is not None
 
@@ -81,6 +84,7 @@ class TestOrchestratorComponents:
             ConversationController,
             ConversationConfig,
         )
+
         assert ConversationController is not None
         assert ConversationConfig is not None
 
@@ -90,12 +94,14 @@ class TestOrchestratorComponents:
             ToolPipeline,
             ToolPipelineConfig,
         )
+
         assert ToolPipeline is not None
         assert ToolPipelineConfig is not None
 
     def test_state_coordinator_importable(self):
         """Test StateCoordinator can be imported."""
         from victor.agent.coordinators.state_coordinator import StateCoordinator
+
         assert StateCoordinator is not None
 
 
@@ -105,6 +111,7 @@ class TestOrchestratorConfiguration:
     def test_settings_importable(self):
         """Test Settings class is importable."""
         from victor.config.settings import Settings
+
         assert Settings is not None
 
     def test_settings_has_default_values(self):
@@ -125,6 +132,7 @@ class TestOrchestratorStateManagement:
             ConversationStage,
             ConversationStateMachine,
         )
+
         assert ConversationStage is not None
         assert ConversationStateMachine is not None
 
@@ -147,16 +155,19 @@ class TestOrchestratorIntegration:
     def test_provider_manager_importable(self):
         """Test ProviderManager can be imported."""
         from victor.agent.provider_manager import ProviderManager
+
         assert ProviderManager is not None
 
     def test_tool_registry_importable(self):
         """Test tool registry components are importable."""
         from victor.agent.tool_registrar import ToolRegistrar
+
         assert ToolRegistrar is not None
 
     def test_message_history_importable(self):
         """Test MessageHistory can be imported."""
         from victor.agent.message_history import MessageHistory
+
         assert MessageHistory is not None
 
 

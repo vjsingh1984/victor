@@ -146,8 +146,7 @@ class ToolPackRegistry:
         if name not in self._packs:
             available = ", ".join(self._packs.keys())
             raise ValueError(
-                f"ToolPack '{name}' not found. "
-                f"Available: {available if available else 'none'}"
+                f"ToolPack '{name}' not found. " f"Available: {available if available else 'none'}"
             )
 
         tools: List[str] = []  # Use list to preserve order

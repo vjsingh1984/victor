@@ -174,15 +174,11 @@ class StageTransitionEngine(StageTransitionProtocol):
         """
         self._current_stage = initial_stage
         self._cooldown_seconds = (
-            cooldown_seconds
-            if cooldown_seconds is not None
-            else self.DEFAULT_COOLDOWN_SECONDS
+            cooldown_seconds if cooldown_seconds is not None else self.DEFAULT_COOLDOWN_SECONDS
         )
         self._event_bus = event_bus
         self._last_transition_time: float = 0.0
-        self._callbacks: List[
-            Callable[[ConversationStage, ConversationStage], None]
-        ] = []
+        self._callbacks: List[Callable[[ConversationStage, ConversationStage], None]] = []
         self._transition_history: List[Dict[str, Any]] = []
         self._transition_count: int = 0
 

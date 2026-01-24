@@ -466,7 +466,10 @@ class TestSynthesis:
             if line.strip().startswith(("1.", "2.", "3.", "4.")):
                 key_points.append(line.strip())
             # Extract sentences with keywords
-            elif any(keyword in line.lower() for keyword in ["machine learning", "applications", "insights"]):
+            elif any(
+                keyword in line.lower()
+                for keyword in ["machine learning", "applications", "insights"]
+            ):
                 key_points.append(line.strip())
 
         # Verify extraction

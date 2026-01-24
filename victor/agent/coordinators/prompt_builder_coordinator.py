@@ -189,7 +189,11 @@ class PromptBuilderCoordinator(IPromptBuilderCoordinator):
                 continue
 
             # Check if line ends thinking section
-            if skip and line.strip() and not any(keyword in line_lower for keyword in thinking_keywords):
+            if (
+                skip
+                and line.strip()
+                and not any(keyword in line_lower for keyword in thinking_keywords)
+            ):
                 skip = False
 
             if not skip:
@@ -238,7 +242,9 @@ class PromptBuilderCoordinator(IPromptBuilderCoordinator):
         hints = "\n\nAvailable Tools:\n"
         # Add tool hints from tool_set
         # This is a simplified version - full implementation would query tool_set
-        hints += "- You have access to various tools for file operations, code analysis, and more.\n"
+        hints += (
+            "- You have access to various tools for file operations, code analysis, and more.\n"
+        )
         hints += "- Use tools when appropriate to accomplish tasks.\n"
         hints += "- Always check if a tool exists before using it.\n"
 

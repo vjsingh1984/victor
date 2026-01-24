@@ -62,7 +62,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="vertical_context property or VerticalContext.set_context()",
         remove_version="0.7.0",
-        reason="Direct setter violates encapsulation - use VerticalContext protocol"
+        reason="Direct setter violates encapsulation - use VerticalContext protocol",
     )
     def set_vertical_context(self, context: "VerticalContext") -> None:
         """Set the vertical context (OrchestratorVerticalProtocol).
@@ -88,7 +88,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="ConfigurationManager.set_tiered_tool_config()",
         remove_version="0.7.0",
-        reason="ConfigurationManager centralizes all tool config management"
+        reason="ConfigurationManager centralizes all tool config management",
     )
     def set_tiered_tool_config(self, config: Any) -> None:
         """Set tiered tool configuration (Phase 1: Gap fix).
@@ -110,7 +110,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="set_project_root() from victor.config.settings",
         remove_version="0.7.0",
-        reason="Project context should be managed globally, not per orchestrator"
+        reason="Project context should be managed globally, not per orchestrator",
     )
     def set_workspace(self, workspace_dir: Path) -> None:
         """Set the workspace directory for task execution.
@@ -142,7 +142,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="VerticalIntegrationAdapter.apply_middleware()",
         remove_version="0.7.0",
-        reason="Middleware management is now centralized in VerticalIntegrationAdapter"
+        reason="Middleware management is now centralized in VerticalIntegrationAdapter",
     )
     def apply_vertical_middleware(self, middleware_list: List[Any]) -> None:
         """Apply middleware from vertical extensions.
@@ -158,7 +158,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="VerticalIntegrationAdapter.apply_safety_patterns()",
         remove_version="0.7.0",
-        reason="Safety pattern management is now centralized"
+        reason="Safety pattern management is now centralized",
     )
     def apply_vertical_safety_patterns(self, patterns: List[Any]) -> None:
         """Apply safety patterns from vertical extensions.
@@ -174,7 +174,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="StateCoordinator or direct property access",
         remove_version="0.7.0",
-        reason="Direct middleware chain access breaks encapsulation"
+        reason="Direct middleware chain access breaks encapsulation",
     )
     def get_middleware_chain(self) -> Optional[Any]:
         """Get the middleware chain for tool execution.
@@ -190,7 +190,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="VerticalIntegrationAdapter for middleware management",
         remove_version="0.7.0",
-        reason="Direct storage access violates DIP principle"
+        reason="Direct storage access violates DIP principle",
     )
     def set_middleware(self, middleware: List[Any]) -> None:
         """Store middleware configuration.
@@ -206,7 +206,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="VerticalIntegrationAdapter for middleware management",
         remove_version="0.7.0",
-        reason="Direct storage access violates DIP principle"
+        reason="Direct storage access violates DIP principle",
     )
     def get_middleware(self) -> List[Any]:
         """Retrieve middleware configuration.
@@ -222,7 +222,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="VerticalIntegrationAdapter for safety pattern management",
         remove_version="0.7.0",
-        reason="Direct storage access violates DIP principle"
+        reason="Direct storage access violates DIP principle",
     )
     def set_safety_patterns(self, patterns: List[Any]) -> None:
         """Store safety patterns.
@@ -238,7 +238,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="VerticalIntegrationAdapter for safety pattern management",
         remove_version="0.7.0",
-        reason="Direct storage access violates DIP principle"
+        reason="Direct storage access violates DIP principle",
     )
     def get_safety_patterns(self) -> List[Any]:
         """Retrieve safety patterns.
@@ -254,7 +254,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="TeamCoordinator.set_team_specs() or TeamCoordinator.get_team_specs()",
         remove_version="0.7.0",
-        reason="Team specification management is now in TeamCoordinator"
+        reason="Team specification management is now in TeamCoordinator",
     )
     def set_team_specs(self, specs: Dict[str, Any]) -> None:
         """Store team specifications.
@@ -274,7 +274,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="TeamCoordinator.get_team_specs()",
         remove_version="0.7.0",
-        reason="Team specification management is now in TeamCoordinator"
+        reason="Team specification management is now in TeamCoordinator",
     )
     def get_team_specs(self) -> Dict[str, Any]:
         """Retrieve team specifications.
@@ -299,7 +299,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="MetricsCoordinator.get_tool_usage_stats()",
         remove_version="0.7.0",
-        reason="All metrics should be accessed through MetricsCoordinator"
+        reason="All metrics should be accessed through MetricsCoordinator",
     )
     def get_tool_usage_stats(self) -> Dict[str, Any]:
         """Get comprehensive tool usage statistics.
@@ -317,7 +317,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="MetricsCoordinator.get_token_usage()",
         remove_version="0.7.0",
-        reason="All metrics should be accessed through MetricsCoordinator"
+        reason="All metrics should be accessed through MetricsCoordinator",
     )
     def get_token_usage(self) -> "TokenUsage":
         """Get cumulative token usage for evaluation tracking.
@@ -333,7 +333,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="MetricsCoordinator.reset_token_usage()",
         remove_version="0.7.0",
-        reason="All metrics should be managed through MetricsCoordinator"
+        reason="All metrics should be managed through MetricsCoordinator",
     )
     def reset_token_usage(self) -> None:
         """Reset cumulative token usage tracking.
@@ -348,7 +348,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="MetricsCoordinator.get_last_stream_metrics()",
         remove_version="0.7.0",
-        reason="All metrics should be accessed through MetricsCoordinator"
+        reason="All metrics should be accessed through MetricsCoordinator",
     )
     def get_last_stream_metrics(self) -> Optional["StreamMetrics"]:
         """Get metrics from the last streaming session.
@@ -364,7 +364,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="MetricsCoordinator.get_streaming_metrics_summary()",
         remove_version="0.7.0",
-        reason="All metrics should be accessed through MetricsCoordinator"
+        reason="All metrics should be accessed through MetricsCoordinator",
     )
     def get_streaming_metrics_summary(self) -> Optional[Dict[str, Any]]:
         """Get comprehensive streaming metrics summary.
@@ -380,7 +380,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="MetricsCoordinator.get_streaming_metrics_history()",
         remove_version="0.7.0",
-        reason="All metrics should be accessed through MetricsCoordinator"
+        reason="All metrics should be accessed through MetricsCoordinator",
     )
     def get_streaming_metrics_history(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent streaming metrics history.
@@ -399,7 +399,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="MetricsCoordinator.get_session_cost_summary()",
         remove_version="0.7.0",
-        reason="All cost tracking should use MetricsCoordinator"
+        reason="All cost tracking should use MetricsCoordinator",
     )
     def get_session_cost_summary(self) -> Dict[str, Any]:
         """Get session cost summary.
@@ -415,7 +415,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="MetricsCoordinator.get_session_cost_formatted()",
         remove_version="0.7.0",
-        reason="All cost tracking should use MetricsCoordinator"
+        reason="All cost tracking should use MetricsCoordinator",
     )
     def get_session_cost_formatted(self) -> str:
         """Get formatted session cost string.
@@ -431,7 +431,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="MetricsCoordinator.export_session_costs()",
         remove_version="0.7.0",
-        reason="All cost tracking should use MetricsCoordinator"
+        reason="All cost tracking should use MetricsCoordinator",
     )
     def export_session_costs(self, path: str, format: str = "json") -> None:
         """Export session costs to file.
@@ -453,7 +453,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="StateCoordinator.get_stage()",
         remove_version="0.7.0",
-        reason="All state access should go through StateCoordinator"
+        reason="All state access should go through StateCoordinator",
     )
     def get_conversation_stage(self) -> "ConversationStage":
         """Get the current conversation stage.
@@ -475,7 +475,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="StateCoordinator.get_stage_tools()",
         remove_version="0.7.0",
-        reason="All state access should go through StateCoordinator"
+        reason="All state access should go through StateCoordinator",
     )
     def get_stage_recommended_tools(self) -> Set[str]:
         """Get tools recommended for the current conversation stage.
@@ -491,7 +491,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="AnalyticsCoordinator.get_optimization_status()",
         remove_version="0.7.0",
-        reason="Optimization status reporting is now in AnalyticsCoordinator"
+        reason="Optimization status reporting is now in AnalyticsCoordinator",
     )
     def get_optimization_status(self) -> Dict[str, Any]:
         """Get comprehensive status of all integrated optimization components.
@@ -518,7 +518,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="StateCoordinator.observed_files property",
         remove_version="0.7.0",
-        reason="All state access should go through StateCoordinator"
+        reason="All state access should go through StateCoordinator",
     )
     def get_observed_files(self) -> Set[str]:
         """Get files observed/read during conversation.
@@ -534,7 +534,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="conversation_state.state.modified_files",
         remove_version="0.7.0",
-        reason="Direct access to conversation state is preferred"
+        reason="Direct access to conversation state is preferred",
     )
     def get_modified_files(self) -> Set[str]:
         """Get files modified during conversation.
@@ -557,7 +557,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="unified_tracker.tool_calls_used or UnifiedTaskTracker",
         remove_version="0.7.0",
-        reason="Tracker access should be through UnifiedTaskTracker protocol"
+        reason="Tracker access should be through UnifiedTaskTracker protocol",
     )
     def get_tool_calls_count(self) -> int:
         """Get total tool calls made (protocol method).
@@ -575,7 +575,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="unified_tracker.tool_budget or UnifiedTaskTracker",
         remove_version="0.7.0",
-        reason="Tracker access should be through UnifiedTaskTracker protocol"
+        reason="Tracker access should be through UnifiedTaskTracker protocol",
     )
     def get_tool_budget(self) -> int:
         """Get tool call budget (protocol method).
@@ -593,7 +593,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="unified_tracker.iteration_count or UnifiedTaskTracker",
         remove_version="0.7.0",
-        reason="Tracker access should be through UnifiedTaskTracker protocol"
+        reason="Tracker access should be through UnifiedTaskTracker protocol",
     )
     def get_iteration_count(self) -> int:
         """Get current agent loop iteration count (protocol method).
@@ -611,7 +611,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="unified_tracker.max_iterations or UnifiedTaskTracker",
         remove_version="0.7.0",
-        reason="Tracker access should be through UnifiedTaskTracker protocol"
+        reason="Tracker access should be through UnifiedTaskTracker protocol",
     )
     def get_max_iterations(self) -> int:
         """Get maximum allowed iterations (protocol method).
@@ -634,7 +634,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="orchestrator.provider_name attribute",
         remove_version="0.7.0",
-        reason="Property is unnecessary - use direct attribute access"
+        reason="Property is unnecessary - use direct attribute access",
     )
     def current_provider(self) -> str:
         """Get current provider name (protocol property).
@@ -650,7 +650,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="orchestrator.model attribute",
         remove_version="0.7.0",
-        reason="Property is unnecessary - use direct attribute access"
+        reason="Property is unnecessary - use direct attribute access",
     )
     def current_model(self) -> str:
         """Get current model name (protocol property).
@@ -666,7 +666,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="ProviderManager.get_info() or provider_name + model attributes",
         remove_version="0.7.0",
-        reason="Provider info should come from ProviderManager"
+        reason="Provider info should come from ProviderManager",
     )
     def get_current_provider_info(self) -> Dict[str, Any]:
         """Get information about the current provider and model.
@@ -694,7 +694,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="tools.list_tools() or ToolRegistryProtocol",
         remove_version="0.7.0",
-        reason="Tool registry access should go through ToolRegistryProtocol"
+        reason="Tool registry access should go through ToolRegistryProtocol",
     )
     def get_available_tools(self) -> Set[str]:
         """Get all registered tool names (protocol method).
@@ -712,7 +712,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="ToolAccessConfigCoordinator.is_tool_enabled()",
         remove_version="0.7.0",
-        reason="Tool access control is now in ToolAccessConfigCoordinator"
+        reason="Tool access control is now in ToolAccessConfigCoordinator",
     )
     def is_tool_enabled(self, tool_name: str) -> bool:
         """Check if a specific tool is enabled (protocol method).
@@ -736,7 +736,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="prompt_builder.build() or SystemPromptBuilder",
         remove_version="0.7.0",
-        reason="Prompt building should use SystemPromptBuilder protocol"
+        reason="Prompt building should use SystemPromptBuilder protocol",
     )
     def get_system_prompt(self) -> str:
         """Get current system prompt (protocol method).
@@ -754,7 +754,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="prompt_builder.set_custom_prompt()",
         remove_version="0.7.0",
-        reason="Prompt customization should use prompt builder methods"
+        reason="Prompt customization should use prompt builder methods",
     )
     def set_system_prompt(self, prompt: str) -> None:
         """Set custom system prompt (protocol method).
@@ -771,7 +771,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="prompt_builder.append_content()",
         remove_version="0.7.0",
-        reason="Prompt customization should use prompt builder methods"
+        reason="Prompt customization should use prompt builder methods",
     )
     def append_to_system_prompt(self, content: str) -> None:
         """Append content to system prompt (protocol method).
@@ -793,7 +793,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="conversation.messages or ConversationStoreProtocol",
         remove_version="0.7.0",
-        reason="Message access should go through ConversationStore protocol"
+        reason="Message access should go through ConversationStore protocol",
     )
     def get_messages(self) -> List[Dict[str, Any]]:
         """Get conversation messages (protocol method).
@@ -809,7 +809,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="len(conversation.messages) or ConversationStoreProtocol",
         remove_version="0.7.0",
-        reason="Message access should go through ConversationStore protocol"
+        reason="Message access should go through ConversationStore protocol",
     )
     def get_message_count(self) -> int:
         """Get message count (protocol method).
@@ -830,7 +830,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="SearchCoordinator.route_search_query()",
         remove_version="0.7.0",
-        reason="Search routing is now in SearchCoordinator"
+        reason="Search routing is now in SearchCoordinator",
     )
     def route_search_query(self, query: str) -> Dict[str, Any]:
         """Route a search query to the optimal search tool using SearchRouter.
@@ -849,7 +849,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="SearchCoordinator.get_recommended_search_tool()",
         remove_version="0.7.0",
-        reason="Search routing is now in SearchCoordinator"
+        reason="Search routing is now in SearchCoordinator",
     )
     def get_recommended_search_tool(self, query: str) -> str:
         """Get the recommended search tool name for a query.
@@ -873,7 +873,7 @@ class LegacyAPIMixin:
         version="0.5.1",
         replacement="ToolSelector.get_health() or dedicated health check protocols",
         remove_version="0.7.0",
-        reason="Health checks should use dedicated health check protocols"
+        reason="Health checks should use dedicated health check protocols",
     )
     def check_tool_selector_health(self) -> Dict[str, Any]:
         """Check health of the tool selector subsystem.
@@ -892,8 +892,7 @@ class LegacyAPIMixin:
         # Check if semantic selector is ready
         if hasattr(self, "_semantic_selector"):
             health["semantic_selector_ready"] = (
-                hasattr(self._semantic_selector, "_is_ready")
-                and self._semantic_selector._is_ready
+                hasattr(self._semantic_selector, "_is_ready") and self._semantic_selector._is_ready
             )
 
         # Check embeddings initialization status

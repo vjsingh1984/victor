@@ -265,9 +265,7 @@ class TestProductionEnvironmentDeployment:
         """Test that production Helm values have valid syntax."""
         import yaml
 
-        values_path = Path(
-            "/Users/vijaysingh/code/codingagent/deployment/helm/values-prod.yaml"
-        )
+        values_path = Path("/Users/vijaysingh/code/codingagent/deployment/helm/values-prod.yaml")
         with open(values_path) as f:
             values = yaml.safe_load(f)
             assert values is not None
@@ -278,9 +276,7 @@ class TestProductionEnvironmentDeployment:
         """Test that resource limits are valid and reasonable."""
         import yaml
 
-        values_path = Path(
-            "/Users/vijaysingh/code/codingagent/deployment/helm/values-prod.yaml"
-        )
+        values_path = Path("/Users/vijaysingh/code/codingagent/deployment/helm/values-prod.yaml")
         with open(values_path) as f:
             values = yaml.safe_load(f)
             resources = values["resources"]
@@ -298,9 +294,7 @@ class TestProductionEnvironmentDeployment:
         """Test that production values configure 6 replicas."""
         import yaml
 
-        values_path = Path(
-            "/Users/vijaysingh/code/codingagent/deployment/helm/values-prod.yaml"
-        )
+        values_path = Path("/Users/vijaysingh/code/codingagent/deployment/helm/values-prod.yaml")
         with open(values_path) as f:
             values = yaml.safe_load(f)
             assert values["replicaCount"] == 6
@@ -309,9 +303,7 @@ class TestProductionEnvironmentDeployment:
         """Test that production has proper affinity rules."""
         import yaml
 
-        values_path = Path(
-            "/Users/vijaysingh/code/codingagent/deployment/helm/values-prod.yaml"
-        )
+        values_path = Path("/Users/vijaysingh/code/codingagent/deployment/helm/values-prod.yaml")
         with open(values_path) as f:
             values = yaml.safe_load(f)
             assert "affinity" in values
@@ -336,9 +328,7 @@ class TestProductionEnvironmentSecurity:
         """Test that TLS is enabled in production values."""
         import yaml
 
-        values_path = Path(
-            "/Users/vijaysingh/code/codingagent/deployment/helm/values-prod.yaml"
-        )
+        values_path = Path("/Users/vijaysingh/code/codingagent/deployment/helm/values-prod.yaml")
         with open(values_path) as f:
             values = yaml.safe_load(f)
             assert values["ingress"]["enabled"] is True
@@ -348,9 +338,7 @@ class TestProductionEnvironmentSecurity:
         """Test that network policies are enabled in production."""
         import yaml
 
-        values_path = Path(
-            "/Users/vijaysingh/code/codingagent/deployment/helm/values-prod.yaml"
-        )
+        values_path = Path("/Users/vijaysingh/code/codingagent/deployment/helm/values-prod.yaml")
         with open(values_path) as f:
             values = yaml.safe_load(f)
             assert values.get("networkPolicy", {}).get("enabled") is True
@@ -407,9 +395,7 @@ class TestProductionEnvironmentMonitoring:
         """Test that full monitoring is enabled in production."""
         import yaml
 
-        values_path = Path(
-            "/Users/vijaysingh/code/codingagent/deployment/helm/values-prod.yaml"
-        )
+        values_path = Path("/Users/vijaysingh/code/codingagent/deployment/helm/values-prod.yaml")
         with open(values_path) as f:
             values = yaml.safe_load(f)
             assert values["monitoring"]["enabled"] is True
@@ -447,9 +433,7 @@ class TestProductionEnvironmentHA:
         """Test that multi-zone affinity is configured."""
         import yaml
 
-        values_path = Path(
-            "/Users/vijaysingh/code/codingagent/deployment/helm/values-prod.yaml"
-        )
+        values_path = Path("/Users/vijaysingh/code/codingagent/deployment/helm/values-prod.yaml")
         with open(values_path) as f:
             values = yaml.safe_load(f)
             # Check for topology spread constraints or zone anti-affinity

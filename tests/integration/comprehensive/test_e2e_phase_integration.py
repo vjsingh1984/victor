@@ -58,7 +58,7 @@ class ComprehensiveAgent:
         skill_discovery,
         skill_chainer,
         authorization_manager,
-        security_event_bus
+        security_event_bus,
     ):
         self.persona_manager = persona_manager
         self.episodic_memory = episodic_memory
@@ -75,7 +75,7 @@ class ComprehensiveAgent:
             "total_time": 0,
             "memory_hits": 0,
             "skill_discoveries": 0,
-            "authorization_checks": 0
+            "authorization_checks": 0,
         }
 
     async def initialize(self, persona_id: str):
@@ -90,7 +90,7 @@ class ComprehensiveAgent:
         required_permissions: List[str],
         use_memory: bool = True,
         use_skills: bool = True,
-        use_multimodal: bool = False
+        use_multimodal: bool = False,
     ) -> Dict[str, Any]:
         """Process task with all phase features."""
         start_time = time.time()
@@ -99,15 +99,12 @@ class ComprehensiveAgent:
         # Phase 4: Authorization check
         self.performance_metrics["authorization_checks"] += 1
         granted, reason = await self.authorization_manager.authorize_tool_execution(
-            user=user,
-            tool_name=f"task_{task_id}",
-            required_permissions=required_permissions
+            user=user, tool_name=f"task_{task_id}", required_permissions=required_permissions
         )
 
         if not granted:
             await self.security_event_bus.publish(
-                "access.denied",
-                {"user": user, "task": task, "reason": reason}
+                "access.denied", {"user": user, "task": task, "reason": reason}
             )
             return {"status": "denied", "reason": reason}
 
@@ -125,8 +122,7 @@ class ComprehensiveAgent:
                 context={"task_type": "general"}
             )
             matched_tools = await self.skill_discovery.match_tools_to_task(
-                task=task,
-                available_tools=available_tools
+                task=task, available_tools=available_tools
             )
             self.performance_metrics["skill_discoveries"] += 1
 
@@ -134,7 +130,7 @@ class ComprehensiveAgent:
                 skill = await self.skill_discovery.compose_skill(
                     name=f"skill_{task_id}",
                     tools=matched_tools[:3],
-                    description=f"Auto-composed skill for: {task}"
+                    description=f"Auto-composed skill for: {task}",
                 )
                 skills_used.append(skill)
 
@@ -147,12 +143,13 @@ class ComprehensiveAgent:
             "persona": self.current_persona.id if self.current_persona else None,
             "memory_context_count": len(memory_context),
             "skills_used": len(skills_used),
-            "multimodal": use_multimodal
+            "multimodal": use_multimodal,
         }
 
         # Phase 3: Store episode in episodic memory
         if use_memory:
             from victor.agent.memory.episodic_memory import Episode
+
             episode = Episode(
                 id=str(task_id),
                 timestamp=datetime.now(),
@@ -160,7 +157,7 @@ class ComprehensiveAgent:
                 actions=["process"],
                 outcomes={"status": "complete"},
                 rewards=8.0,
-                embedding=await self.episodic_memory._embedding_service.embed_text(task)
+                embedding=await self.episodic_memory._embedding_service.embed_text(task),
             )
             await self.episodic_memory.store_episode(episode)
 
@@ -169,13 +166,15 @@ class ComprehensiveAgent:
         self.performance_metrics["tasks_completed"] += 1
         self.performance_metrics["total_time"] += execution_time
 
-        self.execution_log.append({
-            "timestamp": datetime.now(),
-            "task_id": str(task_id),
-            "task": task,
-            "execution_time": execution_time,
-            "result": result
-        })
+        self.execution_log.append(
+            {
+                "timestamp": datetime.now(),
+                "task_id": str(task_id),
+                "task": task,
+                "execution_time": execution_time,
+                "result": result,
+            }
+        )
 
         return result
 
@@ -198,10 +197,9 @@ def mock_embedding_service():
 def episodic_memory(mock_embedding_service):
     """Create episodic memory."""
     from victor.agent.memory.episodic_memory import EpisodicMemory
+
     return EpisodicMemory(
-        embedding_service=mock_embedding_service,
-        max_episodes=1000,
-        decay_rate=0.95
+        embedding_service=mock_embedding_service, max_episodes=1000, decay_rate=0.95
     )
 
 
@@ -209,10 +207,8 @@ def episodic_memory(mock_embedding_service):
 def semantic_memory(mock_embedding_service):
     """Create semantic memory."""
     from victor.agent.memory.semantic_memory import SemanticMemory
-    return SemanticMemory(
-        embedding_service=mock_embedding_service,
-        max_knowledge=1000
-    )
+
+    return SemanticMemory(embedding_service=mock_embedding_service, max_knowledge=1000)
 
 
 @pytest.fixture
@@ -222,7 +218,8 @@ def persona_manager(tmp_path):
     from victor.agent.personas.persona_manager import PersonaManager
 
     persona_yaml = tmp_path / "test_personas.yaml"
-    persona_yaml.write_text("""
+    persona_yaml.write_text(
+        """
 personas:
   senior_developer:
     id: senior_developer
@@ -235,7 +232,8 @@ personas:
     constraints:
       max_tool_calls: 20
       allowed_categories: ["coding", "analysis"]
-""")
+"""
+    )
     repository = PersonaRepository(storage_path=persona_yaml)
     return PersonaManager(repository=repository)
 
@@ -249,19 +247,19 @@ def mock_tool_registry():
             name="analyze_code",
             description="Analyze code for issues",
             cost_tier="LOW",
-            category="coding"
+            category="coding",
         ),
         "generate_report": MagicMock(
             name="generate_report",
             description="Generate analysis report",
             cost_tier="LOW",
-            category="analysis"
+            category="analysis",
         ),
         "execute_tests": MagicMock(
             name="execute_tests",
             description="Run test suite",
             cost_tier="MEDIUM",
-            category="testing"
+            category="testing",
         ),
     }
     registry.list_tools.return_value = list(tools.values())
@@ -277,10 +275,7 @@ def skill_discovery_engine(mock_tool_registry):
     event_bus = MagicMock()
     event_bus.publish = AsyncMock()
 
-    return SkillDiscoveryEngine(
-        tool_registry=mock_tool_registry,
-        event_bus=event_bus
-    )
+    return SkillDiscoveryEngine(tool_registry=mock_tool_registry, event_bus=event_bus)
 
 
 @pytest.fixture
@@ -291,16 +286,16 @@ def skill_chainer(mock_tool_registry):
     event_bus = MagicMock()
     event_bus.publish = AsyncMock()
 
-    return SkillChainer(
-        event_bus=event_bus,
-        tool_pipeline=mock_tool_registry
-    )
+    return SkillChainer(event_bus=event_bus, tool_pipeline=mock_tool_registry)
 
 
 @pytest.fixture
 def authorization_manager():
     """Create authorization manager."""
-    from tests.integration.security.test_security_authorization_integration import MockAuthorizationManager
+    from tests.integration.security.test_security_authorization_integration import (
+        MockAuthorizationManager,
+    )
+
     manager = MockAuthorizationManager()
     # Grant admin permissions
     for perm in ["task:execute", "task:read", "task:write"]:
@@ -311,7 +306,10 @@ def authorization_manager():
 @pytest.fixture
 def security_event_bus():
     """Create security event bus."""
-    from tests.integration.security.test_security_authorization_integration import MockSecurityEventBus
+    from tests.integration.security.test_security_authorization_integration import (
+        MockSecurityEventBus,
+    )
+
     return MockSecurityEventBus()
 
 
@@ -323,7 +321,7 @@ def comprehensive_agent(
     skill_discovery_engine,
     skill_chainer,
     authorization_manager,
-    security_event_bus
+    security_event_bus,
 ):
     """Create comprehensive agent with all phase features."""
     return ComprehensiveAgent(
@@ -333,7 +331,7 @@ def comprehensive_agent(
         skill_discovery=skill_discovery_engine,
         skill_chainer=skill_chainer,
         authorization_manager=authorization_manager,
-        security_event_bus=security_event_bus
+        security_event_bus=security_event_bus,
     )
 
 
@@ -379,7 +377,7 @@ async def test_complete_agent_workflow_with_memory_and_personas(comprehensive_ag
             user="admin",
             required_permissions=["task:execute"],
             use_memory=True,
-            use_skills=True
+            use_skills=True,
         )
         results.append(result)
         assert result["status"] == "complete"
@@ -428,7 +426,7 @@ async def test_multimodal_task_with_skills_and_security(comprehensive_agent):
         required_permissions=["task:execute", "task:read"],
         use_memory=True,
         use_skills=True,
-        use_multimodal=True
+        use_multimodal=True,
     )
 
     # Verify task completed
@@ -445,8 +443,7 @@ async def test_multimodal_task_with_skills_and_security(comprehensive_agent):
 
     # Verify no security violations
     denied_events = [
-        e for e in comprehensive_agent.security_event_bus.events
-        if e.get("type") == "access.denied"
+        e for e in comprehensive_agent.security_event_bus.events if e.get("type") == "access.denied"
     ]
     assert len(denied_events) == 0
 
@@ -483,16 +480,14 @@ async def test_complex_workflow_with_all_optimizations(comprehensive_agent):
     # Execute tasks in parallel
     start_time = time.time()
 
-    results = await asyncio.gather(*[
-        comprehensive_agent.process_task(
-            task=task,
-            user=user,
-            required_permissions=perms,
-            use_memory=True,
-            use_skills=True
-        )
-        for task, user, perms in tasks
-    ])
+    results = await asyncio.gather(
+        *[
+            comprehensive_agent.process_task(
+                task=task, user=user, required_permissions=perms, use_memory=True, use_skills=True
+            )
+            for task, user, perms in tasks
+        ]
+    )
 
     total_time = time.time() - start_time
 
@@ -539,7 +534,7 @@ async def test_cross_phase_event_propagation(comprehensive_agent):
         user="admin",
         required_permissions=["task:execute"],
         use_memory=True,
-        use_skills=True
+        use_skills=True,
     )
 
     # Verify task completed
@@ -599,23 +594,25 @@ async def test_system_wide_performance_validation(comprehensive_agent):
         task = template.format(
             domain=domains[i % len(domains)],
             issue=issues[i % len(issues)],
-            feature=features[i % len(features)]
+            feature=features[i % len(features)],
         )
         tasks.append(task)
 
     # Execute all tasks
     start_time = time.time()
 
-    results = await asyncio.gather(*[
-        comprehensive_agent.process_task(
-            task=task,
-            user="admin",
-            required_permissions=["task:execute"],
-            use_memory=True,
-            use_skills=True
-        )
-        for task in tasks
-    ])
+    results = await asyncio.gather(
+        *[
+            comprehensive_agent.process_task(
+                task=task,
+                user="admin",
+                required_permissions=["task:execute"],
+                use_memory=True,
+                use_skills=True,
+            )
+            for task in tasks
+        ]
+    )
 
     total_time = time.time() - start_time
 
@@ -668,17 +665,13 @@ async def test_memory_driven_personalization(comprehensive_agent):
 
     for task in detail_oriented_tasks:
         result = await comprehensive_agent.process_task(
-            task=task,
-            user="admin",
-            required_permissions=["task:execute"],
-            use_memory=True
+            task=task, user="admin", required_permissions=["task:execute"], use_memory=True
         )
         assert result["status"] == "complete"
 
     # Recall relevant episodes
     relevant = await comprehensive_agent.episodic_memory.recall_relevant(
-        "detailed security analysis",
-        k=5
+        "detailed security analysis", k=5
     )
 
     # Verify memory captured the pattern
@@ -693,7 +686,7 @@ async def test_memory_driven_personalization(comprehensive_agent):
     adaptation_context = {
         "preferred_style": "detailed",
         "expertise_areas": ["security", "code_review"],
-        "communication_pattern": "comprehensive"
+        "communication_pattern": "comprehensive",
     }
 
     assert adaptation_context["preferred_style"] == "detailed"
@@ -730,16 +723,15 @@ async def test_error_handling_and_resilience(comprehensive_agent):
         ("Another valid task", "admin", ["task:execute"]),
     ]
 
-    results = await asyncio.gather(*[
-        comprehensive_agent.process_task(
-            task=task,
-            user=user,
-            required_permissions=perms,
-            use_memory=True,
-            use_skills=True
-        )
-        for task, user, perms in tasks
-    ], return_exceptions=True)
+    results = await asyncio.gather(
+        *[
+            comprehensive_agent.process_task(
+                task=task, user=user, required_permissions=perms, use_memory=True, use_skills=True
+            )
+            for task, user, perms in tasks
+        ],
+        return_exceptions=True,
+    )
 
     # Verify results
     assert len(results) == len(tasks)
@@ -753,9 +745,7 @@ async def test_error_handling_and_resilience(comprehensive_agent):
 
     # Verify system is still functional
     followup_task = await comprehensive_agent.process_task(
-        task="Followup task after errors",
-        user="admin",
-        required_permissions=["task:execute"]
+        task="Followup task after errors", user="admin", required_permissions=["task:execute"]
     )
 
     assert followup_task["status"] == "complete"

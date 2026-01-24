@@ -126,9 +126,7 @@ class TestTestingEnvironmentFeatures:
 
     def test_testing_overlay_exists(self):
         """Test that testing overlay directory exists."""
-        overlay_path = Path(
-            "/Users/vijaysingh/code/codingagent/deployment/kubernetes/overlays"
-        )
+        overlay_path = Path("/Users/vijaysingh/code/codingagent/deployment/kubernetes/overlays")
         # Note: Testing environment uses development overlay with different namespace
         assert overlay_path.exists()
 
@@ -169,13 +167,15 @@ class TestTestingEnvironmentIntegration:
         cursor = conn.cursor()
 
         # Create table
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS checkpoints (
                 thread_id TEXT PRIMARY KEY,
                 state_data TEXT,
                 timestamp REAL
             )
-        """)
+        """
+        )
         conn.commit()
 
         # Insert test data
@@ -203,9 +203,7 @@ class TestTestingEnvironmentIntegration:
             await backend.connect()
 
             # Publish test event
-            event = MessagingEvent(
-                topic="test.event", data={"test": "data"}, source="test"
-            )
+            event = MessagingEvent(topic="test.event", data={"test": "data"}, source="test")
             await backend.publish(event)
 
             await backend.disconnect()

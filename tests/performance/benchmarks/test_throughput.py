@@ -92,6 +92,7 @@ class TestParallelToolExecution:
 
         Baseline for comparison with parallel execution.
         """
+
         def execute_sequential():
             results = []
             for i in range(10):
@@ -107,11 +108,10 @@ class TestParallelToolExecution:
 
         Expected: 15-25% faster than sequential
         """
+
         def execute_parallel():
             with ThreadPoolExecutor(max_workers=5) as executor:
-                futures = [
-                    executor.submit(mock_tool.execute, arg=i) for i in range(10)
-                ]
+                futures = [executor.submit(mock_tool.execute, arg=i) for i in range(10)]
                 results = [f.result() for f in futures]
             return results
 
@@ -123,13 +123,12 @@ class TestParallelToolExecution:
 
         Expected: 20% improvement over sequential execution
         """
+
         async def mock_tool_fn(**kwargs):
             await asyncio.sleep(0.01)
             return {"result": "success"}
 
-        config = ParallelConfig(
-            resource_limit=ResourceLimit(max_concurrent=5)
-        )
+        config = ParallelConfig(resource_limit=ResourceLimit(max_concurrent=5))
         executor = ParallelExecutor(config=config)
 
         async def execute_parallel_tools():
@@ -143,7 +142,9 @@ class TestParallelToolExecution:
 
             # Mock execute_batch
             with patch.object(
-                executor, "execute_batch", new=AsyncMock(return_value=[{"result": f"success_{i}"} for i in range(10)])
+                executor,
+                "execute_batch",
+                new=AsyncMock(return_value=[{"result": f"success_{i}"} for i in range(10)]),
             ):
                 return await executor.execute_batch(tool_calls)
 
@@ -199,6 +200,7 @@ class TestConcurrentRequests:
 
         Expected: < 100ms
         """
+
         def single_request():
             return mock_tool.execute(arg="test")
 
@@ -210,11 +212,10 @@ class TestConcurrentRequests:
 
         Expected: < 200ms total (linear scaling)
         """
+
         def execute_concurrent():
             with ThreadPoolExecutor(max_workers=5) as executor:
-                futures = [
-                    executor.submit(mock_tool.execute, arg=i) for i in range(5)
-                ]
+                futures = [executor.submit(mock_tool.execute, arg=i) for i in range(5)]
                 results = [f.result() for f in futures]
             return results
 
@@ -226,11 +227,10 @@ class TestConcurrentRequests:
 
         Expected: < 400ms total
         """
+
         def execute_concurrent():
             with ThreadPoolExecutor(max_workers=10) as executor:
-                futures = [
-                    executor.submit(mock_tool.execute, arg=i) for i in range(10)
-                ]
+                futures = [executor.submit(mock_tool.execute, arg=i) for i in range(10)]
                 results = [f.result() for f in futures]
             return results
 
@@ -351,9 +351,10 @@ class TestStateGraphThroughput:
         graph.add_node("branch1", lambda state: {"b1": state.get("b1", 0) + 1})
         graph.add_node("branch2", lambda state: {"b2": state.get("b2", 0) + 1})
         graph.add_node("branch3", lambda state: {"b3": state.get("b3", 0) + 1})
-        graph.add_node("merge", lambda state: {
-            "total": state.get("b1", 0) + state.get("b2", 0) + state.get("b3", 0)
-        })
+        graph.add_node(
+            "merge",
+            lambda state: {"total": state.get("b1", 0) + state.get("b2", 0) + state.get("b3", 0)},
+        )
 
         graph.add_edge(START, "branch1")
         graph.add_edge(START, "branch2")
@@ -389,6 +390,7 @@ class TestMultiAgentThroughput:
 
         Baseline for multi-agent comparison.
         """
+
         def agent_task():
             # Simulate agent work
             result = {"status": "complete", "value": 42}
@@ -402,6 +404,7 @@ class TestMultiAgentThroughput:
 
         Expected: 15% faster than sequential
         """
+
         def agent_task(agent_id: int):
             return {"agent_id": agent_id, "status": "complete"}
 
@@ -419,6 +422,7 @@ class TestMultiAgentThroughput:
 
         Expected: < 10ms per message
         """
+
         def simulate_communication():
             # Simulate message passing between agents
             messages = []
@@ -447,6 +451,7 @@ class TestRequestResponseLatency:
 
         Expected: < 100ms
         """
+
         def execute_tool():
             return mock_tool.execute(arg="test")
 
@@ -458,6 +463,7 @@ class TestRequestResponseLatency:
 
         Expected: < 200ms for 5 tools
         """
+
         def execute_batch():
             results = []
             for i in range(5):
@@ -473,6 +479,7 @@ class TestRequestResponseLatency:
 
         Expected: < 100ms
         """
+
         async def execute_async_tool():
             return await async_mock_tool.execute(arg="test")
 
@@ -593,8 +600,6 @@ class TestPerformanceAssertions:
         elapsed = time.perf_counter() - start
 
         # Should complete in < 100ms
-        assert (
-            elapsed < 0.1
-        ), f"Workflow execution too slow: {elapsed:.3f}s (target: < 100ms)"
+        assert elapsed < 0.1, f"Workflow execution too slow: {elapsed:.3f}s (target: < 100ms)"
 
         assert result is not None

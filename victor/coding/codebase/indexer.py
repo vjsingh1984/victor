@@ -2713,7 +2713,9 @@ class CodebaseIndex:
 
         # Ensure provider is initialized
         if not self.embedding_provider._initialized:
-            await self.embedding_provider.initialize(rebuild_on_corruption=self._rebuild_on_corruption)
+            await self.embedding_provider.initialize(
+                rebuild_on_corruption=self._rebuild_on_corruption
+            )
 
         # Query expansion to improve recall (fix false negatives)
         queries_to_search = [query]

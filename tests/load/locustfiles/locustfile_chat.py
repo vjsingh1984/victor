@@ -50,13 +50,15 @@ class ChatUser(HttpUser):
         self.max_turns = random.randint(5, 15)
 
         # Select conversation topic
-        self.topic = random.choice([
-            "coding_help",
-            "debugging",
-            "code_review",
-            "learning",
-            "explanation",
-        ])
+        self.topic = random.choice(
+            [
+                "coding_help",
+                "debugging",
+                "code_review",
+                "learning",
+                "explanation",
+            ]
+        )
 
     def on_start(self):
         """Start new conversation."""
@@ -67,13 +69,15 @@ class ChatUser(HttpUser):
         self.conversation_history = []
         self.turn_count = 0
         self.max_turns = random.randint(5, 15)
-        self.topic = random.choice([
-            "coding_help",
-            "debugging",
-            "code_review",
-            "learning",
-            "explanation",
-        ])
+        self.topic = random.choice(
+            [
+                "coding_help",
+                "debugging",
+                "code_review",
+                "learning",
+                "explanation",
+            ]
+        )
 
     def get_next_message(self) -> str:
         """Generate next message based on conversation state."""
@@ -182,14 +186,18 @@ class ChatUser(HttpUser):
             if response.status_code == 200:
                 try:
                     # Record response in conversation history
-                    self.conversation_history.append({
-                        "role": "user",
-                        "content": message,
-                    })
-                    self.conversation_history.append({
-                        "role": "assistant",
-                        "content": response.text[:200],  # Truncate for memory
-                    })
+                    self.conversation_history.append(
+                        {
+                            "role": "user",
+                            "content": message,
+                        }
+                    )
+                    self.conversation_history.append(
+                        {
+                            "role": "assistant",
+                            "content": response.text[:200],  # Truncate for memory
+                        }
+                    )
                     response.success()
                 except Exception as e:
                     response.failure(f"Failed to process response: {e}")
@@ -233,10 +241,12 @@ class ChatUser(HttpUser):
             name="/api/v1/chat (with tool)",
         ) as response:
             if response.status_code == 200:
-                self.conversation_history.append({
-                    "role": "user",
-                    "content": message,
-                })
+                self.conversation_history.append(
+                    {
+                        "role": "user",
+                        "content": message,
+                    }
+                )
                 response.success()
             else:
                 response.failure(f"Got status code {response.status_code}")
@@ -299,9 +309,11 @@ def on_test_stop(environment, **kwargs):
         print(f"Failed: {stats.total.num_failures}")
 
         if stats.total.num_requests > 0:
-            print(f"Success Rate: {((stats.total.num_requests - stats.total.num_failures) / stats.total.num_requests * 100):.2f}%")
+            print(
+                f"Success Rate: {((stats.total.num_requests - stats.total.num_failures) / stats.total.num_requests * 100):.2f}%"
+            )
 
-        print(f"\nResponse Times:")
+        print("\nResponse Times:")
         print(f"  Median: {stats.total.median_response_time:.0f}ms")
         print(f"  95th percentile: {stats.total.get_response_time_percentile(0.95):.0f}ms")
         print(f"  99th percentile: {stats.total.get_response_time_percentile(0.99):.0f}ms")

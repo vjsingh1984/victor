@@ -123,9 +123,7 @@ class TestProtocolRegistration:
         MinimalVertical.register_protocol(ToolProvider)
 
         # Verify registration via loader
-        assert ProtocolBasedExtensionLoader.implements_protocol(
-            MinimalVertical, ToolProvider
-        )
+        assert ProtocolBasedExtensionLoader.implements_protocol(MinimalVertical, ToolProvider)
 
         # Verify registration via VerticalBase method
         assert MinimalVertical.implements_protocol(ToolProvider)
@@ -138,9 +136,7 @@ class TestProtocolRegistration:
         MultiProtocolVertical.register_protocol(SafetyProvider)
 
         # Verify all are registered via loader
-        assert ProtocolBasedExtensionLoader.implements_protocol(
-            MultiProtocolVertical, ToolProvider
-        )
+        assert ProtocolBasedExtensionLoader.implements_protocol(MultiProtocolVertical, ToolProvider)
         assert ProtocolBasedExtensionLoader.implements_protocol(
             MultiProtocolVertical, MiddlewareProvider
         )
@@ -172,9 +168,7 @@ class TestProtocolRegistration:
         ]
 
         for protocol in protocols:
-            assert ProtocolBasedExtensionLoader.implements_protocol(
-                ComprehensiveVertical, protocol
-            )
+            assert ProtocolBasedExtensionLoader.implements_protocol(ComprehensiveVertical, protocol)
             assert ComprehensiveVertical.implements_protocol(protocol)
 
     def test_list_implemented_protocols(self):
@@ -194,9 +188,7 @@ class TestProtocolRegistration:
         # (MinimalVertical doesn't implement it)
 
         # Verify it's not implemented
-        assert not ProtocolBasedExtensionLoader.implements_protocol(
-            MinimalVertical, TeamProvider
-        )
+        assert not ProtocolBasedExtensionLoader.implements_protocol(MinimalVertical, TeamProvider)
         assert not MinimalVertical.implements_protocol(TeamProvider)
 
     def test_protocol_registration_persistence(self):
@@ -206,9 +198,7 @@ class TestProtocolRegistration:
 
         # Check multiple times
         for _ in range(3):
-            assert ProtocolBasedExtensionLoader.implements_protocol(
-                MinimalVertical, ToolProvider
-            )
+            assert ProtocolBasedExtensionLoader.implements_protocol(MinimalVertical, ToolProvider)
 
 
 # =============================================================================
@@ -224,7 +214,7 @@ class TestProtocolMethods:
         MinimalVertical.register_protocol(ToolProvider)
 
         # Verify method exists and is callable
-        assert hasattr(MinimalVertical, 'get_tools')
+        assert hasattr(MinimalVertical, "get_tools")
         assert callable(MinimalVertical.get_tools)
 
         # Call the method
@@ -237,7 +227,7 @@ class TestProtocolMethods:
         MultiProtocolVertical.register_protocol(MiddlewareProvider)
 
         # Verify method exists
-        assert hasattr(MultiProtocolVertical, 'get_middleware')
+        assert hasattr(MultiProtocolVertical, "get_middleware")
         assert callable(MultiProtocolVertical.get_middleware)
 
         # Call the method
@@ -249,7 +239,7 @@ class TestProtocolMethods:
         ComprehensiveVertical.register_protocol(PromptContributorProvider)
 
         # Verify method exists
-        assert hasattr(ComprehensiveVertical, 'get_task_type_hints')
+        assert hasattr(ComprehensiveVertical, "get_task_type_hints")
         assert callable(ComprehensiveVertical.get_task_type_hints)
 
         # Call the method
@@ -281,9 +271,7 @@ class TestProtocolFiltering:
         assert MultiProtocolVertical in tool_providers
 
         # Get all MiddlewareProvider implementations
-        middleware_providers = ProtocolBasedExtensionLoader.list_verticals(
-            MiddlewareProvider
-        )
+        middleware_providers = ProtocolBasedExtensionLoader.list_verticals(MiddlewareProvider)
 
         # Verify only MultiProtocolVertical is in the list
         assert MultiProtocolVertical in middleware_providers
@@ -332,6 +320,7 @@ class TestBackwardCompatibility:
 
     def test_vertical_without_protocol_registration(self):
         """Test that verticals without protocol registration still work."""
+
         # Create a vertical without explicit protocol registration
         class LegacyVertical(VerticalBase):
             name = "legacy_test"
@@ -378,14 +367,10 @@ class TestProtocolCaching:
         MinimalVertical.register_protocol(ToolProvider)
 
         # First check - caches the result
-        result1 = ProtocolBasedExtensionLoader.implements_protocol(
-            MinimalVertical, ToolProvider
-        )
+        result1 = ProtocolBasedExtensionLoader.implements_protocol(MinimalVertical, ToolProvider)
 
         # Second check - uses cache
-        result2 = ProtocolBasedExtensionLoader.implements_protocol(
-            MinimalVertical, ToolProvider
-        )
+        result2 = ProtocolBasedExtensionLoader.implements_protocol(MinimalVertical, ToolProvider)
 
         # Should return same result
         assert result1 == result2 == True
@@ -395,9 +380,7 @@ class TestProtocolCaching:
         MinimalVertical.register_protocol(ToolProvider)
 
         # Check and cache
-        assert ProtocolBasedExtensionLoader.implements_protocol(
-            MinimalVertical, ToolProvider
-        )
+        assert ProtocolBasedExtensionLoader.implements_protocol(MinimalVertical, ToolProvider)
 
         # Clear cache
         ProtocolBasedExtensionLoader.clear_cache(
@@ -406,28 +389,20 @@ class TestProtocolCaching:
         )
 
         # Check again after cache clear
-        assert ProtocolBasedExtensionLoader.implements_protocol(
-            MinimalVertical, ToolProvider
-        )
+        assert ProtocolBasedExtensionLoader.implements_protocol(MinimalVertical, ToolProvider)
 
     def test_unregister_protocol(self):
         """Test unregistering a protocol."""
         MinimalVertical.register_protocol(ToolProvider)
 
         # Verify registered
-        assert ProtocolBasedExtensionLoader.implements_protocol(
-            MinimalVertical, ToolProvider
-        )
+        assert ProtocolBasedExtensionLoader.implements_protocol(MinimalVertical, ToolProvider)
 
         # Unregister
-        ProtocolBasedExtensionLoader.unregister_protocol(
-            ToolProvider, MinimalVertical
-        )
+        ProtocolBasedExtensionLoader.unregister_protocol(ToolProvider, MinimalVertical)
 
         # Verify no longer registered
-        assert not ProtocolBasedExtensionLoader.implements_protocol(
-            MinimalVertical, ToolProvider
-        )
+        assert not ProtocolBasedExtensionLoader.implements_protocol(MinimalVertical, ToolProvider)
 
 
 # =============================================================================
@@ -440,6 +415,7 @@ class TestISPIntegration:
 
     def test_real_world_vertical_scenario(self):
         """Test a real-world vertical scenario."""
+
         # Simulate a research-like vertical
         class ResearchLikeVertical(VerticalBase):
             name = "research_like_test"
@@ -485,14 +461,16 @@ class TestISPIntegration:
 
         # Framework code: collect all tool providers
         tool_providers = [
-            v for v in [MinimalVertical, MultiProtocolVertical]
+            v
+            for v in [MinimalVertical, MultiProtocolVertical]
             if v.implements_protocol(ToolProvider)
         ]
         assert len(tool_providers) == 2
 
         # Framework code: collect all middleware providers
         middleware_providers = [
-            v for v in [MinimalVertical, MultiProtocolVertical]
+            v
+            for v in [MinimalVertical, MultiProtocolVertical]
             if v.implements_protocol(MiddlewareProvider)
         ]
         assert len(middleware_providers) == 1

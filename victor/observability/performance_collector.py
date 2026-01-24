@@ -521,18 +521,14 @@ class PerformanceMetricsCollector:
             self._tool_selection_metrics.total_latency_saved_ms = stats["combined"].get(
                 "total_latency_saved_ms", 0.0
             )
-            self._tool_selection_metrics.avg_latency_saved_per_hit_ms = stats[
-                "combined"
-            ].get("avg_latency_per_hit_ms", 0.0)
+            self._tool_selection_metrics.avg_latency_saved_per_hit_ms = stats["combined"].get(
+                "avg_latency_per_hit_ms", 0.0
+            )
 
             # Operations
             self._tool_selection_metrics.total_hits = stats["combined"].get("hits", 0)
-            self._tool_selection_metrics.total_misses = stats["combined"].get(
-                "misses", 0
-            )
-            self._tool_selection_metrics.total_evictions = stats["combined"].get(
-                "evictions", 0
-            )
+            self._tool_selection_metrics.total_misses = stats["combined"].get("misses", 0)
+            self._tool_selection_metrics.total_evictions = stats["combined"].get("evictions", 0)
 
             # Entries
             self._tool_selection_metrics.query_entries = (
@@ -550,9 +546,7 @@ class PerformanceMetricsCollector:
                 if "rl" in stats.get("namespaces", {})
                 else 0
             )
-            self._tool_selection_metrics.total_entries = stats["combined"].get(
-                "total_entries", 0
-            )
+            self._tool_selection_metrics.total_entries = stats["combined"].get("total_entries", 0)
 
             # Utilization
             self._tool_selection_metrics.query_utilization = (
@@ -596,9 +590,7 @@ class PerformanceMetricsCollector:
 
             self._cache_metrics.total_entries = combined.get("total_entries", 0)
             self._cache_metrics.active_entries = combined.get("total_entries", 0)
-            self._cache_metrics.total_lookups = combined.get("hits", 0) + combined.get(
-                "misses", 0
-            )
+            self._cache_metrics.total_lookups = combined.get("hits", 0) + combined.get("misses", 0)
             self._cache_metrics.total_hits = combined.get("hits", 0)
             self._cache_metrics.total_misses = combined.get("misses", 0)
             self._cache_metrics.total_evictions = combined.get("evictions", 0)
@@ -613,11 +605,9 @@ class PerformanceMetricsCollector:
                 )
 
             # Estimate memory (roughly 1KB per entry)
-            self._cache_metrics.memory_usage_bytes = (
-                self._cache_metrics.total_entries * 1024
-            )
-            self._cache_metrics.memory_usage_mb = (
-                self._cache_metrics.memory_usage_bytes / (1024 * 1024)
+            self._cache_metrics.memory_usage_bytes = self._cache_metrics.total_entries * 1024
+            self._cache_metrics.memory_usage_mb = self._cache_metrics.memory_usage_bytes / (
+                1024 * 1024
             )
 
         except Exception as e:
@@ -668,9 +658,7 @@ class PerformanceMetricsCollector:
                     tool_durations.append(avg_time)
 
             self._tool_execution_metrics.total_executions = total_calls
-            self._tool_execution_metrics.successful_executions = (
-                total_calls - failed_calls
-            )
+            self._tool_execution_metrics.successful_executions = total_calls - failed_calls
             self._tool_execution_metrics.failed_executions = failed_calls
 
             # Calculate error rate
@@ -685,17 +673,19 @@ class PerformanceMetricsCollector:
                 self._tool_execution_metrics.p50_duration_ms = sorted(tool_durations)[
                     len(tool_durations) // 2
                 ]
-                self._tool_execution_metrics.p95_duration_ms = sorted(tool_durations)[
-                    int(len(tool_durations) * 0.95)
-                ] if len(tool_durations) > 1 else tool_durations[0]
-                self._tool_execution_metrics.p99_duration_ms = sorted(tool_durations)[
-                    int(len(tool_durations) * 0.99)
-                ] if len(tool_durations) > 1 else tool_durations[0]
+                self._tool_execution_metrics.p95_duration_ms = (
+                    sorted(tool_durations)[int(len(tool_durations) * 0.95)]
+                    if len(tool_durations) > 1
+                    else tool_durations[0]
+                )
+                self._tool_execution_metrics.p99_duration_ms = (
+                    sorted(tool_durations)[int(len(tool_durations) * 0.99)]
+                    if len(tool_durations) > 1
+                    else tool_durations[0]
+                )
 
             # Get top tools
-            self._tool_execution_metrics.top_tools = tool_stats.get(
-                "top_tools_by_usage", []
-            )[:10]
+            self._tool_execution_metrics.top_tools = tool_stats.get("top_tools_by_usage", [])[:10]
 
             # Store per-tool metrics
             self._tool_execution_metrics.tool_metrics = tool_stats.get("tool_stats", {})
@@ -712,12 +702,10 @@ class PerformanceMetricsCollector:
             process = psutil.Process()
             memory_info = process.memory_info()
             self._system_metrics.memory_usage_bytes = memory_info.rss
-            self._system_metrics.memory_usage_mb = (
-                self._system_metrics.memory_usage_bytes / (1024 * 1024)
+            self._system_metrics.memory_usage_mb = self._system_metrics.memory_usage_bytes / (
+                1024 * 1024
             )
-            self._system_metrics.memory_usage_gb = (
-                self._system_metrics.memory_usage_mb / 1024
-            )
+            self._system_metrics.memory_usage_gb = self._system_metrics.memory_usage_mb / 1024
 
             virtual_mem = psutil.virtual_memory()
             self._system_metrics.memory_available_bytes = virtual_mem.available
@@ -832,44 +820,38 @@ class PerformanceMetricsCollector:
         lines = []
 
         # Scrape metadata
-        lines.append(f"# Victor AI Performance Metrics")
+        lines.append("# Victor AI Performance Metrics")
         lines.append(f"victor_performance_scrape_timestamp {time.time():.3f}")
         lines.append("")
 
         # Tool selection metrics
         ts = self._tool_selection_metrics
-        lines.append(f"# HELP victor_cache_hit_rate Cache hit rate by namespace")
-        lines.append(f"# TYPE victor_cache_hit_rate gauge")
+        lines.append("# HELP victor_cache_hit_rate Cache hit rate by namespace")
+        lines.append("# TYPE victor_cache_hit_rate gauge")
         lines.append(f'victor_cache_hit_rate{{namespace="query"}} {ts.query_hit_rate:.4f}')
-        lines.append(
-            f'victor_cache_hit_rate{{namespace="context"}} {ts.context_hit_rate:.4f}'
-        )
+        lines.append(f'victor_cache_hit_rate{{namespace="context"}} {ts.context_hit_rate:.4f}')
         lines.append(f'victor_cache_hit_rate{{namespace="rl"}} {ts.rl_hit_rate:.4f}')
         lines.append(f'victor_cache_hit_rate{{namespace="overall"}} {ts.overall_hit_rate:.4f}')
 
         lines.append("")
-        lines.append(f"# HELP victor_cache_entries Cache entry count by namespace")
-        lines.append(f"# TYPE victor_cache_entries gauge")
+        lines.append("# HELP victor_cache_entries Cache entry count by namespace")
+        lines.append("# TYPE victor_cache_entries gauge")
         lines.append(f'victor_cache_entries{{namespace="query"}} {ts.query_entries}')
         lines.append(f'victor_cache_entries{{namespace="context"}} {ts.context_entries}')
         lines.append(f'victor_cache_entries{{namespace="rl"}} {ts.rl_entries}')
         lines.append(f'victor_cache_entries{{namespace="total"}} {ts.total_entries}')
 
         lines.append("")
-        lines.append(f"# HELP victor_cache_operations_total Cache operations")
-        lines.append(f"# TYPE victor_cache_operations_total counter")
-        lines.append(f"victor_cache_operations_total{{operation=\"hits\"}} {ts.total_hits}")
-        lines.append(f"victor_cache_operations_total{{operation=\"misses\"}} {ts.total_misses}")
-        lines.append(
-            f"victor_cache_operations_total{{operation=\"evictions\"}} {ts.total_evictions}"
-        )
+        lines.append("# HELP victor_cache_operations_total Cache operations")
+        lines.append("# TYPE victor_cache_operations_total counter")
+        lines.append(f'victor_cache_operations_total{{operation="hits"}} {ts.total_hits}')
+        lines.append(f'victor_cache_operations_total{{operation="misses"}} {ts.total_misses}')
+        lines.append(f'victor_cache_operations_total{{operation="evictions"}} {ts.total_evictions}')
 
         lines.append("")
-        lines.append(f"# HELP victor_cache_utilization Cache utilization (0-1)")
-        lines.append(f"# TYPE victor_cache_utilization gauge")
-        lines.append(
-            f'victor_cache_utilization{{namespace="query"}} {ts.query_utilization:.4f}'
-        )
+        lines.append("# HELP victor_cache_utilization Cache utilization (0-1)")
+        lines.append("# TYPE victor_cache_utilization gauge")
+        lines.append(f'victor_cache_utilization{{namespace="query"}} {ts.query_utilization:.4f}')
         lines.append(
             f'victor_cache_utilization{{namespace="context"}} {ts.context_utilization:.4f}'
         )
@@ -881,61 +863,61 @@ class PerformanceMetricsCollector:
         # Cache metrics
         cm = self._cache_metrics
         lines.append("")
-        lines.append(f"# HELP victor_cache_memory_bytes Cache memory usage")
-        lines.append(f"# TYPE victor_cache_memory_bytes gauge")
+        lines.append("# HELP victor_cache_memory_bytes Cache memory usage")
+        lines.append("# TYPE victor_cache_memory_bytes gauge")
         lines.append(f"victor_cache_memory_bytes {cm.memory_usage_bytes}")
 
         lines.append("")
-        lines.append(f"# HELP victor_cache_memory_mb Cache memory usage in MB")
-        lines.append(f"# TYPE victor_cache_memory_mb gauge")
+        lines.append("# HELP victor_cache_memory_mb Cache memory usage in MB")
+        lines.append("# TYPE victor_cache_memory_mb gauge")
         lines.append(f"victor_cache_memory_mb {cm.memory_usage_mb:.2f}")
 
         # Tool execution metrics
         te = self._tool_execution_metrics
         lines.append("")
-        lines.append(f"# HELP victor_tool_executions_total Tool execution count")
-        lines.append(f"# TYPE victor_tool_executions_total counter")
-        lines.append(f"victor_tool_executions_total{{status=\"success\"}} {te.successful_executions}")
-        lines.append(f"victor_tool_executions_total{{status=\"failure\"}} {te.failed_executions}")
+        lines.append("# HELP victor_tool_executions_total Tool execution count")
+        lines.append("# TYPE victor_tool_executions_total counter")
+        lines.append(f'victor_tool_executions_total{{status="success"}} {te.successful_executions}')
+        lines.append(f'victor_tool_executions_total{{status="failure"}} {te.failed_executions}')
 
         lines.append("")
-        lines.append(f"# HELP victor_tool_duration_ms Tool execution duration")
-        lines.append(f"# TYPE victor_tool_duration_ms gauge")
-        lines.append(f"victor_tool_duration_ms{{quantile=\"avg\"}} {te.avg_duration_ms:.2f}")
-        lines.append(f"victor_tool_duration_ms{{quantile=\"p50\"}} {te.p50_duration_ms:.2f}")
-        lines.append(f"victor_tool_duration_ms{{quantile=\"p95\"}} {te.p95_duration_ms:.2f}")
-        lines.append(f"victor_tool_duration_ms{{quantile=\"p99\"}} {te.p99_duration_ms:.2f}")
+        lines.append("# HELP victor_tool_duration_ms Tool execution duration")
+        lines.append("# TYPE victor_tool_duration_ms gauge")
+        lines.append(f'victor_tool_duration_ms{{quantile="avg"}} {te.avg_duration_ms:.2f}')
+        lines.append(f'victor_tool_duration_ms{{quantile="p50"}} {te.p50_duration_ms:.2f}')
+        lines.append(f'victor_tool_duration_ms{{quantile="p95"}} {te.p95_duration_ms:.2f}')
+        lines.append(f'victor_tool_duration_ms{{quantile="p99"}} {te.p99_duration_ms:.2f}')
 
         lines.append("")
-        lines.append(f"# HELP victor_tool_error_rate Tool execution error rate")
-        lines.append(f"# TYPE victor_tool_error_rate gauge")
+        lines.append("# HELP victor_tool_error_rate Tool execution error rate")
+        lines.append("# TYPE victor_tool_error_rate gauge")
         lines.append(f"victor_tool_error_rate {te.error_rate:.4f}")
 
         # System metrics
         sm = self._system_metrics
         lines.append("")
-        lines.append(f"# HELP victor_system_memory_bytes System memory usage")
-        lines.append(f"# TYPE victor_system_memory_bytes gauge")
+        lines.append("# HELP victor_system_memory_bytes System memory usage")
+        lines.append("# TYPE victor_system_memory_bytes gauge")
         lines.append(f"victor_system_memory_bytes {sm.memory_usage_bytes}")
 
         lines.append("")
-        lines.append(f"# HELP victor_system_memory_mb System memory usage in MB")
-        lines.append(f"# TYPE victor_system_memory_mb gauge")
+        lines.append("# HELP victor_system_memory_mb System memory usage in MB")
+        lines.append("# TYPE victor_system_memory_mb gauge")
         lines.append(f"victor_system_memory_mb {sm.memory_usage_mb:.2f}")
 
         lines.append("")
-        lines.append(f"# HELP victor_system_cpu_percent CPU usage percent")
-        lines.append(f"# TYPE victor_system_cpu_percent gauge")
+        lines.append("# HELP victor_system_cpu_percent CPU usage percent")
+        lines.append("# TYPE victor_system_cpu_percent gauge")
         lines.append(f"victor_system_cpu_percent {sm.cpu_percent:.2f}")
 
         lines.append("")
-        lines.append(f"# HELP victor_system_uptime_seconds System uptime")
-        lines.append(f"# TYPE victor_system_uptime_seconds gauge")
+        lines.append("# HELP victor_system_uptime_seconds System uptime")
+        lines.append("# TYPE victor_system_uptime_seconds gauge")
         lines.append(f"victor_system_uptime_seconds {sm.uptime_seconds:.2f}")
 
         lines.append("")
-        lines.append(f"# HELP victor_system_threads Active thread count")
-        lines.append(f"# TYPE victor_system_threads gauge")
+        lines.append("# HELP victor_system_threads Active thread count")
+        lines.append("# TYPE victor_system_threads gauge")
         lines.append(f"victor_system_threads {sm.active_threads}")
 
         return "\n".join(lines)

@@ -29,6 +29,7 @@ from victor.agent.utils.conversions import (
 @dataclass
 class MockTokenUsage:
     """Mock TokenUsage for testing."""
+
     prompt_tokens: int
     completion_tokens: int
     total_tokens: int
@@ -37,6 +38,7 @@ class MockTokenUsage:
 @dataclass
 class MockValidationResult:
     """Mock ValidationResult for testing."""
+
     is_valid: bool
     errors: list
     warnings: list
@@ -45,6 +47,7 @@ class MockValidationResult:
 @dataclass
 class MockMessage:
     """Mock Message for testing."""
+
     role: str
     content: str
 
@@ -52,6 +55,7 @@ class MockMessage:
 @dataclass
 class MockStreamMetrics:
     """Mock StreamMetrics for testing."""
+
     duration_ms: int
     tokens_per_second: float
     total_chunks: int
@@ -60,6 +64,7 @@ class MockStreamMetrics:
 @dataclass
 class MockToolResult:
     """Mock ToolResult for testing."""
+
     success: bool
     output: str
     error: str | None
@@ -167,6 +172,7 @@ class TestValidationResultConversions:
 
     def test_validation_result_to_dict_without_warnings_attribute(self):
         """Test conversion with object missing warnings attribute."""
+
         class SimpleValidation:
             is_valid = True
             errors = []
@@ -208,6 +214,7 @@ class TestMessageConversions:
 
     def test_message_to_dict_with_additional_fields(self):
         """Test conversion with message object with extra fields."""
+
         class ExtendedMessage:
             role = "assistant"
             content = "Response"
@@ -261,6 +268,7 @@ class TestStreamMetricsConversions:
 
     def test_stream_metrics_to_dict_with_optional_fields(self):
         """Test conversion with optional fields."""
+
         class ExtendedMetrics:
             duration_ms = 500
             tokens_per_second = 100.0
@@ -347,6 +355,7 @@ class TestEdgeCases:
 
     def test_tool_result_to_dict_success_false_without_error(self):
         """Test failed result without error message."""
+
         class IncompleteResult:
             success = False
 

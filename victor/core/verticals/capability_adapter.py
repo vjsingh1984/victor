@@ -121,7 +121,9 @@ class CapabilityAdapter:
         if legacy_mode is None:
             # Auto-detect from feature flag
             use_context = os.getenv("VICTOR_USE_CONTEXT_CONFIG", "false").lower() == "true"
-            legacy_mode = LegacyWriteMode.CONTEXT_ONLY if use_context else LegacyWriteMode.BACKWARD_COMPATIBLE
+            legacy_mode = (
+                LegacyWriteMode.CONTEXT_ONLY if use_context else LegacyWriteMode.BACKWARD_COMPATIBLE
+            )
 
         self.legacy_mode = legacy_mode
 

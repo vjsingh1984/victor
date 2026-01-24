@@ -56,8 +56,6 @@ from victor.agent.personas.types import (
 # ============================================================================
 
 
-
-
 @pytest.fixture
 def mock_embedding_service():
     """Mock embedding service for memory systems."""
@@ -71,9 +69,7 @@ def mock_embedding_service():
 def episodic_memory(mock_embedding_service):
     """Create episodic memory instance for testing."""
     memory = EpisodicMemory(
-        embedding_service=mock_embedding_service,
-        max_episodes=1000,
-        decay_rate=0.95
+        embedding_service=mock_embedding_service, max_episodes=1000, decay_rate=0.95
     )
     return memory
 
@@ -82,8 +78,7 @@ def episodic_memory(mock_embedding_service):
 def semantic_memory(mock_embedding_service):
     """Create semantic memory instance for testing."""
     memory = SemanticMemory(
-        embedding_service=mock_embedding_service,
-        max_knowledge=1000  # Smaller limit for tests
+        embedding_service=mock_embedding_service, max_knowledge=1000  # Smaller limit for tests
     )
     return memory
 
@@ -130,7 +125,7 @@ async def test_persona_adapts_based_on_episodic_memory(
             rewards=8.5,
             embedding=await episodic_memory._embedding_service.embed_text(
                 "code review python success"
-            )
+            ),
         ),
         Episode(
             id=str(uuid.uuid4()),
@@ -141,7 +136,7 @@ async def test_persona_adapts_based_on_episodic_memory(
             rewards=7.0,
             embedding=await episodic_memory._embedding_service.embed_text(
                 "debugging python success"
-            )
+            ),
         ),
         Episode(
             id=str(uuid.uuid4()),
@@ -152,8 +147,8 @@ async def test_persona_adapts_based_on_episodic_memory(
             rewards=9.0,
             embedding=await episodic_memory._embedding_service.embed_text(
                 "architecture design success"
-            )
-        )
+            ),
+        ),
     ]
 
     for episode in episodes:
@@ -165,8 +160,7 @@ async def test_persona_adapts_based_on_episodic_memory(
 
     # Recall relevant episodes for a new task
     relevant_episodes = await episodic_memory.recall_relevant(
-        "Review and debug Python microservice architecture",
-        k=3
+        "Review and debug Python microservice architecture", k=3
     )
 
     assert len(relevant_episodes) > 0
@@ -181,7 +175,7 @@ async def test_persona_adapts_based_on_episodic_memory(
         verbosity="concise",
         tool_preference=["read_file", "analyze_code", "generate_report"],
         expertise_boost=["code_review", "debugging"],
-        constraint_relaxations={"max_tool_calls": 25}  # Allow more for complex tasks
+        constraint_relaxations={"max_tool_calls": 25},  # Allow more for complex tasks
     )
 
     adapted = AdaptedPersona(
@@ -189,7 +183,7 @@ async def test_persona_adapts_based_on_episodic_memory(
         context_type=context_type,
         adaptations=adaptation,
         confidence=0.85,
-        reasoning="Based on successful code review and debugging episodes"
+        reasoning="Based on successful code review and debugging episodes",
     )
 
     # Verify adaptation reflects memory
@@ -226,30 +220,16 @@ async def test_persona_uses_semantic_memory_for_knowledge_retrieval(
 
     fact_ids = []
     for fact, confidence, source in facts:
-        fact_id = await semantic_memory.store_knowledge(
-            fact,
-            confidence=confidence,
-            source=source
-        )
+        fact_id = await semantic_memory.store_knowledge(fact, confidence=confidence, source=source)
         fact_ids.append(fact_id)
 
     # Create knowledge graph relationships
     await semantic_memory.add_relationship(
-        KnowledgeTriple(
-            subject=fact_ids[0],
-            predicate="related_to",
-            object=fact_ids[2],
-            weight=0.8
-        )
+        KnowledgeTriple(subject=fact_ids[0], predicate="related_to", object=fact_ids[2], weight=0.8)
     )
 
     await semantic_memory.add_relationship(
-        KnowledgeTriple(
-            subject=fact_ids[2],
-            predicate="used_in",
-            object=fact_ids[3],
-            weight=0.9
-        )
+        KnowledgeTriple(subject=fact_ids[2], predicate="used_in", object=fact_ids[3], weight=0.9)
     )
 
     # Query for relevant knowledge
@@ -318,13 +298,17 @@ async def test_persona_evolution_based_on_feedback_and_outcomes(
         episode = Episode(
             id=str(uuid.uuid4()),
             timestamp=datetime.now() - timedelta(hours=len(episodes_data)),
-            inputs={"task": data["task"], "style": data.get("style"), "verbosity": data.get("verbosity")},
+            inputs={
+                "task": data["task"],
+                "style": data.get("style"),
+                "verbosity": data.get("verbosity"),
+            },
             actions=["analyze", "execute", "verify"],
             outcomes={"success": data["success"]},
             rewards=data["reward"],
             embedding=await episodic_memory._embedding_service.embed_text(
                 f"{data['task']} {data.get('style', '')} {data.get('verbosity', '')}"
-            )
+            ),
         )
         await episodic_memory.store_episode(episode)
 
@@ -333,8 +317,16 @@ async def test_persona_evolution_based_on_feedback_and_outcomes(
     assert len(code_review_episodes) > 0
 
     # Calculate success rates by style
-    formal_success = [ep for ep in code_review_episodes if ep.inputs.get("style") == "formal" and ep.outcomes.get("success")]
-    casual_success = [ep for ep in code_review_episodes if ep.inputs.get("style") == "casual" and ep.outcomes.get("success")]
+    formal_success = [
+        ep
+        for ep in code_review_episodes
+        if ep.inputs.get("style") == "formal" and ep.outcomes.get("success")
+    ]
+    casual_success = [
+        ep
+        for ep in code_review_episodes
+        if ep.inputs.get("style") == "casual" and ep.outcomes.get("success")
+    ]
 
     # Formal style performs better
     assert len(formal_success) > len(casual_success)
@@ -351,8 +343,8 @@ async def test_persona_evolution_based_on_feedback_and_outcomes(
         feedback_data={
             "best_style": "formal",
             "worst_style": "casual",
-            "improvement_suggestion": "Prefer formal communication for code review"
-        }
+            "improvement_suggestion": "Prefer formal communication for code review",
+        },
     )
 
     # Apply feedback to evolve persona
@@ -393,7 +385,7 @@ async def test_cross_system_event_propagation(
         actions=["read_docs", "write_code", "test"],
         outcomes={"success": True, "knowledge_gained": True},
         rewards=8.0,
-        embedding=await episodic_memory._embedding_service.embed_text("learned python async")
+        embedding=await episodic_memory._embedding_service.embed_text("learned python async"),
     )
 
     episode_id = await episodic_memory.store_episode(episode)
@@ -404,11 +396,7 @@ async def test_cross_system_event_propagation(
 
     event = MessagingEvent(
         topic="episode.stored",
-        data={
-            "episode_id": str(episode_id),
-            "task": "learn_python_async",
-            "success": True
-        }
+        data={"episode_id": str(episode_id), "task": "learn_python_async", "success": True},
     )
 
     await mock_event_bus.publish(event)
@@ -419,9 +407,7 @@ async def test_cross_system_event_propagation(
     # Consolidate episodic to semantic memory
     knowledge = "Python async/await enables concurrent code execution"
     fact_id = await semantic_memory.store_knowledge(
-        knowledge,
-        confidence=0.9,
-        source=f"episode_{episode_id}"
+        knowledge, confidence=0.9, source=f"episode_{episode_id}"
     )
 
     assert fact_id is not None
@@ -429,11 +415,7 @@ async def test_cross_system_event_propagation(
     # Publish consolidation event
     consolidation_event = MessagingEvent(
         topic="memory.consolidated",
-        data={
-            "episode_id": str(episode_id),
-            "fact_id": fact_id,
-            "knowledge": knowledge
-        }
+        data={"episode_id": str(episode_id), "fact_id": fact_id, "knowledge": knowledge},
     )
 
     await mock_event_bus.publish(consolidation_event)
@@ -477,7 +459,7 @@ async def test_persona_memory_performance_under_load(
             actions=["action1", "action2"],
             outcomes={"success": i % 2 == 0},
             rewards=7.0 + (i % 3),
-            embedding=np.random.rand(1536)
+            embedding=np.random.rand(1536),
         )
         episodes_to_store.append(episode)
 
@@ -510,10 +492,10 @@ async def test_persona_memory_performance_under_load(
                 verbosity="standard",
                 tool_preference=["tool1", "tool2"],
                 expertise_boost=[f"skill_{i % 5}"],
-                constraint_relaxations={}
+                constraint_relaxations={},
             ),
             confidence=0.8,
-            reasoning="Performance test adaptation"
+            reasoning="Performance test adaptation",
         )
 
     adaptation_duration = time.time() - start_time
@@ -546,9 +528,7 @@ async def test_persona_memory_performance_under_load(
 
 
 @pytest.mark.asyncio
-async def test_memory_guided_persona_selection(
-    episodic_memory, persona_manager
-):
+async def test_memory_guided_persona_selection(episodic_memory, persona_manager):
     """Test that memory guides persona selection for new tasks.
 
     Scenario:
@@ -573,16 +553,13 @@ async def test_memory_guided_persona_selection(
         episode = Episode(
             id=str(uuid.uuid4()),
             timestamp=datetime.now() - timedelta(hours=4),
-            inputs={
-                "persona_used": mapping["persona"],
-                "task_type": mapping["task"]
-            },
+            inputs={"persona_used": mapping["persona"], "task_type": mapping["task"]},
             actions=["execute"],
             outcomes={"success": mapping["success"]},
             rewards=mapping["reward"],
             embedding=await episodic_memory._embedding_service.embed_text(
                 f"{mapping['persona']} {mapping['task']} {mapping['success']}"
-            )
+            ),
         )
         await episodic_memory.store_episode(episode)
 
@@ -591,7 +568,8 @@ async def test_memory_guided_persona_selection(
 
     # Filter for successful code review episodes
     successful_reviews = [
-        ep for ep in relevant
+        ep
+        for ep in relevant
         if ep.inputs.get("task_type") == "code_review" and ep.outcomes.get("success")
     ]
 
@@ -599,6 +577,7 @@ async def test_memory_guided_persona_selection(
 
     # Find best performing persona
     from collections import defaultdict
+
     persona_rewards = defaultdict(list)
 
     for ep in successful_reviews:
@@ -608,8 +587,7 @@ async def test_memory_guided_persona_selection(
 
     # Calculate average rewards
     avg_rewards = {
-        persona: sum(rewards) / len(rewards)
-        for persona, rewards in persona_rewards.items()
+        persona: sum(rewards) / len(rewards) for persona, rewards in persona_rewards.items()
     }
 
     # Best persona should be senior_developer

@@ -51,6 +51,7 @@ from victor.coding.codebase.tree_sitter_extractor import (
 # Test Fixture Setup
 # =============================================================================
 
+
 @pytest.fixture
 def extractor():
     """Create a TreeSitterExtractor instance."""
@@ -78,6 +79,7 @@ def sample_files(tmp_path):
 # =============================================================================
 # Language Detection Tests
 # =============================================================================
+
 
 class TestLanguageDetection:
     """Tests for automatic language detection."""
@@ -119,6 +121,7 @@ class TestLanguageDetection:
 # =============================================================================
 # Symbol Extraction Tests
 # =============================================================================
+
 
 class TestSymbolExtraction:
     """Tests for extracting symbols (functions, classes, variables)."""
@@ -232,6 +235,7 @@ def broken_function(
 # =============================================================================
 # Edge Extraction Tests
 # =============================================================================
+
 
 class TestCallEdgeExtraction:
     """Tests for extracting function call relationships."""
@@ -380,6 +384,7 @@ class Implementation(Protocol):
 # Reference Extraction Tests
 # =============================================================================
 
+
 class TestReferenceExtraction:
     """Tests for extracting symbol references."""
 
@@ -427,6 +432,7 @@ class TestReferenceExtraction:
 # Comprehensive Extraction Tests
 # =============================================================================
 
+
 class TestExtractAll:
     """Tests for extracting all information from a file."""
 
@@ -465,9 +471,7 @@ class TestExtractAll:
 
     def test_extract_all_with_references(self, extractor, sample_files):
         """Test extracting symbols, edges, and references."""
-        symbols, edges, references = extractor.extract_all_with_references(
-            sample_files["class.py"]
-        )
+        symbols, edges, references = extractor.extract_all_with_references(sample_files["class.py"])
 
         assert isinstance(symbols, list)
         assert isinstance(edges, list)
@@ -509,6 +513,7 @@ class TestExtractAll:
 # =============================================================================
 # Parser Management Tests
 # =============================================================================
+
 
 class TestParserManagement:
     """Tests for parser caching and management."""
@@ -564,6 +569,7 @@ class TestParserManagement:
 # Error Handling Tests
 # =============================================================================
 
+
 class TestErrorHandling:
     """Tests for error handling and edge cases."""
 
@@ -607,6 +613,7 @@ def greet():
 # Performance Tests
 # =============================================================================
 
+
 class TestPerformance:
     """Tests for performance characteristics."""
 
@@ -621,6 +628,7 @@ class TestPerformance:
         file_path = create_sample_file(tmp_path, "large.py", large_code)
 
         import time
+
         start = time.time()
         symbols = extractor.extract_symbols(file_path)
         elapsed = time.time() - start
@@ -650,6 +658,7 @@ class TestPerformance:
 # =============================================================================
 # Integration Tests
 # =============================================================================
+
 
 class TestIntegration:
     """Integration tests for AST extraction workflows."""
@@ -702,6 +711,7 @@ x = foo()
 # =============================================================================
 # Tree-sitter Manager Tests
 # =============================================================================
+
 
 class TestTreeSitterManager:
     """Tests for tree_sitter_manager module functions."""
@@ -834,10 +844,7 @@ class TestTreeSitterManager:
         file1 = create_sample_file(tmp_path, "file1.py", "def foo(): pass")
         file2 = create_sample_file(tmp_path, "file2.py", "def bar(): pass")
 
-        results = extract_symbols_parallel(
-            [str(file1), str(file2)],
-            ["function"]
-        )
+        results = extract_symbols_parallel([str(file1), str(file2)], ["function"])
 
         assert len(results) == 2
         assert all(len(symbols) >= 0 for symbols in results.values())
@@ -914,6 +921,7 @@ class TestTreeSitterManager:
 # AST Node Traversal Tests
 # =============================================================================
 
+
 class TestASTNodeTraversal:
     """Tests for AST node traversal and navigation."""
 
@@ -925,6 +933,7 @@ class TestASTNodeTraversal:
         tree = parser.parse(b"def foo(): pass")
 
         node_count = 0
+
         def count_nodes(node):
             nonlocal node_count
             node_count += 1
@@ -991,6 +1000,7 @@ class TestASTNodeTraversal:
 # AST Modification Tests
 # =============================================================================
 
+
 class TestASTModifications:
     """Tests for AST modification operations."""
 
@@ -1014,6 +1024,7 @@ class TestASTModifications:
 # =============================================================================
 # Complex Code Pattern Tests
 # =============================================================================
+
 
 class TestComplexCodePatterns:
     """Tests for complex code patterns and edge cases."""
@@ -1145,6 +1156,7 @@ class Circle:
 # =============================================================================
 # Multi-language Support Tests
 # =============================================================================
+
 
 class TestMultiLanguageSupport:
     """Tests for multi-language AST parsing."""

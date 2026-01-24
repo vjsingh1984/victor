@@ -279,7 +279,9 @@ class TestWorkflowValidation:
         assert response.status_code == 200
         data = response.json()
         assert data["valid"] is False
-        assert any("condition" in err.lower() or "branches" in err.lower() for err in data["errors"])
+        assert any(
+            "condition" in err.lower() or "branches" in err.lower() for err in data["errors"]
+        )
 
 
 # =============================================================================
@@ -378,7 +380,10 @@ class TestFormations:
 
         hierarchical = data["hierarchical"]
         assert hierarchical["name"] == "Hierarchical Formation"
-        assert "manager" in hierarchical["description"].lower() or "coordinator" in hierarchical["description"].lower()
+        assert (
+            "manager" in hierarchical["description"].lower()
+            or "coordinator" in hierarchical["description"].lower()
+        )
 
 
 # =============================================================================
@@ -481,7 +486,11 @@ class TestGraphConversion:
 
     def test_graph_to_definition_agent_nodes(self):
         """Test converting graph with agent nodes to definition."""
-        from tools.workflow_editor.backend.api import graph_to_definition, WorkflowGraph, WorkflowNode
+        from tools.workflow_editor.backend.api import (
+            graph_to_definition,
+            WorkflowGraph,
+            WorkflowNode,
+        )
 
         graph = WorkflowGraph(
             nodes=[

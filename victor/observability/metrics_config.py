@@ -165,7 +165,9 @@ class FeatureMetrics:
         self.duration.observe(duration_ms)
 
         if not success:
-            self.errors.increment(labels={"error_type": error_type or "unknown"} if error_type else None)
+            self.errors.increment(
+                labels={"error_type": error_type or "unknown"} if error_type else None
+            )
 
     def record_user_activity(self, user_count: int) -> None:
         """Record active user count.

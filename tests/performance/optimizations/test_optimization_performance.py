@@ -53,6 +53,7 @@ from victor.optimizations.parallel_executor import (
 # Test Helper Functions
 # =============================================================================
 
+
 def create_heavy_component(index: int) -> dict:
     """Create a component with moderate memory footprint."""
     return {
@@ -94,6 +95,7 @@ async def memory_intensive_task(size: int = 10000):
 # LazyComponentLoader Performance Tests (8 tests)
 # =============================================================================
 
+
 class TestLazyComponentLoaderPerformance:
     """Performance test suite for LazyComponentLoader."""
 
@@ -120,10 +122,7 @@ class TestLazyComponentLoaderPerformance:
         lazy_start = time.perf_counter()
         loader = LazyComponentLoader()
         for i in range(20):
-            loader.register_component(
-                f"component_{i}",
-                lambda idx=i: create_heavy_component(idx)
-            )
+            loader.register_component(f"component_{i}", lambda idx=i: create_heavy_component(idx))
         lazy_time = time.perf_counter() - lazy_start
 
         # Calculate improvement
@@ -143,10 +142,7 @@ class TestLazyComponentLoaderPerformance:
         Expected: First access overhead <20ms for typical component loading.
         """
         loader = LazyComponentLoader()
-        loader.register_component(
-            "heavy_component",
-            lambda: create_heavy_component(0)
-        )
+        loader.register_component("heavy_component", lambda: create_heavy_component(0))
 
         start = time.perf_counter()
         component = loader.get_component("heavy_component")
@@ -195,10 +191,7 @@ class TestLazyComponentLoaderPerformance:
         # Test 1: Preload approach
         loader1 = LazyComponentLoader()
         for i in range(50):
-            loader1.register_component(
-                f"comp_{i}",
-                lambda idx=i: create_heavy_component(idx)
-            )
+            loader1.register_component(f"comp_{i}", lambda idx=i: create_heavy_component(idx))
 
         start = time.perf_counter()
         keys = [f"comp_{i}" for i in range(50)]
@@ -209,10 +202,7 @@ class TestLazyComponentLoaderPerformance:
         # Test 2: Lazy access approach
         loader2 = LazyComponentLoader()
         for i in range(50):
-            loader2.register_component(
-                f"comp_{i}",
-                lambda idx=i: create_heavy_component(idx)
-            )
+            loader2.register_component(f"comp_{i}", lambda idx=i: create_heavy_component(idx))
 
         start = time.perf_counter()
         results2 = [loader2.get_component(f"comp_{i}") for i in range(50)]
@@ -238,10 +228,7 @@ class TestLazyComponentLoaderPerformance:
 
         # Register 100 components
         for i in range(100):
-            loader.register_component(
-                f"comp_{i}",
-                lambda idx=i: create_heavy_component(idx)
-            )
+            loader.register_component(f"comp_{i}", lambda idx=i: create_heavy_component(idx))
 
         # Selective preload (10% of components)
         start = time.perf_counter()
@@ -252,10 +239,7 @@ class TestLazyComponentLoaderPerformance:
         # Full preload comparison
         loader2 = LazyComponentLoader()
         for i in range(100):
-            loader2.register_component(
-                f"comp_{i}",
-                lambda idx=i: create_heavy_component(idx)
-            )
+            loader2.register_component(f"comp_{i}", lambda idx=i: create_heavy_component(idx))
 
         start = time.perf_counter()
         all_keys = [f"comp_{i}" for i in range(100)]
@@ -297,10 +281,7 @@ class TestLazyComponentLoaderPerformance:
         snapshot3 = tracemalloc.take_snapshot()
         loader = LazyComponentLoader()
         for i in range(50):
-            loader.register_component(
-                f"comp_{i}",
-                lambda idx=i: create_heavy_component(idx)
-            )
+            loader.register_component(f"comp_{i}", lambda idx=i: create_heavy_component(idx))
         snapshot4 = tracemalloc.take_snapshot()
         lazy_memory = sum(stat.size_diff for stat in snapshot4.compare_to(snapshot3, "lineno"))
 
@@ -390,6 +371,7 @@ class TestLazyComponentLoaderPerformance:
 # AdaptiveParallelExecutor Performance Tests (7 tests)
 # =============================================================================
 
+
 class TestAdaptiveParallelExecutorPerformance:
     """Performance test suite for AdaptiveParallelExecutor."""
 
@@ -433,9 +415,7 @@ class TestAdaptiveParallelExecutorPerformance:
         tasks = [cpu_task for _ in range(20)]
 
         # Sequential baseline
-        executor_seq = create_adaptive_executor(
-            strategy=OptimizationStrategy.ALWAYS_SEQUENTIAL
-        )
+        executor_seq = create_adaptive_executor(strategy=OptimizationStrategy.ALWAYS_SEQUENTIAL)
         start_seq = time.perf_counter()
         await executor_seq.execute(tasks)
         sequential_time = time.perf_counter() - start_seq
@@ -450,7 +430,9 @@ class TestAdaptiveParallelExecutorPerformance:
         parallel_time = time.perf_counter() - start_par
 
         speedup = sequential_time / parallel_time if parallel_time > 0 else 0
-        improvement = (sequential_time - parallel_time) / sequential_time if sequential_time > 0 else 0
+        improvement = (
+            (sequential_time - parallel_time) / sequential_time if sequential_time > 0 else 0
+        )
 
         print(f"\nSequential time: {sequential_time*1000:.2f}ms")
         print(f"Parallel time: {parallel_time*1000:.2f}ms")
@@ -474,10 +456,12 @@ class TestAdaptiveParallelExecutorPerformance:
         tasks = []
         for i in range(20):
             duration = 0.005 + (i % 5) * 0.005  # 5-25ms range
+
             # Create simple async task with closure
             async def task(d=duration):
                 await asyncio.sleep(d)
                 return d
+
             tasks.append(task)
 
         executor = create_adaptive_executor(
@@ -510,9 +494,11 @@ class TestAdaptiveParallelExecutorPerformance:
         durations = [0.001, 0.03, 0.005, 0.025, 0.01, 0.02, 0.001, 0.03]
         tasks = []
         for d in durations:
+
             async def task(duration=d):
                 await asyncio.sleep(duration)
                 return duration
+
             tasks.append(task)
 
         # Test with work stealing enabled
@@ -586,6 +572,7 @@ class TestAdaptiveParallelExecutorPerformance:
 
         Expected: Framework adds acceptable overhead for the features provided.
         """
+
         async def small_task_val():
             await asyncio.sleep(0.001)
             return "result"
@@ -617,6 +604,7 @@ class TestAdaptiveParallelExecutorPerformance:
 
         Expected: System scales appropriately with worker count.
         """
+
         # Create task functions (simple closures)
         async def simple_io_task():
             await asyncio.sleep(0.01)
@@ -652,6 +640,7 @@ class TestAdaptiveParallelExecutorPerformance:
 # Integration Tests
 # =============================================================================
 
+
 class TestOptimizationIntegration:
     """Integration tests for combined optimization features."""
 
@@ -667,8 +656,7 @@ class TestOptimizationIntegration:
         # Register components lazily
         for i in range(10):
             loader.register_component(
-                f"task_component_{i}",
-                lambda idx=i: create_heavy_component(idx)
+                f"task_component_{i}", lambda idx=i: create_heavy_component(idx)
             )
 
         # Create tasks that use lazy-loaded components
@@ -716,17 +704,12 @@ class TestOptimizationIntegration:
 
         # Register many components
         for i in range(100):
-            loader.register_component(
-                f"comp_{i}",
-                lambda idx=i: create_heavy_component(idx)
-            )
+            loader.register_component(f"comp_{i}", lambda idx=i: create_heavy_component(idx))
 
         start = time.perf_counter()
         with ThreadPoolExecutor(max_workers=10) as executor:
             futures = [
-                executor.submit(
-                    lambda idx=i: loader.get_component(f"comp_{idx}")
-                )
+                executor.submit(lambda idx=i: loader.get_component(f"comp_{idx}"))
                 for i in range(100)
             ]
             results = [f.result() for f in futures]
@@ -761,10 +744,7 @@ class TestOptimizationIntegration:
 
         loader = LazyComponentLoader()
         for i in range(50):
-            loader.register_component(
-                f"comp_{i}",
-                lambda idx=i: create_heavy_component(idx)
-            )
+            loader.register_component(f"comp_{i}", lambda idx=i: create_heavy_component(idx))
 
         # Only access 20% of components
         for i in range(0, 50, 5):
@@ -789,6 +769,7 @@ class TestOptimizationIntegration:
 # Benchmark Summary and Reporting
 # =============================================================================
 
+
 @pytest.mark.performance
 @pytest.mark.slow
 class TestOptimizationBenchmarkSummary:
@@ -800,10 +781,7 @@ class TestOptimizationBenchmarkSummary:
 
         # Register components
         for i in range(100):
-            loader.register_component(
-                f"comp_{i}",
-                lambda idx=i: create_heavy_component(idx)
-            )
+            loader.register_component(f"comp_{i}", lambda idx=i: create_heavy_component(idx))
 
         # Test loading performance
         start = time.perf_counter()
@@ -813,15 +791,15 @@ class TestOptimizationBenchmarkSummary:
 
         stats = loader.get_loading_stats()
 
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("LAZY LOADING PERFORMANCE SUMMARY")
-        print("="*70)
+        print("=" * 70)
         print(f"Components loaded: {stats.miss_count}")
         print(f"Total load time: {stats.total_load_time_ms:.2f}ms")
         print(f"Average load time: {stats.avg_load_time_ms:.2f}ms")
         print(f"Memory usage: {stats.memory_usage_bytes / 1024:.1f}KB")
         print(f"Dependency resolutions: {stats.dependency_resolution_count}")
-        print("="*70)
+        print("=" * 70)
 
         # Verify performance characteristics
         assert stats.miss_count == 100
@@ -843,9 +821,9 @@ class TestOptimizationBenchmarkSummary:
 
         metrics = executor.get_metrics()
 
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("PARALLEL EXECUTION PERFORMANCE SUMMARY")
-        print("="*70)
+        print("=" * 70)
         print(f"Tasks executed: {metrics.tasks_executed}")
         print(f"Total time: {metrics.total_duration_ms:.2f}ms")
         print(f"Parallel time: {metrics.parallel_duration_ms:.2f}ms")
@@ -855,7 +833,7 @@ class TestOptimizationBenchmarkSummary:
         print(f"Parallel efficiency: {metrics.efficiency:.1%}")
         print(f"Overhead: {metrics.overhead_ms:.2f}ms")
         print(f"Batches: {metrics.batch_count}")
-        print("="*70)
+        print("=" * 70)
 
         # Verify performance characteristics
         assert metrics.tasks_executed == 20
@@ -864,9 +842,9 @@ class TestOptimizationBenchmarkSummary:
 
     def test_performance_improvement_documentation(self):
         """Document overall performance improvements from optimizations."""
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("OPTIMIZATION PERFORMANCE IMPROVEMENTS")
-        print("="*70)
+        print("=" * 70)
 
         improvements = [
             ("Lazy Loading Init Time", "95%", "Deferred component creation"),
@@ -880,10 +858,10 @@ class TestOptimizationBenchmarkSummary:
         ]
 
         print(f"{'Feature':<35} {'Improvement':<15} {'Notes'}")
-        print("-"*70)
+        print("-" * 70)
         for feature, improvement, notes in improvements:
             print(f"{feature:<35} {improvement:<15} {notes}")
-        print("="*70)
+        print("=" * 70)
 
         # All improvements should be documented
         assert len(improvements) == 8

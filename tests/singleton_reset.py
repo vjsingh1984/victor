@@ -81,7 +81,9 @@ class SingletonResetRegistry:
 
         self._initialized = True
 
-    def _safe_reset(self, module_path: str, class_name: str, method: str = "reset_instance") -> None:
+    def _safe_reset(
+        self, module_path: str, class_name: str, method: str = "reset_instance"
+    ) -> None:
         """Safely attempt to reset a singleton.
 
         Args:
@@ -89,9 +91,11 @@ class SingletonResetRegistry:
             class_name: Name of the class with singleton
             method: Reset method name (default: "reset_instance")
         """
+
         def _do_reset():
             try:
                 import importlib
+
                 module = importlib.import_module(module_path)
                 cls = getattr(module, class_name, None)
                 if cls is not None:
@@ -112,9 +116,11 @@ class SingletonResetRegistry:
             module_path: Full module path
             var_name: Name of the module-level variable
         """
+
         def _do_reset():
             try:
                 import importlib
+
                 module = importlib.import_module(module_path)
                 if hasattr(module, var_name):
                     setattr(module, var_name, None)
@@ -131,111 +137,47 @@ class SingletonResetRegistry:
 
     def _register_embedding_singletons(self) -> None:
         """Reset embedding-related singletons."""
-        self._safe_reset(
-            "victor.storage.embeddings.task_classifier",
-            "TaskTypeClassifier"
-        )
-        self._safe_reset(
-            "victor.storage.embeddings.service",
-            "EmbeddingService"
-        )
-        self._safe_reset(
-            "victor.storage.embeddings.intent_classifier",
-            "IntentClassifier"
-        )
-        self._safe_reset(
-            "victor.storage.cache.embedding_cache_manager",
-            "EmbeddingCacheManager"
-        )
+        self._safe_reset("victor.storage.embeddings.task_classifier", "TaskTypeClassifier")
+        self._safe_reset("victor.storage.embeddings.service", "EmbeddingService")
+        self._safe_reset("victor.storage.embeddings.intent_classifier", "IntentClassifier")
+        self._safe_reset("victor.storage.cache.embedding_cache_manager", "EmbeddingCacheManager")
 
     def _register_agent_singletons(self) -> None:
         """Reset agent-related singletons."""
-        self._safe_reset(
-            "victor.agent.shared_tool_registry",
-            "SharedToolRegistry"
-        )
-        self._safe_reset(
-            "victor.agent.usage_analytics",
-            "UsageAnalytics"
-        )
+        self._safe_reset("victor.agent.shared_tool_registry", "SharedToolRegistry")
+        self._safe_reset("victor.agent.usage_analytics", "UsageAnalytics")
         # Model capability loaders
-        self._safe_reset(
-            "victor.agent.tool_calling.capabilities",
-            "ModelCapabilityLoader"
-        )
+        self._safe_reset("victor.agent.tool_calling.capabilities", "ModelCapabilityLoader")
 
     def _register_framework_singletons(self) -> None:
         """Reset framework-related singletons."""
-        self._safe_reset(
-            "victor.framework.chain_registry",
-            "ChainRegistry"
-        )
-        self._safe_reset(
-            "victor.framework.escape_hatch_registry",
-            "EscapeHatchRegistry"
-        )
-        self._safe_reset(
-            "victor.framework.event_registry",
-            "EventRegistry"
-        )
-        self._safe_reset(
-            "victor.framework.module_loader",
-            "ModuleLoader"
-        )
-        self._safe_reset(
-            "victor.framework.handler_registry",
-            "HandlerRegistry"
-        )
-        self._safe_reset(
-            "victor.framework.persona_registry",
-            "PersonaRegistry"
-        )
-        self._safe_reset(
-            "victor.framework.tools",
-            "ToolRegistry"
-        )
-        self._safe_reset(
-            "victor.framework.task_types",
-            "TaskTypeRegistry"
-        )
-        self._safe_reset(
-            "victor.framework.multi_agent.persona_provider",
-            "PersonaProvider"
-        )
+        self._safe_reset("victor.framework.chain_registry", "ChainRegistry")
+        self._safe_reset("victor.framework.escape_hatch_registry", "EscapeHatchRegistry")
+        self._safe_reset("victor.framework.event_registry", "EventRegistry")
+        self._safe_reset("victor.framework.module_loader", "ModuleLoader")
+        self._safe_reset("victor.framework.handler_registry", "HandlerRegistry")
+        self._safe_reset("victor.framework.persona_registry", "PersonaRegistry")
+        self._safe_reset("victor.framework.tools", "ToolRegistry")
+        self._safe_reset("victor.framework.task_types", "TaskTypeRegistry")
+        self._safe_reset("victor.framework.multi_agent.persona_provider", "PersonaProvider")
 
     def _register_tool_singletons(self) -> None:
         """Reset tool-related singletons."""
-        self._safe_reset(
-            "victor.tools.progressive_registry",
-            "ProgressiveToolsRegistry"
-        )
-        self._safe_reset(
-            "victor.tools.tool_graph",
-            "ToolGraphRegistry"
-        )
-        self._safe_reset(
-            "victor.tools.selection.registry",
-            "ToolSelectionStrategyRegistry"
-        )
-        self._safe_reset(
-            "victor.tools.metadata",
-            "ToolMetadataRegistry"
-        )
-        self._safe_reset(
-            "victor.tools.alias_resolver",
-            "ToolAliasResolver"
-        )
+        self._safe_reset("victor.tools.progressive_registry", "ProgressiveToolsRegistry")
+        self._safe_reset("victor.tools.tool_graph", "ToolGraphRegistry")
+        self._safe_reset("victor.tools.selection.registry", "ToolSelectionStrategyRegistry")
+        self._safe_reset("victor.tools.metadata", "ToolMetadataRegistry")
+        self._safe_reset("victor.tools.alias_resolver", "ToolAliasResolver")
 
     def _register_workflow_singletons(self) -> None:
         """Reset workflow-related singletons."""
-        self._safe_reset(
-            "victor.workflows.isolation",
-            "SandboxProviderRegistry"
-        )
+        self._safe_reset("victor.workflows.isolation", "SandboxProviderRegistry")
+
         # Module-level singletons with dedicated reset functions
         def _reset_trigger_registry():
             try:
                 from victor.workflows.trigger_registry import reset_trigger_registry
+
                 reset_trigger_registry()
             except ImportError:
                 pass
@@ -243,6 +185,7 @@ class SingletonResetRegistry:
         def _reset_scheduler():
             try:
                 from victor.workflows.scheduler import reset_scheduler
+
                 reset_scheduler()
             except ImportError:
                 pass
@@ -250,6 +193,7 @@ class SingletonResetRegistry:
         def _reset_version_registry():
             try:
                 from victor.workflows.versioning import reset_version_registry
+
                 reset_version_registry()
             except ImportError:
                 pass
@@ -260,45 +204,22 @@ class SingletonResetRegistry:
 
     def _register_observability_singletons(self) -> None:
         """Reset observability-related singletons."""
-        self._safe_reset(
-            "victor.observability.event_bus",
-            "EventBus"
-        )
-        self._safe_reset(
-            "victor.observability.bridge",
-            "ObservabilityBridge"
-        )
-        self._safe_reset(
-            "victor.observability.event_registry",
-            "EventTypeRegistry"
-        )
-        self._safe_reset(
-            "victor.native.observability",
-            "NativeMetrics"
-        )
+        self._safe_reset("victor.observability.event_bus", "EventBus")
+        self._safe_reset("victor.observability.bridge", "ObservabilityBridge")
+        self._safe_reset("victor.observability.event_registry", "EventTypeRegistry")
+        self._safe_reset("victor.native.observability", "NativeMetrics")
 
     def _register_storage_singletons(self) -> None:
         """Reset storage-related singletons."""
-        self._safe_reset(
-            "victor.core.database",
-            "DatabaseManager"
-        )
+        self._safe_reset("victor.core.database", "DatabaseManager")
 
     def _register_processing_singletons(self) -> None:
         """Reset processing-related singletons."""
+        self._safe_reset("victor.processing.file_types.detector", "FileTypeRegistry")
         self._safe_reset(
-            "victor.processing.file_types.detector",
-            "FileTypeRegistry"
+            "victor.evaluation.correction.registry", "CodeValidatorRegistry", "reset_singleton"
         )
-        self._safe_reset(
-            "victor.evaluation.correction.registry",
-            "CodeValidatorRegistry",
-            "reset_singleton"
-        )
-        self._safe_reset(
-            "victor.coding.codebase.indexer",
-            "BackgroundIndexerService"
-        )
+        self._safe_reset("victor.coding.codebase.indexer", "BackgroundIndexerService")
         # Native processing module-level instances
         for var in [
             "_symbol_extractor_instance",
@@ -311,10 +232,12 @@ class SingletonResetRegistry:
 
     def _register_classification_singletons(self) -> None:
         """Reset classification-related singletons."""
+
         # Use the module's own reset function if available
         def _reset_classification():
             try:
                 from victor.classification.nudge_engine import reset_singletons
+
                 reset_singletons()
             except ImportError:
                 pass
@@ -325,25 +248,18 @@ class SingletonResetRegistry:
 
     def _register_rl_hooks_singletons(self) -> None:
         """Reset RL hooks module-level singletons."""
-        self._safe_reset_module_var(
-            "victor.dataanalysis.rl",
-            "_hooks_instance"
-        )
-        self._safe_reset_module_var(
-            "victor.coding.rl.hooks",
-            "_hooks_instance"
-        )
-        self._safe_reset_module_var(
-            "victor.devops.rl",
-            "_hooks_instance"
-        )
+        self._safe_reset_module_var("victor.dataanalysis.rl", "_hooks_instance")
+        self._safe_reset_module_var("victor.coding.rl.hooks", "_hooks_instance")
+        self._safe_reset_module_var("victor.devops.rl", "_hooks_instance")
 
     def _register_core_singletons(self) -> None:
         """Reset core module singletons."""
+
         # Reset global DI container first (before other singletons that may depend on it)
         def _reset_container():
             try:
                 from victor.core.container import reset_container
+
                 reset_container()
             except ImportError:
                 pass
@@ -354,29 +270,18 @@ class SingletonResetRegistry:
         def _reset_vertical_config_cache():
             try:
                 from victor.core.verticals.base import VerticalBase
+
                 VerticalBase._config_cache.clear()
             except ImportError:
                 pass
 
         self.register(_reset_vertical_config_cache)
 
-        self._safe_reset(
-            "victor.core.mode_config",
-            "ModeConfigRegistry"
-        )
-        self._safe_reset(
-            "victor.core.registry_base",
-            "RegistryBase"
-        )
-        self._safe_reset(
-            "victor.core.tool_tier_registry",
-            "ToolTierRegistry"
-        )
+        self._safe_reset("victor.core.mode_config", "ModeConfigRegistry")
+        self._safe_reset("victor.core.registry_base", "RegistryBase")
+        self._safe_reset("victor.core.tool_tier_registry", "ToolTierRegistry")
         # Integration singletons
-        self._safe_reset(
-            "victor.integrations.api.event_bridge",
-            "EventBroadcaster"
-        )
+        self._safe_reset("victor.integrations.api.event_bridge", "EventBroadcaster")
 
 
 # Global registry instance
@@ -408,13 +313,15 @@ def reset_event_loop_singletons() -> None:
     """
     try:
         from victor.observability.event_bus import EventBus
+
         EventBus.reset_instance()
     except ImportError:
         pass
 
     try:
         from victor.integrations.api.event_bridge import EventBroadcaster
-        if hasattr(EventBroadcaster, '_instance') and EventBroadcaster._instance is not None:
+
+        if hasattr(EventBroadcaster, "_instance") and EventBroadcaster._instance is not None:
             EventBroadcaster._instance = None
     except ImportError:
         pass

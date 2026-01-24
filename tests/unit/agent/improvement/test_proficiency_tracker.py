@@ -171,9 +171,7 @@ class TestProficiencyTracker:
         assert cursor.fetchone() is not None
 
         # Check task_outcomes table
-        cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='task_outcomes'"
-        )
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='task_outcomes'")
         assert cursor.fetchone() is not None
 
         # Check task_success_rates table
@@ -310,7 +308,10 @@ class TestRecordOutcome:
 
         # Check proficiency was updated
         cursor = tracker.db.cursor()
-        cursor.execute("SELECT success_count, total_count FROM tool_proficiency WHERE tool = ?", ("ast_analyzer",))
+        cursor.execute(
+            "SELECT success_count, total_count FROM tool_proficiency WHERE tool = ?",
+            ("ast_analyzer",),
+        )
         row = cursor.fetchone()
 
         assert row is not None
@@ -324,7 +325,10 @@ class TestRecordOutcome:
         tracker.record_outcome(task="code_review", tool="ast_analyzer", outcome=outcome)
 
         cursor = tracker.db.cursor()
-        cursor.execute("SELECT success_count, total_count FROM task_success_rates WHERE task = ?", ("code_review",))
+        cursor.execute(
+            "SELECT success_count, total_count FROM task_success_rates WHERE task = ?",
+            ("code_review",),
+        )
         row = cursor.fetchone()
 
         assert row is not None
@@ -959,7 +963,9 @@ class TestSuggestToolForTask:
             outcome1 = TaskOutcome(success=True, duration=1.0, cost=0.001, quality_score=0.9)
             tracker.record_outcome(task="code_review", tool="ast_analyzer", outcome=outcome1)
 
-            outcome2 = TaskOutcome(success=(i % 2 == 0), duration=1.5, cost=0.002, quality_score=0.7)
+            outcome2 = TaskOutcome(
+                success=(i % 2 == 0), duration=1.5, cost=0.002, quality_score=0.7
+            )
             tracker.record_outcome(task="code_review", tool="semantic_search", outcome=outcome2)
 
         suggestion = tracker.suggest_tool_for_task("code_review")

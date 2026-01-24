@@ -52,10 +52,7 @@ def _register_escape_hatches() -> None:
 
 
 # Create lazy initializer (no import side-effect)
-_lazy_init = get_initializer_for_vertical(
-    "research",
-    _register_escape_hatches
-)
+_lazy_init = get_initializer_for_vertical("research", _register_escape_hatches)
 
 __all__ = [
     "ResearchAssistant",

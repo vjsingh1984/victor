@@ -246,9 +246,7 @@ class TestProficiencyTrackerIntegration:
         assert score is not None
         assert score.trend in [TrendDirection.IMPROVING, TrendDirection.STABLE]
 
-    def test_tracker_improvement_suggestions(
-        self, proficiency_tracker: ProficiencyTracker
-    ):
+    def test_tracker_improvement_suggestions(self, proficiency_tracker: ProficiencyTracker):
         """Test improvement suggestion generation.
 
         Args:
@@ -276,9 +274,7 @@ class TestProficiencyTrackerIntegration:
         assert any(s.tool == "semantic_search" for s in suggestions)
         assert any(s.priority == "high" for s in suggestions)
 
-    def test_trajectory_snapshot_recording(
-        self, proficiency_tracker: ProficiencyTracker
-    ):
+    def test_trajectory_snapshot_recording(self, proficiency_tracker: ProficiencyTracker):
         """Test improvement trajectory snapshot recording.
 
         Args:
@@ -319,9 +315,7 @@ class TestProficiencyTrackerIntegration:
         tools = ["ast_analyzer", "semantic_search", "test_generator"]
         for tool in tools:
             for i, outcome in enumerate(sample_task_outcomes[:10]):
-                proficiency_tracker.record_outcome(
-                    task="code_review", tool=tool, outcome=outcome
-                )
+                proficiency_tracker.record_outcome(task="code_review", tool=tool, outcome=outcome)
 
         # Export metrics
         metrics = proficiency_tracker.export_metrics(top_n=5)
@@ -366,9 +360,7 @@ class TestRLCoordinatorIntegration:
         assert action in q_table[state]
         assert q_table[state][action] > 0  # Should have positive value
 
-    def test_experience_replay_buffer(
-        self, rl_coordinator: FrameworkRLCoordinator
-    ):
+    def test_experience_replay_buffer(self, rl_coordinator: FrameworkRLCoordinator):
         """Test experience replay buffer functionality.
 
         Args:
@@ -392,9 +384,7 @@ class TestRLCoordinatorIntegration:
         batch = rl_coordinator.replay_buffer.sample(batch_size=32)
         assert len(batch) == 32
 
-    def test_action_selection_with_exploration(
-        self, rl_coordinator: FrameworkRLCoordinator
-    ):
+    def test_action_selection_with_exploration(self, rl_coordinator: FrameworkRLCoordinator):
         """Test action selection with epsilon-greedy exploration.
 
         Args:
@@ -416,9 +406,7 @@ class TestRLCoordinatorIntegration:
         unique_actions = len(set(selections))
         assert unique_actions > 1  # At least 2 different actions selected
 
-    def test_policy_statistics_tracking(
-        self, rl_coordinator: FrameworkRLCoordinator
-    ):
+    def test_policy_statistics_tracking(self, rl_coordinator: FrameworkRLCoordinator):
         """Test policy statistics tracking.
 
         Args:
@@ -436,8 +424,7 @@ class TestRLCoordinatorIntegration:
         # Select actions to increment action_count
         for _ in range(10):
             rl_coordinator.select_action(
-                state="code_review",
-                available_actions=["ast_analyzer", "semantic_search"]
+                state="code_review", available_actions=["ast_analyzer", "semantic_search"]
             )
 
         # Get statistics
@@ -449,9 +436,7 @@ class TestRLCoordinatorIntegration:
         assert 0.0 <= stats.average_reward <= 1.0
         assert 0.0 <= stats.exploration_rate <= 1.0
 
-    def test_reward_computation_from_task_result(
-        self, rl_coordinator: FrameworkRLCoordinator
-    ):
+    def test_reward_computation_from_task_result(self, rl_coordinator: FrameworkRLCoordinator):
         """Test reward computation from task results.
 
         Args:
@@ -656,20 +641,14 @@ class TestSelfImprovementWorkflow:
         assert action_values["ast_analyzer"] > 0
 
         # Select action - should prefer best tool
-        best_action = rl_coordinator.select_action(
-            state=state, available_actions=tools
-        )
+        best_action = rl_coordinator.select_action(state=state, available_actions=tools)
 
         # With low exploration, should select best tool
         rl_coordinator.exploration.epsilon = 0.0
-        best_action = rl_coordinator.select_action(
-            state=state, available_actions=tools
-        )
+        best_action = rl_coordinator.select_action(state=state, available_actions=tools)
         assert best_action in tools
 
-    def test_adaptive_exploration_decay(
-        self, rl_coordinator: FrameworkRLCoordinator
-    ):
+    def test_adaptive_exploration_decay(self, rl_coordinator: FrameworkRLCoordinator):
         """Test adaptive exploration rate decay.
 
         Args:
@@ -816,9 +795,7 @@ class TestIntegrationEdgeCases:
         )
         assert len(suggestions) == 0
 
-    def test_rl_coordinator_with_new_state(
-        self, rl_coordinator: FrameworkRLCoordinator
-    ):
+    def test_rl_coordinator_with_new_state(self, rl_coordinator: FrameworkRLCoordinator):
         """Test RL coordinator with previously unseen state.
 
         Args:
@@ -831,9 +808,7 @@ class TestIntegrationEdgeCases:
         action = rl_coordinator.select_action(state=new_state, available_actions=actions)
         assert action in actions
 
-    def test_tracker_reset_functionality(
-        self, proficiency_tracker: ProficiencyTracker
-    ):
+    def test_tracker_reset_functionality(self, proficiency_tracker: ProficiencyTracker):
         """Test resetting tracker data.
 
         Args:
@@ -841,12 +816,8 @@ class TestIntegrationEdgeCases:
         """
         # Add data
         for i in range(5):
-            outcome = TaskOutcome(
-                success=True, duration=1.0, cost=0.001, quality_score=0.9
-            )
-            proficiency_tracker.record_outcome(
-                task="test", tool="test_tool", outcome=outcome
-            )
+            outcome = TaskOutcome(success=True, duration=1.0, cost=0.001, quality_score=0.9)
+            proficiency_tracker.record_outcome(task="test", tool="test_tool", outcome=outcome)
 
         # Verify data exists
         score = proficiency_tracker.get_proficiency("test_tool")
@@ -867,9 +838,7 @@ class TestIntegrationEdgeCases:
         """
         # Train
         for i in range(10):
-            rl_coordinator.update_policy(
-                reward=1.0, state="test", action="action1"
-            )
+            rl_coordinator.update_policy(reward=1.0, state="test", action="action1")
 
         # Verify learning
         q_table = rl_coordinator.get_q_table()

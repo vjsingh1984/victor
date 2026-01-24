@@ -62,6 +62,7 @@ class TestHelperFunctions:
 
     def test_is_streaming_provider_with_method(self):
         """Test is_streaming_provider with object that has method."""
+
         class MockProvider:
             def supports_streaming(self) -> bool:
                 return True
@@ -71,6 +72,7 @@ class TestHelperFunctions:
 
     def test_is_streaming_provider_without_method(self):
         """Test is_streaming_provider with object without method."""
+
         class MockProvider:
             pass
 
@@ -79,6 +81,7 @@ class TestHelperFunctions:
 
     def test_is_streaming_provider_returns_false(self):
         """Test is_streaming_provider when method returns False."""
+
         class MockProvider:
             def supports_streaming(self) -> bool:
                 return False
@@ -88,6 +91,7 @@ class TestHelperFunctions:
 
     def test_is_tool_calling_provider_with_method(self):
         """Test is_tool_calling_provider with object that has method."""
+
         class MockProvider:
             def supports_tools(self) -> bool:
                 return True
@@ -97,6 +101,7 @@ class TestHelperFunctions:
 
     def test_is_tool_calling_provider_without_method(self):
         """Test is_tool_calling_provider with object without method."""
+
         class MockProvider:
             pass
 
@@ -105,6 +110,7 @@ class TestHelperFunctions:
 
     def test_is_tool_calling_provider_returns_false(self):
         """Test is_tool_calling_provider when method returns False."""
+
         class MockProvider:
             def supports_tools(self) -> bool:
                 return False
@@ -171,12 +177,7 @@ class TestToolDefinition:
         tool = ToolDefinition(
             name="search",
             description="Search the web",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string"}
-                }
-            }
+            parameters={"type": "object", "properties": {"query": {"type": "string"}}},
         )
         assert tool.name == "search"
         assert tool.description == "Search the web"
@@ -246,6 +247,7 @@ class TestBaseProvider:
     def test_base_provider_has_abstract_methods(self):
         """Test BaseProvider has required abstract methods."""
         import inspect
+
         abstract_methods = BaseProvider.__abstractmethods__
         # Should have at least chat and name as abstract
         assert "chat" in abstract_methods or len(abstract_methods) > 0

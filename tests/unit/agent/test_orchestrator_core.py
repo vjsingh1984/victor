@@ -2830,7 +2830,7 @@ class TestGetThinkingDisabledPrompt:
         with patch.object(
             orchestrator._prompt_coordinator,
             "get_thinking_disabled_prompt",
-            return_value="Hello world"
+            return_value="Hello world",
         ):
             result = orchestrator._get_thinking_disabled_prompt("Hello world")
             assert result == "Hello world"
@@ -2841,7 +2841,7 @@ class TestGetThinkingDisabledPrompt:
         with patch.object(
             orchestrator._prompt_coordinator,
             "get_thinking_disabled_prompt",
-            return_value="/no_think\nHello world"
+            return_value="/no_think\nHello world",
         ):
             result = orchestrator._get_thinking_disabled_prompt("Hello world")
             assert result == "/no_think\nHello world"
@@ -2852,7 +2852,7 @@ class TestGetThinkingDisabledPrompt:
         with patch.object(
             orchestrator._prompt_coordinator,
             "get_thinking_disabled_prompt",
-            return_value="Test prompt"
+            return_value="Test prompt",
         ):
             result = orchestrator._get_thinking_disabled_prompt("Test prompt")
             assert result == "Test prompt"

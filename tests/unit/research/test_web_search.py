@@ -410,7 +410,11 @@ class TestSearchIntegration:
 
         results_source_2 = [
             {"title": "Result 3", "url": "https://example.com/3", "snippet": "Snippet 3"},
-            {"title": "Result 1", "url": "https://example.com/1", "snippet": "Snippet 1"},  # Duplicate
+            {
+                "title": "Result 1",
+                "url": "https://example.com/1",
+                "snippet": "Snippet 1",
+            },  # Duplicate
         ]
 
         # Aggregate results
@@ -721,9 +725,7 @@ class TestWebFetchFunction:
         <p>Additional paragraph to ensure length requirements are met.</p>
         </body></html>"""
 
-        respx.get("https://example.com").mock(
-            return_value=httpx.Response(200, text=html_content)
-        )
+        respx.get("https://example.com").mock(return_value=httpx.Response(200, text=html_content))
 
         result = await web_fetch(url="https://example.com")
 
@@ -737,9 +739,7 @@ class TestWebFetchFunction:
     @pytest.mark.asyncio
     async def test_web_fetch_404_error(self):
         """Test web fetch with 404 error."""
-        respx.get("https://example.com").mock(
-            return_value=httpx.Response(404, text="Not Found")
-        )
+        respx.get("https://example.com").mock(return_value=httpx.Response(404, text="Not Found"))
 
         result = await web_fetch(url="https://example.com")
 
@@ -764,9 +764,7 @@ class TestWebFetchFunction:
         # Create large HTML content
         large_content = "<html><body>" + "<p>Test</p>" * 1000 + "</body></html>"
 
-        respx.get("https://example.com").mock(
-            return_value=httpx.Response(200, text=large_content)
-        )
+        respx.get("https://example.com").mock(return_value=httpx.Response(200, text=large_content))
 
         result = await web_fetch(url="https://example.com")
 

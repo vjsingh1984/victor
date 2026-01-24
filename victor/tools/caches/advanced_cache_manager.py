@@ -441,7 +441,11 @@ class AdvancedCacheManager:
             metrics.combined = {
                 "total_hits": total_hits,
                 "total_misses": total_misses,
-                "hit_rate": total_hits / (total_hits + total_misses) if (total_hits + total_misses) > 0 else 0.0,
+                "hit_rate": (
+                    total_hits / (total_hits + total_misses)
+                    if (total_hits + total_misses) > 0
+                    else 0.0
+                ),
                 "total_entries": total_entries,
                 "strategies_enabled": {
                     "basic": True,

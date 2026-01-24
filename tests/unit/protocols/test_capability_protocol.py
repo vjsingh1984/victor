@@ -30,6 +30,7 @@ class TestCapabilityContainerProtocol:
 
         # Check method signature
         import inspect
+
         sig = inspect.signature(CapabilityContainerProtocol.has_capability)
         assert "capability_name" in sig.parameters
         assert sig.return_annotation == bool
@@ -40,12 +41,14 @@ class TestCapabilityContainerProtocol:
 
         # Check method signature
         import inspect
+
         sig = inspect.signature(CapabilityContainerProtocol.get_capability)
         assert "name" in sig.parameters
         assert sig.return_annotation == Optional[Any]
 
     def test_isinstance_with_compliant_implementation(self):
         """isinstance() should return True for compliant implementations."""
+
         # Create a compliant implementation (regular class, not Protocol)
         class CompliantImpl:
             def has_capability(self, capability_name: str) -> bool:
@@ -66,6 +69,7 @@ class TestCapabilityContainerProtocol:
 
     def test_isinstance_with_non_compliant_implementation(self):
         """isinstance() should return False for non-compliant implementations."""
+
         # Create a non-compliant implementation (missing methods)
         class NonCompliantImpl:
             def has_capability(self, capability_name: str) -> bool:
@@ -79,6 +83,7 @@ class TestCapabilityContainerProtocol:
 
     def test_isinstance_with_partial_implementation(self):
         """isinstance() should return False for partial implementations."""
+
         # Create a partial implementation (wrong signature)
         class PartialImpl:
             def has_capability(self, capability_name: str) -> bool:  # Correct
@@ -94,6 +99,7 @@ class TestCapabilityContainerProtocol:
 
     def test_protocol_enforces_type_safety(self):
         """Protocol should enforce type safety for method calls."""
+
         class TypedImpl:
             def has_capability(self, capability_name: str) -> bool:
                 if not isinstance(capability_name, str):
@@ -155,6 +161,7 @@ class TestProtocolComplianceInRealCode:
 
     def test_capability_container_can_store_and_retrieve_capabilities(self):
         """Protocol should support storing and retrieving capabilities."""
+
         class SimpleCapabilityContainer:
             def __init__(self):
                 self._capabilities = {
@@ -187,6 +194,7 @@ class TestProtocolComplianceInRealCode:
 
     def test_multiple_independent_containers(self):
         """Multiple independent containers should coexist."""
+
         class ContainerA:
             def has_capability(self, capability_name: str) -> bool:
                 return capability_name.startswith("a_")
@@ -223,6 +231,7 @@ class TestProtocolEdgeCases:
 
     def test_protocol_with_none_capability(self):
         """Protocol should handle None capability names gracefully."""
+
         class NoneHandlingContainer:
             def has_capability(self, capability_name: str) -> bool:
                 if capability_name is None:
@@ -242,6 +251,7 @@ class TestProtocolEdgeCases:
 
     def test_protocol_with_empty_string_capability(self):
         """Protocol should handle empty string capability names."""
+
         class EmptyStringContainer:
             def has_capability(self, capability_name: str) -> bool:
                 return len(capability_name) > 0

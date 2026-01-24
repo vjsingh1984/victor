@@ -243,8 +243,7 @@ class InMemoryEventBackend:
 
         # Check if event is whitelisted (never sampled)
         is_whitelisted = any(
-            event.topic.startswith(pattern)
-            for pattern in self._sampling_whitelist
+            event.topic.startswith(pattern) for pattern in self._sampling_whitelist
         )
 
         # Apply sampling rate (unless whitelisted or sampling is disabled)

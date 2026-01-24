@@ -186,6 +186,7 @@ class TestPersonaRepository:
 
         # Create a NEW persona object with version 2
         from copy import deepcopy
+
         v2_persona = deepcopy(sample_persona)
         v2_persona.version = 2
         v2_persona.name = "Updated"

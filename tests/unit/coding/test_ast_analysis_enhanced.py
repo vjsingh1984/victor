@@ -154,9 +154,7 @@ class TestSymbolExtraction:
         class_symbols = [s for s in symbols if s.type == "class"]
         assert len(class_symbols) > 0
 
-        calculator_class = next(
-            (s for s in class_symbols if s.name == "Calculator"), None
-        )
+        calculator_class = next((s for s in class_symbols if s.name == "Calculator"), None)
         assert calculator_class is not None
         assert calculator_class.line_number > 0
 
@@ -182,7 +180,9 @@ class TestSymbolExtraction:
         assert len(function_symbols) > 0
 
         # Check for async functions
-        async_funcs = [s for s in function_symbols if "async" in s.name.lower() or "fetch" in s.name.lower()]
+        async_funcs = [
+            s for s in function_symbols if "async" in s.name.lower() or "fetch" in s.name.lower()
+        ]
         assert len(async_funcs) > 0
 
     def test_extract_decorated_functions(self, extractor, temp_file):

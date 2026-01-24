@@ -78,8 +78,10 @@ def safety_checker():
 @pytest.fixture
 def mock_callback():
     """Create a mock confirmation callback."""
+
     async def callback(request):
         return True
+
     return callback
 
 
@@ -124,8 +126,9 @@ class TestBashAuthorization:
             level, details = safety_checker.check_bash_command(cmd)
             assert level == OperationalRiskLevel.MEDIUM, f"'{cmd}' should be MEDIUM but got {level}"
             for keyword in expected_keywords:
-                assert any(keyword.lower() in d.lower() for d in details), \
-                    f"Expected '{keyword}' in details for '{cmd}' but got {details}"
+                assert any(
+                    keyword.lower() in d.lower() for d in details
+                ), f"Expected '{keyword}' in details for '{cmd}' but got {details}"
 
     def test_high_risk_bash_commands(self, safety_checker):
         """High risk commands should be detected correctly."""
@@ -144,8 +147,9 @@ class TestBashAuthorization:
             level, details = safety_checker.check_bash_command(cmd)
             assert level == OperationalRiskLevel.HIGH, f"'{cmd}' should be HIGH but got {level}"
             for keyword in expected_keywords:
-                assert any(keyword.lower() in d.lower() for d in details), \
-                    f"Expected '{keyword}' in details for '{cmd}' but got {details}"
+                assert any(
+                    keyword.lower() in d.lower() for d in details
+                ), f"Expected '{keyword}' in details for '{cmd}' but got {details}"
 
     def test_critical_risk_bash_commands(self, safety_checker):
         """Critical risk commands should be detected correctly."""
@@ -159,10 +163,13 @@ class TestBashAuthorization:
         ]
         for cmd, expected_keywords in critical_commands:
             level, details = safety_checker.check_bash_command(cmd)
-            assert level == OperationalRiskLevel.CRITICAL, f"'{cmd}' should be CRITICAL but got {level}"
+            assert (
+                level == OperationalRiskLevel.CRITICAL
+            ), f"'{cmd}' should be CRITICAL but got {level}"
             for keyword in expected_keywords:
-                assert any(keyword.lower() in d.lower() for d in details), \
-                    f"Expected '{keyword}' in details for '{cmd}' but got {details}"
+                assert any(
+                    keyword.lower() in d.lower() for d in details
+                ), f"Expected '{keyword}' in details for '{cmd}' but got {details}"
 
     def test_bash_command_case_insensitive(self, safety_checker):
         """Bash command patterns should be case-insensitive."""
@@ -272,17 +279,13 @@ class TestFileAccessControl:
 
     def test_delete_file_operation(self, safety_checker):
         """Delete operations should be HIGH risk."""
-        level, details = safety_checker.check_file_operation(
-            "delete", "/tmp/test.txt"
-        )
+        level, details = safety_checker.check_file_operation("delete", "/tmp/test.txt")
         assert level == OperationalRiskLevel.HIGH
         assert any("deleting" in d.lower() for d in details)
 
     def test_edit_file_operation(self, safety_checker):
         """Edit operations should be SAFE by default."""
-        level, details = safety_checker.check_file_operation(
-            "edit", "/tmp/test.txt"
-        )
+        level, details = safety_checker.check_file_operation("edit", "/tmp/test.txt")
         assert level == OperationalRiskLevel.SAFE
 
     def test_path_with_dangerous_extension_in_middle(self, safety_checker):
@@ -336,6 +339,7 @@ class TestDangerousCommandPatterns:
     def test_git_destructive_commands(self, safety_checker):
         """Git destructive operations should be detected."""
         from victor.agent.safety import _RISK_ORDER
+
         destructive_cmds = [
             "git reset --hard",
             "git clean -fd",
@@ -346,19 +350,21 @@ class TestDangerousCommandPatterns:
         ]
         for cmd in destructive_cmds:
             level, details = safety_checker.check_bash_command(cmd)
-            assert _RISK_ORDER[level] >= _RISK_ORDER[OperationalRiskLevel.HIGH], \
-                f"'{cmd}' should be HIGH or CRITICAL but got {level}"
+            assert (
+                _RISK_ORDER[level] >= _RISK_ORDER[OperationalRiskLevel.HIGH]
+            ), f"'{cmd}' should be HIGH or CRITICAL but got {level}"
 
     def test_fork_bomb_detection(self, safety_checker):
         """Fork bomb should be detected as CRITICAL."""
         # The fork bomb pattern matches :(){ :|:& };:
         # Note: This is a subtle pattern where colons are function names
-        fork_bomb = ':{ :|:& };:'
+        fork_bomb = ":{ :|:& };:"
         level, details = safety_checker.check_bash_command(fork_bomb)
 
         # Should detect this dangerous pattern as CRITICAL
-        assert level == OperationalRiskLevel.CRITICAL, \
-            f"Fork bomb should be CRITICAL but got {level}, details: {details}"
+        assert (
+            level == OperationalRiskLevel.CRITICAL
+        ), f"Fork bomb should be CRITICAL but got {level}, details: {details}"
 
     def test_disk_write_commands(self, safety_checker):
         """Direct disk writes should be CRITICAL."""
@@ -408,6 +414,7 @@ class TestDangerousCommandPatterns:
     def test_wildcard_deletion(self, safety_checker):
         """Wildcard deletion should be HIGH risk."""
         from victor.agent.safety import _RISK_ORDER
+
         wildcard_cmds = [
             "rm *.log",
             "rm *.tmp",
@@ -415,8 +422,9 @@ class TestDangerousCommandPatterns:
         ]
         for cmd in wildcard_cmds:
             level, details = safety_checker.check_bash_command(cmd)
-            assert _RISK_ORDER[level] >= _RISK_ORDER[OperationalRiskLevel.HIGH], \
-                f"'{cmd}' should be HIGH or CRITICAL but got {level}"
+            assert (
+                _RISK_ORDER[level] >= _RISK_ORDER[OperationalRiskLevel.HIGH]
+            ), f"'{cmd}' should be HIGH or CRITICAL but got {level}"
 
     def test_git_checkout_discard(self, safety_checker):
         """Git checkout -- should discard changes (MEDIUM risk)."""
@@ -436,6 +444,7 @@ class TestRiskLevelCategorization:
     def test_risk_level_ordering(self):
         """Risk levels should be properly ordered."""
         from victor.agent.safety import _RISK_ORDER
+
         assert _RISK_ORDER[OperationalRiskLevel.SAFE] == 0
         assert _RISK_ORDER[OperationalRiskLevel.LOW] == 1
         assert _RISK_ORDER[OperationalRiskLevel.MEDIUM] == 2
@@ -513,9 +522,7 @@ class TestRiskLevelCategorization:
         test_file = tmp_path / "test.env"
         test_file.write_text("SECRET=value")
 
-        level, _ = safety_checker.check_file_operation(
-            "write", str(test_file), overwrite=True
-        )
+        level, _ = safety_checker.check_file_operation("write", str(test_file), overwrite=True)
         # Should be HIGH due to .env extension (takes priority)
         assert level == OperationalRiskLevel.HIGH
 
@@ -531,10 +538,7 @@ class TestApprovalModes:
     @pytest.mark.asyncio
     async def test_off_approval_mode(self, mock_callback):
         """OFF mode should auto-approve all operations."""
-        checker = SafetyChecker(
-            approval_mode=ApprovalMode.OFF,
-            confirmation_callback=mock_callback
-        )
+        checker = SafetyChecker(approval_mode=ApprovalMode.OFF, confirmation_callback=mock_callback)
 
         # Even critical operations should be auto-approved
         should_proceed, reason = await checker.check_and_confirm(
@@ -553,8 +557,7 @@ class TestApprovalModes:
             return True
 
         checker = SafetyChecker(
-            approval_mode=ApprovalMode.ALL_WRITES,
-            confirmation_callback=mock_callback
+            approval_mode=ApprovalMode.ALL_WRITES, confirmation_callback=mock_callback
         )
 
         # Even safe write operations should require confirmation
@@ -570,7 +573,7 @@ class TestApprovalModes:
         """RISKY_ONLY mode should auto-approve safe operations."""
         checker = SafetyChecker(
             approval_mode=ApprovalMode.RISKY_ONLY,
-            require_confirmation_threshold=OperationalRiskLevel.HIGH
+            require_confirmation_threshold=OperationalRiskLevel.HIGH,
         )
 
         should_proceed, reason = await checker.check_and_confirm(
@@ -592,7 +595,7 @@ class TestApprovalModes:
         checker = SafetyChecker(
             approval_mode=ApprovalMode.RISKY_ONLY,
             confirmation_callback=mock_callback,
-            require_confirmation_threshold=OperationalRiskLevel.HIGH
+            require_confirmation_threshold=OperationalRiskLevel.HIGH,
         )
 
         should_proceed, reason = await checker.check_and_confirm(
@@ -613,7 +616,7 @@ class TestApprovalModes:
         checker = SafetyChecker(
             approval_mode=ApprovalMode.RISKY_ONLY,
             confirmation_callback=mock_callback,
-            require_confirmation_threshold=OperationalRiskLevel.MEDIUM
+            require_confirmation_threshold=OperationalRiskLevel.MEDIUM,
         )
 
         should_proceed, reason = await checker.check_and_confirm(
@@ -625,12 +628,12 @@ class TestApprovalModes:
     @pytest.mark.asyncio
     async def test_user_rejects_operation(self):
         """User rejection should block operation."""
+
         async def mock_callback(request):
             return False  # User rejects
 
         checker = SafetyChecker(
-            approval_mode=ApprovalMode.RISKY_ONLY,
-            confirmation_callback=mock_callback
+            approval_mode=ApprovalMode.RISKY_ONLY, confirmation_callback=mock_callback
         )
 
         should_proceed, reason = await checker.check_and_confirm(
@@ -645,7 +648,7 @@ class TestApprovalModes:
         checker = SafetyChecker(
             approval_mode=ApprovalMode.RISKY_ONLY,
             confirmation_callback=None,
-            require_confirmation_threshold=OperationalRiskLevel.HIGH
+            require_confirmation_threshold=OperationalRiskLevel.HIGH,
         )
 
         # Should proceed even without callback (with logged warning)
@@ -658,12 +661,12 @@ class TestApprovalModes:
     @pytest.mark.asyncio
     async def test_callback_exception_handling(self):
         """Callback exceptions should be handled appropriately."""
+
         async def failing_callback(request):
             raise Exception("Callback failed")
 
         checker = SafetyChecker(
-            approval_mode=ApprovalMode.RISKY_ONLY,
-            confirmation_callback=failing_callback
+            approval_mode=ApprovalMode.RISKY_ONLY, confirmation_callback=failing_callback
         )
 
         # High risk should be blocked on callback failure
@@ -685,9 +688,7 @@ class TestCustomPatterns:
     def test_add_custom_pattern_high_risk(self, safety_checker):
         """Custom HIGH risk pattern should be detected."""
         safety_checker.add_custom_pattern(
-            pattern=r"dangerous_command",
-            description="Custom dangerous command",
-            risk_level="HIGH"
+            pattern=r"dangerous_command", description="Custom dangerous command", risk_level="HIGH"
         )
 
         level, details = safety_checker.check_bash_command("dangerous_command")
@@ -697,9 +698,7 @@ class TestCustomPatterns:
     def test_add_custom_pattern_critical_risk(self, safety_checker):
         """Custom CRITICAL risk pattern should be detected."""
         safety_checker.add_custom_pattern(
-            pattern=r"critical_cmd",
-            description="Critical operation",
-            risk_level="CRITICAL"
+            pattern=r"critical_cmd", description="Critical operation", risk_level="CRITICAL"
         )
 
         level, details = safety_checker.check_bash_command("critical_cmd")
@@ -708,9 +707,7 @@ class TestCustomPatterns:
     def test_add_custom_pattern_medium_risk(self, safety_checker):
         """Custom MEDIUM risk pattern should be detected."""
         safety_checker.add_custom_pattern(
-            pattern=r"moderate_cmd",
-            description="Moderate risk operation",
-            risk_level="MEDIUM"
+            pattern=r"moderate_cmd", description="Moderate risk operation", risk_level="MEDIUM"
         )
 
         level, details = safety_checker.check_bash_command("moderate_cmd")
@@ -719,9 +716,7 @@ class TestCustomPatterns:
     def test_add_custom_pattern_low_risk(self, safety_checker):
         """Custom LOW risk pattern should be detected."""
         safety_checker.add_custom_pattern(
-            pattern=r"low_cmd",
-            description="Low risk operation",
-            risk_level="LOW"
+            pattern=r"low_cmd", description="Low risk operation", risk_level="LOW"
         )
 
         level, details = safety_checker.check_bash_command("low_cmd")
@@ -730,9 +725,7 @@ class TestCustomPatterns:
     def test_custom_pattern_case_insensitive(self, safety_checker):
         """Custom patterns should be case-insensitive."""
         safety_checker.add_custom_pattern(
-            pattern=r"custom_pattern",
-            description="Custom pattern test",
-            risk_level="HIGH"
+            pattern=r"custom_pattern", description="Custom pattern test", risk_level="HIGH"
         )
 
         level, details = safety_checker.check_bash_command("CUSTOM_PATTERN")
@@ -742,9 +735,7 @@ class TestCustomPatterns:
         """Invalid regex pattern should be handled gracefully."""
         # Should not raise exception
         safety_checker.add_custom_pattern(
-            pattern=r"[invalid(unclosed",
-            description="Invalid pattern",
-            risk_level="HIGH"
+            pattern=r"[invalid(unclosed", description="Invalid pattern", risk_level="HIGH"
         )
 
         # Pattern should be ignored (no crash)
@@ -845,7 +836,7 @@ class TestConfirmationRequest:
             risk_level=OperationalRiskLevel.HIGH,
             description="Delete files",
             details=["Recursively delete files/directories"],
-            arguments={"command": "rm -rf /tmp/test"}
+            arguments={"command": "rm -rf /tmp/test"},
         )
 
         message = request.format_message(mock_presentation)
@@ -861,7 +852,7 @@ class TestConfirmationRequest:
             risk_level=OperationalRiskLevel.CRITICAL,
             description="Delete filesystem",
             details=["Delete entire filesystem"],
-            arguments={"command": "rm -rf /"}
+            arguments={"command": "rm -rf /"},
         )
 
         message = request.format_message(mock_presentation)
@@ -874,7 +865,7 @@ class TestConfirmationRequest:
             risk_level=OperationalRiskLevel.LOW,
             description="Write file",
             details=[],
-            arguments={"path": "/tmp/test.txt"}
+            arguments={"path": "/tmp/test.txt"},
         )
 
         message = request.format_message(mock_presentation)
@@ -889,7 +880,7 @@ class TestConfirmationRequest:
             risk_level=OperationalRiskLevel.HIGH,
             description="Dangerous operation",
             details=["Risk 1", "Risk 2", "Risk 3"],
-            arguments={"cmd": "test"}
+            arguments={"cmd": "test"},
         )
 
         message = request.format_message(mock_presentation)
@@ -905,7 +896,7 @@ class TestConfirmationRequest:
             risk_level=OperationalRiskLevel.HIGH,
             description="Execute command",
             details=["Dangerous command"],
-            arguments={"command": "rm -rf /tmp"}
+            arguments={"command": "rm -rf /tmp"},
         )
 
         message = request.format_message(mock_presentation)
@@ -920,7 +911,7 @@ class TestConfirmationRequest:
             risk_level=OperationalRiskLevel.MEDIUM,
             description="Write file",
             details=["Overwrite file"],
-            arguments={"path": "/tmp/test.txt"}
+            arguments={"path": "/tmp/test.txt"},
         )
 
         # Should create default presentation adapter
@@ -956,6 +947,7 @@ class TestHITLIntegration:
         """setup_hitl_safety_integration should configure callback."""
         # Save original callback
         import victor.agent.safety as safety_module
+
         original_checker = safety_module._default_checker
 
         try:
@@ -1022,9 +1014,7 @@ class TestEdgeCases:
     async def test_check_and_confirm_with_no_arguments(self):
         """Operations with no arguments should be handled."""
         checker = SafetyChecker()
-        should_proceed, reason = await checker.check_and_confirm(
-            "read_file", {}
-        )
+        should_proceed, reason = await checker.check_and_confirm("read_file", {})
         assert should_proceed is True
 
     @pytest.mark.asyncio
@@ -1037,18 +1027,18 @@ class TestEdgeCases:
             return True
 
         checker = SafetyChecker(
-            approval_mode=ApprovalMode.ALL_WRITES,
-            confirmation_callback=mock_callback
+            approval_mode=ApprovalMode.ALL_WRITES, confirmation_callback=mock_callback
         )
 
         should_proceed, reason = await checker.check_and_confirm(
-            "edit_files", {
+            "edit_files",
+            {
                 "edits": [
                     {"path": "/tmp/file1.txt"},
                     {"path": "/tmp/file2.txt"},
                     {"path": "/tmp/file3.txt"},
                 ]
-            }
+            },
         )
 
         assert should_proceed is True
@@ -1073,7 +1063,7 @@ class TestEdgeCases:
 
         checker = SafetyChecker(
             confirmation_callback=mock_callback,
-            require_confirmation_threshold=OperationalRiskLevel.MEDIUM
+            require_confirmation_threshold=OperationalRiskLevel.MEDIUM,
         )
 
         long_cmd = "rm " + "x" * 200
@@ -1102,7 +1092,7 @@ class TestEdgeCases:
         special_paths = [
             "/tmp/file with spaces.txt",
             "/tmp/file'with'quotes.txt",
-            "/tmp/file\"with\"doublequotes.txt",
+            '/tmp/file"with"doublequotes.txt',
         ]
         for path in special_paths:
             level, details = safety_checker.check_file_operation("write", path)
@@ -1112,9 +1102,7 @@ class TestEdgeCases:
     def test_custom_pattern_with_special_regex_chars(self, safety_checker):
         """Custom patterns with special regex chars should work."""
         safety_checker.add_custom_pattern(
-            pattern=r"test\.\*+",
-            description="Special regex pattern",
-            risk_level="HIGH"
+            pattern=r"test\.\*+", description="Special regex pattern", risk_level="HIGH"
         )
 
         level, details = safety_checker.check_bash_command("test.*+")
@@ -1137,8 +1125,7 @@ class TestEdgeCases:
                 return True
 
             checker = SafetyChecker(
-                confirmation_callback=mock_callback,
-                require_confirmation_threshold=risk_level
+                confirmation_callback=mock_callback, require_confirmation_threshold=risk_level
             )
 
             # Operation at threshold should require confirmation
@@ -1181,8 +1168,7 @@ class TestIntegration:
             return True
 
         checker = SafetyChecker(
-            approval_mode=ApprovalMode.RISKY_ONLY,
-            confirmation_callback=mock_callback
+            approval_mode=ApprovalMode.RISKY_ONLY, confirmation_callback=mock_callback
         )
 
         should_proceed, reason = await checker.check_and_confirm(
@@ -1196,12 +1182,12 @@ class TestIntegration:
     @pytest.mark.asyncio
     async def test_complete_dangerous_workflow_with_rejection(self):
         """Complete workflow for dangerous operation with user rejection."""
+
         async def mock_callback(request):
             return False
 
         checker = SafetyChecker(
-            approval_mode=ApprovalMode.RISKY_ONLY,
-            confirmation_callback=mock_callback
+            approval_mode=ApprovalMode.RISKY_ONLY, confirmation_callback=mock_callback
         )
 
         should_proceed, reason = await checker.check_and_confirm(
@@ -1221,8 +1207,7 @@ class TestIntegration:
             return True
 
         checker = SafetyChecker(
-            approval_mode=ApprovalMode.ALL_WRITES,
-            confirmation_callback=mock_callback
+            approval_mode=ApprovalMode.ALL_WRITES, confirmation_callback=mock_callback
         )
 
         # Write operation should require confirmation

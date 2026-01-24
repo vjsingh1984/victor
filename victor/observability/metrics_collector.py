@@ -598,7 +598,9 @@ class ProductionMetricsCollector:
             return
 
         self.tool_executions.labels(tool=tool, vertical=vertical, status=status, mode=mode).inc()
-        self.tool_execution_duration.labels(tool=tool, vertical=vertical, status=status).observe(duration)
+        self.tool_execution_duration.labels(tool=tool, vertical=vertical, status=status).observe(
+            duration
+        )
 
     def record_provider_request(
         self,
@@ -657,7 +659,9 @@ class ProductionMetricsCollector:
         if not self.enabled:
             return
 
-        self.request_duration.labels(endpoint=endpoint, status=status, method=method).observe(duration)
+        self.request_duration.labels(endpoint=endpoint, status=status, method=method).observe(
+            duration
+        )
         self.total_requests.inc()
 
     def record_cache_operation(

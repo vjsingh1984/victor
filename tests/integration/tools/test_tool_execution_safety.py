@@ -53,9 +53,15 @@ async def tool_registry():
 
     # Register filesystem tools - use the actual tool classes
     # The @tool decorator creates a wrapper.Tool class
-    registry.register("read", filesystem.read.Tool if hasattr(filesystem.read, 'Tool') else filesystem.read)
-    registry.register("write", filesystem.write.Tool if hasattr(filesystem.write, 'Tool') else filesystem.write)
-    registry.register("list_directory", filesystem.ls.Tool if hasattr(filesystem.ls, 'Tool') else filesystem.ls)
+    registry.register(
+        "read", filesystem.read.Tool if hasattr(filesystem.read, "Tool") else filesystem.read
+    )
+    registry.register(
+        "write", filesystem.write.Tool if hasattr(filesystem.write, "Tool") else filesystem.write
+    )
+    registry.register(
+        "list_directory", filesystem.ls.Tool if hasattr(filesystem.ls, "Tool") else filesystem.ls
+    )
 
     # Register bash tools - use the .Tool class from decorated functions
     registry.register("execute_bash", shell.Tool)
@@ -109,7 +115,10 @@ class TestDangerousCommandBlocking:
 
         assert len(result.results) == 1
         assert result.results[0].success is False
-        assert "blocked" in result.results[0].error.lower() or "dangerous" in result.results[0].error.lower()
+        assert (
+            "blocked" in result.results[0].error.lower()
+            or "dangerous" in result.results[0].error.lower()
+        )
 
     @pytest.mark.asyncio
     async def test_rm_rf_recursive_blocked(self, sandbox_pipeline, temp_dir):
@@ -146,7 +155,10 @@ class TestDangerousCommandBlocking:
 
         assert len(result.results) == 1
         assert result.results[0].success is False
-        assert "blocked" in result.results[0].error.lower() or "dangerous" in result.results[0].error.lower()
+        assert (
+            "blocked" in result.results[0].error.lower()
+            or "dangerous" in result.results[0].error.lower()
+        )
 
     @pytest.mark.asyncio
     async def test_format_command_blocked(self, sandbox_pipeline):
@@ -270,7 +282,10 @@ class TestFileAccessProtection:
 
         assert len(result.results) == 1
         assert result.results[0].success is False
-        assert "blocked" in result.results[0].error.lower() or "permission" in result.results[0].error.lower()
+        assert (
+            "blocked" in result.results[0].error.lower()
+            or "permission" in result.results[0].error.lower()
+        )
 
     @pytest.mark.asyncio
     async def test_path_traversal_blocked(self, sandbox_pipeline, temp_dir):
@@ -406,7 +421,10 @@ class TestNetworkOperationBlocking:
 
         assert len(result.results) == 1
         assert result.results[0].success is False
-        assert "blocked" in result.results[0].error.lower() or "dangerous" in result.results[0].error.lower()
+        assert (
+            "blocked" in result.results[0].error.lower()
+            or "dangerous" in result.results[0].error.lower()
+        )
 
     @pytest.mark.asyncio
     async def test_network_redirect_blocked(self, sandbox_pipeline):

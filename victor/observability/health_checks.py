@@ -333,15 +333,21 @@ class PerformanceHealthCheck(HealthCheck):
 
             if latency_ms > self._latency_threshold:
                 status = HealthStatus.DEGRADED
-                messages.append(f"High latency: {latency_ms:.0f}ms > {self._latency_threshold:.0f}ms")
+                messages.append(
+                    f"High latency: {latency_ms:.0f}ms > {self._latency_threshold:.0f}ms"
+                )
 
             if error_rate > self._error_rate_threshold:
                 status = HealthStatus.UNHEALTHY
-                messages.append(f"High error rate: {error_rate:.1%} > {self._error_rate_threshold:.1%}")
+                messages.append(
+                    f"High error rate: {error_rate:.1%} > {self._error_rate_threshold:.1%}"
+                )
 
             if throughput < self._throughput_threshold and throughput > 0:
                 status = HealthStatus.DEGRADED
-                messages.append(f"Low throughput: {throughput:.1f}/s < {self._throughput_threshold:.1f}/s")
+                messages.append(
+                    f"Low throughput: {throughput:.1f}/s < {self._throughput_threshold:.1f}/s"
+                )
 
             message = "; ".join(messages) if messages else "Performance metrics healthy"
 
@@ -423,9 +429,7 @@ class DegradationDetector:
 
         # Filter metrics within baseline window
         baseline_metrics = [
-            m
-            for m in historical_metrics
-            if now - m.get("timestamp", now) <= self._baseline_window
+            m for m in historical_metrics if now - m.get("timestamp", now) <= self._baseline_window
         ]
 
         if not baseline_metrics:
@@ -433,7 +437,9 @@ class DegradationDetector:
             return []
 
         # Calculate baselines
-        baseline_latency = sum(m.get("latency_ms", 0) for m in baseline_metrics) / len(baseline_metrics)
+        baseline_latency = sum(m.get("latency_ms", 0) for m in baseline_metrics) / len(
+            baseline_metrics
+        )
         baseline_error_rate = sum(m.get("error_rate", 0) for m in baseline_metrics) / len(
             baseline_metrics
         )

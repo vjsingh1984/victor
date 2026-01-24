@@ -112,9 +112,7 @@ class DisposableService(Disposable):
 class ServiceWithDependencies:
     """Test service with dependencies."""
 
-    def __init__(
-        self, logger: ILogger, cache: ICache
-    ) -> None:
+    def __init__(self, logger: ILogger, cache: ICache) -> None:
         self.logger = logger
         self.cache = cache
 
@@ -245,9 +243,7 @@ class TestServiceRegistration:
         """Test register_or_replace returns container for chaining."""
         container = ServiceContainer()
 
-        result = container.register_or_replace(
-            ILogger, lambda c: FileLogger()
-        )
+        result = container.register_or_replace(ILogger, lambda c: FileLogger())
 
         assert result is container
 
@@ -320,9 +316,7 @@ class TestServiceResolution:
         )
         container.register(
             ServiceWithDependencies,
-            lambda c: ServiceWithDependencies(
-                logger=c.get(ILogger), cache=c.get(ICache)
-            ),
+            lambda c: ServiceWithDependencies(logger=c.get(ILogger), cache=c.get(ICache)),
             ServiceLifetime.TRANSIENT,
         )
 

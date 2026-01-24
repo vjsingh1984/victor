@@ -68,9 +68,7 @@ class TestGitSafetyRules:
     def test_custom_protected_branches(self):
         """Test custom protected branches."""
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_git_safety_rules(
-            enforcer, protected_branches=["production", "staging"]
-        )
+        create_git_safety_rules(enforcer, protected_branches=["production", "staging"])
 
         allowed, _ = enforcer.check_operation("git push --force origin production")
         assert not allowed
@@ -132,9 +130,7 @@ class TestDeploymentSafetyRules:
     def test_custom_protected_environments(self):
         """Test custom protected environments."""
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_deployment_safety_rules(
-            enforcer, protected_environments=["live", "prod-eu"]
-        )
+        create_deployment_safety_rules(enforcer, protected_environments=["live", "prod-eu"])
 
         allowed, _ = enforcer.check_operation("deploy to live")
         assert not allowed
@@ -232,9 +228,7 @@ class TestSourceCredibilitySafetyRules:
     def test_require_source_verification(self):
         """Test that non-.edu/.gov sources require verification."""
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.LOW))
-        create_source_credibility_safety_rules(
-            enforcer, require_source_verification=True
-        )
+        create_source_credibility_safety_rules(enforcer, require_source_verification=True)
 
         allowed, _ = enforcer.check_operation("cite from randomwebsite.com")
         assert allowed  # Warning only
@@ -242,9 +236,7 @@ class TestSourceCredibilitySafetyRules:
     def test_block_custom_domains(self):
         """Test blocking custom domains."""
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_source_credibility_safety_rules(
-            enforcer, blocked_domains=["fake-news-site.com"]
-        )
+        create_source_credibility_safety_rules(enforcer, blocked_domains=["fake-news-site.com"])
 
         allowed, _ = enforcer.check_operation("cite from fake-news-site.com")
         assert not allowed
@@ -417,6 +409,7 @@ class TestVerticalDelegation:
 
         # Create rules using both methods
         from victor.framework.middleware import create_git_safety_rules as framework_git_rules
+
         framework_git_rules(framework_enforcer)
         coding_git_rules(coding_enforcer)
 
@@ -439,6 +432,7 @@ class TestVerticalDelegation:
         from victor.framework.middleware import (
             create_deployment_safety_rules as framework_deployment_rules,
         )
+
         framework_deployment_rules(framework_enforcer)
         devops_deployment_rules(devops_enforcer)
 
@@ -475,9 +469,7 @@ class TestCodeDuplicationElimination:
         for op in test_ops:
             allowed1, _ = coding_enforcer.check_operation(op)
             allowed2, _ = framework_enforcer.check_operation(op)
-            assert (
-                allowed1 == allowed2
-            ), f"Inconsistent results for operation: {op}"
+            assert allowed1 == allowed2, f"Inconsistent results for operation: {op}"
 
     def test_pii_safety_rules_consistency(self):
         """Verify that PII safety rules are consistent across implementations."""
@@ -486,9 +478,7 @@ class TestCodeDuplicationElimination:
         )
 
         # Test with same parameters
-        dataanalysis_enforcer = SafetyEnforcer(
-            config=SafetyConfig(level=SafetyLevel.HIGH)
-        )
+        dataanalysis_enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
         framework_enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
 
         from victor.framework.middleware import create_pii_safety_rules as framework_pii
@@ -506,6 +496,4 @@ class TestCodeDuplicationElimination:
         for op in test_ops:
             allowed1, _ = dataanalysis_enforcer.check_operation(op)
             allowed2, _ = framework_enforcer.check_operation(op)
-            assert (
-                allowed1 == allowed2
-            ), f"Inconsistent results for operation: {op}"
+            assert allowed1 == allowed2, f"Inconsistent results for operation: {op}"

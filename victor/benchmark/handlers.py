@@ -359,16 +359,13 @@ class LanguageDetectorHandler(BaseHandler):
         }
     )
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
-        start_time = time.time()
-
+    ) -> Tuple[Any, int]:
+        """Execute language detection."""
         files = node.input_mapping.get("files", [])
 
         # Resolve context variables
@@ -376,12 +373,7 @@ class LanguageDetectorHandler(BaseHandler):
             files = context.get(files[5:]) or []
 
         if not files:
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error="No files provided",
-                duration_seconds=time.time() - start_time,
-            )
+            raise ValueError("No files provided")
 
         language_counts: Dict[str, int] = {}
         for file_path in files:
@@ -400,15 +392,7 @@ class LanguageDetectorHandler(BaseHandler):
             "file_count": len(files),
         }
 
-        output_key = node.output_key or node.id
-        context.set(output_key, output)
-
-        return NodeResult(
-            node_id=node.id,
-            status=ExecutorNodeStatus.COMPLETED,
-            output=output,
-            duration_seconds=time.time() - start_time,
-        )
+        return output, 1
 
 
 # =============================================================================
@@ -416,8 +400,9 @@ class LanguageDetectorHandler(BaseHandler):
 # =============================================================================
 
 
+@handler_decorator("polyglot_verifier", description="Verify multi-language code")
 @dataclass
-class PolyglotVerifierHandler:
+class PolyglotVerifierHandler(BaseHandler):
     """Verify multi-language code modifications.
 
     Example YAML:
@@ -431,16 +416,13 @@ class PolyglotVerifierHandler:
           output: verification_result
     """
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
-        start_time = time.time()
-
+    ) -> Tuple[Any, int]:
+        """Execute polyglot verification."""
         language = node.input_mapping.get("language", "python")
         test_command = node.input_mapping.get("test_command", "")
 
@@ -454,56 +436,33 @@ class PolyglotVerifierHandler:
             "lint_clean": True,
         }
 
-        try:
-            # Syntax check
-            if language == "python":
-                syntax_result = await tool_registry.execute(
-                    "shell",
-                    command="python -m py_compile *.py 2>&1 || true",
-                    timeout=30,
-                )
-                output["syntax_valid"] = "Error" not in (
-                    syntax_result.output if hasattr(syntax_result, "output") else ""
-                )
-
-            # Run tests if command provided
-            if test_command:
-                test_result = await tool_registry.execute(
-                    "shell",
-                    command=test_command,
-                    timeout=180,
-                )
-                output["tests_pass"] = (
-                    test_result.success if hasattr(test_result, "success") else False
-                )
-                output["test_output"] = (
-                    test_result.output if hasattr(test_result, "output") else ""
-                )[:2000]
-
-            output_key = node.output_key or node.id
-            context.set(output_key, output)
-
-            status = (
-                ExecutorNodeStatus.COMPLETED
-                if output["syntax_valid"]
-                else ExecutorNodeStatus.FAILED
+        # Syntax check
+        if language == "python":
+            syntax_result = await tool_registry.execute(
+                "shell",
+                command="python -m py_compile *.py 2>&1 || true",
+                timeout=30,
+            )
+            output["syntax_valid"] = "Error" not in (
+                syntax_result.output if hasattr(syntax_result, "output") else ""
             )
 
-            return NodeResult(
-                node_id=node.id,
-                status=status,
-                output=output,
-                duration_seconds=time.time() - start_time,
-                tool_calls_used=2 if test_command else 1,
+        # Run tests if command provided
+        if test_command:
+            test_result = await tool_registry.execute(
+                "shell",
+                command=test_command,
+                timeout=180,
             )
+            output["tests_pass"] = (
+                test_result.success if hasattr(test_result, "success") else False
+            )
+            output["test_output"] = (
+                test_result.output if hasattr(test_result, "output") else ""
+            )[:2000]
 
-        except Exception as e:
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
-            )
+        tool_calls = 2 if test_command else 1
+        return output, tool_calls
 
 
 # =============================================================================
@@ -511,8 +470,9 @@ class PolyglotVerifierHandler:
 # =============================================================================
 
 
+@handler_decorator("multi_solution_validator", description="Validate multiple solutions for pass@k")
 @dataclass
-class MultiSolutionValidatorHandler:
+class MultiSolutionValidatorHandler(BaseHandler):
     """Validate multiple solutions for pass@k evaluation.
 
     Example YAML:
@@ -527,16 +487,13 @@ class MultiSolutionValidatorHandler:
           output: validation_results
     """
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
-        start_time = time.time()
-
+    ) -> Tuple[Any, int]:
+        """Execute multi-solution validation."""
         solutions = node.input_mapping.get("solutions", [])
         test_cases = node.input_mapping.get("test_cases", [])
         timeout_per = node.input_mapping.get("timeout_per_solution", 30)
@@ -605,16 +562,7 @@ class MultiSolutionValidatorHandler:
             "pass_rate": passed_solutions / len(solutions) if solutions else 0,
         }
 
-        output_key = node.output_key or node.id
-        context.set(output_key, output)
-
-        return NodeResult(
-            node_id=node.id,
-            status=ExecutorNodeStatus.COMPLETED,
-            output=output,
-            duration_seconds=time.time() - start_time,
-            tool_calls_used=len(solutions),
-        )
+        return output, len(solutions)
 
 
 # =============================================================================
@@ -622,8 +570,9 @@ class MultiSolutionValidatorHandler:
 # =============================================================================
 
 
+@handler_decorator("code_tester", description="Test generated code")
 @dataclass
-class CodeTesterHandler:
+class CodeTesterHandler(BaseHandler):
     """Test generated code against test cases.
 
     Example YAML:
@@ -637,16 +586,13 @@ class CodeTesterHandler:
           output: test_results
     """
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
-        start_time = time.time()
-
+    ) -> Tuple[Any, int]:
+        """Execute code testing."""
         code = node.input_mapping.get("code", "")
         test_cases = node.input_mapping.get("test_cases", [])
 
@@ -657,57 +603,34 @@ class CodeTesterHandler:
             test_cases = context.get(test_cases[5:]) or []
 
         if not code:
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error="No code provided",
-                duration_seconds=time.time() - start_time,
-            )
+            raise ValueError("No code provided")
 
-        try:
-            # Combine code and test cases
-            full_code = code
-            if test_cases:
-                full_code += "\n\n# Test Cases\n"
-                for tc in test_cases:
-                    if isinstance(tc, str):
-                        full_code += f"{tc}\n"
+        # Combine code and test cases
+        full_code = code
+        if test_cases:
+            full_code += "\n\n# Test Cases\n"
+            for tc in test_cases:
+                if isinstance(tc, str):
+                    full_code += f"{tc}\n"
 
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-                f.write(full_code)
-                code_file = f.name
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write(full_code)
+            code_file = f.name
 
-            result = await tool_registry.execute(
-                "shell",
-                command=f"python {code_file}",
-                timeout=60,
-            )
+        result = await tool_registry.execute(
+            "shell",
+            command=f"python {code_file}",
+            timeout=60,
+        )
 
-            success = result.success if hasattr(result, "success") else False
-            output = {
-                "passed": success,
-                "output": result.output if hasattr(result, "output") else "",
-                "exit_code": getattr(result, "exit_code", 0),
-            }
+        success = result.success if hasattr(result, "success") else False
+        output = {
+            "passed": success,
+            "output": result.output if hasattr(result, "output") else "",
+            "exit_code": getattr(result, "exit_code", 0),
+        }
 
-            output_key = node.output_key or node.id
-            context.set(output_key, output)
-
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.COMPLETED if success else ExecutorNodeStatus.FAILED,
-                output=output,
-                duration_seconds=time.time() - start_time,
-                tool_calls_used=1,
-            )
-
-        except Exception as e:
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
-            )
+        return output, 1
 
 
 # =============================================================================
@@ -715,8 +638,9 @@ class CodeTesterHandler:
 # =============================================================================
 
 
+@handler_decorator("syntax_check", description="Verify code syntax correctness")
 @dataclass
-class SyntaxCheckHandler:
+class SyntaxCheckHandler(BaseHandler):
     """Verify code syntax correctness.
 
     Example YAML:
@@ -729,16 +653,13 @@ class SyntaxCheckHandler:
           output: syntax_result
     """
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
-        start_time = time.time()
-
+    ) -> Tuple[Any, int]:
+        """Execute syntax check."""
         code = node.input_mapping.get("code", "")
         language = node.input_mapping.get("language", "python")
 
@@ -747,12 +668,7 @@ class SyntaxCheckHandler:
             code = context.get(code[5:]) or ""
 
         if not code:
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error="No code provided",
-                duration_seconds=time.time() - start_time,
-            )
+            raise ValueError("No code provided")
 
         output: Dict[str, Any] = {
             "valid": False,
@@ -760,99 +676,58 @@ class SyntaxCheckHandler:
             "errors": [],
         }
 
-        try:
-            if language == "python":
-                # Use Python's compile for syntax check
-                try:
-                    compile(code, "<solution>", "exec")
-                    output["valid"] = True
-                except SyntaxError as e:
+        tool_calls = 0
+
+        if language == "python":
+            # Use Python's compile for syntax check
+            try:
+                compile(code, "<solution>", "exec")
+                output["valid"] = True
+            except SyntaxError as e:
+                output["errors"].append(
+                    {
+                        "line": e.lineno,
+                        "offset": e.offset,
+                        "message": str(e.msg),
+                    }
+                )
+        else:
+            # For other languages, try to use the language's syntax checker
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=f".{language}", delete=False
+            ) as f:
+                f.write(code)
+                code_file = f.name
+
+            if language == "javascript":
+                result = await tool_registry.execute(
+                    "shell",
+                    command=f"node --check {code_file}",
+                    timeout=10,
+                )
+                tool_calls += 1
+                output["valid"] = result.success if hasattr(result, "success") else False
+                if not output["valid"]:
                     output["errors"].append(
-                        {
-                            "line": e.lineno,
-                            "offset": e.offset,
-                            "message": str(e.msg),
-                        }
+                        {"message": result.output if hasattr(result, "output") else ""}
+                    )
+            elif language == "typescript":
+                result = await tool_registry.execute(
+                    "shell",
+                    command=f"tsc --noEmit {code_file}",
+                    timeout=30,
+                )
+                tool_calls += 1
+                output["valid"] = result.success if hasattr(result, "success") else False
+                if not output["valid"]:
+                    output["errors"].append(
+                        {"message": result.output if hasattr(result, "output") else ""}
                     )
             else:
-                # For other languages, try to use the language's syntax checker
-                with tempfile.NamedTemporaryFile(
-                    mode="w", suffix=f".{language}", delete=False
-                ) as f:
-                    f.write(code)
-                    code_file = f.name
+                # Fallback: assume valid
+                output["valid"] = True
 
-                if language == "javascript":
-                    result = await tool_registry.execute(
-                        "shell",
-                        command=f"node --check {code_file}",
-                        timeout=10,
-                    )
-                elif language == "typescript":
-                    result = await tool_registry.execute(
-                        "shell",
-                        command=f"tsc --noEmit {code_file}",
-                        timeout=30,
-                    )
-                else:
-                    # Fallback: assume valid
-                    output["valid"] = True
-                    result = None
-
-                if result:
-                    output["valid"] = result.success if hasattr(result, "success") else False
-                    if not output["valid"]:
-                        output["errors"].append(
-                            {"message": result.output if hasattr(result, "output") else ""}
-                        )
-
-            output_key = node.output_key or node.id
-            context.set(output_key, output)
-
-            return NodeResult(
-                node_id=node.id,
-                status=(
-                    ExecutorNodeStatus.COMPLETED if output["valid"] else ExecutorNodeStatus.FAILED
-                ),
-                output=output,
-                duration_seconds=time.time() - start_time,
-            )
-
-        except Exception as e:
-            output["errors"].append({"message": str(e)})
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error=str(e),
-                output=output,
-                duration_seconds=time.time() - start_time,
-            )
-
-
-# =============================================================================
-# Handler Registry
-# =============================================================================
-
-
-HANDLERS = {
-    "test_runner": TestRunnerHandler(),
-    "environment_setup": EnvironmentSetupHandler(),
-    "live_executor": LiveExecutorHandler(),
-    "language_detector": LanguageDetectorHandler(),
-    "polyglot_verifier": PolyglotVerifierHandler(),
-    "multi_solution_validator": MultiSolutionValidatorHandler(),
-    "code_tester": CodeTesterHandler(),
-    "syntax_check": SyntaxCheckHandler(),
-}
-
-
-def register_handlers() -> None:
-    """Register Benchmark handlers with the workflow executor."""
-    from victor.workflows.executor import register_compute_handler
-
-    for name, handler in HANDLERS.items():
-        register_compute_handler(name, handler)
-        logger.debug(f"Registered Benchmark handler: {name}")
+        return output, tool_calls
 
 
 __all__ = [
@@ -865,7 +740,4 @@ __all__ = [
     "MultiSolutionValidatorHandler",
     "CodeTesterHandler",
     "SyntaxCheckHandler",
-    # Registry
-    "HANDLERS",
-    "register_handlers",
 ]

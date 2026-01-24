@@ -368,9 +368,7 @@ class TestOrchestratorFactoryToolComponents:
 
         tool_executor = Mock()
 
-        parallel_executor = factory.create_parallel_executor(
-            tool_executor=tool_executor
-        )
+        parallel_executor = factory.create_parallel_executor(tool_executor=tool_executor)
 
         assert parallel_executor is not None
 
@@ -441,9 +439,9 @@ class TestOrchestratorFactoryToolComponents:
 
     def test_create_tool_deduplication_tracker(self):
         """Test tool deduplication tracker creation when enabled."""
-        settings = TestSettingsBuilder().with_tool_deduplication(
-            enabled=True, window_size=10
-        ).build()
+        settings = (
+            TestSettingsBuilder().with_tool_deduplication(enabled=True, window_size=10).build()
+        )
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -458,9 +456,7 @@ class TestOrchestratorFactoryToolComponents:
 
     def test_create_tool_deduplication_tracker_disabled(self):
         """Test tool deduplication tracker creation when disabled."""
-        settings = TestSettingsBuilder().with_tool_deduplication(
-            enabled=False
-        ).build()
+        settings = TestSettingsBuilder().with_tool_deduplication(enabled=False).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -585,9 +581,9 @@ class TestOrchestratorFactoryStreamingComponents:
 
     def test_create_streaming_metrics_collector_disabled(self):
         """Test streaming metrics collector creation when disabled."""
-        settings = TestSettingsBuilder().with_custom_setting(
-            "streaming_metrics_enabled", False
-        ).build()
+        settings = (
+            TestSettingsBuilder().with_custom_setting("streaming_metrics_enabled", False).build()
+        )
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -715,9 +711,7 @@ class TestOrchestratorFactoryRecoveryComponents:
 
         recovery_handler = Mock()
 
-        integration = factory.create_recovery_integration(
-            recovery_handler=recovery_handler
-        )
+        integration = factory.create_recovery_integration(recovery_handler=recovery_handler)
 
         assert integration is not None
 
@@ -761,9 +755,7 @@ class TestOrchestratorFactoryWorkflowComponents:
         tool_calling_caps.continuation_patience = 2
 
         with patch("victor.core.bootstrap.bootstrap_container"):
-            tracker = factory.create_unified_tracker(
-                tool_calling_caps=tool_calling_caps
-            )
+            tracker = factory.create_unified_tracker(tool_calling_caps=tool_calling_caps)
 
         assert tracker is not None
 
@@ -986,9 +978,7 @@ class TestOrchestratorFactoryWorkflowOptimizations:
             model="claude-sonnet-4-5",
         )
 
-        components = factory.create_workflow_optimization_components(
-            timeout_seconds=300.0
-        )
+        components = factory.create_workflow_optimization_components(timeout_seconds=300.0)
 
         assert components is not None
         assert components.task_completion_detector is not None
@@ -1004,9 +994,7 @@ class TestOrchestratorFactoryOrchestratorCreation:
 
     def test_create_orchestrator(self):
         """Test creating a full orchestrator."""
-        settings = TestSettingsBuilder().with_conversation_memory(
-            False
-        ).with_plugins(False).build()
+        settings = TestSettingsBuilder().with_conversation_memory(False).with_plugins(False).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -1024,9 +1012,7 @@ class TestOrchestratorFactoryOrchestratorCreation:
 
     def test_initialize_orchestrator(self):
         """Test initializing an orchestrator instance."""
-        settings = TestSettingsBuilder().with_conversation_memory(
-            False
-        ).with_plugins(False).build()
+        settings = TestSettingsBuilder().with_conversation_memory(False).with_plugins(False).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -1099,9 +1085,7 @@ class TestOrchestratorFactoryHelperMethods:
 
     def test_create_observability(self):
         """Test observability creation when enabled."""
-        settings = TestSettingsBuilder().with_observability(
-            enabled=True
-        ).build()
+        settings = TestSettingsBuilder().with_observability(enabled=True).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -1116,9 +1100,7 @@ class TestOrchestratorFactoryHelperMethods:
 
     def test_create_observability_disabled(self):
         """Test observability creation when disabled."""
-        settings = TestSettingsBuilder().with_observability(
-            enabled=False
-        ).build()
+        settings = TestSettingsBuilder().with_observability(enabled=False).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -1150,9 +1132,7 @@ class TestOrchestratorFactoryHelperMethods:
 
     def test_create_tracers_disabled(self):
         """Test tracer creation when disabled."""
-        settings = TestSettingsBuilder().with_custom_setting(
-            "enable_tracing", False
-        ).build()
+        settings = TestSettingsBuilder().with_custom_setting("enable_tracing", False).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -1326,9 +1306,7 @@ class TestOrchestratorFactorySpecializedMethods:
 
     def test_create_debug_logger_configured(self):
         """Test debug logger creation with configuration."""
-        settings = TestSettingsBuilder().with_debug_logging(
-            enabled=True
-        ).build()
+        settings = TestSettingsBuilder().with_debug_logging(enabled=True).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -1355,14 +1333,10 @@ class TestOrchestratorFactorySpecializedMethods:
         )
 
         with patch("victor.core.bootstrap.bootstrap_container"):
-            middleware_chain, code_correction_middleware = (
-                factory.create_middleware_chain()
-            )
+            middleware_chain, code_correction_middleware = factory.create_middleware_chain()
 
         # Middleware might be None if no verticals loaded
-        assert code_correction_middleware is None or isinstance(
-            code_correction_middleware, Mock
-        )
+        assert code_correction_middleware is None or isinstance(code_correction_middleware, Mock)
 
     def test_create_auto_committer(self):
         """Test auto committer creation."""
@@ -1393,17 +1367,13 @@ class TestOrchestratorFactorySpecializedMethods:
 
         message_adder = Mock()
 
-        handler = factory.create_streaming_chat_handler(
-            message_adder=message_adder
-        )
+        handler = factory.create_streaming_chat_handler(message_adder=message_adder)
 
         assert handler is not None
 
     def test_create_rl_coordinator(self):
         """Test RL coordinator creation when enabled."""
-        settings = TestSettingsBuilder().with_rl_learning(
-            enabled=True
-        ).build()
+        settings = TestSettingsBuilder().with_rl_learning(enabled=True).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -1431,17 +1401,13 @@ class TestOrchestratorFactorySpecializedMethods:
 
         context_compactor = Mock()
 
-        formatter = factory.create_tool_output_formatter(
-            context_compactor=context_compactor
-        )
+        formatter = factory.create_tool_output_formatter(context_compactor=context_compactor)
 
         assert formatter is not None
 
     def test_create_checkpoint_manager(self):
         """Test checkpoint manager creation when enabled."""
-        settings = TestSettingsBuilder().with_custom_setting(
-            "checkpoint_enabled", True
-        ).build()
+        settings = TestSettingsBuilder().with_custom_setting("checkpoint_enabled", True).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -1458,9 +1424,7 @@ class TestOrchestratorFactorySpecializedMethods:
 
     def test_create_checkpoint_manager_disabled(self):
         """Test checkpoint manager creation when disabled."""
-        settings = TestSettingsBuilder().with_custom_setting(
-            "checkpoint_enabled", False
-        ).build()
+        settings = TestSettingsBuilder().with_custom_setting("checkpoint_enabled", False).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(

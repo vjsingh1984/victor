@@ -182,6 +182,7 @@ def register_protocols(
     Returns:
         Decorated class (unchanged)
     """
+
     def decorator(cls: Type[Any]) -> Type[Any]:
         # Lazy load known protocols
         _load_known_protocols()
@@ -210,9 +211,7 @@ def register_protocols(
                 for protocol in protocols_to_register:
                     try:
                         ProtocolBasedExtensionLoader.register_protocol(protocol, cls)
-                        logger.debug(
-                            f"Registered {cls.__name__} for protocol {protocol.__name__}"
-                        )
+                        logger.debug(f"Registered {cls.__name__} for protocol {protocol.__name__}")
                     except Exception as e:
                         logger.warning(
                             f"Failed to register {cls.__name__} for {protocol.__name__}: {e}"

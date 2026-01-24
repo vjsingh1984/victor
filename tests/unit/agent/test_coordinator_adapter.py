@@ -96,9 +96,7 @@ class TestCoordinatorAdapter:
         mock_eval_coordinator = Mock()
         mock_eval_coordinator.send_rl_reward_signal = Mock()
 
-        adapter = CoordinatorAdapter(
-            evaluation_coordinator=mock_eval_coordinator
-        )
+        adapter = CoordinatorAdapter(evaluation_coordinator=mock_eval_coordinator)
 
         session = MockStreamingSession(success=True)
         adapter.send_rl_reward_signal(session)
@@ -120,9 +118,7 @@ class TestCoordinatorAdapter:
             side_effect=Exception("Failed to send reward")
         )
 
-        adapter = CoordinatorAdapter(
-            evaluation_coordinator=mock_eval_coordinator
-        )
+        adapter = CoordinatorAdapter(evaluation_coordinator=mock_eval_coordinator)
 
         session = MockStreamingSession()
         # Should not raise exception
@@ -170,9 +166,7 @@ class TestCoordinatorAdapter:
     def test_get_checkpoint_state_with_exception(self):
         """Test getting checkpoint state when coordinator raises exception."""
         mock_state_coordinator = Mock()
-        mock_state_coordinator.get_state = Mock(
-            side_effect=Exception("Failed to get state")
-        )
+        mock_state_coordinator.get_state = Mock(side_effect=Exception("Failed to get state"))
 
         adapter = CoordinatorAdapter(state_coordinator=mock_state_coordinator)
 
@@ -223,9 +217,7 @@ class TestCoordinatorAdapter:
     def test_apply_checkpoint_state_with_exception(self):
         """Test applying checkpoint state when coordinator raises exception."""
         mock_state_coordinator = Mock()
-        mock_state_coordinator.set_state = Mock(
-            side_effect=Exception("Failed to set state")
-        )
+        mock_state_coordinator.set_state = Mock(side_effect=Exception("Failed to set state"))
 
         adapter = CoordinatorAdapter(state_coordinator=mock_state_coordinator)
 
@@ -238,9 +230,7 @@ class TestCoordinatorAdapter:
         mock_eval_coordinator = Mock()
         mock_eval_coordinator.record_intelligent_outcome = AsyncMock()
 
-        adapter = CoordinatorAdapter(
-            evaluation_coordinator=mock_eval_coordinator
-        )
+        adapter = CoordinatorAdapter(evaluation_coordinator=mock_eval_coordinator)
 
         await adapter.record_intelligent_outcome(
             success=True,
@@ -274,9 +264,7 @@ class TestCoordinatorAdapter:
             side_effect=Exception("Recording failed")
         )
 
-        adapter = CoordinatorAdapter(
-            evaluation_coordinator=mock_eval_coordinator
-        )
+        adapter = CoordinatorAdapter(evaluation_coordinator=mock_eval_coordinator)
 
         # Should not raise exception
         await adapter.record_intelligent_outcome(

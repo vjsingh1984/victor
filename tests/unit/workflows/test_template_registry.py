@@ -63,9 +63,7 @@ class TestWorkflowTemplateRegistry:
             formation: "parallel"
         """
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             f.flush()
             registry.load_templates_from_yaml(f.name)
@@ -88,9 +86,7 @@ class TestWorkflowTemplateRegistry:
             nodes: []
         """
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             f.flush()
             registry.load_templates_from_yaml(f.name)
@@ -111,9 +107,7 @@ class TestWorkflowTemplateRegistry:
             name: "Reviewer 1"
         """
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             f.flush()
             registry.load_templates_from_yaml(f.name)
@@ -139,9 +133,7 @@ class TestWorkflowTemplateRegistry:
             description: "Make changes"
         """
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             f.flush()
             registry.load_templates_from_yaml(f.name)
@@ -160,9 +152,7 @@ class TestWorkflowTemplateRegistry:
             name: "My Template"
         """
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             f.flush()
             registry.load_templates_from_yaml(f.name, namespace="coding")
@@ -243,9 +233,7 @@ class TestWorkflowTemplateRegistry:
         }
         registry.register_template("base", base)
 
-        extended = registry.extend_template(
-            "base", {"name": "Extended"}, deep_merge=False
-        )
+        extended = registry.extend_template("base", {"name": "Extended"}, deep_merge=False)
 
         assert extended["name"] == "Extended"
         assert extended["description"] == "Base description"

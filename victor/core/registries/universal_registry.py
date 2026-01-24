@@ -234,7 +234,9 @@ class UniversalRegistry(Generic[T]):
             # cache_config not available, use provided parameters
             pass
         except Exception as e:
-            logger.debug(f"UniversalRegistry: Could not load cache_config for '{registry_type}': {e}")
+            logger.debug(
+                f"UniversalRegistry: Could not load cache_config for '{registry_type}': {e}"
+            )
 
         with cls._lock:
             if registry_type not in cls._instances:

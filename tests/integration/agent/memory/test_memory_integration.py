@@ -44,7 +44,9 @@ class TestMemoryInteraction:
         mock_service = Mock(spec=EmbeddingService)
         mock_service.dimension = 384
         mock_service.cosine_similarity = Mock(
-            side_effect=lambda a, b: float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-8))
+            side_effect=lambda a, b: float(
+                np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-8)
+            )
         )
 
         # Simple embedding generation based on text hash
@@ -79,8 +81,16 @@ class TestMemoryInteraction:
         # Store episodes with related information
         episodes_data = [
             ("Fix authentication bug", ["debug", "fix"], {"success": True, "files_changed": 2}),
-            ("Add user profile feature", ["implement", "test"], {"success": True, "files_changed": 5}),
-            ("Optimize database queries", ["profile", "optimize"], {"success": True, "speedup": 2.0}),
+            (
+                "Add user profile feature",
+                ["implement", "test"],
+                {"success": True, "files_changed": 5},
+            ),
+            (
+                "Optimize database queries",
+                ["profile", "optimize"],
+                {"success": True, "speedup": 2.0},
+            ),
         ]
 
         for query, actions, outcomes in episodes_data:
@@ -160,7 +170,9 @@ class TestMemoryInteraction:
 
         # Verify both systems have data
         assert episodic_memory.episode_count == 5
-        assert consolidated.knowledge_count >= 0  # May not extract knowledge if patterns aren't strong
+        assert (
+            consolidated.knowledge_count >= 0
+        )  # May not extract knowledge if patterns aren't strong
 
         # Store additional semantic knowledge
         fact_id = await semantic_memory.store_knowledge(
@@ -186,7 +198,9 @@ class TestMemoryConsolidation:
         mock_service = Mock(spec=EmbeddingService)
         mock_service.dimension = 384
         mock_service.cosine_similarity = Mock(
-            side_effect=lambda a, b: float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-8))
+            side_effect=lambda a, b: float(
+                np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-8)
+            )
         )
 
         async def mock_embed(text: str) -> np.ndarray:
@@ -311,7 +325,9 @@ class TestMemoryRecall:
         mock_service = Mock(spec=EmbeddingService)
         mock_service.dimension = 384
         mock_service.cosine_similarity = Mock(
-            side_effect=lambda a, b: float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-8))
+            side_effect=lambda a, b: float(
+                np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-8)
+            )
         )
 
         async def mock_embed(text: str) -> np.ndarray:
@@ -343,10 +359,19 @@ class TestMemoryRecall:
         """Test semantic knowledge retrieval accuracy."""
         # Store knowledge with clear topics
         knowledge_items = [
-            ("Python uses asyncio for asynchronous programming", {"language": "Python", "topic": "async"}),
-            ("JavaScript uses Promises for async operations", {"language": "JavaScript", "topic": "async"}),
+            (
+                "Python uses asyncio for asynchronous programming",
+                {"language": "Python", "topic": "async"},
+            ),
+            (
+                "JavaScript uses Promises for async operations",
+                {"language": "JavaScript", "topic": "async"},
+            ),
             ("Go uses goroutines for concurrency", {"language": "Go", "topic": "concurrency"}),
-            ("Java uses threads for parallel execution", {"language": "Java", "topic": "concurrency"}),
+            (
+                "Java uses threads for parallel execution",
+                {"language": "Java", "topic": "concurrency"},
+            ),
         ]
 
         for fact, metadata in knowledge_items:
@@ -390,7 +415,7 @@ class TestMemoryRecall:
             # Verify episodes are returned (with mock embeddings, exact matching isn't guaranteed)
             assert all(isinstance(ep, Episode) for ep in relevant)
             # Verify all episodes have inputs and context
-            assert all(hasattr(ep, 'inputs') and hasattr(ep, 'context') for ep in relevant)
+            assert all(hasattr(ep, "inputs") and hasattr(ep, "context") for ep in relevant)
 
     @pytest.mark.asyncio
     async def test_hybrid_recall_strategy(self, episodic_memory, semantic_memory):
@@ -424,10 +449,13 @@ class TestMemoryRecall:
         assert len(semantic_results) >= 1
 
         # Results should be relevant
-        assert any("async" in str(ep.inputs).lower() or "python" in str(ep.inputs).lower()
-                   for ep in episodic_results)
-        assert any("async" in k.fact.lower() or "python" in k.fact.lower()
-                   for k in semantic_results)
+        assert any(
+            "async" in str(ep.inputs).lower() or "python" in str(ep.inputs).lower()
+            for ep in episodic_results
+        )
+        assert any(
+            "async" in k.fact.lower() or "python" in k.fact.lower() for k in semantic_results
+        )
 
 
 @pytest.mark.integration
@@ -441,7 +469,9 @@ class TestMemoryPersistence:
         mock_service = Mock(spec=EmbeddingService)
         mock_service.dimension = 384
         mock_service.cosine_similarity = Mock(
-            side_effect=lambda a, b: float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-8))
+            side_effect=lambda a, b: float(
+                np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-8)
+            )
         )
 
         async def mock_embed(text: str) -> np.ndarray:

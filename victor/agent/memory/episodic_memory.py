@@ -177,7 +177,7 @@ class Episode:
         age_hours = (current_time - self.timestamp).total_seconds() / 3600
 
         # Decay factor reduces by 1% per hour (configurable)
-        decayed_importance = self.importance * self.decay_factor ** age_hours
+        decayed_importance = self.importance * self.decay_factor**age_hours
 
         # Boost based on rewards (positive rewards increase importance)
         reward_boost = min(abs(self.rewards) / 100.0, 0.3)  # Max 30% boost
@@ -512,7 +512,10 @@ class MemoryIndex:
 
         for episode_id, embedding in self.embeddings.items():
             # Cosine similarity
-            similarity = float(np.dot(query_embedding, embedding) / (np.linalg.norm(query_embedding) * np.linalg.norm(embedding) + 1e-8))
+            similarity = float(
+                np.dot(query_embedding, embedding)
+                / (np.linalg.norm(query_embedding) * np.linalg.norm(embedding) + 1e-8)
+            )
 
             if similarity >= min_similarity:
                 similarities.append((episode_id, similarity))
@@ -740,7 +743,9 @@ class EpisodicMemory:
             return await self.recall_recent(n=k)
 
         # Find similar episodes via index
-        similar_episodes = self._index.find_similar(query_embedding, k=k * 2, min_similarity=min_similarity)
+        similar_episodes = self._index.find_similar(
+            query_embedding, k=k * 2, min_similarity=min_similarity
+        )
 
         # Apply context filters if provided
         if context:

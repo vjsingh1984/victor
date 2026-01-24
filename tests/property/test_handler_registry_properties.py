@@ -41,7 +41,9 @@ handler_name_strategy = st.text(
     min_size=1,
     max_size=20,
 )
-vertical_name_strategy = st.sampled_from(["coding", "research", "devops", "rag", "dataanalysis", "benchmark"])
+vertical_name_strategy = st.sampled_from(
+    ["coding", "research", "devops", "rag", "dataanalysis", "benchmark"]
+)
 description_strategy = st.text(min_size=0, max_size=100)
 
 
@@ -88,9 +90,7 @@ class TestRegistrationProperties:
         vertical=vertical_name_strategy,
     )
     @settings(max_examples=30, phases=[Phase.generate])
-    def test_list_handlers_contains_all_registered(
-        self, names: List[str], vertical: str
-    ):
+    def test_list_handlers_contains_all_registered(self, names: List[str], vertical: str):
         """list_handlers() should return all registered handler names."""
         registry = get_handler_registry()
 
@@ -107,9 +107,7 @@ class TestRegistrationProperties:
         verticals=st.lists(vertical_name_strategy, min_size=1, max_size=10),
     )
     @settings(max_examples=30, phases=[Phase.generate])
-    def test_list_by_vertical_filters_correctly(
-        self, names: List[str], verticals: List[str]
-    ):
+    def test_list_by_vertical_filters_correctly(self, names: List[str], verticals: List[str]):
         """list_by_vertical() should only return handlers for that vertical."""
         registry = get_handler_registry()
 
@@ -191,17 +189,13 @@ class TestEntryProperties:
         description=description_strategy,
     )
     @settings(max_examples=50, phases=[Phase.generate])
-    def test_entry_preserves_metadata(
-        self, name: str, vertical: str, description: str
-    ):
+    def test_entry_preserves_metadata(self, name: str, vertical: str, description: str):
         """HandlerEntry should preserve all metadata."""
         registry = get_handler_registry()
         handler = Mock()
 
         # Use replace=True since Hypothesis generates multiple examples
-        registry.register(
-            name, handler, vertical=vertical, description=description, replace=True
-        )
+        registry.register(name, handler, vertical=vertical, description=description, replace=True)
 
         entry = registry.get_entry(name)
         assert entry is not None

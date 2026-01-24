@@ -425,9 +425,7 @@ class PersistentSelectionCache:
                 total_entries = cursor.fetchone()[0]
 
                 # Get entries by namespace
-                cursor.execute(
-                    "SELECT namespace, COUNT(*) FROM cache_entries GROUP BY namespace"
-                )
+                cursor.execute("SELECT namespace, COUNT(*) FROM cache_entries GROUP BY namespace")
                 namespaces = dict(cursor.fetchall())
 
                 # Get database size
@@ -442,7 +440,11 @@ class PersistentSelectionCache:
                     "hits": self._hits,
                     "misses": self._misses,
                     "evictions": self._evictions,
-                    "hit_rate": self._hits / (self._hits + self._misses) if (self._hits + self._misses) > 0 else 0.0,
+                    "hit_rate": (
+                        self._hits / (self._hits + self._misses)
+                        if (self._hits + self._misses) > 0
+                        else 0.0
+                    ),
                     "last_compaction": self._last_compaction,
                     "last_save": self._last_save,
                 }
@@ -494,7 +496,9 @@ class PersistentSelectionCache:
         """Initialize SQLite database with schema."""
         try:
             self._conn = sqlite3.connect(str(self._cache_path), check_same_thread=False)
-            self._conn.execute("PRAGMA journal_mode=WAL")  # Write-Ahead Logging for better concurrency
+            self._conn.execute(
+                "PRAGMA journal_mode=WAL"
+            )  # Write-Ahead Logging for better concurrency
             self._conn.execute("PRAGMA synchronous=NORMAL")  # Balance safety and performance
 
             cursor = self._conn.cursor()
@@ -581,9 +585,7 @@ class PersistentSelectionCache:
             # Version-specific migrations
             if from_version == 0 and to_version >= 1:
                 # Add metadata column if not exists
-                cursor.execute(
-                    "ALTER TABLE cache_entries ADD COLUMN metadata TEXT"
-                )
+                cursor.execute("ALTER TABLE cache_entries ADD COLUMN metadata TEXT")
 
             # Update version
             cursor.execute(
@@ -593,7 +595,7 @@ class PersistentSelectionCache:
 
             self._conn.commit()
 
-            logger.info(f"Database migration complete")
+            logger.info("Database migration complete")
 
         except Exception as e:
             logger.error(f"Failed to migrate database: {e}")

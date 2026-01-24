@@ -327,9 +327,7 @@ class HealthMonitor:
         """
         old_status = self._status
         self._status = status
-        logger.info(
-            f"Provider {self.provider_id} status: {old_status.value} -> {status.value}"
-        )
+        logger.info(f"Provider {self.provider_id} status: {old_status.value} -> {status.value}")
 
     def get_stats(self) -> Dict[str, Any]:
         """Get comprehensive health statistics.
@@ -433,11 +431,7 @@ class ProviderHealthRegistry:
         Returns:
             List of provider IDs that can accept traffic
         """
-        return [
-            pid
-            for pid, monitor in self._monitors.items()
-            if monitor.can_accept_traffic
-        ]
+        return [pid for pid, monitor in self._monitors.items() if monitor.can_accept_traffic]
 
     async def shutdown(self) -> None:
         """Shutdown all health monitors."""

@@ -167,7 +167,9 @@ class ProviderPool:
             )
 
             self._initialized = True
-            logger.info(f"Initialized provider pool '{self.name}' with {self.config.load_balancer.value} load balancing")
+            logger.info(
+                f"Initialized provider pool '{self.name}' with {self.config.load_balancer.value} load balancing"
+            )
 
     async def add_provider(
         self,
@@ -229,6 +231,7 @@ class ProviderPool:
             if instance:
                 # Mark as draining first
                 from victor.providers.health_monitor import HealthStatus
+
                 instance.health_monitor.set_status(HealthStatus.DRAINING)
 
                 # Wait for active connections to complete
@@ -236,7 +239,9 @@ class ProviderPool:
                 start = time.time()
                 while instance.active_connections > 0:
                     if time.time() - start > timeout:
-                        logger.warning(f"Timeout waiting for connections to drain for {provider_id}")
+                        logger.warning(
+                            f"Timeout waiting for connections to drain for {provider_id}"
+                        )
                         break
                     await asyncio.sleep(0.1)
 
@@ -349,7 +354,7 @@ class ProviderPool:
 
                 # Retry with backoff
                 if attempt < self.config.max_retries - 1:
-                    await asyncio.sleep(self.config.retry_delay * (2 ** attempt))
+                    await asyncio.sleep(self.config.retry_delay * (2**attempt))
 
             finally:
                 instance.release_connection()

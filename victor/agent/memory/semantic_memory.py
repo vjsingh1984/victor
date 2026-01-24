@@ -184,7 +184,9 @@ class KnowledgeLink:
 
     def __repr__(self) -> str:
         """String representation of link."""
-        return f"KnowledgeLink({self.source_id[:8]}... --[{self.relation}]--> {self.target_id[:8]}...)"
+        return (
+            f"KnowledgeLink({self.source_id[:8]}... --[{self.relation}]--> {self.target_id[:8]}...)"
+        )
 
 
 @dataclass
@@ -431,7 +433,9 @@ class SemanticMemory:
         if len(self._knowledge) > self._max_knowledge:
             await self._evict_knowledge()
 
-        logger.debug(f"Stored knowledge {knowledge_id[:8]}...: {fact[:50]}... (confidence={confidence:.2f})")
+        logger.debug(
+            f"Stored knowledge {knowledge_id[:8]}...: {fact[:50]}... (confidence={confidence:.2f})"
+        )
 
         return knowledge_id
 
@@ -472,7 +476,9 @@ class SemanticMemory:
 
             # Remove edges
             self._graph.edges = [
-                e for e in self._graph.edges if e.source_id != knowledge_id and e.target_id != knowledge_id
+                e
+                for e in self._graph.edges
+                if e.source_id != knowledge_id and e.target_id != knowledge_id
             ]
 
             logger.debug(f"Removed knowledge {knowledge_id[:8]}...")
@@ -584,7 +590,9 @@ class SemanticMemory:
         if new_confidence is not None:
             knowledge.confidence = new_confidence
             knowledge.updated_at = datetime.utcnow()
-            logger.debug(f"Updated confidence for knowledge {knowledge_id[:8]}... to {new_confidence:.2f}")
+            logger.debug(
+                f"Updated confidence for knowledge {knowledge_id[:8]}... to {new_confidence:.2f}"
+            )
 
         return True
 
@@ -715,9 +723,11 @@ class SemanticMemory:
 
         # Check if link already exists
         for edge in self._graph.edges:
-            if (edge.source_id == link.source_id and
-                edge.target_id == link.target_id and
-                edge.relation == link.relation):
+            if (
+                edge.source_id == link.source_id
+                and edge.target_id == link.target_id
+                and edge.relation == link.relation
+            ):
                 # Update weight and metadata
                 edge.weight = link.weight
                 edge.metadata.update(link.metadata)
@@ -775,7 +785,9 @@ class SemanticMemory:
 
         return related
 
-    def get_related_facts(self, fact_id: str, relation_type: Optional[str] = None, max_depth: int = 1) -> List[Knowledge]:
+    def get_related_facts(
+        self, fact_id: str, relation_type: Optional[str] = None, max_depth: int = 1
+    ) -> List[Knowledge]:
         """Get facts related to the given fact ID, optionally filtering by relation type.
 
         This is an alias for get_related_knowledge with additional filtering.
@@ -819,7 +831,9 @@ class SemanticMemory:
 
         return related
 
-    async def merge_facts(self, fact_ids: List[str], merge_strategy: str = "weighted_average") -> str:
+    async def merge_facts(
+        self, fact_ids: List[str], merge_strategy: str = "weighted_average"
+    ) -> str:
         """Merge multiple facts into a single consolidated fact.
 
         This method combines contradictory or complementary facts into a single
@@ -1170,7 +1184,8 @@ class SemanticMemory:
             cursor = conn.cursor()
 
             # Create tables
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS knowledge (
                     id TEXT PRIMARY KEY,
                     fact TEXT NOT NULL,
@@ -1182,9 +1197,11 @@ class SemanticMemory:
                     metadata TEXT,
                     citations TEXT
                 )
-            """)
+            """
+            )
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS links (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     source_id TEXT NOT NULL,
@@ -1196,7 +1213,8 @@ class SemanticMemory:
                     FOREIGN KEY (source_id) REFERENCES knowledge (id),
                     FOREIGN KEY (target_id) REFERENCES knowledge (id)
                 )
-            """)
+            """
+            )
 
             # Clear existing data
             cursor.execute("DELETE FROM knowledge")
@@ -1382,7 +1400,9 @@ class SemanticMemory:
             "newest_knowledge": max(k.created_at for k in self._knowledge.values()).isoformat(),
             "source_breakdown": source_counts,
             "total_citations": sum(citation_counts),
-            "avg_citations_per_fact": sum(citation_counts) / len(citation_counts) if citation_counts else 0,
+            "avg_citations_per_fact": (
+                sum(citation_counts) / len(citation_counts) if citation_counts else 0
+            ),
             "facts_with_citations": sum(1 for c in citation_counts if c > 0),
         }
 

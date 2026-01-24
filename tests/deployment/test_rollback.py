@@ -37,8 +37,10 @@ from pydantic import BaseModel, Field
 # Enums and Models
 # ============================================================================
 
+
 class RollbackScenario(Enum):
     """Rollback test scenarios"""
+
     KUBERNETES_DEPLOYMENT = "kubernetes_deployment"
     BLUE_GREEN = "blue_green"
     DATABASE_MIGRATION = "database_migration"
@@ -48,6 +50,7 @@ class RollbackScenario(Enum):
 
 class RollbackMethod(Enum):
     """Rollback methods"""
+
     TRAFFIC_SWITCH = "traffic_switch"  # Switch traffic back to green
     KUBECTL_UNDO = "kubectl_undo"  # kubectl rollout undo
     IMAGE_REVERT = "image_revert"  # Revert to previous image
@@ -57,6 +60,7 @@ class RollbackMethod(Enum):
 
 class TriggerType(Enum):
     """Rollback trigger types"""
+
     IMMEDIATE = "immediate"  # Rollback immediately (<1 min)
     CONSIDERED = "considered"  # Discuss within 15 min
     MONITOR = "monitor"  # Monitor only
@@ -65,6 +69,7 @@ class TriggerType(Enum):
 @dataclass
 class RollbackMetrics:
     """Metrics collected during rollback"""
+
     scenario: RollbackScenario
     method: RollbackMethod
     trigger_type: TriggerType
@@ -124,6 +129,7 @@ class RollbackMetrics:
 
 class RollbackTrigger(BaseModel):
     """Rollback trigger condition"""
+
     name: str
     description: str
     trigger_type: TriggerType
@@ -209,10 +215,17 @@ IMMEDIATE_TRIGGERS = [
 # Test Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def rollback_test_config():
     """Load rollback test configuration"""
-    config_path = Path(__file__).parent.parent.parent / "deployment" / "kubernetes" / "overlays" / "production"
+    config_path = (
+        Path(__file__).parent.parent.parent
+        / "deployment"
+        / "kubernetes"
+        / "overlays"
+        / "production"
+    )
 
     return {
         "deployment_yaml": config_path / "deployment-patch.yaml",
@@ -229,6 +242,7 @@ def rollback_test_config():
 @pytest.fixture
 def mock_kubectl():
     """Mock kubectl commands for testing"""
+
     class MockKubectl:
         def __init__(self):
             self.deployments = {}
@@ -291,7 +305,11 @@ def rollback_metrics_collector():
                 "total_scenarios": len(self.metrics),
                 "successful_scenarios": sum(1 for m in self.metrics if m.success),
                 "failed_scenarios": sum(1 for m in self.metrics if not m.success),
-                "avg_total_time": sum(m.total_time for m in self.metrics) / len(self.metrics) if self.metrics else 0,
+                "avg_total_time": (
+                    sum(m.total_time for m in self.metrics) / len(self.metrics)
+                    if self.metrics
+                    else 0
+                ),
                 "max_total_time": max(m.total_time for m in self.metrics) if self.metrics else 0,
                 "scenarios_under_5min": sum(1 for m in self.metrics if m.total_time < 300),
                 "data_loss_incidents": sum(m.data_loss_bytes for m in self.metrics),
@@ -304,13 +322,16 @@ def rollback_metrics_collector():
 # Helper Functions
 # ============================================================================
 
+
 def measure_time(func):
     """Decorator to measure function execution time"""
+
     def wrapper(*args, **kwargs):
         start = time.time()
         result = func(*args, **kwargs)
         elapsed = time.time() - start
         return result, elapsed
+
     return wrapper
 
 
@@ -355,11 +376,14 @@ async def run_smoke_tests(base_url: str) -> Dict[str, bool]:
 # Scenario 1: Kubernetes Deployment Rollback
 # ============================================================================
 
+
 class TestKubernetesDeploymentRollback:
     """Test Kubernetes deployment rollback using kubectl rollout undo"""
 
     @pytest.mark.asyncio
-    async def test_kubernetes_rollback_undo(self, rollback_test_config, mock_kubectl, rollback_metrics_collector):
+    async def test_kubernetes_rollback_undo(
+        self, rollback_test_config, mock_kubectl, rollback_metrics_collector
+    ):
         """
         Test kubectl rollout undo for deployment rollback
 
@@ -389,17 +413,14 @@ class TestKubernetesDeploymentRollback:
 
         # Simulate kubectl rollout undo
         success = mock_kubectl.rollout_undo(
-            deployment=config["app_name"],
-            namespace=config["namespace"]
+            deployment=config["app_name"], namespace=config["namespace"]
         )
         assert success
 
         # Wait for rollback to complete
         await asyncio.sleep(0.5)  # Simulate waiting
         mock_kubectl.rollout_status(
-            deployment=config["app_name"],
-            namespace=config["namespace"],
-            timeout=300
+            deployment=config["app_name"], namespace=config["namespace"], timeout=300
         )
 
         metrics.execution_time = time.time() - execution_start
@@ -429,17 +450,19 @@ class TestKubernetesDeploymentRollback:
 
         # Validate success criteria
         metrics.success = (
-            metrics.total_time < 300 and  # <5 minutes
-            metrics.data_loss_bytes == 0 and  # Zero data loss
-            metrics.error_rate_after < 1.0 and  # Error rate back to normal
-            metrics.p95_latency_after < 2.0  # Latency back to normal
+            metrics.total_time < 300  # <5 minutes
+            and metrics.data_loss_bytes == 0  # Zero data loss
+            and metrics.error_rate_after < 1.0  # Error rate back to normal
+            and metrics.p95_latency_after < 2.0  # Latency back to normal
         )
 
         rollback_metrics_collector.add_metrics(metrics)
 
         # Assertions
         assert metrics.success, f"Rollback failed: {metrics.to_dict()}"
-        assert metrics.total_time < 180, f"Rollback took {metrics.total_time:.2f}s, expected <180s"  # <3 minutes
+        assert (
+            metrics.total_time < 180
+        ), f"Rollback took {metrics.total_time:.2f}s, expected <180s"  # <3 minutes
         assert len(mock_kubectl.commands_executed) >= 1, "Expected at least 1 kubectl command"
 
     @pytest.mark.asyncio
@@ -463,34 +486,35 @@ class TestKubernetesDeploymentRollback:
 
         # Simulate kubectl set image
         mock_kubectl.apply(
-            manifest=f"image set to {config['previous_version']}",
-            namespace=config["namespace"]
+            manifest=f"image set to {config['previous_version']}", namespace=config["namespace"]
         )
 
         # Wait for rollout
         await asyncio.sleep(0.3)
-        mock_kubectl.rollout_status(
-            deployment=config["app_name"],
-            namespace=config["namespace"]
-        )
+        mock_kubectl.rollout_status(deployment=config["app_name"], namespace=config["namespace"])
 
         metrics.execution_time = time.time() - execution_start
         metrics.total_time = time.time() - start_time
         metrics.success = True
 
         # Assertions
-        assert metrics.execution_time < 120, f"Rollback took {metrics.execution_time:.2f}s, expected <120s"
+        assert (
+            metrics.execution_time < 120
+        ), f"Rollback took {metrics.execution_time:.2f}s, expected <120s"
 
 
 # ============================================================================
 # Scenario 2: Blue-Green Rollback
 # ============================================================================
 
+
 class TestBlueGreenRollback:
     """Test blue-green deployment rollback"""
 
     @pytest.mark.asyncio
-    async def test_blue_green_rollback_traffic_switch(self, rollback_test_config, mock_kubectl, rollback_metrics_collector):
+    async def test_blue_green_rollback_traffic_switch(
+        self, rollback_test_config, mock_kubectl, rollback_metrics_collector
+    ):
         """
         Test blue-green rollback by switching traffic back to green
 
@@ -513,10 +537,7 @@ class TestBlueGreenRollback:
         execution_start = time.time()
 
         # Apply green-only ingress
-        mock_kubectl.apply(
-            manifest="green-only-ingress.yaml",
-            namespace=config["namespace"]
-        )
+        mock_kubectl.apply(manifest="green-only-ingress.yaml", namespace=config["namespace"])
 
         # Wait for traffic switch
         await asyncio.sleep(0.2)  # Simulate ingress propagation
@@ -538,16 +559,13 @@ class TestBlueGreenRollback:
         mock_kubectl.scale(
             resource=f"deployment/{config['app_name']}",
             replicas=0,
-            namespace=config["blue_namespace"]
+            namespace=config["blue_namespace"],
         )
 
         await asyncio.sleep(0.1)  # Simulate scale down
 
         metrics.total_time = time.time() - start_time
-        metrics.success = (
-            metrics.total_time < 120 and  # <2 minutes
-            healthy
-        )
+        metrics.success = metrics.total_time < 120 and healthy  # <2 minutes
 
         rollback_metrics_collector.add_metrics(metrics)
 
@@ -572,10 +590,7 @@ class TestBlueGreenRollback:
         start_time = time.time()
 
         # Execute traffic switch
-        mock_kubectl.apply(
-            manifest="green-only-ingress.yaml",
-            namespace=config["namespace"]
-        )
+        mock_kubectl.apply(manifest="green-only-ingress.yaml", namespace=config["namespace"])
 
         await asyncio.sleep(0.2)
 
@@ -604,11 +619,14 @@ class TestBlueGreenRollback:
 # Scenario 3: Database Migration Rollback
 # ============================================================================
 
+
 class TestDatabaseMigrationRollback:
     """Test database migration rollback"""
 
     @pytest.mark.asyncio
-    async def test_database_migration_rollback(self, rollback_test_config, rollback_metrics_collector):
+    async def test_database_migration_rollback(
+        self, rollback_test_config, rollback_metrics_collector
+    ):
         """
         Test database migration rollback
 
@@ -664,10 +682,7 @@ class TestDatabaseMigrationRollback:
 
         metrics.verification_time = time.time() - verification_start
         metrics.total_time = time.time() - start_time
-        metrics.success = (
-            metrics.total_time < 180 and  # <3 minutes
-            metrics.data_loss_bytes == 0
-        )
+        metrics.success = metrics.total_time < 180 and metrics.data_loss_bytes == 0  # <3 minutes
 
         rollback_metrics_collector.add_metrics(metrics)
 
@@ -711,11 +726,14 @@ class TestDatabaseMigrationRollback:
 # Scenario 4: Configuration Rollback
 # ============================================================================
 
+
 class TestConfigurationRollback:
     """Test configuration-only rollback"""
 
     @pytest.mark.asyncio
-    async def test_config_map_rollback(self, rollback_test_config, mock_kubectl, rollback_metrics_collector):
+    async def test_config_map_rollback(
+        self, rollback_test_config, mock_kubectl, rollback_metrics_collector
+    ):
         """
         Test ConfigMap rollback
 
@@ -737,10 +755,7 @@ class TestConfigurationRollback:
             "VICTOR_CACHE_SIZE": "2000",
         }
 
-        mock_kubectl.apply(
-            manifest="new-config.yaml",
-            namespace=config["namespace"]
-        )
+        mock_kubectl.apply(manifest="new-config.yaml", namespace=config["namespace"])
 
         # Step 2: Detect issue (config caused high memory usage)
         issue_detected = True
@@ -754,10 +769,7 @@ class TestConfigurationRollback:
             "VICTOR_CACHE_SIZE": "1000",
         }
 
-        mock_kubectl.apply(
-            manifest="old-config.yaml",
-            namespace=config["namespace"]
-        )
+        mock_kubectl.apply(manifest="old-config.yaml", namespace=config["namespace"])
 
         # ConfigMaps update without pod restart (if using watching)
         await asyncio.sleep(0.1)
@@ -776,10 +788,7 @@ class TestConfigurationRollback:
 
         metrics.verification_time = time.time() - verification_start
         metrics.total_time = time.time() - start_time
-        metrics.success = (
-            metrics.total_time < 60 and  # <1 minute
-            pods_unchanged  # No pod restarts
-        )
+        metrics.success = metrics.total_time < 60 and pods_unchanged  # <1 minute  # No pod restarts
 
         rollback_metrics_collector.add_metrics(metrics)
 
@@ -799,19 +808,13 @@ class TestConfigurationRollback:
         start_time = time.time()
 
         # Apply new env vars
-        mock_kubectl.apply(
-            manifest="deployment-with-new-env.yaml",
-            namespace=config["namespace"]
-        )
+        mock_kubectl.apply(manifest="deployment-with-new-env.yaml", namespace=config["namespace"])
 
         # Wait for rollout
         await asyncio.sleep(0.3)
 
         # Rollback env vars
-        mock_kubectl.apply(
-            manifest="deployment-with-old-env.yaml",
-            namespace=config["namespace"]
-        )
+        mock_kubectl.apply(manifest="deployment-with-old-env.yaml", namespace=config["namespace"])
 
         # Wait for rollout
         await asyncio.sleep(0.3)
@@ -826,11 +829,14 @@ class TestConfigurationRollback:
 # Scenario 5: Complete System Rollback
 # ============================================================================
 
+
 class TestCompleteSystemRollback:
     """Test complete system rollback (app + db + config)"""
 
     @pytest.mark.asyncio
-    async def test_complete_system_rollback(self, rollback_test_config, mock_kubectl, rollback_metrics_collector):
+    async def test_complete_system_rollback(
+        self, rollback_test_config, mock_kubectl, rollback_metrics_collector
+    ):
         """
         Test complete system rollback
 
@@ -856,10 +862,7 @@ class TestCompleteSystemRollback:
         execution_start = time.time()
 
         # Rollback application
-        mock_kubectl.apply(
-            manifest="backup/victor-ai-0.5.0.yaml",
-            namespace=config["namespace"]
-        )
+        mock_kubectl.apply(manifest="backup/victor-ai-0.5.0.yaml", namespace=config["namespace"])
 
         await asyncio.sleep(0.3)  # App rollback
 
@@ -867,10 +870,7 @@ class TestCompleteSystemRollback:
         await asyncio.sleep(0.2)  # DB rollback
 
         # Rollback configuration
-        mock_kubectl.apply(
-            manifest="backup/config-0.5.0.yaml",
-            namespace=config["namespace"]
-        )
+        mock_kubectl.apply(manifest="backup/config-0.5.0.yaml", namespace=config["namespace"])
 
         await asyncio.sleep(0.1)  # Config rollback
 
@@ -910,10 +910,10 @@ class TestCompleteSystemRollback:
         metrics.verification_time = time.time() - verification_start
         metrics.total_time = time.time() - start_time
         metrics.success = (
-            metrics.total_time < 300 and  # <5 minutes
-            metrics.error_rate_after < 1.0 and
-            metrics.p95_latency_after < 2.0 and
-            all(health_checks)
+            metrics.total_time < 300  # <5 minutes
+            and metrics.error_rate_after < 1.0
+            and metrics.p95_latency_after < 2.0
+            and all(health_checks)
         )
 
         rollback_metrics_collector.add_metrics(metrics)
@@ -926,6 +926,7 @@ class TestCompleteSystemRollback:
 # ============================================================================
 # Rollback Under Load Tests
 # ============================================================================
+
 
 class TestRollbackUnderLoad:
     """Test rollback procedures under simulated load"""
@@ -952,10 +953,7 @@ class TestRollbackUnderLoad:
         traffic_simulator_running = True
 
         # Execute traffic switch
-        mock_kubectl.apply(
-            manifest="green-only-ingress.yaml",
-            namespace=config["namespace"]
-        )
+        mock_kubectl.apply(manifest="green-only-ingress.yaml", namespace=config["namespace"])
 
         # Measure switch time (downtime)
         switch_start = time.time()
@@ -968,9 +966,9 @@ class TestRollbackUnderLoad:
 
         metrics.total_time = time.time() - start_time
         metrics.success = (
-            metrics.total_time < 120 and
-            metrics.downtime_seconds < 30 and  # <30 seconds downtime
-            error_rate_during_switch < 5.0
+            metrics.total_time < 120
+            and metrics.downtime_seconds < 30  # <30 seconds downtime
+            and error_rate_during_switch < 5.0
         )
 
         # Assertions
@@ -981,6 +979,7 @@ class TestRollbackUnderLoad:
 # ============================================================================
 # Rollback Trigger Evaluation Tests
 # ============================================================================
+
 
 class TestRollbackTriggers:
     """Test rollback trigger evaluation"""
@@ -1037,6 +1036,7 @@ class TestRollbackTriggers:
 # ============================================================================
 # Rollback Report Generation
 # ============================================================================
+
 
 class TestRollbackReporting:
     """Test rollback reporting and metrics"""
@@ -1100,6 +1100,7 @@ class TestRollbackReporting:
 # ============================================================================
 # Test Entry Points
 # ============================================================================
+
 
 @pytest.mark.integration
 class TestRollbackIntegration:
@@ -1178,11 +1179,17 @@ class TestRollbackIntegration:
         rollback_metrics_collector.add_metrics(metrics)
 
         # Validate total time
-        assert metrics.total_time < 300, f"Total rollback time {metrics.total_time:.2f}s exceeds 5 minutes"
+        assert (
+            metrics.total_time < 300
+        ), f"Total rollback time {metrics.total_time:.2f}s exceeds 5 minutes"
 
         # Validate components
-        assert metrics.decision_time < 120, f"Decision time {metrics.decision_time:.2f}s exceeds 2 minutes"
-        assert metrics.execution_time < 180, f"Execution time {metrics.execution_time:.2f}s exceeds 3 minutes"
+        assert (
+            metrics.decision_time < 120
+        ), f"Decision time {metrics.decision_time:.2f}s exceeds 2 minutes"
+        assert (
+            metrics.execution_time < 180
+        ), f"Execution time {metrics.execution_time:.2f}s exceeds 3 minutes"
 
 
 # ============================================================================

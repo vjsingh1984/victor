@@ -212,16 +212,12 @@ class TestNestedTeamNodes:
         shared_ctx = RecursionContext(max_depth=3)
 
         # Create outer team coordinator with shared context
-        outer_coordinator = create_coordinator(
-            lightweight=True, recursion_context=shared_ctx
-        )
+        outer_coordinator = create_coordinator(lightweight=True, recursion_context=shared_ctx)
         outer_member = MockTeamMember("outer_member", "manager", "Outer complete")
         outer_coordinator.add_member(outer_member)
 
         # Create inner team coordinator with same context
-        inner_coordinator = create_coordinator(
-            lightweight=True, recursion_context=shared_ctx
-        )
+        inner_coordinator = create_coordinator(lightweight=True, recursion_context=shared_ctx)
         inner_member = MockTeamMember("inner_member", "worker", "Inner complete")
         inner_coordinator.add_member(inner_member)
 
@@ -238,9 +234,7 @@ class TestNestedTeamNodes:
         assert outer_coordinator.get_recursion_depth() == 1
 
         # Execute inner team (depth 1 -> 2 during execution)
-        inner_result = await inner_coordinator.execute_task(
-            "Do work", {"team_name": "InnerTeam"}
-        )
+        inner_result = await inner_coordinator.execute_task("Do work", {"team_name": "InnerTeam"})
         assert inner_result["success"] is True
         # After execution, depth returns to 1
         assert inner_coordinator.get_recursion_depth() == 1
@@ -351,9 +345,7 @@ class TestRecursionLimitEnforcement:
         assert recursion_ctx.current_depth == 1
 
         # Create coordinator
-        coordinator = create_coordinator(
-            lightweight=True, recursion_context=recursion_ctx
-        )
+        coordinator = create_coordinator(lightweight=True, recursion_context=recursion_ctx)
         member = MockTeamMember("member1", "worker", "Done")
         coordinator.add_member(member)
 
@@ -377,9 +369,7 @@ class TestTeamFormationTypes:
     async def test_sequential_formation(self):
         """Test sequential formation with recursion tracking."""
         recursion_ctx = RecursionContext(max_depth=3)
-        coordinator = create_coordinator(
-            lightweight=True, recursion_context=recursion_ctx
-        )
+        coordinator = create_coordinator(lightweight=True, recursion_context=recursion_ctx)
 
         # Add members
         member1 = MockTeamMember("m1", "step1", "Step 1 complete")
@@ -404,9 +394,7 @@ class TestTeamFormationTypes:
     async def test_parallel_formation(self):
         """Test parallel formation with recursion tracking."""
         recursion_ctx = RecursionContext(max_depth=3)
-        coordinator = create_coordinator(
-            lightweight=True, recursion_context=recursion_ctx
-        )
+        coordinator = create_coordinator(lightweight=True, recursion_context=recursion_ctx)
 
         # Add members
         member1 = MockTeamMember("m1", "worker1", "Work 1 done")
@@ -429,9 +417,7 @@ class TestTeamFormationTypes:
     async def test_pipeline_formation(self):
         """Test pipeline formation with recursion tracking."""
         recursion_ctx = RecursionContext(max_depth=3)
-        coordinator = create_coordinator(
-            lightweight=True, recursion_context=recursion_ctx
-        )
+        coordinator = create_coordinator(lightweight=True, recursion_context=recursion_ctx)
 
         # Add members (pipeline passes output from one to next)
         member1 = MockTeamMember("m1", "stage1", "Stage 1 output")
@@ -455,9 +441,7 @@ class TestTeamFormationTypes:
     async def test_hierarchical_formation(self):
         """Test hierarchical formation with recursion tracking."""
         recursion_ctx = RecursionContext(max_depth=3)
-        coordinator = create_coordinator(
-            lightweight=True, recursion_context=recursion_ctx
-        )
+        coordinator = create_coordinator(lightweight=True, recursion_context=recursion_ctx)
 
         # Add manager and workers
         manager = MockTeamMember("manager", "manager", "Manager decision")
@@ -481,9 +465,7 @@ class TestTeamFormationTypes:
     async def test_consensus_formation(self):
         """Test consensus formation with recursion tracking."""
         recursion_ctx = RecursionContext(max_depth=3)
-        coordinator = create_coordinator(
-            lightweight=True, recursion_context=recursion_ctx
-        )
+        coordinator = create_coordinator(lightweight=True, recursion_context=recursion_ctx)
 
         # Add members
         member1 = MockTeamMember("m1", "voter1", "Vote: Approve")
@@ -530,9 +512,7 @@ class TestCustomMaxRecursionDepth:
 
         # In real execution, this shared_context would be used to create
         # a RecursionContext with the custom limit
-        custom_ctx = RecursionContext(
-            max_depth=team_node.shared_context["max_recursion_depth"]
-        )
+        custom_ctx = RecursionContext(max_depth=team_node.shared_context["max_recursion_depth"])
 
         assert custom_ctx.max_depth == 5
         assert custom_ctx.can_nest(5) is True
@@ -575,9 +555,7 @@ class TestCustomMaxRecursionDepth:
         custom_ctx = RecursionContext(max_depth=shared_context["max_recursion_depth"])
 
         # Create coordinator with custom context
-        coordinator = create_coordinator(
-            lightweight=True, recursion_context=custom_ctx
-        )
+        coordinator = create_coordinator(lightweight=True, recursion_context=custom_ctx)
 
         # Verify coordinator uses custom context
         assert coordinator.get_recursion_depth() == 0
@@ -630,18 +608,14 @@ class TestRuntimeParameterOverride:
         """Test coordinator respecting runtime depth override."""
         # Create coordinator with default context
         default_ctx = RecursionContext(max_depth=3)
-        coordinator = create_coordinator(
-            lightweight=True, recursion_context=default_ctx
-        )
+        coordinator = create_coordinator(lightweight=True, recursion_context=default_ctx)
 
         assert coordinator._recursion_ctx.max_depth == 3
 
         # Simulate runtime override by creating new context
         # In real system, this would be via execution parameters
         runtime_ctx = RecursionContext(max_depth=5)
-        override_coordinator = create_coordinator(
-            lightweight=True, recursion_context=runtime_ctx
-        )
+        override_coordinator = create_coordinator(lightweight=True, recursion_context=runtime_ctx)
 
         assert override_coordinator._recursion_ctx.max_depth == 5
         assert override_coordinator.can_spawn_nested() is True
@@ -692,9 +666,7 @@ class TestTeamNodeErrorHandling:
     async def test_member_failure_with_continue_on_error(self):
         """Test team continues when member fails with continue_on_error=True."""
         recursion_ctx = RecursionContext(max_depth=3)
-        coordinator = create_coordinator(
-            lightweight=True, recursion_context=recursion_ctx
-        )
+        coordinator = create_coordinator(lightweight=True, recursion_context=recursion_ctx)
 
         # Add mix of failing and successful members
         member1 = MockTeamMember("m1", "worker1", "Success", should_fail=False)
@@ -715,9 +687,7 @@ class TestTeamNodeErrorHandling:
     async def test_team_timeout_handling(self):
         """Test team node timeout handling."""
         recursion_ctx = RecursionContext(max_depth=3)
-        coordinator = create_coordinator(
-            lightweight=True, recursion_context=recursion_ctx
-        )
+        coordinator = create_coordinator(lightweight=True, recursion_context=recursion_ctx)
 
         # Add member that simulates long-running task
         async def slow_member(task: str, context: dict) -> str:
@@ -994,9 +964,7 @@ class TestWorkflowCompilerIntegration:
 
         # Try to load team node example (if it exists)
         try:
-            workflows = load_workflow_from_file(
-                "victor/coding/workflows/team_node_example.yaml"
-            )
+            workflows = load_workflow_from_file("victor/coding/workflows/team_node_example.yaml")
 
             # Verify workflow loaded
             assert isinstance(workflows, dict)
@@ -1109,9 +1077,7 @@ class TestTeamNodeEdgeCases:
     async def test_empty_team_execution(self):
         """Test behavior when team has no members."""
         recursion_ctx = RecursionContext(max_depth=3)
-        coordinator = create_coordinator(
-            lightweight=True, recursion_context=recursion_ctx
-        )
+        coordinator = create_coordinator(lightweight=True, recursion_context=recursion_ctx)
 
         # Don't add any members
 
@@ -1126,9 +1092,7 @@ class TestTeamNodeEdgeCases:
     async def test_single_member_team(self):
         """Test team with only one member."""
         recursion_ctx = RecursionContext(max_depth=3)
-        coordinator = create_coordinator(
-            lightweight=True, recursion_context=recursion_ctx
-        )
+        coordinator = create_coordinator(lightweight=True, recursion_context=recursion_ctx)
 
         # Add single member
         member = MockTeamMember("sole_member", "solo_worker", "Solo complete")
@@ -1145,9 +1109,7 @@ class TestTeamNodeEdgeCases:
     async def test_team_formation_switching(self):
         """Test switching formations between executions."""
         recursion_ctx = RecursionContext(max_depth=3)
-        coordinator = create_coordinator(
-            lightweight=True, recursion_context=recursion_ctx
-        )
+        coordinator = create_coordinator(lightweight=True, recursion_context=recursion_ctx)
 
         member1 = MockTeamMember("m1", "worker", "Done")
         member2 = MockTeamMember("m2", "worker", "Done")

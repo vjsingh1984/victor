@@ -211,9 +211,7 @@ class HierarchicalPlanner:
         # Cache for decomposition results
         self._decomposition_cache: Dict[str, TaskGraph] = {}
 
-    async def _emit_event(
-        self, event_type: str, data: Dict[str, Any]
-    ) -> None:
+    async def _emit_event(self, event_type: str, data: Dict[str, Any]) -> None:
         """Emit a planning event.
 
         Args:
@@ -290,9 +288,7 @@ class HierarchicalPlanner:
 
         raise RuntimeError("No LLM provider available for task decomposition")
 
-    def _parse_decomposition_response(
-        self, response: str, root_task: str
-    ) -> List[Task]:
+    def _parse_decomposition_response(self, response: str, root_task: str) -> List[Task]:
         """Parse LLM decomposition response into tasks.
 
         Args:

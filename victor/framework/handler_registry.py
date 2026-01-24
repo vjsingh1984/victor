@@ -330,7 +330,9 @@ class HandlerRegistry:
 
         # Clear existing handlers for this vertical if replace=True
         if replace:
-            to_remove = [name for name, entry in self._handlers.items() if entry.vertical == vertical_name]
+            to_remove = [
+                name for name, entry in self._handlers.items() if entry.vertical == vertical_name
+            ]
             for name in to_remove:
                 del self._handlers[name]
 
@@ -343,7 +345,11 @@ class HandlerRegistry:
             module = importlib.import_module(module_path)
 
             # Clear handlers for this vertical from singleton to avoid duplicate errors on reload
-            to_remove_singleton = [name for name, entry in singleton._handlers.items() if entry.vertical == vertical_name]
+            to_remove_singleton = [
+                name
+                for name, entry in singleton._handlers.items()
+                if entry.vertical == vertical_name
+            ]
             for name in to_remove_singleton:
                 del singleton._handlers[name]
 
@@ -560,6 +566,7 @@ def handler_decorator(
         class CodeValidationHandler:
             pass
     """
+
     def decorator(cls):
         # Determine vertical (explicit or auto-detect)
         final_vertical = vertical

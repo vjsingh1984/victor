@@ -41,8 +41,10 @@ import numpy as np
 # matplotlib is optional - skip tests that need it if not available
 try:
     import matplotlib
-    matplotlib.use('Agg')  # Use non-interactive backend for testing
+
+    matplotlib.use("Agg")  # Use non-interactive backend for testing
     import matplotlib.pyplot as plt
+
     HAS_MATPLOTLIB = True
 except ImportError:
     HAS_MATPLOTLIB = False
@@ -337,6 +339,7 @@ class TestVisualizationGeneration:
     def test_generate_line_plot(self, sample_data):
         """Test generating line plot."""
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
@@ -366,6 +369,7 @@ class TestVisualizationGeneration:
     def test_generate_scatter_plot(self, sample_data):
         """Test generating scatter plot."""
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
@@ -391,6 +395,7 @@ class TestVisualizationGeneration:
     def test_generate_bar_plot(self, sample_data):
         """Test generating bar plot."""
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
@@ -419,6 +424,7 @@ class TestVisualizationGeneration:
     def test_generate_histogram(self, sample_data):
         """Test generating histogram."""
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
@@ -444,13 +450,13 @@ class TestVisualizationGeneration:
     def test_generate_box_plot(self, sample_data):
         """Test generating box plot."""
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
         # Prepare data for box plot
         box_data = [
-            sample_data[sample_data["category"] == cat]["value"].values
-            for cat in ["A", "B", "C"]
+            sample_data[sample_data["category"] == cat]["value"].values for cat in ["A", "B", "C"]
         ]
 
         fig, ax = plt.subplots(figsize=(10, 6))
@@ -475,6 +481,7 @@ class TestVisualizationGeneration:
     def test_generate_multi_plot_figure(self, sample_data):
         """Test generating figure with multiple subplots."""
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
@@ -622,11 +629,11 @@ class TestStatisticalReporting:
         """Test generating markdown report."""
         report_lines = []
         report_lines.append("# Data Analysis Report")
-        report_lines.append(f"\n## Overview")
+        report_lines.append("\n## Overview")
         report_lines.append(f"- Shape: {sample_dataframe.shape}")
         report_lines.append(f"- Columns: {', '.join(sample_dataframe.columns)}")
 
-        report_lines.append(f"\n## Summary Statistics")
+        report_lines.append("\n## Summary Statistics")
         summary = sample_dataframe.describe()
         for col in summary.columns:
             report_lines.append(f"\n### {col}")

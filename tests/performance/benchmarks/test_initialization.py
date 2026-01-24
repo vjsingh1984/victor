@@ -140,9 +140,7 @@ class TestColdStartPerformance:
             return await AgentOrchestrator.from_settings(settings, profile_name="benchmark")
 
         # Run async benchmark
-        result = benchmark.pedantic(
-            create_orchestrator, rounds=5, iterations=1, warmup_rounds=1
-        )
+        result = benchmark.pedantic(create_orchestrator, rounds=5, iterations=1, warmup_rounds=1)
 
         assert result is not None
 
@@ -207,6 +205,7 @@ class TestLazyLoadingBenefits:
 
         Expected: Lazy loading saves > 90% time for partial usage
         """
+
         # Test lazy loading (only create what's needed)
         def lazy_approach():
             container = ServiceContainer()
@@ -287,9 +286,7 @@ class TestMemoryUsage:
 
         # Peak memory should be < 10MB
         peak_mb = peak / 1024 / 1024
-        assert (
-            peak_mb < 10
-        ), f"Factory creation memory too high: {peak_mb:.1f}MB (target: < 10MB)"
+        assert peak_mb < 10, f"Factory creation memory too high: {peak_mb:.1f}MB (target: < 10MB)"
 
         assert result is not None
 
@@ -314,9 +311,7 @@ class TestMemoryUsage:
 
         # Peak memory should be < 50MB
         peak_mb = peak / 1024 / 1024
-        assert (
-            peak_mb < 50
-        ), f"Container startup memory too high: {peak_mb:.1f}MB (target: < 50MB)"
+        assert peak_mb < 50, f"Container startup memory too high: {peak_mb:.1f}MB (target: < 50MB)"
 
         assert result is not None
 
@@ -407,9 +402,7 @@ class TestComponentInitialization:
         result = benchmark(factory.create_project_context)
         assert result is not None
 
-    def test_complexity_classifier_initialization(
-        self, benchmark, settings, mock_provider
-    ):
+    def test_complexity_classifier_initialization(self, benchmark, settings, mock_provider):
         """Benchmark complexity classifier initialization.
 
         Expected: < 5ms
@@ -500,9 +493,7 @@ class TestPerformanceAssertions:
 
         elapsed = time.perf_counter() - start
 
-        assert (
-            elapsed < 0.5
-        ), f"Factory initialization too slow: {elapsed:.3f}s (target: < 500ms)"
+        assert elapsed < 0.5, f"Factory initialization too slow: {elapsed:.3f}s (target: < 500ms)"
         assert factory is not None
 
     def test_memory_usage_meets_target(self, settings, mock_provider):
@@ -529,9 +520,7 @@ class TestPerformanceAssertions:
 
         peak_mb = peak / 1024 / 1024
 
-        assert (
-            peak_mb < 50
-        ), f"Memory usage too high: {peak_mb:.1f}MB (target: < 50MB)"
+        assert peak_mb < 50, f"Memory usage too high: {peak_mb:.1f}MB (target: < 50MB)"
 
     def test_lazy_loading_saves_time(self, settings, mock_provider):
         """Assert lazy loading provides significant time savings.

@@ -96,9 +96,7 @@ class TestVisionAgentInit:
 
     def test_get_default_model_for_unknown_provider(self):
         """Test default model for unknown provider."""
-        unknown_provider = MockProviderFactory.create_with_response(
-            "test", name="unknown_provider"
-        )
+        unknown_provider = MockProviderFactory.create_with_response("test", name="unknown_provider")
         agent = VisionAgent(provider=unknown_provider)
         assert agent.model == "gpt-4o"
 
@@ -115,9 +113,7 @@ class TestVisionAgentInit:
 
     def test_is_vision_capable_unknown(self):
         """Test vision capability check for unknown provider."""
-        unknown_provider = MockProviderFactory.create_with_response(
-            "test", name="unknown"
-        )
+        unknown_provider = MockProviderFactory.create_with_response("test", name="unknown")
         agent = VisionAgent(provider=unknown_provider)
         assert agent._is_vision_capable() is False
 
@@ -133,7 +129,10 @@ class TestImageEncoding:
         assert media_type == ImageFormat.PNG
         assert len(base64_data) > 0
         # Valid base64 should only contain specific characters
-        assert all(c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=" for c in base64_data)
+        assert all(
+            c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
+            for c in base64_data
+        )
 
     def test_encode_image_jpg(self, vision_agent, sample_jpg_path):
         """Test encoding JPG image."""
@@ -184,7 +183,9 @@ class TestAnalyzeImage:
         assert isinstance(analysis.colors, list)
 
     @pytest.mark.asyncio
-    async def test_analyze_image_with_custom_query(self, vision_agent, sample_image_path, mock_provider):
+    async def test_analyze_image_with_custom_query(
+        self, vision_agent, sample_image_path, mock_provider
+    ):
         """Test image analysis with custom query."""
         mock_provider.chat.return_value = Mock(
             content="The image contains a red square",
@@ -247,7 +248,9 @@ class TestExtractPlotData:
             await vision_agent.extract_data_from_plot("/nonexistent/chart.png")
 
     @pytest.mark.asyncio
-    async def test_extract_plot_data_api_error(self, vision_agent, sample_image_path, mock_provider):
+    async def test_extract_plot_data_api_error(
+        self, vision_agent, sample_image_path, mock_provider
+    ):
         """Test handling API errors during extraction."""
         mock_provider.chat.side_effect = Exception("API Error")
 
@@ -289,7 +292,9 @@ class TestCompareImages:
     """Tests for image comparison."""
 
     @pytest.mark.asyncio
-    async def test_compare_images_basic(self, vision_agent, sample_image_path, sample_jpg_path, mock_provider):
+    async def test_compare_images_basic(
+        self, vision_agent, sample_image_path, sample_jpg_path, mock_provider
+    ):
         """Test basic image comparison."""
         mock_provider.chat.return_value = Mock(
             content="The images are different. One is red, one is blue.",
@@ -317,7 +322,9 @@ class TestCompareImages:
             await vision_agent.compare_images(sample_image_path, "/nonexistent/image2.png")
 
     @pytest.mark.asyncio
-    async def test_compare_images_api_error(self, vision_agent, sample_image_path, sample_jpg_path, mock_provider):
+    async def test_compare_images_api_error(
+        self, vision_agent, sample_image_path, sample_jpg_path, mock_provider
+    ):
         """Test handling API errors during comparison."""
         mock_provider.chat.side_effect = Exception("API Error")
 
@@ -329,7 +336,9 @@ class TestGenerateCaption:
     """Tests for image captioning."""
 
     @pytest.mark.asyncio
-    async def test_generate_caption_descriptive(self, vision_agent, sample_image_path, mock_provider):
+    async def test_generate_caption_descriptive(
+        self, vision_agent, sample_image_path, mock_provider
+    ):
         """Test generating descriptive caption."""
         mock_provider.chat.return_value = Mock(
             content="A small red square image on a white background",
@@ -366,7 +375,9 @@ class TestGenerateCaption:
         assert len(caption) > 0
 
     @pytest.mark.asyncio
-    async def test_generate_caption_accessibility(self, vision_agent, sample_image_path, mock_provider):
+    async def test_generate_caption_accessibility(
+        self, vision_agent, sample_image_path, mock_provider
+    ):
         """Test generating accessibility-focused caption."""
         mock_provider.chat.return_value = Mock(
             content="Image shows a red square, 10x10 pixels, centered on white background",
@@ -410,7 +421,9 @@ class TestOCRExtractText:
         assert len(text) > 0
 
     @pytest.mark.asyncio
-    async def test_ocr_extraction_with_language(self, vision_agent, sample_image_path, mock_provider):
+    async def test_ocr_extraction_with_language(
+        self, vision_agent, sample_image_path, mock_provider
+    ):
         """Test OCR with language hint."""
         mock_provider.chat.return_value = Mock(
             content="Texto en español",
@@ -540,7 +553,9 @@ class TestIntegrationScenarios:
         assert isinstance(objects, list)
 
     @pytest.mark.asyncio
-    async def test_different_image_formats(self, vision_agent, sample_image_path, sample_jpg_path, mock_provider):
+    async def test_different_image_formats(
+        self, vision_agent, sample_image_path, sample_jpg_path, mock_provider
+    ):
         """Test processing different image formats."""
         mock_provider.chat.return_value = Mock(content="Analyzed", role="assistant")
 
@@ -557,40 +572,42 @@ class TestBatchProcessImages:
     """Tests for batch image processing."""
 
     @pytest.mark.asyncio
-    async def test_batch_process_analyze(self, vision_agent, sample_image_path, sample_jpg_path, mock_provider):
+    async def test_batch_process_analyze(
+        self, vision_agent, sample_image_path, sample_jpg_path, mock_provider
+    ):
         """Test batch analysis of images."""
         mock_provider.chat.return_value = Mock(content="Analyzed", role="assistant")
 
         results = await vision_agent.batch_process_images(
-            [sample_image_path, sample_jpg_path],
-            operation="analyze"
+            [sample_image_path, sample_jpg_path], operation="analyze"
         )
 
         assert len(results) == 2
         assert all(isinstance(r, ImageAnalysis) for r in results)
 
     @pytest.mark.asyncio
-    async def test_batch_process_caption(self, vision_agent, sample_image_path, sample_jpg_path, mock_provider):
+    async def test_batch_process_caption(
+        self, vision_agent, sample_image_path, sample_jpg_path, mock_provider
+    ):
         """Test batch caption generation."""
         mock_provider.chat.return_value = Mock(content="A test image", role="assistant")
 
         results = await vision_agent.batch_process_images(
-            [sample_image_path, sample_jpg_path],
-            operation="caption",
-            style="concise"
+            [sample_image_path, sample_jpg_path], operation="caption", style="concise"
         )
 
         assert len(results) == 2
         assert all(isinstance(r, str) for r in results)
 
     @pytest.mark.asyncio
-    async def test_batch_process_ocr(self, vision_agent, sample_image_path, sample_jpg_path, mock_provider):
+    async def test_batch_process_ocr(
+        self, vision_agent, sample_image_path, sample_jpg_path, mock_provider
+    ):
         """Test batch OCR extraction."""
         mock_provider.chat.return_value = Mock(content="Extracted text", role="assistant")
 
         results = await vision_agent.batch_process_images(
-            [sample_image_path, sample_jpg_path],
-            operation="ocr"
+            [sample_image_path, sample_jpg_path], operation="ocr"
         )
 
         assert len(results) == 2
@@ -600,19 +617,17 @@ class TestBatchProcessImages:
     async def test_batch_process_invalid_operation(self, vision_agent, sample_image_path):
         """Test batch processing with invalid operation."""
         with pytest.raises(ValidationError, match="Invalid operation"):
-            await vision_agent.batch_process_images(
-                [sample_image_path],
-                operation="invalid_op"
-            )
+            await vision_agent.batch_process_images([sample_image_path], operation="invalid_op")
 
     @pytest.mark.asyncio
-    async def test_batch_process_handles_errors(self, vision_agent, sample_image_path, mock_provider):
+    async def test_batch_process_handles_errors(
+        self, vision_agent, sample_image_path, mock_provider
+    ):
         """Test batch processing handles individual failures gracefully."""
         mock_provider.chat.side_effect = Exception("API Error")
 
         results = await vision_agent.batch_process_images(
-            [sample_image_path, "/nonexistent/image.png"],
-            operation="analyze"
+            [sample_image_path, "/nonexistent/image.png"], operation="analyze"
         )
 
         # Should return results with None for failed items
@@ -625,7 +640,9 @@ class TestAnalyzeImageQuality:
     """Tests for image quality analysis."""
 
     @pytest.mark.asyncio
-    async def test_analyze_image_quality_basic(self, vision_agent, sample_image_path, mock_provider):
+    async def test_analyze_image_quality_basic(
+        self, vision_agent, sample_image_path, mock_provider
+    ):
         """Test basic image quality analysis."""
         mock_provider.chat.return_value = Mock(
             content='{"sharpness": 0.8, "brightness": 0.7, "contrast": 0.75, "noise_level": 0.2, "resolution": "high", "overall_quality": 0.75, "issues": [], "strengths": ["good lighting"]}',
@@ -650,7 +667,9 @@ class TestAnalyzeImageQuality:
             await vision_agent.analyze_image_quality("/nonexistent/image.png")
 
     @pytest.mark.asyncio
-    async def test_analyze_image_quality_parse_error(self, vision_agent, sample_image_path, mock_provider):
+    async def test_analyze_image_quality_parse_error(
+        self, vision_agent, sample_image_path, mock_provider
+    ):
         """Test quality analysis with non-JSON response."""
         mock_provider.chat.return_value = Mock(
             content="The image quality is good",
@@ -668,7 +687,9 @@ class TestExtractTextFromDocument:
     """Tests for document text extraction."""
 
     @pytest.mark.asyncio
-    async def test_extract_text_with_structure(self, vision_agent, sample_image_path, mock_provider):
+    async def test_extract_text_with_structure(
+        self, vision_agent, sample_image_path, mock_provider
+    ):
         """Test document text extraction with structure."""
         mock_response = {
             "text": "Full document text",
@@ -676,7 +697,7 @@ class TestExtractTextFromDocument:
             "sections": [{"heading": "Introduction", "content": "Content"}],
             "tables": [],
             "fields": {},
-            "confidence": 0.95
+            "confidence": 0.95,
         }
         mock_provider.chat.return_value = Mock(
             content=json.dumps(mock_response),
@@ -692,7 +713,9 @@ class TestExtractTextFromDocument:
         assert result["structured"]["title"] == "Test Document"
 
     @pytest.mark.asyncio
-    async def test_extract_text_without_structure(self, vision_agent, sample_image_path, mock_provider):
+    async def test_extract_text_without_structure(
+        self, vision_agent, sample_image_path, mock_provider
+    ):
         """Test document text extraction without structure."""
         mock_provider.chat.return_value = Mock(
             content="Plain text content",
@@ -715,7 +738,9 @@ class TestDetectFacesDetailed:
     """Tests for detailed face detection."""
 
     @pytest.mark.asyncio
-    async def test_detect_faces_with_attributes(self, vision_agent, sample_image_path, mock_provider):
+    async def test_detect_faces_with_attributes(
+        self, vision_agent, sample_image_path, mock_provider
+    ):
         """Test face detection with attributes."""
         mock_response = {
             "faces": [
@@ -729,11 +754,11 @@ class TestDetectFacesDetailed:
                         "left_eye": [40, 60],
                         "right_eye": [80, 60],
                         "nose": [60, 90],
-                        "mouth": [60, 120]
-                    }
+                        "mouth": [60, 120],
+                    },
                 }
             ],
-            "total_faces": 1
+            "total_faces": 1,
         }
         mock_provider.chat.return_value = Mock(
             content=json.dumps(mock_response),
@@ -750,23 +775,22 @@ class TestDetectFacesDetailed:
         assert len(faces[0].landmarks) == 4
 
     @pytest.mark.asyncio
-    async def test_detect_faces_without_attributes(self, vision_agent, sample_image_path, mock_provider):
+    async def test_detect_faces_without_attributes(
+        self, vision_agent, sample_image_path, mock_provider
+    ):
         """Test face detection without attributes."""
         mock_response = {
-            "faces": [
-                {
-                    "bbox": [10, 20, 100, 150],
-                    "confidence": 0.95
-                }
-            ],
-            "total_faces": 1
+            "faces": [{"bbox": [10, 20, 100, 150], "confidence": 0.95}],
+            "total_faces": 1,
         }
         mock_provider.chat.return_value = Mock(
             content=json.dumps(mock_response),
             role="assistant",
         )
 
-        faces = await vision_agent.detect_faces_detailed(sample_image_path, include_attributes=False)
+        faces = await vision_agent.detect_faces_detailed(
+            sample_image_path, include_attributes=False
+        )
 
         assert len(faces) == 1
         assert len(faces[0].attributes) == 0
@@ -800,24 +824,9 @@ class TestExtractColors:
         """Test basic color extraction."""
         mock_response = {
             "colors": [
-                {
-                    "hex": "#FF0000",
-                    "rgb": [255, 0, 0],
-                    "percentage": 45.5,
-                    "name": "red"
-                },
-                {
-                    "hex": "#00FF00",
-                    "rgb": [0, 255, 0],
-                    "percentage": 30.2,
-                    "name": "green"
-                },
-                {
-                    "hex": "#0000FF",
-                    "rgb": [0, 0, 255],
-                    "percentage": 24.3,
-                    "name": "blue"
-                }
+                {"hex": "#FF0000", "rgb": [255, 0, 0], "percentage": 45.5, "name": "red"},
+                {"hex": "#00FF00", "rgb": [0, 255, 0], "percentage": 30.2, "name": "green"},
+                {"hex": "#0000FF", "rgb": [0, 0, 255], "percentage": 24.3, "name": "blue"},
             ]
         }
         mock_provider.chat.return_value = Mock(
@@ -839,7 +848,12 @@ class TestExtractColors:
         # Return 10 colors but request only 5
         mock_response = {
             "colors": [
-                {"hex": f"#FF{i:02x}00", "rgb": [255, i, 0], "percentage": 10.0, "name": f"color{i}"}
+                {
+                    "hex": f"#FF{i:02x}00",
+                    "rgb": [255, i, 0],
+                    "percentage": 10.0,
+                    "name": f"color{i}",
+                }
                 for i in range(10)
             ]
         }

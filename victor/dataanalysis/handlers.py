@@ -645,7 +645,9 @@ class AutoSklearnHandler(BaseHandler):
             }
 
 
-@handler_decorator("rl_training", description="Reinforcement Learning training with Stable-Baselines3")
+@handler_decorator(
+    "rl_training", description="Reinforcement Learning training with Stable-Baselines3"
+)
 @dataclass
 class RLTrainingHandler(BaseHandler):
     """Reinforcement Learning training handler.

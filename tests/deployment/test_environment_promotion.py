@@ -27,9 +27,7 @@ def environment_configs() -> Dict[str, Dict[str, Any]]:
     with open(base_values_path) as f:
         configs["base"] = yaml.safe_load(f)
 
-    prod_values_path = Path(
-        "/Users/vijaysingh/code/codingagent/deployment/helm/values-prod.yaml"
-    )
+    prod_values_path = Path("/Users/vijaysingh/code/codingagent/deployment/helm/values-prod.yaml")
     with open(prod_values_path) as f:
         configs["production"] = yaml.safe_load(f)
 
@@ -122,7 +120,9 @@ class TestConfigurationPromotion:
                 if "_patch" in config:
                     patch = config["_patch"]
                     try:
-                        actual_cpu = patch["spec"]["template"]["spec"]["containers"][0]["resources"]["limits"]["cpu"]
+                        actual_cpu = patch["spec"]["template"]["spec"]["containers"][0][
+                            "resources"
+                        ]["limits"]["cpu"]
                     except (KeyError, TypeError, IndexError):
                         actual_cpu = "1000m"  # Default fallback
                 elif "resources" in config:
@@ -133,7 +133,9 @@ class TestConfigurationPromotion:
                 else:
                     actual_cpu = "1000m"  # Default fallback
 
-                assert actual_cpu == expected_cpu, f"{env}: expected {expected_cpu} CPU, got {actual_cpu}"
+                assert (
+                    actual_cpu == expected_cpu
+                ), f"{env}: expected {expected_cpu} CPU, got {actual_cpu}"
 
     def test_memory_scaling(self, environment_configs):
         """Test that memory allocation scales up through environments."""
@@ -152,7 +154,9 @@ class TestConfigurationPromotion:
                 if "_patch" in config:
                     patch = config["_patch"]
                     try:
-                        actual_memory = patch["spec"]["template"]["spec"]["containers"][0]["resources"]["limits"]["memory"]
+                        actual_memory = patch["spec"]["template"]["spec"]["containers"][0][
+                            "resources"
+                        ]["limits"]["memory"]
                     except (KeyError, TypeError, IndexError):
                         actual_memory = "1Gi"  # Default fallback
                 elif "resources" in config:
@@ -160,7 +164,9 @@ class TestConfigurationPromotion:
                 else:
                     actual_memory = "1Gi"  # Default fallback
 
-                assert actual_memory == expected_memory, f"{env}: expected {expected_memory} memory, got {actual_memory}"
+                assert (
+                    actual_memory == expected_memory
+                ), f"{env}: expected {expected_memory} memory, got {actual_memory}"
 
     def test_cache_size_scaling(self, environment_configs):
         """Test that cache size scales up through environments."""
@@ -263,9 +269,7 @@ class TestConfigurationDrift:
             if overlay_path.exists():
                 with open(overlay_path) as f:
                     config = yaml.safe_load(f)
-                    literals = config.get("configMapGenerator", [{}])[0].get(
-                        "literals", []
-                    )
+                    literals = config.get("configMapGenerator", [{}])[0].get("literals", [])
                     for lit in literals:
                         if lit.startswith("VICTOR_LOG_LEVEL="):
                             actual_level = lit.split("=")[1]
@@ -312,9 +316,7 @@ class TestConfigurationDrift:
             if overlay_path.exists():
                 with open(overlay_path) as f:
                     config = yaml.safe_load(f)
-                    literals = config.get("configMapGenerator", [{}])[0].get(
-                        "literals", []
-                    )
+                    literals = config.get("configMapGenerator", [{}])[0].get("literals", [])
 
                     actual_backends = {}
                     for lit in literals:
@@ -457,9 +459,7 @@ class TestSecretsPromotion:
         # In production, secrets should be injected via external secrets operator
         # or Kubernetes secrets, not hardcoded in values
 
-        base_values_path = Path(
-            "/Users/vijaysingh/code/codingagent/deployment/helm/values.yaml"
-        )
+        base_values_path = Path("/Users/vijaysingh/code/codingagent/deployment/helm/values.yaml")
         with open(base_values_path) as f:
             values = yaml.safe_load(f)
             # Check that existingSecret field is present
@@ -493,7 +493,9 @@ class TestImageTagPromotion:
                     if images:
                         actual_tag = images[0].get("newTag")
                         expected_tag = expected_tags[env]
-                        assert actual_tag == expected_tag, f"{env}: Expected tag {expected_tag}, got {actual_tag}"
+                        assert (
+                            actual_tag == expected_tag
+                        ), f"{env}: Expected tag {expected_tag}, got {actual_tag}"
 
         # Check production values
         prod_values_path = Path(
@@ -503,7 +505,9 @@ class TestImageTagPromotion:
             values = yaml.safe_load(f)
             actual_tag = values["image"]["tag"]
             expected_tag = expected_tags["production"]
-            assert actual_tag == expected_tag, f"production: Expected tag {expected_tag}, got {actual_tag}"
+            assert (
+                actual_tag == expected_tag
+            ), f"production: Expected tag {expected_tag}, got {actual_tag}"
 
 
 @pytest.mark.promotion

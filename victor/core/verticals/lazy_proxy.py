@@ -196,7 +196,7 @@ class LazyProxy(VerticalBase, Generic[T]):  # type: ignore[misc]
         if not self._loaded:
             self.load()
 
-        if self._instance and hasattr(self._instance, 'display_name'):
+        if self._instance and hasattr(self._instance, "display_name"):
             return str(self._instance.display_name)
         return f"{self._vertical_name.title()} (Lazy Proxy)"
 
@@ -211,7 +211,7 @@ class LazyProxy(VerticalBase, Generic[T]):  # type: ignore[misc]
         if not self._loaded:
             self.load()
 
-        if self._instance and hasattr(self._instance, 'description'):
+        if self._instance and hasattr(self._instance, "description"):
             return str(self._instance.description)
         return f"Lazy loading proxy for {self._vertical_name}"
 
@@ -233,7 +233,9 @@ class LazyProxy(VerticalBase, Generic[T]):  # type: ignore[misc]
             instance = self._instance
             if instance is not None:
                 return instance
-            raise RuntimeError(f"Vertical '{self._vertical_name}' marked as loaded but instance is None")
+            raise RuntimeError(
+                f"Vertical '{self._vertical_name}' marked as loaded but instance is None"
+            )
 
         # Slow path: need to load
         with self._load_lock:

@@ -39,6 +39,7 @@ class TestParallelExecutionPerformance:
     @pytest.mark.asyncio
     async def test_parallel_vs_sequential_speedup(self):
         """Test that parallel execution provides 15-25% speedup."""
+
         # Create CPU-bound tasks
         async def cpu_task(context):
             # Simulate CPU work
@@ -78,6 +79,7 @@ class TestParallelExecutionPerformance:
     @pytest.mark.asyncio
     async def test_overhead_minimal(self):
         """Test that optimization framework overhead is <5%."""
+
         async def simple_task(context):
             return "result"
 
@@ -85,6 +87,7 @@ class TestParallelExecutionPerformance:
 
         # Base parallel executor (no optimization)
         from victor.framework.parallel import ParallelExecutor
+
         base_executor = ParallelExecutor()
         start_base = time.perf_counter()
         await base_executor.execute(tasks)
@@ -110,6 +113,7 @@ class TestParallelExecutionPerformance:
     @pytest.mark.asyncio
     async def test_speedup_scaling_with_workers(self):
         """Test that speedup scales reasonably with worker count."""
+
         async def io_task(context):
             await asyncio.sleep(0.01)
             return "result"
@@ -142,6 +146,7 @@ class TestParallelExecutionPerformance:
     @pytest.mark.asyncio
     async def test_work_stealing_performance(self):
         """Test performance improvement with work stealing."""
+
         async def variable_task(context, duration):
             await asyncio.sleep(duration)
             return duration
@@ -188,6 +193,7 @@ class TestParallelExecutionPerformance:
     @pytest.mark.asyncio
     async def test_priority_queue_overhead(self):
         """Test overhead of priority queue execution."""
+
         async def priority_task(context, value):
             await asyncio.sleep(0.001)
             return value
@@ -223,6 +229,7 @@ class TestParallelExecutionPerformance:
     @pytest.mark.asyncio
     async def test_adaptive_batch_sizing(self):
         """Test that adaptive batch sizing improves performance."""
+
         async def quick_task(context):
             await asyncio.sleep(0.001)
             return "quick"
@@ -266,6 +273,7 @@ class TestParallelExecutionPerformance:
     @pytest.mark.asyncio
     async def test_load_balancing_effectiveness(self):
         """Test that load balancing distributes work evenly."""
+
         async def tracked_task(context, worker_id):
             # Simulate work
             await asyncio.sleep(0.01)
@@ -296,6 +304,7 @@ class TestParallelExecutionPerformance:
     @pytest.mark.asyncio
     async def test_small_task_overhead(self):
         """Test overhead for many small tasks."""
+
         async def tiny_task(context):
             return "x"
 
@@ -321,6 +330,7 @@ class TestParallelExecutionPerformance:
     @pytest.mark.asyncio
     async def test_auto_strategy_selection(self):
         """Test that AUTO strategy makes good decisions."""
+
         async def small_task(context):
             await asyncio.sleep(0.001)
             return "result"
@@ -343,6 +353,7 @@ class TestParallelExecutionPerformance:
     @pytest.mark.asyncio
     async def test_metrics_collection_overhead(self):
         """Test overhead of metrics collection."""
+
         async def task(context):
             await asyncio.sleep(0.001)
             return "result"
@@ -374,6 +385,7 @@ class TestParallelExecutionPerformance:
     @pytest.mark.asyncio
     async def test_concurrent_execution_correctness(self):
         """Test that concurrent execution produces correct results."""
+
         async def compute_task(context, value):
             await asyncio.sleep(0.001)
             return value * 2
@@ -397,6 +409,7 @@ class TestParallelExecutionPerformance:
     @pytest.mark.asyncio
     async def test_error_handling_performance(self):
         """Test performance impact of error handling."""
+
         async def failing_task(context):
             raise ValueError("Task failed")
 
@@ -405,10 +418,7 @@ class TestParallelExecutionPerformance:
             return "success"
 
         # Mix of failing and successful tasks
-        tasks = [
-            failing_task if i % 5 == 0 else success_task
-            for i in range(20)
-        ]
+        tasks = [failing_task if i % 5 == 0 else success_task for i in range(20)]
 
         from victor.framework.parallel.strategies import ErrorStrategy, ParallelConfig
 

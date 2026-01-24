@@ -61,9 +61,7 @@ class ExtendedModeControllerProtocol(ModeControllerProtocol, Protocol):
         """
         ...
 
-    def register_callback(
-        self, callback: Callable[["AgentMode", "AgentMode"], None]
-    ) -> None:
+    def register_callback(self, callback: Callable[["AgentMode", "AgentMode"], None]) -> None:
         """Register a callback for mode changes.
 
         Args:

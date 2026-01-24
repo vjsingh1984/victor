@@ -59,6 +59,7 @@ from victor.protocols.lsp_types import (
 # Test Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def lsp_config():
     """Create a mock LSP server config."""
@@ -89,6 +90,7 @@ def sample_file(tmp_path):
 # LSP Client Initialization Tests
 # =============================================================================
 
+
 class TestLSPClientInitialization:
     """Tests for LSP client initialization and setup."""
 
@@ -102,10 +104,7 @@ class TestLSPClientInitialization:
 
     def test_client_initialization_with_custom_root_uri(self, lsp_config):
         """Test initialization with custom root URI."""
-        client = LSPClient(
-            config=lsp_config,
-            root_uri="file:///custom/workspace"
-        )
+        client = LSPClient(config=lsp_config, root_uri="file:///custom/workspace")
         assert client.root_uri == "file:///custom/workspace"
 
     def test_initial_state(self, mock_lsp_client):
@@ -121,6 +120,7 @@ class TestLSPClientInitialization:
 # =============================================================================
 # Server Connection Tests
 # =============================================================================
+
 
 class TestServerConnection:
     """Tests for server connection lifecycle."""
@@ -185,6 +185,7 @@ class TestServerConnection:
 # Server Initialization Tests
 # =============================================================================
 
+
 class TestServerInitialization:
     """Tests for server initialization protocol."""
 
@@ -233,6 +234,7 @@ class TestServerInitialization:
 # =============================================================================
 # Document Management Tests
 # =============================================================================
+
 
 class TestDocumentManagement:
     """Tests for document lifecycle management."""
@@ -312,6 +314,7 @@ class TestDocumentManagement:
 # Completion Tests
 # =============================================================================
 
+
 class TestCompletion:
     """Tests for code completion functionality."""
 
@@ -370,6 +373,7 @@ class TestCompletion:
 # Hover Tests
 # =============================================================================
 
+
 class TestHover:
     """Tests for hover information."""
 
@@ -386,7 +390,10 @@ class TestHover:
         )
 
         with patch.object(
-            mock_lsp_client, "_send_request", new_callable=AsyncMock, return_value=mock_hover.to_dict()
+            mock_lsp_client,
+            "_send_request",
+            new_callable=AsyncMock,
+            return_value=mock_hover.to_dict(),
         ):
             hover = await mock_lsp_client.get_hover(uri, position)
 
@@ -419,6 +426,7 @@ class TestHover:
 # Definition and References Tests
 # =============================================================================
 
+
 class TestDefinitionAndReferences:
     """Tests for go-to-definition and find-references."""
 
@@ -433,7 +441,10 @@ class TestDefinitionAndReferences:
         )
 
         with patch.object(
-            mock_lsp_client, "_send_request", new_callable=AsyncMock, return_value=mock_location.to_dict()
+            mock_lsp_client,
+            "_send_request",
+            new_callable=AsyncMock,
+            return_value=mock_location.to_dict(),
         ):
             definitions = await mock_lsp_client.get_definition("file:///test.py", Position(0, 0))
 
@@ -514,6 +525,7 @@ class TestDefinitionAndReferences:
 # Diagnostics Tests
 # =============================================================================
 
+
 class TestDiagnostics:
     """Tests for diagnostic handling."""
 
@@ -551,6 +563,7 @@ class TestDiagnostics:
 # Notification Handler Tests
 # =============================================================================
 
+
 class TestNotificationHandlers:
     """Tests for notification handler registration."""
 
@@ -577,6 +590,7 @@ class TestNotificationHandlers:
 # =============================================================================
 # Message Handling Tests
 # =============================================================================
+
 
 class TestMessageHandling:
     """Tests for message parsing and handling."""
@@ -651,6 +665,7 @@ class TestMessageHandling:
 # Request/Response Tests
 # =============================================================================
 
+
 class TestRequests:
     """Tests for LSP request handling."""
 
@@ -660,9 +675,7 @@ class TestRequests:
         mock_lsp_client._process = MagicMock()
         mock_lsp_client._write_message = MagicMock()
 
-        with patch.object(
-            mock_lsp_client, "_read_messages", new_callable=AsyncMock
-        ):
+        with patch.object(mock_lsp_client, "_read_messages", new_callable=AsyncMock):
             future: asyncio.Future = asyncio.Future()
             mock_lsp_client._pending_requests[1] = future
             future.set_result({"status": "ok"})
@@ -693,6 +706,7 @@ class TestRequests:
 # Feature Detection Tests
 # =============================================================================
 
+
 class TestFeatureDetection:
     """Tests for LSP capability detection."""
 
@@ -700,11 +714,7 @@ class TestFeatureDetection:
     async def test_completion_support(self, mock_lsp_client):
         """Test detecting completion support."""
         mock_lsp_client._capabilities = {
-            "textDocument": {
-                "completion": {
-                    "completionItem": {"snippetSupport": True}
-                }
-            }
+            "textDocument": {"completion": {"completionItem": {"snippetSupport": True}}}
         }
 
         # Should have completion capability
@@ -714,11 +724,7 @@ class TestFeatureDetection:
     async def test_hover_support(self, mock_lsp_client):
         """Test detecting hover support."""
         mock_lsp_client._capabilities = {
-            "textDocument": {
-                "hover": {
-                    "contentFormat": ["markdown", "plaintext"]
-                }
-            }
+            "textDocument": {"hover": {"contentFormat": ["markdown", "plaintext"]}}
         }
 
         # Should have hover capability
@@ -727,13 +733,7 @@ class TestFeatureDetection:
     @pytest.mark.asyncio
     async def test_definition_support(self, mock_lsp_client):
         """Test detecting definition support."""
-        mock_lsp_client._capabilities = {
-            "textDocument": {
-                "definition": {
-                    "linkSupport": True
-                }
-            }
-        }
+        mock_lsp_client._capabilities = {"textDocument": {"definition": {"linkSupport": True}}}
 
         # Should have definition capability
         assert "definition" in mock_lsp_client._capabilities.get("textDocument", {})
@@ -742,6 +742,7 @@ class TestFeatureDetection:
 # =============================================================================
 # Error Handling Tests
 # =============================================================================
+
 
 class TestErrorHandling:
     """Tests for error handling."""
@@ -780,6 +781,7 @@ class TestErrorHandling:
 # Integration Tests
 # =============================================================================
 
+
 class TestIntegration:
     """Integration tests for LSP workflows."""
 
@@ -794,9 +796,7 @@ class TestIntegration:
         position = Position(line=0, character=0)
 
         # Mock completions
-        with patch.object(
-            mock_lsp_client, "_send_request", new_callable=AsyncMock
-        ) as mock_request:
+        with patch.object(mock_lsp_client, "_send_request", new_callable=AsyncMock) as mock_request:
             mock_request.return_value = {
                 "items": [item.to_dict() for item in MOCK_LSP_COMPLETIONS[:2]]
             }

@@ -245,7 +245,8 @@ class SkillChain:
         self.steps = [s for s in self.steps if s.id != step_id]
         # Also remove associated data flows
         self.data_flows = [
-            df for df in self.data_flows
+            df
+            for df in self.data_flows
             if df.source_step_id != step_id and df.target_step_id != step_id
         ]
         if len(self.steps) < original_length:
@@ -554,6 +555,7 @@ class SkillChainer:
         logger.info(f"Planning chain for goal: {goal[:100]}...")
 
         import time
+
         start_time = time.time()
 
         # Analyze goal to identify required skill categories
@@ -611,8 +613,7 @@ class SkillChainer:
                 metadata={
                     "skill_version": skill.version,
                     "relevance_score": next(
-                        (score for s, score in scored_skills if s.id == skill.id),
-                        0.0
+                        (score for s, score in scored_skills if s.id == skill.id), 0.0
                     ),
                 },
             )
@@ -688,6 +689,7 @@ class SkillChainer:
         logger.info(f"Executing chain '{chain.name}' with {len(chain.steps)} steps")
 
         import time
+
         start_time = time.time()
 
         self._executing_chains.add(chain.id)
@@ -787,8 +789,7 @@ class SkillChainer:
         # Check for orphaned steps
         if len(chain.steps) > 1:
             has_orphans = any(
-                not step.dependencies and step.id != chain.steps[0].id
-                for step in chain.steps
+                not step.dependencies and step.id != chain.steps[0].id for step in chain.steps
             )
             if has_orphans:
                 warnings.append("Chain has orphaned steps (no dependencies but not first step)")
@@ -956,7 +957,9 @@ class SkillChainer:
             "step_count": min(stats.total_steps / 20.0, 1.0) * 30,
             "dependency_depth": self._calculate_max_depth(chain) / 10.0 * 25,
             "data_flow_complexity": len(chain.data_flows) / max(stats.total_steps, 1) * 20,
-            "retry_complexity": sum(s.retry_count for s in chain.steps) / max(stats.total_steps, 1) * 15,
+            "retry_complexity": sum(s.retry_count for s in chain.steps)
+            / max(stats.total_steps, 1)
+            * 15,
             "timeout_variance": self._calculate_timeout_variance(chain) * 10,
         }
         stats.complexity_score = sum(complexity_factors.values())
@@ -971,10 +974,7 @@ class SkillChainer:
         stats.data_flow_complexity = len(chain.data_flows) / max(stats.total_steps, 1)
 
         # Retry overhead
-        stats.retry_overhead = sum(
-            s.retry_delay_seconds * s.retry_count
-            for s in chain.steps
-        )
+        stats.retry_overhead = sum(s.retry_delay_seconds * s.retry_count for s in chain.steps)
 
         # Parallel potential
         if stats.total_steps > 1:
@@ -1029,9 +1029,9 @@ class SkillChainer:
                 continue
 
             alternatives_for_step = [
-                s for s in available_skills
-                if s.name != step.skill_name and
-                any(tag in s.tags for tag in current_skill.tags)
+                s
+                for s in available_skills
+                if s.name != step.skill_name and any(tag in s.tags for tag in current_skill.tags)
             ]
 
             if alternatives_for_step:
@@ -1041,7 +1041,9 @@ class SkillChainer:
                 new_step.id = str(uuid4())
                 new_step.skill_name = alt_skill.name
                 new_step.skill_id = alt_skill.id
-                new_step.description = f"Execute {alt_skill.name} (alternative to {step.skill_name})"
+                new_step.description = (
+                    f"Execute {alt_skill.name} (alternative to {step.skill_name})"
+                )
                 alternative_steps.append(new_step)
             else:
                 alternative_steps.append(self._copy_step(step))
@@ -1053,12 +1055,15 @@ class SkillChainer:
                 description=chain.description,
                 goal=chain.goal,
                 steps=alternative_steps,
-                data_flows=[DataFlow(
-                    source_step_id=df.source_step_id,
-                    target_step_id=df.target_step_id,
-                    data_mapping=df.data_mapping.copy(),
-                    required=df.required,
-                ) for df in chain.data_flows],
+                data_flows=[
+                    DataFlow(
+                        source_step_id=df.source_step_id,
+                        target_step_id=df.target_step_id,
+                        data_mapping=df.data_mapping.copy(),
+                        required=df.required,
+                    )
+                    for df in chain.data_flows
+                ],
                 metadata=chain.metadata.copy(),
             )
             alternatives.append(alt_chain)
@@ -1331,6 +1336,7 @@ class SkillChainer:
 
         # Add nodes for each step
         for step in chain.steps:
+
             async def execute_step_node(state: ChainState, s=step) -> ChainState:
                 result = await self._execute_step(s, context or {})
                 state["step_results"][s.id] = result
@@ -1389,7 +1395,11 @@ class SkillChainer:
         # Convert graph result to chain result
         result = ChainResult(
             chain_id=chain.id,
-            status=ChainExecutionStatus.COMPLETED if graph_result.success else ChainExecutionStatus.FAILED,
+            status=(
+                ChainExecutionStatus.COMPLETED
+                if graph_result.success
+                else ChainExecutionStatus.FAILED
+            ),
             step_results={},
             intermediate_results=graph_result.state.get("step_results", {}),
         )
@@ -1450,10 +1460,7 @@ class SkillChainer:
             # Execute independent levels in parallel
             for level in execution_order:
                 level_results = await asyncio.gather(
-                    *[
-                        self._execute_step(step, context or {})
-                        for step in level
-                    ],
+                    *[self._execute_step(step, context or {}) for step in level],
                     return_exceptions=True,
                 )
 
@@ -1603,7 +1610,7 @@ class SkillChainer:
 
                 # Apply retry delay
                 if step.retry_policy == RetryPolicy.EXPONENTIAL:
-                    delay = step.retry_delay_seconds * (2 ** retry_count)
+                    delay = step.retry_delay_seconds * (2**retry_count)
                 elif step.retry_policy == RetryPolicy.LINEAR:
                     delay = step.retry_delay_seconds * retry_count
                 else:
@@ -1738,7 +1745,7 @@ class SkillChainer:
             return 0.0
 
         variance = sum((t - avg_timeout) ** 2 for t in timeouts) / len(timeouts)
-        return min(variance / (avg_timeout ** 2), 1.0)
+        return min(variance / (avg_timeout**2), 1.0)
 
     def _find_critical_path(self, chain: SkillChain) -> List[str]:
         """Find critical path (longest dependency chain).

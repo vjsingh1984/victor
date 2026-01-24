@@ -84,9 +84,7 @@ class TestIntelligentPipelineAdapter:
             return_value={"mode": "analysis", "max_tools": 5}
         )
 
-        adapter = IntelligentPipelineAdapter(
-            intelligent_integration=mock_integration
-        )
+        adapter = IntelligentPipelineAdapter(intelligent_integration=mock_integration)
 
         result = await adapter.prepare_intelligent_request(
             task="Analyze code",
@@ -119,9 +117,7 @@ class TestIntelligentPipelineAdapter:
             side_effect=Exception("Integration failed")
         )
 
-        adapter = IntelligentPipelineAdapter(
-            intelligent_integration=mock_integration
-        )
+        adapter = IntelligentPipelineAdapter(intelligent_integration=mock_integration)
 
         result = await adapter.prepare_intelligent_request(
             task="Analyze code", task_type="analysis"
@@ -144,9 +140,7 @@ class TestIntelligentPipelineAdapter:
         )
         mock_validator.validate_intelligent_response = AsyncMock(return_value=mock_result)
 
-        adapter = IntelligentPipelineAdapter(
-            validation_coordinator=mock_validator
-        )
+        adapter = IntelligentPipelineAdapter(validation_coordinator=mock_validator)
 
         result = await adapter.validate_intelligent_response(
             response="The code shows good quality",
@@ -168,9 +162,7 @@ class TestIntelligentPipelineAdapter:
         mock_validator = Mock()
         mock_validator.validate_intelligent_response = AsyncMock(return_value=None)
 
-        adapter = IntelligentPipelineAdapter(
-            validation_coordinator=mock_validator
-        )
+        adapter = IntelligentPipelineAdapter(validation_coordinator=mock_validator)
 
         result = await adapter.validate_intelligent_response(
             response="Short response",
@@ -200,9 +192,7 @@ class TestIntelligentPipelineAdapter:
             side_effect=Exception("Validation failed")
         )
 
-        adapter = IntelligentPipelineAdapter(
-            validation_coordinator=mock_validator
-        )
+        adapter = IntelligentPipelineAdapter(validation_coordinator=mock_validator)
 
         result = await adapter.validate_intelligent_response(
             response="Response", query="Query", tool_calls=1, task_type="edit"
@@ -213,13 +203,9 @@ class TestIntelligentPipelineAdapter:
     def test_should_continue_intelligent_with_integration(self):
         """Test checking if should continue with integration available."""
         mock_integration = Mock()
-        mock_integration.should_continue_intelligent = Mock(
-            return_value=(True, "Good progress")
-        )
+        mock_integration.should_continue_intelligent = Mock(return_value=(True, "Good progress"))
 
-        adapter = IntelligentPipelineAdapter(
-            intelligent_integration=mock_integration
-        )
+        adapter = IntelligentPipelineAdapter(intelligent_integration=mock_integration)
 
         should_continue, reason = adapter.should_continue_intelligent()
 
@@ -239,13 +225,9 @@ class TestIntelligentPipelineAdapter:
     def test_should_continue_intelligent_with_exception(self):
         """Test checking if should continue when integration raises exception."""
         mock_integration = Mock()
-        mock_integration.should_continue_intelligent = Mock(
-            side_effect=Exception("Check failed")
-        )
+        mock_integration.should_continue_intelligent = Mock(side_effect=Exception("Check failed"))
 
-        adapter = IntelligentPipelineAdapter(
-            intelligent_integration=mock_integration
-        )
+        adapter = IntelligentPipelineAdapter(intelligent_integration=mock_integration)
 
         should_continue, reason = adapter.should_continue_intelligent()
 
@@ -258,9 +240,7 @@ class TestIntelligentPipelineAdapter:
         mock_integration = AsyncMock()
         mock_integration.record_intelligent_outcome = AsyncMock()
 
-        adapter = IntelligentPipelineAdapter(
-            intelligent_integration=mock_integration
-        )
+        adapter = IntelligentPipelineAdapter(intelligent_integration=mock_integration)
 
         await adapter.record_intelligent_outcome(
             success=True,
@@ -294,9 +274,7 @@ class TestIntelligentPipelineAdapter:
             side_effect=Exception("Recording failed")
         )
 
-        adapter = IntelligentPipelineAdapter(
-            intelligent_integration=mock_integration
-        )
+        adapter = IntelligentPipelineAdapter(intelligent_integration=mock_integration)
 
         # Should not raise exception
         await adapter.record_intelligent_outcome(
@@ -311,9 +289,7 @@ class TestIntelligentPipelineAdapter:
         mock_integration.prepare_intelligent_request = AsyncMock(
             return_value={"mode": "analysis", "max_tools": 10}
         )
-        mock_integration.should_continue_intelligent = Mock(
-            return_value=(True, "Good progress")
-        )
+        mock_integration.should_continue_intelligent = Mock(return_value=(True, "Good progress"))
         mock_integration.record_intelligent_outcome = AsyncMock()
 
         mock_validator = Mock()

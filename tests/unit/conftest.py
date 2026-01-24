@@ -32,6 +32,7 @@ def cleanup_event_bus():
     # Cleanup after test
     try:
         from victor.observability.event_bus import EventBus
+
         EventBus.reset_instance()
     except ImportError:
         pass

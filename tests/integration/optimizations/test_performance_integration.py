@@ -86,11 +86,7 @@ class MockParallelTask:
         await asyncio.sleep(self.duration)
         self.executed = True
         self.execution_time = time.time()
-        return {
-            "task": self.name,
-            "executed": True,
-            "duration": self.duration
-        }
+        return {"task": self.name, "executed": True, "duration": self.duration}
 
 
 class MockCache:
@@ -152,8 +148,9 @@ class MockCache:
             "misses": self._misses,
             "hit_rate": hit_rate,
             "size": len(self._storage),
-            "avg_access_time": sum(self._access_times) / len(self._access_times)
-                if self._access_times else 0
+            "avg_access_time": (
+                sum(self._access_times) / len(self._access_times) if self._access_times else 0
+            ),
         }
 
 
@@ -176,10 +173,7 @@ def lazy_components():
 @pytest.fixture
 def parallel_tasks():
     """Create mock parallel tasks."""
-    return [
-        MockParallelTask(f"task_{i}", duration=0.05 + (i % 5) * 0.02)
-        for i in range(20)
-    ]
+    return [MockParallelTask(f"task_{i}", duration=0.05 + (i % 5) * 0.02) for i in range(20)]
 
 
 @pytest.fixture
@@ -192,8 +186,8 @@ def cache_layers():
     """
     return {
         "l1": MockCache("l1_memory", access_delay=0.0001),  # Fast, small
-        "l2": MockCache("l2_disk", access_delay=0.001),     # Slower, larger
-        "l3": MockCache("l3_remote", access_delay=0.01),    # Slowest, largest
+        "l2": MockCache("l2_disk", access_delay=0.001),  # Slower, larger
+        "l3": MockCache("l3_remote", access_delay=0.01),  # Slowest, largest
     }
 
 
@@ -318,13 +312,23 @@ async def test_lazy_loading_performance_improvement(lazy_components):
     # Note: We don't assert lazy_time < eager_time because timing is non-deterministic
     # and depends on system load, asyncio scheduling, etc.
     # The key validation is that lazy initialization WORKS correctly (behavioral test).
-    assert lazy_test_components["component_a"].is_initialized(), "component_a should be initialized after access"
-    assert lazy_test_components["component_b"].is_initialized(), "component_b should be initialized after access"
-    assert not lazy_test_components["component_c"].is_initialized(), "component_c should NOT be initialized (not accessed)"
-    assert not lazy_test_components["component_d"].is_initialized(), "component_d should NOT be initialized (not accessed)"
+    assert lazy_test_components[
+        "component_a"
+    ].is_initialized(), "component_a should be initialized after access"
+    assert lazy_test_components[
+        "component_b"
+    ].is_initialized(), "component_b should be initialized after access"
+    assert not lazy_test_components[
+        "component_c"
+    ].is_initialized(), "component_c should NOT be initialized (not accessed)"
+    assert not lazy_test_components[
+        "component_d"
+    ].is_initialized(), "component_d should NOT be initialized (not accessed)"
 
     # Verify eager initialization initialized all components
-    assert all(c.is_initialized() for c in eager_components.values()), "All components should be eagerly initialized"
+    assert all(
+        c.is_initialized() for c in eager_components.values()
+    ), "All components should be eagerly initialized"
 
 
 # ============================================================================
@@ -361,9 +365,7 @@ async def test_parallel_executor_concurrent_execution(parallel_tasks):
     # Parallel execution
     start_time = time.time()
 
-    parallel_results = await asyncio.gather(
-        *[task.execute() for task in parallel_tasks]
-    )
+    parallel_results = await asyncio.gather(*[task.execute() for task in parallel_tasks])
 
     parallel_time = time.time() - start_time
 
@@ -393,6 +395,7 @@ async def test_parallel_executor_with_error_handling(parallel_tasks):
     - Partial success handling
     - No cascade failures
     """
+
     # Create mixed tasks (some will fail)
     class FailingTask:
         def __init__(self, name: str, should_fail: bool = False):
@@ -405,10 +408,7 @@ async def test_parallel_executor_with_error_handling(parallel_tasks):
                 raise ValueError(f"Task {self.name} failed")
             return {"task": self.name, "status": "success"}
 
-    tasks = [
-        FailingTask(f"task_{i}", should_fail=(i % 3 == 0))
-        for i in range(15)
-    ]
+    tasks = [FailingTask(f"task_{i}", should_fail=(i % 3 == 0)) for i in range(15)]
 
     # Execute with error handling
     results = []
@@ -571,8 +571,7 @@ async def test_memory_optimization_with_lazy_loading_and_caching(lazy_components
 
     # Create many lazy components
     many_components = {
-        f"component_{i}": MockLazyComponent(f"component_{i}", init_delay=0.01)
-        for i in range(100)
+        f"component_{i}": MockLazyComponent(f"component_{i}", init_delay=0.01) for i in range(100)
     }
 
     # Only access 10% of components
@@ -586,10 +585,7 @@ async def test_memory_optimization_with_lazy_loading_and_caching(lazy_components
     access_time = time.time() - start_time
 
     # Verify only accessed components are initialized
-    initialized_count = sum(
-        1 for comp in many_components.values()
-        if comp.is_initialized()
-    )
+    initialized_count = sum(1 for comp in many_components.values() if comp.is_initialized())
 
     assert initialized_count == 10
 
@@ -642,9 +638,7 @@ async def test_end_to_end_performance_with_optimizations(
     start_time = time.time()
 
     # Execute first 10 tasks in parallel
-    parallel_results = await asyncio.gather(
-        *[task.execute() for task in parallel_tasks[:10]]
-    )
+    parallel_results = await asyncio.gather(*[task.execute() for task in parallel_tasks[:10]])
 
     parallel_execution_time = time.time() - start_time
 
@@ -699,10 +693,7 @@ async def test_performance_scalability_with_increasing_load(parallel_tasks):
     execution_times = {}
 
     for workload_size in workloads:
-        tasks = [
-            MockParallelTask(f"task_{i}", duration=0.02)
-            for i in range(workload_size)
-        ]
+        tasks = [MockParallelTask(f"task_{i}", duration=0.02) for i in range(workload_size)]
 
         start_time = time.time()
 

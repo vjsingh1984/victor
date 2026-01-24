@@ -173,5 +173,5 @@ class TestMessagingEventIntegration:
         event = MessagingEvent(topic="tool.call.sub", data={})
 
         assert event.matches_pattern("tool.*") is False  # Different segment count
-        assert event.matches_pattern("tool.**") is True   # Multi-segment wildcard
+        assert event.matches_pattern("tool.**") is True  # Multi-segment wildcard
         assert event.matches_pattern("tool.*.sub") is True

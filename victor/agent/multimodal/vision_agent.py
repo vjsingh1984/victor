@@ -481,9 +481,7 @@ class VisionAgent:
                 "Results may be limited."
             )
 
-        logger.info(
-            f"VisionAgent initialized with provider={provider.name}, model={self.model}"
-        )
+        logger.info(f"VisionAgent initialized with provider={provider.name}, model={self.model}")
 
     def _get_default_model(self) -> str:
         """Get default vision model for the provider."""
@@ -642,8 +640,7 @@ class VisionAgent:
             )
 
             logger.debug(
-                f"Vision model response: {len(response.content)} chars, "
-                f"model={response.model}"
+                f"Vision model response: {len(response.content)} chars, " f"model={response.model}"
             )
 
             return response
@@ -841,7 +838,9 @@ class VisionAgent:
         """
         logger.info(f"Detecting objects in: {image_path}")
 
-        class_hint = f" Focus on these classes: {', '.join(object_classes)}" if object_classes else ""
+        class_hint = (
+            f" Focus on these classes: {', '.join(object_classes)}" if object_classes else ""
+        )
 
         query = f"""
         Identify all objects in this image.{class_hint}

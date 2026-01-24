@@ -162,9 +162,7 @@ class TestResultConverters:
 
     def test_token_usage_to_dict_with_object(self):
         """Test converting TokenUsage object to dict."""
-        usage = MockTokenUsage(
-            prompt_tokens=1000, completion_tokens=500, total_tokens=1500
-        )
+        usage = MockTokenUsage(prompt_tokens=1000, completion_tokens=500, total_tokens=1500)
         usage_dict = ResultConverters.token_usage_to_dict(usage)
 
         assert usage_dict["prompt_tokens"] == 1000
@@ -192,9 +190,7 @@ class TestResultConverters:
 
     def test_tool_execution_to_dict_with_object(self):
         """Test converting tool execution result to dict."""
-        result = MockToolExecutionResult(
-            success=True, output="Tool output", error="", duration=1.5
-        )
+        result = MockToolExecutionResult(success=True, output="Tool output", error="", duration=1.5)
         result_dict = ResultConverters.tool_execution_to_dict(result)
 
         assert result_dict["success"] is True
@@ -236,9 +232,7 @@ class TestResultConverters:
             tool_history: list
             observed_files: list
 
-        state = MockCheckpointState(
-            stage="EXECUTING", tool_history=["test"], observed_files=[]
-        )
+        state = MockCheckpointState(stage="EXECUTING", tool_history=["test"], observed_files=[])
         state_dict = ResultConverters.checkpoint_state_to_dict(state)
 
         assert state_dict["stage"] == "EXECUTING"

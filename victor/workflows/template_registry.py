@@ -154,9 +154,7 @@ class WorkflowTemplateRegistry:
         if not directory.is_dir():
             raise NotADirectoryError(f"Not a directory: {directory}")
 
-        yaml_files = (
-            directory.rglob(pattern) if recursive else directory.glob(pattern)
-        )
+        yaml_files = directory.rglob(pattern) if recursive else directory.glob(pattern)
 
         for yaml_file in yaml_files:
             try:
@@ -321,9 +319,7 @@ class WorkflowTemplateRegistry:
         self._templates[name] = template
         logger.debug(f"Registered workflow template: {name}")
 
-    def register_stage_template(
-        self, name: str, stage: Dict[str, Any]
-    ) -> None:
+    def register_stage_template(self, name: str, stage: Dict[str, Any]) -> None:
         """Manually register a stage template.
 
         Args:

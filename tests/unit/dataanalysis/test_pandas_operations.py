@@ -282,7 +282,8 @@ class TestDataVisualization:
         """Skip all tests if matplotlib is not available."""
         try:
             import matplotlib
-            matplotlib.use('Agg')  # Use non-interactive backend
+
+            matplotlib.use("Agg")  # Use non-interactive backend
             import matplotlib.pyplot as plt
         except ImportError:
             pytest.skip("matplotlib not installed")
@@ -737,7 +738,11 @@ class TestDataFrameAdvancedOperations:
 
     def test_apply_map_function(self, sample_df):
         """Test applying function to entire DataFrame."""
-        result = sample_df[["A", "B"]].applymap(lambda x: x * 2) if hasattr(sample_df[["A", "B"]], "applymap") else sample_df[["A", "B"]].map(lambda x: x * 2)
+        result = (
+            sample_df[["A", "B"]].applymap(lambda x: x * 2)
+            if hasattr(sample_df[["A", "B"]], "applymap")
+            else sample_df[["A", "B"]].map(lambda x: x * 2)
+        )
 
         # Check if multiplication worked
         assert result["A"].tolist() == [2, 4, 6, 8, 10]
@@ -1094,6 +1099,7 @@ class TestDataFrameAggregations:
 
     def test_custom_aggregation(self, sample_df):
         """Test custom aggregation function."""
+
         def range_func(x):
             return x.max() - x.min()
 
@@ -1177,15 +1183,23 @@ class TestMultiIndexOperations:
             {
                 "A": ["foo", "foo", "foo", "foo", "foo", "bar", "bar", "bar", "bar"],
                 "B": ["one", "one", "one", "two", "two", "one", "one", "two", "two"],
-                "C": ["small", "large", "large", "small", "small", "large", "small", "small", "large"],
+                "C": [
+                    "small",
+                    "large",
+                    "large",
+                    "small",
+                    "small",
+                    "large",
+                    "small",
+                    "small",
+                    "large",
+                ],
                 "D": [1, 2, 2, 3, 3, 4, 5, 6, 7],
                 "E": [2, 4, 5, 5, 6, 6, 8, 9, 9],
             }
         )
 
-        pivot = pd.pivot_table(
-            df, values="D", index=["A", "B"], columns=["C"], aggfunc="sum"
-        )
+        pivot = pd.pivot_table(df, values="D", index=["A", "B"], columns=["C"], aggfunc="sum")
 
         assert isinstance(pivot.index, pd.MultiIndex)
         assert pivot.shape[0] == 4  # 2 (A values) * 2 (B values)

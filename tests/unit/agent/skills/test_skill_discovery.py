@@ -159,13 +159,9 @@ def mock_tools():
 def mock_tool_registry(mock_tool, mock_tools):
     """Create a mock tool registry."""
     registry = Mock()
-    registry.list_tools = Mock(
-        return_value=[tool.name for tool in mock_tools]
-    )
+    registry.list_tools = Mock(return_value=[tool.name for tool in mock_tools])
     registry.get_tool = Mock(
-        side_effect=lambda name: next(
-            (t for t in mock_tools if t.name == name), None
-        )
+        side_effect=lambda name: next((t for t in mock_tools if t.name == name), None)
     )
     registry.tools = {tool.name: tool for tool in mock_tools}
     return registry
@@ -589,9 +585,7 @@ class TestToolDiscovery:
     @pytest.mark.asyncio
     async def test_discover_tools_with_context(self, discovery_engine):
         """Test discovering tools with context."""
-        tools = await discovery_engine.discover_tools(
-            context={"category": "devops"}
-        )
+        tools = await discovery_engine.discover_tools(context={"category": "devops"})
 
         # Context should influence category selection
         assert isinstance(tools, list)
@@ -627,18 +621,14 @@ class TestToolDiscovery:
         bad_registry.list_tools = Mock(return_value=["bad_tool"])
         bad_registry.get_tool = Mock(side_effect=Exception("Tool not found"))
 
-        engine = SkillDiscoveryEngine(
-            tool_registry=bad_registry, event_bus=mock_event_bus
-        )
+        engine = SkillDiscoveryEngine(tool_registry=bad_registry, event_bus=mock_event_bus)
         tools = await engine.discover_tools()
 
         # Should skip bad tools and continue
         assert isinstance(tools, list)
 
     @pytest.mark.asyncio
-    async def test_discover_tools_publishes_event(
-        self, discovery_engine, mock_event_bus
-    ):
+    async def test_discover_tools_publishes_event(self, discovery_engine, mock_event_bus):
         """Test that tool discovery publishes event."""
         await discovery_engine.discover_tools()
 
@@ -867,18 +857,14 @@ class TestSkillComposition:
 
         # Modify original list
         tools.append(
-            AvailableTool(
-                name="tool2", description="Tool", parameters={}, cost_tier=CostTier.FREE
-            )
+            AvailableTool(name="tool2", description="Tool", parameters={}, cost_tier=CostTier.FREE)
         )
 
         # Skill should not be affected
         assert len(skill.tools) == 1
 
     @pytest.mark.asyncio
-    async def test_compose_skill_publishes_event(
-        self, discovery_engine, mock_event_bus
-    ):
+    async def test_compose_skill_publishes_event(self, discovery_engine, mock_event_bus):
         """Test that skill composition publishes event."""
         tools = [
             AvailableTool(
@@ -978,9 +964,7 @@ class TestSkillRanking:
         ]
 
         # Query about reading files
-        matched = await discovery_engine.match_tools_to_task(
-            "I need to read a file", tools
-        )
+        matched = await discovery_engine.match_tools_to_task("I need to read a file", tools)
 
         # Should rank read_file higher
         assert len(matched) > 0
@@ -1008,9 +992,7 @@ class TestSkillRanking:
         ]
 
         # Query about writing
-        matched = await discovery_engine.match_tools_to_task(
-            "Write to file", tools, limit=1
-        )
+        matched = await discovery_engine.match_tools_to_task("Write to file", tools, limit=1)
 
         # With basic keyword matching, "write" should match first
         assert len(matched) >= 1
@@ -1035,9 +1017,7 @@ class TestSkillRanking:
             ),
         ]
 
-        matched = await discovery_engine.match_tools_to_task(
-            "search for something", tools
-        )
+        matched = await discovery_engine.match_tools_to_task("search for something", tools)
 
         # Selector should rank based on scoring
         assert isinstance(matched, list)
@@ -1069,9 +1049,7 @@ class TestSkillRanking:
         ]
 
         # Context-specific query - use selector
-        matched = await discovery_engine.match_tools_to_task(
-            "Help with Python code", tools
-        )
+        matched = await discovery_engine.match_tools_to_task("Help with Python code", tools)
 
         # With the mock selector, we might not get matches for this specific query
         # but it should return an empty list without error
@@ -1090,9 +1068,7 @@ class TestSkillRanking:
             for i in range(10)
         ]
 
-        matched = await discovery_engine.match_tools_to_task(
-            "use tools", tools, limit=3
-        )
+        matched = await discovery_engine.match_tools_to_task("use tools", tools, limit=3)
 
         assert len(matched) <= 3
 
@@ -1115,9 +1091,7 @@ class TestSkillRanking:
         ]
 
         # High threshold
-        matched = await discovery_engine.match_tools_to_task(
-            "relevant task", tools, min_score=0.8
-        )
+        matched = await discovery_engine.match_tools_to_task("relevant task", tools, min_score=0.8)
 
         # Should filter out low-scoring tools
         assert isinstance(matched, list)
@@ -1164,9 +1138,7 @@ class TestSkillRanking:
             ),
         ]
 
-        matched = await discovery_engine.match_tools_to_task(
-            "read and write files", tools
-        )
+        matched = await discovery_engine.match_tools_to_task("read and write files", tools)
 
         # Should use keyword matching
         assert len(matched) > 0
@@ -1325,7 +1297,7 @@ class TestSkillDiscoveryIntegration:
         assert compose_time < 0.5
 
         # Log times for reference
-        print(f"\nPerformance Metrics:")
+        print("\nPerformance Metrics:")
         print(f"  Discover: {discover_time:.4f}s")
         print(f"  Match: {match_time:.4f}s")
         print(f"  Compose: {compose_time:.4f}s")
@@ -1349,18 +1321,14 @@ class TestSkillDiscoveryIntegration:
 
         # 4. Compose with empty tools
         with pytest.raises(ValueError):
-            await discovery_engine.compose_skill(
-                name="empty", tools=[], description="Empty"
-            )
+            await discovery_engine.compose_skill(name="empty", tools=[], description="Empty")
 
         # 5. Discovery should handle registry errors gracefully
         # Registry that returns empty list when there's an error
         bad_registry = Mock()
         bad_registry.list_tools = Mock(return_value=["bad_tool"])
         bad_registry.get_tool = Mock(side_effect=Exception("Tool not found"))
-        bad_engine = SkillDiscoveryEngine(
-            tool_registry=bad_registry, event_bus=mock_event_bus
-        )
+        bad_engine = SkillDiscoveryEngine(tool_registry=bad_registry, event_bus=mock_event_bus)
 
         # Should handle gracefully by skipping bad tools
         tools = await bad_engine.discover_tools()
@@ -1472,9 +1440,7 @@ class TestSkillDiscoveryEngineAdditional:
         assert skill.updated_at > original_time
 
     @pytest.mark.asyncio
-    async def test_event_bus_interface_compatibility(
-        self, discovery_engine, mock_event_bus
-    ):
+    async def test_event_bus_interface_compatibility(self, discovery_engine, mock_event_bus):
         """Test event bus supports both publish and emit interfaces."""
         skill = Skill(name="event_test")
 

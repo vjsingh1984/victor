@@ -150,9 +150,10 @@ class TestStateDelegationMixin:
         assert hasattr(TestClass, "stage")
 
         # Check that they are descriptors
-        assert isinstance(
-            TestClass.__dict__.get("messages"), StateDelegationDescriptor
-        ) or "messages" in TestClass._state_delegations
+        assert (
+            isinstance(TestClass.__dict__.get("messages"), StateDelegationDescriptor)
+            or "messages" in TestClass._state_delegations
+        )
 
 
 class TestStateDelegationDescriptor:
@@ -232,9 +233,7 @@ class TestDynamicStateDelegation:
         obj = TestClass()
 
         # Add new delegation
-        TestClass.add_state_delegation(
-            "new_property", "_context_manager", "context_size"
-        )
+        TestClass.add_state_delegation("new_property", "_context_manager", "context_size")
 
         # Should be accessible
         assert obj.new_property == 1000
@@ -249,9 +248,7 @@ class TestDynamicStateDelegation:
         obj = TestClass()
 
         # Add delegation
-        TestClass.add_state_delegation(
-            "max_size", "_context_manager", "max_context_size"
-        )
+        TestClass.add_state_delegation("max_size", "_context_manager", "max_context_size")
 
         # Should delegate correctly
         assert obj.max_size == 2000

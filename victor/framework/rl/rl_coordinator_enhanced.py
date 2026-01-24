@@ -363,9 +363,7 @@ class TargetNetwork:
 
         if self.tau == 0.0:
             # Hard update
-            self.target_q_table = {
-                state: actions.copy() for state, actions in main_q_table.items()
-            }
+            self.target_q_table = {state: actions.copy() for state, actions in main_q_table.items()}
         else:
             # Soft update
             for state, actions in main_q_table.items():
@@ -442,9 +440,7 @@ class RewardShaper:
         # Can be overridden with domain-specific logic
         return 0.0
 
-    def shape_reward(
-        self, state: Any, action: Any, reward: float, next_state: Any
-    ) -> float:
+    def shape_reward(self, state: Any, action: Any, reward: float, next_state: Any) -> float:
         """Apply potential-based reward shaping.
 
         F(s, a) = reward + gamma * Phi(next_state) - Phi(state)
@@ -465,8 +461,7 @@ class RewardShaper:
         shaped_reward = reward + shaping_bonus
 
         logger.debug(
-            f"Reward shaped: {reward:.3f} -> {shaped_reward:.3f} "
-            f"(bonus: {shaping_bonus:.3f})"
+            f"Reward shaped: {reward:.3f} -> {shaped_reward:.3f} " f"(bonus: {shaping_bonus:.3f})"
         )
 
         return shaped_reward
@@ -562,9 +557,7 @@ class ExplorationStrategyImpl:
             logger.warning(f"Unknown strategy: {self.strategy}, using epsilon-greedy")
             return self._epsilon_greedy(q_values, available_actions)
 
-    def _epsilon_greedy(
-        self, q_values: Dict[Any, float], available_actions: List[Any]
-    ) -> Any:
+    def _epsilon_greedy(self, q_values: Dict[Any, float], available_actions: List[Any]) -> Any:
         """Epsilon-greedy action selection."""
         if random.random() < self.epsilon:
             # Explore: random action
@@ -582,9 +575,7 @@ class ExplorationStrategyImpl:
 
         return action
 
-    def _ucb(
-        self, q_values: Dict[Any, float], available_actions: List[Any], step: int
-    ) -> Any:
+    def _ucb(self, q_values: Dict[Any, float], available_actions: List[Any], step: int) -> Any:
         """Upper Confidence Bound action selection."""
         best_action = None
         best_value = float("-inf")
@@ -606,9 +597,7 @@ class ExplorationStrategyImpl:
         logger.debug(f"UCB: selected action {best_action} (UCB={best_value:.3f})")
         return best_action
 
-    def _thompson_sampling(
-        self, q_values: Dict[Any, float], available_actions: List[Any]
-    ) -> Any:
+    def _thompson_sampling(self, q_values: Dict[Any, float], available_actions: List[Any]) -> Any:
         """Thompson sampling action selection."""
         # Sample from Beta distribution for each action
         # Using Q-value as mean and building posterior
@@ -633,9 +622,7 @@ class ExplorationStrategyImpl:
         logger.debug(f"Thompson: selected action {best_action} (sample={best_sample:.3f})")
         return best_action
 
-    def _boltzmann(
-        self, q_values: Dict[Any, float], available_actions: List[Any]
-    ) -> Any:
+    def _boltzmann(self, q_values: Dict[Any, float], available_actions: List[Any]) -> Any:
         """Boltzmann (softmax) action selection."""
         # Compute probabilities
         valid_actions = [a for a in available_actions if a in q_values]
@@ -655,9 +642,7 @@ class ExplorationStrategyImpl:
         logger.debug(f"Boltzmann: selected action {action} from distribution")
         return action
 
-    def _entropy_bonus(
-        self, q_values: Dict[Any, float], available_actions: List[Any]
-    ) -> Any:
+    def _entropy_bonus(self, q_values: Dict[Any, float], available_actions: List[Any]) -> Any:
         """Entropy-regularized action selection."""
         # Add entropy bonus to Q-values
         valid_actions = [a for a in available_actions if a in q_values]
@@ -787,9 +772,7 @@ class PolicySerializer:
         """
         if isinstance(obj, dict):
             # Convert keys to strings
-            return {
-                str(k): self._make_serializable(v) for k, v in obj.items()
-            }
+            return {str(k): self._make_serializable(v) for k, v in obj.items()}
         elif isinstance(obj, (list, tuple)):
             return [self._make_serializable(item) for item in obj]
         elif isinstance(obj, (np.integer, np.floating)):
@@ -950,7 +933,9 @@ class EnhancedRLCoordinator:
             reward = self.reward_shaper.shape_reward(state, action, reward, next_state)
 
         # Add experience to replay buffer
-        experience = Experience(state=state, action=action, reward=reward, next_state=next_state, done=done)
+        experience = Experience(
+            state=state, action=action, reward=reward, next_state=next_state, done=done
+        )
         self.replay_buffer.add(experience)
 
         # Update policy based on algorithm

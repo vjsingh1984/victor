@@ -116,6 +116,7 @@ def integration_orchestrator():
 
     # Intent classifier for intent classification handler
     from victor.storage.embeddings.intent_classifier import IntentType
+
     orch.intent_classifier = Mock()
     # Create a proper mock result with required attributes
     mock_intent_result = Mock()
@@ -297,8 +298,12 @@ def integration_orchestrator():
     orch._recovery_coordinator.check_progress = Mock(return_value=True)  # Assume making progress
     orch._recovery_coordinator.check_tool_budget = Mock(return_value=None)
     # Important: Return tuple for truncate_tool_calls
-    orch._recovery_coordinator.truncate_tool_calls = Mock(return_value=([], None))  # (tool_calls, truncated)
-    orch._recovery_coordinator.filter_blocked_tool_calls = Mock(return_value=([], [], 0))  # (filtered, chunks, blocked_count)
+    orch._recovery_coordinator.truncate_tool_calls = Mock(
+        return_value=([], None)
+    )  # (tool_calls, truncated)
+    orch._recovery_coordinator.filter_blocked_tool_calls = Mock(
+        return_value=([], [], 0)
+    )  # (filtered, chunks, blocked_count)
     orch._recovery_coordinator.check_blocked_threshold = Mock(return_value=None)
 
     # Handler methods that should return None or proper values
@@ -617,6 +622,7 @@ class TestMultiTurnAgenticLoop:
 
         This test verifies token tracking across iterations.
         """
+
         # Setup: Mock _stream_chat_impl with token usage tracking
         async def mock_stream_impl(user_message: str):
             """Mock streaming implementation with token usage."""
@@ -1136,6 +1142,7 @@ class TestErrorRecoveryIntegration:
 
         This test verifies empty response recovery via response completer.
         """
+
         # Setup: Mock streaming implementation with empty response then recovery
         async def mock_stream_impl(user_message: str):
             # First yield empty response
@@ -1164,6 +1171,7 @@ class TestErrorRecoveryIntegration:
 
         This test verifies error propagation.
         """
+
         # Setup: Mock streaming implementation that raises error
         async def mock_stream_impl(user_message: str):
             raise RuntimeError("Provider error")

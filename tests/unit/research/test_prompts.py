@@ -79,27 +79,27 @@ class TestResearchTaskTypeHints:
     def test_all_hints_have_task_type(self):
         """Test that all hints have task_type attribute."""
         for key, hint in RESEARCH_TASK_TYPE_HINTS.items():
-            assert hasattr(hint, 'task_type')
+            assert hasattr(hint, "task_type")
             assert hint.task_type == key
 
     def test_all_hints_have_hint_text(self):
         """Test that all hints have hint text."""
         for key, hint in RESEARCH_TASK_TYPE_HINTS.items():
-            assert hasattr(hint, 'hint')
+            assert hasattr(hint, "hint")
             assert isinstance(hint.hint, str)
             assert len(hint.hint) > 0
 
     def test_all_hints_have_tool_budget(self):
         """Test that all hints have tool_budget."""
         for key, hint in RESEARCH_TASK_TYPE_HINTS.items():
-            assert hasattr(hint, 'tool_budget')
+            assert hasattr(hint, "tool_budget")
             assert isinstance(hint.tool_budget, int)
             assert hint.tool_budget > 0
 
     def test_all_hints_have_priority_tools(self):
         """Test that all hints have priority_tools."""
         for key, hint in RESEARCH_TASK_TYPE_HINTS.items():
-            assert hasattr(hint, 'priority_tools')
+            assert hasattr(hint, "priority_tools")
             assert isinstance(hint.priority_tools, list)
             assert len(hint.priority_tools) > 0
 
@@ -294,14 +294,19 @@ class TestResearchPromptContributor:
             # Hints should reference searching or fetching or finding
             hint_lower = hint.hint.lower()
             # Most hints should mention at least one of these
-            has_tool_reference = any(term in hint_lower for term in ["search", "fetch", "find", "document", "code", "write"])
+            has_tool_reference = any(
+                term in hint_lower
+                for term in ["search", "fetch", "find", "document", "code", "write"]
+            )
             assert has_tool_reference or len(hint.hint) > 0  # At minimum should have content
 
     def test_system_prompt_section_avoids_outdated_sources(self, contributor):
         """Test that system prompt section warns about outdated sources."""
         section = contributor.get_system_prompt_section()
 
-        assert "outdat" in section.lower() or "old" in section.lower() or "2 year" in section.lower()
+        assert (
+            "outdat" in section.lower() or "old" in section.lower() or "2 year" in section.lower()
+        )
 
     def test_grounding_rules_mentions_uncertainty(self, contributor):
         """Test that grounding rules mention acknowledging uncertainty."""

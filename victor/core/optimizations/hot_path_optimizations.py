@@ -255,9 +255,7 @@ class ThreadSafeMemoized:
         max_size: Maximum number of entries to cache
     """
 
-    def __init__(
-        self, ttl: Optional[int] = None, max_size: int = 128
-    ):
+    def __init__(self, ttl: Optional[int] = None, max_size: int = 128):
         """Initialize memoizer.
 
         Args:
@@ -510,9 +508,7 @@ def retry(
                         time.sleep(delay)
                         delay = min(delay * exponential_base, max_delay)
                     else:
-                        logger.error(
-                            f"{func.__name__} failed after {max_attempts} attempts: {e}"
-                        )
+                        logger.error(f"{func.__name__} failed after {max_attempts} attempts: {e}")
 
             # All attempts failed
             raise last_exception  # type: ignore
@@ -566,9 +562,7 @@ def async_retry(
                         await asyncio.sleep(delay)
                         delay = min(delay * exponential_base, max_delay)
                     else:
-                        logger.error(
-                            f"{func.__name__} failed after {max_attempts} attempts: {e}"
-                        )
+                        logger.error(f"{func.__name__} failed after {max_attempts} attempts: {e}")
 
             # All attempts failed
             raise last_exception  # type: ignore

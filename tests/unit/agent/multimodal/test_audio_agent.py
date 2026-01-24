@@ -94,9 +94,7 @@ class TestAudioAgentInit:
 
     def test_get_default_model_for_unknown_provider(self):
         """Test default model for unknown provider."""
-        unknown_provider = MockProviderFactory.create_with_response(
-            "test", name="unknown_provider"
-        )
+        unknown_provider = MockProviderFactory.create_with_response("test", name="unknown_provider")
         agent = AudioAgent(provider=unknown_provider)
         assert agent.model == "whisper-1"
 
@@ -144,7 +142,9 @@ class TestTranscribeAudio:
     """Tests for audio transcription."""
 
     @pytest.mark.asyncio
-    async def test_transcribe_audio_openai_basic(self, audio_agent_openai, sample_audio_path, mock_openai_provider):
+    async def test_transcribe_audio_openai_basic(
+        self, audio_agent_openai, sample_audio_path, mock_openai_provider
+    ):
         """Test basic transcription with OpenAI provider."""
         # Mock the OpenAI client's audio transcriptions
         mock_transcription_response = Mock()
@@ -169,7 +169,9 @@ class TestTranscribeAudio:
         assert transcription.confidence == 0.95
 
     @pytest.mark.asyncio
-    async def test_transcribe_audio_with_language(self, audio_agent_openai, sample_audio_path, mock_openai_provider):
+    async def test_transcribe_audio_with_language(
+        self, audio_agent_openai, sample_audio_path, mock_openai_provider
+    ):
         """Test transcription with language specified."""
         mock_transcription_response = Mock()
         mock_transcription_response.text = "Hola, esto es una prueba."
@@ -260,9 +262,7 @@ class TestTranscribeAudio:
 
         # Patch both _is_audio_capable and _transcribe_with_provider
         with patch.object(audio_agent_openai, "_is_audio_capable", return_value=True):
-            with patch.object(
-                audio_agent_openai, "_transcribe_with_provider", mock_transcribe
-            ):
+            with patch.object(audio_agent_openai, "_transcribe_with_provider", mock_transcribe):
                 with pytest.raises(RuntimeError):
                     await audio_agent_openai.transcribe_audio(sample_audio_path)
 
@@ -413,7 +413,9 @@ class TestDetectLanguage:
     """Tests for language detection."""
 
     @pytest.mark.asyncio
-    async def test_detect_language_openai(self, audio_agent_openai, sample_audio_path, mock_openai_provider):
+    async def test_detect_language_openai(
+        self, audio_agent_openai, sample_audio_path, mock_openai_provider
+    ):
         """Test language detection with OpenAI provider."""
         mock_transcription_response = Mock()
         mock_transcription_response.language = "en"
@@ -452,11 +454,15 @@ class TestSummarizeAudio:
     """Tests for audio summarization."""
 
     @pytest.mark.asyncio
-    async def test_summarize_audio_basic(self, audio_agent_openai, sample_audio_path, mock_openai_provider):
+    async def test_summarize_audio_basic(
+        self, audio_agent_openai, sample_audio_path, mock_openai_provider
+    ):
         """Test basic audio summarization."""
         # Mock transcription
         mock_transcription_response = Mock()
-        mock_transcription_response.text = "This is a long audio transcript with lots of content that needs to be summarized."
+        mock_transcription_response.text = (
+            "This is a long audio transcript with lots of content that needs to be summarized."
+        )
         mock_transcription_response.language = "en"
         mock_transcription_response.duration = 30.0
         mock_transcription_response.segments = []
@@ -513,7 +519,9 @@ class TestSummarizeAudio:
             await audio_agent_openai.summarize_audio("/nonexistent/audio.mp3")
 
     @pytest.mark.asyncio
-    async def test_summarize_audio_api_error(self, audio_agent_openai, sample_audio_path, mock_openai_provider):
+    async def test_summarize_audio_api_error(
+        self, audio_agent_openai, sample_audio_path, mock_openai_provider
+    ):
         """Test handling API errors during summarization."""
         # Transcription succeeds
         mock_transcription_response = Mock()
@@ -689,11 +697,15 @@ class TestIntegrationScenarios:
     """Integration-style test scenarios."""
 
     @pytest.mark.asyncio
-    async def test_full_audio_workflow(self, audio_agent_openai, sample_audio_path, mock_openai_provider):
+    async def test_full_audio_workflow(
+        self, audio_agent_openai, sample_audio_path, mock_openai_provider
+    ):
         """Test complete audio workflow."""
         # Mock transcription
         mock_transcription_response = Mock()
-        mock_transcription_response.text = "This is a test audio file with multiple segments of speech."
+        mock_transcription_response.text = (
+            "This is a test audio file with multiple segments of speech."
+        )
         mock_transcription_response.language = "en"
         mock_transcription_response.duration = 30.0
         mock_transcription_response.segments = []
@@ -723,7 +735,9 @@ class TestIntegrationScenarios:
         assert "summary" in summary.lower()
 
     @pytest.mark.asyncio
-    async def test_different_audio_formats(self, audio_agent_openai, sample_audio_path, sample_wav_path):
+    async def test_different_audio_formats(
+        self, audio_agent_openai, sample_audio_path, sample_wav_path
+    ):
         """Test processing different audio formats."""
         # Analyze MP3
         analysis_mp3 = await audio_agent_openai.analyze_audio(sample_audio_path)

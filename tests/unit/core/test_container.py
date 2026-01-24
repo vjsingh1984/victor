@@ -393,7 +393,7 @@ class TestServiceDescriptor:
         descriptor = ServiceDescriptor(
             service_type=MockLogger,
             factory=lambda c: MockLogger(),
-            lifetime=ServiceLifetime.SINGLETON
+            lifetime=ServiceLifetime.SINGLETON,
         )
 
         assert descriptor.service_type == MockLogger
@@ -407,7 +407,7 @@ class TestServiceDescriptor:
         descriptor = ServiceDescriptor(
             service_type=MockLogger,
             factory=lambda c: MockLogger(),
-            lifetime=ServiceLifetime.TRANSIENT
+            lifetime=ServiceLifetime.TRANSIENT,
         )
 
         container = ServiceContainer()
@@ -497,6 +497,7 @@ class TestAdvancedScenarios:
 
     def test_nested_dependencies(self):
         """Test container with nested dependency chain."""
+
         class Database:
             def __init__(self, logger: ILogger):
                 self.logger = logger
@@ -518,11 +519,7 @@ class TestAdvancedScenarios:
     def test_multiple_scopes_independent(self):
         """Test that multiple scopes are independent."""
         container = ServiceContainer()
-        container.register(
-            MockLogger,
-            lambda c: MockLogger(),
-            ServiceLifetime.SCOPED
-        )
+        container.register(MockLogger, lambda c: MockLogger(), ServiceLifetime.SCOPED)
 
         with container.create_scope() as scope1:
             logger1 = scope1.get(MockLogger)
@@ -538,11 +535,7 @@ class TestAdvancedScenarios:
     def test_transient_in_scope(self):
         """Test that transient services create new instances even in scope."""
         container = ServiceContainer()
-        container.register(
-            MockLogger,
-            lambda c: MockLogger(),
-            ServiceLifetime.TRANSIENT
-        )
+        container.register(MockLogger, lambda c: MockLogger(), ServiceLifetime.TRANSIENT)
 
         with container.create_scope() as scope:
             logger1 = scope.get(MockLogger)
@@ -553,10 +546,7 @@ class TestAdvancedScenarios:
     def test_container_dispose_idempotent(self):
         """Test that dispose can be called multiple times safely."""
         container = ServiceContainer()
-        container.register(
-            DisposableService,
-            lambda c: DisposableService()
-        )
+        container.register(DisposableService, lambda c: DisposableService())
         container.get(DisposableService)
 
         container.dispose()

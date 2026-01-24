@@ -29,9 +29,11 @@ from victor.core.verticals.plugin_discovery import (
 # Test Fixtures
 # =============================================================================
 
+
 @dataclass
 class MockVertical(VerticalBase):
     """Mock vertical for testing."""
+
     name: str = "mock_vertical"
     display_name: str = "Mock Vertical"
     description: str = "A mock vertical for testing"
@@ -46,6 +48,7 @@ class MockVertical(VerticalBase):
 # =============================================================================
 # Test PluginDiscovery Initialization
 # =============================================================================
+
 
 class TestPluginDiscoveryInit:
     """Test suite for PluginDiscovery initialization."""
@@ -94,6 +97,7 @@ class TestPluginDiscoveryInit:
 # Test Plugin Discovery Methods
 # =============================================================================
 
+
 class TestDiscoverFromEntryPoints:
     """Test suite for entry point discovery."""
 
@@ -106,7 +110,7 @@ class TestDiscoverFromEntryPoints:
         mock_ep.name = "test_vertical"
         mock_ep.value = "test_module:TestVertical"
 
-        with patch('victor.core.verticals.plugin_discovery.entry_points') as mock_eps:
+        with patch("victor.core.verticals.plugin_discovery.entry_points") as mock_eps:
             mock_eps.return_value.group.return_value = [mock_ep]
 
             # Mock the load method
@@ -127,7 +131,7 @@ class TestDiscoverFromEntryPoints:
         mock_ep.value = "broken:BrokenVertical"
         mock_ep.load.side_effect = ImportError("Module not found")
 
-        with patch('victor.core.verticals.plugin_discovery.entry_points') as mock_eps:
+        with patch("victor.core.verticals.plugin_discovery.entry_points") as mock_eps:
             mock_eps.return_value.group.return_value = [mock_ep]
 
             result = discovery.discover_from_entry_points()
@@ -149,7 +153,7 @@ class TestDiscoverFromEntryPoints:
 
         mock_ep.load.return_value = NotAVertical
 
-        with patch('victor.core.verticals.plugin_discovery.entry_points') as mock_eps:
+        with patch("victor.core.verticals.plugin_discovery.entry_points") as mock_eps:
             mock_eps.return_value.group.return_value = [mock_ep]
 
             result = discovery.discover_from_entry_points()
@@ -175,9 +179,9 @@ verticals:
     description: "A vertical from YAML"
 """
 
-        with patch('pathlib.Path.exists', return_value=True):
-            with patch('pathlib.Path.read_text', return_value=yaml_content):
-                with patch('victor.core.verticals.plugin_discovery.import_module') as mock_import:
+        with patch("pathlib.Path.exists", return_value=True):
+            with patch("pathlib.Path.read_text", return_value=yaml_content):
+                with patch("victor.core.verticals.plugin_discovery.import_module") as mock_import:
                     # Mock imported module
                     mock_module = Mock()
                     mock_vertical = MockVertical(name="yaml_vertical")
@@ -194,7 +198,7 @@ verticals:
         """Should return empty result when YAML file doesn't exist."""
         discovery = PluginDiscovery()
 
-        with patch('pathlib.Path.exists', return_value=False):
+        with patch("pathlib.Path.exists", return_value=False):
             result = discovery.discover_from_yaml()
 
             assert result.verticals == {}
@@ -249,6 +253,7 @@ class TestDiscoverBuiltinVerticals:
 # Test Unified Discovery
 # =============================================================================
 
+
 class TestDiscoverAll:
     """Test suite for unified discover_all method."""
 
@@ -257,7 +262,7 @@ class TestDiscoverAll:
         discovery = PluginDiscovery()
 
         # Mock builtin discovery
-        with patch.object(discovery, 'discover_builtin_verticals') as mock_builtin:
+        with patch.object(discovery, "discover_builtin_verticals") as mock_builtin:
             mock_result = DiscoveryResult(
                 verticals={"coding": Mock()},
                 sources={"coding": PluginSource.BUILTIN},
@@ -275,8 +280,8 @@ class TestDiscoverAll:
         discovery = PluginDiscovery()
 
         # Mock multiple sources
-        with patch.object(discovery, 'discover_builtin_verticals') as mock_builtin:
-            with patch.object(discovery, 'discover_from_entry_points') as mock_ep:
+        with patch.object(discovery, "discover_builtin_verticals") as mock_builtin:
+            with patch.object(discovery, "discover_from_entry_points") as mock_ep:
                 mock_builtin_result = DiscoveryResult(
                     verticals={"coding": Mock()},
                     sources={"coding": PluginSource.BUILTIN},
@@ -303,8 +308,8 @@ class TestDiscoverAll:
         """Entry points should override builtin verticals (customization)."""
         discovery = PluginDiscovery()
 
-        with patch.object(discovery, 'discover_builtin_verticals') as mock_builtin:
-            with patch.object(discovery, 'discover_from_entry_points') as mock_ep:
+        with patch.object(discovery, "discover_builtin_verticals") as mock_builtin:
+            with patch.object(discovery, "discover_from_entry_points") as mock_ep:
                 # Both sources have "coding" vertical
                 builtin_mock = Mock()
                 builtin_mock.spec = "builtin"
@@ -337,6 +342,7 @@ class TestDiscoverAll:
 # Test Caching
 # =============================================================================
 
+
 class TestPluginDiscoveryCache:
     """Test suite for plugin discovery caching."""
 
@@ -344,7 +350,7 @@ class TestPluginDiscoveryCache:
         """Should cache discovery results to avoid repeated work."""
         discovery = PluginDiscovery(enable_cache=True, cache_size=10)
 
-        with patch.object(discovery, 'discover_builtin_verticals') as mock_discover:
+        with patch.object(discovery, "discover_builtin_verticals") as mock_discover:
             mock_result = DiscoveryResult(
                 verticals={"coding": Mock()},
                 sources={"coding": PluginSource.BUILTIN},
@@ -366,7 +372,7 @@ class TestPluginDiscoveryCache:
         """Should support manual cache clearing."""
         discovery = PluginDiscovery(enable_cache=True)
 
-        with patch.object(discovery, 'discover_builtin_verticals') as mock_discover:
+        with patch.object(discovery, "discover_builtin_verticals") as mock_discover:
             mock_result = DiscoveryResult(
                 verticals={"coding": Mock()},
                 sources={"coding": PluginSource.BUILTIN},
@@ -392,7 +398,7 @@ class TestPluginDiscoveryCache:
 
         # Discover 3 different times
         for i in range(3):
-            with patch.object(discovery, 'discover_builtin_verticals') as mock_discover:
+            with patch.object(discovery, "discover_builtin_verticals") as mock_discover:
                 mock_result = DiscoveryResult(
                     verticals={f"vertical_{i}": Mock()},
                     sources={f"vertical_{i}": PluginSource.BUILTIN},
@@ -411,6 +417,7 @@ class TestPluginDiscoveryCache:
 # =============================================================================
 # Test Factory Function
 # =============================================================================
+
 
 class TestGetPluginDiscovery:
     """Test suite for get_plugin_discovery factory."""
@@ -452,6 +459,7 @@ class TestGetPluginDiscovery:
 # Test Air-Gapped Mode
 # =============================================================================
 
+
 class TestAirGappedMode:
     """Test suite for air-gapped mode behavior."""
 
@@ -474,7 +482,7 @@ class TestAirGappedMode:
         with patch.dict(os.environ, {"VICTOR_AIRGAPPED": "true"}):
             discovery = PluginDiscovery()
 
-            with patch.object(discovery, 'discover_from_entry_points') as mock_ep:
+            with patch.object(discovery, "discover_from_entry_points") as mock_ep:
                 result = discovery.discover_all()
 
                 # Entry points should not be called
@@ -484,6 +492,7 @@ class TestAirGappedMode:
 # =============================================================================
 # Test Integration with VerticalRegistry
 # =============================================================================
+
 
 class TestVerticalRegistryIntegration:
     """Test suite for integration with VerticalRegistry."""
@@ -498,7 +507,7 @@ class TestVerticalRegistryIntegration:
 
         # Should be able to iterate and register
         for name, vertical_class in result.verticals.items():
-            assert hasattr(vertical_class, 'name')
+            assert hasattr(vertical_class, "name")
             assert vertical_class.name == name
 
     def test_lazy_imports_can_be_registered(self):
@@ -523,6 +532,7 @@ class TestVerticalRegistryIntegration:
 # Test Error Handling
 # =============================================================================
 
+
 class TestErrorHandling:
     """Test suite for error handling and edge cases."""
 
@@ -530,7 +540,7 @@ class TestErrorHandling:
         """Should handle missing entry point group gracefully."""
         discovery = PluginDiscovery()
 
-        with patch('victor.core.verticals.plugin_discovery.entry_points') as mock_eps:
+        with patch("victor.core.verticals.plugin_discovery.entry_points") as mock_eps:
             # Simulate no entry points for the group
             mock_eps.return_value.group.return_value = []
 
@@ -550,8 +560,8 @@ verticals:
     # Missing required fields
 """
 
-        with patch('pathlib.Path.exists', return_value=True):
-            with patch('pathlib.Path.read_text', return_value=corrupt_yaml):
+        with patch("pathlib.Path.exists", return_value=True):
+            with patch("pathlib.Path.read_text", return_value=corrupt_yaml):
                 result = discovery.discover_from_yaml()
 
                 # Should handle corruption gracefully
@@ -563,7 +573,9 @@ verticals:
         discovery = PluginDiscovery()
         discovery.logger = Mock()
 
-        with patch.object(discovery, 'discover_from_entry_points', side_effect=Exception("Test error")):
+        with patch.object(
+            discovery, "discover_from_entry_points", side_effect=Exception("Test error")
+        ):
             result = discovery.discover_all()
 
             # Should log error and return partial result

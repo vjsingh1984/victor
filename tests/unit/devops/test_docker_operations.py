@@ -306,7 +306,9 @@ class TestDockerfileValidation:
 
     def test_invalid_dockerfile_combined_runs(self, invalid_dockerfile):
         """Test detecting non-combined RUN instructions."""
-        run_lines = [line for line in invalid_dockerfile.split("\n") if line.strip().startswith("RUN")]
+        run_lines = [
+            line for line in invalid_dockerfile.split("\n") if line.strip().startswith("RUN")
+        ]
         assert len(run_lines) > 1  # Should be combined for layer optimization
 
 
@@ -530,7 +532,11 @@ class TestDockerToolOperations:
     @pytest.mark.asyncio
     async def test_docker_inspect(self):
         """Test inspecting a container."""
-        inspect_data = {"Id": "abc123", "State": {"Running": True}, "Config": {"Image": "nginx:latest"}}
+        inspect_data = {
+            "Id": "abc123",
+            "State": {"Running": True},
+            "Config": {"Image": "nginx:latest"},
+        }
 
         with patch(
             "victor.tools.docker_tool._run_docker_command_async",
@@ -833,7 +839,9 @@ class TestDockerfileAnalysis:
 
     def test_dockerfile_layer_optimization(self, invalid_dockerfile):
         """Test detecting non-optimized layers."""
-        run_lines = [line for line in invalid_dockerfile.split("\n") if line.strip().startswith("RUN")]
+        run_lines = [
+            line for line in invalid_dockerfile.split("\n") if line.strip().startswith("RUN")
+        ]
         # Multiple separate RUNs should be combined
         assert len(run_lines) > 1
 

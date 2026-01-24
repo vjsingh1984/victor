@@ -66,8 +66,8 @@ class MockBasicProvider(BaseProvider):
 
     def __init__(self, *args, **kwargs):
         # Extract circuit breaker parameters before calling super
-        self._cb_failure_threshold = kwargs.pop('circuit_breaker_failure_threshold', None)
-        self._cb_recovery_timeout = kwargs.pop('circuit_breaker_recovery_timeout', None)
+        self._cb_failure_threshold = kwargs.pop("circuit_breaker_failure_threshold", None)
+        self._cb_recovery_timeout = kwargs.pop("circuit_breaker_recovery_timeout", None)
 
         # Generate unique name for circuit breaker isolation
         MockBasicProvider._instance_count += 1
@@ -302,9 +302,7 @@ class TestHealthChecks:
 
         async def run_test():
             # Auth errors should not count as failures
-            with patch.object(
-                provider, "chat", side_effect=ProviderAuthError("Invalid API key")
-            ):
+            with patch.object(provider, "chat", side_effect=ProviderAuthError("Invalid API key")):
                 try:
                     await provider.chat([], model="test")
                 except ProviderAuthError:
@@ -852,6 +850,7 @@ class TestProtocolHelperFunctions:
 
     def test_is_streaming_provider_with_object_without_method(self):
         """Test is_streaming_provider() with object that doesn't have method."""
+
         class NotAProvider:
             pass
 

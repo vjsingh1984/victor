@@ -56,7 +56,7 @@ class SwitchableMockProvider(MockBaseProvider):
         name: str,
         use_circuit_breaker: bool = False,
         circuit_breaker_failure_threshold: int = 5,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self._provider_name = name
@@ -93,7 +93,7 @@ class SwitchableMockProvider(MockBaseProvider):
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools = None,
+        tools=None,
         **kwargs: Any,
     ) -> CompletionResponse:
         self._call_history.append({"method": "chat", "model": model})
@@ -124,7 +124,7 @@ class SwitchableMockProvider(MockBaseProvider):
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools = None,
+        tools=None,
         **kwargs: Any,
     ):
         self._call_history.append({"method": "stream", "model": model})
@@ -309,7 +309,7 @@ class TestLoadBalancing:
 
         config = ProviderPoolConfig(
             load_balancer=LoadBalancerType.ROUND_ROBIN,
-            enable_warmup=False  # Disable warmup to avoid double counting
+            enable_warmup=False,  # Disable warmup to avoid double counting
         )
 
         pool = await create_provider_pool(
@@ -347,7 +347,7 @@ class TestLoadBalancing:
 
         config = ProviderPoolConfig(
             load_balancer=LoadBalancerType.LEAST_CONNECTIONS,
-            enable_warmup=False  # Disable warmup to avoid double counting
+            enable_warmup=False,  # Disable warmup to avoid double counting
         )
 
         pool = await create_provider_pool(
@@ -407,7 +407,7 @@ class TestLoadBalancing:
 
         config = ProviderPoolConfig(
             load_balancer=LoadBalancerType.ADAPTIVE,
-            enable_warmup=False  # Disable warmup to avoid double counting
+            enable_warmup=False,  # Disable warmup to avoid double counting
         )
 
         pool = await create_provider_pool(
@@ -626,7 +626,9 @@ class TestCircuitBreakerIntegration:
     @pytest.mark.asyncio
     async def test_circuit_breaker_trips_on_failures(self):
         """Test that circuit breaker trips after threshold failures."""
-        provider1 = SwitchableMockProvider(name="cb-1", use_circuit_breaker=True, circuit_breaker_failure_threshold=3)
+        provider1 = SwitchableMockProvider(
+            name="cb-1", use_circuit_breaker=True, circuit_breaker_failure_threshold=3
+        )
 
         # Use single-provider pool to ensure all calls go to the failing provider
         pool = await create_provider_pool(
@@ -657,14 +659,10 @@ class TestCircuitBreakerIntegration:
     async def test_circuit_breaker_isolation(self):
         """Test that circuit breakers isolate failing providers."""
         provider1 = SwitchableMockProvider(
-            name="isolated-1",
-            use_circuit_breaker=True,
-            circuit_breaker_failure_threshold=2
+            name="isolated-1", use_circuit_breaker=True, circuit_breaker_failure_threshold=2
         )
         provider2 = SwitchableMockProvider(
-            name="isolated-2",
-            use_circuit_breaker=True,
-            circuit_breaker_failure_threshold=2
+            name="isolated-2", use_circuit_breaker=True, circuit_breaker_failure_threshold=2
         )
 
         # Create separate pools for each provider to test isolation
@@ -706,9 +704,7 @@ class TestCircuitBreakerIntegration:
     async def test_circuit_breaker_prevents_calls(self):
         """Test that open circuit prevents calls to provider."""
         provider = SwitchableMockProvider(
-            name="blocked",
-            use_circuit_breaker=True,
-            circuit_breaker_failure_threshold=2
+            name="blocked", use_circuit_breaker=True, circuit_breaker_failure_threshold=2
         )
 
         pool = await create_provider_pool(
@@ -745,9 +741,7 @@ class TestCircuitBreakerIntegration:
     async def test_circuit_breaker_recovery(self):
         """Test circuit breaker recovery after reset."""
         provider = SwitchableMockProvider(
-            name="recover-cb",
-            use_circuit_breaker=True,
-            circuit_breaker_failure_threshold=2
+            name="recover-cb", use_circuit_breaker=True, circuit_breaker_failure_threshold=2
         )
 
         messages = ProviderTestHelpers.create_test_messages()
@@ -777,9 +771,7 @@ class TestCircuitBreakerIntegration:
     async def test_circuit_breaker_with_pool_stats(self):
         """Test circuit breaker stats in pool statistics."""
         provider1 = SwitchableMockProvider(
-            name="stats-1",
-            use_circuit_breaker=True,
-            circuit_breaker_failure_threshold=3
+            name="stats-1", use_circuit_breaker=True, circuit_breaker_failure_threshold=3
         )
         provider2 = SwitchableMockProvider(name="stats-2")
 

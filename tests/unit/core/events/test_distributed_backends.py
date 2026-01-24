@@ -223,10 +223,7 @@ class TestRedisEventBackend:
             backend = RedisEventBackend(config)
             await backend.connect()
 
-            events = [
-                MessagingEvent(topic="tool.call", data={"index": i})
-                for i in range(5)
-            ]
+            events = [MessagingEvent(topic="tool.call", data={"index": i}) for i in range(5)]
 
             count = await backend.publish_batch(events)
 

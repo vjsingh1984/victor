@@ -615,6 +615,7 @@ class TestEpisodicMemoryStore:
     @pytest.mark.asyncio
     async def test_store_episode_embedding_failure(self, episodic_memory, sample_episode):
         """Test storing episode handles embedding generation failure."""
+
         # Mock embedding service to fail
         async def failing_embed(text):
             raise Exception("Embedding generation failed")

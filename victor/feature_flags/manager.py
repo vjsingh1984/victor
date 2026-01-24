@@ -451,7 +451,9 @@ class FeatureFlagManager:
                     except Exception as e:
                         logger.error(f"Wildcard flag change callback failed for {flag_name}: {e}")
 
-    def get_audit_log(self, flag_name: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_audit_log(
+        self, flag_name: Optional[str] = None, limit: int = 100
+    ) -> List[Dict[str, Any]]:
         """Get audit log entries for flag changes.
 
         Args:
@@ -500,9 +502,7 @@ class FeatureFlagManager:
         """
         return {
             "flags": self.get_all_flags(),
-            "metadata": {
-                name: self.get_flag_metadata(name) for name in get_all_flag_names()
-            },
+            "metadata": {name: self.get_flag_metadata(name) for name in get_all_flag_names()},
             "audit_log_size": len(self._audit_log),
             "cache_size": len(self._cache),
         }

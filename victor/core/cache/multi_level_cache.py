@@ -327,9 +327,7 @@ class CacheLevel:
     def _evict_if_needed(self) -> None:
         """Evict entries if cache is at capacity."""
         # Remove expired entries first
-        expired_keys = [
-            key for key, entry in self._cache.items() if entry.is_expired()
-        ]
+        expired_keys = [key for key, entry in self._cache.items() if entry.is_expired()]
         for key in expired_keys:
             del self._cache[key]
             self._evictions += 1

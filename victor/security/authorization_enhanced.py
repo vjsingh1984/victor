@@ -197,7 +197,9 @@ class Role:
             permission: Permission to add
         """
         self.permissions.add(permission)
-        logger.debug(f"Added permission {permission.resource}:{permission.action} to role {self.name}")
+        logger.debug(
+            f"Added permission {permission.resource}:{permission.action} to role {self.name}"
+        )
 
     def remove_permission(self, permission: Permission) -> None:
         """Remove a permission from this role.
@@ -410,7 +412,9 @@ class Policy:
 
         return True
 
-    def _evaluate_operator_condition(self, key: str, condition: Dict[str, Any], context: Dict[str, Any]) -> bool:
+    def _evaluate_operator_condition(
+        self, key: str, condition: Dict[str, Any], context: Dict[str, Any]
+    ) -> bool:
         """Evaluate operator-based condition.
 
         Args:
@@ -589,7 +593,9 @@ class EnhancedAuthorizer:
         self._users: Dict[str, User] = {}
         self._policies: List[Policy] = []
 
-        logger.info(f"EnhancedAuthorizer initialized (enabled={enabled}, default_deny={default_deny})")
+        logger.info(
+            f"EnhancedAuthorizer initialized (enabled={enabled}, default_deny={default_deny})"
+        )
 
     @property
     def enabled(self) -> bool:
@@ -829,7 +835,9 @@ class EnhancedAuthorizer:
                 return False
 
             role.add_permission(permission)
-            logger.info(f"Granted permission {permission.resource}:{permission.action} to role {role_name}")
+            logger.info(
+                f"Granted permission {permission.resource}:{permission.action} to role {role_name}"
+            )
             return True
 
     def revoke_permission(self, role_name: str, permission: Permission) -> bool:

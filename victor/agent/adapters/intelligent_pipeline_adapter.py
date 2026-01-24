@@ -178,9 +178,7 @@ class IntelligentPipelineAdapter:
         """
         # Update intelligent integration reference in validation coordinator
         if self._intelligent_integration and self._validation_coordinator:
-            self._validation_coordinator._intelligent_integration = (
-                self._intelligent_integration
-            )
+            self._validation_coordinator._intelligent_integration = self._intelligent_integration
 
         if not self._validation_coordinator:
             return None

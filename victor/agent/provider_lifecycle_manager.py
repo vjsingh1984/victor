@@ -72,9 +72,7 @@ class ProviderLifecycleManager:
         self._container = container
         logger.debug("ProviderLifecycleManager initialized")
 
-    def apply_exploration_settings(
-        self, tracker: Any, capabilities: Any
-    ) -> None:
+    def apply_exploration_settings(self, tracker: Any, capabilities: Any) -> None:
         """Apply model-specific exploration settings to tracker.
 
         Updates the unified tracker with exploration multiplier and
@@ -153,9 +151,7 @@ class ProviderLifecycleManager:
         logger.debug(f"Created SystemPromptBuilder for {provider_name}/{model}")
         return builder
 
-    def calculate_tool_budget(
-        self, capabilities: Any, settings: Any
-    ) -> int:
+    def calculate_tool_budget(self, capabilities: Any, settings: Any) -> int:
         """Calculate the appropriate tool budget.
 
         Uses the model's recommended budget with a minimum of 50,

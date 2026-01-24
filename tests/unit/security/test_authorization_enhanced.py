@@ -30,9 +30,7 @@ class TestPermission:
     def test_permission_creation(self):
         """Test creating a permission."""
         perm = Permission(
-            resource="tools",
-            action="execute",
-            constraints={"tool_category": "data_analysis"}
+            resource="tools", action="execute", constraints={"tool_category": "data_analysis"}
         )
         assert perm.resource == "tools"
         assert perm.action == "execute"
@@ -40,21 +38,14 @@ class TestPermission:
 
     def test_permission_matches(self):
         """Test permission matching."""
-        perm = Permission(
-            resource="tools",
-            action="execute"
-        )
+        perm = Permission(resource="tools", action="execute")
         assert perm.matches("tools", "execute") is True
         assert perm.matches("tools", "read") is False
         assert perm.matches("files", "execute") is False
 
     def test_permission_with_constraints(self):
         """Test permission with constraints."""
-        perm = Permission(
-            resource="tools",
-            action="execute",
-            constraints={"tool_name": "bash"}
-        )
+        perm = Permission(resource="tools", action="execute", constraints={"tool_name": "bash"})
         context = {"tool_name": "bash"}
         assert perm.matches("tools", "execute", context) is True
 
@@ -83,7 +74,7 @@ class TestRole:
                 Permission(resource="tools", action="execute"),
             },
             attributes={"clearance_level": 3},
-            description="Developer role"
+            description="Developer role",
         )
         assert role.name == "developer"
         assert len(role.permissions) == 2
@@ -98,10 +89,7 @@ class TestRole:
 
     def test_has_permission(self):
         """Test checking if role has permission."""
-        role = Role(
-            name="developer",
-            permissions={Permission(resource="tools", action="execute")}
-        )
+        role = Role(name="developer", permissions={Permission(resource="tools", action="execute")})
         assert role.has_permission("tools", "execute") is True
         assert role.has_permission("tools", "read") is False
 
@@ -115,7 +103,7 @@ class TestUser:
             id="user1",
             username="alice",
             roles={"developer", "code_reviewer"},
-            attributes={"department": "engineering", "level": "senior"}
+            attributes={"department": "engineering", "level": "senior"},
         )
         assert user.id == "user1"
         assert user.username == "alice"
@@ -163,7 +151,7 @@ class TestEnhancedAuthorizer:
             permissions=[
                 Permission(resource="workflows", action="execute"),
             ],
-            description="Data scientist role"
+            description="Data scientist role",
         )
         assert role.name == "data_scientist"
         retrieved = authorizer.get_role("data_scientist")
@@ -177,7 +165,7 @@ class TestEnhancedAuthorizer:
             user_id="user1",
             username="alice",
             roles=["developer"],
-            attributes={"department": "engineering"}
+            attributes={"department": "engineering"},
         )
         assert user.username == "alice"
         assert "developer" in user.roles
@@ -216,11 +204,7 @@ class TestEnhancedAuthorizer:
     def test_check_permission_rbac(self):
         """Test RBAC permission check."""
         authorizer = EnhancedAuthorizer()
-        user = authorizer.create_user(
-            user_id="user1",
-            username="alice",
-            roles=["developer"]
-        )
+        user = authorizer.create_user(user_id="user1", username="alice", roles=["developer"])
 
         # Developer should have tool read/execute permissions
         decision = authorizer.check_permission(user, "tools", "read")
@@ -230,12 +214,7 @@ class TestEnhancedAuthorizer:
     def test_check_permission_disabled_user(self):
         """Test that disabled users are denied access."""
         authorizer = EnhancedAuthorizer()
-        user = User(
-            id="user1",
-            username="alice",
-            roles=["admin"],
-            enabled=False
-        )
+        user = User(id="user1", username="alice", roles=["admin"], enabled=False)
 
         decision = authorizer.check_permission(user, "tools", "execute")
         assert decision.allowed is False
@@ -254,9 +233,7 @@ class TestEnhancedAuthorizer:
         """Test policy-based allow."""
         authorizer = EnhancedAuthorizer()
         user = authorizer.create_user(
-            user_id="user1",
-            username="alice",
-            attributes={"department": "engineering"}
+            user_id="user1", username="alice", attributes={"department": "engineering"}
         )
 
         authorizer.create_policy(
@@ -265,7 +242,7 @@ class TestEnhancedAuthorizer:
             resource="files",
             action="write",
             conditions={"department": "engineering"},
-            priority=50
+            priority=50,
         )
 
         decision = authorizer.check_permission(user, "files", "write")
@@ -276,9 +253,7 @@ class TestEnhancedAuthorizer:
         """Test policy-based deny (deny takes precedence)."""
         authorizer = EnhancedAuthorizer()
         user = authorizer.create_user(
-            user_id="user1",
-            username="alice",
-            roles=["admin"]  # Admin normally has all permissions
+            user_id="user1", username="alice", roles=["admin"]  # Admin normally has all permissions
         )
 
         # Create high-priority deny policy
@@ -288,7 +263,7 @@ class TestEnhancedAuthorizer:
             resource="tools",
             action="execute",
             conditions={"tool_name": "dangerous_tool"},
-            priority=100
+            priority=100,
         )
 
         context = {"tool_name": "dangerous_tool"}
@@ -299,11 +274,7 @@ class TestEnhancedAuthorizer:
     def test_default_deny(self):
         """Test default deny behavior."""
         authorizer = EnhancedAuthorizer(default_deny=True)
-        user = authorizer.create_user(
-            user_id="user1",
-            username="alice",
-            roles=[]  # No roles
-        )
+        user = authorizer.create_user(user_id="user1", username="alice", roles=[])  # No roles
 
         decision = authorizer.check_permission(user, "tools", "execute")
         assert decision.allowed is False
@@ -312,11 +283,7 @@ class TestEnhancedAuthorizer:
     def test_default_allow(self):
         """Test default allow behavior."""
         authorizer = EnhancedAuthorizer(default_deny=False)
-        user = authorizer.create_user(
-            user_id="user1",
-            username="alice",
-            roles=[]
-        )
+        user = authorizer.create_user(user_id="user1", username="alice", roles=[])
 
         decision = authorizer.check_permission(user, "tools", "execute")
         assert decision.allowed is True
@@ -329,18 +296,12 @@ class TestEnhancedAuthorizer:
             name="restricted_user",
             permissions=[
                 Permission(
-                    resource="tools",
-                    action="execute",
-                    constraints={"tool_category": "safe"}
+                    resource="tools", action="execute", constraints={"tool_category": "safe"}
                 )
-            ]
+            ],
         )
 
-        user = authorizer.create_user(
-            user_id="user1",
-            username="alice",
-            roles=["restricted_user"]
-        )
+        user = authorizer.create_user(user_id="user1", username="alice", roles=["restricted_user"])
 
         # Should allow with matching context
         context = {"tool_category": "safe"}
@@ -372,10 +333,7 @@ class TestEnhancedAuthorizer:
         """Test deleting a policy."""
         authorizer = EnhancedAuthorizer()
         authorizer.create_policy(
-            name="temp_policy",
-            effect=PolicyEffect.ALLOW,
-            resource="test",
-            action="test"
+            name="temp_policy", effect=PolicyEffect.ALLOW, resource="test", action="test"
         )
         result = authorizer.delete_policy("temp_policy")
         assert result is True
@@ -401,11 +359,7 @@ class TestPolicyEvaluation:
     def test_policy_priority_ordering(self):
         """Test that higher priority policies are evaluated first."""
         authorizer = EnhancedAuthorizer()
-        user = authorizer.create_user(
-            user_id="user1",
-            username="alice",
-            attributes={"level": 3}
-        )
+        user = authorizer.create_user(user_id="user1", username="alice", attributes={"level": 3})
 
         # Low priority allow
         authorizer.create_policy(
@@ -413,7 +367,7 @@ class TestPolicyEvaluation:
             effect=PolicyEffect.ALLOW,
             resource="test",
             action="test",
-            priority=10
+            priority=10,
         )
 
         # High priority deny (should win)
@@ -422,7 +376,7 @@ class TestPolicyEvaluation:
             effect=PolicyEffect.DENY,
             resource="test",
             action="test",
-            priority=100
+            priority=100,
         )
 
         decision = authorizer.check_permission(user, "test", "test")
@@ -433,9 +387,7 @@ class TestPolicyEvaluation:
         """Test policy conditions with operators."""
         authorizer = EnhancedAuthorizer()
         user = authorizer.create_user(
-            user_id="user1",
-            username="alice",
-            attributes={"clearance_level": 5}
+            user_id="user1", username="alice", attributes={"clearance_level": 5}
         )
 
         # Policy with greater-than-or-equal condition
@@ -445,7 +397,7 @@ class TestPolicyEvaluation:
             resource="secret",
             action="read",
             conditions={"clearance_level": {"gte": 3}},
-            priority=50
+            priority=50,
         )
 
         decision = authorizer.check_permission(user, "secret", "read")
@@ -494,29 +446,21 @@ class TestYAMLConfiguration:
             "default_deny": False,
             "roles": {
                 "custom_role": {
-                    "permissions": [
-                        {"resource": "test", "action": "test"}
-                    ],
+                    "permissions": [{"resource": "test", "action": "test"}],
                     "attributes": {"test_attr": "value"},
-                    "description": "Test role"
+                    "description": "Test role",
                 }
             },
-            "users": {
-                "user1": {
-                    "username": "alice",
-                    "roles": ["custom_role"],
-                    "enabled": True
-                }
-            },
+            "users": {"user1": {"username": "alice", "roles": ["custom_role"], "enabled": True}},
             "policies": [
                 {
                     "name": "test_policy",
                     "effect": "allow",
                     "resource": "test",
                     "action": "test",
-                    "priority": 50
+                    "priority": 50,
                 }
-            ]
+            ],
         }
 
         authorizer.load_from_dict(config)

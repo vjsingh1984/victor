@@ -205,9 +205,7 @@ class CacheAnalytics:
         self.metrics_retention_hours = metrics_retention_hours
 
         # Access tracking
-        self._access_log: deque[Tuple[str, str, bool, float]] = deque(
-            maxlen=hot_key_window
-        )
+        self._access_log: deque[Tuple[str, str, bool, float]] = deque(maxlen=hot_key_window)
         self._latency_samples: deque[float] = deque(maxlen=10000)
 
         # Hot key tracking
@@ -235,8 +233,7 @@ class CacheAnalytics:
         self._stop_event = asyncio.Event()
 
         logger.info(
-            f"Initialized cache analytics: hot_keys={track_hot_keys}, "
-            f"window={hot_key_window}"
+            f"Initialized cache analytics: hot_keys={track_hot_keys}, " f"window={hot_key_window}"
         )
 
     def record_access(
@@ -367,9 +364,7 @@ class CacheAnalytics:
         stats = self.cache.get_stats()
         l1_evictions = stats.get("l1", {}).get("evictions", 0)
         l2_evictions = stats.get("l2", {}).get("evictions", 0)
-        total_requests = stats.get("l1", {}).get("hits", 0) + stats.get(
-            "l1", {}
-        ).get("misses", 0)
+        total_requests = stats.get("l1", {}).get("hits", 0) + stats.get("l1", {}).get("misses", 0)
 
         if total_requests == 0:
             return 0.0
@@ -496,9 +491,7 @@ class CacheAnalytics:
 
         return recommendations
 
-    def register_alert_callback(
-        self, callback: Callable[[str, Dict[str, Any]], None]
-    ) -> None:
+    def register_alert_callback(self, callback: Callable[[str, Dict[str, Any]], None]) -> None:
         """Register an alert callback for performance degradation.
 
         Args:
@@ -567,9 +560,7 @@ class CacheAnalytics:
         self._stop_event.clear()
         logger.info("Stopped cache monitoring")
 
-    def _check_performance_issues(
-        self, stats: Dict[str, Any]
-    ) -> List[Tuple[str, Dict[str, Any]]]:
+    def _check_performance_issues(self, stats: Dict[str, Any]) -> List[Tuple[str, Dict[str, Any]]]:
         """Check for performance issues and generate alerts.
 
         Args:

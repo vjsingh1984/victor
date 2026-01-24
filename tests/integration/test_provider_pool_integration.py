@@ -120,6 +120,7 @@ class TestProviderPoolServiceRegistration:
 
         # Check that health registry is registered
         from victor.providers.health_monitor import ProviderHealthRegistry
+
         health_registry = container.get_service(ProviderHealthRegistry)
         assert health_registry is not None
 
@@ -275,9 +276,7 @@ class TestOrchestratorFactoryPoolIntegration:
         )
 
         # Create pool
-        provider_or_pool, is_pool = await factory.create_provider_pool_if_enabled(
-            base_provider
-        )
+        provider_or_pool, is_pool = await factory.create_provider_pool_if_enabled(base_provider)
 
         # Should create pool since we have multiple URLs
         assert is_pool is True
@@ -305,9 +304,7 @@ class TestOrchestratorFactoryPoolIntegration:
         )
 
         # Try to create pool
-        provider_or_pool, is_pool = await factory.create_provider_pool_if_enabled(
-            base_provider
-        )
+        provider_or_pool, is_pool = await factory.create_provider_pool_if_enabled(base_provider)
 
         # Should skip pool since we only have one URL
         assert is_pool is False
@@ -328,9 +325,7 @@ class TestOrchestratorFactoryPoolIntegration:
         )
 
         # Try to create pool
-        provider_or_pool, is_pool = await factory.create_provider_pool_if_enabled(
-            base_provider
-        )
+        provider_or_pool, is_pool = await factory.create_provider_pool_if_enabled(base_provider)
 
         # Should skip pool since it's disabled
         assert is_pool is False

@@ -335,7 +335,9 @@ class CacheKeyBenchmark:
         improvement = (sha256_time - blake2b_time) / sha256_time * 100
         results["improvement_pct"] = improvement
 
-        logger.info(f"Cache key benchmark: blake2b={blake2b_time:.2f}μs, "
-                   f"sha256={sha256_time:.2f}μs, improvement={improvement:.1f}%")
+        logger.info(
+            f"Cache key benchmark: blake2b={blake2b_time:.2f}μs, "
+            f"sha256={sha256_time:.2f}μs, improvement={improvement:.1f}%"
+        )
 
         return results

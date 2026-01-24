@@ -141,17 +141,13 @@ class CoordinatorAdapter:
             # Get base state from StateCoordinator
             # Use string "CHECKPOINT" if StateScope is not available (testing)
             scope = StateScope.CHECKPOINT if StateScope else "CHECKPOINT"
-            base_state = self._state_coordinator.get_state(
-                scope=scope, include_metadata=False
-            )
+            base_state = self._state_coordinator.get_state(scope=scope, include_metadata=False)
 
             # Merge with orchestrator-specific state
             checkpoint_state = {
                 **base_state.get("checkpoint", {}),
                 "modified_files": list(
-                    getattr(
-                        self._conversation_controller, "_modified_files", set()
-                    )
+                    getattr(self._conversation_controller, "_modified_files", set())
                 ),
                 "message_count": len(
                     self._conversation_controller.conversation.messages
@@ -198,9 +194,7 @@ class CoordinatorAdapter:
             # Delegate to StateCoordinator
             # Use string "CHECKPOINT" if StateScope is not available (testing)
             scope = StateScope.CHECKPOINT if StateScope else "CHECKPOINT"
-            self._state_coordinator.set_state(
-                {"checkpoint": checkpoint_state}, scope=scope
-            )
+            self._state_coordinator.set_state({"checkpoint": checkpoint_state}, scope=scope)
 
             logger.debug(
                 f"Checkpoint state applied: stage={checkpoint_state['stage']}, "
@@ -265,10 +259,7 @@ class CoordinatorAdapter:
     @property
     def is_enabled(self) -> bool:
         """Check if any coordinator is enabled."""
-        return (
-            self._state_coordinator is not None
-            or self._evaluation_coordinator is not None
-        )
+        return self._state_coordinator is not None or self._evaluation_coordinator is not None
 
 
 __all__ = [

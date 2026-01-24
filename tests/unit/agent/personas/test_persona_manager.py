@@ -279,9 +279,7 @@ class TestPersonaManager:
         persona_manager.repository.save(persona)
 
         # High threshold should filter out non-matching personas
-        suitable = persona_manager.get_suitable_personas(
-            "Deep security audit", min_score=0.8
-        )
+        suitable = persona_manager.get_suitable_personas("Deep security audit", min_score=0.8)
 
         # Generalist should not match highly for security
         generalist_results = [p for p in suitable if p[0].id == "generalist"]
@@ -582,9 +580,7 @@ class TestFeedback:
 
     def test_feedback_valid_rating(self):
         """Test feedback with valid rating."""
-        feedback = Feedback(
-            persona_id="test", success_rating=4.5, user_comments="Great job"
-        )
+        feedback = Feedback(persona_id="test", success_rating=4.5, user_comments="Great job")
 
         assert feedback.persona_id == "test"
         assert feedback.success_rating == 4.5

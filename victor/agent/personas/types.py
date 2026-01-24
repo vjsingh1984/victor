@@ -153,9 +153,7 @@ class Persona:
 
         # Validate temperature
         if not 0.0 <= self.temperature <= 1.0:
-            raise ValueError(
-                f"temperature must be between 0.0 and 1.0, got {self.temperature}"
-            )
+            raise ValueError(f"temperature must be between 0.0 and 1.0, got {self.temperature}")
 
     def matches_expertise(self, required_expertise: Set[str]) -> float:
         """Calculate expertise match score (0.0 to 1.0).
@@ -404,7 +402,7 @@ class AdaptedPersona:
             if adjustment.temperature is not None:
                 return adjustment.temperature
         # Default to 0.7 if not set
-        return getattr(self.base_persona, 'temperature', 0.7)
+        return getattr(self.base_persona, "temperature", 0.7)
 
     @property
     def constraints(self) -> PersonaConstraints:
@@ -434,9 +432,7 @@ class AdaptedPersona:
                 modifications.get("forbidden_tools", list(base.forbidden_tools or []))
             ),
             response_length=modifications.get("response_length", base.response_length),
-            explanation_depth=modifications.get(
-                "explanation_depth", base.explanation_depth
-            ),
+            explanation_depth=modifications.get("explanation_depth", base.explanation_depth),
         )
 
     def generate_system_prompt(self) -> str:

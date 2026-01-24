@@ -164,9 +164,7 @@ class VerticalLoader:
                 return vertical
 
             proxy = LazyProxy[Type[VerticalBase]](
-                vertical_name=name,
-                loader=_load_vertical,
-                proxy_type=LazyProxyType.LAZY
+                vertical_name=name, loader=_load_vertical, proxy_type=LazyProxyType.LAZY
             )
             logger.debug(f"Created type-safe lazy proxy for vertical: {name}")
             return proxy

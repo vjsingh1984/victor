@@ -246,9 +246,7 @@ class TestTargetNetwork:
         target_net.last_update_step = -100
 
         # Initialize with some values
-        target_net.target_q_table = {
-            "state_1": {"action_a": 0.2, "action_b": 0.2, "action_c": 0.2}
-        }
+        target_net.target_q_table = {"state_1": {"action_a": 0.2, "action_b": 0.2, "action_c": 0.2}}
 
         target_net.update(sample_q_table, step=0)
 
@@ -284,6 +282,7 @@ class TestRewardShaper:
 
     def test_custom_potential_function(self):
         """Test custom potential function."""
+
         def custom_potential(state):
             return -abs(state)  # Negative distance to zero
 
@@ -292,15 +291,14 @@ class TestRewardShaper:
 
     def test_shape_reward(self):
         """Test reward shaping."""
+
         def distance_potential(state):
             return -abs(state)  # Negative distance to zero
 
         shaper = RewardShaper(gamma=0.99, potential_function=distance_potential)
 
         # State gets closer to goal (potential increases from -10 to -5)
-        shaped = shaper.shape_reward(
-            state=-10, action="move", reward=0.0, next_state=-5
-        )
+        shaped = shaper.shape_reward(state=-10, action="move", reward=0.0, next_state=-5)
 
         # Should add positive bonus (Phi(next) - Phi(current) = -5 - (-10) = 5, scaled by gamma)
         expected_bonus = 0.99 * (-5) - (-10)  # = -4.95 + 10 = 5.05
@@ -309,6 +307,7 @@ class TestRewardShaper:
 
     def test_potential_based_preserves_optimality(self):
         """Test that potential-based shaping preserves optimal policy."""
+
         def potential(state):
             return -abs(state)
 
@@ -392,9 +391,7 @@ class TestExplorationStrategyImpl:
 
     def test_ucb_selection(self):
         """Test UCB action selection."""
-        strategy = ExplorationStrategyImpl(
-            strategy=ExplorationStrategy.UCB, ucb_c=2.0
-        )
+        strategy = ExplorationStrategyImpl(strategy=ExplorationStrategy.UCB, ucb_c=2.0)
 
         q_values = {"action_a": 0.5, "action_b": 0.5}
         available = ["action_a", "action_b"]
@@ -409,9 +406,7 @@ class TestExplorationStrategyImpl:
 
     def test_boltzmann_selection(self):
         """Test Boltzmann (softmax) action selection."""
-        strategy = ExplorationStrategyImpl(
-            strategy=ExplorationStrategy.BOLTZMANN, temperature=1.0
-        )
+        strategy = ExplorationStrategyImpl(strategy=ExplorationStrategy.BOLTZMANN, temperature=1.0)
 
         q_values = {"action_a": 10.0, "action_b": 0.0, "action_c": 0.0}
         available = ["action_a", "action_b", "action_c"]
@@ -423,9 +418,7 @@ class TestExplorationStrategyImpl:
 
     def test_entropy_bonus_selection(self):
         """Test entropy bonus action selection."""
-        strategy = ExplorationStrategyImpl(
-            strategy=ExplorationStrategy.ENTROPY_BONUS
-        )
+        strategy = ExplorationStrategyImpl(strategy=ExplorationStrategy.ENTROPY_BONUS)
 
         q_values = {"action_a": 0.5, "action_b": 0.5}
         available = ["action_a", "action_b"]

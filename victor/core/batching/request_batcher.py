@@ -118,7 +118,7 @@ class BatchStats:
     total_wait_time: float = 0.0
     total_execution_time: float = 0.0
     priority_distribution: Dict[BatchPriority, int] = field(
-        default_factory=lambda: {p: 0 for p in BatchPriority}
+        default_factory=lambda: dict.fromkeys(BatchPriority, 0)
     )
 
     def __post_init__(self):
@@ -166,9 +166,7 @@ class BatchStats:
                 "total_batches": self.total_batches,
                 "avg_batch_size": self.avg_batch_size,
                 "avg_wait_time": (
-                    self.total_wait_time / self.total_requests
-                    if self.total_requests > 0
-                    else 0.0
+                    self.total_wait_time / self.total_requests if self.total_requests > 0 else 0.0
                 ),
                 "avg_execution_time": (
                     self.total_execution_time / self.total_batches
@@ -411,8 +409,7 @@ class RequestBatcher:
             self.stats.record_batch(len(entries), execution_time)
 
             logger.debug(
-                f"Flushed batch '{batch_key}': {len(entries)} requests, "
-                f"{execution_time:.3f}s"
+                f"Flushed batch '{batch_key}': {len(entries)} requests, " f"{execution_time:.3f}s"
             )
 
         except Exception as e:
@@ -503,6 +500,7 @@ class ToolCallBatcher:
             batch_timeout: Batch timeout in seconds
         """
         self.executor = executor
+
         # Create key function that handles both positional and keyword args
         def _tool_key_func(*args, **kwargs):
             # If called with positional arg (tool_name), use it
@@ -518,9 +516,7 @@ class ToolCallBatcher:
             batch_timeout=batch_timeout,
         )
 
-    async def _execute_tool_batch(
-        self, entries: List[BatchEntry]
-    ) -> List[Any]:
+    async def _execute_tool_batch(self, entries: List[BatchEntry]) -> List[Any]:
         """Execute a batch of tool calls.
 
         Args:
@@ -545,18 +541,13 @@ class ToolCallBatcher:
 
         # Execute in parallel
         results = await asyncio.gather(
-            *[
-                self.executor.execute_tool(tool_name, **tool_args)
-                for tool_name, tool_args in calls
-            ],
+            *[self.executor.execute_tool(tool_name, **tool_args) for tool_name, tool_args in calls],
             return_exceptions=True,
         )
 
         return results
 
-    async def batch_calls(
-        self, calls: List[Dict[str, Any]]
-    ) -> List[Any]:
+    async def batch_calls(self, calls: List[Dict[str, Any]]) -> List[Any]:
         """Batch multiple tool calls.
 
         Args:

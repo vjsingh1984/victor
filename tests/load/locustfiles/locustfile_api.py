@@ -168,14 +168,14 @@ def on_test_stop(environment, **kwargs):
         print(f"Failed Requests: {stats.total.num_failures}")
         print(f"Failure Rate: {(stats.total.num_failures / stats.total.num_requests * 100):.2f}%")
 
-        print(f"\nResponse Times:")
+        print("\nResponse Times:")
         print(f"  Min: {stats.total.min_response_time:.0f}ms")
         print(f"  Avg: {stats.total.avg_response_time:.0f}ms")
         print(f"  Median: {stats.total.median_response_time:.0f}ms")
         print(f"  95th percentile: {stats.total.get_response_time_percentile(0.95):.0f}ms")
         print(f"  99th percentile: {stats.total.get_response_time_percentile(0.99):.0f}ms")
 
-        print(f"\nThroughput:")
+        print("\nThroughput:")
         print(f"  Requests/second: {stats.total.total_avg_rps:.2f}")
         print(f"  Total RPS: {stats.total.total_rps:.2f}")
 

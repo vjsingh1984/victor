@@ -54,9 +54,7 @@ class TestMockBaseProvider:
     @pytest.mark.asyncio
     async def test_streaming(self):
         """Test streaming functionality."""
-        provider = MockBaseProvider(
-            response_text="Hello world", supports_streaming=True
-        )
+        provider = MockBaseProvider(response_text="Hello world", supports_streaming=True)
         messages = [Message(role="user", content="Test")]
 
         chunks = []
@@ -180,9 +178,7 @@ class TestToolCallMockProvider:
             name="search", arguments={"query": "test"}
         )
 
-        provider = ToolCallMockProvider(
-            response_text="Searching...", tool_calls=[tool_calls]
-        )
+        provider = ToolCallMockProvider(response_text="Searching...", tool_calls=[tool_calls])
         messages = [Message(role="user", content="Search for test")]
 
         response = await provider.chat(messages, model="test")
@@ -259,9 +255,7 @@ class TestProviderTestHelpers:
         )
         messages = ProviderTestHelpers.create_test_messages()
 
-        chunks = await ProviderTestHelpers.collect_stream_chunks(
-            provider, messages, model="test"
-        )
+        chunks = await ProviderTestHelpers.collect_stream_chunks(provider, messages, model="test")
 
         assert len(chunks) > 0
         assert isinstance(chunks[0].content, str)
@@ -327,9 +321,7 @@ class TestLatencySimulationProvider:
     @pytest.mark.asyncio
     async def test_increasing_latency_pattern(self):
         """Test increasing latency pattern."""
-        provider = LatencySimulationProvider(
-            base_latency=0.05, latency_pattern="increasing"
-        )
+        provider = LatencySimulationProvider(base_latency=0.05, latency_pattern="increasing")
         messages = [Message(role="user", content="Test")]
 
         await provider.chat(messages, model="test")
@@ -359,9 +351,7 @@ class TestLatencySimulationProvider:
     @pytest.mark.asyncio
     async def test_timeout_simulation(self):
         """Test timeout simulation."""
-        provider = LatencySimulationProvider(
-            base_latency=0.2, timeout_after=0.15
-        )
+        provider = LatencySimulationProvider(base_latency=0.2, timeout_after=0.15)
         messages = [Message(role="user", content="Test")]
 
         with pytest.raises(ProviderTimeoutError):
@@ -370,9 +360,7 @@ class TestLatencySimulationProvider:
     @pytest.mark.asyncio
     async def test_streaming_with_latency(self):
         """Test streaming with latency simulation."""
-        provider = LatencySimulationProvider(
-            base_latency=0.1, response_text="Hello world"
-        )
+        provider = LatencySimulationProvider(base_latency=0.1, response_text="Hello world")
         messages = [Message(role="user", content="Test")]
 
         import time
@@ -419,9 +407,7 @@ class TestLatencySimulationProvider:
     @pytest.mark.asyncio
     async def test_degrading_latency_pattern(self):
         """Test degrading latency pattern."""
-        provider = LatencySimulationProvider(
-            base_latency=0.05, latency_pattern="degrading"
-        )
+        provider = LatencySimulationProvider(base_latency=0.05, latency_pattern="degrading")
         messages = [Message(role="user", content="Test")]
 
         await provider.chat(messages, model="test")

@@ -228,6 +228,7 @@ def apply_func(
 # Mock AST Trees
 # =============================================================================
 
+
 def create_mock_function_node(name: str, start_line: int = 1) -> Dict[str, Any]:
     """Create a mock function AST node."""
     return {
@@ -353,6 +354,7 @@ MOCK_AST_COMPLEX_HIERARCHY = {
 # =============================================================================
 # Mock LSP Responses
 # =============================================================================
+
 
 def create_mock_completion(
     label: str,
@@ -520,6 +522,7 @@ MOCK_LSP_SYMBOLS = [
 # Mock Code Review Scenarios
 # =============================================================================
 
+
 class CodeReviewScenario:
     """Container for code review test scenarios."""
 
@@ -580,6 +583,7 @@ CODE_REVIEW_SCENARIOS = [
 # =============================================================================
 # Fixture Factory Functions
 # =============================================================================
+
 
 def create_sample_file(
     tmp_path: Path,
@@ -789,6 +793,7 @@ interface DatabaseConnection {
 # Advanced Mock LSP Responses (Hover, CodeAction, CodeLens)
 # =============================================================================
 
+
 def create_mock_hover(
     contents: str,
     range: Range = None,
@@ -901,6 +906,7 @@ MOCK_LSP_CODE_LENS = [
 # =============================================================================
 # Tree-sitter Specific Node Mocks
 # =============================================================================
+
 
 def create_mock_tree_sitter_node(
     type_: str,
@@ -1101,6 +1107,7 @@ class Database(metaclass=SingletonMeta):
 # =============================================================================
 # Additional Helper Functions
 # =============================================================================
+
 
 def create_mock_position(line: int = 0, character: int = 0) -> Position:
     """Create a mock position."""

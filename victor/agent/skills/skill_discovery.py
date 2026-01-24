@@ -477,7 +477,11 @@ class SkillDiscoveryEngine:
                     continue
 
                 # Determine category
-                category = getattr(tool, "category", None) or context.get("category", "general") if context else "general"
+                category = (
+                    getattr(tool, "category", None) or context.get("category", "general")
+                    if context
+                    else "general"
+                )
 
                 # Filter by categories
                 if categories and category not in categories:
@@ -519,7 +523,9 @@ class SkillDiscoveryEngine:
 
         # Return cached tools if available
         if not refresh_cache and cache_key in self._mcp_tools_cache:
-            logger.info(f"Returning cached MCP tools: {len(self._mcp_tools_cache[cache_key])} tools")
+            logger.info(
+                f"Returning cached MCP tools: {len(self._mcp_tools_cache[cache_key])} tools"
+            )
             return self._mcp_tools_cache[cache_key]
 
         mcp_tools = []
@@ -563,7 +569,11 @@ class SkillDiscoveryEngine:
         # Publish event
         await self._publish_event(
             UnifiedEventType.TOOL_RESULT,
-            {"mcp_tools_discovered": len(mcp_tools), "server_url": server_url, "event_type": "mcp_discovery"},
+            {
+                "mcp_tools_discovered": len(mcp_tools),
+                "server_url": server_url,
+                "event_type": "mcp_discovery",
+            },
         )
 
         return mcp_tools
@@ -660,11 +670,7 @@ class SkillDiscoveryEngine:
 
                 # Convert tool names back to AvailableTool instances
                 tool_map = {t.name: t for t in available_tools}
-                matched_tools = [
-                    tool_map[name]
-                    for name in result.tool_names
-                    if name in tool_map
-                ]
+                matched_tools = [tool_map[name] for name in result.tool_names if name in tool_map]
 
                 logger.info(f"Matched {len(matched_tools)} tools using selector")
                 return matched_tools

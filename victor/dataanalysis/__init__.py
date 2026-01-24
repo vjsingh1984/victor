@@ -25,6 +25,7 @@ DataAnalysisToolDependencyProvider = create_vertical_tool_dependency_provider("d
 # Import lazy initializer for eliminating import side-effects
 from victor.framework.lazy_initializer import get_initializer_for_vertical
 
+
 # Auto-register escape hatches (OCP-compliant)
 def _register_escape_hatches() -> None:
     """Register data analysis vertical's escape hatches with the global registry.
@@ -52,10 +53,7 @@ def _register_escape_hatches() -> None:
 
 
 # Create lazy initializer (no import side-effect)
-_lazy_init = get_initializer_for_vertical(
-    "data_analysis",
-    _register_escape_hatches
-)
+_lazy_init = get_initializer_for_vertical("data_analysis", _register_escape_hatches)
 
 __all__ = [
     "DataAnalysisAssistant",

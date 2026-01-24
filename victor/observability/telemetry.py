@@ -74,9 +74,16 @@ _meter: Optional[Any] = None
 try:
     from opentelemetry import trace, metrics
     from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter, SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export import (
+        BatchSpanProcessor,
+        ConsoleSpanExporter,
+        SimpleSpanProcessor,
+    )
     from opentelemetry.sdk.metrics import MeterProvider
-    from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader, ConsoleMetricExporter
+    from opentelemetry.sdk.metrics.export import (
+        PeriodicExportingMetricReader,
+        ConsoleMetricExporter,
+    )
     from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
     from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
     from opentelemetry.sdk.resources import Resource, SERVICE_NAME, SERVICE_VERSION
@@ -236,6 +243,7 @@ def get_tracer(name: Optional[str] = None) -> Optional[Any]:
 
     if _otel_configured:
         from opentelemetry import trace
+
         return trace.get_tracer(name or "victor")
 
     return None
@@ -258,6 +266,7 @@ def get_meter(name: Optional[str] = None) -> Optional[Any]:
 
     if _otel_configured:
         from opentelemetry import metrics
+
         return metrics.get_meter(name or "victor")
 
     return None
@@ -394,6 +403,7 @@ def trace_function(
             # Function execution is automatically traced
             return await handler(request)
     """
+
     def decorator(func: Callable) -> Callable:
         if not is_telemetry_enabled():
             return func

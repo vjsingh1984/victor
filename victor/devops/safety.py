@@ -262,7 +262,9 @@ def create_deployment_safety_rules(
             protected_environments=["production", "staging"]
         )
     """
-    from victor.framework.middleware import create_deployment_safety_rules as framework_deployment_rules
+    from victor.framework.middleware import (
+        create_deployment_safety_rules as framework_deployment_rules,
+    )
 
     # Delegate to framework implementation
     framework_deployment_rules(
@@ -300,7 +302,9 @@ def create_container_safety_rules(
             block_root_user=True
         )
     """
-    from victor.framework.middleware import create_container_safety_rules as framework_container_rules
+    from victor.framework.middleware import (
+        create_container_safety_rules as framework_container_rules,
+    )
 
     # Delegate to framework implementation
     framework_container_rules(
@@ -337,7 +341,9 @@ def create_infrastructure_safety_rules(
             protected_resources=["database", "storage", "vpc", "load-balancer"]
         )
     """
-    from victor.framework.middleware import create_infrastructure_safety_rules as framework_infra_rules
+    from victor.framework.middleware import (
+        create_infrastructure_safety_rules as framework_infra_rules,
+    )
 
     # Delegate to framework implementation
     framework_infra_rules(

@@ -303,10 +303,14 @@ class ChainedFlagResolver(FlagResolver):
             try:
                 value = resolver.resolve(flag_name)
                 if value is not None:
-                    logger.debug(f"Flag {flag_name} resolved to {value} by {resolver.__class__.__name__}")
+                    logger.debug(
+                        f"Flag {flag_name} resolved to {value} by {resolver.__class__.__name__}"
+                    )
                     return value
             except Exception as e:
-                logger.warning(f"Resolver {resolver.__class__.__name__} failed for {flag_name}: {e}")
+                logger.warning(
+                    f"Resolver {resolver.__class__.__name__} failed for {flag_name}: {e}"
+                )
                 continue
 
         logger.debug(f"Flag {flag_name} not resolved by any resolver, using default: {default}")
@@ -378,7 +382,9 @@ class StagedRolloutResolver(FlagResolver):
             resolver = StagedRolloutResolver(rollout_percentage=25.0)
         """
         if not 0.0 <= rollout_percentage <= 100.0:
-            raise ValueError(f"rollout_percentage must be between 0 and 100, got {rollout_percentage}")
+            raise ValueError(
+                f"rollout_percentage must be between 0 and 100, got {rollout_percentage}"
+            )
 
         self._rollout_percentage = rollout_percentage
         self._user_id_provider = user_id_provider or self._default_user_id
@@ -416,7 +422,9 @@ class StagedRolloutResolver(FlagResolver):
         enabled = rollout_value < self._rollout_percentage
 
         if enabled:
-            logger.debug(f"User {user_id} in rollout for {flag_name} (percentage: {self._rollout_percentage}%)")
+            logger.debug(
+                f"User {user_id} in rollout for {flag_name} (percentage: {self._rollout_percentage}%)"
+            )
 
         return enabled
 
@@ -430,7 +438,9 @@ class StagedRolloutResolver(FlagResolver):
         Returns:
             False (not supported)
         """
-        logger.warning("StagedRolloutResolver does not support set() - create new instance with different percentage")
+        logger.warning(
+            "StagedRolloutResolver does not support set() - create new instance with different percentage"
+        )
         return False
 
     def set_rollout_percentage(self, percentage: float) -> None:

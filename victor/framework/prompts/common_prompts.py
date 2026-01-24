@@ -506,7 +506,9 @@ class SystemPromptBuilder:
 
         # Guidelines
         if self._guidelines:
-            guidelines = "\n".join(f"{i}. **{guide}**" for i, guide in enumerate(self._guidelines, 1))
+            guidelines = "\n".join(
+                f"{i}. **{guide}**" for i, guide in enumerate(self._guidelines, 1)
+            )
             parts.append(f"\nGuidelines:\n{guidelines}")
 
         # Best practices

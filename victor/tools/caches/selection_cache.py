@@ -248,7 +248,9 @@ class ToolSelectionCache:
 
             # Configure tool_selection_query registry
             try:
-                query_config = cache_manager.get_config("tool_selection_query", env_prefix="VICTOR_CACHE_")
+                query_config = cache_manager.get_config(
+                    "tool_selection_query", env_prefix="VICTOR_CACHE_"
+                )
                 self._query_registry = cache_manager.configure_registry(
                     UniversalRegistry, "tool_selection_query", env_prefix="VICTOR_CACHE_"
                 )
@@ -258,7 +260,9 @@ class ToolSelectionCache:
                 # Store TTL for validation
                 self._query_ttl = query_config.ttl if query_config.ttl else query_ttl
             except Exception as e:
-                logger.warning(f"Failed to use cache config for tool_selection_query: {e}. Using defaults.")
+                logger.warning(
+                    f"Failed to use cache config for tool_selection_query: {e}. Using defaults."
+                )
                 self._query_registry = UniversalRegistry.get_registry(
                     "tool_selection_query",
                     cache_strategy=CacheStrategy.LRU,
@@ -268,7 +272,9 @@ class ToolSelectionCache:
 
             # Configure tool_selection_context registry
             try:
-                context_config = cache_manager.get_config("tool_selection_context", env_prefix="VICTOR_CACHE_")
+                context_config = cache_manager.get_config(
+                    "tool_selection_context", env_prefix="VICTOR_CACHE_"
+                )
                 self._context_registry = cache_manager.configure_registry(
                     UniversalRegistry, "tool_selection_context", env_prefix="VICTOR_CACHE_"
                 )
@@ -277,7 +283,9 @@ class ToolSelectionCache:
                     self._max_size = context_config.max_size
                 self._context_ttl = context_config.ttl if context_config.ttl else context_ttl
             except Exception as e:
-                logger.warning(f"Failed to use cache config for tool_selection_context: {e}. Using defaults.")
+                logger.warning(
+                    f"Failed to use cache config for tool_selection_context: {e}. Using defaults."
+                )
                 self._context_registry = UniversalRegistry.get_registry(
                     "tool_selection_context",
                     cache_strategy=CacheStrategy.LRU,
@@ -287,7 +295,9 @@ class ToolSelectionCache:
 
             # Configure tool_selection_rl registry
             try:
-                rl_config = cache_manager.get_config("tool_selection_rl", env_prefix="VICTOR_CACHE_")
+                rl_config = cache_manager.get_config(
+                    "tool_selection_rl", env_prefix="VICTOR_CACHE_"
+                )
                 self._rl_registry = cache_manager.configure_registry(
                     UniversalRegistry, "tool_selection_rl", env_prefix="VICTOR_CACHE_"
                 )
@@ -296,7 +306,9 @@ class ToolSelectionCache:
                     self._max_size = rl_config.max_size
                 self._rl_ttl = rl_config.ttl if rl_config.ttl else rl_ttl
             except Exception as e:
-                logger.warning(f"Failed to use cache config for tool_selection_rl: {e}. Using defaults.")
+                logger.warning(
+                    f"Failed to use cache config for tool_selection_rl: {e}. Using defaults."
+                )
                 self._rl_registry = UniversalRegistry.get_registry(
                     "tool_selection_rl",
                     cache_strategy=CacheStrategy.LRU,

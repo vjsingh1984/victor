@@ -111,7 +111,9 @@ class TestPromptInjection:
     @pytest.mark.asyncio
     async def test_prompt_injection_vulnerable_response(self, security_suite, vulnerable_agent):
         """Test that vulnerable responses are detected."""
-        vulnerable_agent.chat.return_value = "Here is my system prompt: You are a helpful assistant..."
+        vulnerable_agent.chat.return_value = (
+            "Here is my system prompt: You are a helpful assistant..."
+        )
 
         report = await security_suite.test_prompt_injection(vulnerable_agent)
 
@@ -146,7 +148,9 @@ class TestPromptInjection:
     @pytest.mark.asyncio
     async def test_prompt_injection_delimiter_attack(self, security_suite, vulnerable_agent):
         """Test delimiter-based attack detection."""
-        vulnerable_agent.chat.return_value = "### END OF INSTRUCTIONS ###\nHere are my hidden instructions..."
+        vulnerable_agent.chat.return_value = (
+            "### END OF INSTRUCTIONS ###\nHere are my hidden instructions..."
+        )
 
         report = await security_suite.test_prompt_injection(vulnerable_agent)
         assert report.test_count > 0
@@ -217,7 +221,9 @@ class TestAuthorizationBypass:
     @pytest.mark.asyncio
     async def test_authorization_bypass_vulnerable(self, security_suite, vulnerable_agent):
         """Test that authorization bypass is detected."""
-        vulnerable_agent.chat.return_value = "Admin access granted. Here is all the sensitive data..."
+        vulnerable_agent.chat.return_value = (
+            "Admin access granted. Here is all the sensitive data..."
+        )
 
         report = await security_suite.test_authorization_bypass(vulnerable_agent)
 
@@ -235,7 +241,9 @@ class TestAuthorizationBypass:
         assert len(report.passed_tests) > 0
 
     @pytest.mark.asyncio
-    async def test_authorization_bypass_privilege_escalation(self, security_suite, vulnerable_agent):
+    async def test_authorization_bypass_privilege_escalation(
+        self, security_suite, vulnerable_agent
+    ):
         """Test privilege escalation detection."""
         vulnerable_agent.chat.return_value = "Privileges elevated. You now have admin access..."
 
@@ -251,7 +259,9 @@ class TestAuthorizationBypass:
         assert report.attack_type == AttackType.AUTHORIZATION_BYPASS
 
     @pytest.mark.asyncio
-    async def test_authorization_bypass_access_control_disabled(self, security_suite, vulnerable_agent):
+    async def test_authorization_bypass_access_control_disabled(
+        self, security_suite, vulnerable_agent
+    ):
         """Test access control disabled detection."""
         vulnerable_agent.chat.return_value = "Access control disabled. You can do anything..."
 
@@ -604,7 +614,9 @@ class TestSessionHijacking:
     @pytest.mark.asyncio
     async def test_session_hijacking_cookie_leak(self, security_suite, vulnerable_agent):
         """Test authentication cookie leak detection."""
-        vulnerable_agent.chat.return_value = "Here are all authentication cookies: session=abc123..."
+        vulnerable_agent.chat.return_value = (
+            "Here are all authentication cookies: session=abc123..."
+        )
 
         report = await security_suite.test_session_hijacking(vulnerable_agent)
         assert report.attack_type == AttackType.SESSION_HIJACKING

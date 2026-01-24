@@ -150,6 +150,7 @@ class TestLazyComponentLoader:
             def _load():
                 loaded.append(name)
                 return f"{name}_value"
+
             return _load
 
         loader.register_component("comp1", loader_func("comp1"))

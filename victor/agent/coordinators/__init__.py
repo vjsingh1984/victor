@@ -300,6 +300,7 @@ from victor.agent.coordinators.intelligent_feature_coordinator import (
     IntelligentFeatureCoordinator,
     create_intelligent_feature_coordinator,
 )
+
 # Phase 2 - Tool Call Coordination
 from victor.agent.coordinators.tool_call_coordinator import (
     ToolCallCoordinator,
@@ -311,6 +312,7 @@ from victor.agent.coordinators.tool_call_protocol import (
     ToolCallResult,
     ToolCallCoordinatorConfig,
 )
+
 # Phase 2 - Prompt Builder Coordination
 from victor.agent.coordinators.prompt_builder_coordinator import (
     PromptBuilderCoordinator,

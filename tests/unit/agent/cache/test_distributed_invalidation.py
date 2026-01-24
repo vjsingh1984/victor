@@ -159,9 +159,7 @@ class TestDistributedCacheInvalidator:
         assert mock_graph_cache in invalidator._graph_caches
 
     @pytest.mark.asyncio
-    async def test_local_invalidation(
-        self, invalidator, mock_tiered_cache, mock_redis_backend
-    ):
+    async def test_local_invalidation(self, invalidator, mock_tiered_cache, mock_redis_backend):
         """Test local invalidation clears local caches."""
         invalidator._redis_backend = mock_redis_backend
         mock_redis_backend.connected = True
@@ -173,9 +171,7 @@ class TestDistributedCacheInvalidator:
         assert invalidator._stats.local_invalidations == 1
 
     @pytest.mark.asyncio
-    async def test_local_invalidation_publishes(
-        self, invalidator, mock_redis_backend
-    ):
+    async def test_local_invalidation_publishes(self, invalidator, mock_redis_backend):
         """Test local invalidation publishes to Redis."""
         invalidator._redis_backend = mock_redis_backend
         mock_redis_backend.connected = True
@@ -202,9 +198,7 @@ class TestDistributedCacheInvalidator:
         assert len(mock_redis_backend.published) == 0
 
     @pytest.mark.asyncio
-    async def test_namespace_invalidation(
-        self, invalidator, mock_tiered_cache, mock_redis_backend
-    ):
+    async def test_namespace_invalidation(self, invalidator, mock_tiered_cache, mock_redis_backend):
         """Test namespace-wide invalidation."""
         invalidator._redis_backend = mock_redis_backend
         mock_redis_backend.connected = True
@@ -230,9 +224,7 @@ class TestDistributedCacheInvalidator:
         assert ("*", GRAPH_CACHE_NAMESPACE) in mock_redis_backend.published
 
     @pytest.mark.asyncio
-    async def test_remote_invalidation_handling(
-        self, invalidator, mock_tiered_cache
-    ):
+    async def test_remote_invalidation_handling(self, invalidator, mock_tiered_cache):
         """Test handling of remote invalidation events."""
         invalidator.register_tiered_cache(mock_tiered_cache)
 
@@ -322,9 +314,7 @@ class TestDistributedCacheInvalidatorWithMockedRedis:
     @pytest.mark.asyncio
     async def test_connect_creates_backend(self):
         """Test that connect creates Redis backend."""
-        with patch(
-            "victor.agent.cache.backends.redis.RedisCacheBackend"
-        ) as MockBackend:
+        with patch("victor.agent.cache.backends.redis.RedisCacheBackend") as MockBackend:
             mock_instance = AsyncMock()
             mock_instance.connect = AsyncMock()
             MockBackend.return_value = mock_instance

@@ -55,8 +55,7 @@ class TestLazyLoadingPerformance:
         for i in range(20):
             # Registration is fast - lambda is just stored, not executed
             lazy_loader.register_component(
-                f"component_{i}",
-                lambda idx=i: self._create_heavy_component(idx)
+                f"component_{i}", lambda idx=i: self._create_heavy_component(idx)
             )
         lazy_init_time = (time.perf_counter() - start_lazy) * 1000
 
@@ -72,10 +71,7 @@ class TestLazyLoadingPerformance:
     def test_first_access_overhead(self):
         """Test that first access overhead is acceptable (<20ms)."""
         lazy_loader = LazyComponentLoader()
-        lazy_loader.register_component(
-            "heavy",
-            lambda: self._create_heavy_component(0)
-        )
+        lazy_loader.register_component("heavy", lambda: self._create_heavy_component(0))
 
         # Time first access
         start = time.perf_counter()
@@ -90,10 +86,7 @@ class TestLazyLoadingPerformance:
     def test_subsequent_access_speed(self):
         """Test that subsequent accesses are instant (cached)."""
         lazy_loader = LazyComponentLoader()
-        lazy_loader.register_component(
-            "component",
-            lambda: {"data": "value"}
-        )
+        lazy_loader.register_component("component", lambda: {"data": "value"})
 
         # First access (loads component)
         lazy_loader.get_component("component")
@@ -130,8 +123,7 @@ class TestLazyLoadingPerformance:
         lazy_loader = LazyComponentLoader()
         for i in range(50):
             lazy_loader.register_component(
-                f"component_{i}",
-                lambda idx=i: self._create_heavy_component(idx)
+                f"component_{i}", lambda idx=i: self._create_heavy_component(idx)
             )
         snapshot4 = tracemalloc.take_snapshot()
         lazy_memory = sum(stat.size_diff for stat in snapshot4.compare_to(snapshot3, "lineno"))
@@ -171,10 +163,7 @@ class TestLazyLoadingPerformance:
 
         # Register many components
         for i in range(100):
-            lazy_loader.register_component(
-                f"comp_{i}",
-                lambda idx=i: {"id": idx}
-            )
+            lazy_loader.register_component(f"comp_{i}", lambda idx=i: {"id": idx})
 
         # Time preloading
         start = time.perf_counter()
@@ -197,10 +186,7 @@ class TestLazyLoadingPerformance:
 
         # Register and load components
         for i in range(50):
-            lazy_loader.register_component(
-                f"comp_{i}",
-                lambda idx=i: {"id": idx}
-            )
+            lazy_loader.register_component(f"comp_{i}", lambda idx=i: {"id": idx})
 
         # Load components
         for i in range(50):
@@ -244,10 +230,7 @@ class TestLazyLoadingPerformance:
 
         # Register many components
         for i in range(100):
-            lazy_loader.register_component(
-                f"comp_{i}",
-                lambda idx=i: {"id": idx}
-            )
+            lazy_loader.register_component(f"comp_{i}", lambda idx=i: {"id": idx})
 
         # Load from multiple threads
         start = time.perf_counter()
@@ -319,8 +302,7 @@ class TestLazyLoadingPerformance:
         # Register 10 components
         for i in range(10):
             loader.register_component(
-                f"comp_{i}",
-                lambda idx=i: {"id": idx, "data": list(range(100))}
+                f"comp_{i}", lambda idx=i: {"id": idx, "data": list(range(100))}
             )
 
         # Load components 0-9 sequentially
@@ -330,8 +312,8 @@ class TestLazyLoadingPerformance:
         # Check loaded components - should have at most 3
         loaded = loader.get_loaded_components()
 
-        print(f"\nCache max_size: 3")
-        print(f"Components registered: 10")
+        print("\nCache max_size: 3")
+        print("Components registered: 10")
         print(f"Components loaded: {len(loaded)}")
         print(f"Loaded components: {sorted(loaded)}")
 
@@ -358,10 +340,7 @@ class TestLazyLoadingPerformance:
 
         # Register 5 components
         for i in range(5):
-            loader.register_component(
-                f"comp_{i}",
-                lambda idx=i: {"id": idx}
-            )
+            loader.register_component(f"comp_{i}", lambda idx=i: {"id": idx})
 
         # Load components 0, 1, 2 (cache: [0, 1, 2])
         loader.get_component("comp_0")
@@ -401,10 +380,7 @@ class TestLazyLoadingPerformance:
 
             # Register 10 components
             for i in range(10):
-                loader.register_component(
-                    f"comp_{i}",
-                    lambda idx=i: {"id": idx}
-                )
+                loader.register_component(f"comp_{i}", lambda idx=i: {"id": idx})
 
             # Load all components
             for i in range(10):
@@ -416,7 +392,9 @@ class TestLazyLoadingPerformance:
             print(f"Cache size: {len(loaded)}")
 
             # Cache should respect max_size for all strategies
-            assert len(loaded) <= 3, f"Cache size {len(loaded)} exceeds max_size 3 for strategy {strategy.value}"
+            assert (
+                len(loaded) <= 3
+            ), f"Cache size {len(loaded)} exceeds max_size 3 for strategy {strategy.value}"
 
             print(f"✓ Cache management works for {strategy.value} strategy")
 
@@ -434,12 +412,12 @@ class TestLazyLoadingPerformance:
         # Register components with different access patterns
         for i in range(20):
             loader.register_component(
-                f"comp_{i}",
-                lambda idx=i: {"id": idx, "data": list(range(100))}
+                f"comp_{i}", lambda idx=i: {"id": idx, "data": list(range(100))}
             )
 
         # Simulate access pattern where some components are accessed frequently
         import random
+
         hot_components = [0, 5, 10, 15]  # These will be accessed frequently
 
         start = time.perf_counter()
@@ -464,7 +442,7 @@ class TestLazyLoadingPerformance:
         # Get statistics
         stats = loader.get_loading_stats()
 
-        print(f"\nAdaptive strategy performance:")
+        print("\nAdaptive strategy performance:")
         print(f"Total time: {adaptive_time:.2f}ms")
         print(f"Hit rate: {stats.hit_rate:.1%}")
         print(f"Total accesses: {stats.hit_count + stats.miss_count}")
@@ -479,7 +457,9 @@ class TestLazyLoadingPerformance:
         # Hot components should be in cache
         loaded = loader.get_loaded_components()
         hot_loaded = sum(1 for idx in hot_components if f"comp_{idx}" in loaded)
-        assert hot_loaded >= len(hot_components) // 2, f"Too few hot components cached: {hot_loaded}/{len(hot_components)}"
+        assert (
+            hot_loaded >= len(hot_components) // 2
+        ), f"Too few hot components cached: {hot_loaded}/{len(hot_components)}"
 
         print(f"✓ Adaptive strategy achieved {stats.hit_rate:.1%} hit rate")
 

@@ -313,17 +313,13 @@ class ResponseCache:
 
             # Compute embedding (run in thread pool to avoid blocking)
             loop = asyncio.get_event_loop()
-            embedding = await loop.run_in_executor(
-                None, service.get_embedding, text
-            )
+            embedding = await loop.run_in_executor(None, service.get_embedding, text)
             return embedding
         except Exception as e:
             logger.warning(f"Failed to compute embedding: {e}")
             return None
 
-    def _cosine_similarity(
-        self, vec1: List[float], vec2: List[float]
-    ) -> float:
+    def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
         """Calculate cosine similarity between two vectors.
 
         Args:
@@ -364,9 +360,7 @@ class ResponseCache:
         """
         with self._lock:
             # Remove expired entries first
-            expired_keys = [
-                key for key, entry in self._cache.items() if entry.is_expired()
-            ]
+            expired_keys = [key for key, entry in self._cache.items() if entry.is_expired()]
             for key in expired_keys:
                 del self._cache[key]
                 self.stats.evictions += 1

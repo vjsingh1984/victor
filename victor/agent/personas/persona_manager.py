@@ -83,7 +83,9 @@ class PersonaManager:
 
         if repository is None:
             # Create repository with default YAML path
-            default_yaml = Path(__file__).parent.parent.parent / "config" / "personas" / "agent_personas.yaml"
+            default_yaml = (
+                Path(__file__).parent.parent.parent / "config" / "personas" / "agent_personas.yaml"
+            )
             if default_yaml.exists() and auto_load:
                 repository = PersonaRepository(storage_path=default_yaml)
                 logger.info(f"Loaded personas from: {default_yaml}")
@@ -117,9 +119,7 @@ class PersonaManager:
 
         return persona
 
-    def adapt_persona(
-        self, persona: Persona, context: Dict[str, Any]
-    ) -> AdaptedPersona:
+    def adapt_persona(self, persona: Persona, context: Dict[str, Any]) -> AdaptedPersona:
         """Adapt a persona based on context.
 
         Context may include:
@@ -297,7 +297,9 @@ class PersonaManager:
         logger.debug("No suitable persona found")
         return None
 
-    def merge_personas(self, personas: List[Persona], merged_name: str, merged_id: Optional[str] = None) -> Persona:
+    def merge_personas(
+        self, personas: List[Persona], merged_name: str, merged_id: Optional[str] = None
+    ) -> Persona:
         """Merge multiple personas into a hybrid persona.
 
         This method combines expertise, constraints, and traits from multiple personas
@@ -384,7 +386,9 @@ class PersonaManager:
             },
         )
 
-        logger.info(f"Created merged persona: {merged_persona.id} with {len(expertise)} expertise areas")
+        logger.info(
+            f"Created merged persona: {merged_persona.id} with {len(expertise)} expertise areas"
+        )
         return merged_persona
 
     def validate_persona(self, persona: Persona) -> None:
@@ -477,6 +481,7 @@ class PersonaManager:
 
         # Create a copy of the persona to evolve
         from dataclasses import replace
+
         evolved = replace(persona, version=persona.version + 1)
 
         # Aggregate feedback data
@@ -498,6 +503,7 @@ class PersonaManager:
         if best_styles:
             # Count best styles
             from collections import Counter
+
             style_counts = Counter(best_styles)
             most_common_style = style_counts.most_common(1)[0][0]
 
@@ -707,11 +713,7 @@ class PersonaManager:
 
         # Expertise activation
         task_type = context.get("task_type", "")
-        relevant_expertise = [
-            exp
-            for exp in persona.expertise
-            if exp.lower() in task_type.lower()
-        ]
+        relevant_expertise = [exp for exp in persona.expertise if exp.lower() in task_type.lower()]
         if relevant_expertise:
             traits.append(
                 DynamicTrait(
@@ -884,9 +886,7 @@ class PersonaManager:
             if persona.constraints.preferred_tools and persona.constraints.forbidden_tools:
                 overlap = persona.constraints.preferred_tools & persona.constraints.forbidden_tools
                 if overlap:
-                    raise ValueError(
-                        f"Tools cannot be both preferred and forbidden: {overlap}"
-                    )
+                    raise ValueError(f"Tools cannot be both preferred and forbidden: {overlap}")
 
     def _apply_improvements(self, persona: Persona, improvements: Dict[str, Any]) -> None:
         """Apply suggested improvements to persona.
@@ -904,9 +904,7 @@ class PersonaManager:
 
         # Update communication style
         if "communication_style" in improvements:
-            persona.communication_style = CommunicationStyle(
-                improvements["communication_style"]
-            )
+            persona.communication_style = CommunicationStyle(improvements["communication_style"])
 
         # Update constraints
         if "constraints" in improvements:
@@ -915,13 +913,9 @@ class PersonaManager:
                 if persona.constraints:
                     # Merge constraints
                     if new_constraints.preferred_tools:
-                        persona.constraints.preferred_tools.update(
-                            new_constraints.preferred_tools
-                        )
+                        persona.constraints.preferred_tools.update(new_constraints.preferred_tools)
                     if new_constraints.forbidden_tools:
-                        persona.constraints.forbidden_tools.update(
-                            new_constraints.forbidden_tools
-                        )
+                        persona.constraints.forbidden_tools.update(new_constraints.forbidden_tools)
                 else:
                     persona.constraints = new_constraints
 
@@ -931,9 +925,7 @@ class PersonaManager:
         Args:
             persona_id: Persona ID to clear cache for
         """
-        keys_to_remove = [
-            key for key in self._adaptation_cache.keys() if key[0] == persona_id
-        ]
+        keys_to_remove = [key for key in self._adaptation_cache.keys() if key[0] == persona_id]
         for key in keys_to_remove:
             del self._adaptation_cache[key]
 

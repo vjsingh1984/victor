@@ -93,6 +93,7 @@ class MockTool(BaseTool):
 @dataclass
 class MockToolCall:
     """Mock tool call structure."""
+
     name: str
     arguments: Dict[str, Any]
 
@@ -313,12 +314,15 @@ class TestSafetyChecks:
 
     def test_safe_file_read(self, safety_checker):
         """Test safe file read operation."""
-        risk, details = safety_checker.check_file_operation("read", "/tmp/test.txt", overwrite=False)
+        risk, details = safety_checker.check_file_operation(
+            "read", "/tmp/test.txt", overwrite=False
+        )
         assert risk == OperationalRiskLevel.SAFE
 
     def test_overwrite_existing_file(self, safety_checker, tmp_path):
         """Test overwriting existing file is detected."""
         from victor.agent.safety import _RISK_ORDER
+
         test_file = tmp_path / "test.txt"
         test_file.write_text("content")
 
@@ -335,13 +339,17 @@ class TestSafetyChecks:
     def test_approval_mode_off_auto_approves(self, safety_checker):
         """Test OFF approval mode auto-approves everything."""
         safety_checker.approval_mode = ApprovalMode.OFF
-        should_proceed, _ = asyncio.run(safety_checker.check_and_confirm("write_file", {"path": "test.txt"}))
+        should_proceed, _ = asyncio.run(
+            safety_checker.check_and_confirm("write_file", {"path": "test.txt"})
+        )
         assert should_proceed is True
 
     def test_approval_mode_all_writes_requires_confirmation(self, safety_checker):
         """Test ALL_WRITES mode requires confirmation for writes."""
         safety_checker.approval_mode = ApprovalMode.ALL_WRITES
-        should_proceed, _ = asyncio.run(safety_checker.check_and_confirm("write_file", {"path": "test.txt"}))
+        should_proceed, _ = asyncio.run(
+            safety_checker.check_and_confirm("write_file", {"path": "test.txt"})
+        )
         # No callback registered, so it should still proceed but log warning
         assert should_proceed is True
 
@@ -384,7 +392,9 @@ class TestSandboxing:
         """Test max calls is not exceeded."""
         tool_calls = [{"name": "read", "arguments": {"path": f"test{i}.txt"}} for i in range(20)]
         result = asyncio.run(basic_pipeline.execute_tool_calls(tool_calls, {}))
-        assert result.total_calls <= basic_pipeline.config.tool_budget + len(tool_calls)  # Account for skips
+        assert result.total_calls <= basic_pipeline.config.tool_budget + len(
+            tool_calls
+        )  # Account for skips
         assert result.budget_exhausted is True
 
     def test_rate_limiter_token_bucket(self):
@@ -463,6 +473,7 @@ class TestAuthorizationFlow:
 
     async def test_confirmation_callback_approves(self):
         """Test operation proceeds when callback returns True."""
+
         async def approve_callback(request: ConfirmationRequest) -> bool:
             return True
 
@@ -470,11 +481,14 @@ class TestAuthorizationFlow:
             confirmation_callback=approve_callback,
             require_confirmation_threshold=OperationalRiskLevel.HIGH,
         )
-        should_proceed, _ = await checker.check_and_confirm("execute_bash", {"command": "rm -rf test"})
+        should_proceed, _ = await checker.check_and_confirm(
+            "execute_bash", {"command": "rm -rf test"}
+        )
         assert should_proceed is True
 
     async def test_confirmation_callback_rejects(self):
         """Test operation is blocked when callback returns False."""
+
         async def reject_callback(request: ConfirmationRequest) -> bool:
             return False
 
@@ -482,12 +496,15 @@ class TestAuthorizationFlow:
             confirmation_callback=reject_callback,
             require_confirmation_threshold=OperationalRiskLevel.HIGH,
         )
-        should_proceed, reason = await checker.check_and_confirm("execute_bash", {"command": "rm -rf test"})
+        should_proceed, reason = await checker.check_and_confirm(
+            "execute_bash", {"command": "rm -rf test"}
+        )
         assert should_proceed is False
         assert reason is not None
 
     async def test_low_risk_auto_approved(self):
         """Test LOW risk operations are auto-approved."""
+
         async def callback(request: ConfirmationRequest) -> bool:
             raise AssertionError("Callback should not be called for LOW risk")
 
@@ -502,12 +519,15 @@ class TestAuthorizationFlow:
     async def test_no_callback_allows_high_risk_with_warning(self, caplog):
         """Test HIGH risk without callback logs warning but proceeds."""
         import logging
+
         checker = SafetyChecker(
             confirmation_callback=None,
             require_confirmation_threshold=OperationalRiskLevel.HIGH,
         )
         with caplog.at_level(logging.WARNING):
-            should_proceed, _ = await checker.check_and_confirm("execute_bash", {"command": "rm -rf test"})
+            should_proceed, _ = await checker.check_and_confirm(
+                "execute_bash", {"command": "rm -rf test"}
+            )
         assert should_proceed is True
         assert "High-risk operation without confirmation callback" in caplog.text
 
@@ -534,6 +554,7 @@ class TestAuthorizationFlow:
     def test_risk_level_ordering(self):
         """Test risk levels are properly ordered."""
         from victor.agent.safety import _RISK_ORDER
+
         assert _RISK_ORDER[OperationalRiskLevel.SAFE] < _RISK_ORDER[OperationalRiskLevel.LOW]
         assert _RISK_ORDER[OperationalRiskLevel.LOW] < _RISK_ORDER[OperationalRiskLevel.MEDIUM]
         assert _RISK_ORDER[OperationalRiskLevel.MEDIUM] < _RISK_ORDER[OperationalRiskLevel.HIGH]
@@ -541,6 +562,7 @@ class TestAuthorizationFlow:
 
     async def test_medium_risk_requires_confirmation_when_threshold_is_medium(self):
         """Test MEDIUM risk requires confirmation when threshold is MEDIUM."""
+
         async def callback(request: ConfirmationRequest) -> bool:
             return True
 
@@ -548,7 +570,9 @@ class TestAuthorizationFlow:
             confirmation_callback=callback,
             require_confirmation_threshold=OperationalRiskLevel.MEDIUM,
         )
-        should_proceed, _ = await checker.check_and_confirm("execute_bash", {"command": "rm file.txt"})
+        should_proceed, _ = await checker.check_and_confirm(
+            "execute_bash", {"command": "rm file.txt"}
+        )
         assert should_proceed is True  # Callback should be called and approved
 
     async def test_critical_risk_always_requires_confirmation(self):
@@ -608,10 +632,7 @@ class TestExecutionPipeline:
     async def test_execution_stops_on_budget_exhausted(self, basic_pipeline):
         """Test execution stops when budget exhausted."""
         basic_pipeline.config.tool_budget = 2
-        tool_calls = [
-            {"name": "read", "arguments": {"path": f"test{i}.txt"}}
-            for i in range(5)
-        ]
+        tool_calls = [{"name": "read", "arguments": {"path": f"test{i}.txt"}} for i in range(5)]
         result = await basic_pipeline.execute_tool_calls(tool_calls, {})
         assert result.budget_exhausted is True
         # Only first 2 should execute
@@ -630,16 +651,15 @@ class TestExecutionPipeline:
 
     async def test_pipeline_result_aggregation(self, basic_pipeline):
         """Test pipeline result correctly aggregates."""
-        basic_pipeline.executor.execute = AsyncMock(side_effect=[
-            Mock(success=True, result="result1"),
-            Mock(success=False, error="error2"),
-            Mock(success=True, result="result3"),
-        ])
+        basic_pipeline.executor.execute = AsyncMock(
+            side_effect=[
+                Mock(success=True, result="result1"),
+                Mock(success=False, error="error2"),
+                Mock(success=True, result="result3"),
+            ]
+        )
 
-        tool_calls = [
-            {"name": "read", "arguments": {"path": f"test{i}.txt"}}
-            for i in range(3)
-        ]
+        tool_calls = [{"name": "read", "arguments": {"path": f"test{i}.txt"}} for i in range(3)]
         result = await basic_pipeline.execute_tool_calls(tool_calls, {})
 
         assert result.successful_calls == 2
@@ -736,7 +756,10 @@ class TestErrorHandling:
     async def test_callback_exception_doesnt_stop_execution(self, basic_pipeline, caplog):
         """Test callback exceptions are logged but don't stop execution."""
         import logging
-        basic_pipeline.on_tool_start = lambda n, a: (_ for _ in ()).throw(RuntimeError("Callback error"))
+
+        basic_pipeline.on_tool_start = lambda n, a: (_ for _ in ()).throw(
+            RuntimeError("Callback error")
+        )
         with caplog.at_level(logging.WARNING):
             tool_call = {"name": "read", "arguments": {"path": "test.txt"}}
             result = await basic_pipeline._execute_single_call(tool_call, {})
@@ -754,6 +777,7 @@ class TestErrorHandling:
     async def test_signature_store_io_error_handled(self, basic_pipeline, caplog):
         """Test signature store I/O errors are handled gracefully."""
         import logging
+
         mock_store = Mock()
         mock_store.is_known_failure = Mock(side_effect=OSError("Store unavailable"))
         basic_pipeline.signature_store = mock_store
@@ -833,7 +857,9 @@ class TestCachingBehavior:
         await basic_pipeline._execute_single_call(tool_call, {})
 
         # Check cache
-        cached = basic_pipeline.get_cached_result("read", {"path": "test.txt", "offset": 0, "limit": 2000})
+        cached = basic_pipeline.get_cached_result(
+            "read", {"path": "test.txt", "offset": 0, "limit": 2000}
+        )
         assert cached is not None
         assert cached.cached is True
 
@@ -966,7 +992,9 @@ class TestMiddlewareIntegration:
     async def test_middleware_process_after_called(self, basic_pipeline):
         """Test middleware chain process_after is called."""
         mock_middleware = Mock()
-        mock_middleware.process_before = AsyncMock(return_value=Mock(proceed=True, modified_arguments=None))
+        mock_middleware.process_before = AsyncMock(
+            return_value=Mock(proceed=True, modified_arguments=None)
+        )
         mock_middleware.process_after = AsyncMock(return_value="modified result")
 
         basic_pipeline.middleware_chain = mock_middleware
@@ -981,10 +1009,9 @@ class TestMiddlewareIntegration:
     async def test_middleware_exception_handled(self, basic_pipeline, caplog):
         """Test middleware exceptions are handled gracefully."""
         import logging
+
         mock_middleware = Mock()
-        mock_middleware.process_before = AsyncMock(
-            side_effect=ValueError("Middleware error")
-        )
+        mock_middleware.process_before = AsyncMock(side_effect=ValueError("Middleware error"))
 
         basic_pipeline.middleware_chain = mock_middleware
 
@@ -1055,6 +1082,7 @@ class TestExecutionMetrics:
     def test_metrics_thread_safety(self):
         """Test metrics operations are thread-safe."""
         import threading
+
         metrics = ExecutionMetrics()
 
         def record():

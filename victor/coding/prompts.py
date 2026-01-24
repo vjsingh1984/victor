@@ -191,16 +191,21 @@ CODING_GROUNDING_EXTENDED = GroundingRulesBuilder().extended().build()
 
 
 # Coding-specific system prompt section (now using framework templates)
-CODING_SYSTEM_PROMPT_SECTION = SystemPromptBuilder().with_tool_usage(
-    TOOL_USAGE_CODING_TEMPLATE
-).with_guidelines([
-    "Understand before modifying: Always read and understand code before making changes",
-    "Incremental changes: Make small, focused changes rather than large rewrites",
-    "Verify changes: Run tests or validation after modifications",
-    "Explain reasoning: Briefly explain your approach when making non-trivial changes",
-    "Preserve style: Match existing code style and patterns",
-    "Handle errors gracefully: If something fails, diagnose and recover",
-]).build()
+CODING_SYSTEM_PROMPT_SECTION = (
+    SystemPromptBuilder()
+    .with_tool_usage(TOOL_USAGE_CODING_TEMPLATE)
+    .with_guidelines(
+        [
+            "Understand before modifying: Always read and understand code before making changes",
+            "Incremental changes: Make small, focused changes rather than large rewrites",
+            "Verify changes: Run tests or validation after modifications",
+            "Explain reasoning: Briefly explain your approach when making non-trivial changes",
+            "Preserve style: Match existing code style and patterns",
+            "Handle errors gracefully: If something fails, diagnose and recover",
+        ]
+    )
+    .build()
+)
 
 
 class CodingPromptContributor(PromptContributorProtocol):

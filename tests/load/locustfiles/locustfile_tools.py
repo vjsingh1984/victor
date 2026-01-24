@@ -342,10 +342,14 @@ def on_test_stop(environment, **kwargs):
         print(f"Failed: {stats.total.num_failures}")
 
         if stats.total.num_requests > 0:
-            success_rate = ((stats.total.num_requests - stats.total.num_failures) / stats.total.num_requests * 100)
+            success_rate = (
+                (stats.total.num_requests - stats.total.num_failures)
+                / stats.total.num_requests
+                * 100
+            )
             print(f"Success Rate: {success_rate:.2f}%")
 
-        print(f"\nResponse Times:")
+        print("\nResponse Times:")
         print(f"  Median: {stats.total.median_response_time:.0f}ms")
         print(f"  95th percentile: {stats.total.get_response_time_percentile(0.95):.0f}ms")
         print(f"  99th percentile: {stats.total.get_response_time_percentile(0.99):.0f}ms")

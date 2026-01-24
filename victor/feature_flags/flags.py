@@ -52,7 +52,6 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
             "max_subtasks": 10,
         },
     },
-
     # ==========================================================================
     # Memory Systems
     # ==========================================================================
@@ -72,7 +71,6 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
             "semantic_query_threshold": 0.25,
         },
     },
-
     # ==========================================================================
     # Dynamic Skills
     # ==========================================================================
@@ -91,7 +89,6 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
             "auto_composition": True,
         },
     },
-
     "self_improvement_enabled": {
         "description": "Enable proficiency tracking and self-improvement loops",
         "default": False,
@@ -107,7 +104,6 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
             "min_samples": 5,
         },
     },
-
     # ==========================================================================
     # Multimodal Capabilities
     # ==========================================================================
@@ -125,7 +121,6 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
             "max_image_size_mb": 10,
         },
     },
-
     "multimodal_audio_enabled": {
         "description": "Enable audio/speech processing capabilities",
         "default": False,
@@ -140,7 +135,6 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
             "max_audio_size_mb": 25,
         },
     },
-
     # ==========================================================================
     # Dynamic Personas
     # ==========================================================================
@@ -159,7 +153,6 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
             "switching_cooldown_seconds": 300,
         },
     },
-
     # ==========================================================================
     # Performance Optimizations
     # ==========================================================================
@@ -177,7 +170,6 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
             "preload_critical": True,
         },
     },
-
     "parallel_execution_enabled": {
         "description": "Enable parallel tool and workflow execution",
         "default": True,

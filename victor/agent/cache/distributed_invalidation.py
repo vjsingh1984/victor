@@ -207,7 +207,7 @@ class DistributedCacheInvalidator:
             key_prefix=self._config.key_prefix,
         )
         await self._redis_backend.connect()
-        logger.info(f"Connected to Redis for distributed invalidation")
+        logger.info("Connected to Redis for distributed invalidation")
 
     async def disconnect(self) -> None:
         """Disconnect from Redis."""
@@ -227,7 +227,7 @@ class DistributedCacheInvalidator:
         """
         if cache not in self._tiered_caches:
             self._tiered_caches.append(cache)
-            logger.debug(f"Registered TieredCache for invalidation")
+            logger.debug("Registered TieredCache for invalidation")
 
     def unregister_tiered_cache(self, cache: "TieredCache") -> None:
         """Unregister a TieredCache.
@@ -246,7 +246,7 @@ class DistributedCacheInvalidator:
         """
         if cache not in self._graph_caches:
             self._graph_caches.append(cache)
-            logger.debug(f"Registered CompiledGraphCache for invalidation")
+            logger.debug("Registered CompiledGraphCache for invalidation")
 
     def unregister_graph_cache(self, cache: "CompiledGraphCache") -> None:
         """Unregister a CompiledGraphCache.
@@ -399,9 +399,7 @@ class DistributedCacheInvalidator:
             and self._redis_backend is not None
         ):
             try:
-                await self._redis_backend.invalidate_publish(
-                    "*", GRAPH_CACHE_NAMESPACE
-                )
+                await self._redis_backend.invalidate_publish("*", GRAPH_CACHE_NAMESPACE)
             except Exception as e:
                 self._stats.publish_errors += 1
                 logger.warning(f"Failed to publish graph cache invalidation: {e}")
@@ -445,9 +443,7 @@ class DistributedCacheInvalidator:
             return
 
         try:
-            await self._redis_backend.listen_for_invalidation(
-                self._handle_remote_invalidation
-            )
+            await self._redis_backend.listen_for_invalidation(self._handle_remote_invalidation)
         except asyncio.CancelledError:
             logger.debug("Invalidation listener cancelled")
             raise

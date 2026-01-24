@@ -683,6 +683,7 @@ class TestHandlerDecoratorIntegration:
         """Reset singleton and executor handlers before each test."""
         HandlerRegistry.reset_instance()
         from victor.workflows import executor
+
         executor._compute_handlers.clear()
         yield
         HandlerRegistry.reset_instance()

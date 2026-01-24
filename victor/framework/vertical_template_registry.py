@@ -221,7 +221,11 @@ class VerticalTemplateRegistry:
             template = VerticalTemplate.from_dict(data)
 
             # Resolve template inheritance if requested
-            if resolve_inheritance and hasattr(template, 'parent_template') and template.parent_template:
+            if (
+                resolve_inheritance
+                and hasattr(template, "parent_template")
+                and template.parent_template
+            ):
                 template = self._resolve_inheritance(template)
                 if template is None:
                     return None

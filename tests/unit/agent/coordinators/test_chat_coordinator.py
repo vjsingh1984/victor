@@ -49,6 +49,7 @@ class TestChatCoordinatorInitialization:
     @pytest.fixture
     def mock_orchestrator(self, base_mock_orchestrator: Mock) -> Mock:
         """Create mock orchestrator with all required dependencies."""
+
         # Add custom stream generator for this test class
         async def stream_generator(*args, **kwargs):
             yield StreamChunk(content="Hello", is_final=False)
@@ -86,7 +87,7 @@ class TestChatCoordinatorChat:
             yield StreamChunk(
                 content="Response content",
                 is_final=True,
-                usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+                usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
             )
 
         # Create a wrapper class to prevent Mock from auto-creating attributes
@@ -99,7 +100,7 @@ class TestChatCoordinatorChat:
                 # Set our custom stream
                 self.stream = stream_generator
                 # Copy any other attributes that might be accessed
-                for attr in ['name', 'model', 'temperature', 'max_tokens']:
+                for attr in ["name", "model", "temperature", "max_tokens"]:
                     if hasattr(provider, attr):
                         setattr(self, attr, getattr(provider, attr))
 
@@ -135,12 +136,13 @@ class TestChatCoordinatorChat:
         self, coordinator: ChatCoordinator, mock_orchestrator: Mock
     ):
         """Test that chat tracks token usage correctly."""
+
         # Setup - override stream generator with specific usage values
         async def stream_with_usage(*args, **kwargs):
             yield StreamChunk(
                 content="Response",
                 is_final=True,
-                usage={"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}
+                usage={"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
             )
 
         # Create a wrapper class to prevent Mock from auto-creating attributes
@@ -153,7 +155,7 @@ class TestChatCoordinatorChat:
                 # Set our custom stream
                 self.stream = stream_with_usage
                 # Copy any other attributes that might be accessed
-                for attr in ['name', 'model', 'temperature', 'max_tokens']:
+                for attr in ["name", "model", "temperature", "max_tokens"]:
                     if hasattr(provider, attr):
                         setattr(self, attr, getattr(provider, attr))
 
@@ -196,14 +198,11 @@ class TestChatCoordinatorChat:
                 yield StreamChunk(
                     content="Thinking...",
                     is_final=True,
-                    tool_calls=[{"name": "test_tool", "arguments": {}}]
+                    tool_calls=[{"name": "test_tool", "arguments": {}}],
                 )
             else:
                 # Second call: return final response
-                yield StreamChunk(
-                    content="Final response",
-                    is_final=True
-                )
+                yield StreamChunk(content="Final response", is_final=True)
 
         # Create a wrapper class to prevent Mock from auto-creating attributes
         class ProviderWrapper:
@@ -213,13 +212,16 @@ class TestChatCoordinatorChat:
                 self.supports_tools = provider.supports_tools
                 # Override chat to return appropriate responses for the test
                 from victor.providers.base import CompletionResponse
+
                 self.chat = AsyncMock(
-                    return_value=CompletionResponse(content="Thinking...", role="assistant", tool_calls=None)
+                    return_value=CompletionResponse(
+                        content="Thinking...", role="assistant", tool_calls=None
+                    )
                 )
                 # Set our custom stream
                 self.stream = stream_func
                 # Copy any other attributes that might be accessed
-                for attr in ['name', 'model', 'temperature', 'max_tokens']:
+                for attr in ["name", "model", "temperature", "max_tokens"]:
                     if hasattr(provider, attr):
                         setattr(self, attr, getattr(provider, attr))
 
@@ -229,14 +231,15 @@ class TestChatCoordinatorChat:
 
         # Mock tool execution handler to continue the loop instead of returning
         from victor.agent.streaming.tool_execution import ToolExecutionResult
+
         mock_tool_exec_result = ToolExecutionResult(
-            chunks=[],
-            should_return=False,  # Continue to next iteration
-            tool_calls_executed=1
+            chunks=[], should_return=False, tool_calls_executed=1  # Continue to next iteration
         )
         # Mock both the coordinator's handler and orchestrator's handler
         coordinator._tool_execution_handler = Mock()
-        coordinator._tool_execution_handler.execute_tools = AsyncMock(return_value=mock_tool_exec_result)
+        coordinator._tool_execution_handler.execute_tools = AsyncMock(
+            return_value=mock_tool_exec_result
+        )
         coordinator._tool_execution_handler.update_observed_files = Mock()
         mock_orchestrator._tool_execution_handler = coordinator._tool_execution_handler
 
@@ -254,6 +257,7 @@ class TestChatCoordinatorChat:
         self, coordinator: ChatCoordinator, mock_orchestrator: Mock
     ):
         """Test that empty response triggers response completer."""
+
         # Setup - provider returns empty response to trigger recovery
         async def empty_stream(*args, **kwargs):
             yield StreamChunk(content="", is_final=True)
@@ -266,13 +270,14 @@ class TestChatCoordinatorChat:
                 self.supports_tools = provider.supports_tools
                 # Override chat to also return empty response for recovery path
                 from victor.providers.base import CompletionResponse
+
                 self.chat = AsyncMock(
                     return_value=CompletionResponse(content="", role="assistant", tool_calls=None)
                 )
                 # Set our custom stream
                 self.stream = stream_func
                 # Copy any other attributes that might be accessed
-                for attr in ['name', 'model', 'temperature', 'max_tokens']:
+                for attr in ["name", "model", "temperature", "max_tokens"]:
                     if hasattr(provider, attr):
                         setattr(self, attr, getattr(provider, attr))
 
@@ -324,13 +329,16 @@ class TestChatCoordinatorChat:
                 self.supports_tools = provider.supports_tools
                 # Override chat to return appropriate responses for the test
                 from victor.providers.base import CompletionResponse
+
                 self.chat = AsyncMock(
-                    return_value=CompletionResponse(content="Still working", role="assistant", tool_calls=None)
+                    return_value=CompletionResponse(
+                        content="Still working", role="assistant", tool_calls=None
+                    )
                 )
                 # Set our custom stream
                 self.stream = stream_func
                 # Copy any other attributes that might be accessed
-                for attr in ['name', 'model', 'temperature', 'max_tokens']:
+                for attr in ["name", "model", "temperature", "max_tokens"]:
                     if hasattr(provider, attr):
                         setattr(self, attr, getattr(provider, attr))
 
@@ -358,6 +366,7 @@ class TestChatCoordinatorChat:
             # Capture kwargs for assertion
             thinking_stream.kwargs_captured = kwargs
             yield StreamChunk(content="Thinking response", is_final=True)
+
         thinking_stream.kwargs_captured = {}
 
         # Create a wrapper class to prevent Mock from auto-creating attributes
@@ -370,7 +379,7 @@ class TestChatCoordinatorChat:
                 # Set our custom stream
                 self.stream = stream_func
                 # Copy any other attributes that might be accessed
-                for attr in ['name', 'model', 'temperature', 'max_tokens']:
+                for attr in ["name", "model", "temperature", "max_tokens"]:
                     if hasattr(provider, attr):
                         setattr(self, attr, getattr(provider, attr))
 
@@ -418,9 +427,7 @@ class TestChatCoordinatorChat:
 
         async def failing_tool_stream(*args, **kwargs):
             yield StreamChunk(
-                content="",
-                is_final=True,
-                tool_calls=[{"name": "failing_tool", "arguments": {}}]
+                content="", is_final=True, tool_calls=[{"name": "failing_tool", "arguments": {}}]
             )
 
         # Create a wrapper class to prevent Mock from auto-creating attributes
@@ -431,13 +438,14 @@ class TestChatCoordinatorChat:
                 self.supports_tools = provider.supports_tools
                 # Override chat to return appropriate responses for the test
                 from victor.providers.base import CompletionResponse
+
                 self.chat = AsyncMock(
                     return_value=CompletionResponse(content="", role="assistant", tool_calls=None)
                 )
                 # Set our custom stream
                 self.stream = stream_func
                 # Copy any other attributes that might be accessed
-                for attr in ['name', 'model', 'temperature', 'max_tokens']:
+                for attr in ["name", "model", "temperature", "max_tokens"]:
                     if hasattr(provider, attr):
                         setattr(self, attr, getattr(provider, attr))
 
@@ -461,6 +469,7 @@ class TestChatCoordinatorStreamChat:
     @pytest.fixture
     def mock_orchestrator(self, base_mock_orchestrator: Mock) -> Mock:
         """Create mock orchestrator for streaming tests."""
+
         # Add custom stream generator for streaming tests
         async def stream_generator(*args, **kwargs):
             yield StreamChunk(
@@ -995,6 +1004,7 @@ class TestChatCoordinatorEdgeCases:
     @pytest.fixture
     def mock_orchestrator(self, base_mock_orchestrator: Mock) -> Mock:
         """Create mock orchestrator for edge case tests."""
+
         # Add stream generator for streaming operations
         async def stream_generator(*args, **kwargs):
             yield StreamChunk(content="", is_final=True)
@@ -1066,6 +1076,7 @@ class TestChatCoordinatorEdgeCases:
         self, coordinator: ChatCoordinator, mock_orchestrator: Mock
     ):
         """Test that provider exceptions are propagated."""
+
         # Setup - stream generator should raise exception
         async def failing_stream(*args, **kwargs):
             raise RuntimeError("Provider error")

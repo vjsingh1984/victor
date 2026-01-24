@@ -39,6 +39,7 @@ from dataclasses import dataclass
 # Try to import pytest-benchmark
 try:
     import pytest_benchmark
+
     HAS_BENCHMARK = True
 except ImportError:
     HAS_BENCHMARK = False
@@ -136,7 +137,9 @@ class TestLazyLoadingPerformance:
             loader = LazyComponentLoader(strategy=LoadingStrategy.LAZY)
             loader.register_component("simple", lambda: SimpleComponent())
             loader.register_component("expensive", lambda: ExpensiveComponent(20))
-            loader.register_component("database", lambda: DatabaseComponent(), dependencies=["config"])
+            loader.register_component(
+                "database", lambda: DatabaseComponent(), dependencies=["config"]
+            )
             loader.register_component("config", lambda: ConfigComponent())
             return loader
 
@@ -147,7 +150,9 @@ class TestLazyLoadingPerformance:
             loader = LazyComponentLoader(strategy=LoadingStrategy.EAGER)
             loader.register_component("simple", lambda: SimpleComponent())
             loader.register_component("expensive", lambda: ExpensiveComponent(20))
-            loader.register_component("database", lambda: DatabaseComponent(), dependencies=["config"])
+            loader.register_component(
+                "database", lambda: DatabaseComponent(), dependencies=["config"]
+            )
             loader.register_component("config", lambda: ConfigComponent())
             # Preload all
             loader.preload_components(["simple", "expensive", "database", "config"])
@@ -282,10 +287,7 @@ class TestParallelExecutionPerformance:
         Expected: 15%+ speedup with parallelization.
         """
         # Create tasks
-        tasks = [
-            lambda: async_task(50, f"result_{i}")
-            for i in range(10)
-        ]
+        tasks = [lambda: async_task(50, f"result_{i}") for i in range(10)]
 
         # Sequential execution
         sequential_start = time.perf_counter()
@@ -354,10 +356,7 @@ class TestParallelExecutionPerformance:
         Expected: Better load distribution and reduced wait times.
         """
         # Create tasks with variable durations
-        tasks = [
-            lambda i=i: async_task(10 + (i % 3) * 10, f"task_{i}")
-            for i in range(12)
-        ]
+        tasks = [lambda i=i: async_task(10 + (i % 3) * 10, f"task_{i}") for i in range(12)]
 
         executor_without_ws = AdaptiveParallelExecutor(
             strategy=OptimizationStrategy.ALWAYS_PARALLEL,
@@ -493,9 +492,9 @@ class TestMemoryEfficiency:
 
         loaded = loader.get_loaded_components()
 
-        print(f"\nRegistered: 10 components")
+        print("\nRegistered: 10 components")
         print(f"Loaded (in cache): {len(loaded)} components")
-        print(f"Max cache size: 5")
+        print("Max cache size: 5")
 
         assert len(loaded) <= 5, "LRU cache should evict old components"
 
@@ -670,7 +669,7 @@ class TestSecurityAuthorizationOverhead:
                 Permission("tools", "read"),
                 Permission("tools", "execute"),
                 Permission("code", "write"),
-            }
+            },
         )
 
         # Setup: Create user and assign role
@@ -701,7 +700,7 @@ class TestSecurityAuthorizationOverhead:
                 Permission("code", "read"),
                 Permission("code", "write"),
                 Permission("code", "delete"),
-            }
+            },
         )
         authorizer.create_user("admin_user", roles=["admin"])
 
@@ -720,10 +719,7 @@ class TestSecurityAuthorizationOverhead:
         ]
 
         start = time.perf_counter()
-        results = [
-            authorizer.check_permission("admin_user", perm)
-            for perm in permissions
-        ]
+        results = [authorizer.check_permission("admin_user", perm) for perm in permissions]
         bulk_check_time = (time.perf_counter() - start) * 1000
 
         avg_bulk_time = bulk_check_time / len(permissions)
@@ -751,9 +747,9 @@ def test_generate_comprehensive_report():
     results = []
 
     # Run lazy loading benchmarks
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("LAZY LOADING BENCHMARKS")
-    print("="*80)
+    print("=" * 80)
 
     loader = LazyComponentLoader(strategy=LoadingStrategy.LAZY)
     loader.register_component("test", lambda: ExpensiveComponent(10))
@@ -766,18 +762,20 @@ def test_generate_comprehensive_report():
     loader.get_component("test")
     cached_access = (time.perf_counter() - start) * 1000
 
-    results.append(BenchmarkResult(
-        name="Lazy Loading",
-        metric="First Access",
-        value=first_access,
-        unit="ms",
-        details=f"Cached access: {cached_access:.2f}ms"
-    ))
+    results.append(
+        BenchmarkResult(
+            name="Lazy Loading",
+            metric="First Access",
+            value=first_access,
+            unit="ms",
+            details=f"Cached access: {cached_access:.2f}ms",
+        )
+    )
 
     # Run parallel execution benchmarks
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("PARALLEL EXECUTION BENCHMARKS")
-    print("="*80)
+    print("=" * 80)
 
     async def run_parallel_benchmarks():
         tasks = [lambda i=i: async_task(20, f"result_{i}") for i in range(10)]
@@ -799,21 +797,23 @@ def test_generate_comprehensive_report():
 
         speedup = sequential_time / parallel_time
 
-        results.append(BenchmarkResult(
-            name="Parallel Execution",
-            metric="Speedup",
-            value=speedup,
-            unit="x",
-            improvement=f"{((1 - 1/speedup) * 100):.1f}% faster",
-            details=f"Sequential: {sequential_time:.0f}ms, Parallel: {parallel_time:.0f}ms"
-        ))
+        results.append(
+            BenchmarkResult(
+                name="Parallel Execution",
+                metric="Speedup",
+                value=speedup,
+                unit="x",
+                improvement=f"{((1 - 1/speedup) * 100):.1f}% faster",
+                details=f"Sequential: {sequential_time:.0f}ms, Parallel: {parallel_time:.0f}ms",
+            )
+        )
 
     asyncio.run(run_parallel_benchmarks())
 
     # Print summary report
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("PHASE 4 PERFORMANCE BENCHMARK SUMMARY")
-    print("="*80)
+    print("=" * 80)
 
     for result in results:
         print(f"\n{result.name}:")
@@ -823,9 +823,9 @@ def test_generate_comprehensive_report():
         if result.details:
             print(f"  Details: {result.details}")
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("All benchmarks completed successfully!")
-    print("="*80)
+    print("=" * 80)
 
     assert len(results) > 0, "Should have collected benchmark results"
 

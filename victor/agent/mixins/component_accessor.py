@@ -154,18 +154,14 @@ class ComponentAccessorMixin:
         """
         # Check if this is a component we should handle
         if name in self._component_exclusions:
-            raise AttributeError(
-                f"'{type(self).__name__}' object has no attribute '{name}'"
-            )
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
         # Get the private attribute name for this component
         private_attr = self._component_map.get(name)
 
         if private_attr is None:
             # Not a component we know about
-            raise AttributeError(
-                f"'{type(self).__name__}' object has no attribute '{name}'"
-            )
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
         # Get the value from the private attribute
         try:
@@ -224,9 +220,9 @@ class ComponentAccessorMixin:
             return False
 
         private_attr = self._component_map[name]
-        return hasattr(self, private_attr) and object.__getattribute__(
-            self, private_attr
-        ) is not None
+        return (
+            hasattr(self, private_attr) and object.__getattribute__(self, private_attr) is not None
+        )
 
     def get_component_names(self) -> Set[str]:
         """Get all registered component names.
@@ -237,9 +233,7 @@ class ComponentAccessorMixin:
         return set(self._component_map.keys())
 
     @classmethod
-    def register_component(
-        cls, name: str, private_attr: Optional[str] = None
-    ) -> None:
+    def register_component(cls, name: str, private_attr: Optional[str] = None) -> None:
         """Register a new component mapping.
 
         This allows subclasses or external code to add new component

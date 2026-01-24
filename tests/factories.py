@@ -905,9 +905,7 @@ class TestSettingsBuilder:
         self._settings["tool_cache_enabled"] = enabled
         return self
 
-    def with_conversation_memory(
-        self, enabled: bool = True
-    ) -> "TestSettingsBuilder":
+    def with_conversation_memory(self, enabled: bool = True) -> "TestSettingsBuilder":
         """Enable or disable conversation memory.
 
         Args:
@@ -955,9 +953,7 @@ class TestSettingsBuilder:
         self._settings["enable_observability"] = enabled
         return self
 
-    def with_tool_selection_strategy(
-        self, strategy: str
-    ) -> "TestSettingsBuilder":
+    def with_tool_selection_strategy(self, strategy: str) -> "TestSettingsBuilder":
         """Set the tool selection strategy.
 
         Args:
@@ -1219,9 +1215,7 @@ class TestFixtureFactory:
                 history.append(Message(role=msg["role"], content=msg["content"]))
         else:
             # Add default conversation
-            history.append(
-                Message(role="user", content="Hello, can you help me?")
-            )
+            history.append(Message(role="user", content="Hello, can you help me?"))
             history.append(
                 Message(
                     role="assistant",
@@ -1307,9 +1301,7 @@ class TestFixtureFactory:
         import os
 
         os.close(fd)
-        conversation_store = TestFixtureFactory.create_conversation_store(
-            Path(db_path)
-        )
+        conversation_store = TestFixtureFactory.create_conversation_store(Path(db_path))
 
         return {
             "provider": provider,

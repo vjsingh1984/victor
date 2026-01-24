@@ -278,7 +278,9 @@ class TestLegacyAPIMixinBackwardCompatibility:
             result = self.orchestrator.is_tool_enabled("read_file")
 
         assert result is True
-        self.orchestrator._tool_access_coordinator.is_tool_enabled.assert_called_once_with("read_file")
+        self.orchestrator._tool_access_coordinator.is_tool_enabled.assert_called_once_with(
+            "read_file"
+        )
 
     def test_get_system_prompt_returns_prompt(self):
         """Test get_system_prompt returns prompt."""

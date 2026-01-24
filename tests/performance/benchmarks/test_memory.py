@@ -115,9 +115,7 @@ class TestMemoryUsagePatterns:
 
         peak_mb = peak / 1024 / 1024
 
-        assert (
-            peak_mb < 20
-        ), f"Factory memory too high: {peak_mb:.1f}MB (target: < 20MB)"
+        assert peak_mb < 20, f"Factory memory too high: {peak_mb:.1f}MB (target: < 20MB)"
         assert result is not None
 
     def test_container_memory_footprint(self, benchmark):
@@ -141,9 +139,7 @@ class TestMemoryUsagePatterns:
 
         peak_mb = peak / 1024 / 1024
 
-        assert (
-            peak_mb < 50
-        ), f"Container memory too high: {peak_mb:.1f}MB (target: < 50MB)"
+        assert peak_mb < 50, f"Container memory too high: {peak_mb:.1f}MB (target: < 50MB)"
         assert result is not None
 
     def test_component_access_memory(self, settings, mock_provider):
@@ -167,9 +163,7 @@ class TestMemoryUsagePatterns:
         peak_mb = peak / 1024 / 1024
 
         # Should still be < 30MB after accessing 3 components
-        assert (
-            peak_mb < 30
-        ), f"Component access memory too high: {peak_mb:.1f}MB (target: < 30MB)"
+        assert peak_mb < 30, f"Component access memory too high: {peak_mb:.1f}MB (target: < 30MB)"
 
 
 # =============================================================================
@@ -217,9 +211,7 @@ class TestMemoryLeaks:
         growth_mb = total_growth / 1024 / 1024
 
         # Growth should be < 10MB over 50 iterations
-        assert (
-            growth_mb < 10
-        ), f"Memory leak detected: {growth_mb:.1f}MB growth over 50 iterations"
+        assert growth_mb < 10, f"Memory leak detected: {growth_mb:.1f}MB growth over 50 iterations"
 
     def test_container_service_no_leak(self):
         """Test that container services don't leak memory."""
@@ -370,9 +362,7 @@ class TestCacheEffectiveness:
 
         hit_rate = benchmark(cache_operations)
 
-        assert (
-            hit_rate > 0.8
-        ), f"Cache hit rate too low: {hit_rate:.1%} (target: > 80%)"
+        assert hit_rate > 0.8, f"Cache hit rate too low: {hit_rate:.1%} (target: > 80%)"
 
     def test_container_singleton_caching(self, benchmark):
         """Benchmark container singleton service caching.
@@ -439,9 +429,7 @@ class TestCacheEffectiveness:
         # Cached operations should be significantly faster
         speedup = uncached_time / cached_time
 
-        assert (
-            speedup > 10
-        ), f"LRU cache ineffective: {speedup:.1f}x speedup (target: > 10x)"
+        assert speedup > 10, f"LRU cache ineffective: {speedup:.1f}x speedup (target: > 10x)"
 
 
 # =============================================================================
@@ -572,9 +560,7 @@ class TestMemoryEfficiency:
         large_data = {"data": list(range(10000))}
 
         # Measure memory with multiple references
-        size_single = sys.getsizeof(large_data) + sum(
-            sys.getsizeof(v) for v in large_data.values()
-        )
+        size_single = sys.getsizeof(large_data) + sum(sys.getsizeof(v) for v in large_data.values())
 
         # Multiple references should not significantly increase memory
         refs = [large_data] * 10

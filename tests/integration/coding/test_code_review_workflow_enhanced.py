@@ -112,7 +112,9 @@ class TestCodeReviewWorkflow:
 
         # Should have parallel execution for reviews (nodes is a Dict[str, WorkflowNode])
         nodes = list(workflow.nodes.values())
-        parallel_nodes = [node for node in nodes if hasattr(node, "is_parallel") and node.is_parallel]
+        parallel_nodes = [
+            node for node in nodes if hasattr(node, "is_parallel") and node.is_parallel
+        ]
 
         # May have parallel execution nodes
         assert len(nodes) >= 5  # identify, security, style, logic, synthesize
@@ -307,7 +309,7 @@ class TestSecurityAnalysis:
         code = "query = f\"SELECT * FROM users WHERE name = '{user_input}'\""
 
         # Should be flagged as potential SQL injection
-        assert "f\"" in code or "{user_input}" in code
+        assert 'f"' in code or "{user_input}" in code
 
     def test_detect_command_injection(self):
         """Test detection of command injection patterns."""

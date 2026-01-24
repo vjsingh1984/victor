@@ -37,7 +37,9 @@ class MockToolExecutor(ToolExecutor):
     async def execute(self, tool_name: str, arguments: dict, context: dict = None):
         self.call_count += 1
         self.calls.append((tool_name, arguments))
-        return type("Result", (), {"success": True, "result": f"Executed {tool_name}", "error": None})
+        return type(
+            "Result", (), {"success": True, "result": f"Executed {tool_name}", "error": None}
+        )
 
 
 class TestToolPipelineDecisionCache:
@@ -136,16 +138,15 @@ class TestToolPipelineDecisionCache:
         stats = pipeline._decision_cache.get_stats()
 
         # Validation should be cached (at least 1 entry)
-        assert stats["validation_cache_size"] > 0, \
-            f"Expected validation cache to have entries, got size: {stats['validation_cache_size']}"
+        assert (
+            stats["validation_cache_size"] > 0
+        ), f"Expected validation cache to have entries, got size: {stats['validation_cache_size']}"
 
         # We should have at least 1 cache hit (second call hits the cache)
-        assert stats["hits"] >= 1, \
-            f"Expected at least 1 cache hit, got: {stats['hits']}"
+        assert stats["hits"] >= 1, f"Expected at least 1 cache hit, got: {stats['hits']}"
 
         # Hit rate should be > 0 (some cache hits occurred)
-        assert stats["hit_rate"] > 0, \
-            f"Expected positive hit rate, got: {stats['hit_rate']}"
+        assert stats["hit_rate"] > 0, f"Expected positive hit rate, got: {stats['hit_rate']}"
 
     def test_cache_hit_rate_increases_with_repeated_calls(self, pipeline):
         """Test that cache hit rate improves with repeated calls."""
@@ -261,6 +262,7 @@ class TestToolPipelineCacheCorrectness:
 
         # Mock get() to return the mock tool for valid_tool, None for others
         original_get = pipeline.tools.get
+
         def mock_get(tool_name):
             if tool_name == "valid_tool":
                 return mock_tool

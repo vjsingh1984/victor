@@ -76,6 +76,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 try:
     import pandas as pd
+
     PANDAS_AVAILABLE = True
 except ImportError:
     PANDAS_AVAILABLE = False
@@ -247,9 +248,7 @@ class ProficiencyMetrics:
             "total_tools": self.total_tools,
             "total_tasks": self.total_tasks,
             "total_outcomes": self.total_outcomes,
-            "tool_scores": {
-                k: v.to_dict() for k, v in self.tool_scores.items()
-            },
+            "tool_scores": {k: v.to_dict() for k, v in self.tool_scores.items()},
             "task_success_rates": self.task_success_rates,
             "top_performing_tools": self.top_performing_tools,
             "improvement_opportunities": self.improvement_opportunities,
@@ -385,6 +384,7 @@ class ProficiencyTracker:
         # Support both raw sqlite3.Connection and DatabaseManager
         if db is None:
             from victor.core.database import get_database
+
             db_manager = get_database()
             self.db = db_manager.get_connection()
         elif hasattr(db, "get_connection"):
@@ -691,9 +691,7 @@ class ProficiencyTracker:
             else:
                 trend = TrendDirection.STABLE
 
-        cursor.execute(
-            "UPDATE tool_proficiency SET trend = ? WHERE tool = ?", (trend.value, tool)
-        )
+        cursor.execute("UPDATE tool_proficiency SET trend = ? WHERE tool = ?", (trend.value, tool))
 
     def get_proficiency(self, tool: str) -> Optional[ProficiencyScore]:
         """Get proficiency score for a tool.
@@ -867,7 +865,7 @@ class ProficiencyTracker:
                 suggestions.append(
                     Suggestion(
                         tool=tool,
-                        reason=f"Performance declining over recent executions",
+                        reason="Performance declining over recent executions",
                         expected_improvement=0.2,
                         confidence=0.7,
                         priority="medium",
@@ -1032,7 +1030,7 @@ class ProficiencyTracker:
         # Calculate variance and std dev (using success rate)
         mean = success_ma
         variance = sum((x - mean) ** 2 for x in successes) / len(successes)
-        std_dev = variance ** 0.5
+        std_dev = variance**0.5
 
         return MovingAverageMetrics(
             window_size=window,
@@ -1326,8 +1324,7 @@ class ProficiencyTracker:
         """
         if not PANDAS_AVAILABLE:
             raise ImportError(
-                "pandas is required for export_training_data(). "
-                "Install with: pip install pandas"
+                "pandas is required for export_training_data(). " "Install with: pip install pandas"
             )
 
         cursor = self.db.cursor()

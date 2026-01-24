@@ -156,7 +156,9 @@ class LanceDBProvider(BaseEmbeddingProvider):
                     # Fallback for older LanceDB versions
                     existing_tables = []
                     try:
-                        existing_tables = self.db.table_names() if hasattr(self.db, "table_names") else []
+                        existing_tables = (
+                            self.db.table_names() if hasattr(self.db, "table_names") else []
+                        )
                     except Exception:
                         existing_tables = []
 
@@ -170,13 +172,21 @@ class LanceDBProvider(BaseEmbeddingProvider):
                         print(f"📖 Opened existing table: {table_name}")
                     except (RuntimeError, Exception) as e:
                         error_msg = str(e).lower()
-                        if "malformed" in error_msg or "corrupted" in error_msg or "database disk image" in error_msg:
+                        if (
+                            "malformed" in error_msg
+                            or "corrupted" in error_msg
+                            or "database disk image" in error_msg
+                        ):
                             print(f"⚠️  Database corrupted: {e}")
                             if should_rebuild:
                                 print("🔧 Rebuilding corrupted database...")
                                 self._corrupted_db_cleanup(persist_dir, table_name)
                                 self.db = lancedb.connect(str(persist_dir))
-                                existing_tables = self.db.list_tables().tables if hasattr(self.db.list_tables(), 'tables') else []
+                                existing_tables = (
+                                    self.db.list_tables().tables
+                                    if hasattr(self.db.list_tables(), "tables")
+                                    else []
+                                )
                             else:
                                 raise RuntimeError(
                                     f"Database is corrupted. Run 'victor index --force' to rebuild.\n"
@@ -189,13 +199,21 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
             except Exception as e:
                 error_msg = str(e).lower()
-                if "malformed" in error_msg or "corrupted" in error_msg or "database disk image" in error_msg:
+                if (
+                    "malformed" in error_msg
+                    or "corrupted" in error_msg
+                    or "database disk image" in error_msg
+                ):
                     if should_rebuild:
                         print(f"⚠️  Database corrupted during connection: {e}")
                         print("🔧 Rebuilding corrupted database...")
                         self._corrupted_db_cleanup(persist_dir, table_name)
                         self.db = lancedb.connect(str(persist_dir))
-                        existing_tables = self.db.list_tables().tables if hasattr(self.db.list_tables(), 'tables') else []
+                        existing_tables = (
+                            self.db.list_tables().tables
+                            if hasattr(self.db.list_tables(), "tables")
+                            else []
+                        )
                     else:
                         raise RuntimeError(
                             f"Database is corrupted. Run 'victor index --force' to rebuild.\n"
@@ -206,7 +224,9 @@ class LanceDBProvider(BaseEmbeddingProvider):
         else:
             # Fresh database
             self.db = lancedb.connect(str(persist_dir))
-            existing_tables = self.db.list_tables().tables if hasattr(self.db.list_tables(), 'tables') else []
+            existing_tables = (
+                self.db.list_tables().tables if hasattr(self.db.list_tables(), "tables") else []
+            )
             print(f"📝 Creating new table: {table_name}")
 
         self._initialized = True

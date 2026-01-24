@@ -88,7 +88,9 @@ class TestToolExecutionLoad:
             "Run the tests",
         ]
 
-        async def execute_tool_request(client: httpx.AsyncClient, request_id: int) -> Dict[str, Any]:
+        async def execute_tool_request(
+            client: httpx.AsyncClient, request_id: int
+        ) -> Dict[str, Any]:
             """Execute a tool-using request."""
             try:
                 start = time.time()
@@ -114,9 +116,7 @@ class TestToolExecutionLoad:
                 }
 
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-            tasks = [
-                execute_tool_request(client, i) for i in range(num_requests)
-            ]
+            tasks = [execute_tool_request(client, i) for i in range(num_requests)]
             results = await asyncio.gather(*tasks)
 
         # Analyze results
@@ -127,9 +127,13 @@ class TestToolExecutionLoad:
         error_rate = (len(errors) / num_requests) * 100
         p50 = statistics.median(latencies) if latencies else 0
         p95 = statistics.quantiles(latencies, n=20)[18] if len(latencies) > 20 else 0
-        p99 = statistics.quantiles(latencies, n=100)[98] if len(latencies) > 100 else max(latencies) if latencies else 0
+        p99 = (
+            statistics.quantiles(latencies, n=100)[98]
+            if len(latencies) > 100
+            else max(latencies) if latencies else 0
+        )
 
-        print(f"\nConcurrent Tool Execution Test:")
+        print("\nConcurrent Tool Execution Test:")
         print(f"  Requests: {num_requests}")
         print(f"  Successful: {len(successful)}")
         print(f"  Errors: {len(errors)}")
@@ -187,7 +191,7 @@ class TestToolExecutionLoad:
         avg_warm = statistics.mean(warm_latencies) if warm_latencies else 0
         speedup = avg_cold / avg_warm if avg_warm > 0 else 0
 
-        print(f"\nTool Selection Caching Test:")
+        print("\nTool Selection Caching Test:")
         print(f"  Iterations: {num_iterations}")
         print(f"  Cold Cache Avg: {avg_cold:.2f}ms")
         print(f"  Warm Cache Avg: {avg_warm:.2f}ms")
@@ -243,9 +247,7 @@ class TestToolExecutionLoad:
             }
 
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-            tasks = [
-                run_conversation(client, i) for i in range(num_conversations)
-            ]
+            tasks = [run_conversation(client, i) for i in range(num_conversations)]
             results = await asyncio.gather(*tasks)
 
         # Aggregate results
@@ -260,7 +262,7 @@ class TestToolExecutionLoad:
         p50 = statistics.median(all_latencies) if all_latencies else 0
         p95 = statistics.quantiles(all_latencies, n=20)[18] if len(all_latencies) > 20 else 0
 
-        print(f"\nMulti-Tool Conversation Test:")
+        print("\nMulti-Tool Conversation Test:")
         print(f"  Conversations: {num_conversations}")
         print(f"  Turns per Conversation: {len(conversation_turns)}")
         print(f"  Total Requests: {total_requests}")
@@ -313,9 +315,7 @@ class TestToolExecutionLoad:
                 }
 
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-            tasks = [
-                make_error_request(client, i) for i in range(num_requests)
-            ]
+            tasks = [make_error_request(client, i) for i in range(num_requests)]
             results = await asyncio.gather(*tasks)
 
         # All requests should get some response (not crash)
@@ -325,7 +325,7 @@ class TestToolExecutionLoad:
 
         avg_latency = statistics.mean(latencies) if latencies else 0
 
-        print(f"\nTool Error Handling Test:")
+        print("\nTool Error Handling Test:")
         print(f"  Requests: {num_requests}")
         print(f"  Responses Received: {responses_received}/{num_requests}")
         print(f"  Response Rate: {response_rate:.2f}%")
@@ -419,7 +419,7 @@ class TestToolExecutionLoad:
                 category = categories[i % len(categories)]
                 category_latencies[category].append(result)
 
-        print(f"\nConcurrent Different Tools Test:")
+        print("\nConcurrent Different Tools Test:")
         for category, latencies in category_latencies.items():
             if latencies:
                 avg = statistics.mean(latencies)

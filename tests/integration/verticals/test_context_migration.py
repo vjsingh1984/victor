@@ -40,7 +40,7 @@ class TestContextMigrationIntegration:
                 "formatter": "black",
                 "linter": "ruff",
                 "max_line_length": 100,
-            }
+            },
         )
 
         # Verify both locations (backward compat)
@@ -76,7 +76,7 @@ class TestContextMigrationIntegration:
                 "formatter": "black",
                 "linter": "ruff",
                 "max_line_length": 100,
-            }
+            },
         )
 
         # Verify only context storage
@@ -86,7 +86,7 @@ class TestContextMigrationIntegration:
             "max_line_length": 100,
         }
         # Orchestrator should NOT have the attribute in context-only mode
-        assert not hasattr(orchestrator, 'code_style')
+        assert not hasattr(orchestrator, "code_style")
 
     def test_multiple_configs_in_single_context(self):
         """Test storing multiple capability configs in one context."""
@@ -140,7 +140,7 @@ class TestContextMigrationIntegration:
                     "require_tests_before_commit": True,
                     "allowed_branches": ["main", "develop"],
                 }
-            }
+            },
         )
 
         # Verify stored in context
@@ -172,14 +172,10 @@ class TestFeatureFlagIntegration:
             assert adapter.legacy_mode == LegacyWriteMode.BACKWARD_COMPATIBLE
 
             # Should write to both locations
-            adapter.set_capability_config(
-                orchestrator,
-                "test_config",
-                {"key": "value"}
-            )
+            adapter.set_capability_config(orchestrator, "test_config", {"key": "value"})
 
             assert context.get_capability_config("test_config") == {"key": "value"}
-            assert hasattr(orchestrator, 'test_config')
+            assert hasattr(orchestrator, "test_config")
 
     def test_context_only_mode_with_true_flag(self):
         """Test VICTOR_USE_CONTEXT_CONFIG=true enables context-only mode."""
@@ -197,15 +193,11 @@ class TestFeatureFlagIntegration:
             assert adapter.legacy_mode == LegacyWriteMode.CONTEXT_ONLY
 
             # Should write only to context
-            adapter.set_capability_config(
-                orchestrator,
-                "test_config",
-                {"key": "value"}
-            )
+            adapter.set_capability_config(orchestrator, "test_config", {"key": "value"})
 
             assert context.get_capability_config("test_config") == {"key": "value"}
             # Orchestrator should NOT have attribute (real object will raise AttributeError)
-            assert not hasattr(orchestrator, 'test_config')
+            assert not hasattr(orchestrator, "test_config")
 
 
 class TestMigrationPath:
@@ -226,8 +218,7 @@ class TestMigrationPath:
         # Migrate to context
         adapter = CapabilityAdapter(context, LegacyWriteMode.CONTEXT_ONLY)
         migrated_count = adapter.migrate_from_orchestrator(
-            orchestrator,
-            config_names=["code_style", "test_config", "nonexistent"]
+            orchestrator, config_names=["code_style", "test_config", "nonexistent"]
         )
 
         # Should migrate 2 configs
@@ -253,7 +244,7 @@ class TestMigrationPath:
         adapter.clear_orchestrator_configs(orchestrator, ["code_style"])
 
         # Verify orchestrator cleaned
-        assert not hasattr(orchestrator, 'code_style')
+        assert not hasattr(orchestrator, "code_style")
 
         # Verify context still has it
         assert context.get_capability_config("code_style") == {"formatter": "black"}
@@ -355,19 +346,11 @@ class TestConcurrencyAndIsolation:
 
         # Configure coding
         coding_adapter = get_capability_adapter(coding_context)
-        coding_adapter.set_capability_config(
-            orchestrator,
-            "code_style",
-            {"formatter": "black"}
-        )
+        coding_adapter.set_capability_config(orchestrator, "code_style", {"formatter": "black"})
 
         # Configure research
         research_adapter = get_capability_adapter(research_context)
-        research_adapter.set_capability_config(
-            orchestrator,
-            "citation_style",
-            {"format": "apa"}
-        )
+        research_adapter.set_capability_config(orchestrator, "citation_style", {"format": "apa"})
 
         # Verify isolation
         assert coding_context.get_capability_config("code_style") == {"formatter": "black"}
@@ -405,11 +388,7 @@ class TestBackwardCompatibilityGuarantees:
 
         # Legacy code might not have context at all
         # Adapter should still work with just orchestrator
-        adapter.set_capability_config(
-            orchestrator,
-            "legacy_config",
-            {"old_way": True}
-        )
+        adapter.set_capability_config(orchestrator, "legacy_config", {"old_way": True})
 
         # Verify backward compat
         assert context.get_capability_config("legacy_config") == {"old_way": True}

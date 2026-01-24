@@ -744,8 +744,7 @@ def create_ingestion_safety_rules(
                 description="Block ingestion of executable files",
                 check_fn=lambda op: "ingest" in op.lower()
                 and any(
-                    ext in op.lower()
-                    for ext in [".exe", ".dll", ".bat", ".cmd", ".sh", ".ps1"]
+                    ext in op.lower() for ext in [".exe", ".dll", ".bat", ".cmd", ".sh", ".ps1"]
                 ),
                 level=SafetyLevel.HIGH,
                 allow_override=False,
@@ -758,9 +757,7 @@ def create_ingestion_safety_rules(
                 name="ingestion_block_system_files",
                 description="Block ingestion of system files (/etc/, ~/.ssh/)",
                 check_fn=lambda op: "ingest" in op.lower()
-                and any(
-                    path in op for path in ["/etc/", "/.ssh/", "~/.ssh/", "passwd", "shadow"]
-                ),
+                and any(path in op for path in ["/etc/", "/.ssh/", "~/.ssh/", "passwd", "shadow"]),
                 level=SafetyLevel.HIGH,
                 allow_override=True,
             )

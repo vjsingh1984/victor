@@ -64,6 +64,7 @@ from typing import (
 
 try:
     import psutil
+
     PSUTIL_AVAILABLE = True
 except ImportError:
     PSUTIL_AVAILABLE = False
@@ -290,7 +291,7 @@ class SystemResourceInfo:
             # CPU and memory
             cpu = psutil.cpu_percent(interval=0.1)
             memory = psutil.virtual_memory()
-            load_avg = os.getloadavg()[0] if hasattr(os, 'getloadavg') else 0.0
+            load_avg = os.getloadavg()[0] if hasattr(os, "getloadavg") else 0.0
 
             # Network and disk I/O (optional, may fail on some systems)
             network_io = {}
@@ -559,6 +560,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
         # Apply join strategy
         from victor.framework.parallel.strategies import create_join_strategy
+
         join_strategy = create_join_strategy(self.config.join_strategy, n_of_m=self.config.n_of_m)
         success, final_result, _ = await join_strategy.evaluate(results, errors)
 
@@ -920,7 +922,9 @@ class AdaptiveParallelExecutor(ParallelExecutor):
             estimated_sequential = avg_task_time * len(tasks)
 
         if estimated_sequential > 0:
-            self._metrics.speedup_factor = estimated_sequential / total_duration if total_duration > 0 else 1.0
+            self._metrics.speedup_factor = (
+                estimated_sequential / total_duration if total_duration > 0 else 1.0
+            )
 
         # Calculate overhead
         if self._metrics.parallel_duration_ms > 0:
@@ -984,9 +988,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
         task_groups = self._create_task_groups(tasks, optimal_workers)
 
         # Assign tasks to workers
-        worker_assignments = self._assign_tasks_to_workers(
-            task_groups, optimal_workers
-        )
+        worker_assignments = self._assign_tasks_to_workers(task_groups, optimal_workers)
 
         # Estimate duration
         estimated_duration = self._estimate_execution_duration(
@@ -1163,9 +1165,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
         if resources.is_overloaded:
             # Reduce workers aggressively when overloaded
             scaled_workers = max(1, int(base_workers * 0.5))
-            logger.info(
-                f"System overloaded, scaling workers: {base_workers} -> {scaled_workers}"
-            )
+            logger.info(f"System overloaded, scaling workers: {base_workers} -> {scaled_workers}")
             return scaled_workers
 
         # Scale based on load factor
@@ -1257,9 +1257,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
                 }
                 for b in bottlenecks
             ],
-            "recommendations": self._generate_optimization_recommendations(
-                bottlenecks, result
-            ),
+            "recommendations": self._generate_optimization_recommendations(bottlenecks, result),
         }
 
         return profile
@@ -1394,10 +1392,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
             Rebalanced assignments
         """
         # Calculate current load per worker
-        worker_loads = {
-            worker_id: len(tasks)
-            for worker_id, tasks in assignments.items()
-        }
+        worker_loads = {worker_id: len(tasks) for worker_id, tasks in assignments.items()}
 
         if not worker_loads:
             return assignments
@@ -1411,19 +1406,12 @@ class AdaptiveParallelExecutor(ParallelExecutor):
             return assignments
 
         # Find overloaded and underloaded workers
-        overloaded = [
-            wid for wid, load in worker_loads.items() if load > avg_load
-        ]
-        underloaded = [
-            wid for wid, load in worker_loads.items() if load < avg_load
-        ]
+        overloaded = [wid for wid, load in worker_loads.items() if load > avg_load]
+        underloaded = [wid for wid, load in worker_loads.items() if load < avg_load]
 
         # Redistribute tasks
         for over_worker in overloaded:
-            while (
-                len(assignments[over_worker]) > avg_load
-                and underloaded
-            ):
+            while len(assignments[over_worker]) > avg_load and underloaded:
                 task = assignments[over_worker].pop()
                 under_worker = underloaded.pop(0)
                 assignments[under_worker].append(task)

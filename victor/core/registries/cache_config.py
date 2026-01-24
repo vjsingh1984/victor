@@ -128,8 +128,7 @@ class CacheConfig:
         # Validate strategy compatibility
         if self.strategy == CacheStrategy.LRU and self.max_size is None:
             logger.warning(
-                f"Cache {self.name}: LRU strategy with no max_size "
-                "(will not evict entries)"
+                f"Cache {self.name}: LRU strategy with no max_size " "(will not evict entries)"
             )
 
 
@@ -173,7 +172,6 @@ DEFAULT_CACHE_CONFIGS: Dict[str, CacheConfig] = {
         description="Tool selection RL cache",
         priority="high",
     ),
-
     # Extension cache (medium priority)
     "extension_cache": CacheConfig(
         name="extension_cache",
@@ -183,7 +181,6 @@ DEFAULT_CACHE_CONFIGS: Dict[str, CacheConfig] = {
         description="Extension cache",
         priority="medium",
     ),
-
     # Vertical integration cache (medium priority)
     "vertical_integration": CacheConfig(
         name="vertical_integration",
@@ -193,7 +190,6 @@ DEFAULT_CACHE_CONFIGS: Dict[str, CacheConfig] = {
         description="Vertical integration cache",
         priority="medium",
     ),
-
     # Orchestrator pool (low priority)
     "orchestrator_pool": CacheConfig(
         name="orchestrator_pool",
@@ -203,7 +199,6 @@ DEFAULT_CACHE_CONFIGS: Dict[str, CacheConfig] = {
         description="Orchestrator instance pool",
         priority="low",
     ),
-
     # Event batching (high priority)
     "event_batching": CacheConfig(
         name="event_batching",
@@ -213,7 +208,6 @@ DEFAULT_CACHE_CONFIGS: Dict[str, CacheConfig] = {
         description="Event batching cache",
         priority="high",
     ),
-
     # Mode configurations (medium priority)
     "modes": CacheConfig(
         name="modes",
@@ -223,7 +217,6 @@ DEFAULT_CACHE_CONFIGS: Dict[str, CacheConfig] = {
         description="Mode configuration cache",
         priority="medium",
     ),
-
     # Workflow cache (low priority)
     "workflows": CacheConfig(
         name="workflows",
@@ -233,7 +226,6 @@ DEFAULT_CACHE_CONFIGS: Dict[str, CacheConfig] = {
         description="Workflow provider cache",
         priority="low",
     ),
-
     # Team specifications (low priority)
     "teams": CacheConfig(
         name="teams",
@@ -243,7 +235,6 @@ DEFAULT_CACHE_CONFIGS: Dict[str, CacheConfig] = {
         description="Team specification cache",
         priority="low",
     ),
-
     # Capability definitions (medium priority)
     "capabilities": CacheConfig(
         name="capabilities",

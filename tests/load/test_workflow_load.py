@@ -109,9 +109,7 @@ class TestWorkflowLoad:
                 }
 
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-            tasks = [
-                execute_workflow(client, i) for i in range(num_workflows)
-            ]
+            tasks = [execute_workflow(client, i) for i in range(num_workflows)]
             results = await asyncio.gather(*tasks)
 
         # Analyze results
@@ -123,7 +121,7 @@ class TestWorkflowLoad:
         avg_duration = statistics.mean(durations) if durations else 0
         p95_duration = statistics.quantiles(durations, n=20)[18] if len(durations) > 20 else 0
 
-        print(f"\nConcurrent Workflow Execution Test:")
+        print("\nConcurrent Workflow Execution Test:")
         print(f"  Workflows: {num_workflows}")
         print(f"  Successful: {len(successful)}")
         print(f"  Errors: {len(errors)}")
@@ -141,7 +139,9 @@ class TestWorkflowLoad:
         """
         num_workflows = 10
 
-        async def execute_workflow_with_state(client: httpx.AsyncClient, wf_id: int) -> Dict[str, Any]:
+        async def execute_workflow_with_state(
+            client: httpx.AsyncClient, wf_id: int
+        ) -> Dict[str, Any]:
             """Execute workflow and verify state isolation."""
             try:
                 # Multi-step workflow
@@ -176,15 +176,13 @@ class TestWorkflowLoad:
                 return {"success": False, "wf_id": wf_id}
 
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-            tasks = [
-                execute_workflow_with_state(client, i) for i in range(num_workflows)
-            ]
+            tasks = [execute_workflow_with_state(client, i) for i in range(num_workflows)]
             results = await asyncio.gather(*tasks)
 
         successful = sum(1 for r in results if r["success"])
         success_rate = (successful / num_workflows) * 100
 
-        print(f"\nWorkflow State Management Test:")
+        print("\nWorkflow State Management Test:")
         print(f"  Workflows: {num_workflows}")
         print(f"  Successful: {successful}/{num_workflows}")
         print(f"  Success Rate: {success_rate:.2f}%")
@@ -219,15 +217,13 @@ class TestWorkflowLoad:
                 return False
 
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-            tasks = [
-                execute_checkpoint_workflow(client, i) for i in range(num_workflows)
-            ]
+            tasks = [execute_checkpoint_workflow(client, i) for i in range(num_workflows)]
             results = await asyncio.gather(*tasks)
 
         successful = sum(1 for r in results if r)
         success_rate = (successful / num_workflows) * 100
 
-        print(f"\nWorkflow Checkpoint Recovery Test:")
+        print("\nWorkflow Checkpoint Recovery Test:")
         print(f"  Workflows: {num_workflows}")
         print(f"  Successful: {successful}/{num_workflows}")
         print(f"  Success Rate: {success_rate:.2f}%")
@@ -268,9 +264,7 @@ class TestWorkflowLoad:
                 }
 
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-            tasks = [
-                execute_nested_workflow(client, i) for i in range(num_workflows)
-            ]
+            tasks = [execute_nested_workflow(client, i) for i in range(num_workflows)]
             results = await asyncio.gather(*tasks)
 
         successful = sum(1 for r in results if r["success"])
@@ -278,7 +272,7 @@ class TestWorkflowLoad:
 
         avg_duration = statistics.mean(durations) if durations else 0
 
-        print(f"\nNested Workflow Execution Test:")
+        print("\nNested Workflow Execution Test:")
         print(f"  Workflows: {num_workflows}")
         print(f"  Successful: {successful}/{num_workflows}")
         print(f"  Avg Duration: {avg_duration:.2f}s")
@@ -334,7 +328,7 @@ class TestWorkflowLoad:
         avg_warm = statistics.mean(warm_durations) if warm_durations else 0
         speedup = avg_cold / avg_warm if avg_warm > 0 else 0
 
-        print(f"\nWorkflow Caching Performance Test:")
+        print("\nWorkflow Caching Performance Test:")
         print(f"  Cold Executions: {len(cold_durations)}")
         print(f"  Warm Executions: {len(warm_durations)}")
         print(f"  Cold Avg: {avg_cold:.2f}s")
@@ -352,7 +346,9 @@ class TestWorkflowLoad:
         """
         num_workflows = 10
 
-        async def execute_workflow_with_error(client: httpx.AsyncClient, wf_id: int) -> Dict[str, Any]:
+        async def execute_workflow_with_error(
+            client: httpx.AsyncClient, wf_id: int
+        ) -> Dict[str, Any]:
             """Execute workflow that may encounter errors."""
             try:
                 # Request that might cause intermediate errors
@@ -376,15 +372,13 @@ class TestWorkflowLoad:
                 }
 
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-            tasks = [
-                execute_workflow_with_error(client, i) for i in range(num_workflows)
-            ]
+            tasks = [execute_workflow_with_error(client, i) for i in range(num_workflows)]
             results = await asyncio.gather(*tasks)
 
         responses_received = sum(1 for r in results if r["got_response"])
         response_rate = (responses_received / num_workflows) * 100
 
-        print(f"\nWorkflow Error Recovery Test:")
+        print("\nWorkflow Error Recovery Test:")
         print(f"  Workflows: {num_workflows}")
         print(f"  Responses Received: {responses_received}/{num_workflows}")
         print(f"  Response Rate: {response_rate:.2f}%")
@@ -420,9 +414,7 @@ class TestWorkflowLoad:
                 return -1
 
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-            tasks = [
-                execute_parallel_workflow(client, i) for i in range(num_workflows)
-            ]
+            tasks = [execute_parallel_workflow(client, i) for i in range(num_workflows)]
             results = await asyncio.gather(*tasks)
 
         successful = [r for r in results if r > 0]
@@ -430,7 +422,7 @@ class TestWorkflowLoad:
 
         if successful:
             avg_duration = statistics.mean(successful)
-            print(f"\nParallel Workflow Execution Test:")
+            print("\nParallel Workflow Execution Test:")
             print(f"  Workflows: {num_workflows}")
             print(f"  Successful: {len(successful)}/{num_workflows}")
             print(f"  Success Rate: {success_rate:.2f}%")

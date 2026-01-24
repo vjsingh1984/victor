@@ -1083,7 +1083,6 @@ class AgentOrchestrator(
             )
         return self._protocol_adapter_instance
 
-
     def __getattr__(self, name: str) -> Any:
         """Dynamic delegation to coordinators.
 
@@ -1122,9 +1121,7 @@ class AgentOrchestrator(
                 return getattr(state_coordinator, name)
 
         # Not found in any coordinator
-        raise AttributeError(
-            f"'{type(self).__name__}' object has no attribute '{name}'"
-        )
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
     # =====================================================================
     # Mode-Workflow-Team Coordination
@@ -2249,9 +2246,7 @@ class AgentOrchestrator(
             )
 
         # Delegate to ProviderLifecycleManager
-        manager.apply_exploration_settings(
-            self.unified_tracker, self._tool_calling_caps_internal
-        )
+        manager.apply_exploration_settings(self.unified_tracker, self._tool_calling_caps_internal)
         prompt_contributors = manager.get_prompt_contributors()
         self.prompt_builder = manager.create_prompt_builder(
             provider_name=self.provider_name,

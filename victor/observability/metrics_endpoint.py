@@ -50,6 +50,7 @@ try:
     from fastapi import FastAPI, Response, status
     from fastapi.responses import PlainTextResponse, JSONResponse
     from fastapi.middleware.cors import CORSMiddleware
+
     FASTAPI_AVAILABLE = True
 except ImportError:
     FASTAPI_AVAILABLE = False

@@ -230,12 +230,15 @@ class TestDataAnalysisEnrichmentStrategy:
         enrichments = await strategy.get_enrichments(prompt, mock_context)
 
         # Classification may map to regression in keyword classifier
-        method_guidance = [e for e in enrichments if "classification" in e.source or "regression" in e.source]
+        method_guidance = [
+            e for e in enrichments if "classification" in e.source or "regression" in e.source
+        ]
         assert len(method_guidance) >= 0  # May or may not have guidance
 
     @pytest.mark.asyncio
     async def test_get_enrichments_with_schema_lookup(self, strategy, mock_context):
         """Test enrichment with schema lookup function."""
+
         # Create async schema lookup function
         async def mock_schema_lookup(source: str) -> Dict[str, Any]:
             return {
@@ -300,12 +303,9 @@ class TestDataAnalysisEnrichmentStrategy:
     @pytest.mark.asyncio
     async def test_get_enrichments_with_multiple_data_sources(self, strategy, mock_context):
         """Test enrichment with multiple data sources."""
+
         async def mock_schema_lookup(source: str) -> Dict[str, Any]:
-            return {
-                "columns": [
-                    {"name": f"{source}_col", "type": "string", "nullable": False}
-                ]
-            }
+            return {"columns": [{"name": f"{source}_col", "type": "string", "nullable": False}]}
 
         strategy.set_schema_lookup_fn(mock_schema_lookup)
 
@@ -319,6 +319,7 @@ class TestDataAnalysisEnrichmentStrategy:
 
     def test_set_schema_lookup_function(self, strategy):
         """Test setting schema lookup function."""
+
         async def dummy_lookup(source: str) -> Dict[str, Any]:
             return {}
 
@@ -340,6 +341,7 @@ class TestDataAnalysisEnrichmentStrategy:
     @pytest.mark.asyncio
     async def test_get_enrichments_handles_exceptions(self, strategy, mock_context):
         """Test that exceptions in enrichment are handled gracefully."""
+
         # Create a schema lookup that raises an exception
         async def failing_lookup(source: str) -> Dict[str, Any]:
             raise ValueError("Database connection failed")
@@ -434,6 +436,7 @@ class TestDataAnalysisEnrichmentStrategy:
     @pytest.mark.asyncio
     async def test_enrich_from_schema_with_empty_data_sources(self, strategy):
         """Test schema enrichment with no data sources."""
+
         async def mock_schema_lookup(source: str) -> Dict[str, Any]:
             return {"columns": []}
 
@@ -453,12 +456,12 @@ class TestDataAnalysisEnrichmentStrategy:
     @pytest.mark.asyncio
     async def test_enrich_from_schema_limits_columns(self, strategy, mock_context):
         """Test that schema enrichment respects max_columns limit."""
+
         async def mock_schema_lookup(source: str) -> Dict[str, Any]:
             # Return 25 columns (more than default max of 20)
             return {
                 "columns": [
-                    {"name": f"col_{i}", "type": "string", "nullable": False}
-                    for i in range(25)
+                    {"name": f"col_{i}", "type": "string", "nullable": False} for i in range(25)
                 ]
             }
 
@@ -470,4 +473,7 @@ class TestDataAnalysisEnrichmentStrategy:
         schema_enrichments = [e for e in enrichments if e.type == EnrichmentType.SCHEMA]
         if schema_enrichments:
             # Check that it mentions truncation
-            assert "more columns" in schema_enrichments[0].content or "20" in schema_enrichments[0].content
+            assert (
+                "more columns" in schema_enrichments[0].content
+                or "20" in schema_enrichments[0].content
+            )

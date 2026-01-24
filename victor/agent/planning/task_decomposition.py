@@ -238,9 +238,7 @@ class TaskDecomposition:
         # Validate dependencies exist
         for dep_id in dependencies:
             if dep_id not in self._task_nodes:
-                raise ValueError(
-                    f"Dependency task '{dep_id}' not found for task '{task.id}'"
-                )
+                raise ValueError(f"Dependency task '{dep_id}' not found for task '{task.id}'")
 
         # Create task node
         task_node = TaskNode(
@@ -505,9 +503,7 @@ class TaskDecomposition:
             True if tasks can run in parallel, False otherwise
         """
         # Check direct dependencies
-        if self._graph.has_edge(task_id1, task_id2) or self._graph.has_edge(
-            task_id2, task_id1
-        ):
+        if self._graph.has_edge(task_id1, task_id2) or self._graph.has_edge(task_id2, task_id1):
             return False
 
         # Check if one is ancestor of the other (transitive dependency)
@@ -590,9 +586,7 @@ class TaskDecomposition:
                     )
 
                     # Calculate total path weight (sum of task durations)
-                    path_length = sum(
-                        self._task_nodes[task_id].estimated_time for task_id in path
-                    )
+                    path_length = sum(self._task_nodes[task_id].estimated_time for task_id in path)
 
                     if path_length > max_length:
                         max_length = path_length
@@ -697,9 +691,7 @@ class TaskDecomposition:
             return 0.0
 
         completed = sum(
-            1
-            for node in self._task_nodes.values()
-            if node.status == TaskStatus.COMPLETED
+            1 for node in self._task_nodes.values() if node.status == TaskStatus.COMPLETED
         )
 
         return (completed / len(self._task_nodes)) * 100.0
@@ -716,11 +708,7 @@ class TaskDecomposition:
             >>> for task in failed:
             ...     print(f"Failed: {task.id} - {task.description}")
         """
-        return [
-            node.task
-            for node in self._task_nodes.values()
-            if node.status == TaskStatus.FAILED
-        ]
+        return [node.task for node in self._task_nodes.values() if node.status == TaskStatus.FAILED]
 
     def get_blocked_tasks(self) -> List[SimpleTask]:
         """
@@ -794,9 +782,7 @@ class TaskDecomposition:
         in_progress = sum(
             1 for node in self._task_nodes.values() if node.status == TaskStatus.IN_PROGRESS
         )
-        failed = sum(
-            1 for node in self._task_nodes.values() if node.status == TaskStatus.FAILED
-        )
+        failed = sum(1 for node in self._task_nodes.values() if node.status == TaskStatus.FAILED)
 
         # Calculate total edges
         total_edges = self._graph.number_of_edges()
@@ -809,9 +795,7 @@ class TaskDecomposition:
         )
 
         # Calculate total estimated time
-        total_estimated_time = sum(
-            node.estimated_time for node in self._task_nodes.values()
-        )
+        total_estimated_time = sum(node.estimated_time for node in self._task_nodes.values())
 
         # Get critical path info
         try:
@@ -1051,7 +1035,9 @@ class TaskDecomposition:
                 # Check if all dependencies satisfied
                 deps = task_graph.get_dependencies(task_id)
                 if all(
-                    task_graph.nodes.get(dep, TaskLegacy(id=dep, description="", status="pending")).status
+                    task_graph.nodes.get(
+                        dep, TaskLegacy(id=dep, description="", status="pending")
+                    ).status
                     == "completed"
                     for dep in deps
                 ):
@@ -1315,8 +1301,7 @@ class TaskGraph:
         """Create from dictionary."""
         graph = cls()
         graph.nodes = {
-            tid: TaskLegacy.from_dict(task_data)
-            for tid, task_data in data.get("nodes", {}).items()
+            tid: TaskLegacy.from_dict(task_data) for tid, task_data in data.get("nodes", {}).items()
         }
         graph.edges = data.get("edges", {})
         graph.metadata = data.get("metadata", {})

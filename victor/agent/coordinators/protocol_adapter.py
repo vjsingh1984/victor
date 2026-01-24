@@ -472,7 +472,9 @@ class OrchestratorProtocolAdapter:
             except Exception as e:
                 raise RuntimeError(f"Tool selector initialization failed: {e}") from e
         else:
-            raise RuntimeError("Tool selector cannot be initialized - no initialize_tool_embeddings method")
+            raise RuntimeError(
+                "Tool selector cannot be initialized - no initialize_tool_embeddings method"
+            )
 
 
 def create_orchestrator_protocol_adapter(

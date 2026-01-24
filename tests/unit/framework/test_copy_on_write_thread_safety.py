@@ -32,10 +32,7 @@ class TestCopyOnWriteStateThreadSafety:
             except Exception as e:
                 errors.append(e)
 
-        threads = [
-            threading.Thread(target=read_worker, args=(f"key{i}",))
-            for i in range(1, 4)
-        ]
+        threads = [threading.Thread(target=read_worker, args=(f"key{i}",)) for i in range(1, 4)]
 
         for t in threads:
             t.start()
@@ -59,10 +56,7 @@ class TestCopyOnWriteStateThreadSafety:
             except Exception as e:
                 errors.append(e)
 
-        threads = [
-            threading.Thread(target=write_worker, args=(i,))
-            for i in range(5)
-        ]
+        threads = [threading.Thread(target=write_worker, args=(i,)) for i in range(5)]
 
         for t in threads:
             t.start()
@@ -170,10 +164,7 @@ class TestCopyOnWriteStateThreadSafety:
             except Exception as e:
                 errors.append(e)
 
-        threads = [
-            threading.Thread(target=updater, args=(i,))
-            for i in range(5)
-        ]
+        threads = [threading.Thread(target=updater, args=(i,)) for i in range(5)]
 
         for t in threads:
             t.start()
@@ -210,10 +201,7 @@ class TestCopyOnWriteStateThreadSafety:
         all_keys = [f"key_{i}" for i in range(100)]
         chunks = [all_keys[i::5] for i in range(5)]
 
-        threads = [
-            threading.Thread(target=popper, args=(chunk,))
-            for chunk in chunks
-        ]
+        threads = [threading.Thread(target=popper, args=(chunk,)) for chunk in chunks]
 
         for t in threads:
             t.start()
@@ -243,10 +231,7 @@ class TestCopyOnWriteStateThreadSafety:
             except Exception as e:
                 errors.append(e)
 
-        threads = [
-            threading.Thread(target=setter, args=(i,))
-            for i in range(5)
-        ]
+        threads = [threading.Thread(target=setter, args=(i,)) for i in range(5)]
 
         for t in threads:
             t.start()

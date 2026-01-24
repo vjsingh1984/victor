@@ -101,19 +101,17 @@ class ResultConverters:
             "grounding_score": result.grounding_score,
             "is_grounded": result.is_grounded,
             "is_valid": result.is_valid,
-            "grounding_issues": list(result.grounding_issues)
-            if hasattr(result, "grounding_issues")
-            else [],
-            "should_finalize": result.should_finalize
-            if hasattr(result, "should_finalize")
-            else False,
+            "grounding_issues": (
+                list(result.grounding_issues) if hasattr(result, "grounding_issues") else []
+            ),
+            "should_finalize": (
+                result.should_finalize if hasattr(result, "should_finalize") else False
+            ),
             "should_retry": result.should_retry if hasattr(result, "should_retry") else False,
-            "finalize_reason": result.finalize_reason
-            if hasattr(result, "finalize_reason")
-            else "",
-            "grounding_feedback": result.grounding_feedback
-            if hasattr(result, "grounding_feedback")
-            else "",
+            "finalize_reason": result.finalize_reason if hasattr(result, "finalize_reason") else "",
+            "grounding_feedback": (
+                result.grounding_feedback if hasattr(result, "grounding_feedback") else ""
+            ),
         }
 
     @staticmethod

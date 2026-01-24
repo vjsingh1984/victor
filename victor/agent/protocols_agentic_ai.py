@@ -170,7 +170,7 @@ class EpisodicMemoryProtocol(Protocol):
 
         # Recall relevant episodes
         relevant = await memory.recall_relevant("fix authentication bug", k=5)
-        """
+    """
 
     async def store_episode(
         self,
@@ -274,7 +274,7 @@ class SemanticMemoryProtocol(Protocol):
 
         # Query knowledge
         facts = await memory.query_knowledge("concurrency in Python")
-        """
+    """
 
     async def store_knowledge(
         self,
@@ -366,7 +366,7 @@ class SkillDiscoveryProtocol(Protocol):
 
         # Compose skill
         skill = await discovery.compose_skill("analyzer", tools, "Analyzes code")
-        """
+    """
 
     async def discover_tools(
         self,
@@ -444,7 +444,7 @@ class SkillChainerProtocol(Protocol):
 
         # Execute chain
         result = await chainer.execute_chain(chain)
-        """
+    """
 
     async def plan_chain(
         self,
@@ -525,7 +525,7 @@ class ProficiencyTrackerProtocol(Protocol):
 
         # Get suggestions
         suggestions = tracker.get_suggestions()
-        """
+    """
 
     async def record_outcome(
         self,
@@ -612,7 +612,7 @@ class RLCoordinatorProtocol(Protocol):
 
         # Update policy
         await rl.update_policy(state, action, reward, next_state)
-        """
+    """
 
     async def select_action(
         self,

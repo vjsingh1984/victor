@@ -374,11 +374,7 @@ class LazyComponentLoader:
             print(f"Loaded: {loaded}")
         """
         with self._lock:
-            return [
-                key
-                for key, descriptor in self._components.items()
-                if descriptor.loaded
-            ]
+            return [key for key, descriptor in self._components.items() if descriptor.loaded]
 
     def get_loading_strategy(self) -> LoadingStrategy:
         """Get the current loading strategy.
@@ -798,6 +794,7 @@ def lazy_load(component_key: str):
         # Database is loaded on first call
         user = get_user(user_id=123)
     """
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):

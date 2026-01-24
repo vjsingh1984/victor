@@ -54,7 +54,7 @@ class TestExecutionMetrics:
             cache_misses=5,
             successful_executions=8,
             failed_executions=2,
-            total_execution_time=1.5
+            total_execution_time=1.5,
         )
         assert metrics.total_executions == 10
         assert metrics.cache_hits == 5
@@ -108,6 +108,7 @@ class TestToolRateLimiter:
     def test_rate_limiter_class_exists(self):
         """Test ToolRateLimiter class exists."""
         from victor.agent.tool_pipeline import ToolRateLimiter
+
         assert ToolRateLimiter is not None
 
 
@@ -117,6 +118,7 @@ class TestLRUToolCache:
     def test_lru_cache_class_exists(self):
         """Test LRUToolCache class exists."""
         from victor.agent.tool_pipeline import LRUToolCache
+
         assert LRUToolCache is not None
 
 
@@ -126,6 +128,7 @@ class TestPipelineExecutionResult:
     def test_execution_result_class_exists(self):
         """Test PipelineExecutionResult class exists."""
         from victor.agent.tool_pipeline import PipelineExecutionResult
+
         assert PipelineExecutionResult is not None
 
 

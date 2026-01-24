@@ -171,6 +171,7 @@ def main():
 @pytest.fixture
 def mock_embedding_fn():
     """Mock embedding function."""
+
     async def _embed(text: str) -> List[float]:
         # Return deterministic mock embeddings with 384 dimensions
         import hashlib
@@ -232,7 +233,7 @@ class TestDocumentTypeDetection:
 
     def test_detect_html_from_content(self):
         """Test detecting HTML from content tags."""
-        content = '<html><body><h1>Test</h1></body></html>'
+        content = "<html><body><h1>Test</h1></body></html>"
         doc_type = detect_document_type("unknown", content)
         assert doc_type == "html"
 
@@ -302,7 +303,9 @@ class TestTextChunking:
             # Chunks should end with sentence-ending punctuation or be at end
             content = chunk.content.strip()
             if not content.endswith(("...", "data", "networks")):
-                assert content[-1] in ".!?", f"Chunk doesn't end at sentence boundary: {content[-50:]}"
+                assert (
+                    content[-1] in ".!?"
+                ), f"Chunk doesn't end at sentence boundary: {content[-50:]}"
 
     @pytest.mark.asyncio
     async def test_text_chunking_min_chunk_size(self, sample_text, mock_embedding_fn):
@@ -473,7 +476,7 @@ class TestJSONChunking:
         # Check that JSON structure is preserved across chunks
         all_content = " ".join(c.content for c in chunks)
         # At least some JSON content should be present
-        assert '"users"' in all_content or '"metadata"' in all_content or 'Alice' in all_content
+        assert '"users"' in all_content or '"metadata"' in all_content or "Alice" in all_content
 
     @pytest.mark.asyncio
     async def test_json_chunking_arrays(self, mock_embedding_fn):
@@ -820,7 +823,12 @@ class TestEmbeddingGeneration:
         chunker = DocumentChunker()
 
         docs = [
-            Document(id=f"batch{i}", content=f"Content {i} " * 100, source=f"test{i}.txt", doc_type="text")
+            Document(
+                id=f"batch{i}",
+                content=f"Content {i} " * 100,
+                source=f"test{i}.txt",
+                doc_type="text",
+            )
             for i in range(5)
         ]
 
@@ -837,6 +845,7 @@ class TestEmbeddingGeneration:
     @pytest.mark.asyncio
     async def test_embedding_error_handling(self):
         """Test handling of embedding generation errors."""
+
         # Mock embedding function that raises an error
         async def failing_embedding_fn(text: str):
             raise RuntimeError("Embedding service unavailable")
@@ -854,7 +863,9 @@ class TestEmbeddingGeneration:
         metadata = {"author": "Test", "category": "test-doc"}
         content = "Test content with metadata. " * 20
         chunker = DocumentChunker()
-        doc = Document(id="meta", content=content, source="test.txt", doc_type="text", metadata=metadata)
+        doc = Document(
+            id="meta", content=content, source="test.txt", doc_type="text", metadata=metadata
+        )
 
         chunks = await chunker.chunk_document(doc, mock_embedding_fn)
 
@@ -994,7 +1005,9 @@ class TestDocumentStorage:
         store = DocumentStore(path=temp_dir / "test_store")
         await store.initialize()
 
-        doc = Document(id="search1", content="Machine learning is a subset of AI", source="test.txt")
+        doc = Document(
+            id="search1", content="Machine learning is a subset of AI", source="test.txt"
+        )
         await store.add_document(doc)
 
         # Search for content

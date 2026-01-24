@@ -589,9 +589,7 @@ class TestDefinition:
         ]
 
         lsp_client._initialized = True
-        lsp_client._send_request = AsyncMock(
-            return_value=[loc.to_dict() for loc in locations]
-        )
+        lsp_client._send_request = AsyncMock(return_value=[loc.to_dict() for loc in locations])
 
         position = Position(line=0, character=0)
         definitions = await lsp_client.get_definition("file:///test.py", position)

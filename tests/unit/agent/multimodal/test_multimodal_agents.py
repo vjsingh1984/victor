@@ -118,7 +118,9 @@ class TestVisionAgentImageAnalysis:
     """Test suite for VisionAgent image analysis functionality."""
 
     @pytest.mark.asyncio
-    async def test_analyze_image_basic_description(self, vision_agent, sample_png_image, mock_vision_provider):
+    async def test_analyze_image_basic_description(
+        self, vision_agent, sample_png_image, mock_vision_provider
+    ):
         """Test basic image analysis returns description."""
         mock_vision_provider.chat.return_value = Mock(
             content="A red square image on white background",
@@ -133,7 +135,9 @@ class TestVisionAgentImageAnalysis:
         assert len(analysis.analysis) > 0
 
     @pytest.mark.asyncio
-    async def test_analyze_image_with_custom_query(self, vision_agent, sample_png_image, mock_vision_provider):
+    async def test_analyze_image_with_custom_query(
+        self, vision_agent, sample_png_image, mock_vision_provider
+    ):
         """Test image analysis with custom query parameter."""
         mock_vision_provider.chat.return_value = Mock(
             content="The image shows geometric shapes",
@@ -141,14 +145,15 @@ class TestVisionAgentImageAnalysis:
         )
 
         analysis = await vision_agent.analyze_image(
-            sample_png_image,
-            query="What shapes are visible in this image?"
+            sample_png_image, query="What shapes are visible in this image?"
         )
 
         assert "geometric shapes" in analysis.analysis
 
     @pytest.mark.asyncio
-    async def test_analyze_image_extracts_metadata(self, vision_agent, sample_png_image, mock_vision_provider):
+    async def test_analyze_image_extracts_metadata(
+        self, vision_agent, sample_png_image, mock_vision_provider
+    ):
         """Test that analysis includes provider and model metadata."""
         mock_vision_provider.chat.return_value = Mock(
             content="Image description",
@@ -185,7 +190,9 @@ class TestVisionAgentPlotExtraction:
     """Test suite for VisionAgent plot data extraction."""
 
     @pytest.mark.asyncio
-    async def test_extract_plot_data_returns_chart_type(self, vision_agent, sample_png_image, mock_vision_provider):
+    async def test_extract_plot_data_returns_chart_type(
+        self, vision_agent, sample_png_image, mock_vision_provider
+    ):
         """Test plot extraction returns chart information."""
         mock_vision_provider.chat.return_value = Mock(
             content="This is a bar chart showing sales data over time",
@@ -198,7 +205,9 @@ class TestVisionAgentPlotExtraction:
         assert plot_data.chart_type == ChartType.UNKNOWN  # Parsing not implemented
 
     @pytest.mark.asyncio
-    async def test_extract_plot_data_includes_raw_response(self, vision_agent, sample_png_image, mock_vision_provider):
+    async def test_extract_plot_data_includes_raw_response(
+        self, vision_agent, sample_png_image, mock_vision_provider
+    ):
         """Test plot extraction includes raw response in metadata."""
         mock_vision_provider.chat.return_value = Mock(
             content="Line chart with upward trend",
@@ -211,7 +220,9 @@ class TestVisionAgentPlotExtraction:
         assert plot_data.metadata["raw_response"] == "Line chart with upward trend"
 
     @pytest.mark.asyncio
-    async def test_extract_plot_data_handles_errors(self, vision_agent, sample_png_image, mock_vision_provider):
+    async def test_extract_plot_data_handles_errors(
+        self, vision_agent, sample_png_image, mock_vision_provider
+    ):
         """Test plot extraction handles API errors gracefully."""
         mock_vision_provider.chat.side_effect = Exception("Vision API Error")
 
@@ -230,7 +241,7 @@ class TestVisionAgentObjectDetection:
     @pytest.mark.asyncio
     async def test_detect_objects_method_exists(self, vision_agent):
         """Test that detect_objects method exists and is callable."""
-        assert hasattr(vision_agent, 'detect_objects')
+        assert hasattr(vision_agent, "detect_objects")
         assert callable(vision_agent.detect_objects)
 
     @pytest.mark.asyncio
@@ -261,7 +272,9 @@ class TestVisionAgentOCR:
     """Test suite for VisionAgent OCR text extraction."""
 
     @pytest.mark.asyncio
-    async def test_ocr_extract_text_basic(self, vision_agent, sample_png_image, mock_vision_provider):
+    async def test_ocr_extract_text_basic(
+        self, vision_agent, sample_png_image, mock_vision_provider
+    ):
         """Test basic OCR text extraction."""
         mock_vision_provider.chat.return_value = Mock(
             content="Extracted text: Hello World 123",
@@ -274,7 +287,9 @@ class TestVisionAgentOCR:
         assert "Hello World" in text
 
     @pytest.mark.asyncio
-    async def test_ocr_extract_text_with_language_hint(self, vision_agent, sample_png_image, mock_vision_provider):
+    async def test_ocr_extract_text_with_language_hint(
+        self, vision_agent, sample_png_image, mock_vision_provider
+    ):
         """Test OCR with language hint parameter."""
         mock_vision_provider.chat.return_value = Mock(
             content="Texto extraído: Hola Mundo",
@@ -296,7 +311,9 @@ class TestVisionAgentImageComparison:
     """Test suite for VisionAgent image comparison."""
 
     @pytest.mark.asyncio
-    async def test_compare_images_basic(self, vision_agent, sample_png_image, sample_jpg_image, mock_vision_provider):
+    async def test_compare_images_basic(
+        self, vision_agent, sample_png_image, sample_jpg_image, mock_vision_provider
+    ):
         """Test basic image comparison."""
         mock_vision_provider.chat.return_value = Mock(
             content="Images are similar but different colors",
@@ -345,7 +362,9 @@ class TestAudioAgentTranscription:
         assert transcription.language == "en"
 
     @pytest.mark.asyncio
-    async def test_transcribe_audio_with_language(self, audio_agent, sample_mp3_audio, mock_audio_provider):
+    async def test_transcribe_audio_with_language(
+        self, audio_agent, sample_mp3_audio, mock_audio_provider
+    ):
         """Test transcription with language parameter."""
         mock_response = Mock()
         mock_response.text = "Hola esto es una prueba"
@@ -429,7 +448,7 @@ class TestAudioAgentDiarization:
     @pytest.mark.asyncio
     async def test_extract_speaker_diarization_method_exists(self, audio_agent):
         """Test that extract_speaker_diarization method exists."""
-        assert hasattr(audio_agent, 'extract_speaker_diarization')
+        assert hasattr(audio_agent, "extract_speaker_diarization")
         assert callable(audio_agent.extract_speaker_diarization)
 
     @pytest.mark.asyncio
@@ -495,7 +514,7 @@ class TestAudioAgentSummarization:
     @pytest.mark.asyncio
     async def test_generate_audio_summary_method_exists(self, audio_agent):
         """Test that generate_audio_summary method exists."""
-        assert hasattr(audio_agent, 'generate_audio_summary')
+        assert hasattr(audio_agent, "generate_audio_summary")
         assert callable(audio_agent.generate_audio_summary)
 
 
@@ -521,9 +540,7 @@ class TestDataValidation:
         # Invalid confidence
         with pytest.raises(ValidationError, match="Confidence must be between 0 and 1"):
             DetectedObject(
-                class_name="person",
-                confidence=1.5,
-                bbox=BoundingBox(x=0, y=0, width=10, height=10)
+                class_name="person", confidence=1.5, bbox=BoundingBox(x=0, y=0, width=10, height=10)
             )
 
     def test_speech_segment_validation(self):
@@ -541,12 +558,18 @@ class TestDataValidation:
 
         # Invalid: end before start
         with pytest.raises(ValidationError, match="End time.*must be greater than start time"):
-            SpeakerSegment(speaker_id="test", start_time=5.0, end_time=3.0, transcript="test", confidence=0.9)
+            SpeakerSegment(
+                speaker_id="test", start_time=5.0, end_time=3.0, transcript="test", confidence=0.9
+            )
 
         # Invalid: negative start
         with pytest.raises(ValidationError, match="Start time must be non-negative"):
-            SpeakerSegment(speaker_id="test", start_time=-1.0, end_time=5.0, transcript="test", confidence=0.9)
+            SpeakerSegment(
+                speaker_id="test", start_time=-1.0, end_time=5.0, transcript="test", confidence=0.9
+            )
 
         # Invalid: confidence out of range
         with pytest.raises(ValidationError, match="Confidence must be between 0 and 1"):
-            SpeakerSegment(speaker_id="test", start_time=0.0, end_time=5.0, transcript="test", confidence=1.5)
+            SpeakerSegment(
+                speaker_id="test", start_time=0.0, end_time=5.0, transcript="test", confidence=1.5
+            )

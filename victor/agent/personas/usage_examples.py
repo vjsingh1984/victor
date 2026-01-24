@@ -66,7 +66,7 @@ def example_adapt_persona() -> None:
     print(f"Adapted personality: {adapted.personality.value}")
     print(f"Adapted communication: {adapted.communication_style.value}")
     print(f"Adaptation reason: {adapted.adaptation_reason}")
-    print(f"\nDynamic traits:")
+    print("\nDynamic traits:")
     for trait in adapted.dynamic_traits:
         print(f"  - {trait.name}: {trait.value} (confidence: {trait.confidence:.0%})")
 
@@ -116,7 +116,9 @@ def example_get_suggested_persona() -> None:
     if suggested:
         print(f"Task: {task}")
         print(f"Suggested persona: {suggested.name}")
-        print(f"Reasoning: Security-focused tasks benefit from {suggested.personality.value} personality")
+        print(
+            f"Reasoning: Security-focused tasks benefit from {suggested.personality.value} personality"
+        )
     else:
         print("No suitable persona found")
 
@@ -144,7 +146,7 @@ def example_merge_personas() -> None:
         print(f"  - {exp}")
 
     if secure_performant.constraints:
-        print(f"\nConstraints:")
+        print("\nConstraints:")
         print(f"  Max tool calls: {secure_performant.constraints.max_tool_calls}")
         print(f"  Response length: {secure_performant.constraints.response_length}")
 

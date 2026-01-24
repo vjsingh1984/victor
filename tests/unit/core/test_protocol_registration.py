@@ -31,24 +31,21 @@ from unittest.mock import Mock, MagicMock, patch
 class MockToolProvider(Protocol):
     """Mock protocol for tool provision."""
 
-    def get_tools(self) -> List[str]:
-        ...
+    def get_tools(self) -> List[str]: ...
 
 
 @runtime_checkable
 class MockPromptProvider(Protocol):
     """Mock protocol for prompt provision."""
 
-    def get_prompt(self) -> str:
-        ...
+    def get_prompt(self) -> str: ...
 
 
 @runtime_checkable
 class MockMiddlewareProvider(Protocol):
     """Mock protocol for middleware provision."""
 
-    def get_middleware(self) -> List[str]:
-        ...
+    def get_middleware(self) -> List[str]: ...
 
 
 class TestRegisterProtocolsDecorator:
@@ -183,6 +180,7 @@ class TestProtocolDecoratorIntegration:
         with patch(
             "victor.core.verticals.protocol_loader.ProtocolBasedExtensionLoader"
         ) as mock_loader:
+
             @register_protocols(protocols=[MockToolProvider])
             class TestVertical:
                 def get_tools(self) -> List[str]:
@@ -234,9 +232,7 @@ class TestKnownVerticalProtocols:
 
         for protocol in KNOWN_VERTICAL_PROTOCOLS:
             # Should be able to use isinstance with runtime_checkable protocols
-            assert hasattr(protocol, "__protocol_attrs__") or hasattr(
-                protocol, "_is_protocol"
-            )
+            assert hasattr(protocol, "__protocol_attrs__") or hasattr(protocol, "_is_protocol")
 
 
 class TestDecoratorSyntax:

@@ -143,10 +143,7 @@ class TestRequestBatcher:
     async def test_max_batch_size_flush(self, batcher):
         """Test that batch flushes at max size."""
         # Submit exactly max_batch_size requests
-        tasks = [
-            batcher.submit(model="test", prompt=str(i))
-            for i in range(batcher.max_batch_size)
-        ]
+        tasks = [batcher.submit(model="test", prompt=str(i)) for i in range(batcher.max_batch_size)]
 
         results = await asyncio.gather(*tasks)
 
@@ -321,6 +318,7 @@ class TestRequestBatcherIntegration:
     @pytest.mark.asyncio
     async def test_real_batching_performance(self):
         """Test that actual batching improves performance."""
+
         # Create a batcher with simulated delay
         async def slow_batch(entries):
             # Simulate network delay
@@ -344,9 +342,7 @@ class TestRequestBatcherIntegration:
 
             # Time batched execution
             start = time.perf_counter()
-            tasks = [
-                batcher.submit(model="test", prompt=str(i)) for i in range(5)
-            ]
+            tasks = [batcher.submit(model="test", prompt=str(i)) for i in range(5)]
             await asyncio.gather(*tasks)
             batched_time = time.perf_counter() - start
 

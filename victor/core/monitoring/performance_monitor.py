@@ -307,9 +307,7 @@ class PerformanceMonitor:
             Dictionary mapping operation names to statistics
         """
         with self._lock:
-            return {
-                name: metrics.get_stats() for name, metrics in self._metrics.items()
-            }
+            return {name: metrics.get_stats() for name, metrics in self._metrics.items()}
 
     def get_hot_operations(
         self, min_count: int = 10, threshold: float = 1.0
@@ -348,9 +346,7 @@ class PerformanceMonitor:
             else:
                 self._metrics.clear()
 
-    def add_alert_callback(
-        self, callback: Callable[[str, float], None]
-    ) -> None:
+    def add_alert_callback(self, callback: Callable[[str, float], None]) -> None:
         """Add a callback for slow operation alerts.
 
         Args:
@@ -502,7 +498,7 @@ def timed(
                 execution_time = time.perf_counter() - start_time
                 monitor.record_operation(name, execution_time, category, True)
                 return result
-            except Exception as e:
+            except Exception:
                 execution_time = time.perf_counter() - start_time
                 monitor.record_operation(name, execution_time, category, False)
                 raise
@@ -515,7 +511,7 @@ def timed(
                 execution_time = time.perf_counter() - start_time
                 monitor.record_operation(name, execution_time, category, True)
                 return result
-            except Exception as e:
+            except Exception:
                 execution_time = time.perf_counter() - start_time
                 monitor.record_operation(name, execution_time, category, False)
                 raise

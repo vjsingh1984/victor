@@ -315,10 +315,7 @@ class TestBuildToolCallSummary:
     def test_build_summary_with_duration_and_error(self):
         """Test building summary with both duration and error."""
         result = build_tool_call_summary(
-            "write_file",
-            False,
-            duration_ms=100.0,
-            error="Permission denied"
+            "write_file", False, duration_ms=100.0, error="Permission denied"
         )
         # When both duration and error are provided for FAILED, duration is shown
         assert "FAILED" in result

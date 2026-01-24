@@ -281,9 +281,7 @@ class TestDevelopmentEnvironmentDeployment:
 
         with open(patch_path) as f:
             config = yaml.safe_load(f)
-            resources = (
-                config["spec"]["template"]["spec"]["containers"][0]["resources"]
-            )
+            resources = config["spec"]["template"]["spec"]["containers"][0]["resources"]
             cpu_req = int(resources["requests"]["cpu"].replace("m", ""))
             cpu_lim = int(resources["limits"]["cpu"].replace("m", ""))
             assert cpu_lim > cpu_req

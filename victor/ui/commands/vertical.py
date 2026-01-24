@@ -759,7 +759,9 @@ def export_template(
     if vertical_class is None:
         console.print(f"[red]Error: Vertical '{vertical_name}' not found[/]")
         console.print()
-        console.print("[dim]Use 'victor vertical list --source builtin' to see available verticals[/]")
+        console.print(
+            "[dim]Use 'victor vertical list --source builtin' to see available verticals[/]"
+        )
         raise typer.Exit(1)
 
     console.print()
@@ -791,7 +793,9 @@ def export_template(
         console.print("[bold]Next steps:[/]")
         console.print(f"  1. Review and customize the template: {output_path}")
         console.print(f"  2. Validate: victor vertical validate-template {output_path}")
-        console.print(f"  3. Use to create new vertical: victor vertical create my_vertical --template {output_path}")
+        console.print(
+            f"  3. Use to create new vertical: victor vertical create my_vertical --template {output_path}"
+        )
         console.print()
     else:
         console.print("[red]Error: Failed to save template[/]")

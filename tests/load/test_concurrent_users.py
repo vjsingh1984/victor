@@ -96,7 +96,7 @@ class TestConcurrentUsers:
                 latencies.append(latency)
 
             avg_latency = statistics.mean(latencies)
-            print(f"\nSingle User Baseline:")
+            print("\nSingle User Baseline:")
             print(f"  Messages: {len(latencies)}")
             print(f"  Avg Latency: {avg_latency:.2f}ms")
 
@@ -144,9 +144,7 @@ class TestConcurrentUsers:
             }
 
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-            tasks = [
-                user_session(client, f"user_{i}") for i in range(num_users)
-            ]
+            tasks = [user_session(client, f"user_{i}") for i in range(num_users)]
             start_time = time.time()
             results = await asyncio.gather(*tasks)
             total_time = time.time() - start_time
@@ -163,7 +161,7 @@ class TestConcurrentUsers:
         p50 = statistics.median(all_latencies) if all_latencies else 0
         p95 = statistics.quantiles(all_latencies, n=20)[18] if len(all_latencies) > 20 else 0
 
-        print(f"\n10 Concurrent Users Test:")
+        print("\n10 Concurrent Users Test:")
         print(f"  Users: {num_users}")
         print(f"  Total Requests: {total_requests}")
         print(f"  Total Time: {total_time:.2f}s")
@@ -219,9 +217,7 @@ class TestConcurrentUsers:
             }
 
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-            tasks = [
-                user_session(client, f"user_{i}") for i in range(num_users)
-            ]
+            tasks = [user_session(client, f"user_{i}") for i in range(num_users)]
             start_time = time.time()
             results = await asyncio.gather(*tasks)
             total_time = time.time() - start_time
@@ -238,7 +234,7 @@ class TestConcurrentUsers:
         p50 = statistics.median(all_latencies) if all_latencies else 0
         p95 = statistics.quantiles(all_latencies, n=20)[18] if len(all_latencies) > 20 else 0
 
-        print(f"\n50 Concurrent Users Test:")
+        print("\n50 Concurrent Users Test:")
         print(f"  Users: {num_users}")
         print(f"  Total Requests: {total_requests}")
         print(f"  Total Time: {total_time:.2f}s")
@@ -261,7 +257,9 @@ class TestConcurrentUsers:
         messages_per_user = 2
         ramp_up_time = 30  # seconds
 
-        async def user_session(client: httpx.AsyncClient, user_id: str, delay: float) -> Dict[str, Any]:
+        async def user_session(
+            client: httpx.AsyncClient, user_id: str, delay: float
+        ) -> Dict[str, Any]:
             """Simulate a user session with initial delay."""
             await asyncio.sleep(delay)  # Ramp-up delay
 
@@ -318,7 +316,7 @@ class TestConcurrentUsers:
         p50 = statistics.median(all_latencies) if all_latencies else 0
         p95 = statistics.quantiles(all_latencies, n=20)[18] if len(all_latencies) > 20 else 0
 
-        print(f"\n100 Concurrent Users Ramp-Up Test:")
+        print("\n100 Concurrent Users Ramp-Up Test:")
         print(f"  Max Users: {max_users}")
         print(f"  Ramp-up Time: {ramp_up_time}s")
         print(f"  Total Requests: {total_requests}")
@@ -372,16 +370,13 @@ class TestConcurrentUsers:
                 return False
 
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-            tasks = [
-                user_session(client, f"user_{i}", user_tokens[i])
-                for i in range(num_users)
-            ]
+            tasks = [user_session(client, f"user_{i}", user_tokens[i]) for i in range(num_users)]
             results = await asyncio.gather(*tasks)
 
         success_count = sum(1 for r in results if r)
         success_rate = (success_count / num_users) * 100
 
-        print(f"\nSession Isolation Test:")
+        print("\nSession Isolation Test:")
         print(f"  Users: {num_users}")
         print(f"  Successful Isolations: {success_count}/{num_users}")
         print(f"  Success Rate: {success_rate:.2f}%")
@@ -422,9 +417,7 @@ class TestConcurrentUsers:
 
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
             # All users start simultaneously (burst)
-            tasks = [
-                user_session(client, f"user_{i}") for i in range(burst_size)
-            ]
+            tasks = [user_session(client, f"user_{i}") for i in range(burst_size)]
             start_time = time.time()
             results = await asyncio.gather(*tasks)
             total_time = time.time() - start_time
@@ -433,7 +426,7 @@ class TestConcurrentUsers:
         total_requests = burst_size * messages_per_user
         error_rate = (total_errors / total_requests) * 100
 
-        print(f"\nBurst Traffic Test:")
+        print("\nBurst Traffic Test:")
         print(f"  Burst Size: {burst_size} users")
         print(f"  Total Requests: {total_requests}")
         print(f"  Total Time: {total_time:.2f}s")

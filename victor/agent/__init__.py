@@ -140,7 +140,10 @@ def __getattr__(name: str) -> Any:
         "IntegrationMetrics": ("victor.agent.orchestrator_integration", "IntegrationMetrics"),
         "enhance_orchestrator": ("victor.agent.orchestrator_integration", "enhance_orchestrator"),
         # Agentic AI (Phase 3)
-        "HierarchicalPlanner": ("victor.agent.planning.hierarchical_planner", "HierarchicalPlanner"),
+        "HierarchicalPlanner": (
+            "victor.agent.planning.hierarchical_planner",
+            "HierarchicalPlanner",
+        ),
         "AutonomousPlanner": ("victor.agent.planning.autonomous", "AutonomousPlanner"),
         "ExecutionPlan": ("victor.agent.planning.base", "ExecutionPlan"),
         "PlanResult": ("victor.agent.planning.base", "PlanResult"),
@@ -156,8 +159,14 @@ def __getattr__(name: str) -> Any:
         "Skill": ("victor.agent.skills.skill_discovery", "Skill"),
         "SkillChainer": ("victor.agent.skills.skill_chaining", "SkillChainer"),
         "SkillChain": ("victor.agent.skills.skill_chaining", "SkillChain"),
-        "ProficiencyTracker": ("victor.agent.improvement.proficiency_tracker", "ProficiencyTracker"),
-        "EnhancedRLCoordinator": ("victor.agent.improvement.rl_coordinator", "EnhancedRLCoordinator"),
+        "ProficiencyTracker": (
+            "victor.agent.improvement.proficiency_tracker",
+            "ProficiencyTracker",
+        ),
+        "EnhancedRLCoordinator": (
+            "victor.agent.improvement.rl_coordinator",
+            "EnhancedRLCoordinator",
+        ),
     }
 
     if name in lazy_imports:

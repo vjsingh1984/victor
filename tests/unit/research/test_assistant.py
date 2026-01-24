@@ -165,11 +165,11 @@ class TestResearchAssistant:
 
         for stage_name, stage_def in stages.items():
             assert isinstance(stage_def, StageDefinition)
-            assert hasattr(stage_def, 'name')
-            assert hasattr(stage_def, 'description')
-            assert hasattr(stage_def, 'tools')
-            assert hasattr(stage_def, 'keywords')
-            assert hasattr(stage_def, 'next_stages')
+            assert hasattr(stage_def, "name")
+            assert hasattr(stage_def, "description")
+            assert hasattr(stage_def, "tools")
+            assert hasattr(stage_def, "keywords")
+            assert hasattr(stage_def, "next_stages")
 
             assert stage_def.name == stage_name
             assert isinstance(stage_def.description, str)
@@ -245,7 +245,7 @@ class TestResearchAssistant:
         builder = ResearchAssistant.get_prompt_builder()
 
         assert builder is not None
-        assert hasattr(builder, 'build')
+        assert hasattr(builder, "build")
 
     def test_get_prompt_builder_adds_grounding(self):
         """Test that prompt builder adds research-specific grounding."""

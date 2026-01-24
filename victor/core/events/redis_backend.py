@@ -464,7 +464,7 @@ class RedisEventBackend:
 
                 # Build stream dict for XREADGROUP
                 # Use ">" to only get new messages
-                stream_dict = {stream: ">" for stream in streams}
+                stream_dict = dict.fromkeys(streams, ">")
 
                 try:
                     # Read from streams
@@ -499,14 +499,10 @@ class RedisEventBackend:
                                     try:
                                         await subscription.handler(event)
                                     except Exception as e:
-                                        logger.warning(
-                                            f"Handler error for {event.topic}: {e}"
-                                        )
+                                        logger.warning(f"Handler error for {event.topic}: {e}")
 
                             # Acknowledge message
-                            await self._redis.xack(
-                                stream_name, self._consumer_group, message_id
-                            )
+                            await self._redis.xack(stream_name, self._consumer_group, message_id)
                             self._consumed_count += 1
 
                         except Exception as e:

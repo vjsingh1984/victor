@@ -34,7 +34,6 @@ class LazyProxyType(str, Enum):
     EAGER: str = "eager"
     """Alias for ON_DEMAND."""
 
-
 # =============================================================================
 # Type-Safe Lazy Proxy
 # =============================================================================
@@ -160,11 +159,8 @@ class LazyProxy(VerticalBase, Generic[T]):
         ...
 
     def __getattr__(self, name: str) -> Any: ...
-
     def __call__(self, *args: Any, **kwargs: Any) -> Any: ...
-
     def __repr__(self) -> str: ...
-
 
 # =============================================================================
 # Proxy Factory
@@ -200,7 +196,6 @@ class LazyProxyFactory:
     def clear_cache(self) -> None:
         """Clear the proxy cache."""
         ...
-
 
 # =============================================================================
 # Factory Functions

@@ -411,6 +411,7 @@ resource "aws_instance" "app_server" {
 # Helper Functions
 # ============================================================================
 
+
 def get_scenario(name: str) -> CrossVerticalScenario:
     """Get a cross-vertical scenario by name.
 

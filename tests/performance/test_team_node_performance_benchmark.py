@@ -492,9 +492,7 @@ def test_single_level_team_execution(benchmark, member_count):
 
     # Create team members
     for i in range(member_count):
-        coordinator.add_member(
-            MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01)
-        )
+        coordinator.add_member(MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01))
 
     def run_team():
         return asyncio.run(
@@ -519,7 +517,10 @@ def test_single_level_team_execution(benchmark, member_count):
 
 
 @pytest.mark.benchmark
-@pytest.mark.parametrize("formation", [TeamFormationType.SEQUENTIAL, TeamFormationType.PARALLEL, TeamFormationType.PIPELINE])
+@pytest.mark.parametrize(
+    "formation",
+    [TeamFormationType.SEQUENTIAL, TeamFormationType.PARALLEL, TeamFormationType.PIPELINE],
+)
 def test_single_level_formations(benchmark, formation):
     """Benchmark different formation types at single level.
 
@@ -529,9 +530,7 @@ def test_single_level_formations(benchmark, formation):
 
     # Create 4 members
     for i in range(4):
-        coordinator.add_member(
-            MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01)
-        )
+        coordinator.add_member(MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01))
 
     def run_team():
         return asyncio.run(
@@ -612,8 +611,7 @@ def test_nested_team_execution_overhead(benchmark, depth):
 
     # Verify overhead is acceptable (<10ms per level)
     assert overhead_per_level < 0.010, (
-        f"Nested team overhead {overhead_per_level*1000:.3f}ms "
-        f"exceeds 10ms per level target"
+        f"Nested team overhead {overhead_per_level*1000:.3f}ms " f"exceeds 10ms per level target"
     )
 
 
@@ -677,12 +675,15 @@ def test_nested_teams_with_recursion_tracking(benchmark):
 
 
 @pytest.mark.benchmark
-@pytest.mark.parametrize("formation,expected_max_ms", [
-    (TeamFormationType.SEQUENTIAL, 50),
-    (TeamFormationType.PARALLEL, 20),
-    (TeamFormationType.PIPELINE, 50),
-    (TeamFormationType.HIERARCHICAL, 30),
-])
+@pytest.mark.parametrize(
+    "formation,expected_max_ms",
+    [
+        (TeamFormationType.SEQUENTIAL, 50),
+        (TeamFormationType.PARALLEL, 20),
+        (TeamFormationType.PIPELINE, 50),
+        (TeamFormationType.HIERARCHICAL, 30),
+    ],
+)
 def test_formation_performance_targets(benchmark, formation, expected_max_ms):
     """Verify that formations meet performance targets.
 
@@ -696,9 +697,7 @@ def test_formation_performance_targets(benchmark, formation, expected_max_ms):
 
     # Create 3 members
     for i in range(3):
-        coordinator.add_member(
-            MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01)
-        )
+        coordinator.add_member(MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01))
 
     def run_team():
         return asyncio.run(
@@ -740,9 +739,7 @@ def test_parallel_vs_sequential_speedup(benchmark):
         )
 
     def run_sequential():
-        return asyncio.run(
-            sequential_coord.execute_team(task="Sequential task", context={})
-        )
+        return asyncio.run(sequential_coord.execute_team(task="Sequential task", context={}))
 
     sequential_result = benchmark(run_sequential)
     sequential_time = sequential_result["total_time"]
@@ -750,14 +747,10 @@ def test_parallel_vs_sequential_speedup(benchmark):
     # Parallel
     parallel_coord = MockTeamCoordinator(formation=TeamFormationType.PARALLEL)
     for i in range(member_count):
-        parallel_coord.add_member(
-            MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01)
-        )
+        parallel_coord.add_member(MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01))
 
     def run_parallel():
-        return asyncio.run(
-            parallel_coord.execute_team(task="Parallel task", context={})
-        )
+        return asyncio.run(parallel_coord.execute_team(task="Parallel task", context={}))
 
     parallel_result = benchmark(run_parallel)
     parallel_time = parallel_result["total_time"]
@@ -765,7 +758,7 @@ def test_parallel_vs_sequential_speedup(benchmark):
     # Calculate speedup
     speedup = sequential_time / parallel_time if parallel_time > 0 else 1.0
 
-    print(f"\nParallel Speedup:")
+    print("\nParallel Speedup:")
     print(f"  Sequential: {sequential_time*1000:.2f}ms")
     print(f"  Parallel:   {parallel_time*1000:.2f}ms")
     print(f"  Speedup:    {speedup:.2f}x")
@@ -852,9 +845,7 @@ def test_memory_leak_detection():
 
     # Add members once
     for i in range(4):
-        coordinator.add_member(
-            MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01)
-        )
+        coordinator.add_member(MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01))
 
     memory_snapshots = []
 
@@ -917,15 +908,14 @@ def test_recursion_context_memory_overhead():
     overhead_kb = (peak_mem - baseline_mem) / 1024
     overhead_per_level_kb = overhead_kb / 10
 
-    print(f"\nRecursionContext Memory Overhead:")
+    print("\nRecursionContext Memory Overhead:")
     print(f"  Baseline:  {baseline_mem / 1024:.1f}KB")
     print(f"  Peak:      {peak_mem / 1024:.1f}KB")
     print(f"  Overhead:  {overhead_kb:.1f}KB ({overhead_per_level_kb:.2f}KB per level)")
 
     # Target: < 1KB per level
     assert overhead_per_level_kb < 1.0, (
-        f"RecursionContext overhead {overhead_per_level_kb:.2f}KB "
-        f"exceeds 1KB per level target"
+        f"RecursionContext overhead {overhead_per_level_kb:.2f}KB " f"exceeds 1KB per level target"
     )
 
 
@@ -960,9 +950,7 @@ def test_team_node_performance_summary():
     for count in member_counts:
         coordinator = MockTeamCoordinator(formation=TeamFormationType.PARALLEL)
         for i in range(count):
-            coordinator.add_member(
-                MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01)
-            )
+            coordinator.add_member(MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01))
 
         async def run_team():
             return await coordinator.execute_team(task="Test", context={})
@@ -1006,7 +994,9 @@ def test_team_node_performance_summary():
             "overhead_per_level_ms": overhead_per_level,
         }
 
-        print(f"  Depth {depth}          ✓  {elapsed*1000:6.2f}ms  ({overhead_per_level:5.3f}ms per level)")
+        print(
+            f"  Depth {depth}          ✓  {elapsed*1000:6.2f}ms  ({overhead_per_level:5.3f}ms per level)"
+        )
 
     # Test formations
     print("\n3. Formation Performance (3 members)")
@@ -1020,9 +1010,7 @@ def test_team_node_performance_summary():
     for formation in formations:
         coordinator = MockTeamCoordinator(formation=formation)
         for i in range(3):
-            coordinator.add_member(
-                MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01)
-            )
+            coordinator.add_member(MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01))
 
         async def run_formation():
             return await coordinator.execute_team(task="Test", context={})
@@ -1036,7 +1024,9 @@ def test_team_node_performance_summary():
             "messages": result["message_count"],
         }
 
-        print(f"  {formation.value:12}     ✓  {elapsed*1000:6.2f}ms  {result['message_count']:3} messages")
+        print(
+            f"  {formation.value:12}     ✓  {elapsed*1000:6.2f}ms  {result['message_count']:3} messages"
+        )
 
     # Test recursion overhead
     print("\n4. Recursion Tracking Overhead Comparison")

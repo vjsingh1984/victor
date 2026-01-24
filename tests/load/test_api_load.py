@@ -92,9 +92,7 @@ class TestAPILoad:
                     "model": "claude-sonnet-4-5",
                     "stream": False,
                 }
-                response = await client.post(
-                    f"{API_HOST}{ENDPOINTS['chat']}", json=payload
-                )
+                response = await client.post(f"{API_HOST}{ENDPOINTS['chat']}", json=payload)
                 latency = (time.time() - req_start) * 1000  # ms
 
                 if response.status_code != 200:
@@ -121,14 +119,14 @@ class TestAPILoad:
         throughput = num_requests / total_time
         error_rate = (errors / num_requests) * 100
         p50 = statistics.median(latencies) if latencies else 0
-        p95 = (
-            statistics.quantiles(latencies, n=20)[18] if len(latencies) > 20 else 0
-        )
+        p95 = statistics.quantiles(latencies, n=20)[18] if len(latencies) > 20 else 0
         p99 = (
-            statistics.quantiles(latencies, n=100)[98] if len(latencies) > 100 else max(latencies) if latencies else 0
+            statistics.quantiles(latencies, n=100)[98]
+            if len(latencies) > 100
+            else max(latencies) if latencies else 0
         )
 
-        print(f"\nChat Endpoint Load Test Results:")
+        print("\nChat Endpoint Load Test Results:")
         print(f"  Requests: {num_requests}")
         print(f"  Throughput: {throughput:.2f} req/s")
         print(f"  Error Rate: {error_rate:.2f}%")
@@ -194,7 +192,7 @@ class TestAPILoad:
         error_rate = (errors / num_requests) * 100
         avg_ttf = statistics.mean(time_to_first_token) if time_to_first_token else 0
 
-        print(f"\nStreaming Endpoint Load Test Results:")
+        print("\nStreaming Endpoint Load Test Results:")
         print(f"  Requests: {num_requests}")
         print(f"  Error Rate: {error_rate:.2f}%")
         print(f"  Avg Time to First Token: {avg_ttf:.2f}ms")
@@ -223,7 +221,7 @@ class TestAPILoad:
         p50 = statistics.median(latencies)
         p95 = statistics.quantiles(latencies, n=20)[18] if len(latencies) > 20 else 0
 
-        print(f"\nHealth Endpoint Performance:")
+        print("\nHealth Endpoint Performance:")
         print(f"  Requests: {num_requests}")
         print(f"  P50 Latency: {p50:.2f}ms")
         print(f"  P95 Latency: {p95:.2f}ms")
@@ -253,7 +251,7 @@ class TestAPILoad:
 
         error_rate = (errors / num_requests) * 100
 
-        print(f"\nModels Endpoint Load Test:")
+        print("\nModels Endpoint Load Test:")
         print(f"  Requests: {num_requests}")
         print(f"  Error Rate: {error_rate:.2f}%")
 
@@ -282,9 +280,7 @@ class TestAPILoad:
                         "model": "claude-sonnet-4-5",
                         "stream": False,
                     }
-                    response = await client.post(
-                        f"{API_HOST}{ENDPOINTS['chat']}", json=payload
-                    )
+                    response = await client.post(f"{API_HOST}{ENDPOINTS['chat']}", json=payload)
                 elif rand < 0.9:  # 20% streaming
                     payload = {
                         "message": "Streaming test",
@@ -324,7 +320,7 @@ class TestAPILoad:
         error_rate = (errors / num_requests) * 100
         p50 = statistics.median(latencies) if latencies else 0
 
-        print(f"\nMixed Workload Test Results:")
+        print("\nMixed Workload Test Results:")
         print(f"  Requests: {num_requests}")
         print(f"  Error Rate: {error_rate:.2f}%")
         print(f"  P50 Latency: {p50:.2f}ms")

@@ -200,9 +200,7 @@ class SemanticCache:
                         from victor.config.settings import load_settings
 
                         settings = load_settings()
-                        self._embedding_service = EmbeddingService(
-                            model_name=self.embedding_model
-                        )
+                        self._embedding_service = EmbeddingService(model_name=self.embedding_model)
                         logger.info(
                             f"Initialized embedding service for semantic cache: {self.embedding_model}"
                         )
@@ -244,9 +242,7 @@ class SemanticCache:
 
             # Compute embedding (run in thread pool to avoid blocking)
             loop = asyncio.get_event_loop()
-            embedding = await loop.run_in_executor(
-                None, service.get_embedding, text
-            )
+            embedding = await loop.run_in_executor(None, service.get_embedding, text)
 
             return np.array(embedding, dtype=np.float32)
         except Exception as e:
@@ -313,9 +309,7 @@ class SemanticCache:
         """
         with self._lock:
             # Remove expired entries first
-            expired_keys = [
-                key for key, entry in self._cache.items() if entry.is_expired()
-            ]
+            expired_keys = [key for key, entry in self._cache.items() if entry.is_expired()]
             for key in expired_keys:
                 del self._cache[key]
 

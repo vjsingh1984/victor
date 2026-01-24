@@ -242,11 +242,13 @@ class KafkaEventBackend:
         try:
             # Create producer
             producer_config = self._get_common_config()
-            producer_config.update({
-                "linger_ms": self._linger_ms,
-                "compression_type": self._compression_type,
-                "max_batch_size": self._max_batch_size,
-            })
+            producer_config.update(
+                {
+                    "linger_ms": self._linger_ms,
+                    "compression_type": self._compression_type,
+                    "max_batch_size": self._max_batch_size,
+                }
+            )
 
             self._producer = AIOKafkaProducer(
                 value_serializer=lambda v: json.dumps(v).encode("utf-8"),
@@ -337,7 +339,7 @@ class KafkaEventBackend:
         """
         # Remove prefix and convert underscores back to dots
         if kafka_topic.startswith(self._topic_prefix + "."):
-            event_topic = kafka_topic[len(self._topic_prefix) + 1:]
+            event_topic = kafka_topic[len(self._topic_prefix) + 1 :]
             return event_topic.replace("_", ".")
         return kafka_topic
 
@@ -553,12 +555,14 @@ class KafkaEventBackend:
             topics: List of Kafka topic names to subscribe to
         """
         consumer_config = self._get_common_config()
-        consumer_config.update({
-            "group_id": self._consumer_group,
-            "auto_offset_reset": self._auto_offset_reset,
-            "enable_auto_commit": self._enable_auto_commit,
-            "value_deserializer": lambda v: json.loads(v.decode("utf-8")),
-        })
+        consumer_config.update(
+            {
+                "group_id": self._consumer_group,
+                "auto_offset_reset": self._auto_offset_reset,
+                "enable_auto_commit": self._enable_auto_commit,
+                "value_deserializer": lambda v: json.loads(v.decode("utf-8")),
+            }
+        )
 
         self._consumer = AIOKafkaConsumer(
             *topics,
@@ -603,9 +607,7 @@ class KafkaEventBackend:
                             try:
                                 await subscription.handler(event)
                             except Exception as e:
-                                logger.warning(
-                                    f"Handler error for {event.topic}: {e}"
-                                )
+                                logger.warning(f"Handler error for {event.topic}: {e}")
 
                     self._consumed_count += 1
 

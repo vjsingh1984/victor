@@ -223,9 +223,7 @@ class PersonaRepository:
         with self._lock:
             return persona_id in self._personas
 
-    def get_version_history(
-        self, persona_id: str
-    ) -> List[PersonaVersion]:
+    def get_version_history(self, persona_id: str) -> List[PersonaVersion]:
         """Get version history for a persona.
 
         Args:
@@ -337,8 +335,7 @@ class PersonaRepository:
             output_path: Output file path
         """
         definitions = {
-            persona_id: persona.to_dict()
-            for persona_id, persona in self._personas.items()
+            persona_id: persona.to_dict() for persona_id, persona in self._personas.items()
         }
 
         with output_path.open("w") as f:
@@ -404,15 +401,10 @@ class PersonaRepository:
         # Check constraints
         if persona.constraints:
             # Check for tool conflicts
-            if (
-                persona.constraints.preferred_tools
-                and persona.constraints.forbidden_tools
-            ):
+            if persona.constraints.preferred_tools and persona.constraints.forbidden_tools:
                 overlap = persona.constraints.preferred_tools & persona.constraints.forbidden_tools
                 if overlap:
-                    errors.append(
-                        f"Tools cannot be both preferred and forbidden: {overlap}"
-                    )
+                    errors.append(f"Tools cannot be both preferred and forbidden: {overlap}")
 
             # Check max_tool_calls
             if (
@@ -533,9 +525,7 @@ class PersonaRepository:
                     for persona_data in data.get("personas", {}).values():
                         self._import_from_dict(persona_data)
             else:
-                logger.warning(
-                    f"Unsupported storage file format: {self._storage_path.suffix}"
-                )
+                logger.warning(f"Unsupported storage file format: {self._storage_path.suffix}")
         except Exception as e:
             logger.warning(f"Failed to load personas from storage: {e}")
 
@@ -557,8 +547,6 @@ class PersonaRepository:
                 with self._storage_path.open("w") as f:
                     json.dump(data, f, indent=2)
             else:
-                logger.warning(
-                    f"Unsupported storage file format: {self._storage_path.suffix}"
-                )
+                logger.warning(f"Unsupported storage file format: {self._storage_path.suffix}")
         except Exception as e:
             logger.warning(f"Failed to save personas to storage: {e}")

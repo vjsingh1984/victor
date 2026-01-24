@@ -35,10 +35,7 @@ class TestCapabilityAdapterInit:
     def test_init_with_legacy_mode(self):
         """Should initialize with specified legacy mode."""
         context = VerticalContext(name="coding")
-        adapter = CapabilityAdapter(
-            context,
-            legacy_mode=LegacyWriteMode.CONTEXT_ONLY
-        )
+        adapter = CapabilityAdapter(context, legacy_mode=LegacyWriteMode.CONTEXT_ONLY)
 
         assert adapter.legacy_mode == LegacyWriteMode.CONTEXT_ONLY
 
@@ -73,16 +70,9 @@ class TestSetCapabilityConfig:
         """Should also store in orchestrator in BACKWARD_COMPATIBLE mode."""
         context = VerticalContext(name="coding")
         orchestrator = Mock()
-        adapter = CapabilityAdapter(
-            context,
-            legacy_mode=LegacyWriteMode.BACKWARD_COMPATIBLE
-        )
+        adapter = CapabilityAdapter(context, legacy_mode=LegacyWriteMode.BACKWARD_COMPATIBLE)
 
-        adapter.set_capability_config(
-            orchestrator,
-            "code_style",
-            {"formatter": "black"}
-        )
+        adapter.set_capability_config(orchestrator, "code_style", {"formatter": "black"})
 
         # Check both storage locations
         assert context.get_capability_config("code_style") == {"formatter": "black"}
@@ -92,61 +82,41 @@ class TestSetCapabilityConfig:
         """Should skip orchestrator writes in CONTEXT_ONLY mode."""
         context = VerticalContext(name="coding")
         orchestrator = Mock()
-        adapter = CapabilityAdapter(
-            context,
-            legacy_mode=LegacyWriteMode.CONTEXT_ONLY
-        )
+        adapter = CapabilityAdapter(context, legacy_mode=LegacyWriteMode.CONTEXT_ONLY)
 
-        adapter.set_capability_config(
-            orchestrator,
-            "code_style",
-            {"formatter": "black"}
-        )
+        adapter.set_capability_config(orchestrator, "code_style", {"formatter": "black"})
 
         # Check only context storage
         assert context.get_capability_config("code_style") == {"formatter": "black"}
-        assert not hasattr(orchestrator, 'code_style')
+        assert not hasattr(orchestrator, "code_style")
 
     def test_emits_deprecation_warning_in_compat_mode(self):
         """Should emit deprecation warning when writing to orchestrator."""
         context = VerticalContext(name="coding")
         orchestrator = Mock()
-        adapter = CapabilityAdapter(
-            context,
-            legacy_mode=LegacyWriteMode.BACKWARD_COMPATIBLE
-        )
+        adapter = CapabilityAdapter(context, legacy_mode=LegacyWriteMode.BACKWARD_COMPATIBLE)
 
         with pytest.warns(DeprecationWarning, match="Direct orchestrator attribute.*deprecated"):
-            adapter.set_capability_config(
-                orchestrator,
-                "code_style",
-                {"formatter": "black"}
-            )
+            adapter.set_capability_config(orchestrator, "code_style", {"formatter": "black"})
 
     def test_nested_dict_updates(self):
         """Should handle nested dict updates correctly."""
         context = VerticalContext(name="coding")
         orchestrator = Mock()
         orchestrator.safety_config = {}
-        adapter = CapabilityAdapter(
-            context,
-            legacy_mode=LegacyWriteMode.BACKWARD_COMPATIBLE
-        )
+        adapter = CapabilityAdapter(context, legacy_mode=LegacyWriteMode.BACKWARD_COMPATIBLE)
 
         # Simulate git safety config pattern
         adapter.set_capability_config(
             orchestrator,
             "safety_config.git",
-            {
-                "require_tests_before_commit": True,
-                "allowed_branches": ["main", "develop"]
-            }
+            {"require_tests_before_commit": True, "allowed_branches": ["main", "develop"]},
         )
 
         # Check nested update happened
         assert orchestrator.safety_config["git"] == {
             "require_tests_before_commit": True,
-            "allowed_branches": ["main", "develop"]
+            "allowed_branches": ["main", "develop"],
         }
 
 
@@ -169,10 +139,7 @@ class TestGetCapabilityConfig:
         orchestrator = Mock()
         orchestrator.code_style = {"formatter": "ruff"}
 
-        adapter = CapabilityAdapter(
-            context,
-            legacy_mode=LegacyWriteMode.BACKWARD_COMPATIBLE
-        )
+        adapter = CapabilityAdapter(context, legacy_mode=LegacyWriteMode.BACKWARD_COMPATIBLE)
 
         result = adapter.get_capability_config(orchestrator, "code_style")
 
@@ -193,10 +160,7 @@ class TestGetCapabilityConfig:
         orchestrator = Mock()
         orchestrator.code_style = {"formatter": "ruff"}
 
-        adapter = CapabilityAdapter(
-            context,
-            legacy_mode=LegacyWriteMode.CONTEXT_ONLY
-        )
+        adapter = CapabilityAdapter(context, legacy_mode=LegacyWriteMode.CONTEXT_ONLY)
 
         result = adapter.get_capability_config(orchestrator, "code_style")
 
@@ -211,10 +175,7 @@ class TestApplyCapabilityConfigs:
         """Should apply multiple configs at once."""
         context = VerticalContext(name="coding")
         orchestrator = Mock()
-        adapter = CapabilityAdapter(
-            context,
-            legacy_mode=LegacyWriteMode.BACKWARD_COMPATIBLE
-        )
+        adapter = CapabilityAdapter(context, legacy_mode=LegacyWriteMode.BACKWARD_COMPATIBLE)
 
         configs = {
             "code_style": {"formatter": "black"},
@@ -238,10 +199,7 @@ class TestApplyCapabilityConfigs:
         """Should only store in context in CONTEXT_ONLY mode."""
         context = VerticalContext(name="coding")
         orchestrator = Mock()
-        adapter = CapabilityAdapter(
-            context,
-            legacy_mode=LegacyWriteMode.CONTEXT_ONLY
-        )
+        adapter = CapabilityAdapter(context, legacy_mode=LegacyWriteMode.CONTEXT_ONLY)
 
         configs = {
             "code_style": {"formatter": "black"},
@@ -252,7 +210,7 @@ class TestApplyCapabilityConfigs:
 
         # Check only context storage
         assert context.get_capability_config("code_style") == {"formatter": "black"}
-        assert not hasattr(orchestrator, 'code_style')
+        assert not hasattr(orchestrator, "code_style")
 
 
 class TestDeprecationWarnings:
@@ -264,10 +222,7 @@ class TestDeprecationWarnings:
         orchestrator = Mock()
         orchestrator.code_style = {"formatter": "black"}
 
-        adapter = CapabilityAdapter(
-            context,
-            legacy_mode=LegacyWriteMode.BACKWARD_COMPATIBLE
-        )
+        adapter = CapabilityAdapter(context, legacy_mode=LegacyWriteMode.BACKWARD_COMPATIBLE)
 
         with pytest.warns(DeprecationWarning):
             _ = adapter.get_capability_config(orchestrator, "code_style")
@@ -277,18 +232,11 @@ class TestDeprecationWarnings:
         context = VerticalContext(name="coding")
         orchestrator = Mock()
 
-        adapter = CapabilityAdapter(
-            context,
-            legacy_mode=LegacyWriteMode.CONTEXT_ONLY
-        )
+        adapter = CapabilityAdapter(context, legacy_mode=LegacyWriteMode.CONTEXT_ONLY)
 
         # Should not emit warning
         with pytest.warns(None) as warning_list:
-            adapter.set_capability_config(
-                orchestrator,
-                "code_style",
-                {"formatter": "black"}
-            )
+            adapter.set_capability_config(orchestrator, "code_style", {"formatter": "black"})
 
         assert len(warning_list) == 0
 
@@ -327,7 +275,7 @@ class TestMigrationHelpers:
 
         # Check orchestrator attributes deleted
         del orchestrator.code_style
-        assert not hasattr(orchestrator, 'code_style')
+        assert not hasattr(orchestrator, "code_style")
 
 
 class TestGetCapabilityAdapterFactory:
@@ -372,10 +320,7 @@ class TestRealWorldIntegrationPatterns:
         context = VerticalContext(name="coding")
         orchestrator = Mock()
         orchestrator.safety_config = {}
-        adapter = CapabilityAdapter(
-            context,
-            legacy_mode=LegacyWriteMode.BACKWARD_COMPATIBLE
-        )
+        adapter = CapabilityAdapter(context, legacy_mode=LegacyWriteMode.BACKWARD_COMPATIBLE)
 
         # Pattern from victor/coding/capabilities.py:94-98
         adapter.set_capability_config(
@@ -386,7 +331,7 @@ class TestRealWorldIntegrationPatterns:
                     "require_tests_before_commit": True,
                     "allowed_branches": ["main", "develop"],
                 }
-            }
+            },
         )
 
         # Verify stored in context
@@ -404,10 +349,7 @@ class TestRealWorldIntegrationPatterns:
         """Should handle code style configuration pattern."""
         context = VerticalContext(name="coding")
         orchestrator = Mock()
-        adapter = CapabilityAdapter(
-            context,
-            legacy_mode=LegacyWriteMode.BACKWARD_COMPATIBLE
-        )
+        adapter = CapabilityAdapter(context, legacy_mode=LegacyWriteMode.BACKWARD_COMPATIBLE)
 
         # Pattern from victor/coding/capabilities.py:120-127
         adapter.set_capability_config(
@@ -418,7 +360,7 @@ class TestRealWorldIntegrationPatterns:
                 "linter": "ruff",
                 "max_line_length": 100,
                 "enforce_type_hints": True,
-            }
+            },
         )
 
         # Verify both locations
@@ -429,10 +371,7 @@ class TestRealWorldIntegrationPatterns:
         """Should handle test requirements configuration pattern."""
         context = VerticalContext(name="coding")
         orchestrator = Mock()
-        adapter = CapabilityAdapter(
-            context,
-            legacy_mode=LegacyWriteMode.BACKWARD_COMPATIBLE
-        )
+        adapter = CapabilityAdapter(context, legacy_mode=LegacyWriteMode.BACKWARD_COMPATIBLE)
 
         # Pattern from victor/coding/capabilities.py:169-175
         adapter.set_capability_config(
@@ -443,7 +382,7 @@ class TestRealWorldIntegrationPatterns:
                 "required_patterns": ["test_*.py"],
                 "framework": "pytest",
                 "run_on_edit": False,
-            }
+            },
         )
 
         # Verify both locations

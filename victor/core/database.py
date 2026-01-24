@@ -913,7 +913,11 @@ class ProjectDatabaseManager:
 
         except sqlite3.DatabaseError as e:
             error_msg = str(e).lower()
-            if "malformed" in error_msg or "corrupted" in error_msg or "database disk image" in error_msg:
+            if (
+                "malformed" in error_msg
+                or "corrupted" in error_msg
+                or "database disk image" in error_msg
+            ):
                 if force_rebuild:
                     logger.warning(f"Database corrupted: {e}. Rebuilding...")
                     self._rebuild_database()
@@ -1284,10 +1288,13 @@ def get_project_database(project_path: Optional[Path] = None) -> ProjectDatabase
 
     # Check environment variable for force rebuild (set by CLI --force)
     import os
+
     force_rebuild = os.environ.get("VICTOR_DATABASE_FORCE_REBUILD") == "1"
 
     if project_key not in _project_databases:
-        _project_databases[project_key] = ProjectDatabaseManager(project_path, force_rebuild=force_rebuild)
+        _project_databases[project_key] = ProjectDatabaseManager(
+            project_path, force_rebuild=force_rebuild
+        )
     return _project_databases[project_key]
 
 

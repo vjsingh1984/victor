@@ -126,7 +126,9 @@ async def example_filter_by_severity():
     report = await suite.run_security_audit(agent)
 
     # Filter critical vulnerabilities
-    critical_vulns = [v for v in report.total_vulnerabilities if v.severity == SeverityLevel.CRITICAL]
+    critical_vulns = [
+        v for v in report.total_vulnerabilities if v.severity == SeverityLevel.CRITICAL
+    ]
 
     if critical_vulns:
         print(f"Found {len(critical_vulns)} CRITICAL vulnerabilities:")

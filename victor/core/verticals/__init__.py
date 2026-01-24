@@ -76,6 +76,19 @@ from victor.core.verticals.base_service_provider import (
     BaseVerticalServiceProvider,
     VerticalServiceProviderFactory,
 )
+from victor.core.verticals.capability_provider import (
+    ICapabilityProvider,
+    IConfigurableCapability,
+    BaseCapabilityProvider,
+    CapabilityProviderRegistry,
+    get_capability_registry,
+    reset_global_registry,
+)
+from victor.core.verticals.capability_injector import (
+    CapabilityInjector,
+    get_capability_injector,
+    create_capability_injector,
+)
 from victor.core.verticals.vertical_loader import (
     VerticalLoader,
     get_vertical_loader,
@@ -212,7 +225,9 @@ def _register_and_discover_verticals() -> None:
                     if vertical_class is not None:  # Not a lazy import
                         try:
                             VerticalRegistry.register(vertical_class)
-                            logger.debug(f"Registered vertical '{name}' from {result.sources.get(name, 'unknown')}")
+                            logger.debug(
+                                f"Registered vertical '{name}' from {result.sources.get(name, 'unknown')}"
+                            )
                         except Exception as e:
                             logger.warning(f"Failed to register vertical '{name}': {e}")
             else:
@@ -232,11 +247,15 @@ def _register_and_discover_verticals() -> None:
                     if vertical_class is not None:
                         try:
                             VerticalRegistry.register(vertical_class)
-                            logger.debug(f"Registered vertical '{name}' from {result.sources.get(name, 'unknown')}")
+                            logger.debug(
+                                f"Registered vertical '{name}' from {result.sources.get(name, 'unknown')}"
+                            )
                         except Exception as e:
                             logger.warning(f"Failed to register vertical '{name}': {e}")
 
-            logger.info(f"Plugin discovery completed: {len(result.lazy_imports)} lazy, {len([v for v in result.verticals.values() if v is not None])} eager")
+            logger.info(
+                f"Plugin discovery completed: {len(result.lazy_imports)} lazy, {len([v for v in result.verticals.values() if v is not None])} eager"
+            )
 
         except Exception as e:
             logger.error(f"Plugin discovery failed, falling back to hardcoded registration: {e}")
@@ -262,7 +281,9 @@ def _register_builtin_verticals_fallback(lazy_loading_enabled: bool) -> None:
         VerticalRegistry.register_lazy_import("coding", "victor.coding:CodingAssistant")
         VerticalRegistry.register_lazy_import("research", "victor.research:ResearchAssistant")
         VerticalRegistry.register_lazy_import("devops", "victor.devops:DevOpsAssistant")
-        VerticalRegistry.register_lazy_import("dataanalysis", "victor.dataanalysis:DataAnalysisAssistant")
+        VerticalRegistry.register_lazy_import(
+            "dataanalysis", "victor.dataanalysis:DataAnalysisAssistant"
+        )
         VerticalRegistry.register_lazy_import("rag", "victor.rag:RAGAssistant")
         VerticalRegistry.register_lazy_import("benchmark", "victor.benchmark:BenchmarkVertical")
         logger.debug("Registered 6 built-in verticals with lazy loading")
@@ -298,6 +319,7 @@ def _discover_external_verticals() -> None:
     This function will be removed in a future release.
     """
     import logging
+
     logger = logging.getLogger(__name__)
 
     logger.debug("External vertical discovery is now handled by PluginDiscovery system")

@@ -193,7 +193,7 @@ class TestProviderPool:
         assert response.content.startswith("Response from")
         assert "provider-" in response.content
 
-    @ pytest.mark.asyncio
+    @pytest.mark.asyncio
     async def test_chat_with_retry(self, pool_config, mock_providers) -> None:
         """Test chat with retry on failure."""
         pool = ProviderPool(name="test-pool", config=pool_config)
@@ -211,7 +211,7 @@ class TestProviderPool:
         # Should succeed with fallback
         assert response.content.startswith("Response from")
 
-    @ pytest.mark.asyncio
+    @pytest.mark.asyncio
     async def test_stream_through_pool(self, pool_config, mock_providers) -> None:
         """Test streaming through pool."""
         pool = ProviderPool(name="test-pool", config=pool_config)
@@ -229,7 +229,7 @@ class TestProviderPool:
         assert len(chunks) == 3
         assert any("Chunk from" in chunk.content for chunk in chunks)
 
-    @ pytest.mark.asyncio
+    @pytest.mark.asyncio
     async def test_select_provider(self, pool_config, mock_providers) -> None:
         """Test provider selection."""
         pool = ProviderPool(name="test-pool", config=pool_config)
@@ -242,7 +242,7 @@ class TestProviderPool:
         assert selected is not None
         assert selected.provider_id in mock_providers
 
-    @ pytest.mark.asyncio
+    @pytest.mark.asyncio
     async def test_round_robin_distribution(self, pool_config, mock_providers) -> None:
         """Test round-robin load distribution."""
         pool = ProviderPool(name="test-pool", config=pool_config)
@@ -269,7 +269,7 @@ class TestProviderPool:
             "provider-3",
         ]
 
-    @ pytest.mark.asyncio
+    @pytest.mark.asyncio
     async def test_connection_tracking(self, pool_config, mock_providers) -> None:
         """Test active connection tracking."""
         pool = ProviderPool(name="test-pool", config=pool_config)
@@ -298,7 +298,7 @@ class TestProviderPool:
         stats = pool.get_pool_stats()
         assert stats["connections"]["active"] == 0
 
-    @ pytest.mark.asyncio
+    @pytest.mark.asyncio
     async def test_pool_stats(self, pool_config, mock_providers) -> None:
         """Test getting pool statistics."""
         pool = ProviderPool(name="test-pool", config=pool_config)
@@ -321,7 +321,7 @@ class TestProviderPool:
         assert "weight" in provider_stats
         assert provider_stats["weight"] == 2.0
 
-    @ pytest.mark.asyncio
+    @pytest.mark.asyncio
     async def test_close_pool(self, pool_config, mock_providers) -> None:
         """Test closing pool."""
         pool = ProviderPool(name="test-pool", config=pool_config)
@@ -370,7 +370,7 @@ class TestProviderPoolConfig:
 class TestCreateProviderPool:
     """Tests for create_provider_pool factory."""
 
-    @ pytest.mark.asyncio
+    @pytest.mark.asyncio
     async def test_create_pool(self, mock_providers) -> None:
         """Test creating pool with factory."""
         config = ProviderPoolConfig(enable_warmup=False)
@@ -385,7 +385,7 @@ class TestCreateProviderPool:
         stats = pool.get_pool_stats()
         assert stats["instances"]["total"] == 3
 
-    @ pytest.mark.asyncio
+    @pytest.mark.asyncio
     async def test_create_pool_with_warmup(self, mock_providers) -> None:
         """Test creating pool with warmup."""
         config = ProviderPoolConfig(enable_warmup=True, warmup_concurrency=2)
@@ -409,7 +409,7 @@ class TestCreateProviderPool:
 class TestPoolFailover:
     """Tests for pool failover behavior."""
 
-    @ pytest.mark.asyncio
+    @pytest.mark.asyncio
     async def test_all_providers_fail(self, pool_config, mock_providers) -> None:
         """Test when all providers fail."""
         pool = ProviderPool(name="test-pool", config=pool_config)
@@ -424,7 +424,7 @@ class TestPoolFailover:
         with pytest.raises(RuntimeError, match="All providers.*failed"):
             await pool.chat(messages, model="test-model")
 
-    @ pytest.mark.asyncio
+    @pytest.mark.asyncio
     async def test_unhealthy_provider_excluded(self, pool_config, mock_providers) -> None:
         """Test that unhealthy providers are excluded."""
         pool = ProviderPool(name="test-pool", config=pool_config)
@@ -435,14 +435,13 @@ class TestPoolFailover:
 
         # Mark first as unhealthy
         from victor.providers.health_monitor import HealthStatus
-        pool._instances["provider-1"].health_monitor.set_status(
-            HealthStatus.UNHEALTHY
-        )
+
+        pool._instances["provider-1"].health_monitor.set_status(HealthStatus.UNHEALTHY)
 
         selected = await pool.select_provider()
         assert selected.provider_id != "provider-1"
 
-    @ pytest.mark.asyncio
+    @pytest.mark.asyncio
     async def test_no_healthy_providers(self, pool_config, mock_providers) -> None:
         """Test when no healthy providers available."""
         pool = ProviderPool(name="test-pool", config=pool_config)
@@ -453,6 +452,7 @@ class TestPoolFailover:
 
         # Mark all as unhealthy
         from victor.providers.health_monitor import HealthStatus
+
         for instance in pool._instances.values():
             instance.health_monitor.set_status(HealthStatus.UNHEALTHY)
 

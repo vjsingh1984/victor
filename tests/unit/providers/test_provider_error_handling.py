@@ -255,8 +255,12 @@ class TestRetryLogic:
             def name(self) -> str:
                 return "context_tracking"
 
-            async def chat(self, messages, *, model, temperature=0.7, **kwargs) -> CompletionResponse:
-                context_tracker.append({"model": model, "temperature": temperature, "messages": messages})
+            async def chat(
+                self, messages, *, model, temperature=0.7, **kwargs
+            ) -> CompletionResponse:
+                context_tracker.append(
+                    {"model": model, "temperature": temperature, "messages": messages}
+                )
 
                 if len(context_tracker) < 3:
                     raise ProviderConnectionError("Transient error")
@@ -463,7 +467,9 @@ class TestNetworkFailureRecovery:
 
         error = exc_info.value
         assert error.recovery_hint is not None
-        assert "network" in error.recovery_hint.lower() or "connection" in error.recovery_hint.lower()
+        assert (
+            "network" in error.recovery_hint.lower() or "connection" in error.recovery_hint.lower()
+        )
 
 
 # =============================================================================
@@ -532,7 +538,9 @@ class TestTimeoutScenarios:
 
         error = exc_info.value
         assert error.recovery_hint is not None
-        assert "timeout" in error.recovery_hint.lower() or "timed out" in error.recovery_hint.lower()
+        assert (
+            "timeout" in error.recovery_hint.lower() or "timed out" in error.recovery_hint.lower()
+        )
 
 
 # =============================================================================
@@ -608,7 +616,11 @@ class TestConnectionErrors:
     @pytest.mark.asyncio
     async def test_connection_error_with_circuit_breaker(self):
         """Test that connection errors work with circuit breaker pattern."""
-        from victor.providers.circuit_breaker import CircuitBreaker, CircuitBreakerConfig, CircuitState
+        from victor.providers.circuit_breaker import (
+            CircuitBreaker,
+            CircuitBreakerConfig,
+            CircuitState,
+        )
 
         # Create a circuit breaker with low threshold
         config = CircuitBreakerConfig(failure_threshold=2, timeout_seconds=5.0)
@@ -640,7 +652,11 @@ class TestConnectionErrors:
     @pytest.mark.asyncio
     async def test_connection_error_recovery_after_circuit_reset(self):
         """Test recovery after circuit breaker reset."""
-        from victor.providers.circuit_breaker import CircuitBreaker, CircuitBreakerConfig, CircuitState
+        from victor.providers.circuit_breaker import (
+            CircuitBreaker,
+            CircuitBreakerConfig,
+            CircuitState,
+        )
 
         # Create a circuit breaker
         config = CircuitBreakerConfig(failure_threshold=2, success_threshold=2, timeout_seconds=5.0)

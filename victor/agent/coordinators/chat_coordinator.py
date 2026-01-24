@@ -116,14 +116,16 @@ class ChatCoordinator:
         # Stream the response and collect all chunks
         async for chunk in self.stream_chat(user_message):
             # Collect content chunks
-            if hasattr(chunk, 'content') and chunk.content:
+            if hasattr(chunk, "content") and chunk.content:
                 # Skip tool result metadata chunks
                 # Check metadata is a dict before checking 'tool_result' in it
                 metadata = chunk.metadata
-                if not (hasattr(chunk, 'metadata') and
-                        metadata and
-                        isinstance(metadata, dict) and
-                        'tool_result' in metadata):
+                if not (
+                    hasattr(chunk, "metadata")
+                    and metadata
+                    and isinstance(metadata, dict)
+                    and "tool_result" in metadata
+                ):
                     # Ensure content is a string before adding
                     content = chunk.content
                     if not isinstance(content, str):
@@ -133,12 +135,12 @@ class ChatCoordinator:
             # Collect tool calls for tracking
             # Check metadata is a dict before checking keys
             metadata = chunk.metadata
-            if hasattr(chunk, 'metadata') and metadata and isinstance(metadata, dict):
-                if 'tool_call' in metadata:
-                    tool_calls_list.append(metadata['tool_call'])
+            if hasattr(chunk, "metadata") and metadata and isinstance(metadata, dict):
+                if "tool_call" in metadata:
+                    tool_calls_list.append(metadata["tool_call"])
 
         # Combine all content
-        combined_content = ''.join(full_content).strip()
+        combined_content = "".join(full_content).strip()
 
         # Create and return CompletionResponse
         return CompletionResponse(
@@ -169,7 +171,9 @@ class ChatCoordinator:
                 ctx = orch._current_stream_context
                 if hasattr(ctx, "cumulative_usage") and ctx.cumulative_usage:
                     # Check if cumulative_usage is dict-like (not a Mock)
-                    if hasattr(ctx.cumulative_usage, "__contains__") and hasattr(ctx.cumulative_usage, "__getitem__"):
+                    if hasattr(ctx.cumulative_usage, "__contains__") and hasattr(
+                        ctx.cumulative_usage, "__getitem__"
+                    ):
                         for key in orch._cumulative_token_usage:
                             if key in ctx.cumulative_usage:
                                 orch._cumulative_token_usage[key] += ctx.cumulative_usage[key]
@@ -1300,7 +1304,7 @@ class ChatCoordinator:
 
         # Check context length (handle both dict and object access)
         context_length = sum(
-            len(msg.get('content', '') if isinstance(msg, dict) else getattr(msg, 'content', ''))
+            len(msg.get("content", "") if isinstance(msg, dict) else getattr(msg, "content", ""))
             for msg in orch.messages
         )
         if context_length > max_context * 0.9:  # 90% threshold
@@ -1350,8 +1354,7 @@ class ChatCoordinator:
                 # Add fallback message
                 chunks.append(
                     StreamChunk(
-                        content="\n\n[Unable to generate summary due to error. "
-                        f"Reason: {e}]\n",
+                        content="\n\n[Unable to generate summary due to error. " f"Reason: {e}]\n",
                         is_final=True,
                     )
                 )

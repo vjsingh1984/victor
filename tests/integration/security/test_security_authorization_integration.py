@@ -54,10 +54,7 @@ class MockSecurityTool:
 
     async def execute(self, **kwargs):
         """Execute tool with permission check."""
-        self.execution_log.append({
-            "timestamp": datetime.now(),
-            "kwargs": kwargs
-        })
+        self.execution_log.append({"timestamp": datetime.now(), "kwargs": kwargs})
         return {"status": "success", "tool": self.name}
 
 
@@ -90,19 +87,18 @@ class MockAuthorizationManager:
         return role in self.roles.get(user, set())
 
     async def authorize_tool_execution(
-        self,
-        user: str,
-        tool_name: str,
-        required_permissions: List[str]
+        self, user: str, tool_name: str, required_permissions: List[str]
     ) -> tuple[bool, Optional[str]]:
         """Authorize tool execution."""
-        self.audit_log.append({
-            "timestamp": datetime.now(),
-            "user": user,
-            "tool": tool_name,
-            "required_permissions": required_permissions,
-            "decision": "checking"
-        })
+        self.audit_log.append(
+            {
+                "timestamp": datetime.now(),
+                "user": user,
+                "tool": tool_name,
+                "required_permissions": required_permissions,
+                "decision": "checking",
+            }
+        )
 
         # Check all required permissions
         for perm in required_permissions:
@@ -123,11 +119,7 @@ class MockSecurityEventBus:
 
     async def publish(self, event_type: str, data: Dict[str, Any]):
         """Publish security event."""
-        self.events.append({
-            "type": event_type,
-            "data": data,
-            "timestamp": datetime.now()
-        })
+        self.events.append({"type": event_type, "data": data, "timestamp": datetime.now()})
 
     async def subscribe(self, event_type: str, handler):
         """Subscribe to security events."""
@@ -156,24 +148,19 @@ def security_tools():
     """Create mock security tools."""
     return {
         "vulnerability_scan": MockSecurityTool(
-            "vulnerability_scan",
-            ["security:scan:read", "security:scan:execute"]
+            "vulnerability_scan", ["security:scan:read", "security:scan:execute"]
         ),
         "penetration_test": MockSecurityTool(
-            "penetration_test",
-            ["security:pen_test:execute", "security:attack_simulate"]
+            "penetration_test", ["security:pen_test:execute", "security:attack_simulate"]
         ),
         "security_audit": MockSecurityTool(
-            "security_audit",
-            ["security:audit:read", "security:audit:write"]
+            "security_audit", ["security:audit:read", "security:audit:write"]
         ),
         "access_control_check": MockSecurityTool(
-            "access_control_check",
-            ["security:access:read", "security:access:evaluate"]
+            "access_control_check", ["security:access:read", "security:access:evaluate"]
         ),
         "credential_scan": MockSecurityTool(
-            "credential_scan",
-            ["security:credentials:read", "security:credentials:scan"]
+            "credential_scan", ["security:credentials:read", "security:credentials:scan"]
         ),
     }
 
@@ -184,20 +171,26 @@ def test_users(authorization_manager):
     # Admin user - all permissions
     authorization_manager.grant_role("admin", "security_admin")
     for perm in [
-        "security:scan:read", "security:scan:execute",
-        "security:pen_test:execute", "security:attack_simulate",
-        "security:audit:read", "security:audit:write",
-        "security:access:read", "security:access:evaluate",
-        "security:credentials:read", "security:credentials:scan"
+        "security:scan:read",
+        "security:scan:execute",
+        "security:pen_test:execute",
+        "security:attack_simulate",
+        "security:audit:read",
+        "security:audit:write",
+        "security:access:read",
+        "security:access:evaluate",
+        "security:credentials:read",
+        "security:credentials:scan",
     ]:
         authorization_manager.grant_permission("admin", perm)
 
     # Security analyst - scan and audit only
     authorization_manager.grant_role("analyst", "security_analyst")
     for perm in [
-        "security:scan:read", "security:scan:execute",
+        "security:scan:read",
+        "security:scan:execute",
         "security:audit:read",
-        "security:access:read"
+        "security:access:read",
     ]:
         authorization_manager.grant_permission("analyst", perm)
 
@@ -217,19 +210,19 @@ def mock_tool_registry():
             name="vulnerability_scan",
             description="Scan for security vulnerabilities",
             category="security",
-            required_permissions=["security:scan:execute"]
+            required_permissions=["security:scan:execute"],
         ),
         "penetration_test": MagicMock(
             name="penetration_test",
             description="Perform penetration testing",
             category="security",
-            required_permissions=["security:pen_test:execute"]
+            required_permissions=["security:pen_test:execute"],
         ),
         "security_audit": MagicMock(
             name="security_audit",
             description="Perform security audit",
             category="security",
-            required_permissions=["security:audit:write"]
+            required_permissions=["security:audit:write"],
         ),
     }
 
@@ -268,7 +261,7 @@ async def test_penetration_test_requires_authorization(
     granted, reason = await authorization_manager.authorize_tool_execution(
         user=admin_user,
         tool_name="penetration_test",
-        required_permissions=pen_test_tool.required_permissions
+        required_permissions=pen_test_tool.required_permissions,
     )
 
     assert granted is True
@@ -285,8 +278,8 @@ async def test_penetration_test_requires_authorization(
             "user": admin_user,
             "tool": "penetration_test",
             "authorized": True,
-            "target": "test-system"
-        }
+            "target": "test-system",
+        },
     )
 
     # Analyst should NOT be authorized
@@ -294,7 +287,7 @@ async def test_penetration_test_requires_authorization(
     granted, reason = await authorization_manager.authorize_tool_execution(
         user=analyst_user,
         tool_name="penetration_test",
-        required_permissions=pen_test_tool.required_permissions
+        required_permissions=pen_test_tool.required_permissions,
     )
 
     assert granted is False
@@ -302,12 +295,7 @@ async def test_penetration_test_requires_authorization(
 
     # Publish denial event
     await security_event_bus.publish(
-        "tool.denied",
-        {
-            "user": analyst_user,
-            "tool": "penetration_test",
-            "reason": reason
-        }
+        "tool.denied", {"user": analyst_user, "tool": "penetration_test", "reason": reason}
     )
 
     # Verify events
@@ -342,7 +330,7 @@ async def test_vulnerability_scan_permission_levels(
     granted, _ = await authorization_manager.authorize_tool_execution(
         user="analyst",
         tool_name="vulnerability_scan",
-        required_permissions=["security:scan:execute"]
+        required_permissions=["security:scan:execute"],
     )
 
     assert granted is True
@@ -351,7 +339,7 @@ async def test_vulnerability_scan_permission_levels(
     granted, _ = await authorization_manager.authorize_tool_execution(
         user="admin",
         tool_name="vulnerability_scan",
-        required_permissions=["security:scan:execute", "security:scan:fix"]
+        required_permissions=["security:scan:execute", "security:scan:fix"],
     )
 
     assert granted is True
@@ -360,7 +348,7 @@ async def test_vulnerability_scan_permission_levels(
     granted, reason = await authorization_manager.authorize_tool_execution(
         user="analyst",
         tool_name="vulnerability_scan",
-        required_permissions=["security:scan:execute", "security:scan:fix"]
+        required_permissions=["security:scan:execute", "security:scan:fix"],
     )
 
     assert granted is False
@@ -396,9 +384,7 @@ async def test_security_tool_execution_creates_audit_trail(
     for tool_name, tool in security_tools.items():
         # Authorize
         granted, reason = await authorization_manager.authorize_tool_execution(
-            user=user,
-            tool_name=tool_name,
-            required_permissions=tool.required_permissions
+            user=user, tool_name=tool_name, required_permissions=tool.required_permissions
         )
 
         if granted:
@@ -415,8 +401,8 @@ async def test_security_tool_execution_creates_audit_trail(
                     "action": "execute",
                     "target": "test-target",
                     "timestamp": datetime.now().isoformat(),
-                    "result": "success"
-                }
+                    "result": "success",
+                },
             )
         else:
             # Log denied attempt to audit
@@ -430,8 +416,8 @@ async def test_security_tool_execution_creates_audit_trail(
                     "target": "test-target",
                     "timestamp": datetime.now().isoformat(),
                     "result": "denied",
-                    "reason": reason
-                }
+                    "reason": reason,
+                },
             )
 
     # Verify audit log
@@ -474,7 +460,7 @@ async def test_unauthorized_tool_execution_blocked_and_logged(
     granted, reason = await authorization_manager.authorize_tool_execution(
         user=unauthorized_user,
         tool_name="penetration_test",
-        required_permissions=tool.required_permissions
+        required_permissions=tool.required_permissions,
     )
 
     assert granted is False
@@ -488,8 +474,8 @@ async def test_unauthorized_tool_execution_blocked_and_logged(
             "tool": "penetration_test",
             "reason": reason,
             "severity": "high",
-            "timestamp": datetime.now().isoformat()
-        }
+            "timestamp": datetime.now().isoformat(),
+        },
     )
 
     # Verify incident was logged
@@ -505,9 +491,7 @@ async def test_unauthorized_tool_execution_blocked_and_logged(
 
 
 @pytest.mark.asyncio
-async def test_security_events_propagate_across_systems(
-    authorization_manager, security_event_bus
-):
+async def test_security_events_propagate_across_systems(authorization_manager, security_event_bus):
     """Test that security events propagate across all systems.
 
     Scenario:
@@ -529,9 +513,7 @@ async def test_security_events_propagate_across_systems(
 
     # Authorization check fails
     granted, reason = await authorization_manager.authorize_tool_execution(
-        user=user,
-        tool_name=tool,
-        required_permissions=["security:pen_test:execute"]
+        user=user, tool_name=tool, required_permissions=["security:pen_test:execute"]
     )
 
     assert granted is False
@@ -539,20 +521,11 @@ async def test_security_events_propagate_across_systems(
     # Publish denial event
     await security_event_bus.publish(
         "access.denied",
-        {
-            "user": user,
-            "tool": tool,
-            "reason": reason,
-            "timestamp": datetime.now().isoformat()
-        }
+        {"user": user, "tool": tool, "reason": reason, "timestamp": datetime.now().isoformat()},
     )
 
     # Simulate other systems receiving and processing event
-    received_events = {
-        "monitoring": [],
-        "audit": [],
-        "alerting": []
-    }
+    received_events = {"monitoring": [], "audit": [], "alerting": []}
 
     # Monitoring system subscribes to all security events
     async def monitoring_handler(event):
@@ -616,9 +589,7 @@ async def test_security_authorization_performance_under_load(
 
         auth_tasks.append(
             authorization_manager.authorize_tool_execution(
-                user=user,
-                tool_name=tool_name,
-                required_permissions=tool.required_permissions
+                user=user, tool_name=tool_name, required_permissions=tool.required_permissions
             )
         )
 
@@ -666,9 +637,7 @@ async def test_security_authorization_performance_under_load(
 
 
 @pytest.mark.asyncio
-async def test_role_based_access_control_with_security_tools(
-    authorization_manager, security_tools
-):
+async def test_role_based_access_control_with_security_tools(authorization_manager, security_tools):
     """Test role-based access control with security tools.
 
     Scenario:
@@ -686,18 +655,19 @@ async def test_role_based_access_control_with_security_tools(
     # Define roles
     roles = {
         "security_admin": [
-            "security:scan:execute", "security:scan:fix",
-            "security:pen_test:execute", "security:attack_simulate",
-            "security:audit:write", "security:credentials:scan"
+            "security:scan:execute",
+            "security:scan:fix",
+            "security:pen_test:execute",
+            "security:attack_simulate",
+            "security:audit:write",
+            "security:credentials:scan",
         ],
         "security_analyst": [
             "security:scan:execute",
             "security:audit:read",
-            "security:access:read"
+            "security:access:read",
         ],
-        "security_auditor": [
-            "security:audit:read", "security:audit:write"
-        ]
+        "security_auditor": ["security:audit:read", "security:audit:write"],
     }
 
     # Assign roles to users
@@ -706,7 +676,11 @@ async def test_role_based_access_control_with_security_tools(
     authorization_manager.grant_role("user3", "security_auditor")
 
     # Grant permissions based on roles
-    for user, role in [("user1", "security_admin"), ("user2", "security_analyst"), ("user3", "security_auditor")]:
+    for user, role in [
+        ("user1", "security_admin"),
+        ("user2", "security_analyst"),
+        ("user3", "security_auditor"),
+    ]:
         for perm in roles[role]:
             authorization_manager.grant_permission(user, perm)
 
@@ -714,30 +688,26 @@ async def test_role_based_access_control_with_security_tools(
     admin_granted, _ = await authorization_manager.authorize_tool_execution(
         user="user1",
         tool_name="penetration_test",
-        required_permissions=["security:pen_test:execute"]
+        required_permissions=["security:pen_test:execute"],
     )
     assert admin_granted is True
 
     # Test analyst role - should have limited permissions
     analyst_granted, _ = await authorization_manager.authorize_tool_execution(
-        user="user2",
-        tool_name="vulnerability_scan",
-        required_permissions=["security:scan:execute"]
+        user="user2", tool_name="vulnerability_scan", required_permissions=["security:scan:execute"]
     )
     assert analyst_granted is True
 
     analyst_denied, _ = await authorization_manager.authorize_tool_execution(
         user="user2",
         tool_name="penetration_test",
-        required_permissions=["security:pen_test:execute"]
+        required_permissions=["security:pen_test:execute"],
     )
     assert analyst_denied is False
 
     # Test auditor role - should only have audit permissions
     auditor_granted, _ = await authorization_manager.authorize_tool_execution(
-        user="user3",
-        tool_name="security_audit",
-        required_permissions=["security:audit:write"]
+        user="user3", tool_name="security_audit", required_permissions=["security:audit:write"]
     )
     assert auditor_granted is True
 

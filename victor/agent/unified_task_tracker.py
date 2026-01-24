@@ -497,7 +497,9 @@ class UnifiedTaskConfigLoader:
                 }
 
                 # Populate task types, using tool_budget from DEFAULT_TOOL_BUDGETS
-                for task_type, default_template in self.DEFAULT_CONFIG.get("task_types", {}).items():
+                for task_type, default_template in self.DEFAULT_CONFIG.get(
+                    "task_types", {}
+                ).items():
                     yaml_config = task_config.get("task_types", {}).get(task_type, {})
 
                     # Start with default template
@@ -512,12 +514,18 @@ class UnifiedTaskConfigLoader:
                     task_type_config["tool_budget"] = default_template["tool_budget"]
                     self._config["task_types"][task_type] = task_type_config
 
-                logger.debug(f"Loaded task config from {task_config_path} (merged with centralized budgets)")
+                logger.debug(
+                    f"Loaded task config from {task_config_path} (merged with centralized budgets)"
+                )
             except Exception as e:
-                logger.warning(f"Failed to load task config: {e}, using defaults with centralized budgets")
+                logger.warning(
+                    f"Failed to load task config: {e}, using defaults with centralized budgets"
+                )
                 self._config = self.DEFAULT_CONFIG
         else:
-            logger.debug("Using default task config with centralized budgets (task_tool_config.yaml not found)")
+            logger.debug(
+                "Using default task config with centralized budgets (task_tool_config.yaml not found)"
+            )
             self._config = self.DEFAULT_CONFIG
 
     def reload(self) -> None:

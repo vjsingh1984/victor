@@ -56,9 +56,7 @@ class TestAdaptiveParallelExecutor:
     @pytest.mark.asyncio
     async def test_execute_multiple_tasks_always_sequential(self):
         """Test sequential execution with ALWAYS_SEQUENTIAL strategy."""
-        executor = AdaptiveParallelExecutor(
-            strategy=OptimizationStrategy.ALWAYS_SEQUENTIAL
-        )
+        executor = AdaptiveParallelExecutor(strategy=OptimizationStrategy.ALWAYS_SEQUENTIAL)
 
         execution_order = []
 
@@ -123,6 +121,7 @@ class TestAdaptiveParallelExecutor:
         async def make_task(i):
             async def task(context):
                 return f"result{i}"
+
             return task
 
         tasks = [make_task(i) for i in range(5)]
@@ -230,9 +229,7 @@ class TestAdaptiveParallelExecutor:
     @pytest.mark.asyncio
     async def test_should_parallelize_with_always_parallel(self):
         """Test _should_parallelize with ALWAYS_PARALLEL."""
-        executor = AdaptiveParallelExecutor(
-            strategy=OptimizationStrategy.ALWAYS_PARALLEL
-        )
+        executor = AdaptiveParallelExecutor(strategy=OptimizationStrategy.ALWAYS_PARALLEL)
 
         assert executor._should_parallelize([]) is True
         assert executor._should_parallelize([None]) is True
@@ -240,9 +237,7 @@ class TestAdaptiveParallelExecutor:
     @pytest.mark.asyncio
     async def test_should_parallelize_with_always_sequential(self):
         """Test _should_parallelize with ALWAYS_SEQUENTIAL."""
-        executor = AdaptiveParallelExecutor(
-            strategy=OptimizationStrategy.ALWAYS_SEQUENTIAL
-        )
+        executor = AdaptiveParallelExecutor(strategy=OptimizationStrategy.ALWAYS_SEQUENTIAL)
 
         assert executor._should_parallelize([]) is False
         assert executor._should_parallelize([None, None, None]) is False
@@ -250,9 +245,7 @@ class TestAdaptiveParallelExecutor:
     @pytest.mark.asyncio
     async def test_should_parallelize_with_auto_single_task(self):
         """Test _should_parallelize with AUTO and single task."""
-        executor = AdaptiveParallelExecutor(
-            strategy=OptimizationStrategy.AUTO
-        )
+        executor = AdaptiveParallelExecutor(strategy=OptimizationStrategy.AUTO)
 
         assert executor._should_parallelize([None]) is False
 

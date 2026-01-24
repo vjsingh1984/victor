@@ -31,7 +31,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from victor.rag.chunker import DocumentChunker, ChunkingConfig
-from victor.rag.document_store import Document, DocumentSearchResult, DocumentStore, DocumentStoreConfig
+from victor.rag.document_store import (
+    Document,
+    DocumentSearchResult,
+    DocumentStore,
+    DocumentStoreConfig,
+)
 from victor.rag.tools.ingest import RAGIngestTool
 from victor.rag.tools.search import RAGSearchTool
 
@@ -80,7 +85,9 @@ async def rag_store():
         code_aware=True,
     )
 
-    store = DocumentStore(config, embedding_service=MockEmbeddingService(), chunking_config=chunking_config)
+    store = DocumentStore(
+        config, embedding_service=MockEmbeddingService(), chunking_config=chunking_config
+    )
     await store.initialize()
     yield store
     # Cleanup is handled by temp directory
@@ -165,7 +172,9 @@ class TestDocumentIngestionPipeline:
 
         assert len(chunks) > 0, f"Expected chunks but got {len(chunks)}"
         assert all(c.doc_id == "test1" for c in chunks)
-        assert all(len(c.embedding) == 384 for c in chunks)  # Embeddings should have correct dimension
+        assert all(
+            len(c.embedding) == 384 for c in chunks
+        )  # Embeddings should have correct dimension
 
     @pytest.mark.asyncio
     async def test_ingest_multiple_documents(self, rag_store, sample_documents):
@@ -273,7 +282,9 @@ class TestSimilaritySearch:
     @pytest.mark.asyncio
     async def test_search_with_metadata_filter(self, populated_store):
         """Test search filtering by metadata."""
-        results = await populated_store.search("container", k=5, filter_metadata={"topic": "docker"})
+        results = await populated_store.search(
+            "container", k=5, filter_metadata={"topic": "docker"}
+        )
 
         # Should only return docker-related results
         assert all(r.metadata.get("topic") == "docker" for r in results)
@@ -334,13 +345,14 @@ class TestRAGToolIntegration:
         """Test RAGIngestTool with document store."""
         tool = RAGIngestTool()
         store = DocumentStore(
-            DocumentStoreConfig(path=Path(tempfile.mkdtemp())),
-            chunking_config=test_chunking_config
+            DocumentStoreConfig(path=Path(tempfile.mkdtemp())), chunking_config=test_chunking_config
         )
         await store.initialize()
 
         with patch.object(tool, "_get_document_store", return_value=store):
-            result = await tool.execute(content="Test content for tool integration", doc_type="text")
+            result = await tool.execute(
+                content="Test content for tool integration", doc_type="text"
+            )
 
             assert result.success
             assert "Successfully ingested" in result.output
@@ -392,8 +404,7 @@ class TestEndToEndRAGWorkflow:
         """Test complete RAG workflow: ingest → search → retrieve."""
         # Setup
         store = DocumentStore(
-            DocumentStoreConfig(path=Path(tempfile.mkdtemp())),
-            chunking_config=test_chunking_config
+            DocumentStoreConfig(path=Path(tempfile.mkdtemp())), chunking_config=test_chunking_config
         )
         await store.initialize()
 
@@ -463,8 +474,7 @@ class TestEndToEndRAGWorkflow:
     async def test_batch_document_ingestion(self, test_chunking_config):
         """Test ingesting multiple documents in batch."""
         store = DocumentStore(
-            DocumentStoreConfig(path=Path(tempfile.mkdtemp())),
-            chunking_config=test_chunking_config
+            DocumentStoreConfig(path=Path(tempfile.mkdtemp())), chunking_config=test_chunking_config
         )
         await store.initialize()
 
@@ -516,7 +526,9 @@ class TestRAGWithLLMIntegration:
             # Check that results contain relevant terms
             all_text = " ".join(r.content.lower() for r in results)
             # Should mention ML or AI terms
-            assert any(term in all_text for term in ["machine learning", "algorithms", "neural", "ai"])
+            assert any(
+                term in all_text for term in ["machine learning", "algorithms", "neural", "ai"]
+            )
 
     @pytest.mark.asyncio
     async def test_multi_turn_rag_conversation(self, populated_store):
@@ -560,8 +572,7 @@ class TestRAGPerformance:
         import time
 
         store = DocumentStore(
-            DocumentStoreConfig(path=Path(tempfile.mkdtemp())),
-            chunking_config=test_chunking_config
+            DocumentStoreConfig(path=Path(tempfile.mkdtemp())), chunking_config=test_chunking_config
         )
         await store.initialize()
 
@@ -604,8 +615,7 @@ class TestRAGErrorHandling:
     async def test_search_empty_store(self, test_chunking_config):
         """Test searching an empty document store."""
         store = DocumentStore(
-            DocumentStoreConfig(path=Path(tempfile.mkdtemp())),
-            chunking_config=test_chunking_config
+            DocumentStoreConfig(path=Path(tempfile.mkdtemp())), chunking_config=test_chunking_config
         )
         await store.initialize()
 
@@ -657,7 +667,9 @@ class TestMetadataAndFiltering:
     async def test_complex_metadata_filtering(self, populated_store):
         """Test filtering with complex metadata queries."""
         # Filter by category
-        results = await populated_store.search("platform", k=5, filter_metadata={"category": "devops"})
+        results = await populated_store.search(
+            "platform", k=5, filter_metadata={"category": "devops"}
+        )
 
         assert all(r.metadata.get("category") == "devops" for r in results)
 
@@ -665,8 +677,7 @@ class TestMetadataAndFiltering:
     async def test_array_metadata_filtering(self, test_chunking_config):
         """Test filtering with array values in metadata."""
         store = DocumentStore(
-            DocumentStoreConfig(path=Path(tempfile.mkdtemp())),
-            chunking_config=test_chunking_config
+            DocumentStoreConfig(path=Path(tempfile.mkdtemp())), chunking_config=test_chunking_config
         )
         await store.initialize()
 

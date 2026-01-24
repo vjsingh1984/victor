@@ -622,6 +622,7 @@ class OrchestratorServiceProvider:
 
         # ToolCallCoordinator - scoped for tool call coordination
         from victor.agent.coordinators.tool_call_protocol import IToolCallCoordinator
+
         container.register(
             IToolCallCoordinator,
             lambda c: self._create_tool_call_coordinator(),
@@ -630,6 +631,7 @@ class OrchestratorServiceProvider:
 
         # PromptBuilderCoordinator - scoped for prompt building coordination
         from victor.agent.coordinators.prompt_builder_protocol import IPromptBuilderCoordinator
+
         container.register(
             IPromptBuilderCoordinator,
             lambda c: self._create_prompt_builder_coordinator(),
@@ -1988,6 +1990,7 @@ class OrchestratorServiceProvider:
 
         # Get sanitizer if available
         from victor.agent.tool_calling.sanitizer import ToolNameSanitizer
+
         sanitizer = ToolNameSanitizer()
 
         return create_tool_call_coordinator(
@@ -2017,7 +2020,9 @@ class OrchestratorServiceProvider:
         config = PromptBuilderCoordinatorConfig(
             cache_enabled=getattr(self._settings, "enable_prompt_cache", True),
             include_tool_hints=getattr(self._settings, "include_tool_hints_in_prompt", True),
-            include_thinking_instructions=getattr(self._settings, "include_thinking_instructions", True),
+            include_thinking_instructions=getattr(
+                self._settings, "include_thinking_instructions", True
+            ),
             max_prompt_length=getattr(self._settings, "max_system_prompt_length", 50000),
         )
 

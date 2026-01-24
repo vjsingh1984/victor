@@ -56,12 +56,14 @@ class TestFrameworkNodeStatus:
     def test_node_status_enum_exists(self):
         """Test FrameworkNodeStatus enum exists."""
         from victor.framework.graph import FrameworkNodeStatus
+
         statuses = list(FrameworkNodeStatus)
         assert len(statuses) >= 2
 
     def test_can_iterate_node_status(self):
         """Test can iterate over FrameworkNodeStatus."""
         from victor.framework.graph import FrameworkNodeStatus
+
         statuses = list(FrameworkNodeStatus)
         assert len(statuses) > 0
 
@@ -103,26 +105,22 @@ class TestNode:
 
     def test_create_function_node(self):
         """Test creating a function node."""
+
         def my_node(state: Dict[str, Any]) -> Dict[str, Any]:
             return {"result": "done"}
 
-        node = Node(
-            id="test_node",
-            func=my_node
-        )
+        node = Node(id="test_node", func=my_node)
         assert node.id == "test_node"
         assert node.func == my_node
 
     def test_create_agent_node(self):
         """Test creating an agent node."""
+
         def agent_fn(state: Dict[str, Any]) -> Dict[str, Any]:
             return {"output": "agent response"}
 
         # Create node without config if that's not supported
-        node = Node(
-            id="agent_node",
-            func=agent_fn
-        )
+        node = Node(id="agent_node", func=agent_fn)
         assert node.id == "agent_node"
         assert node.func == agent_fn
 
@@ -132,11 +130,7 @@ class TestEdge:
 
     def test_create_normal_edge(self):
         """Test creating a normal edge."""
-        edge = Edge(
-            source="node1",
-            target="node2",
-            edge_type=EdgeType.NORMAL
-        )
+        edge = Edge(source="node1", target="node2", edge_type=EdgeType.NORMAL)
         assert edge.source == "node1"
         assert edge.target == "node2"
         assert edge.edge_type == EdgeType.NORMAL
@@ -144,14 +138,12 @@ class TestEdge:
 
     def test_create_conditional_edge(self):
         """Test creating a conditional edge."""
+
         def condition(state: Dict[str, Any]) -> str:
             return "node2"
 
         edge = Edge(
-            source="node1",
-            target="node2",
-            edge_type=EdgeType.CONDITIONAL,
-            condition=condition
+            source="node1", target="node2", edge_type=EdgeType.CONDITIONAL, condition=condition
         )
         assert edge.source == "node1"
         assert edge.target == "node2"

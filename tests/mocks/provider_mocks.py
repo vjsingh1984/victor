@@ -377,12 +377,8 @@ class FailingProvider(BaseProvider):
                 message, retry_after=60, provider=self.name
             ),
             "auth": lambda: ProviderAuthError(message, provider=self.name),
-            "connection": lambda: ProviderConnectionError(
-                message, provider=self.name
-            ),
-            "invalid_response": lambda: ProviderInvalidResponseError(
-                message, provider=self.name
-            ),
+            "connection": lambda: ProviderConnectionError(message, provider=self.name),
+            "invalid_response": lambda: ProviderInvalidResponseError(message, provider=self.name),
             "generic": lambda: ProviderError(message, provider=self.name),
         }
 
@@ -618,9 +614,7 @@ class ToolCallMockProvider(BaseProvider):
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream a chat completion response (not implemented for tool calls)."""
-        raise NotImplementedError(
-            "Streaming not implemented for ToolCallMockProvider"
-        )
+        raise NotImplementedError("Streaming not implemented for ToolCallMockProvider")
 
     async def close(self) -> None:
         """Close any open connections or resources."""
@@ -672,9 +666,7 @@ class ProviderTestHelpers:
         return StreamingTestProvider(chunks=chunks, chunk_delay=chunk_delay)
 
     @staticmethod
-    def create_failing_mock(
-        error_type: str = "generic", fail_after: int = 0
-    ) -> FailingProvider:
+    def create_failing_mock(error_type: str = "generic", fail_after: int = 0) -> FailingProvider:
         """Create a failing mock provider.
 
         Args:
@@ -699,9 +691,7 @@ class ProviderTestHelpers:
         Returns:
             Configured ToolCallMockProvider instance
         """
-        return ToolCallMockProvider(
-            tool_calls=tool_calls, response_text=response_text
-        )
+        return ToolCallMockProvider(tool_calls=tool_calls, response_text=response_text)
 
     @staticmethod
     def create_test_messages(content: str = "Test message") -> List[Message]:

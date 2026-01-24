@@ -139,9 +139,7 @@ class TestVisionAgentIntegration:
         agent = VisionAgent(provider=provider)
 
         # Verify file is read and encoded
-        provider.chat.return_value = Mock(
-            content="Processed real image file", role="assistant"
-        )
+        provider.chat.return_value = Mock(content="Processed real image file", role="assistant")
 
         analysis = await agent.analyze_image(sample_image)
 
@@ -403,9 +401,7 @@ class TestMultimodalWorkflowIntegration:
         import asyncio
 
         provider = MockProviderFactory.create_anthropic()
-        provider.chat.return_value = Mock(
-            content="Parallel multimodal analysis", role="assistant"
-        )
+        provider.chat.return_value = Mock(content="Parallel multimodal analysis", role="assistant")
 
         vision_agent = VisionAgent(provider=provider)
 
@@ -479,9 +475,7 @@ class TestMultimodalPerformance:
         provider = MockProviderFactory.create_anthropic()
         agent = VisionAgent(provider=provider)
 
-        provider.chat.return_value = Mock(
-            content="Large image analysis complete", role="assistant"
-        )
+        provider.chat.return_value = Mock(content="Large image analysis complete", role="assistant")
 
         analysis = await agent.analyze_image(str(image_path))
 

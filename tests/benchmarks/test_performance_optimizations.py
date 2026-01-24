@@ -87,9 +87,7 @@ class BenchmarkResult:
 # =============================================================================
 
 
-def run_benchmark(
-    func, iterations: int, warmup: int = 0
-) -> BenchmarkResult:
+def run_benchmark(func, iterations: int, warmup: int = 0) -> BenchmarkResult:
     """Run a synchronous benchmark.
 
     Args:
@@ -128,9 +126,7 @@ def run_benchmark(
     )
 
 
-async def run_async_benchmark(
-    func, iterations: int, warmup: int = 0
-) -> BenchmarkResult:
+async def run_async_benchmark(func, iterations: int, warmup: int = 0) -> BenchmarkResult:
     """Run an asynchronous benchmark.
 
     Args:
@@ -191,9 +187,7 @@ def print_benchmark_results(results: List[BenchmarkResult]) -> None:
         else:
             speedup_str = "1.00x (baseline)"
 
-        print(
-            f"{result.name:<40} {avg_ms:<15.4f} {throughput:<15.2f} {speedup_str:<10}"
-        )
+        print(f"{result.name:<40} {avg_ms:<15.4f} {throughput:<15.2f} {speedup_str:<10}")
 
     print("=" * 100 + "\n")
 
@@ -387,6 +381,7 @@ class TestRequestBatchingBenchmarks:
     @pytest.mark.asyncio
     async def test_batched_vs_sequential(self):
         """Compare batched vs sequential execution."""
+
         # Simulated API delay
         async def mock_api_call(request):
             await asyncio.sleep(0.01)  # 10ms delay
@@ -410,6 +405,7 @@ class TestRequestBatchingBenchmarks:
         await batcher.start()
 
         try:
+
             async def batched_execution():
                 tasks = [batcher.submit(req=i) for i in range(50)]
                 return await asyncio.gather(*tasks)
@@ -449,7 +445,9 @@ class TestOverallPerformance:
         # Create batcher
         batcher = RequestBatcher(
             key_func=lambda **kwargs: kwargs.get("operation"),
-            batch_func=lambda entries: asyncio.sleep(0.01, [f"result_{i}" for i in range(len(entries))]),
+            batch_func=lambda entries: asyncio.sleep(
+                0.01, [f"result_{i}" for i in range(len(entries))]
+            ),
             max_batch_size=10,
             batch_timeout=0.05,
         )

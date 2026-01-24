@@ -14,10 +14,16 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from victor.framework.graph import (
-    StateGraph, CompiledGraph, CopyOnWriteState, 
-    WorkflowCheckpoint, CheckpointerProtocol,
-    MemoryCheckpointer, GraphExecutionResult, END,
-    IterationController, TimeoutManager,
+    StateGraph,
+    CompiledGraph,
+    CopyOnWriteState,
+    WorkflowCheckpoint,
+    CheckpointerProtocol,
+    MemoryCheckpointer,
+    GraphExecutionResult,
+    END,
+    IterationController,
+    TimeoutManager,
 )
 
 
@@ -51,8 +57,10 @@ class TestEdges:
     def test_add_conditional_edge(self):
         graph = StateGraph()
         graph.add_node("router", lambda s: s)
+
         def route_func(state):
             return state.get("branch", "a")
+
         graph.add_conditional_edge("router", route_func, {"a": "branch_a"})
         assert "router" in graph._edges
 
@@ -78,24 +86,24 @@ class TestSimpleExecution:
     @pytest.mark.asyncio
     async def test_linear_execution(self):
         graph = StateGraph()
-        
+
         def node_a(state):
             state["steps"] = state.get("steps", "") + "->a"
             return state
-        
+
         def node_b(state):
             state["steps"] += "->b"
             return state
-        
+
         graph.add_node("a", node_a)
         graph.add_node("b", node_b)
         graph.add_edge("a", "b")
         graph.add_edge("b", END)
         graph.set_entry_point("a")
-        
+
         compiled = graph.compile()
         result = await compiled.invoke({"steps": ""})
-        
+
         assert result.success
         assert result.state["steps"] == "->a->b"
 
@@ -104,23 +112,23 @@ class TestConditionalEdges:
     @pytest.mark.asyncio
     async def test_conditional_routing(self):
         graph = StateGraph()
-        
+
         def router(state):
             return "a"
-        
+
         def branch_a(state):
             state["result"] = "A"
             return state
-        
+
         graph.add_node("router", lambda s: s)
         graph.add_node("branch_a", branch_a)
         graph.add_conditional_edge("router", router, {"a": "branch_a"})
         graph.add_edge("branch_a", END)
         graph.set_entry_point("router")
-        
+
         compiled = graph.compile()
         result = await compiled.invoke({})
-        
+
         assert result.success
         assert result.state["result"] == "A"
 
@@ -129,25 +137,26 @@ class TestCyclesAndLoops:
     @pytest.mark.asyncio
     async def test_simple_cycle(self):
         graph = StateGraph()
-        
+
         def counter(state):
             count = state.get("count", 0) + 1
             state["count"] = count
             return state
-        
+
         def should_continue(state):
             return "continue" if state["count"] < 3 else "stop"
-        
+
         graph.add_node("counter", counter)
         graph.add_node("stop", lambda s: s)
-        graph.add_conditional_edge("counter", should_continue, 
-                                     {"continue": "counter", "stop": "stop"})
+        graph.add_conditional_edge(
+            "counter", should_continue, {"continue": "counter", "stop": "stop"}
+        )
         graph.add_edge("stop", END)
         graph.set_entry_point("counter")
-        
+
         compiled = graph.compile()
         result = await compiled.invoke({"count": 0})
-        
+
         assert result.success
         assert result.state["count"] == 3
 
@@ -203,18 +212,18 @@ class TestStreamingExecution:
     @pytest.mark.asyncio
     async def test_stream_linear_graph(self):
         graph = StateGraph()
-        
+
         graph.add_node("a", lambda s: {**s, "step": "a"})
         graph.add_node("b", lambda s: {**s, "step": "b"})
         graph.add_edge("a", "b")
         graph.add_edge("b", END)
         graph.set_entry_point("a")
-        
+
         compiled = graph.compile()
         results = []
         async for node_id, state in compiled.stream({}):
             results.append(node_id)
-        
+
         assert len(results) == 2
 
 
@@ -222,25 +231,24 @@ class TestIntegration:
     @pytest.mark.asyncio
     async def test_complex_workflow(self):
         graph = StateGraph()
-        
+
         def process(state):
             count = state.get("count", 0) + 1
             state["count"] = count
             return state
-        
+
         def should_retry(state):
             return "retry" if state["count"] < 3 else "done"
-        
+
         graph.add_node("process", process)
         graph.add_node("done", lambda s: {**s, "status": "complete"})
-        graph.add_conditional_edge("process", should_retry, 
-                                     {"retry": "process", "done": "done"})
+        graph.add_conditional_edge("process", should_retry, {"retry": "process", "done": "done"})
         graph.add_edge("done", END)
         graph.set_entry_point("process")
-        
+
         compiled = graph.compile()
         result = await compiled.invoke({"count": 0})
-        
+
         assert result.success
         assert result.state["count"] == 3
         assert result.state["status"] == "complete"

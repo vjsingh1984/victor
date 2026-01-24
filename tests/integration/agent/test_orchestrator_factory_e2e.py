@@ -43,9 +43,13 @@ class TestOrchestratorFactoryE2E:
     @pytest.mark.asyncio
     async def test_create_minimal_orchestrator(self):
         """Test creating a minimal orchestrator with defaults."""
-        settings = TestSettingsBuilder().with_conversation_memory(
-            False
-        ).with_plugins(False).with_analytics(False).build()
+        settings = (
+            TestSettingsBuilder()
+            .with_conversation_memory(False)
+            .with_plugins(False)
+            .with_analytics(False)
+            .build()
+        )
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -98,9 +102,7 @@ class TestOrchestratorFactoryE2E:
     @pytest.mark.asyncio
     async def test_create_orchestrator_with_thinking_mode(self):
         """Test creating orchestrator with thinking mode enabled."""
-        settings = TestSettingsBuilder().with_conversation_memory(
-            False
-        ).with_plugins(False).build()
+        settings = TestSettingsBuilder().with_conversation_memory(False).with_plugins(False).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -118,9 +120,7 @@ class TestOrchestratorFactoryE2E:
     @pytest.mark.asyncio
     async def test_create_orchestrator_with_profile_name(self):
         """Test creating orchestrator with profile name."""
-        settings = TestSettingsBuilder().with_conversation_memory(
-            False
-        ).with_plugins(False).build()
+        settings = TestSettingsBuilder().with_conversation_memory(False).with_plugins(False).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -138,9 +138,7 @@ class TestOrchestratorFactoryE2E:
     @pytest.mark.asyncio
     async def test_create_all_components(self):
         """Test creating all orchestrator components."""
-        settings = TestSettingsBuilder().with_conversation_memory(
-            False
-        ).with_plugins(False).build()
+        settings = TestSettingsBuilder().with_conversation_memory(False).with_plugins(False).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -164,9 +162,7 @@ class TestOrchestratorFactoryE2E:
     @pytest.mark.asyncio
     async def test_components_have_correct_attributes(self):
         """Test that components have correct attributes."""
-        settings = TestSettingsBuilder().with_conversation_memory(
-            False
-        ).with_plugins(False).build()
+        settings = TestSettingsBuilder().with_conversation_memory(False).with_plugins(False).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -194,9 +190,7 @@ class TestOrchestratorFactoryE2E:
     @pytest.mark.asyncio
     async def test_orchestrator_has_tool_registry(self):
         """Test that created orchestrator has tool registry."""
-        settings = TestSettingsBuilder().with_conversation_memory(
-            False
-        ).with_plugins(False).build()
+        settings = TestSettingsBuilder().with_conversation_memory(False).with_plugins(False).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -214,9 +208,7 @@ class TestOrchestratorFactoryE2E:
     @pytest.mark.asyncio
     async def test_orchestrator_has_tool_executor(self):
         """Test that created orchestrator has tool executor."""
-        settings = TestSettingsBuilder().with_conversation_memory(
-            False
-        ).with_plugins(False).build()
+        settings = TestSettingsBuilder().with_conversation_memory(False).with_plugins(False).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -234,9 +226,7 @@ class TestOrchestratorFactoryE2E:
     @pytest.mark.asyncio
     async def test_orchestrator_has_conversation_controller(self):
         """Test that created orchestrator has conversation controller."""
-        settings = TestSettingsBuilder().with_conversation_memory(
-            False
-        ).with_plugins(False).build()
+        settings = TestSettingsBuilder().with_conversation_memory(False).with_plugins(False).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -254,9 +244,7 @@ class TestOrchestratorFactoryE2E:
     @pytest.mark.asyncio
     async def test_orchestrator_has_metrics_collector(self):
         """Test that created orchestrator has metrics collector."""
-        settings = TestSettingsBuilder().with_conversation_memory(
-            False
-        ).with_plugins(False).build()
+        settings = TestSettingsBuilder().with_conversation_memory(False).with_plugins(False).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -274,9 +262,7 @@ class TestOrchestratorFactoryE2E:
     @pytest.mark.asyncio
     async def test_orchestrator_has_recovery_handler(self):
         """Test that created orchestrator has recovery handler."""
-        settings = TestSettingsBuilder().with_conversation_memory(
-            False
-        ).with_plugins(False).build()
+        settings = TestSettingsBuilder().with_conversation_memory(False).with_plugins(False).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -294,9 +280,7 @@ class TestOrchestratorFactoryE2E:
     @pytest.mark.asyncio
     async def test_orchestrator_factory_is_reusable(self):
         """Test that factory can be reused to create multiple orchestrators."""
-        settings = TestSettingsBuilder().with_conversation_memory(
-            False
-        ).with_plugins(False).build()
+        settings = TestSettingsBuilder().with_conversation_memory(False).with_plugins(False).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -315,9 +299,7 @@ class TestOrchestratorFactoryE2E:
     @pytest.mark.asyncio
     async def test_factory_with_different_providers(self):
         """Test creating orchestrators with different providers."""
-        settings = TestSettingsBuilder().with_conversation_memory(
-            False
-        ).with_plugins(False).build()
+        settings = TestSettingsBuilder().with_conversation_memory(False).with_plugins(False).build()
 
         anthropic_provider = MockProviderFactory.create_anthropic()
         openai_provider = MockProviderFactory.create_openai()
@@ -345,9 +327,7 @@ class TestOrchestratorFactoryE2E:
     @pytest.mark.asyncio
     async def test_orchestrator_with_workflow_optimizations(self):
         """Test creating orchestrator with workflow optimizations enabled."""
-        settings = TestSettingsBuilder().with_conversation_memory(
-            False
-        ).with_plugins(False).build()
+        settings = TestSettingsBuilder().with_conversation_memory(False).with_plugins(False).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -364,9 +344,7 @@ class TestOrchestratorFactoryE2E:
     @pytest.mark.asyncio
     async def test_orchestrator_with_coordinators(self):
         """Test creating orchestrator with new coordinators."""
-        settings = TestSettingsBuilder().with_conversation_memory(
-            False
-        ).with_plugins(False).build()
+        settings = TestSettingsBuilder().with_conversation_memory(False).with_plugins(False).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -478,9 +456,7 @@ class TestOrchestratorFactoryE2E:
     @pytest.mark.asyncio
     async def test_initialize_orchestrator_instance(self):
         """Test initializing an existing orchestrator instance."""
-        settings = TestSettingsBuilder().with_conversation_memory(
-            False
-        ).with_plugins(False).build()
+        settings = TestSettingsBuilder().with_conversation_memory(False).with_plugins(False).build()
         provider = MockProviderFactory.create_anthropic()
 
         factory = OrchestratorFactory(
@@ -553,13 +529,12 @@ class TestOrchestratorFactoryE2E:
     @pytest.mark.asyncio
     async def test_factory_container_caching(self):
         """Test that factory caches DI container."""
-        settings = TestSettingsBuilder().with_conversation_memory(
-            False
-        ).with_plugins(False).build()
+        settings = TestSettingsBuilder().with_conversation_memory(False).with_plugins(False).build()
         provider = MockProviderFactory.create_anthropic()
 
         # Explicitly reset any global container state before test
         from victor.core.container import reset_container
+
         reset_container()
 
         factory = OrchestratorFactory(

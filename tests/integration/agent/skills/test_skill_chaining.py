@@ -276,6 +276,7 @@ class TestSkillChainExecution:
     @pytest.mark.asyncio
     async def test_execute_chain_with_failures(self, skill_chainer):
         """Test chain execution with failures."""
+
         # Create executor that fails for specific skill
         async def failing_executor(skill_name: str, context: dict):
             if skill_name == "failing_skill":
@@ -530,9 +531,7 @@ class TestSkillChainOptimization:
             ],
         )
 
-        optimized = await skill_chainer.optimize_chain(
-            chain, strategy="remove_redundant"
-        )
+        optimized = await skill_chainer.optimize_chain(chain, strategy="remove_redundant")
 
         assert len(optimized.steps) < len(chain.steps)
         # Should have removed duplicate
@@ -641,9 +640,7 @@ class TestSkillChainAlternatives:
             available_skills=sample_skills,
         )
 
-        alternatives = await skill_chainer.suggest_chain_alternatives(
-            chain, sample_skills
-        )
+        alternatives = await skill_chainer.suggest_chain_alternatives(chain, sample_skills)
 
         assert len(alternatives) > 0
         assert all(isinstance(alt, SkillChain) for alt in alternatives)
@@ -656,9 +653,7 @@ class TestSkillChainAlternatives:
             available_skills=sample_skills,
         )
 
-        alternatives = await skill_chainer.suggest_chain_alternatives(
-            chain, sample_skills
-        )
+        alternatives = await skill_chainer.suggest_chain_alternatives(chain, sample_skills)
 
         # Should include parallel variant
         parallel_variants = [alt for alt in alternatives if "parallel" in alt.name]
@@ -672,9 +667,7 @@ class TestSkillChainAlternatives:
             available_skills=sample_skills,
         )
 
-        alternatives = await skill_chainer.suggest_chain_alternatives(
-            chain, sample_skills
-        )
+        alternatives = await skill_chainer.suggest_chain_alternatives(chain, sample_skills)
 
         # Should have at least one alternative
         assert len(alternatives) > 0
@@ -695,9 +688,7 @@ class TestSkillChainIntegration:
     """Integration tests for complete workflows."""
 
     @pytest.mark.asyncio
-    async def test_full_workflow_plan_validate_optimize_execute(
-        self, skill_chainer, sample_skills
-    ):
+    async def test_full_workflow_plan_validate_optimize_execute(self, skill_chainer, sample_skills):
         """Test complete workflow: plan, validate, optimize, execute."""
         # Plan
         chain = await skill_chainer.plan_chain(
@@ -767,6 +758,7 @@ class TestSkillChainIntegration:
     @pytest.mark.asyncio
     async def test_error_handling_in_workflow(self, skill_chainer):
         """Test error handling throughout workflow."""
+
         # Create chain that will fail
         async def failing_executor(skill_name: str, context: dict):
             raise RuntimeError(f"Failed to execute {skill_name}")

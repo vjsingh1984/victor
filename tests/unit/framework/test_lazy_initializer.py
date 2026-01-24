@@ -50,10 +50,7 @@ class TestLazyInitializerInit:
             call_count[0] += 1
             return "initialized"
 
-        init = LazyInitializer(
-            vertical_name="test_vertical",
-            initializer=initializer
-        )
+        init = LazyInitializer(vertical_name="test_vertical", initializer=initializer)
 
         assert init.vertical_name == "test_vertical"
         assert call_count[0] == 0  # Not called yet
@@ -69,10 +66,7 @@ class TestLazyInitializerInit:
         def init2():
             order.append("init2")
 
-        init = LazyInitializer(
-            vertical_name="test",
-            initializers=[init1, init2]
-        )
+        init = LazyInitializer(vertical_name="test", initializers=[init1, init2])
 
         init.initialize()
 
@@ -95,10 +89,7 @@ class TestLazyInitialization:
             call_count[0] += 1
             return "result"
 
-        init = LazyInitializer(
-            vertical_name="test",
-            initializer=initializer
-        )
+        init = LazyInitializer(vertical_name="test", initializer=initializer)
 
         assert call_count[0] == 0  # Not called yet
 
@@ -115,10 +106,7 @@ class TestLazyInitialization:
             call_count[0] += 1
             return call_count[0]
 
-        init = LazyInitializer(
-            vertical_name="test",
-            initializer=initializer
-        )
+        init = LazyInitializer(vertical_name="test", initializer=initializer)
 
         # Call multiple times
         result1 = init.get_or_initialize()
@@ -133,13 +121,11 @@ class TestLazyInitialization:
 
     def test_caches_initialization_result(self):
         """Should cache the initialization result."""
+
         def initializer():
             return {"data": "value"}
 
-        init = LazyInitializer(
-            vertical_name="test",
-            initializer=initializer
-        )
+        init = LazyInitializer(vertical_name="test", initializer=initializer)
 
         # Get result twice
         result1 = init.get_or_initialize()
@@ -151,10 +137,7 @@ class TestLazyInitialization:
 
     def test_is_initialized_tracking(self):
         """Should correctly track initialization state."""
-        init = LazyInitializer(
-            vertical_name="test",
-            initializer=lambda: None
-        )
+        init = LazyInitializer(vertical_name="test", initializer=lambda: None)
 
         assert not init.is_initialized()
 
@@ -183,10 +166,7 @@ class TestThreadSafety:
                 time.sleep(0.01)
             return call_count[0]
 
-        init = LazyInitializer(
-            vertical_name="test",
-            initializer=initializer
-        )
+        init = LazyInitializer(vertical_name="test", initializer=initializer)
 
         # Spawn multiple threads
         threads = []
@@ -214,10 +194,7 @@ class TestThreadSafety:
 
     def test_double_checked_locking_pattern(self):
         """Should use double-checked locking for efficiency."""
-        init = LazyInitializer(
-            vertical_name="test",
-            initializer=lambda: "initialized"
-        )
+        init = LazyInitializer(vertical_name="test", initializer=lambda: "initialized")
 
         # First initialization
         init.get_or_initialize()
@@ -244,10 +221,7 @@ class TestFactoryFunctions:
         """Should return initializer for a vertical."""
         initializer = lambda: "result"
 
-        init = get_initializer_for_vertical(
-            "test_vertical",
-            initializer
-        )
+        init = get_initializer_for_vertical("test_vertical", initializer)
 
         assert isinstance(init, LazyInitializer)
         assert init.vertical_name == "test_vertical"
@@ -291,13 +265,11 @@ class TestErrorHandling:
 
     def test_handles_initializer_exception_gracefully(self):
         """Should handle initializer exceptions gracefully."""
+
         def failing_initializer():
             raise RuntimeError("Initialization failed")
 
-        init = LazyInitializer(
-            vertical_name="test",
-            initializer=failing_initializer
-        )
+        init = LazyInitializer(vertical_name="test", initializer=failing_initializer)
 
         # Should raise exception
         with pytest.raises(RuntimeError, match="Initialization failed"):
@@ -316,10 +288,7 @@ class TestErrorHandling:
                 raise RuntimeError("First attempt fails")
             return "success"
 
-        init = LazyInitializer(
-            vertical_name="test",
-            initializer=flaky_initializer
-        )
+        init = LazyInitializer(vertical_name="test", initializer=flaky_initializer)
 
         # First attempt fails
         with pytest.raises(RuntimeError):
@@ -333,10 +302,7 @@ class TestErrorHandling:
 
     def test_reset_clears_initialization(self):
         """Should clear initialization state on reset()."""
-        init = LazyInitializer(
-            vertical_name="test",
-            initializer=lambda: "result"
-        )
+        init = LazyInitializer(vertical_name="test", initializer=lambda: "result")
 
         # Initialize
         init.get_or_initialize()
@@ -373,17 +339,10 @@ class TestVerticalIntegration:
             call_count[0] += 1
             # Simulate registering escape hatches
             registry = EscapeHatchRegistry.get_instance()
-            registry.register_condition(
-                "test_condition",
-                lambda ctx: "test",
-                vertical="mock"
-            )
+            registry.register_condition("test_condition", lambda ctx: "test", vertical="mock")
             return True
 
-        init = LazyInitializer(
-            vertical_name="mock",
-            initializer=mock_initializer
-        )
+        init = LazyInitializer(vertical_name="mock", initializer=mock_initializer)
 
         # Not registered yet
         registry = EscapeHatchRegistry.get_instance()
@@ -448,10 +407,7 @@ class TestFeatureFlags:
 
         # Note: This would require modifying LazyInitializer to check env var
         # For now, we just test the basic functionality
-        init = LazyInitializer(
-            vertical_name="test",
-            initializer=initializer
-        )
+        init = LazyInitializer(vertical_name="test", initializer=initializer)
 
         # With flag disabled, would initialize immediately
         # For now, we just verify lazy behavior
@@ -470,14 +426,12 @@ class TestPerformance:
 
     def test_first_access_overhead_acceptable(self):
         """First access overhead should be acceptable (<50ms)."""
+
         def slow_initializer():
             time.sleep(0.01)  # Simulate 10ms initialization
             return "result"
 
-        init = LazyInitializer(
-            vertical_name="test",
-            initializer=slow_initializer
-        )
+        init = LazyInitializer(vertical_name="test", initializer=slow_initializer)
 
         start = time.time()
         result = init.get_or_initialize()
@@ -490,10 +444,7 @@ class TestPerformance:
 
     def test_cached_access_fast(self):
         """Cached access should be very fast (<1ms)."""
-        init = LazyInitializer(
-            vertical_name="test",
-            initializer=lambda: "result"
-        )
+        init = LazyInitializer(vertical_name="test", initializer=lambda: "result")
 
         # Initialize once
         init.get_or_initialize()

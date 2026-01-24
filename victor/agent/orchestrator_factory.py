@@ -2302,9 +2302,7 @@ class OrchestratorFactory(ModeAwareMixin):
             enable_warmup=getattr(self.settings, "pool_enable_warmup", True),
             warmup_concurrency=getattr(self.settings, "pool_warmup_concurrency", 3),
             health_check_config=HealthCheckConfig(
-                check_interval_seconds=getattr(
-                    self.settings, "pool_health_check_interval", 30
-                ),
+                check_interval_seconds=getattr(self.settings, "pool_health_check_interval", 30),
             ),
             circuit_breaker_config=CircuitBreakerConfig(),
             max_retries=getattr(self.settings, "pool_max_retries", 3),
@@ -2312,11 +2310,9 @@ class OrchestratorFactory(ModeAwareMixin):
 
         # Create provider instances from each base URL
         providers = {}
-        for i, base_url in enumerate(base_urls[:pool_config.pool_size]):
+        for i, base_url in enumerate(base_urls[: pool_config.pool_size]):
             # Create provider instance with specific base URL
-            provider_instance = await self._create_provider_for_url(
-                provider_name, base_url
-            )
+            provider_instance = await self._create_provider_for_url(provider_name, base_url)
             provider_id = f"{provider_name}-{i}"
             providers[provider_id] = provider_instance
 

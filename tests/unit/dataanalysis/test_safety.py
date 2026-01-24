@@ -52,10 +52,10 @@ class TestDataAnalysisSafetyExtension:
         # Check that all items are SafetyPattern objects
         for pattern in patterns:
             assert isinstance(pattern, SafetyPattern)
-            assert hasattr(pattern, 'pattern')
-            assert hasattr(pattern, 'description')
-            assert hasattr(pattern, 'risk_level')
-            assert hasattr(pattern, 'category')
+            assert hasattr(pattern, "pattern")
+            assert hasattr(pattern, "description")
+            assert hasattr(pattern, "risk_level")
+            assert hasattr(pattern, "category")
 
     def test_get_bash_patterns_category(self, safety):
         """Test that bash patterns have correct category."""
@@ -233,7 +233,9 @@ class TestDataAnalysisSafetyExtension:
         all_reminders = " ".join(reminders).lower()
 
         # Should mention privacy or security or protection
-        assert any(term in all_reminders for term in ["privacy", "secur", "protect", "pii", "personal"])
+        assert any(
+            term in all_reminders for term in ["privacy", "secur", "protect", "pii", "personal"]
+        )
 
     def test_bash_patterns_detect_ssn(self, safety):
         """Test that bash patterns detect SSN exposure."""
@@ -309,7 +311,13 @@ class TestDataAnalysisSafetyExtension:
         patterns = safety.get_bash_patterns()
 
         # Find salary/income pattern (may be in description or pattern itself)
-        financial_patterns = [p for p in patterns if "salary" in str(p.description).lower() or "income" in str(p.description).lower() or "salary" in str(p.pattern).lower()]
+        financial_patterns = [
+            p
+            for p in patterns
+            if "salary" in str(p.description).lower()
+            or "income" in str(p.description).lower()
+            or "salary" in str(p.pattern).lower()
+        ]
 
         # May not have financial patterns in all implementations
         assert len(financial_patterns) >= 0
@@ -361,7 +369,10 @@ class TestDataAnalysisSafetyExtension:
         ssn_suggestion = safety.get_anonymization_suggestions("ssn")
 
         # At least some suggestions should differ
-        assert not (email_suggestion == phone_suggestion == ssn_suggestion) or len(email_suggestion) > 0
+        assert (
+            not (email_suggestion == phone_suggestion == ssn_suggestion)
+            or len(email_suggestion) > 0
+        )
 
     def test_safety_reminders_comprehensive(self, safety):
         """Test that safety reminders cover multiple aspects."""
