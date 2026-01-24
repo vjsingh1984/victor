@@ -373,7 +373,7 @@ class TestProtocolCaching:
         result2 = ProtocolBasedExtensionLoader.implements_protocol(MinimalVertical, ToolProvider)
 
         # Should return same result
-        assert result1 == result2 == True
+        assert result1 is result2 and result2
 
     def test_clear_protocol_cache(self):
         """Test clearing protocol cache."""

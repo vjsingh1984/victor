@@ -67,12 +67,22 @@ class AnotherMockVertical(VerticalBase):
 # =============================================================================
 
 
+def create_mock_vertical_loader():
+    """Helper function to create MockVertical instances."""
+    return MockVertical()
+
+
+def create_another_mock_vertical_loader():
+    """Helper function to create AnotherMockVertical instances."""
+    return AnotherMockVertical()
+
+
 class TestLazyProxyInit:
     """Test suite for LazyProxy initialization."""
 
     def test_init_with_vertical_name_and_loader(self):
         """Should initialize with vertical name and loader callable."""
-        loader = lambda: MockVertical()
+        loader = create_mock_vertical_loader
 
         proxy = LazyProxy[MockVertical](vertical_name="mock_vertical", loader=loader)
 
@@ -83,7 +93,7 @@ class TestLazyProxyInit:
 
     def test_init_with_custom_settings(self):
         """Should initialize with custom proxy type."""
-        loader = lambda: MockVertical()
+        loader = create_mock_vertical_loader
 
         proxy = LazyProxy[MockVertical](
             vertical_name="mock_vertical", loader=loader, proxy_type=LazyProxyType.LAZY
@@ -93,7 +103,7 @@ class TestLazyProxyInit:
 
     def test_init_defaults_to_lazy_type(self):
         """Should default to LAZY proxy type."""
-        loader = lambda: MockVertical()
+        loader = create_mock_vertical_loader
 
         proxy = LazyProxy[MockVertical](vertical_name="mock_vertical", loader=loader)
 
@@ -113,7 +123,7 @@ class TestLSPCompliance:
 
     def test_proxy_is_instance_of_vertical_base(self):
         """Proxy should be instance of VerticalBase (LSP compliance)."""
-        loader = lambda: MockVertical()
+        loader = create_mock_vertical_loader
 
         proxy = LazyProxy[MockVertical](vertical_name="mock_vertical", loader=loader)
 
@@ -122,7 +132,7 @@ class TestLSPCompliance:
 
     def test_proxy_inherits_vertical_base_attributes(self):
         """Proxy should have VerticalBase attributes."""
-        loader = lambda: MockVertical()
+        loader = create_mock_vertical_loader
 
         proxy = LazyProxy[MockVertical](vertical_name="mock_vertical", loader=loader)
 
@@ -135,7 +145,7 @@ class TestLSPCompliance:
 
     def test_proxy_name_attribute_works(self):
         """Proxy name attribute should work correctly."""
-        loader = lambda: MockVertical()
+        loader = create_mock_vertical_loader
 
         proxy = LazyProxy[MockVertical](vertical_name="mock_vertical", loader=loader)
 
@@ -144,7 +154,7 @@ class TestLSPCompliance:
 
     def test_proxy_display_name_lazy_loaded(self):
         """Proxy display_name should lazy load the vertical."""
-        loader = lambda: MockVertical()
+        loader = create_mock_vertical_loader
 
         proxy = LazyProxy[MockVertical](vertical_name="mock_vertical", loader=loader)
 
@@ -154,7 +164,7 @@ class TestLSPCompliance:
 
     def test_proxy_get_tools_lazy_loaded(self):
         """Proxy get_tools() should lazy load and delegate."""
-        loader = lambda: MockVertical()
+        loader = create_mock_vertical_loader
 
         proxy = LazyProxy[MockVertical](vertical_name="mock_vertical", loader=loader)
 
@@ -166,7 +176,7 @@ class TestLSPCompliance:
 
     def test_proxy_get_system_prompt_lazy_loaded(self):
         """Proxy get_system_prompt() should lazy load and delegate."""
-        loader = lambda: MockVertical()
+        loader = create_mock_vertical_loader
 
         proxy = LazyProxy[MockVertical](vertical_name="mock_vertical", loader=loader)
 
@@ -226,7 +236,7 @@ class TestLazyLoading:
 
     def test_caches_loaded_instance(self):
         """Should cache loaded instance for subsequent accesses."""
-        loader = lambda: MockVertical()
+        loader = create_mock_vertical_loader
 
         proxy = LazyProxy[MockVertical](vertical_name="mock_vertical", loader=loader)
 
@@ -289,7 +299,7 @@ class TestThreadSafety:
     def test_double_checked_locking_pattern(self):
         """Should use double-checked locking for efficiency."""
         proxy = LazyProxy[MockVertical](
-            vertical_name="mock_vertical", loader=lambda: MockVertical()
+            vertical_name="mock_vertical", loader=create_mock_vertical_loader
         )
 
         # First load
@@ -355,7 +365,7 @@ class TestProxyType:
         """Should detect proxy type from environment variable."""
         with patch.dict("os.environ", {"VICTOR_LAZY_LOADING": "true"}):
             proxy = LazyProxy[MockVertical](
-                vertical_name="mock_vertical", loader=lambda: MockVertical()
+                vertical_name="mock_vertical", loader=create_mock_vertical_loader
             )
 
             # Should use LAZY type when env var is set
@@ -376,7 +386,7 @@ class TestLazyProxyFactory:
 
         proxy = factory.create_proxy(
             vertical_name="mock_vertical",
-            loader=lambda: MockVertical(),
+            loader=create_mock_vertical_loader,
             vertical_class=MockVertical,
         )
 
@@ -386,13 +396,13 @@ class TestLazyProxyFactory:
         """Factory should cache proxies by vertical name."""
         factory = get_lazy_proxy_factory()
 
-        loader1 = lambda: MockVertical()
+        loader1 = create_mock_vertical_loader
         proxy1 = factory.create_proxy(
             vertical_name="mock_vertical", loader=loader1, vertical_class=MockVertical
         )
 
         # Get same vertical again
-        loader2 = lambda: MockVertical()
+        loader2 = create_mock_vertical_loader
         proxy2 = factory.create_proxy(
             vertical_name="mock_vertical", loader=loader2, vertical_class=MockVertical
         )
@@ -408,7 +418,7 @@ class TestLazyProxyFactory:
         factory1 = get_lazy_proxy_factory()
         proxy1 = factory1.create_proxy(
             vertical_name="mock_vertical",
-            loader=lambda: MockVertical(),
+            loader=create_mock_vertical_loader,
             vertical_class=MockVertical,
         )
 
@@ -419,7 +429,7 @@ class TestLazyProxyFactory:
         factory2 = get_lazy_proxy_factory()
         proxy2 = factory2.create_proxy(
             vertical_name="mock_vertical",
-            loader=lambda: MockVertical(),
+            loader=create_mock_vertical_loader,
             vertical_class=MockVertical,
         )
 
@@ -465,7 +475,7 @@ class TestErrorHandling:
 
     def test_unload_clears_cache(self):
         """Should unload and clear cached instance."""
-        loader = lambda: MockVertical()
+        loader = create_mock_vertical_loader
 
         proxy = LazyProxy[MockVertical](vertical_name="mock_vertical", loader=loader)
 
@@ -480,7 +490,7 @@ class TestErrorHandling:
 
     def test_is_loaded_check(self):
         """Should correctly report loaded status."""
-        loader = lambda: MockVertical()
+        loader = create_mock_vertical_loader
 
         proxy = LazyProxy[MockVertical](vertical_name="mock_vertical", loader=loader)
 
@@ -502,7 +512,7 @@ class TestTypeSafety:
 
     def test_proxy_preserves_type_information(self):
         """Proxy should preserve type information for type checkers."""
-        loader = lambda: MockVertical()
+        loader = create_mock_vertical_loader
 
         proxy: LazyProxy[MockVertical] = LazyProxy[MockVertical](
             vertical_name="mock_vertical", loader=loader
@@ -513,7 +523,7 @@ class TestTypeSafety:
 
     def test_proxy_delegates_typed_methods(self):
         """Proxy should correctly delegate typed methods."""
-        loader = lambda: MockVertical()
+        loader = create_mock_vertical_loader
 
         proxy = LazyProxy[MockVertical](vertical_name="mock_vertical", loader=loader)
 
@@ -536,7 +546,7 @@ class TestVerticalRegistryIntegration:
 
     def test_proxy_can_be_registered(self):
         """Proxy should be registrable with VerticalRegistry."""
-        loader = lambda: MockVertical()
+        loader = create_mock_vertical_loader
 
         proxy = LazyProxy[MockVertical](vertical_name="mock_vertical", loader=loader)
 
@@ -585,7 +595,7 @@ class TestPerformance:
 
     def test_cached_access_fast(self):
         """Cached access should be very fast (<1ms)."""
-        loader = lambda: MockVertical()
+        loader = create_mock_vertical_loader
 
         proxy = LazyProxy[MockVertical](vertical_name="mock_vertical", loader=loader)
 

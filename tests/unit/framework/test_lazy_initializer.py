@@ -39,6 +39,21 @@ class MockVertical:
 # =============================================================================
 
 
+def _result_loader():
+    """Helper function for tests that need a simple loader."""
+    return "result"
+
+
+def _result_loader_1():
+    """Helper function that returns '1'."""
+    return "1"
+
+
+def _result_loader_2():
+    """Helper function that returns '2'."""
+    return "2"
+
+
 class TestLazyInitializerInit:
     """Test suite for LazyInitializer initialization."""
 
@@ -219,7 +234,7 @@ class TestFactoryFunctions:
 
     def test_get_initializer_for_vertical(self):
         """Should return initializer for a vertical."""
-        initializer = lambda: "result"
+        initializer = _result_loader
 
         init = get_initializer_for_vertical("test_vertical", initializer)
 
@@ -228,8 +243,8 @@ class TestFactoryFunctions:
 
     def test_get_initializer_returns_singleton(self):
         """Should return singleton initializer for same vertical."""
-        initializer1 = lambda: "result1"
-        initializer2 = lambda: "result2"
+        initializer1 = _result_loader
+        initializer2 = _result_loader
 
         init1 = get_initializer_for_vertical("test", initializer1)
         init2 = get_initializer_for_vertical("test", initializer2)
@@ -240,15 +255,15 @@ class TestFactoryFunctions:
     def test_clear_all_initializers(self):
         """Should clear all cached initializers."""
         # Create initializers
-        init1 = get_initializer_for_vertical("test1", lambda: "1")
-        init2 = get_initializer_for_vertical("test2", lambda: "2")
+        init1 = get_initializer_for_vertical("test1", _result_loader_1)
+        init2 = get_initializer_for_vertical("test2", _result_loader_2)
 
         # Clear all
         clear_all_initializers()
 
         # Should create new instances
-        init3 = get_initializer_for_vertical("test1", lambda: "1")
-        init4 = get_initializer_for_vertical("test2", lambda: "2")
+        init3 = get_initializer_for_vertical("test1", _result_loader_1)
+        init4 = get_initializer_for_vertical("test2", _result_loader_2)
 
         # Should be different instances
         assert init1 is not init3
@@ -302,7 +317,7 @@ class TestErrorHandling:
 
     def test_reset_clears_initialization(self):
         """Should clear initialization state on reset()."""
-        init = LazyInitializer(vertical_name="test", initializer=lambda: "result")
+        init = LazyInitializer(vertical_name="test", initializer=_result_loader)
 
         # Initialize
         init.get_or_initialize()
@@ -444,7 +459,7 @@ class TestPerformance:
 
     def test_cached_access_fast(self):
         """Cached access should be very fast (<1ms)."""
-        init = LazyInitializer(vertical_name="test", initializer=lambda: "result")
+        init = LazyInitializer(vertical_name="test", initializer=_result_loader)
 
         # Initialize once
         init.get_or_initialize()

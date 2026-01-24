@@ -235,7 +235,7 @@ workflows:
         compiler = UnifiedWorkflowCompiler()
         try:
             compiler.compile_yaml_content(yaml_content, "test")
-            raise AssertionError("Unreachable code reached"), "Should have raised error for missing node"
+            raise AssertionError("Should have raised error for missing node")
         except Exception as e:
             error_msg = str(e).lower()
             # Error should mention the missing node

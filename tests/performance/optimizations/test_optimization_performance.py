@@ -655,8 +655,10 @@ class TestOptimizationIntegration:
 
         # Register components lazily
         for i in range(10):
+            # Use partial application instead of lambda
+            from functools import partial
             loader.register_component(
-                f"task_component_{i}", lambda idx=i: create_heavy_component(idx)
+                f"task_component_{i}", partial(create_heavy_component, i)
             )
 
         # Create tasks that use lazy-loaded components
@@ -667,11 +669,8 @@ class TestOptimizationIntegration:
             return component["id"]
 
         # Create task functions (not tuples, just async functions)
-        tasks = []
-        for i in range(10):
-            # Create closure
-            task_fn = lambda idx=i: task_with_lazy_component(idx)
-            tasks.append(task_fn)
+        # Store coroutine objects directly instead of wrapping in lambdas
+        tasks = [task_with_lazy_component(i) for i in range(10)]
 
         executor = create_adaptive_executor(
             strategy=OptimizationStrategy.ALWAYS_PARALLEL,

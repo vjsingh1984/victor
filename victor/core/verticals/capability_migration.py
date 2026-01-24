@@ -264,7 +264,7 @@ def check_migration_status(vertical_class: Type[Any]) -> dict[str, bool]:
     instantiation.
 
     Args:
-        vertical_class: The vertical class to check
+        vertical_class: The vertical class to check (can be class or instance)
 
     Returns:
         Dictionary mapping capability names to migration status (True = migrated)
@@ -275,7 +275,6 @@ def check_migration_status(vertical_class: Type[Any]) -> dict[str, bool]:
     """
     from victor.core.verticals.capability_injector import get_capability_injector
 
-    injector = get_capability_injector()
     status = {}
 
     # Check for common capability attributes
@@ -287,10 +286,22 @@ def check_migration_status(vertical_class: Type[Any]) -> dict[str, bool]:
     }
 
     for old_attr, capability_name in common_capabilities.items():
+        # Check if class has the attribute (could be class attribute or instance attribute)
         if hasattr(vertical_class, old_attr):
+            # Get the attribute value
+            try:
+                attr_value = getattr(vertical_class, old_attr)
+            except AttributeError:
+                continue
+
             # Check if it's a property (likely migrated) or has value (not migrated)
-            attr = getattr(vertical_class, old_attr)
-            is_property = isinstance(attr, property)
+            is_property = isinstance(attr_value, property)
+
+            # If we can't tell (e.g., it's an instance), assume not migrated
+            if not is_property and not isinstance(attr_value, type):
+                # It's an instance attribute, check if it's from injector
+                is_property = False
+
             status[capability_name] = is_property
 
     return status

@@ -417,7 +417,7 @@ class TestVerticalDelegation:
         allowed1, _ = framework_enforcer.check_operation("git push --force origin main")
         allowed2, _ = coding_enforcer.check_operation("git push --force origin main")
 
-        assert allowed1 == allowed2 == False
+        assert allowed1 is allowed2 and not allowed2
 
     def test_devops_deployment_delegates_to_framework(self):
         """Test that devops vertical delegates to framework deployment rules."""
@@ -440,7 +440,7 @@ class TestVerticalDelegation:
         allowed1, _ = framework_enforcer.check_operation("deploy to production")
         allowed2, _ = devops_enforcer.check_operation("deploy to production")
 
-        assert allowed1 == allowed2 == False
+        assert allowed1 is allowed2 and not allowed2
 
 
 class TestCodeDuplicationElimination:

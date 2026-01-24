@@ -996,11 +996,11 @@ class TestRollbackTriggers:
         )
 
         # Should trigger at 6%
-        assert trigger.evaluate(6.0) == True
+        assert trigger.evaluate(6.0)
         # Should not trigger at 4%
-        assert trigger.evaluate(4.0) == False
+        assert not trigger.evaluate(4.0)
         # Should trigger at exactly 5%
-        assert trigger.evaluate(5.0) == True
+        assert trigger.evaluate(5.0)
 
     def test_considered_trigger_evaluation(self):
         """Test considered rollback triggers"""
@@ -1013,9 +1013,9 @@ class TestRollbackTriggers:
         )
 
         # Should trigger at 6%
-        assert trigger.evaluate(6.0) == True
+        assert trigger.evaluate(6.0)
         # Should not trigger at 4%
-        assert trigger.evaluate(4.0) == False
+        assert not trigger.evaluate(4.0)
 
     def test_boolean_trigger_evaluation(self):
         """Test boolean rollback triggers"""
@@ -1028,9 +1028,9 @@ class TestRollbackTriggers:
         )
 
         # Should trigger when True
-        assert trigger.evaluate(True) == True
+        assert trigger.evaluate(True)
         # Should not trigger when False
-        assert trigger.evaluate(False) == False
+        assert not trigger.evaluate(False)
 
 
 # ============================================================================
