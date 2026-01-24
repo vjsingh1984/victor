@@ -660,7 +660,8 @@ class ValidationCoordinator:
         # Fall back to cancel event
         if self._cancel_event:
             try:
-                return self._cancel_event.is_set()
+                is_set: bool = self._cancel_event.is_set()
+                return is_set
             except Exception:
                 pass
 

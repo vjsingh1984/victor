@@ -114,7 +114,7 @@ class EvaluationCoordinator:
         self._enable_event_publishing = enable_event_publishing
         self._event_bus = None  # Lazy-loaded
 
-    def _get_event_bus(self):
+    def _get_event_bus(self) -> Optional[Any]:
         """Get the event bus (lazy-loaded).
 
         Returns:

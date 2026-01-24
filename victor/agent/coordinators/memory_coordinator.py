@@ -154,7 +154,8 @@ class MemoryCoordinator:
 
         # Delegate to MemoryManager with exception handling
         try:
-            return self._memory_manager.get_context(max_tokens=max_tokens)
+            messages: List[Dict[str, Any]] = self._memory_manager.get_context(max_tokens=max_tokens)
+            return messages
         except Exception as e:
             logger.warning(f"Failed to get memory context, falling back to in-memory: {e}")
             return self._get_in_memory_messages()
@@ -235,7 +236,8 @@ class MemoryCoordinator:
 
         # Delegate to MemoryManager with exception handling
         try:
-            return self._memory_manager.get_recent_sessions(limit=limit)
+            sessions: List[Dict[str, Any]] = self._memory_manager.get_recent_sessions(limit=limit)
+            return sessions
         except Exception as e:
             logger.warning(f"Failed to get recent sessions: {e}")
             return []
@@ -258,7 +260,7 @@ class MemoryCoordinator:
 
         try:
             # Delegate to MemoryManager
-            success = self._memory_manager.recover_session(session_id)
+            success: bool = self._memory_manager.recover_session(session_id)
 
             if success:
                 # Update session tracking
@@ -307,7 +309,8 @@ class MemoryCoordinator:
             return []
 
         try:
-            return [msg.model_dump() for msg in self._conversation_store.messages]
+            messages_list = self._conversation_store.get_recent_messages(limit=1000)
+            return [msg.model_dump() for msg in messages_list]
         except Exception as e:
             logger.warning(f"Failed to get in-memory messages: {e}")
             return []

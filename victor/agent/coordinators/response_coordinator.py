@@ -881,8 +881,8 @@ class ResponseCoordinator:
         # Fallback: try to check via registry
         if self._tool_registry:
             try:
-                tool = self._tool_registry.get_tool(name)
-                return tool is not None
+                available_tools = self._tool_registry.list_tools(only_enabled=False)
+                return name in available_tools
             except Exception:
                 pass
 

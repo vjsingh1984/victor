@@ -101,7 +101,8 @@ class IntelligentFeatureCoordinator:
             return None
 
         try:
-            return await self._qlearning_coordinator.prepare_request(task, task_type)
+            result: Optional[Dict[str, Any]] = await self._qlearning_coordinator.prepare_request(task, task_type)
+            return result
         except Exception as e:
             logger.warning(f"Failed to prepare intelligent request: {e}")
             return None
@@ -130,10 +131,11 @@ class IntelligentFeatureCoordinator:
             return {"validated": False, "reason": "Evaluation coordinator not available"}
 
         try:
-            return await self._evaluation_coordinator.validate_response(
+            validation_result: Dict[str, Any] = await self._evaluation_coordinator.validate_response(
                 response,
                 expected_outcomes=expected_outcomes,
             )
+            return validation_result
         except Exception as e:
             logger.warning(f"Failed to validate intelligent response: {e}")
             return {"validated": False, "reason": str(e)}
@@ -166,12 +168,13 @@ class IntelligentFeatureCoordinator:
             return False
 
         try:
-            return await self._evaluation_coordinator.record_outcome(
+            success: bool = await self._evaluation_coordinator.record_outcome(
                 task=task,
                 task_type=task_type,
                 outcome=outcome,
                 metadata=metadata or {},
             )
+            return success
         except Exception as e:
             logger.warning(f"Failed to record intelligent outcome: {e}")
             return False
@@ -217,8 +220,8 @@ class IntelligentFeatureCoordinator:
                     try:
                         with open(file_path, "r") as f:
                             content = f.read()
-                            # Trigger embedding by calling encode
-                            _ = embedding_service.encode(content)
+                            # Trigger embedding by calling embed_text_sync
+                            _ = embedding_service.embed_text_sync(content)
                     except Exception:
                         # Skip files that can't be read
                         continue

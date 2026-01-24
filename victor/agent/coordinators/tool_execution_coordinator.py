@@ -71,9 +71,9 @@ from typing import (
 if TYPE_CHECKING:
     from victor.agent.tool_executor import ToolExecutor, ToolExecutionResult
     from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
-    from victor.agent.tool_calling import ToolCallingAdapter
+    from victor.agent.tool_calling import BaseToolCallingAdapter
     from victor.storage.cache.tool_cache import ToolCache
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
     from victor.agent.response_sanitizer import ResponseSanitizer
     from victor.agent.tool_output_formatter import ToolOutputFormatter
 
@@ -693,7 +693,8 @@ class ToolExecutionCoordinator:
         # Apply adapter-based normalization
         normalized_args = self._tool_adapter.normalize_arguments(normalized_args, tool_name)
 
-        return normalized_args
+        result: Dict[str, Any] = normalized_args
+        return result
 
     def _build_exec_context(self, context: ExecutionContext) -> Dict[str, Any]:
         """Build execution context dict for tool executor.

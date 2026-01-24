@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Optional, Set
 
 if TYPE_CHECKING:
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
 
 from victor.agent.coordinators.base_config import BaseCoordinatorConfig
 
@@ -188,7 +188,7 @@ class ToolAccessCoordinator:
             config = self._mode_controller.config
             if config.allow_all_tools:
                 all_tools = self.get_available_tools()
-                enabled = all_tools - config.disallowed_tools
+                enabled: Set[str] = all_tools - config.disallowed_tools
                 return enabled
 
         # Return session-set tools
@@ -299,9 +299,9 @@ class ToolAccessCoordinator:
         logger.info(f"Session enabled tools: {sorted(tools)}")
 
         # Propagate to tool_selector if available
-        if hasattr(self._mode_controller, "tool_selector"):
+        if self._mode_controller is not None and hasattr(self._mode_controller, "tool_selector"):
             selector = self._mode_controller.tool_selector
-            if selector and hasattr(selector, "set_enabled_tools"):
+            if selector is not None and hasattr(selector, "set_enabled_tools"):
                 selector.set_enabled_tools(tools)
 
     def clear_session_restrictions(self) -> None:
@@ -332,7 +332,7 @@ class ToolAccessCoordinator:
         Returns:
             ToolAccessContext with session and mode information
         """
-        disallowed = set()
+        disallowed: Set[str] = set()
         mode_name = None
 
         if self._mode_controller:

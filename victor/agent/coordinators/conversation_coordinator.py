@@ -81,7 +81,8 @@ class ConversationCoordinator:
         Returns:
             List of messages in conversation history
         """
-        return self._conversation.messages
+        result: List[Any] = self._conversation.messages
+        return result
 
     def add_message(self, role: str, content: str) -> None:
         """Add a message to conversation history.

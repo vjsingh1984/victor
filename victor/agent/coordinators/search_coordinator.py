@@ -130,4 +130,6 @@ class SearchCoordinator:
             >>> print(tool)
             "code_search"
         """
-        return self.route_search_query(query)["recommended_tool"]
+        result: Dict[str, Any] = self.route_search_query(query)
+        tool_name: str = result["recommended_tool"]
+        return tool_name

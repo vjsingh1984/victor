@@ -299,9 +299,9 @@ class ToolRetryCoordinator:
         if "paths" in tool_args and isinstance(tool_args["paths"], list):
             touched_paths.extend(tool_args["paths"])
 
-        if touched_paths:
+        if touched_paths and self._tool_cache is not None:
             self._tool_cache.invalidate_paths(touched_paths)
-        else:
+        elif self._tool_cache is not None:
             namespaces_to_clear = [
                 "code_search",
                 "semantic_code_search",
@@ -359,7 +359,10 @@ class ToolRetryCoordinator:
         Returns:
             Delay in seconds
         """
-        return min(self._config.base_delay * (2**attempt), self._config.max_delay)
+        base_delay: float = self._config.base_delay
+        max_delay: float = self._config.max_delay
+        calculated_delay: float = min(base_delay * (2**attempt), max_delay)
+        return calculated_delay
 
     def get_config(self) -> ToolRetryConfig:
         """Get current retry configuration.

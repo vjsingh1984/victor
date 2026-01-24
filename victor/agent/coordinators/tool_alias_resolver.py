@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Dict, Optional
 
 if TYPE_CHECKING:
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
 
 from victor.agent.coordinators.base_config import BaseCoordinatorConfig
 
