@@ -135,6 +135,9 @@ class CodingAssistant(VerticalBase):
     # Framework prompt contributions (common hints like read_first, verify_changes)
     _prompt_contrib = PromptContributionCapability()
 
+    # Framework file operations (read, write, edit, grep)
+    _file_ops = FileOperationsCapability()
+
     # =========================================================================
     # Extension Caching
     # =========================================================================
@@ -163,6 +166,7 @@ class CodingAssistant(VerticalBase):
             ToolNames.LS,  # list_directory -> ls
             ToolNames.OVERVIEW,  # get_project_overview -> overview
             # Search
+            ToolNames.GREP,  # grep (framework capability)
             ToolNames.CODE_SEARCH,  # semantic_code_search -> code_search
             ToolNames.PLAN,  # plan_files -> plan
             # Git (unified git tool handles all operations)
