@@ -42,7 +42,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
 
 import numpy as np
 
@@ -60,15 +60,19 @@ logger = logging.getLogger(__name__)
 
 # Try to import the native extension
 _NATIVE_AVAILABLE = False
-_native = None
+_native_module: Any = None
 
 try:
-    import victor_native as _native
+    import victor_native
 
+    _native_module = victor_native
     _NATIVE_AVAILABLE = True
-    logger.info(f"Native extensions loaded (version {_native.__version__})")
+    logger.info(f"Native extensions loaded (version {victor_native.__version__})")
 except ImportError:
     logger.debug("Native extensions not available, using pure Python fallback")
+
+# Type alias for easier access
+_native: Any = _native_module
 
 
 def is_native_available() -> bool:
@@ -78,8 +82,8 @@ def is_native_available() -> bool:
 
 def get_native_version() -> Optional[str]:
     """Get the version of the native extension, if available."""
-    if _NATIVE_AVAILABLE:
-        return _native.__version__
+    if _NATIVE_AVAILABLE and _native is not None:
+        return cast(str, _native.__version__)
     return None
 
 
@@ -98,7 +102,7 @@ def normalize_block(block: str) -> str:
         Normalized string (lowercase, collapsed whitespace, no trailing punctuation)
     """
     if _NATIVE_AVAILABLE:
-        return _native.normalize_block(block)
+        return cast(str, _native.normalize_block(block))
 
     # Pure Python fallback
     normalized = block.strip()
@@ -123,11 +127,11 @@ def rolling_hash_blocks(content: str, min_block_length: int = 50) -> List[Tuple[
         List of tuples: (hash string, original block, is_duplicate boolean)
     """
     if _NATIVE_AVAILABLE:
-        return _native.rolling_hash_blocks(content, min_block_length)
+        return cast(List[Tuple[str, str, bool]], _native.rolling_hash_blocks(content, min_block_length))
 
     # Pure Python fallback
     blocks = _split_into_blocks(content)
-    seen_hashes: set = set()
+    seen_hashes: set[str] = set()
     results: List[Tuple[str, str, bool]] = []
 
     for block in blocks:
@@ -160,7 +164,7 @@ def find_duplicate_blocks(content: str, min_block_length: int = 50) -> List[Tupl
 
     # Pure Python fallback
     blocks = _split_into_blocks(content)
-    seen_hashes: set = set()
+    seen_hashes: set[str] = set()
     duplicates: List[Tuple[int, str]] = []
 
     for idx, block in enumerate(blocks):
@@ -298,7 +302,7 @@ def top_k_similar(
         List of (index, similarity) tuples, sorted by similarity descending
     """
     if _NATIVE_AVAILABLE:
-        return _native.top_k_similar(query, corpus, k)
+        return cast(List[Tuple[int, float]], _native.top_k_similar(query, corpus, k))
 
     # Pure Python fallback
     similarities = batch_cosine_similarity(query, corpus)
@@ -320,7 +324,7 @@ def batch_normalize_vectors(vectors: List[List[float]]) -> List[List[float]]:
         List of normalized vectors (unit length)
     """
     if _NATIVE_AVAILABLE:
-        return _native.batch_normalize_vectors(vectors)
+        return cast(List[List[float]], _native.batch_normalize_vectors(vectors))
 
     # Pure Python fallback using NumPy
     if not vectors:
@@ -468,7 +472,7 @@ def extract_json_objects(text: str) -> List[Tuple[int, int, str]]:
         List of (start_pos, end_pos, json_string) tuples for each found object
     """
     if _NATIVE_AVAILABLE:
-        return _native.extract_json_objects(text)
+        return cast(List[Tuple[int, int, str]], _native.extract_json_objects(text))
 
     # Pure Python fallback
     results: List[Tuple[int, int, str]] = []
@@ -592,7 +596,7 @@ def signature_similarity(sig1: str, sig2: str) -> float:
         Similarity score between 0.0 and 1.0
     """
     if _NATIVE_AVAILABLE:
-        return _native.signature_similarity(sig1, sig2)
+        return cast(float, _native.signature_similarity(sig1, sig2))
 
     # Pure Python fallback
     if sig1 == sig2:
@@ -664,7 +668,7 @@ def strip_thinking_tokens(content: str) -> str:
         Content with thinking tokens removed
     """
     if _NATIVE_AVAILABLE:
-        return _native.strip_thinking_tokens(content)
+        return cast(str, _native.strip_thinking_tokens(content))
 
     # Pure Python fallback
     result = content
@@ -683,7 +687,7 @@ def contains_thinking_tokens(content: str) -> bool:
         True if thinking tokens are present
     """
     if _NATIVE_AVAILABLE:
-        return _native.contains_thinking_tokens(content)
+        return cast(bool, _native.contains_thinking_tokens(content))
 
     # Pure Python fallback
     return any(pattern in content for pattern in _ALL_THINKING_PATTERNS)
@@ -699,7 +703,7 @@ def find_thinking_tokens(content: str) -> List[Tuple[int, int, int]]:
         List of (start, end, pattern_index) tuples
     """
     if _NATIVE_AVAILABLE:
-        return _native.find_thinking_tokens(content)
+        return cast(List[Tuple[int, int, int]], _native.find_thinking_tokens(content))
 
     # Pure Python fallback
     results = []
@@ -726,7 +730,7 @@ def extract_thinking_content(content: str) -> Tuple[str, str]:
         Tuple of (main_content, thinking_content)
     """
     if _NATIVE_AVAILABLE:
-        return _native.extract_thinking_content(content)
+        return cast(Tuple[str, str], _native.extract_thinking_content(content))
 
     # Pure Python fallback
     main_content = []
@@ -822,7 +826,7 @@ def has_action_keywords(text: str) -> bool:
         True if action keywords are present
     """
     if _NATIVE_AVAILABLE:
-        return _native.has_action_keywords(text)
+        return cast(bool, _native.has_action_keywords(text))
 
     # Pure Python fallback
     action_keywords = [
@@ -855,7 +859,7 @@ def has_analysis_keywords(text: str) -> bool:
         True if analysis keywords are present
     """
     if _NATIVE_AVAILABLE:
-        return _native.has_analysis_keywords(text)
+        return cast(bool, _native.has_analysis_keywords(text))
 
     # Pure Python fallback
     analysis_keywords = [
@@ -886,7 +890,7 @@ def has_generation_keywords(text: str) -> bool:
         True if generation keywords are present
     """
     if _NATIVE_AVAILABLE:
-        return _native.has_generation_keywords(text)
+        return cast(bool, _native.has_generation_keywords(text))
 
     # Pure Python fallback
     generation_keywords = [
@@ -915,7 +919,7 @@ def has_negation(text: str) -> bool:
         True if negation patterns are present
     """
     if _NATIVE_AVAILABLE:
-        return _native.has_negation(text)
+        return cast(bool, _native.has_negation(text))
 
     # Pure Python fallback
     negation_patterns = [
@@ -949,7 +953,7 @@ def find_all_keywords(text: str) -> List[Tuple[int, int, str, str]]:
         List of (start, end, matched_text, category) tuples
     """
     if _NATIVE_AVAILABLE:
-        return _native.find_all_keywords(text)
+        return cast(List[Tuple[int, int, str, str]], _native.find_all_keywords(text))
 
     # Pure Python fallback
     results = []
@@ -1071,7 +1075,7 @@ def detect_circular_phrases(text: str) -> bool:
         True if circular phrases are detected
     """
     if _NATIVE_AVAILABLE:
-        return _native.detect_circular_phrases(text)
+        return cast(bool, _native.detect_circular_phrases(text))
 
     # Pure Python fallback
     text_lower = text.lower()
@@ -1088,7 +1092,7 @@ def count_circular_patterns(text: str) -> int:
         Number of circular pattern matches
     """
     if _NATIVE_AVAILABLE:
-        return _native.count_circular_patterns(text)
+        return cast(int, _native.count_circular_patterns(text))
 
     # Pure Python fallback
     text_lower = text.lower()
@@ -1114,7 +1118,7 @@ def find_circular_patterns(text: str) -> List[Tuple[int, int, str]]:
         List of (start, end, matched_text) tuples
     """
     if _NATIVE_AVAILABLE:
-        return _native.find_circular_patterns(text)
+        return cast(List[Tuple[int, int, str]], _native.find_circular_patterns(text))
 
     # Pure Python fallback
     text_lower = text.lower()
@@ -1301,7 +1305,7 @@ def count_tokens_approx(text: str) -> int:
         Approximate token count
     """
     if _NATIVE_AVAILABLE:
-        return _native.count_tokens_approx(text)
+        return cast(int, _native.count_tokens_approx(text))
 
     # Pure Python fallback (words + punctuation)
     import re
@@ -1360,7 +1364,7 @@ def scan_secrets(text: str) -> List[Any]:
         List of SecretMatch objects
     """
     if _NATIVE_AVAILABLE:
-        return _native.scan_secrets(text)
+        return cast(List[Any], _native.scan_secrets(text))
 
     # Pure Python fallback
     matches = []
@@ -1394,7 +1398,7 @@ def has_secrets(text: str) -> bool:
         True if secrets are found
     """
     if _NATIVE_AVAILABLE:
-        return _native.has_secrets(text)
+        return cast(bool, _native.has_secrets(text))
 
     # Pure Python fallback
     for _, pattern, _ in _SECRET_PATTERNS:
@@ -1413,7 +1417,7 @@ def get_secret_types(text: str) -> List[str]:
         List of secret type names
     """
     if _NATIVE_AVAILABLE:
-        return _native.get_secret_types(text)
+        return cast(List[str], _native.get_secret_types(text))
 
     # Pure Python fallback
     types = []
@@ -1458,7 +1462,7 @@ def list_secret_patterns() -> List[str]:
         List of pattern names
     """
     if _NATIVE_AVAILABLE:
-        return _native.list_secret_patterns()
+        return cast(List[str], _native.list_secret_patterns())
 
     # Pure Python fallback
     return [name for name, _, _ in _SECRET_PATTERNS]
@@ -1474,7 +1478,7 @@ def scan_secrets_summary(text: str) -> Dict[str, Any]:
         Summary dict with counts
     """
     if _NATIVE_AVAILABLE:
-        return _native.scan_secrets_summary(text)
+        return cast(Dict[str, Any], _native.scan_secrets_summary(text))
 
     # Pure Python fallback
     matches = scan_secrets(text)
@@ -1754,7 +1758,7 @@ def extract_file_path(text: str) -> Optional[str]:
         Extracted file path or None
     """
     if _NATIVE_AVAILABLE and hasattr(_native, "extract_file_path"):
-        return _native.extract_file_path(text)
+        return cast(Optional[str], _native.extract_file_path(text))
 
     # Pure Python fallback
     for pattern in _FILE_PATH_PATTERNS:
@@ -1778,7 +1782,7 @@ def extract_code_blocks(text: str) -> List[str]:
         List of extracted code block contents
     """
     if _NATIVE_AVAILABLE and hasattr(_native, "extract_code_blocks"):
-        return _native.extract_code_blocks(text)
+        return cast(List[str], _native.extract_code_blocks(text))
 
     # Pure Python fallback
     blocks = []
@@ -1815,7 +1819,7 @@ def extract_shell_commands(text: str) -> List[str]:
         List of extracted shell commands
     """
     if _NATIVE_AVAILABLE and hasattr(_native, "extract_shell_commands"):
-        return _native.extract_shell_commands(text)
+        return cast(List[str], _native.extract_shell_commands(text))
 
     # Pure Python fallback
     commands = []
@@ -1941,7 +1945,7 @@ def batch_extract_file_paths(texts: List[str]) -> List[Optional[str]]:
         List of extracted paths (None for texts without paths)
     """
     if _NATIVE_AVAILABLE and hasattr(_native, "batch_extract_file_paths"):
-        return _native.batch_extract_file_paths(texts)
+        return cast(List[Optional[str]], _native.batch_extract_file_paths(texts))
 
     return [extract_file_path(text) for text in texts]
 
@@ -2035,7 +2039,7 @@ def is_garbage_content_fast(content: str) -> bool:
         True if content appears to be garbage
     """
     if _NATIVE_AVAILABLE and hasattr(_native, "is_garbage_content"):
-        return _native.is_garbage_content(content)
+        return cast(bool, _native.is_garbage_content(content))
 
     if not content:
         return False
@@ -2092,7 +2096,7 @@ def strip_markup_fast(text: str) -> str:
         Plain text with markup removed
     """
     if _NATIVE_AVAILABLE and hasattr(_native, "strip_markup"):
-        return _native.strip_markup(text)
+        return cast(str, _native.strip_markup(text))
 
     if not text:
         return text
@@ -2112,7 +2116,7 @@ def validate_tool_name(name: str) -> Tuple[bool, Optional[str]]:
         Tuple of (is_valid, rejection_reason)
     """
     if _NATIVE_AVAILABLE and hasattr(_native, "validate_tool_name"):
-        return _native.validate_tool_name(name)
+        return cast(Tuple[bool, Optional[str]], _native.validate_tool_name(name))
 
     if not name or not isinstance(name, str):
         return False, "empty_or_invalid_type"
@@ -2345,7 +2349,7 @@ def is_stdlib_module(module_name: str) -> bool:
         True if the module is a stdlib module
     """
     if _NATIVE_AVAILABLE and hasattr(_native, "is_stdlib_module"):
-        return _native.is_stdlib_module(module_name)
+        return cast(bool, _native.is_stdlib_module(module_name))
 
     # Pure Python fallback - check top-level module
     top_level = module_name.split(".")[0]

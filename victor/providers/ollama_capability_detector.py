@@ -27,7 +27,7 @@ Usage:
 import logging
 import re
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import httpx
 
