@@ -270,7 +270,7 @@ class ModeDefinition:
             allowed_tools=self.allowed_tools,
         )
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary format."""
         return {
             "name": self.name,

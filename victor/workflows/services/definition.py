@@ -409,7 +409,7 @@ class VolumeMount:
     type: Literal["bind", "volume", "tmpfs"] = "bind"
 
     @classmethod
-    def parse(cls, spec: Union[str, Dict, "VolumeMount"]) -> "VolumeMount":
+    def parse(cls, spec: Union[str, Dict[str, Any], "VolumeMount"]) -> "VolumeMount":
         """Parse volume specification.
 
         Formats:

@@ -128,7 +128,7 @@ class PromptRequirements:
             ]
         )
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for logging/serialization."""
         return {
             "file_count": self.file_count,
