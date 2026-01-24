@@ -38,7 +38,7 @@ class IntelligentIntegrationBuilder(FactoryAwareBuilder):
         """
         super().__init__(settings, factory)
 
-    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> Dict[str, Any]:
+    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> Dict[str, Any]:  # type: ignore[override]
         """Build intelligent integration components and attach them to orchestrator."""
         factory = self._ensure_factory()
         components: Dict[str, Any] = {}

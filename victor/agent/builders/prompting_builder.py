@@ -42,7 +42,7 @@ class PromptingBuilder(FactoryAwareBuilder):
         """
         super().__init__(settings, factory)
 
-    def build(
+    def build(  # type: ignore[override]
         self,
         orchestrator: "AgentOrchestrator",
         model: str,

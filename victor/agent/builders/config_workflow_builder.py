@@ -47,7 +47,7 @@ class ConfigWorkflowBuilder(FactoryAwareBuilder):
         """
         super().__init__(settings, factory)
 
-    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> Dict[str, Any]:
+    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> Dict[str, Any]:  # type: ignore[override]
         """Build configuration and workflow optimization components."""
         factory = self._ensure_factory()
         components: Dict[str, Any] = {}
@@ -60,7 +60,7 @@ class ConfigWorkflowBuilder(FactoryAwareBuilder):
         # MemoryManager: Unified memory operations interface
         # Wraps ConversationStore for cleaner session management
         orchestrator._memory_manager_wrapper = create_memory_manager(
-            conversation_store=orchestrator.memory_manager,
+            conversation_store=orchestrator.memory_manager,  # type: ignore[arg-type]
             session_id=orchestrator._memory_session_id,
             message_history=orchestrator.conversation,
         )

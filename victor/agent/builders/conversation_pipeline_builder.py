@@ -42,7 +42,7 @@ class ConversationPipelineBuilder(FactoryAwareBuilder):
         """
         super().__init__(settings, factory)
 
-    def build(
+    def build(  # type: ignore[override]
         self,
         orchestrator: "AgentOrchestrator",
         provider: "BaseProvider",
@@ -117,9 +117,9 @@ class ConversationPipelineBuilder(FactoryAwareBuilder):
             hasattr(orchestrator, "_pending_semantic_cache")
             and orchestrator._pending_semantic_cache is not None
         ):
-            orchestrator._tool_pipeline.set_semantic_cache(orchestrator._pending_semantic_cache)  # type: ignore[arg-type]
+            orchestrator._tool_pipeline.set_semantic_cache(orchestrator._pending_semantic_cache)
             logger.info("[AgentOrchestrator] Semantic tool result cache enabled")
-            orchestrator._pending_semantic_cache = None  # Clear reference
+            orchestrator._pending_semantic_cache = None  # type: ignore[assignment]
 
         # StreamingController: Manages streaming sessions and metrics (via factory)
         orchestrator._streaming_controller = factory.create_streaming_controller(

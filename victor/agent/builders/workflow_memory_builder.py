@@ -43,7 +43,7 @@ class WorkflowMemoryBuilder(FactoryAwareBuilder):
         """
         super().__init__(settings, factory)
 
-    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> Dict[str, Any]:
+    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> Dict[str, Any]:  # type: ignore[override]
         """Build workflow and memory components and attach them to orchestrator."""
         factory = self._ensure_factory()
         components: Dict[str, Any] = {}
@@ -81,7 +81,7 @@ class WorkflowMemoryBuilder(FactoryAwareBuilder):
             orchestrator.provider_name,
             orchestrator._tool_calling_caps_internal.native_tool_calls,
         )
-        orchestrator.memory_manager, orchestrator._memory_session_id = memory_result
+        orchestrator.memory_manager, orchestrator._memory_session_id = memory_result  # type: ignore[assignment]
         components["memory_manager"] = orchestrator.memory_manager
         components["memory_session_id"] = orchestrator._memory_session_id
 

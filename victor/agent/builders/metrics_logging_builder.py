@@ -42,7 +42,7 @@ class MetricsLoggingBuilder(FactoryAwareBuilder):
         """
         super().__init__(settings, factory)
 
-    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> Dict[str, Any]:
+    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> Dict[str, Any]:  # type: ignore[override]
         """Build metrics and logging components and attach them to orchestrator."""
         factory = self._ensure_factory()
         components: Dict[str, Any] = {}
@@ -81,7 +81,7 @@ class MetricsLoggingBuilder(FactoryAwareBuilder):
             usage_logger=orchestrator.usage_logger,
             debug_logger=orchestrator.debug_logger,
             tool_cost_lookup=lambda name: (
-                orchestrator.tools.get_tool_cost(name)  # type: ignore[union-attr]
+                orchestrator.tools.get_tool_cost(name)
                 if hasattr(orchestrator, "tools") and orchestrator.tools is not None
                 else CostTier.FREE
             ),

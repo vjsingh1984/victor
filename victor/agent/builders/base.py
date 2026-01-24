@@ -60,7 +60,7 @@ class ComponentBuilder(ABC):
         self._logger = logging.getLogger(self.__class__.__name__)
 
     @abstractmethod
-    def build(self, **kwargs: Any) -> Any:
+    def build(self, **kwargs: Any) -> Dict[str, Any]:
         """Build and return the component(s).
 
         This method must be implemented by concrete builder classes to
@@ -70,8 +70,7 @@ class ComponentBuilder(ABC):
             **kwargs: Dependencies from other builders or external sources
 
         Returns:
-            The built component(s). Can be a single component or a dictionary
-            of multiple components.
+            Dictionary mapping component names to component instances.
 
         Raises:
             NotImplementedError: If not implemented by subclass
