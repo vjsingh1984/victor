@@ -410,7 +410,8 @@ class SessionCoordinator:
             Dictionary with session cost statistics
         """
         if self._cost_tracker and hasattr(self._cost_tracker, "get_summary"):
-            return self._cost_tracker.get_summary()
+            summary: Dict[str, Any] = self._cost_tracker.get_summary()
+            return summary
         return {}
 
     def get_session_cost_formatted(self) -> str:
@@ -420,7 +421,8 @@ class SessionCoordinator:
             Cost string like "$0.0123" or "cost n/a"
         """
         if self._cost_tracker and hasattr(self._cost_tracker, "format_inline_cost"):
-            return self._cost_tracker.format_inline_cost()
+            cost_str: str = self._cost_tracker.format_inline_cost()
+            return cost_str
         return "cost n/a"
 
     # ========================================================================
@@ -449,13 +451,14 @@ class SessionCoordinator:
         state = self._get_checkpoint_state()
 
         try:
-            checkpoint_id = await self._checkpoint_manager.save_checkpoint(
+            checkpoint_id: Optional[str] = await self._checkpoint_manager.save_checkpoint(
                 session_id=self._memory_session_id or "default",
                 state=state,
                 description=description,
                 tags=tags,
             )
-            logger.info(f"Checkpoint saved: {checkpoint_id[:20]}...")
+            if checkpoint_id:
+                logger.info(f"Checkpoint saved: {checkpoint_id[:20]}...")
             return checkpoint_id
         except (OSError, IOError) as e:
             logger.warning(f"Failed to save checkpoint (I/O error): {e}")
