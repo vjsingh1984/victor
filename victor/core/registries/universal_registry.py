@@ -201,10 +201,12 @@ class UniversalRegistry(Generic[T]):
         This is the factory method for obtaining registry instances.
         Each registry_type gets its own singleton instance.
 
+        Integrates with centralized cache_config when available (Phase 6).
+
         Args:
             registry_type: Type identifier (e.g., "modes", "teams", "capabilities")
-            cache_strategy: Cache invalidation strategy
-            max_size: Maximum size for LRU eviction
+            cache_strategy: Cache invalidation strategy (used as fallback)
+            max_size: Maximum size for LRU eviction (used as fallback)
 
         Returns:
             UniversalRegistry instance for the given type
@@ -213,6 +215,27 @@ class UniversalRegistry(Generic[T]):
             mode_registry = UniversalRegistry.get_registry("modes")
             team_registry = UniversalRegistry.get_registry("teams")
         """
+        # Try to use centralized cache configuration (Phase 6 integration)
+        try:
+            from victor.core.registries.cache_config import get_cache_config_manager
+
+            cache_manager = get_cache_config_manager()
+            config = cache_manager.get_config(registry_type, env_prefix="VICTOR_CACHE_")
+
+            if config is not None:
+                # Use centralized config values
+                cache_strategy = CacheStrategy(config.strategy.value)
+                max_size = config.max_size if config.max_size else max_size
+                logger.debug(
+                    f"UniversalRegistry: Using cache_config for '{registry_type}': "
+                    f"strategy={cache_strategy.value}, max_size={max_size}"
+                )
+        except ImportError:
+            # cache_config not available, use provided parameters
+            pass
+        except Exception as e:
+            logger.debug(f"UniversalRegistry: Could not load cache_config for '{registry_type}': {e}")
+
         with cls._lock:
             if registry_type not in cls._instances:
                 cls._instances[registry_type] = cls(registry_type, cache_strategy, max_size)

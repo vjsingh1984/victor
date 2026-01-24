@@ -220,38 +220,118 @@ class ToolSelectionCache:
         context_ttl: int = DEFAULT_CONTEXT_TTL,
         rl_ttl: int = DEFAULT_RL_TTL,
         enabled: bool = True,
+        use_cache_config: bool = True,
     ):
         """Initialize tool selection cache.
 
         Args:
-            max_size: Maximum number of entries per namespace
-            query_ttl: Default TTL for query cache (seconds)
-            context_ttl: Default TTL for context cache (seconds)
-            rl_ttl: Default TTL for RL cache (seconds)
+            max_size: Maximum number of entries per namespace (deprecated, use cache_config)
+            query_ttl: Default TTL for query cache (seconds) (deprecated, use cache_config)
+            context_ttl: Default TTL for context cache (seconds) (deprecated, use cache_config)
+            rl_ttl: Default TTL for RL cache (seconds) (deprecated, use cache_config)
             enabled: Whether caching is enabled
+            use_cache_config: Use centralized cache_config module (recommended)
         """
+        self._enabled = enabled
+
+        # Always store max_size for backward compatibility and stats
         self._max_size = max_size
         self._query_ttl = query_ttl
         self._context_ttl = context_ttl
         self._rl_ttl = rl_ttl
-        self._enabled = enabled
 
-        # Create registries for each namespace
-        self._query_registry = UniversalRegistry.get_registry(
-            "tool_selection_query",
-            cache_strategy=CacheStrategy.LRU,
-            max_size=max_size,
-        )
-        self._context_registry = UniversalRegistry.get_registry(
-            "tool_selection_context",
-            cache_strategy=CacheStrategy.LRU,
-            max_size=max_size,
-        )
-        self._rl_registry = UniversalRegistry.get_registry(
-            "tool_selection_rl",
-            cache_strategy=CacheStrategy.LRU,
-            max_size=max_size,
-        )
+        # Use centralized cache configuration if requested (recommended for Phase 6)
+        if use_cache_config:
+            from victor.core.registries.cache_config import get_cache_config_manager
+
+            cache_manager = get_cache_config_manager()
+
+            # Configure tool_selection_query registry
+            try:
+                query_config = cache_manager.get_config("tool_selection_query", env_prefix="VICTOR_CACHE_")
+                self._query_registry = cache_manager.configure_registry(
+                    UniversalRegistry, "tool_selection_query", env_prefix="VICTOR_CACHE_"
+                )
+                # Update max_size from config if available
+                if query_config.max_size is not None:
+                    self._max_size = query_config.max_size
+                # Store TTL for validation
+                self._query_ttl = query_config.ttl if query_config.ttl else query_ttl
+            except Exception as e:
+                logger.warning(f"Failed to use cache config for tool_selection_query: {e}. Using defaults.")
+                self._query_registry = UniversalRegistry.get_registry(
+                    "tool_selection_query",
+                    cache_strategy=CacheStrategy.LRU,
+                    max_size=max_size,
+                )
+                self._query_ttl = query_ttl
+
+            # Configure tool_selection_context registry
+            try:
+                context_config = cache_manager.get_config("tool_selection_context", env_prefix="VICTOR_CACHE_")
+                self._context_registry = cache_manager.configure_registry(
+                    UniversalRegistry, "tool_selection_context", env_prefix="VICTOR_CACHE_"
+                )
+                # Update max_size from config if available (and larger)
+                if context_config.max_size is not None and context_config.max_size > self._max_size:
+                    self._max_size = context_config.max_size
+                self._context_ttl = context_config.ttl if context_config.ttl else context_ttl
+            except Exception as e:
+                logger.warning(f"Failed to use cache config for tool_selection_context: {e}. Using defaults.")
+                self._context_registry = UniversalRegistry.get_registry(
+                    "tool_selection_context",
+                    cache_strategy=CacheStrategy.LRU,
+                    max_size=max_size,
+                )
+                self._context_ttl = context_ttl
+
+            # Configure tool_selection_rl registry
+            try:
+                rl_config = cache_manager.get_config("tool_selection_rl", env_prefix="VICTOR_CACHE_")
+                self._rl_registry = cache_manager.configure_registry(
+                    UniversalRegistry, "tool_selection_rl", env_prefix="VICTOR_CACHE_"
+                )
+                # Update max_size from config if available (and larger)
+                if rl_config.max_size is not None and rl_config.max_size > self._max_size:
+                    self._max_size = rl_config.max_size
+                self._rl_ttl = rl_config.ttl if rl_config.ttl else rl_ttl
+            except Exception as e:
+                logger.warning(f"Failed to use cache config for tool_selection_rl: {e}. Using defaults.")
+                self._rl_registry = UniversalRegistry.get_registry(
+                    "tool_selection_rl",
+                    cache_strategy=CacheStrategy.LRU,
+                    max_size=max_size,
+                )
+                self._rl_ttl = rl_ttl
+
+            logger.info(
+                f"ToolSelectionCache initialized using centralized cache_config: enabled={enabled}, max_size={self._max_size}"
+            )
+        else:
+            # Legacy initialization with hardcoded values
+            # (max_size and TTLs already set above)
+
+            # Create registries for each namespace
+            self._query_registry = UniversalRegistry.get_registry(
+                "tool_selection_query",
+                cache_strategy=CacheStrategy.LRU,
+                max_size=max_size,
+            )
+            self._context_registry = UniversalRegistry.get_registry(
+                "tool_selection_context",
+                cache_strategy=CacheStrategy.LRU,
+                max_size=max_size,
+            )
+            self._rl_registry = UniversalRegistry.get_registry(
+                "tool_selection_rl",
+                cache_strategy=CacheStrategy.LRU,
+                max_size=max_size,
+            )
+
+            logger.info(
+                f"ToolSelectionCache initialized (legacy): enabled={enabled}, max_size={max_size}, "
+                f"TTL(query={query_ttl}s, context={context_ttl}s, rl={rl_ttl}s)"
+            )
 
         # Metrics per namespace
         self._metrics: Dict[str, CacheMetrics] = {
@@ -262,11 +342,6 @@ class ToolSelectionCache:
 
         # Lock for metrics updates
         self._metrics_lock = threading.RLock()
-
-        logger.info(
-            f"ToolSelectionCache initialized: enabled={enabled}, max_size={max_size}, "
-            f"TTL(query={query_ttl}s, context={context_ttl}s, rl={rl_ttl}s)"
-        )
 
     # ========================================================================
     # Cache Access Methods
