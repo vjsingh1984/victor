@@ -160,7 +160,7 @@ def find_duplicate_blocks(content: str, min_block_length: int = 50) -> List[Tupl
         List of (block_index, hash) for duplicate blocks
     """
     if _NATIVE_AVAILABLE:
-        return _native.find_duplicate_blocks(content, min_block_length)
+        return cast(List[Tuple[int, str]], _native.find_duplicate_blocks(content, min_block_length))
 
     # Pure Python fallback
     blocks = _split_into_blocks(content)
@@ -233,7 +233,7 @@ def cosine_similarity(a: List[float], b: List[float]) -> float:
         ValueError: If vectors have different lengths
     """
     if _NATIVE_AVAILABLE:
-        return _native.cosine_similarity(a, b)
+        return cast(float, _native.cosine_similarity(a, b))
 
     # Pure Python fallback using NumPy
     a_arr = np.array(a, dtype=np.float32)
@@ -264,7 +264,7 @@ def batch_cosine_similarity(query: List[float], corpus: List[List[float]]) -> Li
         ValueError: If query dimension doesn't match corpus dimensions
     """
     if _NATIVE_AVAILABLE:
-        return _native.batch_cosine_similarity(query, corpus)
+        return cast(List[float], _native.batch_cosine_similarity(query, corpus))
 
     # Pure Python fallback using NumPy
     if not corpus:
@@ -285,7 +285,7 @@ def batch_cosine_similarity(query: List[float], corpus: List[List[float]]) -> Li
 
     # Compute similarities
     similarities = np.dot(corpus_norms, query_norm)
-    return similarities.tolist()
+    return cast(List[float], similarities.tolist())
 
 
 def top_k_similar(
@@ -333,7 +333,7 @@ def batch_normalize_vectors(vectors: List[List[float]]) -> List[List[float]]:
     arr = np.array(vectors, dtype=np.float32)
     norms = np.linalg.norm(arr, axis=1, keepdims=True) + 1e-9
     normalized = arr / norms
-    return normalized.tolist()
+    return cast(List[List[float]], normalized.tolist())
 
 
 def batch_cosine_similarity_normalized(
@@ -353,7 +353,7 @@ def batch_cosine_similarity_normalized(
         List of similarity scores, one per corpus vector
     """
     if _NATIVE_AVAILABLE:
-        return _native.batch_cosine_similarity_normalized(query, normalized_corpus)
+        return cast(List[float], _native.batch_cosine_similarity_normalized(query, normalized_corpus))
 
     # Pure Python fallback using NumPy
     if not normalized_corpus:
@@ -367,7 +367,7 @@ def batch_cosine_similarity_normalized(
 
     # For pre-normalized corpus, similarity is just dot product
     similarities = np.dot(corpus_arr, query_normalized)
-    return similarities.tolist()
+    return cast(List[float], similarities.tolist())
 
 
 def top_k_similar_normalized(
@@ -387,7 +387,7 @@ def top_k_similar_normalized(
         List of (index, similarity) tuples, sorted by similarity descending
     """
     if _NATIVE_AVAILABLE:
-        return _native.top_k_similar_normalized(query, normalized_corpus, k)
+        return cast(List[Tuple[int, float]], _native.top_k_similar_normalized(query, normalized_corpus, k))
 
     # Pure Python fallback using heap for efficiency
     import heapq
@@ -421,7 +421,7 @@ def repair_json(input_str: str) -> str:
         Repaired JSON string
     """
     if _NATIVE_AVAILABLE:
-        return _native.repair_json(input_str)
+        return cast(str, _native.repair_json(input_str))
 
     # Pure Python fallback
     result = input_str
@@ -558,7 +558,7 @@ def compute_signature(tool_name: str, arguments: Dict[str, Any]) -> str:
         16-character hex string signature
     """
     if _NATIVE_AVAILABLE:
-        return _native.compute_signature(tool_name, arguments)
+        return cast(str, _native.compute_signature(tool_name, arguments))
 
     # Pure Python fallback
     # Sort keys for deterministic output
@@ -579,7 +579,7 @@ def compute_batch_signatures(tool_calls: List[Tuple[str, Dict[str, Any]]]) -> Li
         List of signature strings, one per tool call
     """
     if _NATIVE_AVAILABLE:
-        return _native.compute_batch_signatures(tool_calls)
+        return cast(List[str], _native.compute_batch_signatures(tool_calls))
 
     # Pure Python fallback
     return [compute_signature(name, args) for name, args in tool_calls]
@@ -1162,7 +1162,7 @@ def chunk_by_sentences(text: str, chunk_size: int = 1344, overlap: int = 128) ->
         List of text chunks
     """
     if _NATIVE_AVAILABLE:
-        return _native.chunk_by_sentences(text, chunk_size, overlap)
+        return cast(List[str], _native.chunk_by_sentences(text, chunk_size, overlap))
 
     # Pure Python fallback
     import re
@@ -1200,7 +1200,7 @@ def chunk_by_chars(text: str, chunk_size: int = 1344, overlap: int = 128) -> Lis
         List of text chunks
     """
     if _NATIVE_AVAILABLE:
-        return _native.chunk_by_chars(text, chunk_size, overlap)
+        return cast(List[str], _native.chunk_by_chars(text, chunk_size, overlap))
 
     # Pure Python fallback
     chunks = []
@@ -1229,7 +1229,7 @@ def chunk_by_paragraphs(text: str, chunk_size: int = 1344, overlap: int = 128) -
         List of text chunks
     """
     if _NATIVE_AVAILABLE:
-        return _native.chunk_by_paragraphs(text, chunk_size, overlap)
+        return cast(List[str], _native.chunk_by_paragraphs(text, chunk_size, overlap))
 
     # Pure Python fallback
     paragraphs = text.split("\n\n")
@@ -1264,7 +1264,7 @@ def detect_doc_type(source: str) -> str:
         Document type string
     """
     if _NATIVE_AVAILABLE:
-        return _native.detect_doc_type(source)
+        return cast(str, _native.detect_doc_type(source))
 
     # Pure Python fallback
     source_lower = source.lower()
@@ -1439,7 +1439,7 @@ def mask_secrets(text: str, mask_char: str = "*", visible_chars: int = 4) -> str
         Text with secrets masked
     """
     if _NATIVE_AVAILABLE:
-        return _native.mask_secrets(text, mask_char, visible_chars)
+        return cast(str, _native.mask_secrets(text, mask_char, visible_chars))
 
     # Pure Python fallback
     result = text
@@ -1588,7 +1588,7 @@ def contains_any_pattern(text: str, patterns: List[str], case_insensitive: bool 
         True if any pattern matches
     """
     if _NATIVE_AVAILABLE:
-        return _native.contains_any_pattern(text, patterns, case_insensitive)
+        return cast(bool, _native.contains_any_pattern(text, patterns, case_insensitive))
 
     matcher = PatternMatcherFallback(patterns, case_insensitive)
     return matcher.contains_any(text)
@@ -1606,7 +1606,7 @@ def find_all_patterns(text: str, patterns: List[str], case_insensitive: bool = T
         List of PatternMatch objects
     """
     if _NATIVE_AVAILABLE:
-        return _native.find_all_patterns(text, patterns, case_insensitive)
+        return cast(List[Any], _native.find_all_patterns(text, patterns, case_insensitive))
 
     matcher = PatternMatcherFallback(patterns, case_insensitive)
     return matcher.find_all(text)
@@ -1624,7 +1624,7 @@ def count_pattern_matches(text: str, patterns: List[str], case_insensitive: bool
         Total match count
     """
     if _NATIVE_AVAILABLE:
-        return _native.count_pattern_matches(text, patterns, case_insensitive)
+        return cast(int, _native.count_pattern_matches(text, patterns, case_insensitive))
 
     matcher = PatternMatcherFallback(patterns, case_insensitive)
     return matcher.count_matches(text)
@@ -1644,7 +1644,7 @@ def get_matched_pattern_indices(
         List of matched pattern indices
     """
     if _NATIVE_AVAILABLE:
-        return _native.get_matched_pattern_indices(text, patterns, case_insensitive)
+        return cast(List[int], _native.get_matched_pattern_indices(text, patterns, case_insensitive))
 
     matcher = PatternMatcherFallback(patterns, case_insensitive)
     return matcher.matched_patterns(text)
@@ -1664,7 +1664,7 @@ def batch_contains_any(
         List of booleans, one per text
     """
     if _NATIVE_AVAILABLE:
-        return _native.batch_contains_any(texts, patterns, case_insensitive)
+        return cast(List[bool], _native.batch_contains_any(texts, patterns, case_insensitive))
 
     matcher = PatternMatcherFallback(patterns, case_insensitive)
     return [matcher.contains_any(text) for text in texts]
@@ -1685,7 +1685,7 @@ def weighted_pattern_score(
         Sum of weights for matched patterns
     """
     if _NATIVE_AVAILABLE:
-        return _native.weighted_pattern_score(text, patterns, weights, case_insensitive)
+        return cast(float, _native.weighted_pattern_score(text, patterns, weights, case_insensitive))
 
     if len(patterns) != len(weights):
         raise ValueError(
@@ -1999,7 +1999,7 @@ def sanitize_response_fast(text: str) -> str:
         Cleaned text suitable for display
     """
     if _NATIVE_AVAILABLE and hasattr(_native, "sanitize_response"):
-        return _native.sanitize_response(text)
+        return cast(str, _native.sanitize_response(text))
 
     if not text:
         return text
@@ -2062,7 +2062,7 @@ def detect_leakage_patterns(text: str) -> List[Tuple[int, int, str]]:
         List of (start, end, pattern_name) tuples for matches
     """
     if _NATIVE_AVAILABLE and hasattr(_native, "detect_leakage_patterns"):
-        return _native.detect_leakage_patterns(text)
+        return cast(List[Tuple[int, int, str]], _native.detect_leakage_patterns(text))
 
     # Pure Python fallback
     matches = []
@@ -2169,7 +2169,7 @@ def coerce_string_type(value: str) -> Tuple[str, str, Optional[str]]:
         - error_or_none: Error message if coercion failed, else None
     """
     if _NATIVE_AVAILABLE and hasattr(_native, "coerce_string_type"):
-        return _native.coerce_string_type(value)
+        return cast(Tuple[str, str, Optional[str]], _native.coerce_string_type(value))
 
     # Pure Python fallback
     # Check for null
@@ -2472,7 +2472,7 @@ def validate_yaml(yaml_content: str) -> bool:
         True if valid, False if invalid
     """
     if _NATIVE_AVAILABLE and hasattr(_native, "validate_yaml"):
-        return _native.validate_yaml(yaml_content)
+        return cast(bool, _native.validate_yaml(yaml_content))
 
     import yaml
 
@@ -2495,7 +2495,7 @@ def extract_workflow_names(yaml_content: str) -> List[str]:
         List of workflow names found
     """
     if _NATIVE_AVAILABLE and hasattr(_native, "extract_workflow_names"):
-        return _native.extract_workflow_names(yaml_content)
+        return cast(List[str], _native.extract_workflow_names(yaml_content))
 
     import yaml
 
@@ -2933,11 +2933,14 @@ def get_content_hasher(
     """
     from victor.core.utils.content_hasher import ContentHasher
 
-    return ContentHasher(
-        normalize_whitespace=normalize_whitespace,
-        case_insensitive=case_insensitive,
-        hash_length=hash_length,
-        remove_punctuation=remove_punctuation,
+    return cast(
+        "ContentHasherProtocol",
+        ContentHasher(
+            normalize_whitespace=normalize_whitespace,
+            case_insensitive=case_insensitive,
+            hash_length=hash_length,
+            remove_punctuation=remove_punctuation,
+        ),
     )
 
 
@@ -2958,7 +2961,7 @@ def get_default_content_hasher_fuzzy() -> "ContentHasherProtocol":
     if _content_hasher_fuzzy is None:
         from victor.core.utils.content_hasher import HasherPresets
 
-        _content_hasher_fuzzy = HasherPresets.text_fuzzy()
+        _content_hasher_fuzzy = cast("ContentHasherProtocol", HasherPresets.text_fuzzy())
     return _content_hasher_fuzzy
 
 
@@ -2974,7 +2977,7 @@ def get_default_content_hasher_exact() -> "ContentHasherProtocol":
     if _content_hasher_exact is None:
         from victor.core.utils.content_hasher import HasherPresets
 
-        _content_hasher_exact = HasherPresets.exact_match()
+        _content_hasher_exact = cast("ContentHasherProtocol", HasherPresets.exact_match())
     return _content_hasher_exact
 
 
