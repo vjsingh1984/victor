@@ -167,27 +167,7 @@ class CitationFormatterHandler(BaseHandler):
             return f"{authors[0] if authors else 'Unknown'} ({year}). {title}"
 
 
-# HANDLERS dict deprecated - handlers are now auto-registered via @handler_decorator
-# Kept for backward compatibility
-HANDLERS = {
-    "web_scraper": WebScraperHandler(),
-    "citation_formatter": CitationFormatterHandler(),
-}
-
-
-def register_handlers() -> None:
-    """Register Research handlers with the workflow executor.
-
-    DEPRECATED: Handlers are now auto-registered via @handler_decorator.
-    This function is kept for backward compatibility but is now a no-op.
-    """
-    # No-op: handlers are auto-registered via @handler_decorator
-    logger.debug("register_handlers() called but handlers are auto-registered")
-
-
 __all__ = [
     "WebScraperHandler",
     "CitationFormatterHandler",
-    "HANDLERS",
-    "register_handlers",
 ]

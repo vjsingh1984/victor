@@ -816,33 +816,10 @@ class RLTrainingHandler(BaseHandler):
             }
 
 
-# HANDLERS dict deprecated - handlers are now auto-registered via @handler_decorator
-# Kept for backward compatibility
-HANDLERS = {
-    "stats_compute": StatsComputeHandler(),
-    "ml_training": MLTrainingHandler(),
-    "pycaret_automl": PyCaretHandler(),
-    "autosklearn_automl": AutoSklearnHandler(),
-    "rl_training": RLTrainingHandler(),
-}
-
-
-def register_handlers() -> None:
-    """Register DataAnalysis handlers with the workflow executor.
-
-    DEPRECATED: Handlers are now auto-registered via @handler_decorator.
-    This function is kept for backward compatibility but is now a no-op.
-    """
-    # No-op: handlers are auto-registered via @handler_decorator
-    logger.debug("register_handlers() called but handlers are auto-registered")
-
-
 __all__ = [
     "StatsComputeHandler",
     "MLTrainingHandler",
     "PyCaretHandler",
     "AutoSklearnHandler",
     "RLTrainingHandler",
-    "HANDLERS",
-    "register_handlers",
 ]

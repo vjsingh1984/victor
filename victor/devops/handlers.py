@@ -492,29 +492,8 @@ class MLOpsHandler(BaseHandler):
         }
 
 
-# HANDLERS dict deprecated - handlers are now auto-registered via @handler_decorator
-# Kept for backward compatibility
-HANDLERS = {
-    "container_ops": ContainerOpsHandler(),
-    "terraform_apply": TerraformHandler(),
-    "mlops": MLOpsHandler(),
-}
-
-
-def register_handlers() -> None:
-    """Register DevOps handlers with the workflow executor.
-
-    DEPRECATED: Handlers are now auto-registered via @handler_decorator.
-    This function is kept for backward compatibility but is now a no-op.
-    """
-    # No-op: handlers are auto-registered via @handler_decorator
-    logger.debug("register_handlers() called but handlers are auto-registered")
-
-
 __all__ = [
     "ContainerOpsHandler",
     "TerraformHandler",
     "MLOpsHandler",
-    "HANDLERS",
-    "register_handlers",
 ]

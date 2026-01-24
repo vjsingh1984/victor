@@ -174,27 +174,7 @@ class TestRunnerHandler(BaseHandler):
         return output, 1
 
 
-# HANDLERS dict deprecated - handlers are now auto-registered via @handler_decorator
-# Kept for backward compatibility
-HANDLERS = {
-    "code_validation": CodeValidationHandler(),
-    "test_runner": TestRunnerHandler(),
-}
-
-
-def register_handlers() -> None:
-    """Register Coding handlers with the workflow executor.
-
-    DEPRECATED: Handlers are now auto-registered via @handler_decorator.
-    This function is kept for backward compatibility but is now a no-op.
-    """
-    # No-op: handlers are auto-registered via @handler_decorator
-    logger.debug("register_handlers() called but handlers are auto-registered")
-
-
 __all__ = [
     "CodeValidationHandler",
     "TestRunnerHandler",
-    "HANDLERS",
-    "register_handlers",
 ]

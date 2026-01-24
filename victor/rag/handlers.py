@@ -200,27 +200,7 @@ class ChunkProcessorHandler(BaseHandler):
         return chunks
 
 
-# HANDLERS dict deprecated - handlers are now auto-registered via @handler_decorator
-# Kept for backward compatibility
-HANDLERS = {
-    "vector_search": VectorSearchHandler(),
-    "chunk_processor": ChunkProcessorHandler(),
-}
-
-
-def register_handlers() -> None:
-    """Register RAG handlers with the workflow executor.
-
-    DEPRECATED: Handlers are now auto-registered via @handler_decorator.
-    This function is kept for backward compatibility but is now a no-op.
-    """
-    # No-op: handlers are auto-registered via @handler_decorator
-    logger.debug("register_handlers() called but handlers are auto-registered")
-
-
 __all__ = [
     "VectorSearchHandler",
     "ChunkProcessorHandler",
-    "HANDLERS",
-    "register_handlers",
 ]
