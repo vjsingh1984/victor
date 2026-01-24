@@ -126,8 +126,8 @@ class ChromaDBProvider(BaseEmbeddingProvider):
 
         # Create embedding model config
         embedding_config = EmbeddingModelConfig(
-            model_type=model_type,
-            model_name=model_name,
+            embedding_type=model_type,
+            embedding_model=model_name,
             dimension=self.config.extra_config.get("dimension", 4096),  # Default to 4096 for Qwen3
             api_key=self.config.embedding_api_key,  # For OpenAI/Cohere API key, or Ollama base_url
             batch_size=self.config.extra_config.get(

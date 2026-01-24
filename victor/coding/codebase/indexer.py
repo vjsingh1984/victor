@@ -63,12 +63,10 @@ try:
     )
 
     _NATIVE_AVAILABLE = is_native_available()
+    _native_is_stdlib_module = native_is_stdlib_module
 except ImportError:
     _NATIVE_AVAILABLE = False
-
-    def native_is_stdlib_module(name: str) -> bool:
-        """Fallback stub when native not available."""
-        return False
+    _native_is_stdlib_module = None
 
 
 logger = logging.getLogger(__name__)
@@ -156,8 +154,8 @@ def _is_stdlib_module(module_name: str) -> bool:
     Uses Rust accelerator via unified facade when available for 5-10x speedup.
     """
     # Use Rust accelerator when available (HashSet lookup is O(1))
-    if _NATIVE_AVAILABLE:
-        return native_is_stdlib_module(module_name)
+    if _NATIVE_AVAILABLE and _native_is_stdlib_module is not None:
+        return _native_is_stdlib_module(module_name)
 
     # Python fallback
     # Check exact match

@@ -25,7 +25,7 @@ This separation allows mixing and matching:
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -216,7 +216,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
     def __init__(self, config: EmbeddingModelConfig):
         """Initialize OpenAI embedding model."""
         super().__init__(config)
-        self.client = None
+        self.client: Optional[Any] = None  # AsyncOpenAI, imported dynamically
 
     async def initialize(self) -> None:
         """Initialize OpenAI client."""
@@ -241,13 +241,19 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         if not self._initialized:
             await self.initialize()
 
+        if self.client is None:
+            raise RuntimeError("OpenAI client not initialized")
+
         response = await self.client.embeddings.create(model=self.config.embedding_model, input=text)
-        return response.data[0].embedding
+        return response.data[0].embedding  # type: ignore[no-any-return]
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for multiple texts."""
         if not self._initialized:
             await self.initialize()
+
+        if self.client is None:
+            raise RuntimeError("OpenAI client not initialized")
 
         # OpenAI API handles batching internally (up to 2048 texts per request)
         response = await self.client.embeddings.create(model=self.config.embedding_model, input=texts)
@@ -288,7 +294,7 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
     def __init__(self, config: EmbeddingModelConfig):
         """Initialize Cohere embedding model."""
         super().__init__(config)
-        self.client = None
+        self.client: Optional[Any] = None  # cohere.AsyncClient, imported dynamically
 
     async def initialize(self) -> None:
         """Initialize Cohere client."""
@@ -313,16 +319,22 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
         if not self._initialized:
             await self.initialize()
 
+        if self.client is None:
+            raise RuntimeError("Cohere client not initialized")
+
         response = await self.client.embed(texts=[text], model=self.config.embedding_model)
-        return response.embeddings[0]
+        return response.embeddings[0]  # type: ignore[no-any-return]
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for multiple texts."""
         if not self._initialized:
             await self.initialize()
 
+        if self.client is None:
+            raise RuntimeError("Cohere client not initialized")
+
         response = await self.client.embed(texts=texts, model=self.config.embedding_model)
-        return response.embeddings
+        return response.embeddings  # type: ignore[no-any-return]
 
     def get_dimension(self) -> int:
         """Get embedding dimension."""
@@ -375,7 +387,7 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
         self.base_url = (
             config.api_key or "http://localhost:11434"
         )  # Reuse api_key field for base_url
-        self.client = None
+        self.client: Optional[Any] = None  # httpx.AsyncClient, imported dynamically
 
     async def initialize(self) -> None:
         """Initialize Ollama client and verify model availability."""
@@ -396,6 +408,8 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
         print(f"🔗 Ollama server: {self.base_url}")
 
         # Verify model is available by testing with a small prompt
+        if self.client is None:
+            raise RuntimeError("HTTP client not initialized")
         try:
             response = await self.client.post(
                 "/api/embeddings", json={"model": self.config.embedding_model, "prompt": "test"}
@@ -433,13 +447,19 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
         if not self._initialized:
             await self.initialize()
 
+        if self.client is None:
+            raise RuntimeError("HTTP client not initialized")
+
         try:
             response = await self.client.post(
                 "/api/embeddings", json={"model": self.config.embedding_model, "prompt": text}
             )
             response.raise_for_status()
             result = response.json()
-            return result["embedding"]
+            embedding = result.get("embedding")
+            if isinstance(embedding, list):
+                return embedding  # type: ignore[return-value]
+            raise RuntimeError(f"Invalid embedding response: {result}")
         except Exception as e:
             raise RuntimeError(f"Failed to generate embedding: {e}")
 

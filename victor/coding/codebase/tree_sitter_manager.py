@@ -74,7 +74,7 @@ try:
     from victor.native.accelerators.ast_processor import get_ast_processor
 
     _ast_accelerator = get_ast_processor()
-    if _ast_accelerator.is_available:
+    if _ast_accelerator.is_available():  # type: ignore[call-arg]
         logger.info("AST processing: Using Rust accelerator (10x faster)")
     else:
         logger.info("AST processing: Using Python tree-sitter")
@@ -172,10 +172,10 @@ def run_query(tree: "Tree", query_src: str, language: str) -> Dict[str, List["No
     # Use Rust accelerator if available
     if _ast_accelerator is not None and _ast_accelerator.rust_available:
         try:
-            nodes = _ast_accelerator.execute_query(tree, query_src, language)  # type: ignore[call-arg]
+            nodes: list[Any] = _ast_accelerator.execute_query(tree, query_src, language)  # type: ignore[call-arg]
             # Convert list of nodes to capture dict format
             # For now, return all nodes under a default capture name
-            return {"_all": nodes}
+            return {"_all": nodes}  # type: ignore[dict-item]
         except Exception as e:
             logger.debug(f"Rust query execution failed, falling back to Python: {e}")
 
@@ -216,7 +216,7 @@ def parse_file_accelerated(
     # Use Rust accelerator if available
     if _ast_accelerator is not None and _ast_accelerator.rust_available:
         try:
-            tree = _ast_accelerator.parse_to_ast(source_code, language, file_path)
+            tree: "Tree | None" = _ast_accelerator.parse_to_ast(source_code, language, file_path)  # type: ignore[call-arg]
             return tree
         except Exception as e:
             logger.debug(f"Rust parsing failed for {file_path}, falling back to Python: {e}")
@@ -285,7 +285,7 @@ def extract_symbols_parallel(
     # Use Rust parallel extraction if available
     if _ast_accelerator is not None and _ast_accelerator.rust_available:
         try:
-            results = _ast_accelerator.extract_symbols_parallel(file_data, symbol_types)
+            results: Dict[str, List[Dict[str, Any]]] = _ast_accelerator.extract_symbols_parallel(file_data, symbol_types)  # type: ignore[arg-type, assignment]
             return results
         except Exception as e:
             logger.debug(f"Rust parallel extraction failed, falling back to Python: {e}")

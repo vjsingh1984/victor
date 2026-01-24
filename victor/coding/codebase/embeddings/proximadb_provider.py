@@ -106,8 +106,8 @@ class ProximaDBProvider(BaseEmbeddingProvider):
 
         # Create embedding model config
         embedding_config = EmbeddingModelConfig(
-            model_type=model_type,
-            model_name=model_name,
+            embedding_type=model_type,
+            embedding_model=model_name,
             dimension=dimension,
             api_key=api_key,
             batch_size=batch_size,
@@ -122,9 +122,9 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         print(f"Embedding Model: {model_name} ({model_type})")
 
         # Setup data directory
-        persist_dir = self.config.persist_directory
-        if persist_dir:
-            persist_dir = Path(persist_dir).expanduser()
+        persist_dir_str = self.config.persist_directory
+        if persist_dir_str:
+            persist_dir = Path(persist_dir_str).expanduser()
             persist_dir.mkdir(parents=True, exist_ok=True)
             print(f"Using persistent storage: {persist_dir}")
         else:

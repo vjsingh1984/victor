@@ -490,7 +490,8 @@ class SymbolStore:
             return True
 
         current_mtime = file_path.stat().st_mtime
-        return current_mtime > row[0]
+        last_modified: float = row[0]  # type: ignore[assignment]
+        return current_mtime > last_modified
 
     def _store_file(
         self,
@@ -836,11 +837,11 @@ class SymbolStore:
                     if name_field is None:
                         # Special handling for Go type_spec: name is in type_identifier child
                         if language == "go" and node.type == "type_spec":
-                            for child in node.children:
+                            for child in getattr(node, "children", []):
                                 if child.type == "type_identifier":
                                     name = content[child.start_byte : child.end_byte]
                                     # Determine if it's struct, interface, or other
-                                    for sibling in node.children:
+                                    for sibling in getattr(node, "children", []):
                                         if sibling.type == "struct_type":
                                             actual_symbol_type = "struct"
                                             break
@@ -880,7 +881,7 @@ class SymbolStore:
                 if import_match:
                     imports.append(import_match.group(1))
 
-            for child in node.children:
+            for child in getattr(node, "children", []):
                 walk_tree(child)
 
         walk_tree(root)

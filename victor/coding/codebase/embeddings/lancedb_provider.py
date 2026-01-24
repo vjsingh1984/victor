@@ -110,8 +110,8 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
         # Create embedding model config
         embedding_config = EmbeddingModelConfig(
-            model_type=model_type,
-            model_name=model_name,
+            embedding_type=model_type,
+            embedding_model=model_name,
             dimension=dimension,
             api_key=api_key,
             batch_size=batch_size,

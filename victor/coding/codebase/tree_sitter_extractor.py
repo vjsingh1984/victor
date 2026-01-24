@@ -146,7 +146,10 @@ class TreeSitterExtractor:
             query = self._query_cache.get(query_key)
 
             if query is None:
-                query = Query(parser.language, query_src)
+                lang = parser.language
+                if lang is None:
+                    return {}
+                query = Query(lang, query_src)
                 self._query_cache[query_key] = query
 
             cursor = QueryCursor(query)
