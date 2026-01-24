@@ -35,7 +35,7 @@ called with session_id parameter (done automatically in chat command).
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 

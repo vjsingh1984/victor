@@ -235,51 +235,46 @@ class TestFrameworkShimVertical:
     @pytest.fixture
     def mock_orchestrator(self):
         """Create mock orchestrator with capability protocol support."""
-        orch = MagicMock()
-        orch.prompt_builder = MagicMock()
-        orch.prompt_builder.set_custom_prompt = MagicMock()
+        from victor.framework.protocols import CapabilityRegistryProtocol
 
-        # Add protocol methods for tools
-        orch._enabled_tools = set()
+        class MockOrchestrator:
+            """Mock orchestrator that implements capability protocols."""
 
-        def set_tools(tools):
-            orch._enabled_tools = set(tools) if tools else set()
+            def __init__(self):
+                self._enabled_tools = set()
+                self._vertical_context = None
+                self.prompt_builder = MagicMock()
+                self.prompt_builder.set_custom_prompt = MagicMock()
+                self._custom_prompt_calls = []
 
-        orch.set_enabled_tools = MagicMock(side_effect=set_tools)
-        orch.get_enabled_tools = MagicMock(side_effect=lambda: orch._enabled_tools)
+            def set_enabled_tools(self, tools):
+                self._enabled_tools = set(tools) if tools else set()
 
-        # Add set_custom_prompt method
-        orch.set_custom_prompt = MagicMock()
+            def get_enabled_tools(self):
+                return self._enabled_tools
 
-        # Add vertical context storage (set via pipeline)
-        orch._vertical_context = None
+            def set_custom_prompt(self, prompt):
+                self._custom_prompt_calls.append(prompt)
 
-        def set_context(context):
-            orch._vertical_context = context
+            def set_vertical_context(self, context):
+                self._vertical_context = context
 
-        orch.set_vertical_context = MagicMock(side_effect=set_context)
+            def has_capability(self, name, min_version=None):
+                return name in ["enabled_tools", "custom_prompt", "vertical_context"]
 
-        # Implement capability protocol methods
-        def has_capability(name, min_version=None):
-            return name in ["enabled_tools", "custom_prompt", "vertical_context"]
+            def invoke_capability(self, name, *args, min_version=None, **kwargs):
+                if name == "enabled_tools" and args:
+                    self.set_enabled_tools(args[0])
+                    return True
+                elif name == "custom_prompt" and args:
+                    self.set_custom_prompt(args[0])
+                    return True
+                elif name == "vertical_context" and args:
+                    self.set_vertical_context(args[0])
+                    return True
+                return False
 
-        def invoke_capability(name, *args, min_version=None, **kwargs):
-            if name == "enabled_tools" and args:
-                set_tools(args[0])
-                return True
-            elif name == "custom_prompt" and args:
-                orch.set_custom_prompt(args[0])
-                return True
-            elif name == "vertical_context" and args:
-                set_context(args[0])
-                return True
-            return False
-
-        # Don't use MagicMock for these - use regular functions to avoid spec issues
-        orch.has_capability = has_capability
-        orch.invoke_capability = invoke_capability
-
-        return orch
+        return MockOrchestrator()
 
     @pytest.fixture(autouse=True)
     def register_mock_vertical(self):

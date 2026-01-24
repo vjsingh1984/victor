@@ -22,7 +22,7 @@ victor.security.safety.infrastructure for pattern scanning, while maintaining
 backward compatibility for existing interfaces.
 """
 
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from victor.security.safety.infrastructure import (
     InfrastructureScanner,

@@ -1,6 +1,6 @@
 """Data Analysis Safety Extension - Privacy and data protection patterns."""
 
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from victor.core.verticals.protocols import SafetyExtensionProtocol, SafetyPattern
 

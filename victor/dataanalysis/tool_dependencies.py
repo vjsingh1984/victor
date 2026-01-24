@@ -35,7 +35,7 @@ from __future__ import annotations
 import logging
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Set, Tuple
+from typing import Any, TYPE_CHECKING, Dict, List, Set, Tuple
 
 from victor.core.tool_dependency_loader import YAMLToolDependencyProvider
 

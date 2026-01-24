@@ -26,7 +26,7 @@ testability and reusability across the codebase.
 from __future__ import annotations
 
 import logging
-from typing import Set
+from typing import Any, Set
 
 from victor.tools.tool_names import ToolNames
 

@@ -43,7 +43,7 @@ from __future__ import annotations
 import logging
 import threading
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from victor.core.errors import RecursionDepthError
 

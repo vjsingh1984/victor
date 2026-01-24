@@ -14,7 +14,7 @@
 
 """RAG Prompt Contributor - Task hints and prompt contributions for RAG."""
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from victor.core.vertical_types import TaskTypeHint
 from victor.core.verticals.protocols import PromptContributorProtocol

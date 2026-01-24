@@ -21,7 +21,7 @@ import logging
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from victor.coding.refactor.analyzer import BaseCodeAnalyzer, get_analyzer
 from victor.coding.refactor.protocol import (

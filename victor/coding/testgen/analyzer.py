@@ -22,7 +22,7 @@ import ast
 import logging
 import re
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from victor.coding.testgen.protocol import ClassSignature, FunctionSignature
 
