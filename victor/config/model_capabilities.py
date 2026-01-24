@@ -118,7 +118,7 @@ def _minimal_builtin_defaults() -> Dict[str, List[str]]:
     return defaults
 
 
-def _extract_tool_capable_patterns(data: Dict, result: Dict[str, List[str]]) -> None:
+def _extract_tool_capable_patterns(data: Dict[str, Any], result: Dict[str, Any]) -> None:
     """Extract tool-capable patterns from capability data into result dict."""
     # Providers with native_tool_calls: true at provider_defaults level
     provider_defaults = data.get("provider_defaults", {})
@@ -142,7 +142,7 @@ def _extract_tool_capable_patterns(data: Dict, result: Dict[str, List[str]]) -> 
                     result.setdefault(provider_l, []).append(pattern)
 
 
-def _flatten_yaml_manifest(data: Dict[str, Iterable]) -> Dict[str, List[str]]:
+def _flatten_yaml_manifest(data: Dict[str, Any]) -> Dict[str, List[str]]:
     """Flatten the tiered YAML manifest into provider -> model list."""
     result: Dict[str, List[str]] = {}
 

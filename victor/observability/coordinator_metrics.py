@@ -625,7 +625,7 @@ def track_coordinator_metrics(
                 pass
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
             name = coordinator_name or func.__qualname__

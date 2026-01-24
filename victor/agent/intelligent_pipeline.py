@@ -755,7 +755,7 @@ class IntelligentAgentPipeline:
         provider: "BaseProvider",
         messages: List[Dict[str, Any]],
         circuit_name: Optional[str] = None,
-        fallback: Optional[Callable] = None,
+        fallback: Optional[Callable[..., Any]] = None,
         **kwargs,
     ) -> Any:
         """Execute a provider call with resilience (circuit breaker, retry).

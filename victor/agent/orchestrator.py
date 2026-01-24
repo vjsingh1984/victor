@@ -1323,7 +1323,7 @@ class AgentOrchestrator(
         """Build a dictionary representing current conversation state for checkpointing."""
         return self._coordinator_adapter.get_checkpoint_state()
 
-    def _apply_checkpoint_state(self, state: dict) -> None:
+    def _apply_checkpoint_state(self, state: dict[str, Any]) -> None:
         """Apply a checkpoint state to restore the orchestrator."""
         self._coordinator_adapter.apply_checkpoint_state(state)
 
@@ -2384,7 +2384,7 @@ class AgentOrchestrator(
         # Delegate to ModeCoordinator for mode-aware shell variant resolution
         return self._mode_coordinator.resolve_shell_variant(tool_name)
 
-    def _log_tool_call(self, name: str, kwargs: dict) -> None:
+    def _log_tool_call(self, name: str, kwargs: dict[str, Any]) -> None:
         """A hook that logs information before a tool is called."""
         # Move verbose argument logging to debug level - not user-facing
         logger.debug(f"Tool call: {name} with args: {kwargs}")

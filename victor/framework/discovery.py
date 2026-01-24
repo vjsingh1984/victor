@@ -309,7 +309,7 @@ class VerticalDiscovery:
         return verticals
 
     @staticmethod
-    def discover_vertical_by_name(vertical_name: str) -> Optional[Type]:
+    def discover_vertical_by_name(vertical_name: str) -> Optional[Type[Any]]:
         """Discover a specific vertical by name.
 
         Args:

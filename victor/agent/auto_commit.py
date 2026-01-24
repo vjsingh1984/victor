@@ -39,7 +39,7 @@ import subprocess
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -380,7 +380,7 @@ class AutoCommitter:
             logger.error(f"Failed to undo commit: {e.stderr}")
             return False
 
-    def get_last_commit_info(self) -> Optional[dict]:
+    def get_last_commit_info(self) -> Optional[dict[str, Any]]:
         """Get information about the last commit.
 
         Returns:

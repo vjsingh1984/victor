@@ -27,7 +27,7 @@ import time
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 from victor.security.protocol import (
     CVE,
@@ -266,7 +266,7 @@ class LocalCVECache:
             "affected_products": cve.affected_products,
         }
 
-    def _deserialize_cve(self, data: dict) -> CVE:
+    def _deserialize_cve(self, data: dict[str, Any]) -> CVE:
         """Deserialize CVE from dict."""
         cvss = None
         if data.get("cvss"):
@@ -426,7 +426,7 @@ class OSVDatabase(BaseCVEDatabase):
         }
         return mapping.get(ecosystem.lower(), ecosystem)
 
-    def _parse_osv_vuln(self, data: dict) -> Optional[CVE]:
+    def _parse_osv_vuln(self, data: dict[str, Any]) -> Optional[CVE]:
         """Parse OSV vulnerability to CVE format."""
         vuln_id = data.get("id", "")
 
@@ -505,7 +505,7 @@ class OfflineCVEDatabase(BaseCVEDatabase):
         """
         self.data_dir = data_dir
         self._cache = LocalCVECache(data_dir / "cve_cache.db")
-        self._advisory_index: dict[str, list[dict]] = {}
+        self._advisory_index: dict[str, Any] = {}
         self._load_advisories()
 
     def _load_advisories(self) -> None:

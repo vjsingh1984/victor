@@ -176,7 +176,7 @@ class DepsManager:
         if not analysis.graph:
             return {}
 
-        def build_tree(pkg_name: str, visited: set) -> dict:
+        def build_tree(pkg_name: str, visited: set[Any]) -> dict:
             if pkg_name in visited:
                 return {"name": pkg_name, "circular": True}
             visited.add(pkg_name)

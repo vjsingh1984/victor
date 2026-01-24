@@ -255,12 +255,16 @@ class BaseHITLResponse:
     @property
     def is_timeout(self) -> bool:
         """Whether the interaction timed out."""
-        return self.metadata.get("timed_out", False)
+        value = self.metadata.get("timed_out", False)
+        assert isinstance(value, (bool, int))
+        return bool(value)
 
     @property
     def is_skipped(self) -> bool:
         """Whether the interaction was skipped."""
-        return self.metadata.get("skipped", False)
+        value = self.metadata.get("skipped", False)
+        assert isinstance(value, (bool, int))
+        return bool(value)
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary."""

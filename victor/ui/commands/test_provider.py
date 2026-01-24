@@ -5,6 +5,7 @@ from rich.console import Console
 
 from victor.config.settings import load_settings
 from victor.providers.registry import ProviderRegistry
+from typing import Any
 
 test_provider_app = typer.Typer(
     name="test-provider", help="Test if a provider is working correctly."
@@ -65,7 +66,7 @@ async def test_provider_async(provider: str) -> None:
         console.print(f"[red]✗[/] Error: {e}")
 
 
-async def _test_ollama(provider_settings: dict) -> None:
+async def _test_ollama(provider_settings: dict[str, Any]) -> None:
     """Test Ollama connectivity."""
     from victor.providers.ollama_provider import OllamaProvider
 
@@ -86,7 +87,7 @@ async def _test_ollama(provider_settings: dict) -> None:
         await ollama.close()
 
 
-async def _test_anthropic(provider_settings: dict) -> None:
+async def _test_anthropic(provider_settings: dict[str, Any]) -> None:
     """Test Anthropic API connectivity."""
     from victor.providers.anthropic_provider import AnthropicProvider
 
@@ -118,7 +119,7 @@ async def _test_anthropic(provider_settings: dict) -> None:
         await anthropic.close()
 
 
-async def _test_openai(provider_settings: dict) -> None:
+async def _test_openai(provider_settings: dict[str, Any]) -> None:
     """Test OpenAI API connectivity."""
     from victor.providers.openai_provider import OpenAIProvider
 
@@ -147,7 +148,7 @@ async def _test_openai(provider_settings: dict) -> None:
         await openai.close()
 
 
-async def _test_google(provider_settings: dict) -> None:
+async def _test_google(provider_settings: dict[str, Any]) -> None:
     """Test Google Gemini API connectivity."""
     try:
         from victor.providers.google_provider import GoogleProvider

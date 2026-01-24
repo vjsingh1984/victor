@@ -267,7 +267,7 @@ class CPUProfiler(BaseProfiler):
 
     def profile_function(
         self,
-        func: Callable,
+        func: Callable[..., Any],
         *args,
         **kwargs,
     ) -> tuple[Any, ProfileResult]:
@@ -465,7 +465,7 @@ class MemoryProfiler(BaseProfiler):
 
     def profile_function(
         self,
-        func: Callable,
+        func: Callable[..., Any],
         *args,
         **kwargs,
     ) -> tuple[Any, ProfileResult]:
@@ -511,7 +511,7 @@ class LineProfiler(BaseProfiler):
     def profiler_type(self) -> ProfilerType:
         return ProfilerType.LINE
 
-    def add_function(self, func: Callable) -> None:
+    def add_function(self, func: Callable[..., Any]) -> None:
         """Add a function to profile line-by-line.
 
         Args:

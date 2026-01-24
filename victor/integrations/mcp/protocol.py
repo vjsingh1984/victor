@@ -112,7 +112,7 @@ class MCPCapabilities(BaseModel):
     prompts: Optional[Dict[str, Any]] = Field(default=None, description="Prompts capability")
     sampling: Optional[Dict[str, Any]] = Field(default=None, description="Sampling capability")
 
-    def model_dump(self, **kwargs) -> Dict[str, Any]:
+    def model_dump(self, **kwargs: Any) -> Dict[str, Any]:
         """Override to exclude None values by default."""
         kwargs.setdefault("exclude_none", True)
         return super().model_dump(**kwargs)

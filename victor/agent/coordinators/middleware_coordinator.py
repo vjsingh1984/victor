@@ -58,7 +58,7 @@ class MiddlewareCoordinator:
         patterns = coordinator.get_safety_patterns()
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize MiddlewareCoordinator."""
         self._vertical_middleware: List[Any] = []
         self._middleware_chain: Optional[Any] = None

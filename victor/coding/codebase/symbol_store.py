@@ -379,7 +379,8 @@ class SymbolStore:
 
                     languages_dict = stats.get("languages")
                     assert isinstance(languages_dict, dict)
-                    languages_dict[language] = languages_dict.get(language, 0) + 1  # type: ignore[assignment]
+                    current_count = languages_dict.get(language, 0)
+                    languages_dict[language] = current_count + 1
 
                     # Track files that had parse errors but were still indexed
                     if parse_error:

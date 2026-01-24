@@ -24,7 +24,7 @@ to avoid code duplication. This module focuses on task execution.
 import asyncio
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from victor.evaluation.harness import BaseBenchmarkRunner, TaskEnvironment
 from victor.evaluation.protocol import (
@@ -436,14 +436,14 @@ class MBPPRunner(BaseBenchmarkRunner):
         self._tasks_cache = tasks
         return self._filter_tasks(tasks, config)
 
-    def _build_prompt(self, item: dict) -> str:
+    def _build_prompt(self, item: dict[str, Any]) -> str:
         """Build the prompt for the agent."""
         return f'''"""
 {item["text"]}
 """
 '''
 
-    def _build_test_code(self, item: dict) -> str:
+    def _build_test_code(self, item: dict[str, Any]) -> str:
         """Build test code from test_list."""
         tests = item.get("test_list", [])
         setup = item.get("test_setup_code", "")

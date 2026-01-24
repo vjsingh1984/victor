@@ -19,8 +19,7 @@ Appends entity names, tickers, and aliases to improve search recall.
 
 This is the fallback strategy when LLM is unavailable or disabled.
 
-Example:
-    Query: "What is Apple's revenue?"
+Example: Query[Any, Any]: "What is Apple's revenue?"
     Entities: [{"name": "Apple Inc", "ticker": "AAPL"}]
     →
     Enhanced: "What is Apple's revenue? Apple Inc AAPL"

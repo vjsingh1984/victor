@@ -163,7 +163,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         """Start ProximaDB in embedded mode if available."""
         try:
             # Try to import proximadb embedded module
-            from proximadb import EmbeddedProximaDB, EmbeddedConfig  # type: ignore
+            from proximadb import EmbeddedProximaDB, EmbeddedConfig
 
             config = EmbeddedConfig(
                 data_dir=str(self._data_dir),

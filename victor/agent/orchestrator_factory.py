@@ -1406,7 +1406,7 @@ class OrchestratorFactory(ModeAwareMixin):
     def create_streaming_controller(
         self,
         streaming_metrics_collector: Optional[Any],
-        on_session_complete: Callable,
+        on_session_complete: Callable[..., Any],
     ) -> Any:
         """Create streaming controller for managing streaming sessions and metrics.
 
@@ -1518,8 +1518,8 @@ class OrchestratorFactory(ModeAwareMixin):
         tool_budget: int,
         tool_cache: Optional[Any],
         argument_normalizer: Any,
-        on_tool_start: Callable,
-        on_tool_complete: Callable,
+        on_tool_start: Callable[..., Any],
+        on_tool_complete: Callable[..., Any],
         deduplication_tracker: Optional[Any],
         middleware_chain: Optional[Any] = None,
         semantic_cache: Optional[Any] = None,

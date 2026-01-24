@@ -183,7 +183,7 @@ def cqrs_event_to_framework(cqrs_event: "CQRSEvent") -> AgentExecutionEvent:
 
 
 def observability_event_to_framework(
-    topic: str, data: Dict[str, Any], **metadata
+    topic: str, data: Dict[str, Any], **metadata: Any
 ) -> AgentExecutionEvent:
     """Convert an observability event (topic-based) to a framework AgentExecutionEvent.
 
@@ -476,7 +476,7 @@ class ObservabilityToCQRSBridge:
         self._is_running = False
         logger.debug(f"ObservabilityToCQRSBridge stopped ({self._event_count} events)")
 
-    def _handle_event(self, topic: str, data: Dict[str, Any], **metadata) -> None:
+    def _handle_event(self, topic: str, data: Dict[str, Any], **metadata: Any) -> None:
         """Handle an observability event (topic-based)."""
         try:
             from victor.core.event_sourcing import (

@@ -116,7 +116,7 @@ class OllamaCapabilityDetector:
         if hasattr(self, "_client"):
             self._client.close()
 
-    def get_model_info(self, model: str) -> Optional[Dict]:
+    def get_model_info(self, model: str) -> Optional[Dict[str, Any]]:
         """Get model information from Ollama server.
 
         Args:

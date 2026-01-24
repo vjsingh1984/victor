@@ -68,7 +68,7 @@ try:
     PSUTIL_AVAILABLE = True
 except ImportError:
     PSUTIL_AVAILABLE = False
-    psutil = None  # type: ignore
+    psutil = None
 
 from victor.framework.parallel.executor import (
     ParallelExecutor,
@@ -161,8 +161,7 @@ class TaskWithPriority:
 
     priority: int
     task_id: int
-    task: TaskInput
-
+    task: TaskInput[Any]
     def __lt__(self, other: "TaskWithPriority") -> bool:
         """Compare for priority queue ordering."""
         return self.priority < other.priority

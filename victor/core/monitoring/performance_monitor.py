@@ -437,7 +437,7 @@ class _PerformanceContext:
         self.start_time = time.perf_counter()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Exit context and record timing."""
         if self.start_time is not None:
             execution_time = time.perf_counter() - self.start_time
@@ -454,7 +454,7 @@ class _NullContext:
         """Enter context (no-op)."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Exit context (no-op)."""
         pass
 

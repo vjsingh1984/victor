@@ -317,7 +317,7 @@ class CheckpointTree:
     - Generate visualizations
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize empty tree."""
         self._nodes: Dict[str, CheckpointNode] = {}
         self._root_id: Optional[str] = None
@@ -493,7 +493,7 @@ class CheckpointTree:
             node = self._nodes.get(current)
             if node:
                 path.append(node)
-                current = node.parent_id
+                current: str = node.parent_id  # type: ignore[assignment]
             else:
                 break
 
@@ -508,7 +508,7 @@ class CheckpointTree:
             node = self._nodes.get(current)
             if node:
                 to_path.append(node)
-                current = node.parent_id
+                current: str = node.parent_id  # type: ignore[assignment]
             else:
                 break
         to_path.reverse()

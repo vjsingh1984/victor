@@ -114,7 +114,7 @@ class ResearchAssistant(VerticalBase):
 - Clear communication of findings"""
 
     @classmethod
-    def get_prompt_builder(cls):  # type: ignore[override]
+    def get_prompt_builder(cls) -> "PromptBuilder":
         """Get configured PromptBuilder for research vertical.
 
         Returns:

@@ -215,7 +215,7 @@ class ProviderConfigRegistry:
         return await strategy.list_models(settings, endpoint)
 
     @classmethod
-    def get_config_form(cls, provider_name: str) -> Optional[Type]:
+    def get_config_form(cls, provider_name: str) -> Optional[Type[Any]]:
         """Get the config form class for a provider.
 
         Args:

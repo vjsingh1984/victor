@@ -112,7 +112,7 @@ class RAGIngestTool(BaseTool):
         recursive: bool = False,
         pattern: str = "*",
         metadata: Optional[Dict[str, Any]] = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> ToolResult:
         """Execute document ingestion.
 
@@ -214,7 +214,7 @@ class RAGIngestTool(BaseTool):
 
     async def _ingest_url(
         self,
-        store,
+        store: Any,
         url: str,
         doc_type: str,
         doc_id: Optional[str],
@@ -329,7 +329,7 @@ class RAGIngestTool(BaseTool):
 
     async def _ingest_directory(
         self,
-        store,
+        store: Any,
         directory: Path,
         recursive: bool,
         pattern: str,
@@ -489,7 +489,7 @@ class RAGIngestTool(BaseTool):
     async def _read_pdf(self, path: Path) -> str:
         """Read text from PDF file."""
         try:
-            import pypdf  # type: ignore
+            import pypdf
 
             reader = pypdf.PdfReader(str(path))
             text_parts = []

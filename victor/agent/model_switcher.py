@@ -84,7 +84,7 @@ class ModelSwitcher:
     - Support for fallback chains
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the model switcher."""
         self._current_provider: Optional[str] = None
         self._current_model: Optional[str] = None

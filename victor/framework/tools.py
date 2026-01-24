@@ -39,7 +39,7 @@ class ToolCategory(str, Enum):
     """Essential tools: read, write, edit, shell, search."""
 
     FILESYSTEM = "filesystem"
-    """File operations: list, glob, find, mkdir, rm, mv, cp."""
+    """File operations: list[Any], glob, find, mkdir, rm, mv, cp."""
 
     GIT = "git"
     """Version control: status, diff, commit, branch, log."""
@@ -135,7 +135,7 @@ def _load_builtin_category_tools() -> dict:
 
 
 # Lazy-loaded category tools (populated on first access)
-_BUILTIN_CATEGORY_TOOLS: Optional[dict] = None
+_BUILTIN_CATEGORY_TOOLS: Optional[dict[str, Any]] = None
 
 
 def _get_builtin_category_tools() -> dict:

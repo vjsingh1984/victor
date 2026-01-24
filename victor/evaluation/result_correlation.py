@@ -172,8 +172,8 @@ class CorrelationReport:
     avg_f2p_score: float = 0.0
     avg_p2p_score: float = 0.0
     avg_overall_score: float = 0.0
-    by_repo: dict[str, dict] = field(default_factory=dict)
-    by_difficulty: dict[str, dict] = field(default_factory=dict)
+    by_repo: dict[str, dict[str, Any]] = field(default_factory=dict)
+    by_difficulty: dict[str, dict[str, Any]] = field(default_factory=dict)
     failure_analysis: dict = field(default_factory=dict)
     scores: list[SWEBenchScore] = field(default_factory=list)
 
@@ -401,7 +401,7 @@ class ResultCorrelator:
     def compute_score(
         self,
         validation_result: BaselineValidationResult,
-        instance_metadata: Optional[dict] = None,
+        instance_metadata: Optional[dict[str, Any]] = None,
     ) -> SWEBenchScore:
         """Compute detailed SWE-bench score from validation result.
 
@@ -507,8 +507,8 @@ class ResultCorrelator:
         total_p2p = 0.0
         total_overall = 0.0
 
-        repo_stats: dict[str, dict] = {}
-        difficulty_stats: dict[str, dict] = {}
+        repo_stats: dict[str, dict[str, Any]] = {}
+        difficulty_stats: dict[str, dict[str, Any]] = {}
         failure_counts: dict[str, int] = {}
 
         for score in scores:
@@ -587,7 +587,7 @@ class ResultCorrelator:
 
 def correlate_validation_results(
     results: list[BaselineValidationResult],
-    metadata: Optional[dict[str, dict]] = None,
+    metadata: Optional[dict[str, dict[str, Any]]] = None,
 ) -> CorrelationReport:
     """Correlate multiple validation results into a report.
 

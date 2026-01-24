@@ -125,7 +125,7 @@ class CircuitBreaker:
         recovery_timeout: float = 30.0,
         half_open_max_calls: int = 3,
         success_threshold: int = 2,
-        excluded_exceptions: Optional[tuple] = None,
+        excluded_exceptions: Optional[tuple[Any, ...]] = None,
         name: str = "default",
         config: Optional[CircuitBreakerConfig] = None,
     ):
@@ -393,7 +393,7 @@ class CircuitBreaker:
         cls,
         name: str,
         config: CircuitBreakerConfig,
-        excluded_exceptions: Optional[tuple] = None,
+        excluded_exceptions: Optional[tuple[Any, ...]] = None,
     ) -> "CircuitBreaker":
         """Create CircuitBreaker from config object.
 

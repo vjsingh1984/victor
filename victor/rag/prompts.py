@@ -104,7 +104,7 @@ Citation Format:
 - Include the source name when summarizing multiple sources
 """
 
-    def get_context_hints(self, context: Dict) -> List[str]:
+    def get_context_hints(self, context: Dict[str, Any]) -> List[str]:
         """Get context-specific hints.
 
         Args:

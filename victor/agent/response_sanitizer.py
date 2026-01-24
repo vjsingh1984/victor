@@ -50,7 +50,8 @@ try:
     import victor_native as _native  # type: ignore
 
     _NATIVE_AVAILABLE = True
-    logger.debug(f"Native streaming filter loaded (v{_native.__version__})")
+    if _native:
+        logger.debug(f"Native streaming filter loaded (v{_native.__version__})")
 except ImportError:
     logger.debug("Native extensions not available, using Python streaming filter")
 
@@ -380,8 +381,8 @@ def create_streaming_filter(
     Returns:
         StreamingContentFilter (native or Python implementation)
     """
-    if _NATIVE_AVAILABLE:
-        return _native.StreamingFilter(suppress_thinking, max_thinking_content)
+    if _NATIVE_AVAILABLE and _native:
+        return _native.StreamingFilter(suppress_thinking, max_thinking_content)  # type: ignore[attr-defined]
     return StreamingContentFilter(suppress_thinking)
 
 
@@ -396,8 +397,8 @@ def strip_thinking_tokens_fast(content: str) -> str:
     Returns:
         Content with thinking tokens removed
     """
-    if _NATIVE_AVAILABLE:
-        return _native.strip_thinking_tokens(content)
+    if _NATIVE_AVAILABLE and _native:
+        return _native.strip_thinking_tokens(content)  # type: ignore[attr-defined]
 
     # Fallback to simple string replacement
     patterns = [

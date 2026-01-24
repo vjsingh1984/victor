@@ -735,7 +735,7 @@ class EmbeddingCache:
         self.cache = cache or TieredCache()
         self.namespace = "embeddings"
 
-    def get_embedding(self, text: str, model: str) -> Optional[list]:
+    def get_embedding(self, text: str, model: str) -> Optional[list[Any]]:
         """Get cached embedding.
 
         Args:
@@ -749,7 +749,7 @@ class EmbeddingCache:
         return self.cache.get(key, self.namespace)
 
     def cache_embedding(
-        self, text: str, model: str, embedding: list, ttl: Optional[int] = None
+        self, text: str, model: str, embedding: list[Any], ttl: Optional[int] = None
     ) -> bool:
         """Cache embedding.
 

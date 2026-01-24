@@ -549,7 +549,7 @@ class ErrorRecovery:
     async def execute_with_retry(
         self,
         node_id: str,
-        execute_func: Callable,
+        execute_func: Callable[..., Any],
         context: ExecutionContext,
     ) -> Any:
         """Execute a node with retry logic.

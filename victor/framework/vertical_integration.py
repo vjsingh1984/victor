@@ -422,7 +422,7 @@ class ExtensionHandlerRegistry:
         self,
         name: str,
         attr_name: str,
-        handler: Callable,
+        handler: Callable[..., Any],
         order: int = 100,
     ) -> None:
         """Register an extension handler.
@@ -537,7 +537,7 @@ def get_extension_handler_registry() -> ExtensionHandlerRegistry:
 def register_extension_handler(
     name: str,
     attr_name: str,
-    handler: Callable,
+    handler: Callable[..., Any],
     order: int = 100,
 ) -> None:
     """Register a new extension handler (OCP extension point).

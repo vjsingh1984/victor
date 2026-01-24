@@ -73,9 +73,9 @@ try:
     from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
     from aiokafka.errors import KafkaError
 except ImportError:
-    AIOKafkaConsumer = None  # type: ignore
-    AIOKafkaProducer = None  # type: ignore
-    KafkaError = Exception  # type: ignore
+    AIOKafkaConsumer = None
+    AIOKafkaProducer = None
+    KafkaError = Exception
 
 from victor.core.events.pattern_matcher import matches_topic_pattern
 from victor.core.events.protocols import (

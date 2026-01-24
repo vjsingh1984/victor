@@ -81,7 +81,7 @@ import threading
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Tuple, cast
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +185,9 @@ class DatabaseManager:
         Returns:
             Thread-local SQLite connection with Row factory
         """
-        return self._get_raw_connection()
+        conn = self._get_raw_connection()
+        assert isinstance(conn, sqlite3.Connection)
+        return conn
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
@@ -280,7 +282,8 @@ class DatabaseManager:
         """
         conn = self.get_connection()
         cursor = conn.execute(sql, params or ())
-        return cursor.fetchone()
+        row = cursor.fetchone()
+        return cast(Optional[sqlite3.Row], row)
 
     def table_exists(self, table_name: str) -> bool:
         """Check if a table exists.
@@ -983,7 +986,9 @@ class ProjectDatabaseManager:
 
     def get_connection(self) -> sqlite3.Connection:
         """Get database connection."""
-        return self._get_raw_connection()
+        conn = self._get_raw_connection()
+        assert isinstance(conn, sqlite3.Connection)
+        return conn
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
@@ -1025,7 +1030,8 @@ class ProjectDatabaseManager:
         """Execute query and return first row."""
         conn = self.get_connection()
         cursor = conn.execute(sql, params or ())
-        return cursor.fetchone()
+        row = cursor.fetchone()
+        return cast(Optional[sqlite3.Row], row)
 
     def table_exists(self, table_name: str) -> bool:
         """Check if a table exists."""

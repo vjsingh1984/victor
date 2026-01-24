@@ -222,7 +222,7 @@ class CachingCompletionProvider(BaseCompletionProvider):
         """
         super().__init__(priority)
         self._cache_ttl = cache_ttl
-        self._cache: dict[str, tuple[float, CompletionList]] = {}
+        self._cache: dict[str, tuple[float]] = {}
 
     def _cache_key(self, params: CompletionParams) -> str:
         """Generate cache key for completion params."""

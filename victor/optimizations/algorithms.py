@@ -54,7 +54,7 @@ T = TypeVar("T")
 logger = logging.getLogger(__name__)
 
 K = TypeVar("K")
-V = TypeVar("T")
+V = TypeVar("V")
 
 
 class LRUCache(Generic[K, V]):
@@ -135,7 +135,7 @@ class LRUCache(Generic[K, V]):
         """Clear all entries from cache."""
         self._cache.clear()
 
-    def __contains__(self, key: K) -> bool:  # type: ignore
+    def __contains__(self, key: object) -> bool:
         """Check if key is in cache."""
         return key in self._cache
 
@@ -235,7 +235,7 @@ class BloomFilter:
 
         self._item_count += 1
 
-    def __contains__(self, item: Any) -> bool:  # type: ignore
+    def __contains__(self, item: object) -> bool:
         """Check if item is probably in filter.
 
         Args:
@@ -444,8 +444,8 @@ class AlgorithmOptimizer:
 
     def __init__(self):
         """Initialize algorithm optimizer."""
-        self._caches: Dict[str, LRUCache] = {}
-        self._timed_caches: Dict[str, TimedCache] = {}
+        self._caches: Dict[str, LRUCache[Any, Any]] = {}
+        self._timed_caches: Dict[str, TimedCache[Any, Any]] = {}
 
     def create_lru_cache(
         self,
@@ -548,7 +548,7 @@ class AlgorithmOptimizer:
         """
         cache = LRUCache(max_size=max_size)
 
-        def decorator(func: Callable) -> Callable:
+        def decorator(func: Callable[..., Any]) -> Callable:
             @functools.wraps(func)
             def wrapper(*args: Any, **kwargs: Any) -> Any:
                 # Create cache key from args
@@ -623,7 +623,7 @@ def lru_cache(max_size: int = 128) -> Callable:
     """
     cache = LRUCache(max_size=max_size)
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             key = (args, tuple(sorted(kwargs.items())))

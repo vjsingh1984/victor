@@ -229,14 +229,14 @@ class CopyOnWriteState(Generic[StateType]):
         """
         # Fast path: no lock needed if already modified (immutable after set)
         if self._modified:
-            return self._copy  # type: ignore
+            return self._copy
 
         # Slow path: lock and recheck (RLock allows nested calls)
         with self._lock:
             if not self._modified:
                 self._copy = copy.deepcopy(self._source)
                 self._modified = True
-            return self._copy  # type: ignore
+            return self._copy
 
     def _get_current_state(self) -> StateType:
         """Get current state reference (thread-safe read).
@@ -329,10 +329,10 @@ class CopyOnWriteState(Generic[StateType]):
         """
         # Fast path for unmodified
         if not self._modified:
-            return iter(list(self._source.keys()))  # type: ignore
+            return iter(list(self._source.keys()))
         # Return snapshot to avoid concurrent modification issues
         with self._lock:
-            return iter(list(self._copy.keys()))  # type: ignore
+            return iter(list(self._copy.keys()))
 
     def get(self, key: str, default: Any = None) -> Any:
         """Get with default (thread-safe).
@@ -358,9 +358,9 @@ class CopyOnWriteState(Generic[StateType]):
         """
         # Fast path for unmodified
         if not self._modified:
-            return list(self._source.keys())  # type: ignore
+            return list(self._source.keys())
         with self._lock:
-            return list(self._copy.keys())  # type: ignore
+            return list(self._copy.keys())
 
     def values(self):
         """Get values (thread-safe snapshot).
@@ -370,9 +370,9 @@ class CopyOnWriteState(Generic[StateType]):
         """
         # Fast path for unmodified
         if not self._modified:
-            return list(self._source.values())  # type: ignore
+            return list(self._source.values())
         with self._lock:
-            return list(self._copy.values())  # type: ignore
+            return list(self._copy.values())
 
     def items(self):
         """Get items (thread-safe snapshot).
@@ -382,9 +382,9 @@ class CopyOnWriteState(Generic[StateType]):
         """
         # Fast path for unmodified
         if not self._modified:
-            return list(self._source.items())  # type: ignore
+            return list(self._source.items())
         with self._lock:
-            return list(self._copy.items())  # type: ignore
+            return list(self._copy.items())
 
     def update(self, other: Dict[str, Any]) -> None:
         """Update state, triggering copy (thread-safe).
@@ -438,9 +438,9 @@ class CopyOnWriteState(Generic[StateType]):
         """
         # Fast path for unmodified
         if not self._modified:
-            return self._source.copy()  # type: ignore
+            return self._source.copy()
         with self._lock:
-            return self._copy.copy()  # type: ignore
+            return self._copy.copy()
 
     def get_state(self) -> StateType:
         """Get the final state (thread-safe).
@@ -1112,7 +1112,7 @@ class BatchingCheckpointer:
         await self.start_background_flush()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Async context manager exit - ensures flush on completion."""
         await self.stop_background_flush()
 
@@ -1333,10 +1333,10 @@ class NodeExecutor:
                 cow_state: CopyOnWriteState[StateType] = CopyOnWriteState(state)
                 if remaining is not None:
                     result = await asyncio.wait_for(
-                        node.execute(cow_state), timeout=remaining  # type: ignore
+                        node.execute(cow_state), timeout=remaining
                     )
                 else:
-                    result = await node.execute(cow_state)  # type: ignore
+                    result = await node.execute(cow_state)
 
                 # Extract final state from COW wrapper or result
                 if isinstance(result, CopyOnWriteState):
@@ -2450,7 +2450,7 @@ class StateGraph(Generic[StateType]):
     def __init__(
         self,
         state_schema: Optional[Type[StateType]] = None,
-        config_schema: Optional[Type] = None,
+        config_schema: Optional[Type[Any]] = None,
     ):
         """Initialize StateGraph.
 
@@ -2733,8 +2733,8 @@ class StateGraph(Generic[StateType]):
         cls,
         schema: Union[Dict[str, Any], str],
         state_schema: Optional[Type[StateType]] = None,
-        node_registry: Optional[Dict[str, Callable]] = None,
-        condition_registry: Optional[Dict[str, Callable]] = None,
+        node_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        condition_registry: Optional[Dict[str, Callable[..., Any]]] = None,
     ) -> "StateGraph[StateType]":
         """Create StateGraph from schema dictionary or YAML string.
 

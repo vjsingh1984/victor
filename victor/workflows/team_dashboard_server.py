@@ -313,7 +313,7 @@ class ConnectionManager:
     def __init__(self) -> None:
         """Initialize connection manager."""
         self._active_connections: Dict[str, Set[WebSocket]] = defaultdict(set)  # type: ignore
-        self._connection_metadata: Dict[WebSocket, Dict[str, Any]] = {}  # type: ignore
+        self._connection_metadata: Dict[WebSocket, Dict[str, Any]] = {}
         self._lock = asyncio.Lock()
 
     async def connect(self, websocket: WebSocket, execution_id: str) -> None:

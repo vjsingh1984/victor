@@ -29,7 +29,7 @@ import subprocess
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from victor.evaluation.protocol import CodeQualityMetrics
 
@@ -43,7 +43,7 @@ class LintResult:
     errors: int = 0
     warnings: int = 0
     info: int = 0
-    issues: list[dict] = field(default_factory=list)
+    issues: list[dict[str, Any]] = field(default_factory=list)
 
 
 class CodeQualityAnalyzer:

@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from victor.evaluation.test_runners import (
     Language,
@@ -182,7 +182,7 @@ class TestBaseline:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "TestBaseline":
+    def from_dict(cls, data: dict[str, Any]) -> "TestBaseline":
         """Deserialize from dictionary."""
         fail_to_pass_results = {}
         for k, v in data.get("fail_to_pass_results", {}).items():

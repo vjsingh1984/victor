@@ -17,7 +17,7 @@ class DuckDBGraphStore(GraphStoreProtocol):
 
     def __init__(self, db_path: Path) -> None:
         try:
-            import duckdb  # type: ignore
+            import duckdb
         except Exception as exc:  # pragma: no cover - import guard
             raise RuntimeError("duckdb must be installed to use DuckDBGraphStore") from exc
 

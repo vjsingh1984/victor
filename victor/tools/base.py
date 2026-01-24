@@ -667,8 +667,8 @@ class BaseTool(ABC):
             "number": (int, float),
             "integer": int,
             "boolean": bool,
-            "array": list,
-            "object": dict,
+            "array": list[Any],
+            "object": dict[str, Any],
         }
 
         expected_python_type = type_mapping.get(expected_type)

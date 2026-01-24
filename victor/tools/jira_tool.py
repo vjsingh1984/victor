@@ -91,7 +91,7 @@ async def jira(
         issue_key: The key of the issue (e.g., 'PROJ-123') for 'get_issue' and 'add_comment'.
         summary: The summary/title of the issue for 'create_issue'.
         project: The project key for 'create_issue' (e.g., 'PROJ').
-        issue_type: The type of issue for 'create_issue' (default: 'Task'). Options: Task, Bug, Story, Epic.
+        issue_type: The type of issue for 'create_issue' (default: 'Task'). Options: Task[Any, Any], Bug, Story, Epic.
         description: Optional description for 'create_issue'.
         comment: The comment to add for 'add_comment'.
         max_results: The maximum number of results to return for 'search_issues' (default: 10).

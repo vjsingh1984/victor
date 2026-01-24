@@ -765,7 +765,7 @@ class ToolExecutionGraph:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "ToolExecutionGraph":
+    def from_dict(cls, data: Dict[str, Any]) -> "ToolExecutionGraph":
         """Create graph from dictionary.
 
         Args:

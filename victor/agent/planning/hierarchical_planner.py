@@ -104,8 +104,7 @@ Guidelines:
 - Keep descriptions concise but clear
 - Include relevant context metadata when helpful
 
-Example:
-Task: "Implement user authentication"
+Example: Task[Any, Any]: "Implement user authentication"
 
 {
   "root_task": "Implement secure user authentication system",

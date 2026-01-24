@@ -159,7 +159,7 @@ class PersonaRegistry:
     _instance: Optional["PersonaRegistry"] = None
     _class_lock: threading.Lock = threading.Lock()
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the registry."""
         self._personas: Dict[str, PersonaSpec] = {}
         self._factories: Dict[str, Callable[[], PersonaSpec]] = {}
@@ -273,7 +273,7 @@ class PersonaRegistry:
 
         with self._lock:
             if key in self._factories:
-                factory = self._factories[key]
+                factory: Callable[[], PersonaSpec] = self._factories[key]  # type: ignore[assignment]
             elif vertical:
                 factory = self._factories.get(name)
             else:

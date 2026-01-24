@@ -53,7 +53,8 @@ try:
     import victor_native as _native
 
     _NATIVE_AVAILABLE = True
-    logger.debug(f"Native thinking detector loaded (v{_native.__version__})")
+    if _native:
+        logger.debug(f"Native thinking detector loaded (v{_native.__version__})")
 except ImportError:
     logger.debug("Native extensions not available, using Python thinking detector")
 
@@ -333,8 +334,10 @@ class ThinkingPatternDetector:
             True if circular phrases detected
         """
         # Use native implementation when available (6x faster)
-        if _NATIVE_AVAILABLE:
-            return _native.detect_circular_phrases(text)
+        if _NATIVE_AVAILABLE and _native:
+            result = _native.detect_circular_phrases(text)  # type: ignore[attr-defined]
+            assert isinstance(result, bool)
+            return result
 
         # Python fallback
         for pattern in CIRCULAR_PATTERNS:

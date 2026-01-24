@@ -71,8 +71,7 @@ class VerticalConfigLoader:
           description: Vertical description
 
         core:
-          tools:
-            list: [tool1, tool2]
+          tools: list[Any]: [tool1, tool2]
           system_prompt:
             source: inline
             text: "Prompt text"

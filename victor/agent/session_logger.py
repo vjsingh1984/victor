@@ -73,7 +73,7 @@ def get_session_logger(session_id: Optional[str] = None, component: str = "") ->
     return logging.getLogger(name)
 
 
-def get_agent_logger(agent, component: str = "") -> logging.Logger:
+def get_agent_logger(agent: Any, component: str = "") -> logging.Logger:
     """Get logger for agent with session ID if available.
 
     Args:

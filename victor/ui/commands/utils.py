@@ -492,8 +492,7 @@ def setup_safety_confirmation() -> None:
 
 
 def get_rl_profile_suggestion(
-    current_provider: str, profiles: dict
-) -> Optional[tuple[str, str, float]]:
+    current_provider: str, profiles: dict[str, Any]) -> Optional[tuple[str, str, float]]:
     """Get RL-based profile suggestion if different from current."""
     try:
         from victor.framework.rl.coordinator import get_rl_coordinator

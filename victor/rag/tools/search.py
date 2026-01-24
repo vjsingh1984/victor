@@ -74,7 +74,7 @@ class RAGSearchTool(BaseTool):
         k: int = 10,
         doc_ids: Optional[List[str]] = None,
         use_hybrid: bool = True,
-        **kwargs,
+        **kwargs: Any,
     ) -> ToolResult:
         """Execute search query.
 

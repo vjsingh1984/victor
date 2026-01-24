@@ -1336,7 +1336,7 @@ class SkillChainer:
         # Add nodes for each step
         for step in chain.steps:
 
-            async def execute_step_node(state: ChainState, s=step) -> ChainState:
+            async def execute_step_node(state: ChainState, s: Any = step) -> ChainState:
                 result = await self._execute_step(s, context or {})
                 state["step_results"][s.id] = result
                 if not result.success:
@@ -1640,7 +1640,7 @@ class SkillChainer:
 
     async def _execute_with_timeout(
         self,
-        func: Callable,
+        func: Callable[..., Any],
         skill_name: str,
         context: Dict[str, Any],
         timeout: int,

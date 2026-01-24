@@ -440,8 +440,8 @@ class ProviderManager:
                 provider=self.provider_name,
                 model=self.model,
                 context_window=limits.context_window,
-                supports_tools=self.provider.supports_tools() if self.provider else False,  # type: ignore[union-attr]
-                supports_streaming=self.provider.supports_streaming() if self.provider else False,  # type: ignore[union-attr]
+                supports_tools=self.provider.supports_tools() if self.provider else False,
+                supports_streaming=self.provider.supports_streaming() if self.provider else False,
                 source="config",
             )
 

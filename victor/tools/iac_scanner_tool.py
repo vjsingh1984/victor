@@ -330,7 +330,7 @@ class IaCScannerTool(BaseTool):
 
         return "\n".join(lines)
 
-    def _format_findings(self, findings: list, file_path: Path) -> str:
+    def _format_findings(self, findings: list[Any], file_path: Path) -> str:
         """Format findings for a specific file."""
         if not findings:
             return f"{_get_icon('success')} No security issues found in {file_path.name}"

@@ -550,7 +550,7 @@ class ServiceConfig:
     memory_limit: Optional[str] = None  # e.g., "512m", "2g"
     cpu_limit: Optional[float] = None  # e.g., 1.0, 0.5
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # Parse port specs
         if self.ports:
             self.ports = [PortMapping.parse(p) for p in self.ports]

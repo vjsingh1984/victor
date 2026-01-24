@@ -66,7 +66,7 @@ class ConversationExport:
 class ConversationExporter:
     """Exports conversations to various formats."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the exporter."""
         self._exporters = {
             ExportFormat.MARKDOWN: self._export_markdown,

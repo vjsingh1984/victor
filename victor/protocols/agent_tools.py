@@ -122,7 +122,7 @@ class ToolExecutorProtocol(Protocol):
     Usage:
         from victor.protocols.agent_tools import ToolExecutorProtocol
 
-        def run_tool(executor: ToolExecutorProtocol, tool: str, args: dict) -> Any:
+        def run_tool(executor: ToolExecutorProtocol, tool: str, args: dict[str, Any]) -> Any:
             if executor.validate_arguments(tool, args):
                 return await executor.aexecute(tool, args)
             raise ValueError(f"Invalid arguments for {tool}")

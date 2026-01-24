@@ -275,7 +275,7 @@ class ParallelExecutor:
 
     def _prepare_task(
         self,
-        task: TaskInput,
+        task: TaskInput[Any],
         index: int,
         context: Dict[str, Any],
     ) -> Coroutine[Any, Any, T]:

@@ -216,7 +216,7 @@ class FrameworkResult:
     config: dict = field(default_factory=dict)
 
     # Raw results for detailed analysis
-    task_results: list[dict] = field(default_factory=list)
+    task_results: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass

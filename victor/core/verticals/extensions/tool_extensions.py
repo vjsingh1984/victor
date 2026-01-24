@@ -26,7 +26,7 @@ Usage:
     from victor.core.verticals.protocols import MiddlewareProtocol
 
     class CodeValidationMiddleware(MiddlewareProtocol):
-        async def before_tool_call(self, tool_name: str, arguments: dict):
+        async def before_tool_call(self, tool_name: str, arguments: dict[str, Any]):
             # Validate code before writing
             ...
 

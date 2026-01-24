@@ -59,7 +59,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +123,7 @@ class TaskTypeDefinition:
     force_action_hints: Dict[str, str] = field(default_factory=dict)
     exploration_multiplier: float = 1.0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Normalize name to lowercase."""
         self.name = self.name.lower()
         # Ensure aliases are a set
@@ -159,7 +159,7 @@ class TaskTypeRegistry:
 
     _instance: Optional["TaskTypeRegistry"] = None
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize empty registry. Use get_instance() for singleton access."""
         self._core_types: Dict[str, TaskTypeDefinition] = {}
         self._vertical_overrides: Dict[str, Dict[str, TaskTypeDefinition]] = {}
@@ -778,7 +778,7 @@ def register_vertical_task_type(
     category: TaskCategory,
     hint: str,
     tool_budget: int = 10,
-    **kwargs,
+    **kwargs: Any,
 ) -> None:
     """Register a task type for a specific vertical.
 

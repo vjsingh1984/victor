@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 class ToolingBuilder(FactoryAwareBuilder):
     """Build tool registry, executor, and access control components."""
 
-    def __init__(self, settings, factory: Optional["OrchestratorFactory"] = None):
+    def __init__(self, settings: Any, factory: Optional["OrchestratorFactory"] = None):
         """Initialize the builder.
 
         Args:
@@ -44,7 +44,7 @@ class ToolingBuilder(FactoryAwareBuilder):
         orchestrator: "AgentOrchestrator",
         provider: "BaseProvider",
         model: str,
-        **_kwargs,
+        **kwargs: Any,
     ) -> Dict[str, Any]:
         """Build tooling components and attach them to orchestrator."""
         factory = self._ensure_factory(provider=provider, model=model)

@@ -297,7 +297,7 @@ class WorkflowDefinitionSchema(BaseModel):
 
     @field_validator("entry_point")
     @classmethod
-    def validate_entry_point_exists(cls, v: str, info) -> str:
+    def validate_entry_point_exists(cls, v: str, info: Any) -> str:
         """Ensure entry point references an existing node.
 
         The entry point must be a valid node ID in the workflow.

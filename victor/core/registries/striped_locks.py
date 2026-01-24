@@ -215,23 +215,24 @@ class StripedLockManager:
 
         # Track wait time and contention
         start_time = time.time()
-        was_contended = lock._count > 0
+        was_contended = lock._count > 0 if hasattr(lock, "_count") else False
 
         # Return a wrapped lock that records metrics
         class MetricLock:
-            def __init__(self, inner_lock, manager, stripe_idx, start):
+            def __init__(self, inner_lock: threading.RLock, manager: Any, stripe_idx: int, start: float) -> None:
                 self._inner = inner_lock
                 self._manager = manager
                 self._stripe_idx = stripe_idx
                 self._start = start
 
-            def __enter__(self):
+            def __enter__(self) -> "MetricLock":
                 self._inner.acquire()
                 wait_time = (time.time() - self._start) * 1000
-                self._manager._metrics.record_acquire(self._stripe_idx, wait_time, was_contended)
+                if self._manager._metrics:
+                    self._manager._metrics.record_acquire(self._stripe_idx, wait_time, was_contended)
                 return self
 
-            def __exit__(self, *args):
+            def __exit__(self, *args: Any) -> None:
                 self._inner.release()
 
         return MetricLock(lock, self, stripe_index, start_time)
@@ -294,7 +295,7 @@ class ReadWriteLock:
             pass
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize read-write lock."""
         self._lock = threading.Lock()
         self._readers = 0
@@ -332,7 +333,7 @@ class ReadWriteLock:
 class ReadLockContext:
     """Context manager for read locks."""
 
-    def __init__(self, rw_lock: ReadWriteLock):
+    def __init__(self, rw_lock: ReadWriteLock) -> None:
         """Initialize read lock context.
 
         Args:
@@ -340,7 +341,7 @@ class ReadLockContext:
         """
         self._rw_lock = rw_lock
 
-    def __enter__(self):
+    def __enter__(self) -> "ReadLockContext":
         """Acquire read lock."""
         with self._rw_lock._lock:
             # Wait for any active writers to finish
@@ -349,7 +350,7 @@ class ReadLockContext:
             self._rw_lock._readers += 1
         return self
 
-    def __exit__(self, *args):
+    def __exit__(self, *args: Any) -> None:
         """Release read lock."""
         with self._rw_lock._lock:
             self._rw_lock._readers -= 1
@@ -361,7 +362,7 @@ class ReadLockContext:
 class WriteLockContext:
     """Context manager for write locks."""
 
-    def __init__(self, rw_lock: ReadWriteLock):
+    def __init__(self, rw_lock: ReadWriteLock) -> None:
         """Initialize write lock context.
 
         Args:
@@ -369,7 +370,7 @@ class WriteLockContext:
         """
         self._rw_lock = rw_lock
 
-    def __enter__(self):
+    def __enter__(self) -> "WriteLockContext":
         """Acquire write lock."""
         with self._rw_lock._lock:
             self._rw_lock._writers += 1
@@ -380,7 +381,7 @@ class WriteLockContext:
 
         return self
 
-    def __exit__(self, *args):
+    def __exit__(self, *args: Any) -> None:
         """Release write lock."""
         with self._rw_lock._lock:
             self._rw_lock._writers -= 1

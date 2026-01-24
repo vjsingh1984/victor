@@ -21,7 +21,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from victor.processing.completion.protocol import (
     CompletionCapabilities,
@@ -58,7 +58,7 @@ class Snippet:
 
 
 # Built-in snippets organized by language
-BUILTIN_SNIPPETS: dict[str, list[dict]] = {
+BUILTIN_SNIPPETS: dict[str, Any] = {
     "python": [
         {
             "name": "def",
@@ -213,13 +213,13 @@ BUILTIN_SNIPPETS: dict[str, list[dict]] = {
         {
             "name": "struct",
             "prefix": "struct",
-            "body": "struct ${1:Name} {\n    ${2:field}: ${3:Type},\n}",
+            "body": "struct ${1:Name} {\n    ${2:field}: ${3: Type[Any]},\n}",
             "description": "Struct",
         },
         {
             "name": "impl",
             "prefix": "impl",
-            "body": "impl ${1:Type} {\n    ${2}\n}",
+            "body": "impl ${1: Type[Any]} {\n    ${2}\n}",
             "description": "Implementation block",
         },
         {
@@ -245,7 +245,7 @@ BUILTIN_SNIPPETS: dict[str, list[dict]] = {
         {
             "name": "struct",
             "prefix": "type struct",
-            "body": "type ${1:Name} struct {\n    ${2:Field} ${3:Type}\n}",
+            "body": "type ${1:Name} struct {\n    ${2:Field} ${3: Type[Any]}\n}",
             "description": "Struct type",
         },
         {

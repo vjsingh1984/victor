@@ -283,7 +283,7 @@ class PromptRequirementExtractor:
         """
         self._patterns = patterns or DEFAULT_PATTERNS
         self._buffer_multiplier = buffer_multiplier
-        self._compiled: Dict[str, List[Pattern]] = {}
+        self._compiled: Dict[str, Any] = {}
         self._compile_patterns()
 
     def _compile_patterns(self) -> None:
@@ -345,7 +345,7 @@ class PromptRequirementExtractor:
 
         return requirements
 
-    def _extract_value(self, matches: List, pattern_name: str = "") -> Optional[int]:
+    def _extract_value(self, matches: List[Any], pattern_name: str = "") -> Optional[int]:
         """Extract numeric value from regex matches.
 
         Handles both simple matches and tuple matches (from groups).

@@ -131,7 +131,7 @@ class DataAnalysisSafetyExtension(SafetyExtensionProtocol):
         """
         return core_get_safety_reminders()
 
-    def scan_for_pii(self, content: str) -> List[Dict]:
+    def scan_for_pii(self, content: str) -> List[Dict[str, Any]]:
         """Scan content for PII using the core PIIScanner.
 
         Args:

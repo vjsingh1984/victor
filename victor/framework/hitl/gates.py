@@ -92,12 +92,16 @@ class ApprovalResponse:
     @property
     def is_timeout(self) -> bool:
         """Whether the interaction timed out."""
-        return self.metadata.get("timed_out", False)
+        value = self.metadata.get("timed_out", False)
+        assert isinstance(value, bool)
+        return value
 
     @property
     def is_skipped(self) -> bool:
         """Whether the interaction was skipped."""
-        return self.metadata.get("skipped", False)
+        value = self.metadata.get("skipped", False)
+        assert isinstance(value, bool)
+        return value
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary."""
@@ -156,12 +160,16 @@ class TextResponse:
     @property
     def is_timeout(self) -> bool:
         """Whether the interaction timed out."""
-        return self.metadata.get("timed_out", False)
+        value = self.metadata.get("timed_out", False)
+        assert isinstance(value, bool)
+        return value
 
     @property
     def is_skipped(self) -> bool:
         """Whether the interaction was skipped."""
-        return self.metadata.get("skipped", False)
+        value = self.metadata.get("skipped", False)
+        assert isinstance(value, bool)
+        return value
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary."""
@@ -223,12 +231,16 @@ class ChoiceResponse:
     @property
     def is_timeout(self) -> bool:
         """Whether the interaction timed out."""
-        return self.metadata.get("timed_out", False)
+        value = self.metadata.get("timed_out", False)
+        assert isinstance(value, bool)
+        return value
 
     @property
     def is_skipped(self) -> bool:
         """Whether the interaction was skipped."""
-        return self.metadata.get("skipped", False)
+        value = self.metadata.get("skipped", False)
+        assert isinstance(value, bool)
+        return value
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary."""
@@ -289,12 +301,16 @@ class ReviewResponse:
     @property
     def is_timeout(self) -> bool:
         """Whether the interaction timed out."""
-        return self.metadata.get("timed_out", False)
+        value = self.metadata.get("timed_out", False)
+        assert isinstance(value, bool)
+        return value
 
     @property
     def is_skipped(self) -> bool:
         """Whether the interaction was skipped."""
-        return self.metadata.get("skipped", False)
+        value = self.metadata.get("skipped", False)
+        assert isinstance(value, bool)
+        return value
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary."""

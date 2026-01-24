@@ -138,7 +138,7 @@ def _build_report(
     results: Dict[str, Dict[str, Any]],
     filtered_issues: List[Dict[str, Any]],
     issues_by_severity: Dict[str, int],
-    languages_found: set,
+    languages_found: set[Any],
 ) -> str:
     """Build comprehensive code review report."""
     report = ["Code Review Report"]

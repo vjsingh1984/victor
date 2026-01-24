@@ -519,7 +519,7 @@ def create_sandboxed_mcp_client(
     class SandboxedMCPClient(MCPClient):
         """MCP client with sandboxed subprocess."""
 
-        def __init__(self, sandbox_config: Optional[SandboxConfig] = None, **kwargs):
+        def __init__(self, sandbox_config: Optional[SandboxConfig] = None, **kwargs: Any):
             super().__init__(**kwargs)
             self._sandbox = SandboxedProcess(sandbox_config)
 

@@ -38,8 +38,7 @@ import time
 import weakref
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any, Callable, Deque, Dict, List, Optional, Type, TypeVar
-from typing import Generic
+from typing import Any, Callable, Deque, Dict, Generic, List, Optional, Type, TypeVar, cast
 
 logger = logging.getLogger(__name__)
 
@@ -336,7 +335,7 @@ class MemoryOptimizer:
         """Initialize memory optimizer."""
         self._pools: Dict[str, ObjectPool] = {}
         self._profiler: Optional[MemoryProfiler] = None
-        self._original_gc_thresholds: Optional[tuple] = None
+        self._original_gc_thresholds: Optional[tuple[Any, ...]] = None
 
     @classmethod
     def enable_gc_tuning(
@@ -544,7 +543,8 @@ def memory_efficient(maxsize: int = 128) -> Callable:
             nonlocal pool
             if pool is None:
                 pool = ObjectPool(lambda: func(*args, **kwargs), max_size=maxsize)
-            return pool.acquire()
+            result = pool.acquire()
+            return cast(T, result)
 
         return wrapper
 

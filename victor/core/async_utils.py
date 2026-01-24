@@ -51,7 +51,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import logging
-from typing import Any, Awaitable, Callable, TypeVar
+from typing import Any, Awaitable, Callable, TypeVar, cast
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +120,8 @@ def run_sync_in_thread(coro: Awaitable[T]) -> T:
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(run_in_loop)
-        return future.result()
+        result = future.result()
+        return cast(T, result)
 
 
 def async_to_sync(func: Callable[..., Awaitable[T]]) -> Callable[..., T]:
@@ -196,7 +197,9 @@ class SyncAsyncBridge:
 
         @functools.wraps(async_method)
         def wrapper(self, *args: Any, **kwargs: Any) -> T:
-            return self._run_sync(async_method(self, *args, **kwargs))
+            coro = async_method(self, *args, **kwargs)
+            result = self._run_sync(coro)
+            return cast(T, result)
 
         return wrapper
 

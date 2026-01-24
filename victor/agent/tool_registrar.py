@@ -198,7 +198,7 @@ class ToolRegistrar:
         self._stats = RegistrationStats()
 
         # Background task callback
-        self._create_background_task: Optional[Callable] = None
+        self._create_background_task: Optional[Callable[..., Any]] = None
 
         # Tool configuration for context injection (populated in _setup_providers)
         self._tool_config: Dict[str, Any] = {}

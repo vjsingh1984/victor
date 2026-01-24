@@ -26,7 +26,7 @@ Usage:
 import re
 import typer
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from rich.console import Console
 from rich.panel import Panel
@@ -111,7 +111,7 @@ def to_title(name: str) -> str:
 def render_template(
     env: "Environment",
     template_name: str,
-    context: dict,
+    context: dict[str, Any],
 ) -> str:
     """Render a Jinja2 template with the given context.
 

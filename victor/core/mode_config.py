@@ -417,7 +417,7 @@ class ModeConfigRegistry:
 
     _instance: Optional["ModeConfigRegistry"] = None
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the registry with default modes."""
         self._default_modes: Dict[str, ModeDefinition] = DEFAULT_MODES.copy()
         self._default_task_budgets: Dict[str, int] = DEFAULT_TASK_BUDGETS.copy()

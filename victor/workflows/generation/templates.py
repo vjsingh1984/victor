@@ -48,7 +48,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 from enum import Enum
 
 from victor.workflows.generation.requirements import WorkflowRequirements
@@ -726,7 +726,8 @@ class TemplateLibrary:
                 return [replace_in_dict(item) for item in obj]
             return obj
 
-        return replace_in_dict(schema)
+        result = replace_in_dict(schema)
+        return cast(Dict[str, Any], result)
 
     def _validate_instantiated_schema(self, schema: Dict[str, Any]) -> None:
         """Validate instantiated schema.

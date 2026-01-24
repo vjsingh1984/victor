@@ -356,7 +356,7 @@ Actions:
 
         return "\n".join(lines)
 
-    def _format_events(self, events: list) -> str:
+    def _format_events(self, events: list[Any]) -> str:
         """Format audit events."""
         if not events:
             return "No audit events found for the specified criteria."

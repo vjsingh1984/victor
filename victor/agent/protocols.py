@@ -388,7 +388,7 @@ class ToolExecutorProtocol(Protocol):
     Usage:
         from victor.agent.protocols import ToolExecutorProtocol
 
-        def run_tool(executor: ToolExecutorProtocol, tool: str, args: dict) -> Any:
+        def run_tool(executor: ToolExecutorProtocol, tool: str, args: dict[str, Any]) -> Any:
             if executor.validate_arguments(tool, args):
                 return await executor.aexecute(tool, args)
             raise ValueError(f"Invalid arguments for {tool}")
@@ -3796,7 +3796,7 @@ class IMessageStore(Protocol):
     Separated from other conversation concerns to follow ISP.
     """
 
-    def add_message(self, role: str, content: str, **metadata) -> None:
+    def add_message(self, role: str, content: str, **metadata: Any) -> None:
         """Add a message to storage.
 
         Args:

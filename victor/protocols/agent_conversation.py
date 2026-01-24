@@ -359,7 +359,7 @@ class ReminderManagerProtocol(Protocol):
 
     def update_state(
         self,
-        observed_files: Optional[set] = None,
+        observed_files: Optional[set[Any]] = None,
         executed_tool: Optional[str] = None,
         tool_calls: Optional[int] = None,
         tool_budget: Optional[int] = None,

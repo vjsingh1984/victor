@@ -131,7 +131,7 @@ class RefactorManager:
         end_line: int,
         end_column: int,
         scope: RefactorScope = RefactorScope.PROJECT,
-        **kwargs,
+        **kwargs: Any,
     ) -> RefactorPreview:
         """Generate a preview of a refactoring operation.
 

@@ -28,7 +28,7 @@ from victor.workflows.base import WorkflowRegistry
     keywords=["workflow", "automation", "task", "sequence"],
 )
 async def workflow(
-    workflow_name: str, context: dict, workflow_args: Dict[str, Any]
+    workflow_name: str, context: dict[str, Any], workflow_args: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
     Runs a pre-defined, multi-step workflow to automate a complex task.

@@ -87,7 +87,7 @@ class HTMLChunkingStrategy(ChunkingStrategy):
         # Convert to chunks respecting size limits
         return self._build_chunks(semantic_elements)
 
-    def _extract_semantic_elements(self, soup) -> List[tuple]:
+    def _extract_semantic_elements(self, soup: Any) -> List[tuple]:
         """Extract semantic elements from parsed HTML.
 
         Args:

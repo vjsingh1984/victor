@@ -408,7 +408,7 @@ class BatchProcessorAccelerator:
     async def _execute_with_retry(
         self,
         task: BatchTask,
-        executor: Callable,
+        executor: Callable[..., Any],
         retry_policy: RetryPolicy,
         timeout_sec: float,
     ) -> TaskResult:
@@ -451,7 +451,7 @@ class BatchProcessorAccelerator:
     def _execute_with_retry_sync(
         self,
         task: BatchTask,
-        executor: Callable,
+        executor: Callable[..., Any],
         retry_policy: RetryPolicy,
         timeout_sec: float,
     ) -> TaskResult:

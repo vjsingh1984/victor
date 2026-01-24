@@ -174,7 +174,7 @@ class ChainRegistry:
     _instance: Optional["ChainRegistry"] = None
     _class_lock: threading.Lock = threading.Lock()
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the registry."""
         self._chains: Dict[str, Any] = {}
         self._factories: Dict[str, Callable[[], Any]] = {}
@@ -340,7 +340,7 @@ class ChainRegistry:
 
         with self._lock:
             if key in self._factories:
-                factory = self._factories[key]
+                factory: Callable[[], Any] = self._factories[key]  # type: ignore[assignment]
             elif vertical:
                 # Try without vertical prefix
                 factory = self._factories.get(name)

@@ -1410,7 +1410,7 @@ async def graph(
                 in_edges = analyzer.incoming.get(nid, [])
                 out_edges = analyzer.outgoing.get(nid, [])
 
-                def edge_count(et: str, edges: list) -> int:
+                def edge_count(et: str, edges: list[Any]) -> int:
                     return len([e for e in edges if e[1] == et])
 
                 item["edge_counts"] = {

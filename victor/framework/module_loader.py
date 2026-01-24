@@ -387,15 +387,15 @@ class DynamicModuleLoader:
 
                     loader._debounce_timer.schedule(module_name, do_reload)
 
-            def on_modified(handler_self, event) -> None:
+            def on_modified(handler_self: Any, event: Any) -> None:
                 if not event.is_directory:
                     handler_self._handle_change(event.src_path, "modified")
 
-            def on_created(handler_self, event) -> None:
+            def on_created(handler_self: Any, event: Any) -> None:
                 if not event.is_directory:
                     handler_self._handle_change(event.src_path, "created")
 
-            def on_deleted(handler_self, event) -> None:
+            def on_deleted(handler_self: Any, event: Any) -> None:
                 if not event.is_directory:
                     handler_self._handle_change(event.src_path, "deleted")
 
@@ -602,7 +602,7 @@ class DynamicModuleLoader:
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Context manager exit - cleanup."""
         self.stop_file_watcher()
 

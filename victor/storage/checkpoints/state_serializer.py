@@ -25,7 +25,7 @@ import json
 import logging
 from dataclasses import dataclass, asdict
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set, Union, cast
 
 logger = logging.getLogger(__name__)
 
@@ -167,7 +167,8 @@ class StateSerializer:
                     )
 
         # Restore Python types
-        return self._from_json_safe(json_safe)
+        result = self._from_json_safe(json_safe)
+        return cast(Dict[str, Any], result)
 
     def _to_json_safe(self, obj: Any) -> Any:
         """Convert Python objects to JSON-safe format.

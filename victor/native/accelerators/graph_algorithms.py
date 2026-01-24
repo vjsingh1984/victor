@@ -90,7 +90,7 @@ class PathResult:
     hops: int
 
 
-def _time_function(func: Callable) -> Callable:
+def _time_function(func: Callable[..., Any]) -> Callable:
     """Decorator to time function execution."""
 
     def wrapper(*args, **kwargs):

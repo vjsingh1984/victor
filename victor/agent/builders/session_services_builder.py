@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 class SessionServicesBuilder(FactoryAwareBuilder):
     """Build session state, budgets, and core service wiring."""
 
-    def __init__(self, settings, factory: Optional["OrchestratorFactory"] = None):
+    def __init__(self, settings: Any, factory: Optional["OrchestratorFactory"] = None):
         """Initialize the builder.
 
         Args:

@@ -402,7 +402,7 @@ class WorkflowOptimizer:
 
         return variant
 
-    def set_config(self, **kwargs) -> None:
+    def set_config(self, **kwargs: Any) -> None:
         """Update optimizer configuration.
 
         Args:

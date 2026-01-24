@@ -400,7 +400,7 @@ class WorkflowScheduler:
     def __init__(
         self,
         check_interval: float = 60.0,  # Check every minute
-        executor: Optional[Callable] = None,
+        executor: Optional[Callable[..., Any]] = None,
     ):
         """Initialize the scheduler.
 

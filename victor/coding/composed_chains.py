@@ -235,7 +235,7 @@ class LazyToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
         self._tool_name = tool_name
         self._output_key = output_key
         self._input_mapping = input_mapping or {}
-        self._runnable: Optional[Runnable] = None
+        self._runnable: Optional[Runnable[Any]] = None
 
         # Use the framework's LazyToolRunnable for lazy loading
         self._lazy_loader = BaseLazyToolRunnable(
@@ -611,7 +611,7 @@ CODING_CHAINS: Dict[str, Runnable] = {
 }
 
 
-def get_chain(name: str) -> Optional[Runnable]:
+def get_chain(name: str) -> Optional[Runnable[Any]]:
     """Get a pre-built chain by name.
 
     Args:

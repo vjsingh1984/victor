@@ -27,7 +27,7 @@ Test Categories:
 """
 
 import uuid
-from typing import Optional
+from typing import Any, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -235,9 +235,7 @@ class TestFrameworkShimVertical:
     @pytest.fixture
     def mock_orchestrator(self):
         """Create mock orchestrator with capability protocol support."""
-        from victor.framework.protocols import CapabilityRegistryProtocol
-
-        orch = MagicMock(spec=CapabilityRegistryProtocol)
+        orch = MagicMock()
         orch.prompt_builder = MagicMock()
         orch.prompt_builder.set_custom_prompt = MagicMock()
 
@@ -245,7 +243,7 @@ class TestFrameworkShimVertical:
         orch._enabled_tools = set()
 
         def set_tools(tools):
-            orch._enabled_tools = tools
+            orch._enabled_tools = set(tools) if tools else set()
 
         orch.set_enabled_tools = MagicMock(side_effect=set_tools)
         orch.get_enabled_tools = MagicMock(side_effect=lambda: orch._enabled_tools)
@@ -277,8 +275,9 @@ class TestFrameworkShimVertical:
                 return True
             return False
 
-        orch.has_capability = MagicMock(side_effect=has_capability)
-        orch.invoke_capability = MagicMock(side_effect=invoke_capability)
+        # Don't use MagicMock for these - use regular functions to avoid spec issues
+        orch.has_capability = has_capability
+        orch.invoke_capability = invoke_capability
 
         return orch
 

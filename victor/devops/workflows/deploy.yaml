@@ -1,3 +1,17 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # DevOps Deployment Workflow
 # ==========================
 # Infrastructure deployment with:
@@ -5,6 +19,9 @@
 # - Multi-environment support
 # - Rollback capabilities
 # - Health checks and monitoring
+#
+# MIGRATION: This version uses stage template references to reduce duplication.
+# Original file backed up as deploy.yaml.pre-migration
 
 workflows:
   deploy:
@@ -42,20 +59,16 @@ workflows:
           "false": fix_config
 
       - id: fix_config
-        type: agent
-        name: "Fix Configuration Issues"
-        role: executor
-        goal: |
-          Fix the configuration issues:
-          {config_errors}
+        stage: modify_stage
+        overrides:
+          name: "Fix Configuration Issues"
+          goal: |
+            Fix the configuration issues:
+            {config_errors}
 
-          Ensure all required values are set and valid.
-        tool_budget: 15
-        tools: [read, edit]
-        llm_config:
-          temperature: 0.1
-        output: fixed_config
-        next: [validate_config]
+            Ensure all required values are set and valid.
+          tools: [read, edit]
+          tool_budget: 15
 
       - id: check_dependencies
         type: compute
@@ -83,20 +96,19 @@ workflows:
           "false": resolve_dependencies
 
       - id: resolve_dependencies
-        type: hitl
-        name: "Resolve Missing Dependencies"
-        hitl_type: input
-        prompt: |
-          ## Missing Dependencies
+        stage: input_stage
+        overrides:
+          name: "Resolve Missing Dependencies"
+          prompt: |
+            ## Missing Dependencies
 
-          The following dependencies are not met:
-          {missing_dependencies}
+            The following dependencies are not met:
+            {missing_dependencies}
 
-          Please resolve these issues and confirm when ready.
-        context_keys:
-          - missing_dependencies
-        timeout: 1800
-        fallback: abort
+            Please resolve these issues and confirm when ready.
+          context_keys:
+            - missing_dependencies
+          timeout: 1800
         next: [check_dependencies]
 
       # =====================================================================
@@ -117,26 +129,25 @@ workflows:
         next: [approval_gate]
 
       - id: approval_gate
-        type: hitl
-        name: "Deployment Approval"
-        hitl_type: approval
-        prompt: |
-          ## Ready for Deployment
+        stage: approval_stage
+        overrides:
+          name: "Deployment Approval"
+          prompt: |
+            ## Ready for Deployment
 
-          **Environment:** {target_env}
-          **Version:** {deploy_version}
-          **Changes:** {change_summary}
+            **Environment:** {target_env}
+            **Version:** {deploy_version}
+            **Changes:** {change_summary}
 
-          **Backup Created:** {backup_info}
+            **Backup Created:** {backup_info}
 
-          Approve deployment?
-        context_keys:
-          - target_env
-          - deploy_version
-          - change_summary
-          - backup_info
-        timeout: 900
-        fallback: abort
+            Approve deployment?
+          context_keys:
+            - target_env
+            - deploy_version
+            - change_summary
+            - backup_info
+          timeout: 900
         next: [deploy]
 
       # =====================================================================
@@ -194,46 +205,37 @@ workflows:
           "false": investigate_health
 
       - id: investigate_health
-        type: agent
-        name: "Investigate Health Issues"
-        role: analyst
-        goal: |
-          Investigate the health check failures:
-          {health_failures}
+        stage: analyze_stage
+        overrides:
+          name: "Investigate Health Issues"
+          role: analyst
+          goal: |
+            Investigate the health check failures:
+            {health_failures}
 
-          Determine:
-          1. Root cause of failures
-          2. Whether to proceed or rollback
-          3. Potential fixes
-        tool_budget: 20
-        tools: [shell, read]
-        llm_config:
-          temperature: 0.2
-        output: investigation
+            Determine:
+            1. Root cause of failures
+            2. Whether to proceed or rollback
+            3. Potential fixes
+          tools: [shell, read]
+          tool_budget: 20
+          llm_config:
+            temperature: 0.2
         next: [health_decision]
 
       - id: health_decision
-        type: hitl
-        name: "Health Issue Decision"
-        hitl_type: approval
-        prompt: |
-          ## Health Check Issues
+        stage: choice_stage
+        overrides:
+          name: "Health Issue Decision"
+          prompt: |
+            ## Health Check Issues
 
-          **Investigation:**
-          {investigation}
+            **Investigation:**
+            {investigation}
 
-          Options:
-          1. Continue (issues are minor)
-          2. Rollback
-          3. Retry health checks
-        context_keys:
-          - investigation
-        choices:
-          - "Continue"
-          - "Rollback"
-          - "Retry"
-        timeout: 600
-        fallback: abort
+            Options:
+          context_keys:
+            - investigation
         next: [handle_health_decision]
 
       - id: handle_health_decision
@@ -299,17 +301,16 @@ workflows:
         next: [notify_rollback]
 
       - id: notify_rollback
-        type: agent
-        name: "Generate Rollback Report"
-        role: reviewer
-        goal: |
-          Generate a rollback incident report:
-          - What was being deployed
-          - Why it failed
-          - Rollback status
-          - Next steps
-        tool_budget: 10
-        output: rollback_report
+        stage: review_stage
+        overrides:
+          name: "Generate Rollback Report"
+          goal: |
+            Generate a rollback incident report:
+            - What was being deployed
+            - Why it failed
+            - Rollback status
+            - Next steps
+          tool_budget: 10
         next: [failed]
 
       - id: failed
@@ -360,12 +361,11 @@ workflows:
         tools: [write]
 
       - id: done
-        type: transform
-        name: "Deployment Complete"
-        transform: |
-          status = "completed"
-          deployed_version = deploy_version
-
+        stage: complete_stage
+        overrides:
+          transform: |
+            status = "completed"
+            deployed_version = deploy_version
 
   # =========================================================================
   # CI/CD Pipeline
@@ -390,15 +390,7 @@ workflows:
         next: [test]
 
       - id: test
-        type: compute
-        name: "Run Tests"
-        tools: [shell]
-        inputs:
-          command: $ctx.test_command
-        output: test_result
-        constraints:
-          llm_allowed: false
-          timeout: 900
+        stage: test_stage
         next: [check_tests]
 
       - id: check_tests
@@ -410,15 +402,7 @@ workflows:
           "false": notify_failure
 
       - id: security_scan
-        type: compute
-        name: "Security Scan"
-        tools: [shell]
-        inputs:
-          scan_type: full
-        output: security_results
-        constraints:
-          llm_allowed: false
-          timeout: 300
+        stage: security_analysis_stage
         next: [check_security]
 
       - id: check_security
@@ -479,7 +463,4 @@ workflows:
           timeout: 30
 
       - id: complete
-        type: transform
-        name: "Pipeline Complete"
-        transform: |
-          status = "completed"
+        stage: complete_stage

@@ -240,22 +240,26 @@ class AttributeSpecification(BaseSpecification[T]):
         actual = getattr(entity, self.attribute, None)
 
         if self.operator == "eq":
-            return actual == self.value
+            result = actual == self.value
         elif self.operator == "ne":
-            return actual != self.value
+            result = actual != self.value
         elif self.operator == "gt":
-            return actual > self.value
+            result = actual > self.value
         elif self.operator == "lt":
-            return actual < self.value
+            result = actual < self.value
         elif self.operator == "gte":
-            return actual >= self.value
+            result = actual >= self.value
         elif self.operator == "lte":
-            return actual <= self.value
+            result = actual <= self.value
         elif self.operator == "in":
-            return actual in self.value
+            result = actual in self.value
         elif self.operator == "contains":
-            return self.value in actual if actual else False
-        return False
+            result = self.value in actual if actual else False
+        else:
+            result = False
+
+        assert isinstance(result, bool)
+        return result
 
     def to_query(self) -> Dict[str, Any]:
         op_map = {
@@ -722,7 +726,9 @@ class SQLiteRepository(Repository[T], Generic[T]):
             async with self._lock:
                 with sqlite3.connect(self._db_path) as conn:
                     cursor = conn.execute(f"SELECT COUNT(*) FROM {self._table_name}")
-                    return cursor.fetchone()[0]
+                    row = cursor.fetchone()[0]
+                    assert isinstance(row, int)
+                    return row
 
         # For specifications, we need to filter in Python
         entities = await self.list(specification, limit=10000)

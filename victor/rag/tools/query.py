@@ -145,7 +145,7 @@ class RAGQueryTool(BaseTool):
         provider: Optional[str] = None,
         model: Optional[str] = None,
         max_context_chars: int = 10240,
-        **kwargs,
+        **kwargs: Any,
     ) -> ToolResult:
         """Execute RAG query with optional LLM synthesis.
 
@@ -426,7 +426,7 @@ class RAGQueryTool(BaseTool):
 
     async def _multi_entity_search(
         self,
-        store,
+        store: Any,
         question: str,
         entities: List[Any],
         k: int,
@@ -524,7 +524,7 @@ class RAGQueryTool(BaseTool):
         # Return top k results
         return all_results[:k]
 
-    async def _handle_metadata_query(self, question: str, store) -> ToolResult:
+    async def _handle_metadata_query(self, question: str, store: Any) -> ToolResult:
         """Handle metadata queries like 'list all tickers'.
 
         Args:

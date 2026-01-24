@@ -64,6 +64,7 @@ from typing import (
     Optional,
     Type,
     TypeVar,
+    cast,
     get_type_hints,
 )
 from functools import wraps
@@ -97,7 +98,7 @@ class DIError(Exception):
 class ServiceNotFoundError(DIError):
     """Raised when a requested service is not registered."""
 
-    def __init__(self, service_type: Type, chain: Optional[list[Type]] = None):
+    def __init__(self, service_type: Type[Any], chain: Optional[list[Type]] = None):
         self.service_type = service_type
         self.chain = chain or []
         name = getattr(service_type, "__name__", str(service_type))
@@ -123,13 +124,13 @@ class CircularDependencyError(DIError):
 class ServiceAlreadyRegisteredError(DIError):
     """Raised when trying to register a service that already exists."""
 
-    def __init__(self, service_type: Type):
+    def __init__(self, service_type: Type[Any]):
         self.service_type = service_type
         super().__init__(f"Service already registered: {service_type.__name__}")
 
 
 @dataclass
-class ServiceDescriptor:
+class ServiceDescriptor(Generic[T]):
     """Describes how to create and manage a service with auto-resolution."""
 
     service_type: Type[T]
@@ -392,7 +393,7 @@ class DIContainer:
         except ServiceNotFoundError:
             return None
 
-    def is_registered(self, service_type: Type) -> bool:
+    def is_registered(self, service_type: Type[Any]) -> bool:
         """Check if a service type is registered.
 
         Args:
@@ -450,11 +451,11 @@ class DIContainer:
         try:
             # Inspect factory signature
             sig = inspect.signature(factory)
-            parameters = sig.parameters
+            parameters: Mapping[str, Parameter] = sig.parameters  # type: ignore[assignment]
 
             # Skip 'self' parameter for methods
             if list(parameters.keys()) and list(parameters.keys())[0] == "self":
-                parameters = {k: v for k, v in parameters.items() if k != "self"}
+                parameters = {k: v for k, v in parameters.items() if k != "self"}  # type: ignore[assignment]
 
             # Build kwargs with resolved dependencies
             kwargs = {}
@@ -582,10 +583,10 @@ class DIScope:
             with self._lock:
                 if service_type not in self._scoped_instances:
                     self._scoped_instances[service_type] = descriptor.create_instance(self._parent)
-                return self._scoped_instances[service_type]
+                return cast(T, self._scoped_instances[service_type])
 
         # Transient - always create new
-        return descriptor.create_instance(self._parent)
+        return cast(T, descriptor.create_instance(self._parent))
 
     def dispose(self) -> None:
         """Dispose all scoped services."""

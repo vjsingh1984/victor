@@ -291,7 +291,7 @@ class PerformanceAnalyzer:
             "consensus": {"avg_latency_ms": 115, "throughput": 0.8},
         }
 
-    def load_metrics_from_collector(self, collector) -> None:
+    def load_metrics_from_collector(self, collector: Any) -> None:
         """Load metrics from TeamMetricsCollector.
 
         Args:

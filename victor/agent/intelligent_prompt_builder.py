@@ -1049,7 +1049,7 @@ async def build_intelligent_prompt(
     task: str,
     task_type: str = "general",
     profile_name: Optional[str] = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> str:
     """Build an intelligent system prompt (convenience function).
 

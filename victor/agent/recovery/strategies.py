@@ -89,6 +89,20 @@ class BaseRecoveryStrategy:
     def can_handle(self, context: RecoveryContext) -> bool:
         return context.failure_type in self.handles_failure_types
 
+    async def recover(self, context: RecoveryContext) -> RecoveryResult:
+        """Execute recovery strategy.
+
+        Args:
+            context: Recovery context with failure details
+
+        Returns:
+            Recovery result with outcome
+
+        Raises:
+            NotImplementedError: Must be implemented by subclasses
+        """
+        raise NotImplementedError(f"{self.__class__.__name__} must implement recover()")
+
     def calculate_priority(self, context: RecoveryContext) -> float:
         """Calculate priority using base + Q-learning adjustment."""
         priority = self._base_priority
@@ -97,7 +111,7 @@ class BaseRecoveryStrategy:
         if self._q_store:
             state_key = context.to_state_key()
             # Get all actions and find the best one
-            all_actions = self._q_store.get_all_actions(state_key)
+            all_actions = getattr(self._q_store, "get_all_actions", lambda x: {})(state_key)  # type: ignore[attr-defined]
             if all_actions:
                 best_action_key = max(all_actions, key=all_actions.get)
                 q_value = all_actions[best_action_key]

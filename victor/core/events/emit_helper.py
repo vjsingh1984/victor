@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 def emit_event_sync(
-    event_bus,
+    event_bus: Any,
     topic: str,
     data: Dict[str, Any],
     *,

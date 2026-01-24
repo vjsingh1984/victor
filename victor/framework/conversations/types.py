@@ -74,7 +74,7 @@ class ConversationParticipant:
     persona: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not self.name:
             self.name = self.id
 
@@ -111,7 +111,7 @@ class ConversationalMessage:
     requires_response: bool = True
     id: str = field(default_factory=lambda: str(uuid4())[:8])
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.timestamp is None:
             self.timestamp = datetime.now()
 
@@ -197,7 +197,7 @@ class ConversationContext:
     termination_reason: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.started_at is None:
             self.started_at = datetime.now()
 
@@ -280,7 +280,7 @@ class ConversationalTurn:
     timestamp: Optional[datetime] = None
     duration_seconds: float = 0.0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.timestamp is None:
             self.timestamp = datetime.now()
 

@@ -251,7 +251,7 @@ You excel at:
 - Following project conventions and style guides"""
 
     @classmethod
-    def get_prompt_builder(cls):  # type: ignore[override]
+    def get_prompt_builder(cls) -> "PromptBuilder":
         """Get configured PromptBuilder for coding vertical.
 
         Returns:

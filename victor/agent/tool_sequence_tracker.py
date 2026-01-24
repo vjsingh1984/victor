@@ -382,7 +382,7 @@ class ToolSequenceTracker:
 
         return None
 
-    def get_statistics(self) -> Dict[str, any]:
+    def get_statistics(self) -> Dict[str, Any]:
         """Get tracker statistics.
 
         Returns:

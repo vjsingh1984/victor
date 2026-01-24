@@ -944,7 +944,7 @@ class YAMLToStateGraphCompiler:
 
     def _add_parallel_node_group(
         self,
-        graph: StateGraph,
+        graph: StateGraph[Any],
         parallel_node: ParallelNode,
         workflow: WorkflowDefinition,
         nodes_added: Set[str],

@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 class ConversationPipelineBuilder(FactoryAwareBuilder):
     """Build conversation controller, lifecycle manager, and streaming pipeline."""
 
-    def __init__(self, settings, factory: Optional["OrchestratorFactory"] = None):
+    def __init__(self, settings: Any, factory: Optional["OrchestratorFactory"] = None):
         """Initialize the builder.
 
         Args:
@@ -47,7 +47,7 @@ class ConversationPipelineBuilder(FactoryAwareBuilder):
         orchestrator: "AgentOrchestrator",
         provider: "BaseProvider",
         model: str,
-        **_kwargs,
+        **kwargs: Any,
     ) -> Dict[str, Any]:
         """Build conversation pipeline components and attach them to orchestrator."""
         factory = self._ensure_factory(provider=provider, model=model)

@@ -559,7 +559,7 @@ def require_permission(permission: Permission) -> Callable:
         Decorator function
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable:
         @wraps(func)
         async def async_wrapper(*args, **kwargs):
             # Get RBAC manager from context if available

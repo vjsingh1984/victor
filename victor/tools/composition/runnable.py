@@ -128,7 +128,7 @@ class Runnable(ABC, Generic[Input, Output]):
 
     Example:
         class MyRunnable(Runnable[Dict, str]):
-            async def invoke(self, input: Dict, config: RunnableConfig = None) -> str:
+            async def invoke(self, input: Dict[str, Any], config: RunnableConfig = None) -> str:
                 return f"Processed: {input}"
 
         # Use in chain
@@ -359,7 +359,7 @@ class RunnableParallel(Runnable[Input, Dict[str, Any]]):
     def __init__(
         self,
         steps: Optional[Mapping[str, Runnable]] = None,
-        **kwargs: Runnable,
+        **kwargs: Runnable[Any],
     ):
         """Initialize with named runnables.
 
@@ -391,7 +391,7 @@ class RunnableParallel(Runnable[Input, Dict[str, Any]]):
         """
         config = config or RunnableConfig()
 
-        async def run_step(name: str, runnable: Runnable) -> Tuple[str, Any]:
+        async def run_step(name: str, runnable: Runnable[Any]) -> Tuple[str, Any]:
             try:
                 result = await runnable.invoke(input, config)
                 return (name, result)
@@ -402,7 +402,7 @@ class RunnableParallel(Runnable[Input, Dict[str, Any]]):
         # Create tasks with optional concurrency limit
         semaphore = asyncio.Semaphore(config.max_concurrency)
 
-        async def bounded_run(name: str, runnable: Runnable) -> Tuple[str, Any]:
+        async def bounded_run(name: str, runnable: Runnable[Any]) -> Tuple[str, Any]:
             async with semaphore:
                 return await run_step(name, runnable)
 
@@ -781,7 +781,7 @@ class FunctionToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
 
     def __init__(
         self,
-        func: Callable,
+        func: Callable[..., Any],
         output_key: Optional[str] = None,
         input_mapping: Optional[Dict[str, str]] = None,
     ):
@@ -897,8 +897,7 @@ def as_runnable(
     # Import here to avoid circular imports
     from victor.tools.base import BaseTool
 
-    runnable: Runnable
-
+    runnable: Runnable[Any]
     if isinstance(tool_or_func, BaseTool):
         runnable = ToolRunnable(tool_or_func, output_key, input_mapping)
     elif hasattr(tool_or_func, "Tool"):
@@ -1003,7 +1002,7 @@ def branch(
         else:
             raise TypeError(f"Cannot branch to {type(r)}")
 
-    default_runnable: Optional[Runnable] = None
+    default_runnable: Optional[Runnable[Any]] = None
     if default is not None:
         if isinstance(default, Runnable):
             default_runnable = default
@@ -1078,7 +1077,7 @@ def map_keys(mapping: Dict[str, str]) -> Callable[[Dict], Dict]:
         chain = tool1 | map_keys({"result": "input"}) | tool2
     """
 
-    def mapper(d: Dict) -> Dict:
+    def mapper(d: Dict[str, Any]) -> Dict:
         result = dict(d)
         for old, new in mapping.items():
             if old in result:
@@ -1098,7 +1097,7 @@ def select_keys(*keys: str) -> Callable[[Dict], Dict]:
         A function that filters to specified keys
     """
 
-    def selector(d: Dict) -> Dict:
+    def selector(d: Dict[str, Any]) -> Dict:
         return {k: v for k, v in d.items() if k in keys}
 
     return selector

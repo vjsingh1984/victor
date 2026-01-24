@@ -312,7 +312,7 @@ class GraphConfig:
     observability: ObservabilityConfig = field(default_factory=ObservabilityConfig)
 
     @classmethod
-    def from_legacy(cls, **kwargs) -> "GraphConfig":
+    def from_legacy(cls, **kwargs: Any) -> "GraphConfig":
         """Migrate from legacy config format.
 
         This class method allows gradual migration from legacy code

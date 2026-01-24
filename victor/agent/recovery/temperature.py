@@ -312,7 +312,7 @@ class ProgressiveTemperatureAdjuster:
         if session_id in self._sessions:
             del self._sessions[session_id]
 
-    def get_session_stats(self, session_id: str) -> Optional[Dict]:
+    def get_session_stats(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Get statistics for a session."""
         if session_id not in self._sessions:
             return None

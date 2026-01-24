@@ -44,12 +44,13 @@ from typing import (
     Callable,
     Coroutine,
     Dict,
+    Generic,
     List,
     Optional,
-    TypeVar,
     ParamSpec,
+    TypeVar,
+    cast,
 )
-from typing import Generic
 
 logger = logging.getLogger(__name__)
 
@@ -229,7 +230,8 @@ class LockFreeQueue(Generic[T]):
 
     def get(self, block: bool = True, timeout: Optional[float] = None) -> T:
         """Get item from queue."""
-        return self._queue.get(block=block, timeout=timeout)
+        result = self._queue.get(block=block, timeout=timeout)
+        return cast(T, result)
 
     def put_nowait(self, item: T) -> None:
         """Put item without blocking."""
@@ -237,7 +239,8 @@ class LockFreeQueue(Generic[T]):
 
     def get_nowait(self) -> T:
         """Get item without blocking."""
-        return self._queue.get_nowait()
+        result = self._queue.get_nowait()
+        return cast(T, result)
 
     def qsize(self) -> int:
         """Get approximate queue size."""

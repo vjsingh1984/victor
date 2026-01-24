@@ -41,7 +41,7 @@ class LanguageRegistry:
     - Plugin discovery and lazy loading
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize empty registry."""
         self._plugins: Dict[str, PluginFactory] = {}
         self._instances: Dict[str, LanguagePlugin] = {}
@@ -67,7 +67,7 @@ class LanguageRegistry:
 
         # Convert class to factory if needed
         if isinstance(plugin, type):
-            factory: PluginFactory = plugin  # type: ignore
+            factory: PluginFactory = plugin
         else:
             factory = plugin
 

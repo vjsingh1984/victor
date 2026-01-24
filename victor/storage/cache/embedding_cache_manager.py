@@ -229,7 +229,7 @@ class EmbeddingCacheManager:
         self._project_embeddings = paths.project_victor_dir / "embeddings"
 
         # Cache category definitions
-        self._categories: Dict[CacheType, Dict] = {
+        self._categories: Dict[str, Any] = {
             CacheType.TOOL: {
                 "name": "Tool Embeddings",
                 "desc": "Semantic tool selection (project-isolated)",

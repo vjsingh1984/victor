@@ -16,6 +16,9 @@
 # ==========================================
 # Multi-step workflows for safe code refactoring with verification.
 # Supports: rename, extract, restructure, and optimization refactorings.
+#
+# MIGRATION: This version uses stage template references to reduce duplication.
+# Original file backed up as refactor.yaml.pre-migration
 
 workflows:
   # ===========================================================================
@@ -36,20 +39,20 @@ workflows:
       # Stage 1: Analyze Current State
       # =====================================================================
       - id: analyze_code
-        type: agent
-        name: "Analyze Code Structure"
-        role: researcher
-        goal: |
-          Analyze the code to understand what needs refactoring:
-          1. Identify the target code (functions, classes, modules)
-          2. Understand current structure and dependencies
-          3. Find all usages and references
-          4. Identify potential risks
-          5. Note existing tests that cover this code
-        tool_budget: 30
-        tools: [read, grep, code_search, refs, symbol]
-        llm_config:
-          temperature: 0.2
+        stage: analyze_stage
+        overrides:
+          name: "Analyze Code Structure"
+          goal: |
+            Analyze the code to understand what needs refactoring:
+            1. Identify the target code (functions, classes, modules)
+            2. Understand current structure and dependencies
+            3. Find all usages and references
+            4. Identify potential risks
+            5. Note existing tests that cover this code
+          tools: [read, grep, code_search, refs, symbol]
+          tool_budget: 30
+          llm_config:
+            temperature: 0.2
         output: code_analysis
         next: [run_baseline_tests]
 
@@ -57,16 +60,9 @@ workflows:
       # Stage 2: Baseline Tests
       # =====================================================================
       - id: run_baseline_tests
-        type: compute
-        name: "Run Baseline Tests"
-        handler: test_runner
-        inputs:
-          test_command: $ctx.test_command
-          timeout: 180
-        output: baseline_tests
-        constraints:
-          llm_allowed: false
-          timeout: 180
+        stage: test_stage
+        overrides:
+          name: "Run Baseline Tests"
         next: [check_baseline]
 
       - id: check_baseline
@@ -79,21 +75,20 @@ workflows:
           "no_tests": plan_refactor
 
       - id: warn_failing_tests
-        type: hitl
-        name: "Warn About Failing Tests"
-        hitl_type: approval
-        prompt: |
-          ## Warning: Tests Already Failing
+        stage: approval_stage
+        overrides:
+          name: "Warn About Failing Tests"
+          prompt: |
+            ## Warning: Tests Already Failing
 
-          Some tests are already failing before refactoring:
-          {baseline_tests}
+            Some tests are already failing before refactoring:
+            {baseline_tests}
 
-          Proceeding with refactoring may make it harder to verify changes.
-          Do you want to continue anyway?
-        context_keys:
-          - baseline_tests
-        timeout: 300
-        fallback: continue
+            Proceeding with refactoring may make it harder to verify changes.
+            Do you want to continue anyway?
+          context_keys:
+            - baseline_tests
+          timeout: 300
         next: [plan_refactor]
 
       # =====================================================================
@@ -133,21 +128,7 @@ workflows:
       # Stage 4a: Quick Refactor (simple changes)
       # =====================================================================
       - id: quick_refactor
-        type: agent
-        name: "Quick Refactor"
-        role: executor
-        goal: |
-          Apply the simple refactoring:
-          1. Make the planned changes
-          2. Keep changes minimal and focused
-          3. Preserve existing behavior
-        tool_budget: 20
-        tools: [read, edit, write]
-        llm_config:
-          temperature: 0.1
-        input_mapping:
-          plan: refactor_plan
-        output: refactor_result
+        stage: refactor_stage
         next: [verify_changes]
 
       # =====================================================================
@@ -200,41 +181,33 @@ workflows:
       # Stage 4d: Major Refactor (needs approval)
       # =====================================================================
       - id: approve_major
-        type: hitl
-        name: "Approve Major Refactoring"
-        hitl_type: approval
-        prompt: |
-          ## Major Refactoring Required
+        stage: approval_stage
+        overrides:
+          name: "Approve Major Refactoring"
+          prompt: |
+            ## Major Refactoring Required
 
-          **Analysis:**
-          {code_analysis}
+            **Analysis:**
+            {code_analysis}
 
-          **Proposed Plan:**
-          {refactor_plan}
+            **Proposed Plan:**
+            {refactor_plan}
 
-          This is a major refactoring that will touch many files.
-          Do you approve this plan?
-        context_keys:
-          - code_analysis
-          - refactor_plan
-        timeout: 600
-        fallback: abort
+            This is a major refactoring that will touch many files.
+            Do you approve this plan?
+          context_keys:
+            - code_analysis
+            - refactor_plan
+          timeout: 600
         next: [staged_refactor]
 
       # =====================================================================
       # Stage 5: Verify Changes
       # =====================================================================
       - id: verify_changes
-        type: compute
-        name: "Run Tests After Refactor"
-        handler: test_runner
-        inputs:
-          test_command: $ctx.test_command
-          timeout: 180
-        output: test_results
-        constraints:
-          llm_allowed: false
-          timeout: 180
+        stage: test_stage
+        overrides:
+          name: "Run Tests After Refactor"
         next: [check_tests]
 
       - id: check_tests
@@ -275,26 +248,25 @@ workflows:
           "escalate": escalate_human
 
       - id: escalate_human
-        type: hitl
-        name: "Escalate to Human"
-        hitl_type: input
-        prompt: |
-          ## Refactoring Issues
+        stage: input_stage
+        overrides:
+          name: "Escalate to Human"
+          prompt: |
+            ## Refactoring Issues
 
-          The refactoring resulted in test failures that could not be automatically fixed.
+            The refactoring resulted in test failures that could not be automatically fixed.
 
-          **Changes Made:**
-          {refactor_result}
+            **Changes Made:**
+            {refactor_result}
 
-          **Test Failures:**
-          {test_results}
+            **Test Failures:**
+            {test_results}
 
-          Please provide guidance on how to proceed.
-        context_keys:
-          - refactor_result
-          - test_results
-        timeout: 600
-        fallback: continue
+            Please provide guidance on how to proceed.
+          context_keys:
+            - refactor_result
+            - test_results
+          timeout: 600
         next: [fix_failures]
 
       # =====================================================================
@@ -343,13 +315,12 @@ workflows:
       # Stage 7: Finalize
       # =====================================================================
       - id: finalize
-        type: transform
-        name: "Finalize Refactoring"
-        transform: |
-          status = "completed"
-          success = True
-          files_changed = ctx.get("refactor_result", {}).get("files", [])
-
+        stage: complete_stage
+        overrides:
+          transform: |
+            status = "completed"
+            success = True
+            files_changed = ctx.get("refactor_result", {}).get("files", [])
 
   # ===========================================================================
   # Rename Refactoring Workflow
@@ -365,20 +336,19 @@ workflows:
 
     nodes:
       - id: find_symbol
-        type: agent
-        name: "Find Symbol"
-        role: researcher
-        goal: |
-          Find the symbol to rename and all its references:
-          1. Locate the symbol definition
-          2. Find all usages across the codebase
-          3. Identify import statements
-          4. Note any dynamic references (strings, comments)
-        tool_budget: 20
-        tools: [read, grep, code_search, refs, symbol]
-        llm_config:
-          temperature: 0.2
-        output: symbol_info
+        stage: analyze_stage
+        overrides:
+          name: "Find Symbol"
+          goal: |
+            Find the symbol to rename and all its references:
+            1. Locate the symbol definition
+            2. Find all usages across the codebase
+            3. Identify import statements
+            4. Note any dynamic references (strings, comments)
+          tools: [read, grep, code_search, refs, symbol]
+          tool_budget: 20
+          llm_config:
+            temperature: 0.2
         next: [apply_rename]
 
       - id: apply_rename
@@ -402,16 +372,9 @@ workflows:
         next: [verify_rename]
 
       - id: verify_rename
-        type: compute
-        name: "Verify Rename"
-        handler: test_runner
-        inputs:
-          test_command: $ctx.test_command
-          timeout: 120
-        output: test_results
-        constraints:
-          llm_allowed: false
-          timeout: 120
+        stage: test_stage
+        overrides:
+          name: "Verify Rename"
         next: [check_rename]
 
       - id: check_rename
@@ -440,12 +403,7 @@ workflows:
         next: [verify_rename]
 
       - id: complete
-        type: transform
-        name: "Complete"
-        transform: |
-          status = "completed"
-          success = True
-
+        stage: complete_stage
 
   # ===========================================================================
   # Extract Function/Method Workflow
@@ -461,54 +419,39 @@ workflows:
 
     nodes:
       - id: analyze_extraction
-        type: agent
-        name: "Analyze Extraction"
-        role: researcher
-        goal: |
-          Analyze the code to extract:
-          1. Identify the code block to extract
-          2. Determine inputs (parameters needed)
-          3. Determine outputs (return values)
-          4. Check for side effects
-          5. Identify the best location for new function
-        tool_budget: 20
-        tools: [read, grep, symbol]
-        llm_config:
-          temperature: 0.2
-        output: extraction_analysis
+        stage: analyze_stage
+        overrides:
+          name: "Analyze Extraction"
+          goal: |
+            Analyze the code to extract:
+            1. Identify the code block to extract
+            2. Determine inputs (parameters needed)
+            3. Determine outputs (return values)
+            4. Check for side effects
+            5. Identify the best location for new function
+          tools: [read, grep, symbol]
+          tool_budget: 20
+          llm_config:
+            temperature: 0.2
         next: [create_function]
 
       - id: create_function
-        type: agent
-        name: "Create New Function"
-        role: executor
-        goal: |
-          Create the new function and update call sites:
-          1. Create the new function with proper signature
-          2. Add appropriate docstring
-          3. Replace original code with function call
-          4. Handle return values properly
-        tool_budget: 25
-        tools: [read, edit, write]
-        llm_config:
-          temperature: 0.1
-        input_mapping:
-          analysis: extraction_analysis
-          function_name: $ctx.function_name
-        output: extraction_result
+        stage: modify_stage
+        overrides:
+          name: "Create New Function"
+          goal: |
+            Create the new function and update call sites:
+            1. Create the new function with proper signature
+            2. Add appropriate docstring
+            3. Replace original code with function call
+            4. Handle return values properly
+          tool_budget: 25
         next: [verify_extraction]
 
       - id: verify_extraction
-        type: compute
-        name: "Verify Extraction"
-        handler: test_runner
-        inputs:
-          test_command: $ctx.test_command
-          timeout: 120
-        output: test_results
-        constraints:
-          llm_allowed: false
-          timeout: 120
+        stage: test_stage
+        overrides:
+          name: "Verify Extraction"
         next: [check_extraction]
 
       - id: check_extraction
@@ -537,12 +480,7 @@ workflows:
         next: [verify_extraction]
 
       - id: complete
-        type: transform
-        name: "Complete"
-        transform: |
-          status = "completed"
-          success = True
-
+        stage: complete_stage
 
   # ===========================================================================
   # Code Optimization Workflow
@@ -558,71 +496,55 @@ workflows:
 
     nodes:
       - id: profile_code
-        type: agent
-        name: "Profile Code"
-        role: researcher
-        goal: |
-          Analyze the code for optimization opportunities:
-          1. Identify performance bottlenecks
-          2. Find inefficient algorithms or data structures
-          3. Locate redundant computations
-          4. Check for memory inefficiencies
-        tool_budget: 25
-        tools: [read, grep, shell]
-        llm_config:
-          temperature: 0.2
-        output: profile_results
+        stage: analyze_stage
+        overrides:
+          name: "Profile Code"
+          role: researcher
+          goal: |
+            Analyze the code for optimization opportunities:
+            1. Identify performance bottlenecks
+            2. Find inefficient algorithms or data structures
+            3. Locate redundant computations
+            4. Check for memory inefficiencies
+          tools: [read, grep, shell]
+          tool_budget: 25
+          llm_config:
+            temperature: 0.2
         next: [plan_optimization]
 
       - id: plan_optimization
-        type: agent
-        name: "Plan Optimization"
-        role: planner
-        goal: |
-          Create optimization plan:
-          1. Prioritize optimizations by impact
-          2. Consider trade-offs (readability vs speed)
-          3. Plan benchmarking approach
-          4. Identify risks
-        tool_budget: 15
-        tools: [read]
-        llm_config:
-          temperature: 0.3
-        input_mapping:
-          profile: profile_results
-        output: optimization_plan
+        stage: analyze_stage
+        overrides:
+          name: "Plan Optimization"
+          role: planner
+          goal: |
+            Create optimization plan:
+            1. Prioritize optimizations by impact
+            2. Consider trade-offs (readability vs speed)
+            3. Plan benchmarking approach
+            4. Identify risks
+          tool_budget: 15
+          llm_config:
+            temperature: 0.3
         next: [apply_optimization]
 
       - id: apply_optimization
-        type: agent
-        name: "Apply Optimizations"
-        role: executor
-        goal: |
-          Implement the optimizations:
-          1. Apply changes in order of priority
-          2. Maintain code readability
-          3. Preserve existing behavior
-          4. Add comments explaining optimizations
-        tool_budget: 35
-        tools: [read, edit, write]
-        llm_config:
-          temperature: 0.1
-        input_mapping:
-          plan: optimization_plan
-        output: optimization_result
+        stage: modify_stage
+        overrides:
+          name: "Apply Optimizations"
+          goal: |
+            Implement the optimizations:
+            1. Apply changes in order of priority
+            2. Maintain code readability
+            3. Preserve existing behavior
+            4. Add comments explaining optimizations
+          tool_budget: 35
         next: [verify_optimization]
 
       - id: verify_optimization
-        type: compute
-        name: "Verify Optimization"
-        handler: test_runner
-        inputs:
-          test_command: $ctx.test_command
-          timeout: 180
-        output: test_results
-        constraints:
-          llm_allowed: false
-          timeout: 180
+        stage: test_stage
+        overrides:
+          name: "Verify Optimization"
         next: [check_tests]
 
       - id: check_tests
@@ -635,24 +557,22 @@ workflows:
           "no_tests": complete
 
       - id: fix_issues
-        type: agent
-        name: "Fix Issues"
-        role: executor
-        goal: |
-          Fix any issues from optimization:
-          1. Ensure behavior is preserved
-          2. Fix any edge cases
-        tool_budget: 20
-        tools: [read, edit]
-        llm_config:
-          temperature: 0.2
-        output: fix_result
+        stage: modify_stage
+        overrides:
+          name: "Fix Issues"
+          goal: |
+            Fix any issues from optimization:
+            1. Ensure behavior is preserved
+            2. Fix any edge cases
+          tool_budget: 20
+          llm_config:
+            temperature: 0.2
         next: [verify_optimization]
 
       - id: complete
-        type: transform
-        name: "Complete"
-        transform: |
-          status = "completed"
-          success = True
-          optimizations_applied = ctx.get("optimization_plan", {}).get("optimizations", [])
+        stage: complete_stage
+        overrides:
+          transform: |
+            status = "completed"
+            success = True
+            optimizations_applied = ctx.get("optimization_plan", {}).get("optimizations", [])

@@ -73,7 +73,7 @@ class TaskManager:
 
     def create_tracked_task(
         self,
-        coro: Awaitable,
+        coro: Awaitable[Any],
         name: Optional[str] = None,
     ) -> asyncio.Task:
         """Create a task and track it for cleanup.

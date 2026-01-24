@@ -60,7 +60,7 @@ class ComponentBuilder(ABC):
         self._logger = logging.getLogger(self.__class__.__name__)
 
     @abstractmethod
-    def build(self, **kwargs) -> Any:
+    def build(self, **kwargs: Any) -> Any:
         """Build and return the component(s).
 
         This method must be implemented by concrete builder classes to

@@ -18,8 +18,7 @@ This package provides unified registry infrastructure for managing
 framework entities with configurable cache strategies and striped locks
 for linear scalability.
 
-Exports:
-    UniversalRegistry: Type-safe generic registry with striped locks
+Exports: UniversalRegistry[Any]: Type-safe generic registry with striped locks
     CacheStrategy: Cache invalidation strategies
     RegistryEntry: Registry entry with metadata
     StripedLockManager: Striped lock manager for concurrent access

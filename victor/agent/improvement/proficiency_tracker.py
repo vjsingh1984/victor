@@ -80,7 +80,7 @@ try:
     PANDAS_AVAILABLE = True
 except ImportError:
     PANDAS_AVAILABLE = False
-    pd = None  # type: ignore
+    pd = None
 
 from victor.core.database import get_database
 

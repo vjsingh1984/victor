@@ -1224,8 +1224,8 @@ class ToolProgressPanel(Static):
     def __init__(
         self,
         tool_name: str,
-        arguments: Optional[dict] = None,
-        on_cancel: Optional[Callable] = None,
+        arguments: Optional[dict[str, Any]] = None,
+        on_cancel: Optional[Callable[..., Any]] = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -1370,7 +1370,7 @@ class VirtualScrollContainer(VerticalScroll):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         # Store all message data (lightweight dicts)
-        self._all_messages: List[Dict] = []
+        self._all_messages: List[Dict[str, Any]] = []
         # Track which messages are currently in DOM
         self._visible_start = 0
         self._visible_end = 0
@@ -1415,7 +1415,7 @@ class VirtualScrollContainer(VerticalScroll):
         self._message_count += 1
         self._check_enable_virtual_scrolling()
 
-    def _create_message_widget(self, msg_data: Dict):
+    def _create_message_widget(self, msg_data: Dict[str, Any]):
         """Create a widget from message data."""
         role = msg_data["role"]
         content = msg_data["content"]
@@ -1638,8 +1638,8 @@ class VirtualScrollContainer(VerticalScroll):
     def add_tool_progress(
         self,
         tool_name: str,
-        arguments: Optional[dict] = None,
-        on_cancel: Optional[Callable] = None,
+        arguments: Optional[dict[str, Any]] = None,
+        on_cancel: Optional[Callable[..., Any]] = None,
     ) -> ToolProgressPanel:
         """Add a tool progress panel and return it for updates."""
         panel = ToolProgressPanel(

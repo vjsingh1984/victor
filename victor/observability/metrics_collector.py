@@ -811,7 +811,7 @@ class ProductionMetricsCollector:
             Decorator function
         """
 
-        def decorator(func: Callable) -> Callable:
+        def decorator(func: Callable[..., Any]) -> Callable:
             @wraps(func)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 start = time.time()

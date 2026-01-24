@@ -74,7 +74,7 @@ class JSONChunkingStrategy(ChunkingStrategy):
                 )
             ]
 
-    def _chunk_object(self, data: dict) -> List[Chunk]:
+    def _chunk_object(self, data: dict[str, Any]) -> List[Chunk]:
         """Chunk a JSON object by top-level keys.
 
         Args:
@@ -125,7 +125,7 @@ class JSONChunkingStrategy(ChunkingStrategy):
         logger.debug(f"JSON object chunking produced {len(chunks)} chunks")
         return chunks
 
-    def _chunk_array(self, data: list) -> List[Chunk]:
+    def _chunk_array(self, data: list[Any]) -> List[Chunk]:
         """Chunk a JSON array by batching items.
 
         Args:

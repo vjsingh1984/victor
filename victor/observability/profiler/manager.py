@@ -113,7 +113,7 @@ class ProfilerManager:
 
     def profile_function(
         self,
-        func: Callable,
+        func: Callable[..., Any],
         *args,
         profiler_type: ProfilerType = ProfilerType.CPU,
         **kwargs,
@@ -144,7 +144,7 @@ class ProfilerManager:
 
     def benchmark(
         self,
-        func: Callable,
+        func: Callable[..., Any],
         *args,
         iterations: int = 100,
         warmup: int = 10,

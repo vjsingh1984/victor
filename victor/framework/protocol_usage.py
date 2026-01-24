@@ -68,7 +68,7 @@ Protocol Selection Guide:
    Example:
         from victor.core.verticals import VerticalContext
 
-        def apply_config(context: VerticalContext, config: dict):
+        def apply_config(context: VerticalContext, config: dict[str, Any]):
             context.set_capability_config("rag_config", config)
 
 5. VerticalContextCapabilityProtocol (framework/protocols.py)

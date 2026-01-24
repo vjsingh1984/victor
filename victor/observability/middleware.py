@@ -404,7 +404,7 @@ class ASGIMonitoringMiddleware:
             tracer=tracer,
         )
 
-    async def __call__(self, scope: Dict[str, Any], receive: Callable, send: Callable) -> None:
+    async def __call__(self, scope: Dict[str, Any], receive: Callable[..., Any], send: Callable[..., Any]) -> None:
         """ASGI entry point.
 
         Args:
@@ -469,7 +469,7 @@ def monitor_function(
     collector = metrics_collector or ProductionMetricsCollector()
     tr = tracer or DistributedTracer("victor.functions")
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable:
         @functools.wraps(func)
         async def async_wrapper(*args, **kwargs):
             name = function_name or f"{func.__module__}.{func.__name__}"

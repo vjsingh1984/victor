@@ -31,6 +31,9 @@ from typing import Any
 CACHE_SIGNING_KEY_ENV = "VICTOR_CACHE_SIGNING_KEY"
 
 
+_signing_key_cache: bytes | None = None
+
+
 def _get_signing_key() -> bytes:
     """Get the signing key for cache data.
 
@@ -42,6 +45,8 @@ def _get_signing_key() -> bytes:
         so cache data survives process restarts. Otherwise, a random key
         is generated per process (cache will be invalidated on restart).
     """
+    global _signing_key_cache
+
     key = os.getenv(CACHE_SIGNING_KEY_ENV)
     if key:
         return key.encode("utf-8")
@@ -49,10 +54,10 @@ def _get_signing_key() -> bytes:
     # Generate a random key for this process lifetime
     # This means cache data will be invalidated on process restart
     # which is acceptable for development/testing
-    if not hasattr(_get_signing_key, "_key"):
-        _get_signing_key._key = secrets.token_bytes(32)  # 256-bit key
+    if _signing_key_cache is None:
+        _signing_key_cache = secrets.token_bytes(32)  # 256-bit key
 
-    return _get_signing_key._key
+    return _signing_key_cache
 
 
 def safe_pickle_dumps(obj: Any) -> bytes:

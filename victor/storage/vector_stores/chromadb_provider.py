@@ -31,8 +31,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 try:
-    import chromadb  # type: ignore
-    from chromadb.config import Settings  # type: ignore
+    import chromadb
+    from chromadb.config import Settings
 
     CHROMADB_AVAILABLE = True
 except ImportError:

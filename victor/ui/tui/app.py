@@ -984,7 +984,7 @@ class VictorTUI(App):
         container = self.query_one("#thinking-container")
         container.remove_class("visible")
 
-    def _show_tool_call(self, tool_name: str, arguments: dict) -> None:
+    def _show_tool_call(self, tool_name: str, arguments: dict[str, Any]) -> None:
         """Show tool call widget."""
         container = self.query_one("#tool-calls-container")
         container.add_class("visible")

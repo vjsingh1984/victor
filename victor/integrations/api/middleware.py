@@ -130,7 +130,7 @@ class RateLimiter:
         self._lock = asyncio.Lock()
 
     @lru_cache(maxsize=1024)
-    def _get_client_id_cached(self, forwarded: str, peername: tuple) -> str:
+    def _get_client_id_cached(self, forwarded: str, peername: tuple[Any, ...]) -> str:
         """Cached client ID extraction."""
         if forwarded:
             return forwarded.split(",")[0].strip()
@@ -303,7 +303,7 @@ def create_auth_middleware(
     authenticator = APIKeyAuthenticator(config)
 
     @web.middleware
-    async def auth_middleware(request: Request, handler: Callable) -> Response:
+    async def auth_middleware(request: Request, handler: Callable[..., Any]) -> Response:
         """Authenticate requests."""
         authenticated, client_id = authenticator.authenticate(request)
 
@@ -336,7 +336,7 @@ def create_rate_limit_middleware(
     limiter = RateLimiter(config)
 
     @web.middleware
-    async def rate_limit_middleware(request: Request, handler: Callable) -> Response:
+    async def rate_limit_middleware(request: Request, handler: Callable[..., Any]) -> Response:
         """Apply rate limiting."""
         allowed, info = await limiter.is_allowed(request)
 
@@ -365,7 +365,7 @@ def create_request_logging_middleware() -> Callable:
     """
 
     @web.middleware
-    async def logging_middleware(request: Request, handler: Callable) -> Response:
+    async def logging_middleware(request: Request, handler: Callable[..., Any]) -> Response:
         """Log requests and responses."""
         start_time = time.monotonic()
 
@@ -422,7 +422,7 @@ class APIMiddlewareStack:
         """
 
         @web.middleware
-        async def cors_middleware(request: Request, handler: Callable) -> Response:
+        async def cors_middleware(request: Request, handler: Callable[..., Any]) -> Response:
             if request.method == "OPTIONS":
                 return Response(
                     headers={

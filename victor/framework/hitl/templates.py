@@ -149,7 +149,7 @@ class PromptTemplateRegistry:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the registry with default templates."""
         if PromptTemplateRegistry._initialized:
             return

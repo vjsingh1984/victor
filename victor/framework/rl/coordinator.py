@@ -733,7 +733,7 @@ class RLCoordinator:
         learner_id: str,
         metric_type: str,
         metric_value: float,
-        metadata: Optional[dict] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Record a telemetry metric to rl_metric table.
 
@@ -769,7 +769,7 @@ class RLCoordinator:
         learner_id: str,
         metric_type: str,
         metric_value: float,
-        metadata: Optional[dict] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Public interface to record telemetry metrics.
 

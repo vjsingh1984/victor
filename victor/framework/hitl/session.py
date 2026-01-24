@@ -213,7 +213,7 @@ class HITLSession:
 
     async def execute_gate(
         self,
-        gate,
+        gate: Any,
         context: Optional[Dict[str, Any]] = None,
         handler: Optional[Callable[..., Awaitable]] = None,
     ) -> GateExecutionResult:

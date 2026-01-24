@@ -626,8 +626,7 @@ def __getattr__(name: str):
                 print(f"Available tools: {len(caps['tools'])}")
                 print(f"Available verticals: {caps['verticals']}")
 
-            Returns:
-                dict: Capability manifest with keys:
+            Returns: dict[str, Any]: Capability manifest with keys:
                     - tools: List of tool names
                     - tool_categories: List of category names
                     - verticals: List of vertical names

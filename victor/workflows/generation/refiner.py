@@ -342,7 +342,7 @@ class SchemaRefiner:
 
         elif field_name == "timeout":
             clamped_value = max(0, float(current_value))
-            node[field_name] = clamped_value
+            node[field_name] = int(clamped_value)  # type: ignore[assignment]
 
             return WorkflowFix(
                 fix_type="schema_clamp",

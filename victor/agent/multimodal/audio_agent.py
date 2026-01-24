@@ -1064,7 +1064,7 @@ Summary:"""
         self,
         audio_paths: List[str],
         operation: str = "transcribe",
-        **kwargs,
+        **kwargs: Any,
     ) -> List[Any]:
         """Process multiple audio files in batch.
 

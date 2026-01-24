@@ -39,7 +39,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Type
+from typing import Any, Dict, List, Optional, Set, Type, cast
 
 import yaml
 
@@ -484,7 +484,8 @@ class WorkflowLinter:
 
         try:
             with open(path, "r") as f:
-                return yaml.safe_load(f)
+                data = yaml.safe_load(f)
+                return cast(Dict[str, Any], data)
         except yaml.YAMLError as e:
             raise ValueError(f"Invalid YAML: {e}")
 

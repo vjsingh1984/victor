@@ -48,14 +48,14 @@ logger = logging.getLogger(__name__)
 
 # Optional Docker SDK import
 try:
-    import docker  # type: ignore
-    from docker.errors import APIError, ContainerError, ImageNotFound, NotFound  # type: ignore
-    from docker.models.containers import Container  # type: ignore
+    import docker
+    from docker.errors import APIError, ContainerError, ImageNotFound, NotFound
+    from docker.models.containers import Container
 
     DOCKER_AVAILABLE = True
 except ImportError:
     DOCKER_AVAILABLE = False
-    docker = None  # type: ignore
+    docker = None
 
 
 class DockerServiceProvider(BaseServiceProvider):

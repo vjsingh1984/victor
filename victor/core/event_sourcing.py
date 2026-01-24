@@ -672,7 +672,9 @@ class SQLiteEventStore(EventStore):
                     """,
                     (stream_id,),
                 )
-                current_version = cursor.fetchone()[0]
+                version_row = cursor.fetchone()[0]
+                assert isinstance(version_row, int)
+                current_version = version_row
 
                 if expected_version is not None and current_version != expected_version:
                     raise ConcurrencyError(stream_id, expected_version, current_version)
@@ -790,7 +792,9 @@ class SQLiteEventStore(EventStore):
                     """,
                     (stream_id,),
                 )
-                return cursor.fetchone()[0]
+                version = cursor.fetchone()[0]
+                assert isinstance(version, int)
+                return version
 
     async def save_snapshot(
         self,

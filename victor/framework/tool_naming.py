@@ -225,7 +225,7 @@ def validate_tool_names(
     Optionally logs warnings for each legacy name found.
 
     Args:
-        tools: Set, list, or dict of tool names to validate
+        tools: Set[Any], list, or dict of tool names to validate
         context: Optional context string for warning messages (e.g., "coding vertical")
         warn: Whether to log warnings for legacy names (default True)
 
@@ -270,7 +270,7 @@ def get_legacy_names_report(
     Useful for migration and debugging. Does not log warnings.
 
     Args:
-        tools: Set, list, or dict of tool names to analyze
+        tools: Set[Any], list, or dict of tool names to analyze
 
     Returns:
         Dict mapping legacy names found to their canonical equivalents

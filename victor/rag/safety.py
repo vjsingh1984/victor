@@ -250,7 +250,7 @@ class RAGSafetyExtension(SafetyExtensionProtocol):
         patterns.update(SECRET_PATTERNS)
         return patterns
 
-    def scan_for_pii(self, content: str) -> List[Dict]:
+    def scan_for_pii(self, content: str) -> List[Dict[str, Any]]:
         """Scan content for PII and secrets.
 
         Delegates to framework PIIScanner for standard PII detection,

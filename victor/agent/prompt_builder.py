@@ -155,7 +155,7 @@ _DEPRECATED_TASK_TYPE_HINTS = {
 }
 
 
-def get_task_type_hint(task_type: str, prompt_contributors: Optional[list] = None) -> str:
+def get_task_type_hint(task_type: str, prompt_contributors: Optional[list[Any]] = None) -> str:
     """Get prompt hint for a specific task type.
 
     This function supports vertical prompt contributors. It gets hints from:
@@ -266,7 +266,7 @@ class SystemPromptBuilder:
         model: str,
         tool_adapter: Optional[BaseToolCallingAdapter] = None,
         capabilities: Optional[ToolCallingCapabilities] = None,
-        prompt_contributors: Optional[list] = None,
+        prompt_contributors: Optional[list[Any]] = None,
         tool_guidance_strategy: Optional[ToolGuidanceStrategy] = None,
         task_type: str = "medium",
         available_tools: Optional[List[str]] = None,
@@ -882,7 +882,7 @@ def build_system_prompt(
     model: str,
     tool_adapter: Optional[BaseToolCallingAdapter] = None,
     capabilities: Optional[ToolCallingCapabilities] = None,
-    prompt_contributors: Optional[list] = None,
+    prompt_contributors: Optional[list[Any]] = None,
     concise_mode: bool = False,
 ) -> str:
     """Build a system prompt (convenience function).

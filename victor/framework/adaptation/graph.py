@@ -42,7 +42,7 @@ if TYPE_CHECKING:
     try:
         from langchain_core.runnables import Runnable
     except ImportError:
-        Runnable = object  # type: ignore
+        Runnable = object
 
 logger = logging.getLogger(__name__)
 

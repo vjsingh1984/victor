@@ -39,7 +39,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from victor.framework.protocols import OrchestratorProtocol
 from victor.workflows.generation.requirements import (
@@ -512,7 +512,8 @@ Do not include any explanatory text outside the JSON structure."""
                 response = response[:-3]
             response = response.strip()
 
-            return json.loads(response)
+            data = json.loads(response)
+            return cast(Dict[str, Any], data)
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response: {e}")

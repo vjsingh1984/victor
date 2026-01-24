@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 class ProviderLayerBuilder(FactoryAwareBuilder):
     """Build provider-related components for the orchestrator."""
 
-    def __init__(self, settings, factory: Optional["OrchestratorFactory"] = None):
+    def __init__(self, settings: Any, factory: Optional["OrchestratorFactory"] = None):
         """Initialize the builder.
 
         Args:
@@ -45,7 +45,7 @@ class ProviderLayerBuilder(FactoryAwareBuilder):
         provider: "BaseProvider",
         model: str,
         provider_name: Optional[str],
-        **_kwargs,
+        **kwargs: Any,
     ) -> Dict[str, Any]:
         """Build provider layer components and attach them to orchestrator."""
         factory = self._ensure_factory(

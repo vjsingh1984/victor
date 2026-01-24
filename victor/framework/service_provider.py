@@ -191,7 +191,7 @@ def _create_agent_bridge(container: ServiceContainer) -> "AgentBridge":
 class ServiceRegistration:
     """Describes a service to register."""
 
-    service_type: Type
+    service_type: Type[Any]
     factory: Callable[[ServiceContainer], Any]
     lifetime: ServiceLifetime
     description: str

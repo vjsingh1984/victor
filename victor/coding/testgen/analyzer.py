@@ -203,7 +203,7 @@ class TestTargetAnalyzer:
     def infer_test_values(
         self,
         type_hint: Optional[str],
-    ) -> list[tuple[str, any]]:
+    ) -> list[tuple[str, Any]]:
         """Infer test values from type hints.
 
         Args:

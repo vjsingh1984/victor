@@ -397,7 +397,7 @@ class PromptBuilder:
     # =========================================================================
     # These methods provide typed composition using structured section classes
 
-    def add_grounding(self, content: str, priority: int = 10, **variables) -> Self:
+    def add_grounding(self, content: str, priority: int = 10, **variables: Any) -> Self:
         """Add grounding section with variable substitution.
 
         Grounding sections provide contextual information with support for

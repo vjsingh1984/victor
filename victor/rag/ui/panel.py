@@ -165,11 +165,11 @@ if TEXTUAL_AVAILABLE:
 
         def __init__(
             self,
-            *args,
+            *args: Any,
             on_search: Optional[Callable[[str], Any]] = None,
             on_ingest: Optional[Callable[[str], Any]] = None,
             on_delete: Optional[Callable[[str], Any]] = None,
-            **kwargs,
+            **kwargs: Any,
         ):
             """Initialize RAG panel.
 

@@ -15,7 +15,7 @@
 """Unified dependency management tool for Python projects.
 
 Consolidates all dependency operations into a single tool for better token efficiency.
-Supports: list, outdated, security, generate, update, tree, check.
+Supports: list[Any], outdated, security, generate, update, tree, check.
 """
 
 import json
@@ -70,7 +70,7 @@ async def _do_list() -> Dict[str, Any]:
     report.append("=" * 70)
     report.append(f"\nTotal: {len(packages)} packages\n")
 
-    by_letter: Dict[str, List[Dict]] = {}
+    by_letter: Dict[str, List[Dict[str, Any]]] = {}
     for pkg in packages:
         letter = pkg["name"][0].upper()
         if letter not in by_letter:
@@ -381,7 +381,7 @@ async def dependency(
     requirements_file: str = "requirements.txt",
     dry_run: bool = True,
 ) -> Dict[str, Any]:
-    """Python dependency management: list, outdated, security, generate, update, tree, check.
+    """Python dependency management: list[Any], outdated, security, generate, update, tree, check.
 
     Actions: list (packages), outdated, security (vulns), generate (requirements.txt),
     update (packages, dry_run), tree (package), check (requirements_file).
@@ -412,5 +412,5 @@ async def dependency(
     else:
         return {
             "success": False,
-            "error": f"Unknown action: {action}. Valid actions: list, outdated, security, generate, update, tree, check",
+            "error": f"Unknown action: {action}. Valid actions: list[Any], outdated, security, generate, update, tree, check",
         }

@@ -5,7 +5,7 @@ Supports light, dark, high-contrast, and custom themes.
 """
 
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 
 @dataclass
@@ -284,7 +284,7 @@ def create_custom_theme(
     name: str,
     display_name: str,
     base_theme: str = "default",
-    **overrides,
+    **overrides: Any,
 ) -> Theme:
     """Create a custom theme based on an existing theme.
 

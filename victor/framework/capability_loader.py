@@ -101,8 +101,8 @@ class CapabilityEntry:
     """
 
     capability: OrchestratorCapability
-    handler: Optional[Callable] = None
-    getter_handler: Optional[Callable] = None
+    handler: Optional[Callable[..., Any]] = None
+    getter_handler: Optional[Callable[..., Any]] = None
     source_module: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
@@ -445,7 +445,7 @@ class CapabilityLoader(DynamicModuleLoader):
 
     def _register_from_meta(
         self,
-        func: Callable,
+        func: Callable[..., Any],
         meta: Dict[str, Any],
         source_module: str,
     ) -> Optional[str]:
@@ -476,8 +476,8 @@ class CapabilityLoader(DynamicModuleLoader):
     def _register_capability_internal(
         self,
         capability: OrchestratorCapability,
-        handler: Optional[Callable] = None,
-        getter_handler: Optional[Callable] = None,
+        handler: Optional[Callable[..., Any]] = None,
+        getter_handler: Optional[Callable[..., Any]] = None,
         source_module: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
@@ -527,10 +527,10 @@ class CapabilityLoader(DynamicModuleLoader):
     def register_capability(
         self,
         name: str,
-        handler: Callable,
+        handler: Callable[..., Any],
         capability_type: CapabilityType = CapabilityType.TOOL,
         version: str = "1.0",
-        getter: Optional[Callable] = None,
+        getter: Optional[Callable[..., Any]] = None,
         description: str = "",
         **kwargs: Any,
     ) -> None:
@@ -973,7 +973,7 @@ class CapabilityLoader(DynamicModuleLoader):
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Context manager exit - cleanup."""
         self.stop_watching()
 
@@ -1020,7 +1020,7 @@ def capability(
                 pass
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable:
         func._capability_meta = {
             "name": name,
             "capability_type": capability_type,

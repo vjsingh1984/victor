@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 class ContextIntelligenceBuilder(FactoryAwareBuilder):
     """Build context management and intelligence components."""
 
-    def __init__(self, settings, factory: Optional["OrchestratorFactory"] = None):
+    def __init__(self, settings: Any, factory: Optional["OrchestratorFactory"] = None):
         """Initialize the builder.
 
         Args:
@@ -45,7 +45,7 @@ class ContextIntelligenceBuilder(FactoryAwareBuilder):
         """
         super().__init__(settings, factory)
 
-    def build(self, orchestrator: "AgentOrchestrator", **_kwargs) -> Dict[str, Any]:
+    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> Dict[str, Any]:
         """Build context and intelligence components and attach them to orchestrator."""
         factory = self._ensure_factory()
         components: Dict[str, Any] = {}

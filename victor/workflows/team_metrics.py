@@ -224,7 +224,7 @@ class TeamMetricsCollector:
     """
 
     _instance: Optional["TeamMetricsCollector"] = None
-    _lock = threading.Lock()
+    _lock: threading.RLock = threading.RLock()  # Class-level lock (reusable)
 
     def __init__(
         self,
@@ -242,6 +242,7 @@ class TeamMetricsCollector:
         self._team_metrics: Dict[str, TeamExecutionMetrics] = {}
         self._active_teams: Set[str] = set()
         self._lock = threading.RLock()
+        self._registry: Any = None  # Will be MetricsRegistry if available
 
         # Integration with MetricsRegistry
         try:
@@ -251,7 +252,6 @@ class TeamMetricsCollector:
             self._setup_registry_metrics()
         except ImportError:
             logger.debug("MetricsRegistry not available, using standalone collection")
-            self._registry = None
 
     def _setup_registry_metrics(self) -> None:
         """Setup metrics in the global registry."""

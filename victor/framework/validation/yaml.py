@@ -41,7 +41,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field as dataclass_field
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union, cast
 
 from victor.framework.validation.pipeline import (
     ChainHandler,
@@ -373,7 +373,7 @@ class ValidatorFactory:
 
             def condition(data: Dict[str, Any]) -> bool:
                 parts = condition_path.split(".")
-                value = data
+                value: Any = data
                 for part in parts:
                     if isinstance(value, dict):
                         value = value.get(part)
@@ -384,7 +384,9 @@ class ValidatorFactory:
         else:
 
             def condition(data: Dict[str, Any]) -> bool:
-                return data.get("_validate", True)
+                value = data.get("_validate", True)
+                assert isinstance(value, bool)
+                return value
 
         return ConditionalValidator(
             validator=inner,
@@ -408,13 +410,29 @@ class ValidatorFactory:
         transform_type = cfg.get("transform", "strip")
 
         if transform_type == "strip":
-            transform = str.strip
+
+            def _strip_transform(x: Any) -> Any:
+                return str.strip(x) if isinstance(x, str) else x
+
+            transform = _strip_transform
         elif transform_type == "lower":
-            transform = str.lower
+
+            def _lower_transform(x: Any) -> Any:
+                return str.lower(x) if isinstance(x, str) else x
+
+            transform = _lower_transform
         elif transform_type == "upper":
-            transform = str.upper
+
+            def _upper_transform(x: Any) -> Any:
+                return str.upper(x) if isinstance(x, str) else x
+
+            transform = _upper_transform
         elif transform_type == "title":
-            transform = str.title
+
+            def _title_transform(x: Any) -> Any:
+                return str.title(x) if isinstance(x, str) else x
+
+            transform = _title_transform
         elif transform_type == "trim":
 
             def _trim_transform(x: Any) -> Any:
@@ -428,7 +446,7 @@ class ValidatorFactory:
                 """Pass through value unchanged."""
                 return x
 
-            transform = _identity_transform
+            transform = cast(Callable[[Any], Any], _identity_transform)
 
         return TransformingValidator(
             validator=inner,
@@ -515,7 +533,7 @@ class HandlerFactory:
         action = ValidationAction(action_str)
 
         # Create condition function
-        def condition(result) -> bool:
+        def condition(result: Any) -> bool:
             # Check severity level
             min_severity = cfg.get("min_severity", "error")
             if min_severity == "error":

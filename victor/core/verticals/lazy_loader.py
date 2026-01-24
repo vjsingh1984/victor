@@ -37,10 +37,11 @@ import logging
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, Optional, Set, Type
+from typing import Any, Callable, Dict, Optional, Set, Type, TypeVar
 
 logger = logging.getLogger(__name__)
 
+T = TypeVar("T")
 
 class LoadTrigger(str, Enum):
     """When to load vertical.
@@ -83,13 +84,13 @@ class LazyVerticalProxy:
     """
 
     vertical_name: str
-    loader: Callable[[], Type]
+    loader: Callable[[], type[Any]]
     _loaded: bool = False
-    _instance: Optional[Type] = None
+    _instance: Optional[type[Any]] = None
     _load_lock: threading.Lock = field(default_factory=threading.Lock)
     _loading: bool = False
 
-    def load(self) -> Type:
+    def load(self) -> type[Any]:
         """Load vertical on first access with thread-safe lazy initialization.
 
         Uses double-checked locking pattern for thread safety:
@@ -163,7 +164,7 @@ class LazyVerticalProxy:
             Attribute value from loaded vertical
         """
         # Ensure loaded
-        vertical = self.load()
+        vertical: type[Any] = self.load()
         return getattr(vertical, name)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
@@ -176,7 +177,7 @@ class LazyVerticalProxy:
         Returns:
             Result of calling the vertical
         """
-        vertical = self.load()
+        vertical: type[Any] = self.load()
         return vertical(*args, **kwargs)
 
     def __repr__(self) -> str:
@@ -245,7 +246,7 @@ class LazyVerticalLoader:
         return trigger
 
     def register_vertical(
-        self, vertical_name: str, loader: Callable[[], Type], load_immediately: bool = False
+        self, vertical_name: str, loader: Callable[[], type[Any]], load_immediately: bool = False
     ) -> None:
         """Register vertical for lazy loading.
 
@@ -262,7 +263,7 @@ class LazyVerticalLoader:
             self._loaded_verticals.add(vertical_name)
             logger.info(f"Eagerly loaded vertical: {vertical_name}")
 
-    def get_vertical(self, vertical_name: str) -> Optional[Type]:
+    def get_vertical(self, vertical_name: str) -> Optional[type[Any]]:
         """Get vertical, loading if needed.
 
         Args:
@@ -276,7 +277,7 @@ class LazyVerticalLoader:
             logger.warning(f"Vertical not registered: {vertical_name}")
             return None
 
-        vertical = proxy.load()
+        vertical: type[Any] = proxy.load()
         self._loaded_verticals.add(vertical_name)
         return vertical
 
@@ -331,7 +332,7 @@ class LazyVerticalLoader:
         """
         return self._loaded_verticals.copy()
 
-    def list_registered(self) -> list:
+    def list_registered(self) -> list[str]:
         """List all registered verticals (loaded or not).
 
         Returns:

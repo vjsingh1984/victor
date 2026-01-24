@@ -58,6 +58,7 @@ from typing import (
     Protocol,
     Type,
     TypeVar,
+    cast,
     runtime_checkable,
 )
 
@@ -148,10 +149,10 @@ class ServiceScope:
             with self._lock:
                 if service_type not in self._scoped_instances:
                     self._scoped_instances[service_type] = descriptor.create_instance(self._parent)
-                return self._scoped_instances[service_type]
+                return cast(T, self._scoped_instances[service_type])
 
         # Transient - always create new
-        return descriptor.create_instance(self._parent)
+        return cast(T, descriptor.create_instance(self._parent))
 
     def dispose(self) -> None:
         """Dispose all scoped services."""
@@ -178,7 +179,7 @@ class ServiceScope:
 class ServiceNotFoundError(Exception):
     """Raised when a requested service is not registered."""
 
-    def __init__(self, service_type: Type):
+    def __init__(self, service_type: Type[Any]):
         self.service_type = service_type
         # Handle both Type objects and string service names
         name = service_type.__name__ if hasattr(service_type, "__name__") else str(service_type)
@@ -188,7 +189,7 @@ class ServiceNotFoundError(Exception):
 class ServiceAlreadyRegisteredError(Exception):
     """Raised when trying to register a service that already exists."""
 
-    def __init__(self, service_type: Type):
+    def __init__(self, service_type: Type[Any]):
         self.service_type = service_type
         super().__init__(f"Service already registered: {service_type.__name__}")
 
@@ -277,7 +278,7 @@ class ServiceContainer:
 
             descriptor = ServiceDescriptor(
                 service_type=service_type,
-                factory=lambda c: instance,  # type: ignore
+                factory=lambda c: instance,
                 lifetime=ServiceLifetime.SINGLETON,
                 instance=instance,
             )
@@ -374,7 +375,7 @@ class ServiceContainer:
         """
         return self.get(service_type)
 
-    def is_registered(self, service_type: Type) -> bool:
+    def is_registered(self, service_type: Type[Any]) -> bool:
         """Check if a service type is registered.
 
         Args:

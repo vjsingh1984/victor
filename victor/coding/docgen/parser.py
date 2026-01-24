@@ -22,7 +22,7 @@ import logging
 import re
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from victor.coding.docgen.protocol import (
     Attribute,
@@ -80,12 +80,12 @@ class GoogleDocstringParser(BaseDocstringParser):
 
     PARAM_REGEX = re.compile(r"^\s*(\*{0,2}\w+)\s*(?:\(([^)]+)\))?\s*:\s*(.*)$")
 
-    def parse(self, docstring: str) -> dict:
+    def parse(self, docstring: str) -> dict[str, Any]:
         """Parse Google-style docstring."""
         if not docstring:
             return {}
 
-        result = {
+        result: dict[str, Any] = {
             "description": "",
             "long_description": "",
             "parameters": [],
@@ -114,10 +114,10 @@ class GoogleDocstringParser(BaseDocstringParser):
                 result["parameters"] = self._parse_parameters(section_content)
 
             elif section_name.lower() == "returns":
-                result["returns"] = self._parse_return(section_content)
+                result["returns"] = self._parse_return(section_content)  # type: ignore[assignment]
 
             elif section_name.lower() == "yields":
-                result["yields"] = self._parse_return(section_content)
+                result["yields"] = self._parse_return(section_content)  # type: ignore[assignment]
 
             elif section_name.lower() == "raises":
                 result["raises"] = self._parse_raises(section_content)
@@ -325,10 +325,10 @@ class NumpyDocstringParser(BaseDocstringParser):
                 result["parameters"] = self._parse_numpy_params(section_content)
 
             elif section_name.lower() == "returns":
-                result["returns"] = self._parse_numpy_return(section_content)
+                result["returns"] = self._parse_numpy_return(section_content)  # type: ignore[assignment]
 
             elif section_name.lower() == "yields":
-                result["yields"] = self._parse_numpy_return(section_content)
+                result["yields"] = self._parse_numpy_return(section_content)  # type: ignore[assignment]
 
             elif section_name.lower() == "raises":
                 result["raises"] = self._parse_numpy_raises(section_content)

@@ -47,6 +47,7 @@ from typing import (
     Optional,
     Tuple,
     Union,
+    cast,
 )
 import uuid
 
@@ -193,7 +194,7 @@ class RecordingStorage(ABC):
     @abstractmethod
     async def save(
         self,
-        recorder,
+        recorder: Any,
         filepath: Optional[Path] = None,
     ) -> str:
         """Save a recording.
@@ -364,7 +365,8 @@ class FileRecordingStorage(RecordingStorage):
             return {"recordings": {}, "last_updated": None}
 
         with open(self.index_file, "r") as f:
-            return json.load(f)
+            data = json.load(f)
+            return cast(Dict[str, Any], data)
 
     async def _save_index(self, index: Dict[str, Any]) -> None:
         """Save the metadata index.
@@ -378,7 +380,7 @@ class FileRecordingStorage(RecordingStorage):
 
     async def save(
         self,
-        recorder,
+        recorder: Any,
         filepath: Optional[Path] = None,
     ) -> str:
         """Save a recording.
@@ -433,7 +435,7 @@ class FileRecordingStorage(RecordingStorage):
 
         logger.info(f"Saved recording: {metadata.recording_id}")
 
-        return metadata.recording_id
+        return str(metadata.recording_id)
 
     async def load(self, recording_id: str):
         """Load a recording.
@@ -527,7 +529,8 @@ class FileRecordingStorage(RecordingStorage):
             Metadata dictionary or None if not found
         """
         index = await self._load_index()
-        return index["recordings"].get(recording_id)
+        result = index["recordings"].get(recording_id)
+        return cast(Optional[Dict[str, Any]], result)
 
     async def cleanup_empty_files(self) -> int:
         """Remove empty or corrupted recording files.
@@ -603,7 +606,7 @@ class InMemoryRecordingStorage(RecordingStorage):
 
     async def save(
         self,
-        recorder,
+        recorder: Any,
         filepath: Optional[Path] = None,
     ) -> str:
         """Save a recording.
@@ -644,7 +647,7 @@ class InMemoryRecordingStorage(RecordingStorage):
 
         logger.info(f"Saved recording to memory: {metadata.recording_id}")
 
-        return metadata.recording_id
+        return str(metadata.recording_id)
 
     async def load(self, recording_id: str):
         """Load a recording.

@@ -859,17 +859,17 @@ class CodebaseFileHandler(FileSystemEventHandler):
             self._debounce_timer.daemon = True
             self._debounce_timer.start()
 
-    def on_modified(self, event) -> None:
+    def on_modified(self, event: Any) -> None:
         """Handle file modification."""
         if not event.is_directory and self._should_process(event.src_path):
             self._schedule_notification(event.src_path)
 
-    def on_created(self, event) -> None:
+    def on_created(self, event: Any) -> None:
         """Handle file creation."""
         if not event.is_directory and self._should_process(event.src_path):
             self._schedule_notification(event.src_path)
 
-    def on_deleted(self, event) -> None:
+    def on_deleted(self, event: Any) -> None:
         """Handle file deletion."""
         if not event.is_directory and self._should_process(event.src_path):
             self._schedule_notification(event.src_path)
@@ -1744,7 +1744,7 @@ class CodebaseIndex:
                 _walk(data)
             elif language == "config-yaml":
                 try:
-                    import yaml  # type: ignore
+                    import yaml
 
                     data = yaml.safe_load(content)
                     _walk(data)
@@ -2045,7 +2045,7 @@ class CodebaseIndex:
                 edges.append((owner, target_type))
         return edges
 
-    def _find_enclosing_symbol_name(self, node, language: str) -> Optional[str]:
+    def _find_enclosing_symbol_name(self, node: Any, language: str) -> Optional[str]:
         """Best-effort caller lookup by walking ancestors."""
         fields = ENCLOSING_NAME_FIELDS.get(language, [])
         current = node.parent

@@ -148,7 +148,7 @@ class AgentBuildOptions:
     enable_cqrs: bool = False
     cqrs_event_sourcing: bool = True
     custom_system_prompt: Optional[str] = None
-    state_hooks: Optional[Dict[str, Callable]] = None
+    state_hooks: Optional[Dict[str, Callable[..., Any]]] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -1707,7 +1707,7 @@ async def create_bridge(
 
 # Import Agent at runtime to avoid circular imports
 # This is resolved when the module is fully loaded
-Agent = "Agent"  # type: ignore[misc]
+Agent: Any = "Agent"
 
 
 def _resolve_agent_type() -> None:
@@ -1715,7 +1715,7 @@ def _resolve_agent_type() -> None:
     global Agent
     from victor.framework.agent import Agent as RealAgent
 
-    Agent = RealAgent  # type: ignore[misc]
+    Agent = RealAgent
 
 
 # Resolve on import

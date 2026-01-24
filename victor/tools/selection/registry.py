@@ -254,7 +254,7 @@ class ToolSelectionStrategyRegistry:
         all_names = set(self._strategies.keys()) | set(self._strategy_classes.keys())
         return sorted(all_names)
 
-    def get_strategy_info(self, name: str) -> Optional[Dict]:
+    def get_strategy_info(self, name: str) -> Optional[Dict[str, Any]]:
         """Get information about a strategy.
 
         Args:

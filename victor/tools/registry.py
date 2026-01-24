@@ -42,7 +42,7 @@ class Hook:
 
     def __init__(
         self,
-        callback: Callable,
+        callback: Callable[..., Any],
         name: str = "",
         critical: bool = False,
         description: str = "",

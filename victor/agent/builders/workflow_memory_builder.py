@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 class WorkflowMemoryBuilder(FactoryAwareBuilder):
     """Build workflow registry, conversation memory, and state components."""
 
-    def __init__(self, settings, factory: Optional["OrchestratorFactory"] = None):
+    def __init__(self, settings: Any, factory: Optional["OrchestratorFactory"] = None):
         """Initialize the builder.
 
         Args:
@@ -43,7 +43,7 @@ class WorkflowMemoryBuilder(FactoryAwareBuilder):
         """
         super().__init__(settings, factory)
 
-    def build(self, orchestrator: "AgentOrchestrator", **_kwargs) -> Dict[str, Any]:
+    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> Dict[str, Any]:
         """Build workflow and memory components and attach them to orchestrator."""
         factory = self._ensure_factory()
         components: Dict[str, Any] = {}

@@ -404,7 +404,7 @@ def trace_function(
             return await handler(request)
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable:
         if not is_telemetry_enabled():
             return func
 

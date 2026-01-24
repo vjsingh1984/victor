@@ -225,9 +225,12 @@ class StateDelegationMixin:
                     delegations[prop_name] = (comp_attr, prop_name_on_comp, doc)
 
         # Create descriptors for each delegation
-        for prop_name, (comp_attr, prop_name_on_comp, doc) in delegations.items():
+        for prop_name, delegation_info in delegations.items():
             # Only create if not already defined on the class
             if prop_name not in cls.__dict__:
+                comp_attr, prop_name_on_comp, doc = delegation_info
+                if prop_name_on_comp is None:
+                    continue  # Skip if property name is None
                 descriptor = StateDelegationDescriptor(
                     component_attr=comp_attr,
                     property_name=prop_name_on_comp,

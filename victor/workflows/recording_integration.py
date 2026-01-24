@@ -40,7 +40,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union, cast
 
 from victor.workflows.execution_recorder import ExecutionRecorder, RecordingEventType
 from victor.workflows.recording_storage import FileRecordingStorage
@@ -186,7 +186,7 @@ async def save_workflow_recording(
     if storage:
         recording_id = await storage.save(recorder)
         metadata = await storage.get_metadata(recording_id)
-        return metadata
+        return cast(Dict[str, Any], metadata)
 
     if filepath:
         metadata = await recorder.save(filepath)

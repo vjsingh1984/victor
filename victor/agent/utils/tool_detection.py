@@ -78,7 +78,7 @@ def is_shell_alias(tool_name: str) -> bool:
 
 def resolve_shell_variant(
     tool_name: str,
-    mode_coordinator=None,
+    mode_coordinator: Any = None,
 ) -> str:
     """Resolve shell aliases to the appropriate enabled shell variant.
 

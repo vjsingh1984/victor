@@ -93,12 +93,12 @@ class RecoveryCoordinatorProtocol(Protocol):
     ) -> Optional[StreamChunk]: ...
 
     def truncate_tool_calls(
-        self, recovery_ctx: Any, tool_calls: List[Dict], remaining: int
-    ) -> Tuple[List[Dict], Any]: ...
+        self, recovery_ctx: Any, tool_calls: List[Dict[str, Any]], remaining: int
+    ) -> Tuple[List[Dict[str, Any]], Any]: ...
 
     def filter_blocked_tool_calls(
-        self, recovery_ctx: Any, tool_calls: List[Dict]
-    ) -> Tuple[List[Dict], List[StreamChunk], int]: ...
+        self, recovery_ctx: Any, tool_calls: List[Dict[str, Any]]
+    ) -> Tuple[List[Dict[str, Any]], List[StreamChunk], int]: ...
 
     def check_blocked_threshold(
         self, recovery_ctx: Any, all_blocked: bool
@@ -109,7 +109,7 @@ class ChunkGeneratorProtocol(Protocol):
     """Protocol for chunk generation."""
 
     def generate_tool_start_chunk(
-        self, tool_name: str, tool_args: Dict, status_msg: str
+        self, tool_name: str, tool_args: Dict[str, Any], status_msg: str
     ) -> StreamChunk: ...
 
     def generate_tool_result_chunks(self, result: Dict[str, Any]) -> List[StreamChunk]: ...
@@ -219,7 +219,7 @@ class ToolExecutionHandler:
         ],
         handle_budget_exhausted: Callable[[StreamingChatContext], AsyncIterator[StreamChunk]],
         handle_force_final_response: Callable[[StreamingChatContext], AsyncIterator[StreamChunk]],
-        handle_tool_calls: Callable[[List[Dict]], Any],
+        handle_tool_calls: Callable[[List[Dict[str, Any]]], Any],
         get_tool_status_message: Callable[[str, Dict], str],
         observed_files: Optional[Set[str]] = None,
     ):

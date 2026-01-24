@@ -73,7 +73,7 @@ class OptionState:
     last_tool_success: bool = True
     custom_features: Dict[str, Any] = field(default_factory=dict)
 
-    def to_tuple(self) -> tuple:
+    def to_tuple(self) -> tuple[Any, ...]:
         """Convert to hashable tuple for Q-table lookup."""
         return (
             self.current_mode,
@@ -252,7 +252,7 @@ class ExploreOption(Option):
     MAX_EXPLORE_STEPS = 15
     MIN_CONTEXT_FOR_COMPLETION = 5000
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             name="explore_codebase",
             description="Explore and understand the codebase structure",
@@ -313,7 +313,7 @@ class ImplementOption(Option):
     MAX_IMPLEMENT_STEPS = 20
     MIN_PROGRESS_FOR_COMPLETION = 0.8
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             name="implement_feature",
             description="Implement code changes for the task",
@@ -362,7 +362,7 @@ class DebugOption(Option):
 
     MAX_DEBUG_STEPS = 10
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             name="debug_issue",
             description="Debug and fix issues",
@@ -402,7 +402,7 @@ class ReviewOption(Option):
 
     MAX_REVIEW_STEPS = 8
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             name="review_work",
             description="Review and validate completed work",
@@ -432,7 +432,7 @@ class OptionRegistry:
     Manages option lifecycle and selection based on state.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize registry with default options."""
         self._options: Dict[str, Option] = {}
         self._active_option: Optional[Option] = None

@@ -242,7 +242,7 @@ class UnifiedMessage:
         return "\n".join(texts)
 
     @classmethod
-    def user(cls, text: str, **kwargs) -> "UnifiedMessage":
+    def user(cls, text: str, **kwargs: Any) -> "UnifiedMessage":
         """Create a user message."""
         return cls(
             role=MessageRole.USER,
@@ -251,7 +251,7 @@ class UnifiedMessage:
         )
 
     @classmethod
-    def assistant(cls, text: str, **kwargs) -> "UnifiedMessage":
+    def assistant(cls, text: str, **kwargs: Any) -> "UnifiedMessage":
         """Create an assistant message."""
         return cls(
             role=MessageRole.ASSISTANT,
@@ -260,7 +260,7 @@ class UnifiedMessage:
         )
 
     @classmethod
-    def system(cls, text: str, **kwargs) -> "UnifiedMessage":
+    def system(cls, text: str, **kwargs: Any) -> "UnifiedMessage":
         """Create a system message."""
         return cls(
             role=MessageRole.SYSTEM,
@@ -366,27 +366,27 @@ class StreamChunk:
     timestamp: float = field(default_factory=time.time)
 
     @classmethod
-    def content(cls, text: str, **kwargs) -> "StreamChunk":
+    def content(cls, text: str, **kwargs: Any) -> "StreamChunk":
         """Create a content chunk."""
         return cls(type="content", data={"text": text, **kwargs})
 
     @classmethod
-    def tool_call(cls, tool_call: ToolCall, **kwargs) -> "StreamChunk":
+    def tool_call(cls, tool_call: ToolCall, **kwargs: Any) -> "StreamChunk":
         """Create a tool call chunk."""
         return cls(type="tool_call", data={**tool_call.to_dict(), **kwargs})
 
     @classmethod
-    def thinking(cls, text: str, **kwargs) -> "StreamChunk":
+    def thinking(cls, text: str, **kwargs: Any) -> "StreamChunk":
         """Create a thinking chunk."""
         return cls(type="thinking", data={"text": text, **kwargs})
 
     @classmethod
-    def done(cls, **kwargs) -> "StreamChunk":
+    def done(cls, **kwargs: Any) -> "StreamChunk":
         """Create a done chunk."""
         return cls(type="done", data=kwargs)
 
     @classmethod
-    def error(cls, message: str, code: Optional[str] = None, **kwargs) -> "StreamChunk":
+    def error(cls, message: str, code: Optional[str] = None, **kwargs: Any) -> "StreamChunk":
         """Create an error chunk."""
         return cls(type="error", data={"message": message, "code": code, **kwargs})
 

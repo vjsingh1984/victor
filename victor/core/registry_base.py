@@ -131,11 +131,11 @@ class SingletonRegistry(ABC, Generic[T]):
                     was_allowed = cls._instantiation_allowed
                     cls._instantiation_allowed = True
                     try:
-                        cls._instance = cls()  # type: ignore[assignment]
+                        cls._instance = cls()  # type: ignore
                         logger.debug(f"{cls.__name__} singleton instance created")
                     finally:
                         cls._instantiation_allowed = was_allowed
-        return cls._instance  # type: ignore[return-value]
+        return cls._instance
 
     @classmethod
     def reset_instance(cls) -> None:

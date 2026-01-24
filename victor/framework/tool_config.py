@@ -443,7 +443,7 @@ class ToolConfigurator:
     def add_hook(
         self,
         event: str,
-        callback: Callable,
+        callback: Callable[..., Any],
     ) -> Callable[[], None]:
         """Add a configuration hook.
 

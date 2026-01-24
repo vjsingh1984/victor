@@ -424,7 +424,7 @@ class CommandRegistry:
         """Initialize registry with built-in commands."""
         self._commands: Dict[str, CommandDefinition] = {}
         self._aliases: Dict[str, str] = {}
-        self._handlers: Dict[str, Callable] = {}
+        self._handlers: Dict[str, Callable[..., Any]] = {}
 
         # Register built-in commands
         for cmd in SHARED_COMMANDS:
@@ -563,7 +563,7 @@ command_registry = CommandRegistry()
 def command_handler(name: str):
     """Decorator to register a function as a command handler."""
 
-    def decorator(func: Callable):
+    def decorator(func: Callable[..., Any]):
         command_registry.register_handler(name, func)
         return func
 

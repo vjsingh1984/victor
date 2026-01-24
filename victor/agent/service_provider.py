@@ -1328,7 +1328,7 @@ class OrchestratorServiceProvider:
                 def select_tools(
                     self,
                     query: str,
-                    available_tools: list,
+                    available_tools: list[Any],
                     max_tools: int = 10,
                     threshold: float = 0.3,
                 ) -> list:
@@ -2345,7 +2345,7 @@ class OrchestratorServiceProvider:
 class _NullObservability:
     """No-op observability implementation."""
 
-    def on_tool_start(self, tool_name: str, arguments: dict, tool_id: str) -> None:
+    def on_tool_start(self, tool_name: str, arguments: dict[str, Any], tool_id: str) -> None:
         pass
 
     def on_tool_end(
@@ -2361,7 +2361,7 @@ class _NullObservability:
     def wire_state_machine(self, state_machine: Any) -> None:
         pass
 
-    def on_error(self, error: Exception, context: dict) -> None:
+    def on_error(self, error: Exception, context: dict[str, Any]) -> None:
         pass
 
 
@@ -2439,9 +2439,9 @@ class _NullMemoryCoordinator:
         self,
         query: str,
         limit: int = 20,
-        memory_types: Optional[list] = None,
+        memory_types: Optional[list[Any]] = None,
         session_id: Optional[str] = None,
-        filters: Optional[dict] = None,
+        filters: Optional[dict[str, Any]] = None,
         min_relevance: float = 0.0,
     ) -> list:
         return []
@@ -2460,7 +2460,7 @@ class _NullMemoryCoordinator:
         memory_type: Any,
         key: str,
         value: Any,
-        metadata: Optional[dict] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> bool:
         return False
 

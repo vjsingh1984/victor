@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Callable, Dict, List, Optional, TypeVar, cast
 
 logger = logging.getLogger(__name__)
 
@@ -1307,7 +1307,8 @@ def handle_errors_async(
         async def wrapper(*args: Any, **kwargs: Any) -> T:
             handler = ErrorHandler()
             try:
-                return await func(*args, **kwargs)
+                result = await func(*args, **kwargs)
+                return cast(T, result)
             except VictorError:
                 raise
             except Exception as e:
@@ -1321,9 +1322,9 @@ def handle_errors_async(
                         recovery_hint=recovery_hint or error_info.recovery_hint,
                         cause=e,
                     ) from e
-                return default_return  # type: ignore
+                return cast(T, default_return)
 
-        return wrapper  # type: ignore
+        return wrapper
 
     return decorator
 

@@ -239,7 +239,7 @@ async def edit(
             "success": False,
         }
 
-    # Allow callers (models) to pass ops as a JSON string; normalize to list[dict]
+    # Allow callers (models) to pass ops as a JSON string; normalize to list[dict[str, Any]]
     if isinstance(ops, str):
         import json
         import logging

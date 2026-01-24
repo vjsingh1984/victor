@@ -308,7 +308,7 @@ def get_pattern_matcher() -> PatternMatcher:
     return _pattern_matcher
 
 
-def reset_singletons():
+def reset_singletons() -> None:
     """Reset singleton instances. Useful for testing."""
     global _nudge_engine, _pattern_matcher
     _nudge_engine = None

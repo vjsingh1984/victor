@@ -230,7 +230,7 @@ class RecoveryCoordinator:
     def detect_failure(
         self,
         content: str = "",
-        tool_calls: Optional[List[Dict]] = None,
+        tool_calls: Optional[List[Dict[str, Any]]] = None,
         mentioned_tools: Optional[List[str]] = None,
         elapsed_time: float = 0.0,
         session_idle_timeout: float = 180.0,

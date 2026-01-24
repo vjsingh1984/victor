@@ -321,7 +321,7 @@ class VerticalServiceProviderFactory:
     """
 
     @staticmethod
-    def create(vertical_class: Type) -> BaseVerticalServiceProvider:
+    def create(vertical_class: Type[Any]) -> BaseVerticalServiceProvider:
         """Create a service provider for a vertical.
 
         The created provider is pre-configured with the vertical's
@@ -346,7 +346,7 @@ class _ConfiguredVerticalServiceProvider(BaseVerticalServiceProvider):
     Internal class used by VerticalServiceProviderFactory.
     """
 
-    def __init__(self, vertical_name: str, vertical_class: Type):
+    def __init__(self, vertical_name: str, vertical_class: Type[Any]):
         """Initialize with vertical class.
 
         Args:

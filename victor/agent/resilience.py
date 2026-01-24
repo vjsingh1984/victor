@@ -56,7 +56,7 @@ import logging
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, TypeVar, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, TypeVar, TYPE_CHECKING, cast
 
 # Import canonical types from circuit_breaker.py to avoid duplication
 from victor.providers.circuit_breaker import (
@@ -414,7 +414,8 @@ class RetryHandler:
 
         for attempt in range(self.config.max_retries + 1):
             try:
-                return await func(*args, **kwargs)
+                result = await func(*args, **kwargs)
+                return cast(T, result)
             except self.config.retryable_exceptions as e:
                 last_error = e
 
@@ -615,7 +616,8 @@ class ResilientExecutor:
         if not self.circuit_breaker.is_allowed(name):
             if fallback:
                 logger.info(f"Circuit '{name}' open, using fallback")
-                return await fallback(*args, **kwargs)
+                fallback_result = await fallback(*args, **kwargs)
+                return cast(T, fallback_result)
             raise CircuitOpenError(f"Circuit '{name}' is open")
 
         # 3. Execute with retry
@@ -627,13 +629,14 @@ class ResilientExecutor:
                 **kwargs,
             )
             self.circuit_breaker.record_success(name)
-            return result
+            return cast(T, result)
 
         except Exception as e:
             self.circuit_breaker.record_failure(name, e)
             if fallback:
                 logger.warning(f"Primary failed for '{name}', using fallback: {e}")
-                return await fallback(*args, **kwargs)
+                fallback_result = await fallback(*args, **kwargs)
+                return cast(T, fallback_result)
             raise
 
     def get_health_report(self) -> Dict[str, Any]:

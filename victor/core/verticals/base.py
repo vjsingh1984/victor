@@ -49,8 +49,7 @@ YAML Configuration (NEW):
           version: "2.0.0"
 
         core:
-          tools:
-            list: [read, write, edit, code_search]
+          tools: list[Any]: [read, write, edit, code_search]
           system_prompt:
             source: inline
             text: "You are an expert software developer..."
@@ -318,8 +317,7 @@ class VerticalBase(
           name: coding
           description: Software development assistant
         core:
-          tools:
-            list: [read, write, edit]
+          tools: list[Any]: [read, write, edit]
           system_prompt:
             source: inline
             text: "You are an expert developer..."

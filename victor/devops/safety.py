@@ -126,7 +126,7 @@ class DevOpsSafetyExtension(SafetyExtensionProtocol):
         # Return simplified dict format for backward compatibility
         return {name: pattern for name, (pattern, _, _) in CREDENTIAL_PATTERNS.items()}
 
-    def scan_for_secrets(self, content: str) -> List[Dict]:
+    def scan_for_secrets(self, content: str) -> List[Dict[str, Any]]:
         """Scan content for secrets using the core SecretScanner.
 
         Args:

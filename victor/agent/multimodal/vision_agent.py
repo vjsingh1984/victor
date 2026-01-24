@@ -1124,7 +1124,7 @@ class VisionAgent:
         self,
         image_paths: List[str],
         operation: str = "analyze",
-        **kwargs,
+        **kwargs: Any,
     ) -> List[Any]:
         """Process multiple images in batch.
 

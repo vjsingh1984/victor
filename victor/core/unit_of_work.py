@@ -391,7 +391,7 @@ class UnitOfWork(UnitOfWorkProtocol):
         """Enter async context."""
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> bool:
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
         """Exit async context with auto-rollback on error."""
         if exc_type is not None:
             await self.rollback()
@@ -557,7 +557,7 @@ class CompositeUnitOfWork(UnitOfWorkProtocol):
 # =============================================================================
 
 
-def create_unit_of_work(backend: str = "memory", **kwargs) -> UnitOfWork:
+def create_unit_of_work(backend: str = "memory", **kwargs: Any) -> UnitOfWork:
     """Factory function to create Unit of Work instances.
 
     Args:

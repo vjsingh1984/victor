@@ -172,7 +172,7 @@ def run_query(tree: "Tree", query_src: str, language: str) -> Dict[str, List["No
     # Use Rust accelerator if available
     if _ast_accelerator is not None and _ast_accelerator.rust_available:
         try:
-            nodes = _ast_accelerator.execute_query(tree, query_src, language)
+            nodes = _ast_accelerator.execute_query(tree, query_src, language)  # type: ignore[call-arg]
             # Convert list of nodes to capture dict format
             # For now, return all nodes under a default capture name
             return {"_all": nodes}
@@ -252,7 +252,7 @@ def parse_file_with_timing(file_path: str) -> Tuple[Optional["Tree"], float]:
 def extract_symbols_parallel(
     files: List[str],
     symbol_types: List[str],
-) -> Dict[str, List[Dict]]:
+) -> Dict[str, List[Dict[str, Any]]]:
     """Extract symbols from multiple files using parallel processing.
 
     This function provides 10x faster symbol extraction by using the Rust

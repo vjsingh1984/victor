@@ -217,7 +217,7 @@ class DebugSession:
         """
         return self.execution_ctrl.pause_context
 
-    def set_breakpoint(self, **kwargs) -> WorkflowBreakpoint:
+    def set_breakpoint(self, **kwargs: Any) -> WorkflowBreakpoint:
         """Set a breakpoint (delegates to manager).
 
         Returns:
@@ -236,7 +236,7 @@ class DebugSession:
         """
         return self.breakpoint_mgr.clear_breakpoint(breakpoint_id)
 
-    def list_breakpoints(self, **kwargs) -> List[WorkflowBreakpoint]:
+    def list_breakpoints(self, **kwargs: Any) -> List[WorkflowBreakpoint]:
         """List breakpoints (delegates to manager).
 
         Returns:

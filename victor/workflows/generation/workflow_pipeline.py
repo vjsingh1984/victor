@@ -119,7 +119,7 @@ class PipelineResult:
     """
 
     success: bool
-    graph: Optional[StateGraph] = None
+    graph: Optional[StateGraph[Any]] = None
     schema: Optional[Dict[str, Any]] = None
     requirements: Optional[WorkflowRequirements] = None
     validation: Optional[WorkflowGenerationValidationResult] = None
@@ -219,8 +219,8 @@ class WorkflowGenerationPipeline:
         description: str,
         mode: str = "auto",
         context: Optional[Dict[str, Any]] = None,
-        validation_callback: Optional[Callable] = None,
-        progress_callback: Optional[Callable] = None,
+        validation_callback: Optional[Callable[..., Any]] = None,
+        progress_callback: Optional[Callable[..., Any]] = None,
     ) -> PipelineResult:
         """Generate workflow from natural language description.
 
@@ -353,7 +353,7 @@ class WorkflowGenerationPipeline:
 
     async def refine_workflow(
         self,
-        graph: StateGraph,
+        graph: StateGraph[Any],
         feedback: str,
         mode: str = "auto",
     ) -> PipelineResult:

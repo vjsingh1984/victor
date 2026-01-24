@@ -75,6 +75,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import (
     Any,
+    Awaitable,
     Callable,
     Dict,
     Generic,
@@ -83,7 +84,7 @@ from typing import (
     Type,
     TypeVar,
     Union,
-    Awaitable,
+    cast,
 )
 from uuid import uuid4
 
@@ -220,7 +221,7 @@ def query_handler(
             return await user_repo.get(query.user_id)
     """
 
-    def decorator(func: QueryHandlerFunc) -> QueryHandlerFunc:
+    def decorator(func: QueryHandlerFunc[Any, Any]) -> QueryHandlerFunc:
         _QUERY_HANDLERS[query_type] = func
         logger.debug(f"Registered query handler for {query_type.__name__}")
         return func
@@ -354,7 +355,7 @@ class RetryCommandMiddleware(CommandMiddleware):
         self,
         max_retries: int = 3,
         retry_delay: float = 0.1,
-        retryable_exceptions: Optional[tuple] = None,
+        retryable_exceptions: Optional[tuple[Any, ...]] = None,
     ) -> None:
         self._max_retries = max_retries
         self._retry_delay = retry_delay
@@ -390,7 +391,7 @@ class CachingQueryMiddleware(QueryMiddleware):
         self._ttl = ttl
         self._timestamps: Dict[str, float] = {}
 
-    def _get_cache_key(self, query: Query) -> str:
+    def _get_cache_key(self, query: Query[Any, Any]) -> str:
         """Generate cache key from query."""
         query_dict = {k: v for k, v in query.__dict__.items() if k not in ("query_id", "timestamp")}
         return f"{type(query).__name__}:{hash(frozenset(query_dict.items()))}"
@@ -407,7 +408,7 @@ class CachingQueryMiddleware(QueryMiddleware):
             cached_at = self._timestamps.get(key, 0)
             if time.time() - cached_at < self._ttl:
                 logger.debug(f"Cache hit for {type(query).__name__}")
-                return self._cache[key]
+                return cast(TResult, self._cache[key])
             else:
                 # Expired
                 del self._cache[key]
@@ -519,7 +520,7 @@ class CommandBus:
         chain = final_handler
         for middleware in reversed(self._middleware):
 
-            def create_next(mw: CommandMiddleware, next_fn: Callable) -> Callable:
+            def create_next(mw: CommandMiddleware, next_fn: Callable[..., Any]) -> Callable:
                 async def wrapped(cmd: Command) -> Any:
                     return await mw.execute(cmd, next_fn)
 
@@ -630,16 +631,17 @@ class QueryBus:
 
         # Build middleware chain
         async def final_handler(q: Query[TResult]) -> TResult:
-            return await handler(q)
+            result = await handler(q)
+            return cast(TResult, result)
 
         chain = final_handler
         for middleware in reversed(self._middleware):
 
             def create_next(
-                mw: QueryMiddleware, next_fn: Callable
-            ) -> Callable[[Query[TResult]], Awaitable[TResult]]:
+                mw: QueryMiddleware, next_fn: Callable[..., Any]) -> Callable[[Query[TResult]], Awaitable[TResult]]:
                 async def wrapped(q: Query[TResult]) -> TResult:
-                    return await mw.execute(q, next_fn)
+                    result = await mw.execute(q, next_fn)
+                    return cast(TResult, result)
 
                 return wrapped
 

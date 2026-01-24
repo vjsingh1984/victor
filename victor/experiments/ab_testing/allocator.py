@@ -20,7 +20,7 @@ This module implements various strategies for allocating users to experiment var
 import hashlib
 import random
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from victor.experiments.ab_testing.models import (
     AllocationStrategy,
@@ -40,7 +40,7 @@ class TrafficAllocator(ABC):
         self,
         user_id: str,
         experiment: ExperimentConfig,
-        context: Optional[Dict] = None,
+        context: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Allocate a user to a variant.
 
@@ -99,7 +99,7 @@ class RandomAllocator(TrafficAllocator):
         self,
         user_id: str,
         experiment: ExperimentConfig,
-        context: Optional[Dict] = None,
+        context: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Allocate user to variant using weighted random selection.
 
@@ -157,7 +157,7 @@ class StickyAllocator(TrafficAllocator):
         self,
         user_id: str,
         experiment: ExperimentConfig,
-        context: Optional[Dict] = None,
+        context: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Allocate user to variant using consistent hashing.
 
@@ -252,7 +252,7 @@ class RoundRobinAllocator(TrafficAllocator):
         self,
         user_id: str,
         experiment: ExperimentConfig,
-        context: Optional[Dict] = None,
+        context: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Allocate user to variant using round-robin.
 

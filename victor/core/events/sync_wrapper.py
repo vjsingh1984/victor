@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Awaitable, Callable
+from typing import Any, TYPE_CHECKING, Awaitable, Callable
 
 from victor.core.events.protocols import (
     EventHandler,
@@ -95,7 +95,7 @@ class SyncEventWrapper:
         self._backend = backend
         logger.debug(f"[SyncEventWrapper] Created wrapper for {type(backend).__name__}")
 
-    def _run_async_synchronous(self, coro: Awaitable) -> any:
+    def _run_async_synchronous(self, coro: Awaitable[Any]) -> any:
         """Run an async coroutine in a synchronous context.
 
         This method handles both cases:
@@ -272,7 +272,7 @@ class SyncObservabilityBus:
     def emit(
         self,
         topic: str,
-        data: dict,
+        data: dict[str, Any],
         *,
         source: str = "victor",
         correlation_id: str | None = None,

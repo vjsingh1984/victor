@@ -305,9 +305,9 @@ class TerraformCloudConfig(BaseTransportConfig):
 class CustomHookConfig(BaseTransportConfig):
     """Configuration for custom hook-based approvals."""
 
-    send_hook: Optional[Callable] = None  # async def send(request) -> str
-    poll_hook: Optional[Callable] = None  # async def poll(request_id) -> Optional[Response]
-    cancel_hook: Optional[Callable] = None  # async def cancel(request_id) -> bool
+    send_hook: Optional[Callable[..., Any]] = None  # async def send(request) -> str
+    poll_hook: Optional[Callable[..., Any]] = None  # async def poll(request_id) -> Optional[Response]
+    cancel_hook: Optional[Callable[..., Any]] = None  # async def cancel(request_id) -> bool
 
 
 # =============================================================================
@@ -607,7 +607,7 @@ class SlackTransport(BaseTransport):
         request: HITLRequest,
         workflow_id: str,
         urls: Dict[str, str],
-    ) -> List[Dict]:
+    ) -> List[Dict[str, Any]]:
         """Build Slack Block Kit blocks."""
         blocks = [
             {"type": "header", "text": {"type": "plain_text", "text": "🔔 Approval Required"}},

@@ -193,7 +193,7 @@ def json_loads(s: Union[str, bytes]) -> Any:
         return json.loads(s)
 
 
-def json_dump(obj: Any, fp, *, indent: Optional[int] = None) -> None:
+def json_dump(obj: Any, fp: Any, *, indent: Optional[int] = None) -> None:
     """Serialize object to JSON file.
 
     Args:
@@ -210,7 +210,7 @@ def json_dump(obj: Any, fp, *, indent: Optional[int] = None) -> None:
         fp.write(content)
 
 
-def json_load(fp) -> Any:
+def json_load(fp: Any) -> Any:
     """Deserialize JSON file to object.
 
     Args:
@@ -368,7 +368,7 @@ class cached_property:
         self.attr_name = f"_cached_{func.__name__}"
         self._lock = threading.Lock()
 
-    def __get__(self, instance: Any, owner: Optional[Type] = None) -> Any:
+    def __get__(self, instance: Any, owner: Optional[Type[Any]] = None) -> Any:
         """Get property value, computing and caching if necessary.
 
         Args:
@@ -402,7 +402,7 @@ class cached_property:
 
             return cached_value
 
-    def __set_name__(self, owner: Type, name: str) -> None:
+    def __set_name__(self, owner: Type[Any], name: str) -> None:
         """Set property name (Python 3.8+)."""
         self.attr_name = f"_cached_{name}"
 
@@ -621,7 +621,7 @@ class PerformanceMonitor:
         self.start_time = time.perf_counter()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Exit context and log elapsed time."""
         if self.start_time is not None:
             self.elapsed = time.perf_counter() - self.start_time

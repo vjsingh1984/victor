@@ -259,7 +259,7 @@ class InteractiveSessionHandler(BaseSessionHandler):
     multiple messages in a REPL-style interface.
     """
 
-    def __init__(self, on_message_callback: Optional[Callable] = None):
+    def __init__(self, on_message_callback: Optional[Callable[..., Any]] = None):
         """Initialize interactive handler.
 
         Args:
@@ -315,7 +315,7 @@ class TUISessionHandler(BaseSessionHandler):
     and enhanced interactivity.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize TUI handler."""
         super().__init__()
 

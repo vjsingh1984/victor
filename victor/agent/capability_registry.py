@@ -159,15 +159,15 @@ class CapabilityRegistryMixin:
         Call this at the end of __init__ after all components are initialized.
         """
         self._capabilities: Dict[str, OrchestratorCapability] = {}
-        self._capability_methods: Dict[str, Callable] = {}
+        self._capability_methods: Dict[str, Callable[..., Any]] = {}
         self._dynamic_capabilities: Set[str] = set()  # Track dynamically loaded caps
         self._register_default_capabilities()
 
     def _register_capability(
         self,
         capability: OrchestratorCapability,
-        setter_method: Optional[Callable] = None,
-        getter_method: Optional[Callable] = None,
+        setter_method: Optional[Callable[..., Any]] = None,
+        getter_method: Optional[Callable[..., Any]] = None,
     ) -> None:
         """Register a capability with its methods.
 
@@ -655,7 +655,7 @@ class CapabilityRegistryMixin:
             if hasattr(self.prompt_builder, "add_prompt_section"):
                 self.prompt_builder.add_prompt_section(section)
 
-    def _add_safety_patterns(self, patterns: list) -> None:
+    def _add_safety_patterns(self, patterns: list[Any]) -> None:
         """Add safety patterns to checker."""
         if hasattr(self, "_safety_checker") and self._safety_checker:
             if hasattr(self._safety_checker, "add_patterns"):
@@ -683,7 +683,7 @@ class CapabilityRegistryMixin:
             if hasattr(self._sequence_tracker, "set_dependencies"):
                 self._sequence_tracker.set_dependencies(dependencies)
 
-    def _set_tool_sequences(self, sequences: list) -> None:
+    def _set_tool_sequences(self, sequences: list[Any]) -> None:
         """Set tool sequences."""
         if hasattr(self, "_sequence_tracker") and self._sequence_tracker:
             if hasattr(self._sequence_tracker, "set_sequences"):
@@ -710,8 +710,8 @@ class CapabilityRegistryMixin:
     def register_dynamic_capability(
         self,
         capability: OrchestratorCapability,
-        setter_method: Optional[Callable] = None,
-        getter_method: Optional[Callable] = None,
+        setter_method: Optional[Callable[..., Any]] = None,
+        getter_method: Optional[Callable[..., Any]] = None,
     ) -> bool:
         """Register a capability dynamically at runtime.
 
@@ -824,7 +824,7 @@ class CapabilityRegistryMixin:
     def load_capabilities_from_loader(
         self,
         loader: Any,
-        capability_names: Optional[list] = None,
+        capability_names: Optional[list[Any]] = None,
     ) -> list:
         """Load capabilities from a CapabilityLoader.
 

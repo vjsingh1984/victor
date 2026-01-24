@@ -331,7 +331,7 @@ class FrameworkShim:
     # Lifecycle Methods
     # =========================================================================
 
-    def emit_session_start(self, metadata: Optional[dict] = None) -> None:
+    def emit_session_start(self, metadata: Optional[dict[str, Any]] = None) -> None:
         """Emit a session start event if observability is enabled.
 
         Args:

@@ -46,7 +46,7 @@ class Message:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Message":
+    def from_dict(cls, data: dict[str, Any]) -> "Message":
         """Create from dictionary."""
         return cls(
             role=data["role"],
@@ -90,7 +90,7 @@ class Session:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Session":
+    def from_dict(cls, data: dict[str, Any]) -> "Session":
         """Create from dictionary."""
         return cls(
             id=data.get("id", str(uuid.uuid4())),

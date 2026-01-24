@@ -20,10 +20,23 @@ version control without code changes.
 Extended Schema Features:
 - llm_config: Agent LLM settings (temperature, model_hint, max_tokens)
 - $ref: External file references for node reuse
+- stage: Stage template references for workflow reuse
 - batch_config: Workflow-level batch execution settings
 - temporal_context: Point-in-time analysis for backtesting
 - $env.VAR_NAME: Environment variable interpolation
 - ${VAR:-default}: Shell-style env vars with defaults
+
+Stage Template References:
+    Workflows can reference predefined stage templates:
+        nodes:
+          - id: lint_check
+            stage: lint_check_stage
+            overrides:
+              timeout: 240
+            next: [type_check]
+
+    This resolves the 'lint_check_stage' template from the registry,
+    applies the timeout override, and preserves the next node reference.
 
 Example YAML format:
     workflows:
@@ -93,6 +106,7 @@ Example YAML format:
 
 from __future__ import annotations
 
+import copy
 import logging
 import operator
 import os
@@ -106,6 +120,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TYPE_CHE
 import yaml
 
 from victor.core.errors import ConfigurationError
+from victor.workflows.template_registry import get_workflow_template_registry
 
 
 # =============================================================================
@@ -756,6 +771,133 @@ def _expand_refs(
     return expanded
 
 
+def _deep_merge_dicts(base: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]:
+    """Deep merge overrides into base dict.
+
+    Args:
+        base: Base dictionary to merge into
+        overrides: Override values to apply
+
+    Returns:
+        New dictionary with merged values
+
+    Example:
+        base = {"a": 1, "b": {"x": 10, "y": 20}}
+        overrides = {"b": {"y": 99}, "c": 3}
+        result = {"a": 1, "b": {"x": 10, "y": 99}, "c": 3}
+    """
+    result = base.copy()
+
+    for key, value in overrides.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            # Recursively merge nested dicts
+            result[key] = _deep_merge_dicts(result[key], value)
+        elif key in result and isinstance(result[key], list) and isinstance(value, list):
+            # For lists, replace with override (could implement list merging if needed)
+            result[key] = value
+        else:
+            # Replace with override value
+            result[key] = value
+
+    return result
+
+
+def _resolve_stage_templates(
+    node_list: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Resolve stage template references in node list.
+
+    This function processes nodes that contain a 'stage' field, which references
+    a stage template from the WorkflowTemplateRegistry. Templates are deeply merged
+    with node definitions, and any 'overrides' section is applied.
+
+    Args:
+        node_list: List of node definitions (may contain 'stage' references)
+
+    Returns:
+        List with all stage template references resolved to full definitions
+
+    Raises:
+        YAMLWorkflowError: If stage template not found
+
+    Example:
+        # Input node with stage reference:
+        {
+            "id": "lint_check",
+            "stage": "lint_check_stage",
+            "overrides": {"timeout": 240},
+            "next": ["type_check"]
+        }
+
+        # Output node with resolved template:
+        {
+            "id": "lint_check",
+            "type": "compute",
+            "name": "Run Linters",
+            "tools": ["shell"],
+            "timeout": 240,  # Overridden value
+            # ... other fields from template
+            "next": ["type_check"]
+        }
+    """
+    registry = get_workflow_template_registry()
+    resolved = []
+
+    for node_data in node_list:
+        if "stage" in node_data:
+            stage_name = node_data["stage"]
+
+            # Get template from registry
+            template = registry.get_stage_template(stage_name)
+            if template is None:
+                available = ", ".join(registry.list_stage_templates()[:10])
+                if len(registry.list_stage_templates()) > 10:
+                    available += f", ... ({len(registry.list_stage_templates())} total)"
+                raise YAMLWorkflowError(
+                    f"Stage template '{stage_name}' not found. "
+                    f"Available templates: {available or 'none'}"
+                )
+
+            # Deep copy template to avoid mutating registry
+            resolved_node = copy.deepcopy(template)
+
+            # Apply node-level overrides (except 'stage' and 'overrides' keys)
+            for key, value in node_data.items():
+                if key not in ("stage", "overrides"):
+                    # Special handling for 'id' - always use node's id
+                    if key == "id":
+                        resolved_node[key] = value
+                    # For other keys, node value takes precedence over template
+                    else:
+                        resolved_node[key] = value
+
+            # Apply explicit overrides if present
+            if "overrides" in node_data:
+                overrides = node_data["overrides"]
+                resolved_node = _deep_merge_dicts(resolved_node, overrides)
+                # Remove overrides key from result
+                if "overrides" in resolved_node:
+                    del resolved_node["overrides"]
+
+            # Remove stage reference (now resolved)
+            if "stage" in resolved_node:
+                del resolved_node["stage"]
+
+            # Ensure node has an ID (required for workflow definition)
+            if "id" not in resolved_node:
+                raise YAMLWorkflowError(
+                    f"Node resolved from stage '{stage_name}' is missing 'id' field"
+                )
+
+            resolved.append(resolved_node)
+            logger.debug(f"Resolved stage template '{stage_name}' for node '{resolved_node.get('id')}'")
+        else:
+            # No stage template reference, use node as-is
+            resolved.append(node_data)
+
+    return resolved
+
+
 # =============================================================================
 # Configuration
 # =============================================================================
@@ -1369,6 +1511,9 @@ def load_workflow_from_dict(
     node_list = data.get("nodes", [])
     if config.base_dir:
         node_list = _expand_refs(node_list, config.base_dir)
+
+    # Resolve stage template references
+    node_list = _resolve_stage_templates(node_list)
 
     # Parse nodes
     nodes: Dict[str, WorkflowNode] = {}

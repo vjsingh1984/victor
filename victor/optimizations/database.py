@@ -35,7 +35,7 @@ import logging
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, cast
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -528,7 +528,7 @@ def cached_query(
             if key in _cache:
                 result, timestamp = _cache[key]
                 if time.time() - timestamp < cache_ttl:
-                    return result
+                    return cast(T, result)
 
             # Execute function
             result = await func(*args, **kwargs)
@@ -536,7 +536,7 @@ def cached_query(
             # Cache result
             _cache[key] = (result, time.time())
 
-            return result
+            return cast(T, result)
 
         return wrapper
 

@@ -63,12 +63,12 @@ class WorkflowInterceptor:
 
     async def execute_with_experiment(
         self,
-        workflow_func: Callable,
+        workflow_func: Callable[..., Any],
         experiment_id: str,
         user_id: str,
-        context: Optional[Dict] = None,
-        *args,
-        **kwargs,
+        context: Optional[Dict[str, Any]] = None,
+        *args: Any,
+        **kwargs: Any,
     ) -> Any:
         """Execute workflow with A/B testing.
 
@@ -186,7 +186,7 @@ class WorkflowInterceptor:
         variant_id: str,
         user_id: str,
         execution_id: str,
-        context: Optional[Dict],
+        context: Optional[Dict[str, Any]],
         result: Any,
         start_time: float,
         success: bool,
@@ -286,7 +286,7 @@ class ExperimentCompiledGraphWrapper:
         self,
         initial_state: Dict[str, Any],
         user_id: str = "unknown",
-        **kwargs,
+        **kwargs: Any,
     ) -> Any:
         """Invoke graph with experiment configuration.
 
@@ -360,7 +360,7 @@ class ExperimentCompiledGraphWrapper:
         self,
         initial_state: Dict[str, Any],
         user_id: str = "unknown",
-        **kwargs,
+        **kwargs: Any,
     ):
         """Stream graph execution with experiment configuration.
 
@@ -440,7 +440,7 @@ class ExperimentCompiledGraphWrapper:
         variant_id: str,
         user_id: str,
         execution_id: str,
-        context: Optional[Dict],
+        context: Optional[Dict[str, Any]],
         result: Any,
         start_time: float,
         success: bool,

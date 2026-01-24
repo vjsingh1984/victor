@@ -626,7 +626,7 @@ class CacheInvalidator:
         self._event_handlers[event_type].append(handler)
         logger.debug(f"Registered event handler for: {event_type}")
 
-    async def trigger_event(self, event_type: str, **kwargs) -> None:
+    async def trigger_event(self, event_type: str, **kwargs: Any) -> None:
         """Trigger an invalidation event.
 
         Args:

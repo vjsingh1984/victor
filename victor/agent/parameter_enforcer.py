@@ -471,15 +471,15 @@ def enforce_parameters(
     """
     enforcer = ParameterEnforcer(tool_name=tool_name, parameter_specs=specs)
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable:
         @wraps(func)
-        def wrapper(*args, context: Optional[Dict[str, Any]] = None, **kwargs):
+        def wrapper(*args: Any, context: Optional[Dict[str, Any]] = None, **kwargs: Any):
             # Enforce parameters
             enforced_kwargs = enforcer.enforce(kwargs, context=context)
             return func(*args, **enforced_kwargs)
 
         # Attach enforcer for introspection
-        wrapper._parameter_enforcer = enforcer
+        setattr(wrapper, "_parameter_enforcer", enforcer)  # type: ignore[attr-defined]
         return wrapper
 
     return decorator

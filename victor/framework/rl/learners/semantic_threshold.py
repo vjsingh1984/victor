@@ -32,7 +32,7 @@ Migrated from: victor/codebase/semantic_threshold_learner.py
 
 import logging
 import sqlite3
-from typing import Optional
+from typing import Any, Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
@@ -204,7 +204,7 @@ class SemanticThresholdLearner(BaseLearner):
             f"threshold={stats['avg_threshold']:.2f})"
         )
 
-    def _update_threshold(self, stats: dict) -> None:
+    def _update_threshold(self, stats: dict[str, Any]) -> None:
         """Update threshold recommendation based on stats.
 
         Strategy:

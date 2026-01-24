@@ -24,7 +24,7 @@ import time
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 import yaml
 
@@ -139,7 +139,7 @@ def _load_yaml_cached(file_path: Path, cache_key: str) -> Optional[Dict[str, Any
     if cache_key in _cache_data:
         cached_time = _cache_timestamps.get(cache_key, 0)
         if now - cached_time < _cache_ttl:
-            return _cache_data[cache_key]
+            return cast(Optional[Dict[str, Any]], _cache_data[cache_key])
 
     if not file_path.exists():
         logger.debug(f"Config file not found: {file_path}")
@@ -151,7 +151,7 @@ def _load_yaml_cached(file_path: Path, cache_key: str) -> Optional[Dict[str, Any
 
         _cache_data[cache_key] = data
         _cache_timestamps[cache_key] = now
-        return data
+        return cast(Optional[Dict[str, Any]], data)
 
     except Exception as e:
         logger.warning(f"Failed to load {file_path}: {e}")
@@ -278,7 +278,9 @@ def get_stage_tool_preferences(stage: str) -> List[str]:
         return []
 
     tool_prefs = data.get("tool_preferences", {})
-    return tool_prefs.get(stage, [])
+    result = tool_prefs.get(stage, [])
+    assert isinstance(result, list)
+    return cast(List[str], result)
 
 
 def _get_default_stage_keywords() -> Dict[str, StageConfig]:

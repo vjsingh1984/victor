@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 class PromptingBuilder(FactoryAwareBuilder):
     """Build response sanitization, prompt, and mode components."""
 
-    def __init__(self, settings, factory: Optional["OrchestratorFactory"] = None):
+    def __init__(self, settings: Any, factory: Optional["OrchestratorFactory"] = None):
         """Initialize the builder.
 
         Args:
@@ -46,7 +46,7 @@ class PromptingBuilder(FactoryAwareBuilder):
         self,
         orchestrator: "AgentOrchestrator",
         model: str,
-        **_kwargs,
+        **kwargs: Any,
     ) -> Dict[str, Any]:
         """Build prompting components and attach them to orchestrator."""
         factory = self._ensure_factory()

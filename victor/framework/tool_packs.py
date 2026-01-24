@@ -75,7 +75,7 @@ class ToolPack:
     excludes: List[str] = field(default_factory=list)
     metadata: Dict[str, object] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate tool pack configuration."""
         if not self.name:
             raise ValueError("ToolPack must have a name")
@@ -97,7 +97,7 @@ class ToolPackRegistry:
         tools = registry.resolve("devops")
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._packs: Dict[str, ToolPack] = {}
 
     def register(self, pack: ToolPack) -> None:

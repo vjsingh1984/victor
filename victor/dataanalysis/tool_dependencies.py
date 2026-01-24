@@ -147,7 +147,7 @@ class _DeprecatedTransitions:
         _warn_deprecated("DATA_ANALYSIS_TOOL_TRANSITIONS")
         return _get_deprecated_config().get_tool_transitions().values()
 
-    def get(self, key: str, default=None):
+    def get(self, key: str, default: Any = None):
         _warn_deprecated("DATA_ANALYSIS_TOOL_TRANSITIONS")
         return _get_deprecated_config().get_tool_transitions().get(key, default)
 
@@ -175,7 +175,7 @@ class _DeprecatedClusters:
         _warn_deprecated("DATA_ANALYSIS_TOOL_CLUSTERS")
         return _get_deprecated_config().get_tool_clusters().values()
 
-    def get(self, key: str, default=None):
+    def get(self, key: str, default: Any = None):
         _warn_deprecated("DATA_ANALYSIS_TOOL_CLUSTERS")
         return _get_deprecated_config().get_tool_clusters().get(key, default)
 
@@ -203,7 +203,7 @@ class _DeprecatedSequences:
         _warn_deprecated("DATA_ANALYSIS_TOOL_SEQUENCES")
         return _get_deprecated_config().get_tool_sequences().values()
 
-    def get(self, key: str, default=None):
+    def get(self, key: str, default: Any = None):
         _warn_deprecated("DATA_ANALYSIS_TOOL_SEQUENCES")
         return _get_deprecated_config().get_tool_sequences().get(key, default)
 

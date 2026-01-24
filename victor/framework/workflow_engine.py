@@ -329,8 +329,8 @@ class WorkflowEngine:
         yaml_path: Union[str, Path],
         initial_state: Optional[Dict[str, Any]] = None,
         workflow_name: Optional[str] = None,
-        condition_registry: Optional[Dict[str, Callable]] = None,
-        transform_registry: Optional[Dict[str, Callable]] = None,
+        condition_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        transform_registry: Optional[Dict[str, Callable[..., Any]]] = None,
         use_unified_compiler: bool = True,
         **kwargs: Any,
     ) -> WorkflowExecutionResult:
@@ -633,8 +633,8 @@ class WorkflowEngine:
         yaml_path: Union[str, Path],
         initial_state: Optional[Dict[str, Any]] = None,
         workflow_name: Optional[str] = None,
-        condition_registry: Optional[Dict[str, Callable]] = None,
-        transform_registry: Optional[Dict[str, Callable]] = None,
+        condition_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        transform_registry: Optional[Dict[str, Callable[..., Any]]] = None,
         use_unified_compiler: bool = True,
         **kwargs: Any,
     ) -> AsyncIterator[WorkflowEvent]:

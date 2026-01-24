@@ -196,7 +196,7 @@ class AgentNodeExecutor:
 
         return role_map[role]
 
-    def _substitute_context(self, template: str, context: dict) -> str:
+    def _substitute_context(self, template: str, context: dict[str, Any]) -> str:
         """Substitute context variables in template string.
 
         Args:

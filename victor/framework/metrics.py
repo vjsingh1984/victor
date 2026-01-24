@@ -19,7 +19,7 @@ from the framework layer. It re-exports existing implementations from core modul
 without duplicating code, following the Facade Pattern.
 
 Delegated modules:
-- victor.observability.metrics: Counter, Gauge, Histogram, Timer metrics
+- victor.observability.metrics: Counter[str], Gauge, Histogram, Timer metrics
 - victor.telemetry: OpenTelemetry integration for tracing and metrics
 
 Design Pattern: Facade

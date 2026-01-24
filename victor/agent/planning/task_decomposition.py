@@ -951,6 +951,7 @@ class TaskDecomposition:
                 return dot_str
             except ImportError:
                 plt.close()
+                return str(self._graph)
 
     # ========================================================================
     # Legacy API Compatibility Methods for HierarchicalPlanner Integration
@@ -1005,7 +1006,7 @@ class TaskDecomposition:
 
         return legacy_graph
 
-    def get_ready_tasks(self, task_graph: Optional["TaskGraph"] = None) -> List:
+    def get_ready_tasks(self, task_graph: Optional["TaskGraph"] = None) -> List[Any]:
         """Get tasks that are ready to execute.
 
         This method provides compatibility with both legacy and new APIs.
@@ -1047,7 +1048,7 @@ class TaskDecomposition:
             return ready_tasks
 
         # New API: use internal state
-        ready_tasks: List[SimpleTask] = []
+        ready_tasks_new: List[SimpleTask] = []
 
         for task_id, node in self._task_nodes.items():
             if node.status != TaskStatus.PENDING:
@@ -1068,9 +1069,9 @@ class TaskDecomposition:
                         break
 
             if all_deps_completed:
-                ready_tasks.append(node.task)
+                ready_tasks_new.append(node.task)
 
-        return ready_tasks
+        return ready_tasks_new  # type: ignore
 
     def validate_plan(self, task_graph: Optional["TaskGraph"] = None) -> "ValidationResult":
         """Validate a task graph for correctness.

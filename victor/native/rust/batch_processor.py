@@ -474,7 +474,7 @@ class BatchProcessor:
         graph = {task.task_id: set(task.dependencies) for task in tasks}
 
         # Detect cycles using DFS
-        def visit(node: str, visited: set, rec_stack: set) -> bool:
+        def visit(node: str, visited: set[Any], rec_stack: set[Any]) -> bool:
             visited.add(node)
             rec_stack.add(node)
 

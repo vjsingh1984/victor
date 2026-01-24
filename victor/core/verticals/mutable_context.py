@@ -114,7 +114,7 @@ class MutableVerticalContext(VerticalContext):
         self._capability_values: Dict[str, Any] = {}
         self._rollback_stack: List[CapabilityRollback] = []
 
-    def apply_capability(self, capability_name: str, **kwargs) -> None:
+    def apply_capability(self, capability_name: str, **kwargs: Any) -> None:
         """Apply a capability through context (DIP compliant).
 
         This is the single point of entry for all capability mutations,

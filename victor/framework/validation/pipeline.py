@@ -289,7 +289,7 @@ class ValidationContext:
     def get_nested(self, path: str, default: Any = None) -> Any:
         """Get a nested value using dot notation."""
         parts = path.split(".")
-        current = self.data
+        current: Any = self.data
         for part in parts:
             if isinstance(current, dict):
                 current = current.get(part)

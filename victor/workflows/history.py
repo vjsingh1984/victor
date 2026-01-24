@@ -281,7 +281,7 @@ class WorkflowExecutionHistory:
     def replay_execution(
         self,
         execution_id: str,
-        executor: Optional[Callable] = None,
+        executor: Optional[Callable[..., Any]] = None,
         override_inputs: Optional[Dict[str, Any]] = None,
     ) -> Any:
         """Replay a previous execution.

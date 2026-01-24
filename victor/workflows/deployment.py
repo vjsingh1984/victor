@@ -1176,7 +1176,7 @@ class ECSDeploymentHandler(DeploymentHandler):
         """Get or create boto3 ECS client."""
         if self._ecs_client is None:
             try:
-                import boto3  # type: ignore
+                import boto3
 
                 self._ecs_client = boto3.client("ecs")
             except ImportError:

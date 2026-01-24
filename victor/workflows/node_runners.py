@@ -316,7 +316,7 @@ class ComputeNodeRunner(BaseNodeRunner):
     def __init__(
         self,
         tool_registry: Optional["ToolRegistry"] = None,
-        handler_registry: Optional[Dict[str, Callable]] = None,
+        handler_registry: Optional[Dict[str, Callable[..., Any]]] = None,
     ):
         """Initialize the compute runner.
 
@@ -332,7 +332,7 @@ class ComputeNodeRunner(BaseNodeRunner):
         """Set the tool registry (for deferred initialization)."""
         self._tool_registry = registry
 
-    def register_handler(self, name: str, handler: Callable) -> None:
+    def register_handler(self, name: str, handler: Callable[..., Any]) -> None:
         """Register a compute handler.
 
         Args:
@@ -444,7 +444,7 @@ class TransformNodeRunner(BaseNodeRunner):
         )
     """
 
-    def __init__(self, transform_registry: Optional[Dict[str, Callable]] = None):
+    def __init__(self, transform_registry: Optional[Dict[str, Callable[..., Any]]] = None):
         """Initialize the transform runner.
 
         Args:
@@ -453,7 +453,7 @@ class TransformNodeRunner(BaseNodeRunner):
         super().__init__(["transform"])
         self._transform_registry = transform_registry or {}
 
-    def register_transform(self, name: str, transform: Callable) -> None:
+    def register_transform(self, name: str, transform: Callable[..., Any]) -> None:
         """Register a transform function."""
         self._transform_registry[name] = transform
 
@@ -602,7 +602,7 @@ class ConditionNodeRunner(BaseNodeRunner):
         )
     """
 
-    def __init__(self, condition_registry: Optional[Dict[str, Callable]] = None):
+    def __init__(self, condition_registry: Optional[Dict[str, Callable[..., Any]]] = None):
         """Initialize the condition runner.
 
         Args:
@@ -611,7 +611,7 @@ class ConditionNodeRunner(BaseNodeRunner):
         super().__init__(["condition", "branch", "router"])
         self._condition_registry = condition_registry or {}
 
-    def register_condition(self, name: str, condition: Callable) -> None:
+    def register_condition(self, name: str, condition: Callable[..., Any]) -> None:
         """Register a condition function."""
         self._condition_registry[name] = condition
 

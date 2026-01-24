@@ -684,7 +684,7 @@ def trace_function(
             ...
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             tracer = get_current_tracer()
@@ -735,7 +735,7 @@ def trace_async_function(
             ...
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable:
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             tracer = get_current_tracer()

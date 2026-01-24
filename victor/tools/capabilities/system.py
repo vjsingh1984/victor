@@ -102,7 +102,7 @@ class ToolCapability(Enum):
         NOTIFICATION: Alert management
 
     Workflow & Automation:
-        WORKFLOW_ORCHESTRATION: StateGraph, DAG workflows
+        WORKFLOW_ORCHESTRATION: StateGraph[Any], DAG workflows
         AUTOMATION: Batch processing, scheduling
 
     Intelligence:

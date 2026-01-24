@@ -65,15 +65,15 @@ logger = logging.getLogger(__name__)
 
 # Optional kubernetes import
 try:
-    from kubernetes import client, config as k8s_config  # type: ignore
-    from kubernetes.client.rest import ApiException  # type: ignore
-    from kubernetes.stream import stream  # type: ignore
+    from kubernetes import client, config as k8s_config
+    from kubernetes.client.rest import ApiException
+    from kubernetes.stream import stream
 
     K8S_AVAILABLE = True
 except ImportError:
     K8S_AVAILABLE = False
-    client = None  # type: ignore
-    k8s_config = None  # type: ignore
+    client = None
+    k8s_config = None
 
 
 class KubernetesServiceProvider(BaseServiceProvider):

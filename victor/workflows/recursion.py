@@ -198,7 +198,7 @@ class RecursionContext:
         """
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Context manager exit - reset state (thread-safe)."""
         with self._lock:
             self.current_depth = 0
@@ -277,6 +277,6 @@ class RecursionGuard:
         self._ctx.enter(self._operation_type, self._identifier)
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         self._ctx.exit()
         return False  # Don't suppress exceptions

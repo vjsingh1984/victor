@@ -61,7 +61,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Callable, Dict, List, Optional, Protocol, cast, runtime_checkable
 
 logger = logging.getLogger(__name__)
 
@@ -278,8 +278,9 @@ class CallableHealthCheck(BaseHealthCheck):
         """Execute the callable."""
         result = self._check_fn()
         if asyncio.iscoroutine(result):
-            return await result
-        return result
+            coro_result = await result
+            return cast(ComponentHealth, coro_result)
+        return cast(ComponentHealth, result)
 
 
 class ProviderHealthCheck(BaseHealthCheck):

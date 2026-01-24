@@ -1207,6 +1207,7 @@ class OutputValidationMiddleware(MiddlewareProtocol):
         try:
             fixed = content
             for iteration in range(self.max_fix_iterations):
+                # Validator.fix is dynamically implemented by specific validators
                 fixed = self.validator.fix(fixed, issues, context)  # type: ignore
                 # Re-validate to check if fix worked
                 result = self._validate_content(fixed, context)
@@ -2025,8 +2026,8 @@ class ValidationMiddleware(MiddlewareProtocol):
                 "number": (int, float),
                 "integer": int,
                 "boolean": bool,
-                "array": list,
-                "object": dict,
+                "array": list[Any],
+                "object": dict[str, Any],
             }
 
             expected_python_type = type_mapping.get(expected_type)

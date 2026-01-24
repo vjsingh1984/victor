@@ -270,7 +270,7 @@ class SqliteGraphStore(GraphStoreProtocol):
                 )
             return edges
 
-    def _row_to_node(self, row: tuple) -> GraphNode:
+    def _row_to_node(self, row: tuple[Any, ...]) -> GraphNode:
         """Convert a database row to a GraphNode."""
         return GraphNode(
             node_id=row[0],

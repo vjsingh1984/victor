@@ -137,7 +137,7 @@ class BenchmarkAgent:
         self._agent = agent
         self._config = config
         self._current_trace: Optional[ExecutionTrace] = None
-        self._event_unsubscribe: Optional[Callable] = None
+        self._event_unsubscribe: Optional[Callable[..., Any]] = None
 
     @classmethod
     async def create(

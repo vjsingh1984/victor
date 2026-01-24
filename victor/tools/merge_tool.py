@@ -243,7 +243,7 @@ class MergeConflictTool(BaseTool):
                 error=str(e),
             )
 
-    def _format_conflicts(self, conflicts: list) -> str:
+    def _format_conflicts(self, conflicts: list[Any]) -> str:
         """Format detected conflicts."""
         lines = ["**Merge Conflicts Detected**", ""]
         lines.append(f"**Total Files:** {len(conflicts)}")

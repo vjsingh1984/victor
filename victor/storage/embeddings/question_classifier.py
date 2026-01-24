@@ -218,7 +218,7 @@ class QuestionTypeClassifier:
 
     _instance: Optional["QuestionTypeClassifier"] = None
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the classifier."""
         self._patterns = QUESTION_PATTERNS
         logger.debug(f"QuestionTypeClassifier initialized with {len(self._patterns)} patterns")

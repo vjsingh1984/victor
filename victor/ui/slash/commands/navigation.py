@@ -334,7 +334,7 @@ class SnapshotsCommand(BaseSlashCommand):
 
             else:
                 ctx.console.print(f"[red]Unknown subcommand:[/] {subcommand}")
-                ctx.console.print("[dim]Use: list, create, restore, diff, clear[/]")
+                ctx.console.print("[dim]Use: list[Any], create, restore, diff, clear[/]")
 
         except ImportError:
             ctx.console.print("[yellow]Snapshot store not available[/]")

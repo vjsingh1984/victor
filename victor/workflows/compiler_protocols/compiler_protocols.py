@@ -276,8 +276,7 @@ class NodeExecutorFactoryProtocol(Protocol):
         Args:
             node: Workflow node definition
 
-        Returns:
-            Callable: Async executor function that takes WorkflowState and
+        Returns: Callable[..., Any]: Async executor function that takes WorkflowState and
                      returns WorkflowState
 
         Raises:

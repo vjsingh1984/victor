@@ -340,7 +340,7 @@ class WorkflowMetricsCollector:
         except Exception as e:
             logger.warning(f"Metrics collection error: {e}")
 
-    def get_filter(self) -> Optional[set]:
+    def get_filter(self) -> Optional[set[Any]]:
         """Get event filter (all events)."""
         return None
 

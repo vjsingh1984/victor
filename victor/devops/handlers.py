@@ -354,8 +354,7 @@ class MLOpsHandler(BaseHandler):
             }
 
     def _register_model(
-        self, mlflow, client, model_name: str, model_path: str, metrics: Dict, params: Dict
-    ) -> Dict[str, Any]:
+        self, mlflow, client, model_name: str, model_path: str, metrics: Dict[str, Any], params: Dict[str, Any]) -> Dict[str, Any]:
         """Register a model with MLflow."""
         with mlflow.start_run() as run:
             # Log parameters
@@ -384,8 +383,7 @@ class MLOpsHandler(BaseHandler):
             }
 
     def _log_experiment(
-        self, mlflow, experiment_name: str, metrics: Dict, params: Dict
-    ) -> Dict[str, Any]:
+        self, mlflow, experiment_name: str, metrics: Dict[str, Any], params: Dict[str, Any]) -> Dict[str, Any]:
         """Log an experiment run."""
         mlflow.set_experiment(experiment_name)
 

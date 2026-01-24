@@ -220,7 +220,7 @@ class TemporalContext:
             period_type: quarters
 
     Example usage in tools:
-        def my_tool(symbol: str, _exec_ctx: dict) -> ToolResult:
+        def my_tool(symbol: str, _exec_ctx: dict[str, Any]) -> ToolResult:
             temporal = _exec_ctx.get("temporal_context")
             if temporal:
                 data = fetch_data(symbol, as_of=temporal.as_of_date)
@@ -1331,7 +1331,7 @@ class WorkflowExecutor:
 
             if node.parallel and len(allowed_tools) > 1:
                 # Execute tools in parallel
-                async def execute_tool(tool_name: str, exec_context: dict) -> tuple:
+                async def execute_tool(tool_name: str, exec_context: dict[str, Any]) -> tuple:
                     try:
                         result = await asyncio.wait_for(
                             self.tool_registry.execute(

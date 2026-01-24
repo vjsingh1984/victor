@@ -271,7 +271,7 @@ class SecretScanner:
             include_low_severity: Whether to include LOW severity matches
         """
         self._patterns = patterns or CREDENTIAL_PATTERNS.copy()
-        self._compiled: Dict[str, Pattern] = {}
+        self._compiled: Dict[str, Pattern[str]] = {}
         self._include_low = include_low_severity
         self._compile_patterns()
 

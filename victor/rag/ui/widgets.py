@@ -82,7 +82,7 @@ if TEXTUAL_AVAILABLE:
                 super().__init__()
                 self.doc_id = doc_id
 
-        def __init__(self, documents: Optional[List[Any]] = None, *args, **kwargs):
+        def __init__(self, documents: Optional[List[Any]] = None, *args: Any, **kwargs: Any):
             """Initialize document list.
 
             Args:
@@ -120,7 +120,7 @@ if TEXTUAL_AVAILABLE:
             self._documents = documents
             self.refresh(recompose=True)
 
-        async def on_click(self, event) -> None:
+        async def on_click(self, event: Any) -> None:
             """Handle click events for selection."""
             # Find clicked document item
             for widget in self.query(".doc-item"):
@@ -205,8 +205,8 @@ if TEXTUAL_AVAILABLE:
             self,
             results: Optional[List[Any]] = None,
             query: str = "",
-            *args,
-            **kwargs,
+            *args: Any,
+            **kwargs: Any,
         ):
             """Initialize search results widget.
 

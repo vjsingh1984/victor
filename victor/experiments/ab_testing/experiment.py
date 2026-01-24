@@ -474,7 +474,7 @@ class ABTestManager:
         self,
         experiment_id: str,
         user_id: str,
-        context: Optional[Dict] = None,
+        context: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Allocate a user to a variant.
 

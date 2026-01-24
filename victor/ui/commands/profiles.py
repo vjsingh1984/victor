@@ -1,6 +1,6 @@
 import typer
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 from rich.console import Console
 from rich.table import Table
 
@@ -293,7 +293,7 @@ def _load_profiles_yaml(profiles_file: Path) -> dict:
         return {"profiles": {}}
 
 
-def _save_profiles_yaml(profiles_file: Path, data: dict) -> None:
+def _save_profiles_yaml(profiles_file: Path, data: dict[str, Any]) -> None:
     """Save data to profiles.yaml."""
     # Ensure directory exists
     profiles_file.parent.mkdir(parents=True, exist_ok=True)

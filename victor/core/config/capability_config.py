@@ -86,7 +86,7 @@ class CapabilityConfig:
     default_config: Dict[str, Any] = field(default_factory=dict)
     dependencies: List[str] = field(default_factory=list)
 
-    def import_handler(self) -> Optional[Callable]:
+    def import_handler(self) -> Optional[Callable[..., Any]]:
         """Import the handler function from its module.
 
         Returns:
@@ -104,7 +104,7 @@ class CapabilityConfig:
             )
             return None
 
-    def import_getter(self) -> Optional[Callable]:
+    def import_getter(self) -> Optional[Callable[..., Any]]:
         """Import the getter function from its module.
 
         Returns:

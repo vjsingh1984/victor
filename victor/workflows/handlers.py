@@ -133,7 +133,7 @@ class HandlerErrorBoundary:
 
     async def execute(
         self,
-        handler: Callable,
+        handler: Callable[..., Any],
         handler_name: str,
         node: "ComputeNode",
         context: "WorkflowContext",
@@ -279,7 +279,7 @@ def with_error_boundary(handler_name: str):
         register_compute_handler("my_custom", my_handler)
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable:
         @wraps(func)
         async def wrapper(
             node: "ComputeNode",

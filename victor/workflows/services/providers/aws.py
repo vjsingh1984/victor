@@ -58,13 +58,13 @@ logger = logging.getLogger(__name__)
 
 # Optional boto3 import
 try:
-    import boto3  # type: ignore
-    from botocore.exceptions import ClientError, WaiterError  # type: ignore
+    import boto3
+    from botocore.exceptions import ClientError, WaiterError
 
     BOTO3_AVAILABLE = True
 except ImportError:
     BOTO3_AVAILABLE = False
-    boto3 = None  # type: ignore
+    boto3 = None
 
 
 class AWSServiceProvider(BaseServiceProvider):

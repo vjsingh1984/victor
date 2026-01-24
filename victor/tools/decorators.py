@@ -221,7 +221,7 @@ def _get_json_schema_type(annotation: Any) -> Dict[str, Any]:
 
 
 def tool(
-    func: Optional[Callable] = None,
+    func: Optional[Callable[..., Any]] = None,
     *,
     name: Optional[str] = None,
     aliases: Optional[List[str]] = None,
@@ -367,7 +367,7 @@ def tool(
     _explicit_name = name
     _explicit_aliases = aliases or []
 
-    def decorator(fn: Callable) -> Callable:
+    def decorator(fn: Callable[..., Any]) -> Callable:
         @wraps(fn)
         def wrapper(*args, **kwargs) -> Any:
             # This wrapper is what gets called if the decorated function is called directly
@@ -425,7 +425,7 @@ def _resolve_tool_name(func_name: str, explicit_name: Optional[str] = None) -> s
 
 
 def _create_tool_class(
-    func: Callable,
+    func: Callable[..., Any],
     cost_tier: CostTier = CostTier.FREE,
     metadata_params: Optional[Dict[str, Any]] = None,
     selection_params: Optional[Dict[str, Any]] = None,
@@ -548,7 +548,7 @@ def _create_tool_class(
 
     # Dynamically create the tool class
     class FunctionTool(BaseTool):
-        def __init__(self, fn: Callable):
+        def __init__(self, fn: Callable[..., Any]):
             self._fn = fn
             self._name = _resolved_name  # Use resolved canonical name
             self._original_name = _original_func_name  # Keep original for debugging

@@ -621,7 +621,7 @@ def create_merge_strategy(
     else:
         raise ValueError(
             f"Unknown merge strategy type: {strategy_type}. "
-            f"Valid options: dict, list, custom, selective"
+            f"Valid options: dict[str, Any], list, custom, selective"
         )
 
 

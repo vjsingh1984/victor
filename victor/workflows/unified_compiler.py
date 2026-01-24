@@ -883,7 +883,7 @@ class NodeExecutorFactory:
             try:
                 if child_executors:
                     # Execute all child nodes in true parallel with asyncio.gather
-                    async def run_child(child_node: "WorkflowNode", executor: Callable) -> tuple:
+                    async def run_child(child_node: "WorkflowNode", executor: Callable[..., Any]) -> tuple:
                         # Use selective copy instead of full deepcopy for performance
                         # Shallow copies most keys, deep copies only mutable internal structures
                         child_state = factory._copy_state_for_parallel(state)

@@ -46,6 +46,7 @@ from typing import (
     Protocol,
     Set,
     Union,
+    cast,
     runtime_checkable,
 )
 
@@ -64,14 +65,14 @@ logger = __import__("logging").getLogger(__name__)
 # =============================================================================
 
 
-def _get_validation_result() -> type:
+def _get_validation_result() -> type[ValidationResult]:  # type: ignore[name-defined]
     """Get ValidationResult at runtime to avoid circular import."""
     from victor.framework.validation.pipeline import ValidationResult
 
     return ValidationResult
 
 
-def _get_validation_context() -> type:
+def _get_validation_context() -> type[ValidationContext]:  # type: ignore[name-defined]
     """Get ValidationContext at runtime to avoid circular import."""
     from victor.framework.validation.pipeline import ValidationContext
 
@@ -160,8 +161,8 @@ class BaseValidator(ABC):
         # Support nested paths with dot notation
         if "." in self._field:
             parts = self._field.split(".")
-            value = data
-            path = []
+            value: Any = data
+            path: list[str] = []
             for part in parts:
                 if isinstance(value, dict):
                     value = value.get(part)
@@ -175,7 +176,7 @@ class BaseValidator(ABC):
     def _create_result(
         self,
         is_valid: bool = True,
-    ):
+    ) -> "ValidationResult":
         """Create a validation result.
 
         Args:
@@ -185,7 +186,7 @@ class BaseValidator(ABC):
             ValidationResult
         """
         ValidationResult = _get_validation_result()
-        return ValidationResult(is_valid=is_valid)
+        return cast("ValidationResult", ValidationResult(is_valid=is_valid))
 
     def _add_error(
         self,
@@ -609,7 +610,7 @@ class PatternValidator(BaseValidator):
         USERNAME = "username"
 
     # Common regex patterns
-    PATTERNS = {
+    PATTERNS: Dict[PatternType, str] = {
         PatternType.EMAIL: r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$",
         PatternType.URL: r"^https?://[^\s/$.?#].[^\s]*$",
         PatternType.UUID: r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
@@ -620,6 +621,8 @@ class PatternValidator(BaseValidator):
         PatternType.SLUG: r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
         PatternType.USERNAME: r"^[a-zA-Z0-9_-]{3,20}$",
     }
+
+    _pattern: str = ""
 
     def __init__(
         self,
@@ -648,7 +651,7 @@ class PatternValidator(BaseValidator):
             self._pattern = pattern
 
         self._flags = flags
-        self._compiled_pattern: Optional[re.Pattern] = None
+        self._compiled_pattern: Optional[re.Pattern[str]] = None
         self._compile_pattern()
 
     def _compile_pattern(self) -> None:
@@ -773,10 +776,10 @@ class TypeValidator(BaseValidator):
             "string": str,
             "bool": bool,
             "boolean": bool,
-            "list": list,
-            "dict": dict,
-            "tuple": tuple,
-            "set": set,
+            "list": list[Any],
+            "dict": dict[str, Any],
+            "tuple": tuple[Any, ...],
+            "set": set[Any],
         }
         return type_map.get(type_name.lower(), str)
 
@@ -850,7 +853,7 @@ class TypeValidator(BaseValidator):
                             data[self._field] = coerced
                     result.add_info(
                         path,
-                        f"Coerced '{path}' from {type(value).__name__} to {self._expected_type.__name__}",
+                        f"Coerced '{path}' from {type(value).__name__} to {self._type_name()}",
                     )
                     return result
 

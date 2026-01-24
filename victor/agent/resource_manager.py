@@ -48,7 +48,7 @@ class ManagedResource:
     """Represents a managed resource."""
 
     name: str
-    resource_ref: weakref.ref
+    resource_ref: weakref.ref[Any]
     cleanup_method: str
     priority: int = 0  # Higher priority = cleanup first
     state: ResourceState = ResourceState.ACTIVE
@@ -84,7 +84,7 @@ class ManagedResource:
 class IResourceManager(Protocol):
     """Protocol for resource management."""
 
-    def register_cleanup(self, callback: Callable) -> None:
+    def register_cleanup(self, callback: Callable[..., Any]) -> None:
         """Register a cleanup callback."""
         ...
 
@@ -145,7 +145,7 @@ class ResourceManager:
         atexit.register(self._atexit_cleanup)
         logger.debug("ResourceManager initialized")
 
-    def register_cleanup(self, callback: Callable, priority: int = 0) -> None:
+    def register_cleanup(self, callback: Callable[..., Any], priority: int = 0) -> None:
         """Register a cleanup callback to run on shutdown.
 
         Args:
@@ -164,7 +164,7 @@ class ResourceManager:
         name: str,
         cleanup_method: str = "close",
         priority: int = 0,
-        **metadata,
+        **metadata: Any,
     ) -> None:
         """Register a resource for cleanup.
 

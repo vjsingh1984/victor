@@ -173,7 +173,7 @@ class MetricsAggregator:
         all_metrics = self._storage.get_metrics(run_id)
 
         # Group by metric name
-        metrics_by_name: Dict[str, List] = {}
+        metrics_by_name: Dict[str, List[Any]] = {}
         for metric in all_metrics:
             if metric.key not in metrics_by_name:
                 metrics_by_name[metric.key] = []

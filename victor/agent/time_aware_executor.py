@@ -114,7 +114,7 @@ class ExecutionBudget:
 
         return new_phase
 
-    def checkpoint(self, description: str, **metadata) -> ExecutionCheckpoint:
+    def checkpoint(self, description: str, **metadata: Any) -> ExecutionCheckpoint:
         """Record a checkpoint for progress tracking.
 
         Args:
@@ -331,7 +331,7 @@ class TimeAwareExecutor:
         """
         return self._budget.elapsed if self._budget else 0.0
 
-    def checkpoint(self, description: str, **metadata) -> Optional[ExecutionCheckpoint]:
+    def checkpoint(self, description: str, **metadata: Any) -> Optional[ExecutionCheckpoint]:
         """Record a progress checkpoint.
 
         Args:

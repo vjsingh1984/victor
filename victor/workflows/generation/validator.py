@@ -1409,7 +1409,7 @@ class RequirementValidator:
         }
         self._valid_environments = {"local", "cloud", "sandbox"}
 
-    def validate(self, requirements) -> "RequirementValidationResult":
+    def validate(self, requirements: Any) -> "RequirementValidationResult":
         """Perform comprehensive validation.
 
         Args:
@@ -1463,7 +1463,7 @@ class RequirementValidator:
             score=score,
         )
 
-    def _check_completeness(self, requirements) -> List:
+    def _check_completeness(self, requirements: Any) -> List:
         """Check for missing required information."""
         from victor.workflows.generation.requirements import RequirementValidationError
 
@@ -1566,7 +1566,7 @@ class RequirementValidator:
 
         return errors
 
-    def _check_consistency(self, requirements) -> tuple:
+    def _check_consistency(self, requirements: Any) -> tuple:
         """Check for contradictions.
 
         Returns:
@@ -1659,7 +1659,7 @@ class RequirementValidator:
 
         return errors, warnings
 
-    def _check_feasibility(self, requirements) -> tuple:
+    def _check_feasibility(self, requirements: Any) -> tuple:
         """Check if requirements can be implemented.
 
         Returns:
@@ -1738,7 +1738,7 @@ class RequirementValidator:
 
         return errors, warnings
 
-    def _check_specificity(self, requirements) -> List:
+    def _check_specificity(self, requirements: Any) -> List:
         """Check if requirements are specific enough.
 
         Args:
@@ -1792,7 +1792,7 @@ class RequirementValidator:
 
         return warnings
 
-    def _generate_recommendations(self, requirements, errors, warnings) -> List[str]:
+    def _generate_recommendations(self, requirements: Any, errors: Any, warnings: Any) -> List[str]:
         """Generate recommendations for improvement.
 
         Args:
@@ -1830,7 +1830,7 @@ class RequirementValidator:
 
         return recommendations
 
-    def _compute_score(self, requirements, errors, warnings) -> float:
+    def _compute_score(self, requirements: Any, errors: Any, warnings: Any) -> float:
         """Compute overall quality score (0.0-1.0).
 
         Args:
@@ -1871,7 +1871,7 @@ class RequirementValidator:
         # Clamp to [0, 1]
         return max(0.0, min(1.0, score))
 
-    def _detect_cycles(self, dependencies) -> List:
+    def _detect_cycles(self, dependencies: Any) -> List:
         """Detect cycles in dependency graph using DFS.
 
         Args:

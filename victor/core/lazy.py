@@ -51,7 +51,7 @@ Known Circular Import Chains (documented for future developers):
 import logging
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Generic, List, Optional, Type, TypeVar, overload
+from typing import Any, Callable, Dict, Generic, List, Optional, Type, TypeVar, cast, overload
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +121,7 @@ def deferred_import(
     class_name: str,
     fallback: Optional[T] = None,
     call_method: Optional[str] = None,
-    init_args: Optional[tuple] = None,
+    init_args: Optional[tuple[Any, ...]] = None,
     init_kwargs: Optional[Dict[str, Any]] = None,
     logger_name: str = __name__,
 ) -> Optional[T]:
@@ -164,12 +164,14 @@ def deferred_import(
 
         # Call factory method if specified
         if call_method:
-            return getattr(cls, call_method)()
+            result: Optional[T] = getattr(cls, call_method)()
+            return result
 
         # Otherwise instantiate
         args = init_args or ()
         kwargs = init_kwargs or {}
-        return cls(*args, **kwargs)
+        result = cast(T, cls(*args, **kwargs))
+        return result
 
     except (ImportError, AttributeError, TypeError) as e:
         log = logging.getLogger(logger_name)
@@ -220,10 +222,11 @@ class SingletonFactory:
                 # Double-check inside lock
                 if service_type not in cls._instances:
                     if factory is None:
-                        cls._instances[service_type] = service_type()
+                        instance = cast(T, service_type())
+                        cls._instances[service_type] = instance
                     else:
                         cls._instances[service_type] = factory()
-        return cls._instances[service_type]
+        return cast(T, cls._instances[service_type])
 
     @classmethod
     def has_instance(cls, service_type: Type[Any]) -> bool:

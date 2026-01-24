@@ -372,7 +372,7 @@ class FormatRegistry:
         candidates.sort(key=lambda x: x[0], reverse=True)
         return candidates[0][1]
 
-    def add_hook(self, hook_type: str, callback: Callable) -> None:
+    def add_hook(self, hook_type: str, callback: Callable[..., Any]) -> None:
         """Add a hook callback.
 
         Hook types:
@@ -389,7 +389,7 @@ class FormatRegistry:
         else:
             raise ValueError(f"Unknown hook type: {hook_type}")
 
-    def remove_hook(self, hook_type: str, callback: Callable) -> bool:
+    def remove_hook(self, hook_type: str, callback: Callable[..., Any]) -> bool:
         """Remove a hook callback.
 
         Args:
@@ -404,7 +404,7 @@ class FormatRegistry:
             return True
         return False
 
-    def invoke_hooks(self, hook_type: str, *args, **kwargs) -> None:
+    def invoke_hooks(self, hook_type: str, *args: Any, **kwargs: Any) -> None:
         """Invoke all hooks of a given type.
 
         Args:

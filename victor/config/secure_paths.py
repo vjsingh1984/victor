@@ -39,7 +39,7 @@ import platform
 import pwd
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ SECURITY_EVENT_SYMLINK_ESCAPE = "SYMLINK_ESCAPE_ATTEMPT"
 SECURITY_EVENT_INSECURE_PERMISSIONS = "INSECURE_FILE_PERMISSIONS"
 
 
-def _log_security_event(event_type: str, details: dict) -> None:
+def _log_security_event(event_type: str, details: dict[str, Any]) -> None:
     """Log a security event for audit purposes.
 
     This function logs security-relevant events at WARNING level
@@ -918,7 +918,7 @@ def load_plugin_trust_store() -> dict:
         return {"version": 1, "trusted_plugins": {}, "trusted_signers": []}
 
 
-def save_plugin_trust_store(trust_store: dict) -> bool:
+def save_plugin_trust_store(trust_store: dict[str, Any]) -> bool:
     """Save the plugin trust store.
 
     Args:
@@ -1018,7 +1018,7 @@ def verify_plugin_trust(plugin_path: Path) -> Tuple[bool, str]:
     return False, "not_trusted"
 
 
-def list_trusted_plugins() -> list[dict]:
+def list_trusted_plugins() -> list[dict[str, Any]]:
     """List all trusted plugins.
 
     Returns:
@@ -1243,7 +1243,7 @@ def check_plugin_can_load(
 def check_sandbox_action(
     plugin_name: str,
     action: str,
-    details: Optional[dict] = None,
+    details: Optional[dict[str, Any]] = None,
     policy: Optional[PluginSandboxPolicy] = None,
 ) -> Tuple[bool, str]:
     """Check if a plugin action is allowed by sandbox policy.

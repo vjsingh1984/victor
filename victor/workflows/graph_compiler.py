@@ -362,7 +362,7 @@ class WorkflowGraphCompiler(Generic[S]):
     def _create_node_function(
         self,
         graph_node: "GraphNode[S]",
-        GraphNodeType: Type,
+        GraphNodeType: Type[Any],
         state_type: Type[S],
     ) -> Callable[[Any], Any]:
         """Create a node function for CompiledGraph.
@@ -430,7 +430,7 @@ class WorkflowGraphCompiler(Generic[S]):
     def _extract_node_config(
         self,
         graph_node: "GraphNode[S]",
-        GraphNodeType: Type,
+        GraphNodeType: Type[Any],
     ) -> Dict[str, Any]:
         """Extract node configuration for NodeRunner.
 

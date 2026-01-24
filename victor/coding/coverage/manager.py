@@ -23,7 +23,7 @@ import logging
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from victor.coding.coverage.parser import (
     COVERAGE_PARSERS,
@@ -481,7 +481,7 @@ class CoverageManager:
             },
         }
 
-    def _deserialize_report(self, data: dict) -> CoverageReport:
+    def _deserialize_report(self, data: dict[str, Any]) -> CoverageReport:
         """Deserialize a coverage report from JSON-compatible dict."""
         from victor.coding.coverage.protocol import LineCoverage, CoverageStatus
 

@@ -253,7 +253,7 @@ class PyCaretHandler(BaseHandler):
 
         # Check if PyCaret is available
         try:
-            import pandas as pd  # type: ignore
+            import pandas as pd
         except ImportError:
             raise ImportError("pandas is required for PyCaret. Install with: pip install pandas")
 

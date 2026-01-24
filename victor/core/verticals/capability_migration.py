@@ -134,7 +134,7 @@ def migrate_capability_property(
                 pass
     """
 
-    def getter(self) -> Any:
+    def getter(self: Any) -> Any:
         from victor.core.verticals.capability_injector import get_capability_injector
 
         # Issue deprecation warning for old property access

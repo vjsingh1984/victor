@@ -608,9 +608,7 @@ class NegotiationFormation:
         Returns:
             Negotiation prompt
         """
-        return f"""We are negotiating the best approach for the following task:
-
-Task: {task.content}
+        return f"""We are negotiating the best approach for the following task: Task[Any, Any]: {task.content}
 
 Round: {round_number}
 
@@ -1019,9 +1017,7 @@ class VotingFormation:
         """
         choices_str = "\n".join(f"{i + 1}. {choice}" for i, choice in enumerate(choices))
 
-        return f"""We need to decide on the best approach for this task:
-
-Task: {task.content}
+        return f"""We need to decide on the best approach for this task: Task[Any, Any]: {task.content}
 
 Please vote on one of the following approaches:
 {choices_str}

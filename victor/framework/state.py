@@ -371,7 +371,7 @@ class State:
 
     def subscribe_to_state_changes(
         self,
-        callback: Callable[[str, str, Dict[str, Any, Any]], None],
+        callback: Callable[[str, str, Dict[str, Any]], None],
     ) -> Optional[Callable[[], None]]:
         """Subscribe to state machine transitions via ObservabilityBus.
 
@@ -419,7 +419,7 @@ class State:
         return unsubscribe
 
     @property
-    def transition_history(self) -> list:
+    def transition_history(self) -> list[Dict[str, Any]]:
         """Get state transition history.
 
         Returns:

@@ -32,7 +32,7 @@ Strategy:
 """
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
@@ -181,7 +181,7 @@ class ContinuationPatienceLearner(BaseLearner):
             f"TP={stats['true_positives']}, missed={stats['missed_stuck_loops']})"
         )
 
-    def _update_patience(self, stats: dict) -> None:
+    def _update_patience(self, stats: dict[str, Any]) -> None:
         """Update patience recommendation based on stats.
 
         Strategy:

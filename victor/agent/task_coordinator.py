@@ -371,7 +371,7 @@ class TaskCoordinator:
         return self._observed_files
 
     @observed_files.setter
-    def observed_files(self, value: list):
+    def observed_files(self, value: list[Any]):
         """Set the list of observed files."""
         self._observed_files = value
 

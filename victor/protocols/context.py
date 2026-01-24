@@ -159,7 +159,7 @@ class ICompactionStrategy(Protocol):
 
 
 # Dict-based models for context-related types (instantiable for tests).
-class CompactionContext(dict):
+class CompactionContext(dict[str, Any]):
     """Context for context compaction operations.
 
     This is distinct from ConversationContext in victor/framework/conversations/
@@ -173,7 +173,7 @@ class CompactionContext(dict):
     """
 
 
-class ContextBudget(dict):
+class ContextBudget(dict[str, Any]):
     """Context budget with token limits.
 
     Common keys:

@@ -453,7 +453,7 @@ class FallbackParsingMixin:
         self,
         content: str,
         validate_name_fn: Optional[Callable[[str], bool]] = None,
-        valid_tool_names: Optional[set] = None,
+        valid_tool_names: Optional[set[Any]] = None,
     ) -> ToolCallParseResult:
         """Parse Python-style function calls from content (fallback).
 
@@ -523,7 +523,7 @@ class FallbackParsingMixin:
         self,
         content: str,
         validate_name_fn: Optional[Callable[[str], bool]] = None,
-        valid_tool_names: Optional[set] = None,
+        valid_tool_names: Optional[set[Any]] = None,
     ) -> ToolCallParseResult:
         """Parse tool calls from content using all fallback methods.
 

@@ -224,7 +224,7 @@ class ParallelExecutionResult:
         self.duration_seconds = duration_seconds
         self.strategy_used = strategy_used
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "success": self.success,
@@ -238,7 +238,7 @@ class ParallelExecutionResult:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "ParallelExecutionResult":
+    def from_dict(cls, data: dict[str, Any]) -> "ParallelExecutionResult":
         """Create from dictionary."""
         return cls(
             success=data["success"],

@@ -69,6 +69,7 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    cast,
 )
 
 logger = logging.getLogger(__name__)
@@ -350,7 +351,8 @@ class MiddlewarePipeline(Generic[TRequest, TResponse]):
         chain = self._build_chain(handler, context)
 
         # Execute chain
-        return await chain()
+        result = await chain()
+        return cast(TResponse, result)
 
     def _build_chain(
         self,
@@ -368,7 +370,8 @@ class MiddlewarePipeline(Generic[TRequest, TResponse]):
         """
 
         async def final() -> TResponse:
-            return await handler(context)
+            result = await handler(context)
+            return cast(TResponse, result)
 
         chain = final
 
@@ -376,8 +379,9 @@ class MiddlewarePipeline(Generic[TRequest, TResponse]):
         for middleware in reversed(self._middleware):
             current_chain = chain
 
-            async def make_next(mw: Middleware, next_fn: NextHandler) -> TResponse:
-                return await mw(context, next_fn)
+            async def make_next(mw: Middleware[Any], next_fn: NextHandler) -> TResponse:
+                result = await mw(context, next_fn)
+                return cast(TResponse, result)
 
             # Capture current middleware and chain in closure
             chain = self._make_chain_link(middleware, current_chain, context)
@@ -386,14 +390,15 @@ class MiddlewarePipeline(Generic[TRequest, TResponse]):
 
     def _make_chain_link(
         self,
-        middleware: Middleware,
+        middleware: Middleware[Any],
         next_chain: NextHandler,
         context: MiddlewareContext[TRequest],
     ) -> NextHandler:
         """Create a chain link for middleware."""
 
         async def link() -> TResponse:
-            return await middleware(context, next_chain)
+            result = await middleware(context, next_chain)
+            return cast(TResponse, result)
 
         return link
 
@@ -437,7 +442,7 @@ class LoggingMiddleware(Middleware):
         self._log_request = log_request
         self._log_response = log_response
 
-    async def before(self, context: MiddlewareContext) -> bool:
+    async def before(self, context: MiddlewareContext[Any]) -> bool:
         """Log request."""
         if self._log_request:
             logger.log(
@@ -446,7 +451,7 @@ class LoggingMiddleware(Middleware):
             )
         return True
 
-    async def after(self, context: MiddlewareContext, response: Any) -> Any:
+    async def after(self, context: MiddlewareContext[Any], response: Any) -> Any:
         """Log response."""
         if self._log_response:
             logger.log(
@@ -456,7 +461,7 @@ class LoggingMiddleware(Middleware):
             )
         return response
 
-    async def on_error(self, context: MiddlewareContext, error: Exception) -> Any:
+    async def on_error(self, context: MiddlewareContext[Any], error: Exception) -> Any:
         """Log error."""
         logger.error(
             f"Request failed: id={context.request_id} "
@@ -479,12 +484,12 @@ class TimingMiddleware(Middleware):
         """
         self._key = metric_key
 
-    async def before(self, context: MiddlewareContext) -> bool:
+    async def before(self, context: MiddlewareContext[Any]) -> bool:
         """Record start time."""
         context.set(f"{self._key}_start", time.perf_counter())
         return True
 
-    async def after(self, context: MiddlewareContext, response: Any) -> Any:
+    async def after(self, context: MiddlewareContext[Any], response: Any) -> Any:
         """Record end time and duration."""
         start = context.get(f"{self._key}_start", time.perf_counter())
         duration_ms = (time.perf_counter() - start) * 1000
@@ -523,7 +528,7 @@ class ErrorHandlingMiddleware(Middleware):
         self._default = default_handler
         self._reraise = reraise
 
-    async def on_error(self, context: MiddlewareContext, error: Exception) -> Any:
+    async def on_error(self, context: MiddlewareContext[Any], error: Exception) -> Any:
         """Handle error."""
         context.error = error
 
@@ -576,7 +581,7 @@ class RetryMiddleware(Middleware):
 
     async def __call__(
         self,
-        context: MiddlewareContext,
+        context: MiddlewareContext[Any],
         next_handler: NextHandler,
     ) -> Any:
         """Execute with retry logic."""
@@ -615,7 +620,7 @@ class TimeoutMiddleware(Middleware):
 
     async def __call__(
         self,
-        context: MiddlewareContext,
+        context: MiddlewareContext[Any],
         next_handler: NextHandler,
     ) -> Any:
         """Execute with timeout."""
@@ -659,7 +664,7 @@ class CachingMiddleware(Middleware):
 
     async def __call__(
         self,
-        context: MiddlewareContext,
+        context: MiddlewareContext[Any],
         next_handler: NextHandler,
     ) -> Any:
         """Execute with caching."""
@@ -706,7 +711,7 @@ class ValidationMiddleware(Middleware):
         """
         self._validator = validator
 
-    async def before(self, context: MiddlewareContext) -> bool:
+    async def before(self, context: MiddlewareContext[Any]) -> bool:
         """Validate request."""
         self._validator(context)
         return True
@@ -739,17 +744,17 @@ class MetricsMiddleware(Middleware):
         self._error_count = 0
         self._total_duration = 0.0
 
-    async def before(self, context: MiddlewareContext) -> bool:
+    async def before(self, context: MiddlewareContext[Any]) -> bool:
         """Track request start."""
         self._request_count += 1
         return True
 
-    async def after(self, context: MiddlewareContext, response: Any) -> Any:
+    async def after(self, context: MiddlewareContext[Any], response: Any) -> Any:
         """Track request completion."""
         self._total_duration += context.elapsed_ms
         return response
 
-    async def on_error(self, context: MiddlewareContext, error: Exception) -> Any:
+    async def on_error(self, context: MiddlewareContext[Any], error: Exception) -> Any:
         """Track error."""
         self._error_count += 1
         raise error

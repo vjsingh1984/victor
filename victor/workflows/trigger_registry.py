@@ -142,7 +142,7 @@ class WorkflowTriggerRegistry:
             workflow_name, vertical = result
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the registry."""
         self._triggers: List[WorkflowTrigger] = []
         self._by_vertical: Dict[str, List[WorkflowTrigger]] = {}

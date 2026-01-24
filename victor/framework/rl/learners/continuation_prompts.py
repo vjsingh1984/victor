@@ -31,7 +31,7 @@ Migrated from: victor/agent/continuation_learner.py
 """
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
@@ -208,7 +208,7 @@ class ContinuationPromptLearner(BaseLearner):
             f"stuck={stats['stuck_loop_count']}, quality={stats['avg_quality_score']:.2f})"
         )
 
-    def _update_max_prompts(self, stats: dict) -> None:
+    def _update_max_prompts(self, stats: dict[str, Any]) -> None:
         """Update max_prompts recommendation based on stats.
 
         Strategy:

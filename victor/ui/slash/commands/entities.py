@@ -127,7 +127,7 @@ class EntitiesCommand(BaseSlashCommand):
 
         return None
 
-    def _list_entities(self, ctx: CommandContext, args: list) -> None:
+    def _list_entities(self, ctx: CommandContext, args: list[Any]) -> None:
         """List entities in memory."""
         try:
             from victor.storage.memory import EntityMemory, EntityType
@@ -159,7 +159,7 @@ class EntitiesCommand(BaseSlashCommand):
             logger.error(f"Error listing entities: {e}")
             ctx.console.print(f"[red]Error:[/] {e}")
 
-    def _search_entities(self, ctx: CommandContext, args: list) -> None:
+    def _search_entities(self, ctx: CommandContext, args: list[Any]) -> None:
         """Search for entities by name."""
         if not args:
             ctx.console.print("[yellow]Usage:[/] /entities search <query>")
@@ -175,7 +175,7 @@ class EntitiesCommand(BaseSlashCommand):
 
         ctx.console.print("[yellow]Entity search requires async context.[/]")
 
-    def _show_entity(self, ctx: CommandContext, args: list) -> None:
+    def _show_entity(self, ctx: CommandContext, args: list[Any]) -> None:
         """Show detailed entity information."""
         if not args:
             ctx.console.print("[yellow]Usage:[/] /entities show <name>")
@@ -191,7 +191,7 @@ class EntitiesCommand(BaseSlashCommand):
 
         ctx.console.print("[yellow]Entity details require async context.[/]")
 
-    def _show_related(self, ctx: CommandContext, args: list) -> None:
+    def _show_related(self, ctx: CommandContext, args: list[Any]) -> None:
         """Show entities related to the named entity."""
         if not args:
             ctx.console.print("[yellow]Usage:[/] /entities related <name>")

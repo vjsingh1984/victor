@@ -191,7 +191,7 @@ def config_validate(
         )
 
 
-async def _check_connectivity(settings: Any, profiles: dict, verbose: bool) -> None:
+async def _check_connectivity(settings: Any, profiles: dict[str, Any], verbose: bool) -> None:
     """Check provider connectivity for profiles."""
     checked_providers: set[str] = set()
 
