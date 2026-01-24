@@ -33,7 +33,7 @@ class TestCapabilityContainerProtocol:
 
         sig = inspect.signature(CapabilityContainerProtocol.has_capability)
         assert "capability_name" in sig.parameters
-        assert sig.return_annotation == bool
+        assert sig.return_annotation is bool
 
     def test_protocol_defines_get_capability_method(self):
         """Protocol must define get_capability(name: str) -> Optional[Any]."""

@@ -89,6 +89,14 @@ from victor.core.verticals.capability_injector import (
     get_capability_injector,
     create_capability_injector,
 )
+from victor.core.verticals.capability_migration import (
+    deprecated_direct_instantiation,
+    migrate_capability_property,
+    migrate_to_injector,
+    get_capability_or_create,
+    check_migration_status,
+    print_migration_report,
+)
 from victor.core.verticals.vertical_loader import (
     VerticalLoader,
     get_vertical_loader,
@@ -150,6 +158,23 @@ __all__ = [
     # Service providers
     "BaseVerticalServiceProvider",
     "VerticalServiceProviderFactory",
+    # Capability Injection (DI-based)
+    "ICapabilityProvider",
+    "IConfigurableCapability",
+    "BaseCapabilityProvider",
+    "CapabilityProviderRegistry",
+    "get_capability_registry",
+    "reset_global_registry",
+    "CapabilityInjector",
+    "get_capability_injector",
+    "create_capability_injector",
+    # Migration Helpers
+    "deprecated_direct_instantiation",
+    "migrate_capability_property",
+    "migrate_to_injector",
+    "get_capability_or_create",
+    "check_migration_status",
+    "print_migration_report",
     # Vertical loader
     "VerticalLoader",
     "get_vertical_loader",

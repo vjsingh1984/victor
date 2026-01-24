@@ -197,9 +197,7 @@ class SemanticCache:
                 if self._embedding_service is None:
                     try:
                         from victor.agents.embeddings import EmbeddingService
-                        from victor.config.settings import load_settings
 
-                        settings = load_settings()
                         self._embedding_service = EmbeddingService(model_name=self.embedding_model)
                         logger.info(
                             f"Initialized embedding service for semantic cache: {self.embedding_model}"

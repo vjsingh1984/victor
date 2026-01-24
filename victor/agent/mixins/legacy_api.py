@@ -40,6 +40,7 @@ from victor.agent.decorators import deprecated
 if TYPE_CHECKING:
     from victor.core.state import ConversationStage
     from victor.core.events.vertical_context import VerticalContext
+    from victor.providers.base import StreamMetrics, TokenUsage
 
 logger = logging.getLogger(__name__)
 

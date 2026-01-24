@@ -140,7 +140,7 @@ class TestOrchestratorStateManagement:
         """Test ConversationStage enum has expected values."""
         from victor.agent.conversation_state import ConversationStage
 
-        stages = [stage for stage in ConversationStage]
+        stages = list(ConversationStage)
         assert len(stages) > 0
 
         # Common stages that should exist

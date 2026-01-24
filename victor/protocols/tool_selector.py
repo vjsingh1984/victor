@@ -48,11 +48,13 @@ from typing import (
     Protocol,
     Set,
     Tuple,
+    Union,
     runtime_checkable,
 )
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
+    from victor.tools.tool import ToolDefinition
 
 
 class ToolSelectionStrategy(Enum):

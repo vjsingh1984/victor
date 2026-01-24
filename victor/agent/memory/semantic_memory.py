@@ -874,10 +874,10 @@ class SemanticMemory:
         merged_confidence = self._merge_confidences(facts, merge_strategy)
 
         # Merge all citations
-        merged_citations = list(set([cite for fact in facts for cite in fact.citations]))
+        merged_citations = list({cite for fact in facts for cite in fact.citations})
 
         # Merge all sources
-        merged_sources = list(set([fact.source for fact in facts]))
+        merged_sources = list({fact.source for fact in facts})
         merged_source = ", ".join(merged_sources) if merged_sources else "unknown"
 
         # Merge metadata

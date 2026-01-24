@@ -365,7 +365,7 @@ class TestSkillChainExecution:
         # Second execution should raise error or be blocked
         try:
             await skill_chainer.execute_chain(chain)
-            assert False, "Should have raised ValueError"
+            raise AssertionError("Unreachable code reached"), "Should have raised ValueError"
         except ValueError as e:
             assert "already executing" in str(e)
 

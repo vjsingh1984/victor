@@ -64,13 +64,13 @@ class TestProtocolTypeChecking:
         # Check has_capability signature
         sig = inspect.signature(CapabilityContainerProtocol.has_capability)
         assert "capability_name" in sig.parameters
-        assert sig.parameters["capability_name"].annotation == str
-        assert sig.return_annotation == bool
+        assert sig.parameters["capability_name"].annotation is str
+        assert sig.return_annotation is bool
 
         # Check get_capability signature
         sig = inspect.signature(CapabilityContainerProtocol.get_capability)
         assert "name" in sig.parameters
-        assert sig.parameters["name"].annotation == str
+        assert sig.parameters["name"].annotation is str
 
     def test_test_file_passes_mypy(self):
         """Test file itself should pass mypy type checking."""

@@ -1009,13 +1009,11 @@ class SecurityTestSuite:
         """
         # Check for external URLs in response
         url_pattern = r"https?://[^\s/$.?#].[^\s]*"
-        urls = re.findall(url_pattern, response)
-
-        # Check for email addresses
+        if re.search(url_pattern, response):
+            return True
         email_pattern = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
-        emails = re.findall(email_pattern, response)
-
-        # Check for API keys, passwords, tokens
+        if re.search(email_pattern, response):
+            return True
         sensitive_patterns = [
             r"api[_-]?key\s*[:=]\s*['\"][\w-]+['\"]",
             r"password\s*[:=]\s*['\"][\w-]+['\"]",

@@ -417,7 +417,6 @@ class CacheAnalytics:
 
         stats = self.get_comprehensive_stats()
         hit_rate = stats["hit_rate"]
-        miss_rate = stats["miss_rate"]
         eviction_rate = self.get_eviction_rate()
         size_util = stats["size_utilization"]
         latency = stats["latency"]

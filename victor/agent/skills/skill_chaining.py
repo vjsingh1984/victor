@@ -1290,7 +1290,6 @@ class SkillChainer:
                 current_level.append(step_map[step_id])
 
                 # Reduce in-degree for dependent steps
-                step = step_map[step_id]
                 for dependent_step in chain.get_dependent_steps(step_id):
                     if dependent_step.id not in visited:
                         in_degree[dependent_step.id] -= 1

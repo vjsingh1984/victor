@@ -587,7 +587,7 @@ class EnhancedAuthorizer:
         self._lock = threading.RLock()
 
         # Initialize with default roles
-        self._roles: Dict[str, Role] = {name: role for name, role in self.DEFAULT_ROLES.items()}
+        self._roles: Dict[str, Role] = dict(self.DEFAULT_ROLES)
 
         # Users and policies
         self._users: Dict[str, User] = {}

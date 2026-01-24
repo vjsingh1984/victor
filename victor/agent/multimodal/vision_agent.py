@@ -531,9 +531,6 @@ class VisionAgent:
 
         base64_data = base64.b64encode(image_data).decode("utf-8")
 
-        # Calculate hash for caching
-        hash_value = hashlib.sha256(image_data).hexdigest()
-
         logger.debug(
             f"Encoded image: {image_path} "
             f"(format={image_format.value}, size={len(image_data)} bytes, "

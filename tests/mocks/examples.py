@@ -121,7 +121,7 @@ async def example_error_handling():
     # Third call fails
     try:
         await provider.chat(messages, model="test")
-        assert False, "Should have raised ProviderRateLimitError"
+        raise AssertionError("Unreachable code reached"), "Should have raised ProviderRateLimitError"
     except ProviderRateLimitError as e:
         assert e.retry_after == 60  # Default retry_after
         print(f"Rate limited! Retry after {e.retry_after}s")

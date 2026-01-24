@@ -92,8 +92,6 @@ class TestRunnerHandler(BaseHandler):
         tool_registry: "ToolRegistry",
     ) -> Tuple[Any, int]:
         """Execute test runner."""
-        start_time = time.time()
-
         test_file = node.input_mapping.get("test_file", "")
         test_command = node.input_mapping.get("test_command", "")
         timeout = node.input_mapping.get("timeout", self.default_timeout)

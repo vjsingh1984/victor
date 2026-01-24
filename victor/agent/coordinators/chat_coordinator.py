@@ -109,7 +109,6 @@ class ChatCoordinator:
         """
         from victor.providers.base import StreamChunk
 
-        orch = self._orchestrator
         full_content = []
         tool_calls_list = []
 
