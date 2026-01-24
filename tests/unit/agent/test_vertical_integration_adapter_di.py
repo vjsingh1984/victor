@@ -42,6 +42,18 @@ class MockMiddleware(MiddlewareProtocol):
         self.post_process_calls.append((tool_name, result))
         return result
 
+    def before_tool_call(self, tool_name: str, args: dict) -> dict:
+        """Before tool call hook."""
+        return args
+
+    def after_tool_call(self, tool_name: str, result: any) -> any:
+        """After tool call hook."""
+        return result
+
+    def on_error(self, tool_name: str, error: Exception) -> None:
+        """Error handling hook."""
+        pass
+
 
 class TestAdapterCapabilityRegistryRequired:
     """Tests for enforcing capability registry requirement in adapter."""

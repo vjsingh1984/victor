@@ -1097,6 +1097,8 @@ class AgentOrchestrator(
     def _protocol_adapter(self) -> OrchestratorProtocolAdapter:
         """Adapter for protocol implementations (extracted from orchestrator)."""
         if not hasattr(self, "_protocol_adapter_instance"):
+            if self._state_coordinator is None:
+                raise RuntimeError("State coordinator is required for protocol adapter")
             self._protocol_adapter_instance = create_orchestrator_protocol_adapter(
                 orchestrator=self,
                 state_coordinator=self._state_coordinator,
@@ -2019,6 +2021,8 @@ class AgentOrchestrator(
             Current ConversationStage enum value
         """
         # StateCoordinator returns stage name, convert to enum
+        if self._state_coordinator is None:
+            return ConversationStage.INITIAL
         stage_name = self._state_coordinator.get_stage()
         if stage_name:
             return ConversationStage[stage_name]
@@ -2030,6 +2034,8 @@ class AgentOrchestrator(
         Returns:
             Set of tool names recommended for current stage
         """
+        if self._state_coordinator is None:
+            return set()
         return self._state_coordinator.get_stage_tools()
 
     def get_optimization_status(self) -> Dict[str, Any]:

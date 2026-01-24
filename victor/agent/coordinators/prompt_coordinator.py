@@ -78,7 +78,7 @@ class IPromptBuilderCoordinator:
         Returns:
             Built system prompt string
         """
-        ...
+        raise NotImplementedError
 
     def get_thinking_disabled_prompt(self, base_prompt: str) -> str:
         """Get prompt with thinking mode disabled prefix.
@@ -89,7 +89,7 @@ class IPromptBuilderCoordinator:
         Returns:
             Prompt with thinking disable prefix if available
         """
-        ...
+        raise NotImplementedError
 
 
 class PromptCoordinator:

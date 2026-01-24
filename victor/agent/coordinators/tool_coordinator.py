@@ -74,10 +74,10 @@ if TYPE_CHECKING:
     from victor.agent.budget_manager import BudgetManager
     from victor.agent.tool_executor import ToolExecutionResult
     from victor.storage.cache.tool_cache import ToolCache
-    from victor.tools.base import BaseTool, ToolRegistry
+    from victor.tools.base import BaseTool
+    from victor.tools.registry import ToolRegistry
     from victor.agent.argument_normalizer import ArgumentNormalizer
-    from victor.agent.tool_calling import ToolCallingAdapter, ToolCallParseResult
-    from victor.agent.protocols import ToolAccessContext
+    from victor.agent.tool_calling import BaseToolCallingAdapter, ToolCallParseResult
     from victor.tools.tool_names import ToolNames
 
 from victor.agent.coordinators.base_config import BaseCoordinatorConfig
