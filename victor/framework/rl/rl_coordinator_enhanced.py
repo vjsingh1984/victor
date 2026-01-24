@@ -69,6 +69,7 @@ from typing import (
     Any,
     Callable,
     Dict,
+    Generic,
     List,
     Optional,
     Protocol,
@@ -172,7 +173,7 @@ class PolicyStats:
 
 
 @dataclass
-class Experience:
+class Experience(Generic[S, A]):
     """A single experience tuple for replay buffer.
 
     Attributes:
@@ -1097,12 +1098,17 @@ class EnhancedRLCoordinator:
         # Select action using exploration strategy
         action = self.exploration.select_action(q_values, available_actions, self.total_steps)
 
+        # Ensure action is of correct type
+        if not isinstance(action, list) or action not in available_actions:
+            # Fallback to first available action
+            action = available_actions[0]
+
         # Update statistics
         self.stats.action_count += 1
         if state not in self.q_table and state not in self.policy:
             self.stats.state_count += 1
 
-        return action
+        return action  # type: ignore[return-value]
 
     def compute_reward(self, outcome: TaskResult) -> float:
         """Compute reward signal from task outcome.
@@ -1140,7 +1146,7 @@ class EnhancedRLCoordinator:
             time_penalty = -min(0.2, outcome.duration_seconds / 300.0)  # 5 min max penalty
 
         # Combine components
-        reward = base_reward * 0.5 + quality_modifier * 0.3 + efficiency_modifier + time_penalty
+        reward = float(base_reward) * 0.5 + float(quality_modifier) * 0.3 + float(efficiency_modifier) + float(time_penalty)
 
         logger.debug(f"Computed reward: {reward:.3f} from outcome")
         return reward

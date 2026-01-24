@@ -408,10 +408,13 @@ class PolicyManager:
         if mid < 10:
             return False
 
-        early_rate = sum(o["success"] for o in outcomes[:mid]) / mid
-        recent_rate = sum(o["success"] for o in outcomes[mid:]) / (len(outcomes) - mid)
+        early_successes = sum(1 for o in outcomes[:mid] if isinstance(o.get("success"), bool) and o["success"])
+        recent_successes = sum(1 for o in outcomes[mid:] if isinstance(o.get("success"), bool) and o["success"])
 
-        return early_rate - recent_rate > self.DEGRADATION_THRESHOLD
+        early_rate = early_successes / mid
+        recent_rate = recent_successes / (len(outcomes) - mid)
+
+        return bool(early_rate - recent_rate > self.DEGRADATION_THRESHOLD)
 
     def rollback(
         self,
