@@ -50,13 +50,44 @@ from victor.core.verticals.protocols import TaskTypeHint, SafetyPattern, ModeCon
 
 
 class MockVerticalConfig:
-    """Mock vertical configuration."""
+    """Mock vertical configuration with dict-like interface."""
 
     def __init__(self, name: str = "mock"):
         self.name = name
         self.tools = ["read", "write", "shell"]
         self.system_prompt = "You are a mock assistant."
         self.stages = {"INITIAL": {}, "READING": {}, "WRITING": {}}
+        self._data = {
+            "name": name,
+            "tools": self.tools,
+            "system_prompt": self.system_prompt,
+            "stages": self.stages,
+        }
+        self._dynamic_values = {}
+
+    def keys(self):
+        """Return keys for dict-like access."""
+        return self._data.keys()
+
+    def __getitem__(self, key):
+        """Enable dict-like access."""
+        if key in self._dynamic_values:
+            return self._dynamic_values[key]
+        return self._data[key]
+
+    def get(self, key, default=None):
+        """Get value with default."""
+        if key in self._dynamic_values:
+            return self._dynamic_values[key]
+        return self._data.get(key, default)
+
+    def __contains__(self, key):
+        """Enable 'in' operator."""
+        return key in self._data or key in self._dynamic_values
+
+    def __setitem__(self, key, value):
+        """Enable item assignment."""
+        self._dynamic_values[key] = value
 
 
 class MockVerticalExtensions:
