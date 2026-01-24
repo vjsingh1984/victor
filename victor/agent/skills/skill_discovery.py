@@ -212,7 +212,7 @@ class Skill:
     tools: List[AvailableTool] = field(default_factory=list)
     dependencies: List[str] = field(default_factory=list)
     tags: List[str] = field(default_factory=list)
-    version: str = "1.0.0"
+    version: str = "0.5.0"
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
     metadata: Dict[str, Any] = field(default_factory=dict)

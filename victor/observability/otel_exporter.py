@@ -90,7 +90,7 @@ class OTELConfig:
     """Configuration for OpenTelemetry integration."""
 
     service_name: str = "victor-agent"
-    service_version: str = "1.0.0"
+    service_version: str = "0.5.0"
     endpoint: Optional[str] = None
     headers: Optional[Dict[str, str]] = None
     use_console_exporter: bool = False
@@ -116,7 +116,7 @@ class OpenTelemetryExporter(BaseExporter):
     def __init__(
         self,
         service_name: str = "victor-agent",
-        service_version: str = "1.0.0",
+        service_version: str = "0.5.0",
         endpoint: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
         use_console_exporter: bool = False,

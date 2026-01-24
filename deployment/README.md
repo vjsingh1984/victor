@@ -23,7 +23,7 @@ This deployment automation provides enterprise-grade deployment capabilities:
 # Deploy everything (infrastructure + monitoring + application)
 ./deployment/scripts/deploy_production_complete.sh \
   --environment production \
-  --image-tag v1.0.0
+  --image-tag v0.5.0
 ```
 
 **Estimated time:** ~40 minutes
@@ -45,7 +45,7 @@ This deployment automation provides enterprise-grade deployment capabilities:
 ```bash
 ./deployment/scripts/deploy_production_complete.sh \
   --environment production \
-  --image-tag v1.0.0
+  --image-tag v0.5.0
 ```
 
 **What happens:**
@@ -119,7 +119,7 @@ This deployment automation provides enterprise-grade deployment capabilities:
 ### 1. Pre-Deployment Validation
 ./deployment/scripts/deploy_production.sh \
   --environment production \
-  --image-tag v1.0.0 \
+  --image-tag v0.5.0 \
   --dry-run
 ```
 
@@ -614,7 +614,7 @@ docker run -d \
   --name victor \
   -p 8000:8000 \
   -e ANTHROPIC_API_KEY="sk-ant-..." \
-  victorai/victor:0.5.1
+  victorai/victor:0.5.0
 ```
 
 ### Helm Deployment
@@ -651,7 +651,7 @@ terraform apply -var="environment=production"
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0.0 | 2024-01-21 | Initial production deployment automation |
+| 0.5.0 | 2024-01-21 | Initial production deployment automation |
 
 ---
 

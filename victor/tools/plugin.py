@@ -33,7 +33,7 @@ Example plugin.py:
 
     class Plugin(ToolPlugin):
         name = "my_plugin"
-        version = "1.0.0"
+        version = "0.5.0"
         description = "My custom tool plugin"
 
         def get_tools(self):
@@ -74,7 +74,7 @@ class ToolPlugin(ABC):
 
     Attributes:
         name: Unique identifier for the plugin
-        version: Semantic version string (e.g., "1.0.0")
+        version: Semantic version string (e.g., "0.5.0")
         description: Human-readable description
         author: Plugin author
         homepage: URL for plugin documentation/source
@@ -82,7 +82,7 @@ class ToolPlugin(ABC):
     Example:
         class MyPlugin(ToolPlugin):
             name = "my_plugin"
-            version = "1.0.0"
+            version = "0.5.0"
             description = "Adds custom tools for my workflow"
 
             def get_tools(self):
@@ -250,7 +250,7 @@ class FunctionToolPlugin(ToolPlugin):
         # Create plugin from functions
         plugin = FunctionToolPlugin(
             name="my_functions",
-            version="1.0.0",
+            version="0.5.0",
             tool_functions=[my_custom_tool]
         )
     """

@@ -1,6 +1,6 @@
-# Configuration Migration Guide: Victor 0.5.x to 1.0.0
+# Configuration Migration Guide: Victor 0.5.x to 0.5.0
 
-This guide explains how to migrate your configuration from Victor 0.5.x to 1.0.0.
+This guide explains how to migrate your configuration from Victor 0.5.x to 0.5.0.
 
 ## Table of Contents
 
@@ -42,7 +42,7 @@ config.tool_budget = 100
 config.use_semantic_tool_selection = True
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 # victor_settings.py
 from victor.config.settings import Settings
@@ -68,7 +68,7 @@ class Config:
         self.max_tokens = int(os.getenv("VICTOR_MAX_TOKENS", "2000"))
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 # Automatic via pydantic-settings
 from victor.config.settings import Settings
@@ -124,7 +124,7 @@ settings = Settings(
 
 ### New YAML Configuration Structure
 
-Victor 1.0.0 introduces YAML-first configuration:
+Victor 0.5.0 introduces YAML-first configuration:
 
 ```
 victor/config/
@@ -145,7 +145,7 @@ victor/config/
 
 ### Mode Configuration
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```yaml
 # victor/config/modes/coding_modes.yaml
 vertical_name: coding
@@ -179,7 +179,7 @@ modes:
 
 ### Capability Configuration
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```yaml
 # victor/config/capabilities/coding_capabilities.yaml
 vertical_name: coding
@@ -214,7 +214,7 @@ handlers:
 
 ### Team Configuration
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```yaml
 # victor/config/teams/coding_teams.yaml
 teams:
@@ -246,7 +246,7 @@ teams:
 
 ### Model Capabilities Configuration
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```yaml
 # victor/config/model_capabilities.yaml
 models:
@@ -277,7 +277,7 @@ models:
 
 ### Provider Context Limits
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```yaml
 # victor/config/provider_context_limits.yaml
 providers:
@@ -355,7 +355,7 @@ config.temperature = 0.7
 config.use_semantic_tool_selection = True
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```bash
 # .env
 OPENAI_API_KEY=sk-...
@@ -392,7 +392,7 @@ config.enable_planning = True
 config.enable_memory = False
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```bash
 # .env
 ANTHROPIC_API_KEY=sk-ant-...
@@ -433,7 +433,7 @@ features:
 
 ### Example 3: Custom Mode Configuration
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```yaml
 # victor/config/modes/custom_modes.yaml
 vertical_name: custom
@@ -568,4 +568,4 @@ print(modes)  # Should include 'custom'
 ---
 
 **Last Updated**: 2025-01-21
-**Version**: 1.0.0
+**Version**: 0.5.0

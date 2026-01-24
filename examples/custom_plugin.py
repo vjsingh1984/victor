@@ -138,7 +138,7 @@ EXAMPLE_WORKFLOW = {
             "metadata": {
                 "name": "Simple Task",
                 "description": "A simple one-step workflow",
-                "version": "1.0.0",
+                "version": "0.5.0",
             },
             "nodes": [
                 {

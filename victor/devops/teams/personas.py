@@ -729,7 +729,7 @@ def _register_personas_with_framework() -> None:
     register all DevOps personas with the framework's persona registry.
 
     Each persona is registered with:
-    - Version 1.0.0
+    - Version 0.5.0
     - Appropriate category (planning, execution, review, research)
     - DevOps-specific tags
     - vertical="devops"
@@ -767,7 +767,7 @@ def _register_personas_with_framework() -> None:
         # Register with framework
         provider.register_persona(
             name=persona_name,
-            version="1.0.0",
+            version="0.5.0",
             persona=framework_traits,
             category=category,
             description=persona.approach,

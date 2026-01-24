@@ -51,13 +51,13 @@ class PackageManager(Enum):
 class VersionConstraint(Enum):
     """Version constraint types."""
 
-    EXACT = "exact"  # ==1.0.0
-    GREATER = "greater"  # >1.0.0
-    GREATER_EQUAL = "greater_equal"  # >=1.0.0
+    EXACT = "exact"  # ==0.5.0
+    GREATER = "greater"  # >0.5.0
+    GREATER_EQUAL = "greater_equal"  # >=0.5.0
     LESS = "less"  # <2.0.0
     LESS_EQUAL = "less_equal"  # <=2.0.0
-    COMPATIBLE = "compatible"  # ~=1.0.0 or ^1.0.0
-    RANGE = "range"  # >=1.0.0,<2.0.0
+    COMPATIBLE = "compatible"  # ~=0.5.0 or ^0.5.0
+    RANGE = "range"  # >=0.5.0,<2.0.0
     ANY = "any"  # *
 
 

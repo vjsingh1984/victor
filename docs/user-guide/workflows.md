@@ -718,7 +718,7 @@ registry.register(VersionedWorkflow(
 ))
 
 # Get specific version
-v1 = registry.get("data_pipeline", "1.0.0")
+v1 = registry.get("data_pipeline", "0.5.0")
 latest = registry.get_latest("data_pipeline")
 ```
 

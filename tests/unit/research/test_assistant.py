@@ -49,7 +49,7 @@ class TestResearchAssistant:
 
     def test_version(self):
         """Test assistant version."""
-        assert ResearchAssistant.version == "1.0.0"
+        assert ResearchAssistant.version == "0.5.0"
 
     def test_get_tools_returns_list(self):
         """Test that get_tools returns a list."""

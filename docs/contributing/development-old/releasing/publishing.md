@@ -56,11 +56,11 @@ Before creating a release, ensure:
 We follow [Semantic Versioning](https://semver.org/):
 
 - **MAJOR.MINOR.PATCH** (e.g., `1.2.3`)
-- **Pre-release**: `1.0.0-alpha`, `1.0.0-beta`, `1.0.0-rc.1`
+- **Pre-release**: `0.5.0-alpha`, `0.5.0-beta`, `0.5.0-rc.1`
 
 | Change Type | Version Bump | Example |
 |-------------|--------------|---------|
-| Breaking changes | MAJOR | 0.1.0 → 1.0.0 |
+| Breaking changes | MAJOR | 0.1.0 → 0.5.0 |
 | New features (backward compatible) | MINOR | 0.1.0 → 0.2.0 |
 | Bug fixes | PATCH | 0.1.0 → 0.1.1 |
 | Pre-release | Suffix | 0.2.0-beta |

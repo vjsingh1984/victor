@@ -39,7 +39,7 @@ async def demo_client():
     # Create MCP client
     print("1️⃣ Creating MCP Client...")
     print("-" * 70)
-    client = MCPClient(name="Victor MCP Client", version="1.0.0")
+    client = MCPClient(name="Victor MCP Client", version="0.5.0")
     print(f"✓ Client created: {client.name} v{client.version}")
 
     # Connect to server

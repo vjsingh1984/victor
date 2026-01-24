@@ -85,7 +85,7 @@ class TierRegistryEntry:
     parent: Optional[str] = None
     description: str = ""
     metadata: Dict[str, Any] = field(default_factory=dict)
-    version: str = "1.0.0"
+    version: str = "0.5.0"
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -208,7 +208,7 @@ class ToolTierRegistry:
         parent: Optional[str] = None,
         description: str = "",
         metadata: Optional[Dict[str, Any]] = None,
-        version: str = "1.0.0",
+        version: str = "0.5.0",
         overwrite: bool = False,
     ) -> None:
         """Register a tier configuration.

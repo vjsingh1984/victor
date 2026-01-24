@@ -149,7 +149,7 @@ async def demo_best_practices():
     print("3️⃣ Updates:")
     print("  • Patch updates (1.2.3 → 1.2.4): Apply quickly")
     print("  • Minor updates (1.2.0 → 1.3.0): Test thoroughly")
-    print("  • Major updates (1.0.0 → 2.0.0): Plan carefully")
+    print("  • Major updates (0.5.0 → 2.0.0): Plan carefully")
     print("  • Use virtual environments for testing")
     print("")
 

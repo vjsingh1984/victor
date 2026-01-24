@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Victor Workflow Migration Script (0.5.x to 1.0.0)
+Victor Workflow Migration Script (0.5.x to 0.5.0)
 
-This script automatically migrates workflows from Victor 0.5.x to 1.0.0 format.
+This script automatically migrates workflows from Victor 0.5.x to 0.5.0 format.
 
 Usage:
     python scripts/migration/migrate_workflows.py --source ./old_workflows --dest ./victor/workflows
@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 class WorkflowMigrator:
-    """Migrates Victor workflows from 0.5.x to 1.0.0."""
+    """Migrates Victor workflows from 0.5.x to 0.5.0."""
 
     def __init__(self, source: Path, dest: Optional[Path] = None):
         self.source = source
@@ -41,7 +41,7 @@ class WorkflowMigrator:
             workflow_name = source_file.stem
             workflow["workflows"][workflow_name] = {
                 "metadata": {
-                    "version": "1.0.0",
+                    "version": "0.5.0",
                     "migrated_from": "python"
                 },
                 "nodes": []
@@ -52,7 +52,7 @@ class WorkflowMigrator:
         return workflow
 
     def migrate_yaml_workflow(self, source_file: Path) -> Dict[str, Any]:
-        """Migrate YAML workflow to 1.0.0 format."""
+        """Migrate YAML workflow to 0.5.0 format."""
         with open(source_file) as f:
             old_workflow = yaml.safe_load(f)
 
@@ -60,13 +60,13 @@ class WorkflowMigrator:
 
         # Check if already migrated
         if "workflows" in old_workflow:
-            return old_workflow  # Already in 1.0.0 format
+            return old_workflow  # Already in 0.5.0 format
 
         # Migrate to new format
         workflow_name = old_workflow.get("name", source_file.stem)
         new_workflow["workflows"][workflow_name] = {
             "metadata": {
-                "version": "1.0.0",
+                "version": "0.5.0",
                 "migrated_from": "yaml_0.5.x"
             },
             "nodes": []
@@ -83,7 +83,7 @@ class WorkflowMigrator:
         return new_workflow
 
     def migrate_node(self, old_node: Dict[str, Any]) -> Dict[str, Any]:
-        """Migrate a single node to 1.0.0 format."""
+        """Migrate a single node to 0.5.0 format."""
         new_node = {
             "id": old_node.get("id", "unknown"),
             "type": old_node.get("type", "agent"),
@@ -248,7 +248,7 @@ class WorkflowMigrator:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Migrate Victor workflows from 0.5.x to 1.0.0"
+        description="Migrate Victor workflows from 0.5.x to 0.5.0"
     )
     parser.add_argument(
         "--source",

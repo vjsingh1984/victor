@@ -76,12 +76,12 @@ class TestPolicyState:
         """Test creating policy state."""
         state = PolicyState(
             learner_name="tool_selector",
-            current_version="v1.0.0",
+            current_version="v0.5.0",
             stage=PolicyStage.PRODUCTION,
         )
 
         assert state.learner_name == "tool_selector"
-        assert state.current_version == "v1.0.0"
+        assert state.current_version == "v0.5.0"
         assert state.stage == PolicyStage.PRODUCTION
 
     def test_policy_state_defaults(self) -> None:
@@ -116,14 +116,14 @@ class TestRollbackEvent:
         event = RollbackEvent(
             learner_name="tool_selector",
             from_version="v2.0.0",
-            to_version="v1.0.0",
+            to_version="v0.5.0",
             reason="Performance degradation",
             metrics_before={"success_rate": 0.5},
         )
 
         assert event.learner_name == "tool_selector"
         assert event.from_version == "v2.0.0"
-        assert event.to_version == "v1.0.0"
+        assert event.to_version == "v0.5.0"
         assert event.timestamp is not None
 
 
@@ -264,7 +264,7 @@ class TestPolicyManager:
 
         # Create checkpoints
         manager._checkpoint_store.create_checkpoint(
-            "tool_selector", "v1.0.0", {"q_values": {"ctx1": 0.5}}
+            "tool_selector", "v0.5.0", {"q_values": {"ctx1": 0.5}}
         )
         manager._checkpoint_store.create_checkpoint(
             "tool_selector", "v2.0.0", {"q_values": {"ctx1": 0.7}}
@@ -274,10 +274,10 @@ class TestPolicyManager:
         state.current_version = "v2.0.0"
 
         # Rollback
-        result = manager.rollback("tool_selector", to_version="v1.0.0")
+        result = manager.rollback("tool_selector", to_version="v0.5.0")
 
         assert result is True
-        assert state.current_version == "v1.0.0"
+        assert state.current_version == "v0.5.0"
         assert len(manager._rollback_history) == 1
 
     def test_rollback_to_previous(
@@ -286,7 +286,7 @@ class TestPolicyManager:
         """Test rollback to previous version."""
         mock_coordinator.get_learner.return_value = mock_learner
 
-        manager._checkpoint_store.create_checkpoint("tool_selector", "v1.0.0", {})
+        manager._checkpoint_store.create_checkpoint("tool_selector", "v0.5.0", {})
         manager._checkpoint_store.create_checkpoint("tool_selector", "v2.0.0", {})
 
         state = manager.get_policy_state("tool_selector")
@@ -295,7 +295,7 @@ class TestPolicyManager:
         result = manager.rollback("tool_selector")
 
         assert result is True
-        assert state.current_version == "v1.0.0"
+        assert state.current_version == "v0.5.0"
 
     def test_rollback_no_previous_checkpoint(self, manager: PolicyManager) -> None:
         """Test rollback fails when no previous checkpoint."""
@@ -308,7 +308,7 @@ class TestPolicyManager:
         """Test rollback records event."""
         mock_coordinator.get_learner.return_value = mock_learner
 
-        manager._checkpoint_store.create_checkpoint("tool_selector", "v1.0.0", {})
+        manager._checkpoint_store.create_checkpoint("tool_selector", "v0.5.0", {})
         manager._checkpoint_store.create_checkpoint("tool_selector", "v2.0.0", {})
 
         state = manager.get_policy_state("tool_selector")
@@ -329,7 +329,7 @@ class TestPolicyManager:
         mock_coordinator.get_learner.return_value = mock_learner
 
         # Create checkpoint first
-        manager._checkpoint_store.create_checkpoint("tool_selector", "v1.0.0", {})
+        manager._checkpoint_store.create_checkpoint("tool_selector", "v0.5.0", {})
         manager._checkpoint_store.create_checkpoint("tool_selector", "v2.0.0", {})
 
         state = manager.get_policy_state("tool_selector")

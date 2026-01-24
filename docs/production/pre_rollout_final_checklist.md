@@ -407,7 +407,7 @@ This checklist provides a comprehensive validation process before rolling out th
   - [ ] New features listed
   - [ ] Breaking changes noted
   - [ ] Migration instructions provided
-  - Location: `docs/releases/v0.5.1-coordinators.md`
+  - Location: `docs/releases/v0.5.0-coordinators.md`
   - Reviewed by: ___________
 
 - [ ] Known issues documented
@@ -669,7 +669,7 @@ python scripts/toggle_coordinator_orchestrator.py --mode orchestrator
 
 - Architecture: `docs/architecture/coordinators.md`
 - Migration Guide: `docs/MIGRATION_GUIDE.md`
-- Release Notes: `docs/releases/v0.5.1-coordinators.md`
+- Release Notes: `docs/releases/v0.5.0-coordinators.md`
 - Runbook: `docs/operations/coordinator_runbook.md`
 - Rollback Plan: `docs/production/rollback_plan.md`
 

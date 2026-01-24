@@ -67,7 +67,7 @@ class MCPClient:
     def __init__(
         self,
         name: str = "Victor MCP Client",
-        version: str = "1.0.0",
+        version: str = "0.5.0",
         health_check_interval: int = 30,
         auto_reconnect: bool = True,
         max_reconnect_attempts: int = 3,

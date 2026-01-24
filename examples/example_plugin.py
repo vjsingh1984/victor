@@ -241,7 +241,7 @@ class WeatherPlugin(ToolPlugin):
 
     # Plugin metadata
     name = "weather_plugin"
-    version = "1.0.0"
+    version = "0.5.0"
     description = "Weather information and temperature conversion tools"
     author = "Victor Team"
     homepage = "https://github.com/example/victor-weather-plugin"

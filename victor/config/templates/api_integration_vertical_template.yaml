@@ -5,7 +5,7 @@
 metadata:
   name: api_integration
   description: "API integration, webhook handling, and service communication assistant"
-  version: "1.0.0"
+  version: "0.5.0"
   author: "Victor Team"
   license: "Apache-2.0"
   category: integration

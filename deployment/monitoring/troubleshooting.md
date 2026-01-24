@@ -1,6 +1,6 @@
 # Victor AI Monitoring Troubleshooting Guide
 
-**Version**: 0.5.1
+**Version**: 0.5.0
 **Last Updated**: 2026-01-21
 **Purpose**: Diagnostic procedures and solutions for common monitoring issues
 

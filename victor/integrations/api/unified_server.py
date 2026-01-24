@@ -377,7 +377,7 @@ def create_unified_server(
     app = FastAPI(
         title="Victor Unified API",
         description="Consolidated API for all Victor services",
-        version="1.0.0",
+        version="0.5.0",
         docs_url="/docs",
         redoc_url="/redoc",
     )

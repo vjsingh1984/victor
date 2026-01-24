@@ -19,7 +19,7 @@
 workflows:
   comprehensive_team_analysis:
     description: "Multi-agent team data analysis with hierarchical coordination"
-    version: "1.0.0"
+    version: "0.5.0"
     vertical: "dataanalysis"
 
     metadata:
@@ -504,7 +504,7 @@ workflows:
   # ===========================================================================
   parallel_quick_analysis:
     description: "Quick parallel analysis for rapid insights"
-    version: "1.0.0"
+    version: "0.5.0"
     vertical: "dataanalysis"
 
     metadata:

@@ -97,8 +97,8 @@ docs/
 │   └── cache_invalidation_example.md
 ├── reference/                        # Reference documentation
 │   ├── index.md
-│   ├── cli-commands.md
-│   ├── configuration-options.md
+│   ├── cli-reference.md (in user-guide/)
+│   ├── configuration/ (subdirectory with index.md, keys.md)
 │   └── environment-variables.md
 ├── verticals/                        # Vertical-specific docs
 │   ├── coding.md

@@ -85,11 +85,21 @@ class LanceDBProvider(BaseEmbeddingProvider):
         self.db = None
         self.table = None
         self.embedding_model: Optional[BaseEmbeddingModel] = None
+        # Store rebuild flag from config (for corruption recovery)
+        self._rebuild_on_corruption = config.extra_config.get("rebuild_on_corruption", False)
 
-    async def initialize(self) -> None:
-        """Initialize LanceDB and load embedding model."""
+    async def initialize(self, rebuild_on_corruption: bool = False) -> None:
+        """Initialize LanceDB and load embedding model.
+
+        Args:
+            rebuild_on_corruption: If True, rebuild database if corrupted.
+                If not provided, uses the value from config.
+        """
         if self._initialized:
             return
+
+        # Use parameter if provided, otherwise use stored value from config
+        should_rebuild = rebuild_on_corruption or self._rebuild_on_corruption
 
         # Get embedding model configuration from EmbeddingConfig
         model_type = self.config.embedding_model_type
@@ -129,25 +139,114 @@ class LanceDBProvider(BaseEmbeddingProvider):
             persist_dir.mkdir(parents=True, exist_ok=True)
             print(f"📁 Using default storage: {persist_dir}")
 
-        # Connect to LanceDB
-        self.db = lancedb.connect(str(persist_dir))
-
-        # Get or create table
+        # Check for database corruption and handle it
         table_name = self.config.extra_config.get("table_name", "embeddings")
-        print(f"📚 Table: {table_name}")
+        db_path = persist_dir / f"{table_name}.lance"
 
-        # Check if table exists
-        existing_tables = self.db.list_tables().tables
-        if table_name not in existing_tables:
-            # Create empty table with schema
-            # We'll add data later when indexing
-            print(f"📝 Creating new table: {table_name}")
+        # If rebuild requested or DB is corrupted, clean up
+        if should_rebuild or db_path.exists():
+            try:
+                # Try to connect first to check if DB is valid
+                self.db = lancedb.connect(str(persist_dir))
+                existing_tables = self.db.list_tables().tables
+
+                # Try to open the table to verify it's not corrupted
+                if table_name in existing_tables:
+                    try:
+                        test_table = self.db.open_table(table_name)
+                        # Try a simple operation to verify integrity
+                        _ = test_table.count_rows()
+                        self.table = test_table
+                        print(f"📖 Opened existing table: {table_name}")
+                    except (RuntimeError, Exception) as e:
+                        error_msg = str(e).lower()
+                        if "malformed" in error_msg or "corrupted" in error_msg or "database disk image" in error_msg:
+                            print(f"⚠️  Database corrupted: {e}")
+                            if should_rebuild:
+                                print("🔧 Rebuilding corrupted database...")
+                                self._corrupted_db_cleanup(persist_dir, table_name)
+                                self.db = lancedb.connect(str(persist_dir))
+                                existing_tables = self.db.list_tables().tables
+                            else:
+                                raise RuntimeError(
+                                    f"Database is corrupted. Run 'victor index --force' to rebuild.\n"
+                                    f"Original error: {e}"
+                                ) from e
+                        else:
+                            raise
+                else:
+                    print(f"📝 Creating new table: {table_name}")
+
+            except Exception as e:
+                error_msg = str(e).lower()
+                if "malformed" in error_msg or "corrupted" in error_msg or "database disk image" in error_msg:
+                    if should_rebuild:
+                        print(f"⚠️  Database corrupted during connection: {e}")
+                        print("🔧 Rebuilding corrupted database...")
+                        self._corrupted_db_cleanup(persist_dir, table_name)
+                        self.db = lancedb.connect(str(persist_dir))
+                        existing_tables = self.db.list_tables().tables
+                    else:
+                        raise RuntimeError(
+                            f"Database is corrupted. Run 'victor index --force' to rebuild.\n"
+                            f"Original error: {e}"
+                        ) from e
+                else:
+                    raise
         else:
-            self.table = self.db.open_table(table_name)
-            print(f"📖 Opened existing table: {table_name}")
+            # Fresh database
+            self.db = lancedb.connect(str(persist_dir))
+            existing_tables = self.db.list_tables().tables
+            print(f"📝 Creating new table: {table_name}")
 
         self._initialized = True
         print("✅ LanceDB provider initialized!")
+
+    def _corrupted_db_cleanup(self, persist_dir: Path, table_name: str) -> None:
+        """Clean up corrupted database files.
+
+        Args:
+            persist_dir: Directory containing the database
+            table_name: Name of the corrupted table
+        """
+        import shutil
+
+        # Close existing connection
+        if self.db:
+            try:
+                del self.db
+            except Exception:
+                pass
+            self.db = None
+        self.table = None
+
+        # Remove corrupted database files
+        db_pattern = f"{table_name}.*"
+        removed_files = []
+        for file in persist_dir.glob(db_pattern):
+            try:
+                if file.is_file():
+                    file.unlink()
+                    removed_files.append(file.name)
+                elif file.is_dir():
+                    shutil.rmtree(file)
+                    removed_files.append(file.name + "/")
+            except Exception as e:
+                print(f"⚠️  Could not remove {file}: {e}")
+
+        # Also remove any journal/wal files
+        for suffix in ["-journal", "-wal", "-shm"]:
+            journal_file = persist_dir / f"{table_name}.lance{suffix}"
+            if journal_file.exists():
+                try:
+                    journal_file.unlink()
+                    removed_files.append(journal_file.name)
+                except Exception:
+                    pass
+
+        if removed_files:
+            print(f"🗑️  Removed corrupted files: {', '.join(removed_files)}")
+        print("✅ Corrupted database cleaned up, will rebuild on next index")
 
     async def embed_text(self, text: str) -> List[float]:
         """Generate embedding for single text.

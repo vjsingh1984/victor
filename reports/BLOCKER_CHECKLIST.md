@@ -229,7 +229,7 @@ kubectl describe pod -n victor-ai-prod -l app=victor-ai | grep -A 10 "Volumes:"
 - [ ] Install Trivy CLI
   - macOS: `brew install trivy`
   - Linux: See https://aquasecurity.github.io/trivy/latest/getting-started/installation/
-- [ ] Scan base images: `trivy image victorai/victor:0.5.1`
+- [ ] Scan base images: `trivy image victorai/victor:0.5.0`
 - [ ] Configure Trivy in CI/CD pipeline
 - [ ] Set vulnerability policy (fail on HIGH/CRITICAL)
 - [ ] Review and remediate vulnerabilities
@@ -238,7 +238,7 @@ kubectl describe pod -n victor-ai-prod -l app=victor-ai | grep -A 10 "Volumes:"
 **Verification**:
 ```bash
 trivy --version
-trivy image --severity HIGH,CRITICAL victorai/victor:0.5.1
+trivy image --severity HIGH,CRITICAL victorai/victor:0.5.0
 ```
 
 **References**:

@@ -405,14 +405,14 @@ class TestModuleDoc:
                 ClassDoc(name="Timer"),
             ],
             constants=[
-                Attribute(name="VERSION", type_hint="str", default='"1.0.0"'),
+                Attribute(name="VERSION", type_hint="str", default='"0.5.0"'),
             ],
             imports=["os", "sys", "pathlib.Path"],
             all_exports=["slugify", "truncate", "Timer"],
             examples=[Example(code="from utils import slugify")],
             deprecation=None,
             notes=["All functions are pure"],
-            version="1.0.0",
+            version="0.5.0",
             author="John Doe",
             license="Apache-2.0",
         )
@@ -422,7 +422,7 @@ class TestModuleDoc:
         assert len(mod.constants) == 1
         assert len(mod.imports) == 3
         assert len(mod.all_exports) == 3
-        assert mod.version == "1.0.0"
+        assert mod.version == "0.5.0"
         assert mod.author == "John Doe"
         assert mod.license == "Apache-2.0"
 

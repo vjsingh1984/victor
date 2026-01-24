@@ -456,7 +456,7 @@ All templates follow this YAML structure:
 metadata:
   name: vertical_name
   description: "Vertical description"
-  version: "1.0.0"
+  version: "0.5.0"
   category: category_name
   tags: [tag1, tag2]
 
@@ -988,7 +988,7 @@ For template-related questions:
 
 ---
 
-### Version 1.0.0 (2025-01-18)
+### Version 0.5.0 (2025-01-18)
 
 **Added**:
 - Coding vertical template

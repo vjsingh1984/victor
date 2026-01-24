@@ -1,6 +1,6 @@
 # Victor AI Benchmark CI/CD Integration Guide
 
-This guide explains how to integrate comprehensive performance benchmarks into your CI/CD pipeline for Victor AI 0.5.1.
+This guide explains how to integrate comprehensive performance benchmarks into your CI/CD pipeline for Victor AI 0.5.0.
 
 ## Table of Contents
 
@@ -439,7 +439,7 @@ if __name__ == "__main__":
 # Update baseline after release
 cp .benchmark_results/comprehensive_benchmark_latest.json .benchmark_results/baseline.json
 git add .benchmark_results/baseline.json
-git commit -m "Update performance baseline for v0.5.1"
+git commit -m "Update performance baseline for v0.5.0"
 ```
 
 ### 2. Benchmark Frequency

@@ -1,8 +1,8 @@
 # Test Coverage Report
 
 **Generated**: 2026-01-14
-**Version**: 0.5.1
-**Branch**: 0.5.1-agent-coderbranch
+**Version**: 0.5.0
+**Branch**: 0.5.0-agent-coderbranch
 
 ## Executive Summary
 

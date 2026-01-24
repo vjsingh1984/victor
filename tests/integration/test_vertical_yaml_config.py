@@ -47,7 +47,7 @@ def temp_yaml_vertical(tmp_path):
 metadata:
   name: test_yaml
   description: Test vertical with YAML config
-  version: "1.0.0"
+  version: "0.5.0"
 
 core:
   tools:
@@ -147,7 +147,7 @@ from typing import List
 class TestNoYAMLVertical(VerticalBase):
     name = "test_no_yaml"
     description = "Test vertical without YAML"
-    version = "1.0.0"
+    version = "0.5.0"
 
     @classmethod
     def get_tools(cls) -> List[str]:
@@ -182,7 +182,7 @@ class TestYAMLConfigLoading:
         # Verify YAML values are loaded
         assert config.metadata["name"] == "test_yaml"
         assert config.metadata["description"] == "Test vertical with YAML config"
-        assert config.metadata["version"] == "1.0.0"
+        assert config.metadata["version"] == "0.5.0"
 
         # Verify tools from YAML
         assert "read" in config.tools.tools
@@ -202,7 +202,7 @@ class TestYAMLConfigLoading:
         assert config.metadata["description"] == "Test vertical with YAML config"
         assert config.metadata["description"] != temp_yaml_vertical.description
 
-        assert config.metadata["version"] == "1.0.0"
+        assert config.metadata["version"] == "0.5.0"
         assert config.metadata["version"] != temp_yaml_vertical.version
 
     def test_yaml_config_loads_stages(self, temp_yaml_vertical):

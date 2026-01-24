@@ -107,7 +107,7 @@ class HealthReport:
     status: HealthStatus
     components: Dict[str, ComponentHealth]
     timestamp: datetime
-    version: str = "1.0.0"
+    version: str = "0.5.0"
     uptime_seconds: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -561,7 +561,7 @@ class HealthChecker:
     def __init__(
         self,
         cache_ttl: float = 5.0,
-        version: str = "1.0.0",
+        version: str = "0.5.0",
     ) -> None:
         """Initialize health checker.
 
@@ -753,7 +753,7 @@ class HealthChecker:
 
 
 def create_default_health_checker(
-    version: str = "1.0.0",
+    version: str = "0.5.0",
     include_memory: bool = True,
 ) -> HealthChecker:
     """Create a health checker with default checks.

@@ -249,7 +249,7 @@ class TestMockPlugin:
 
         class TestPlugin(ToolPlugin):
             name = "test_plugin"
-            version = "1.0.0"
+            version = "0.5.0"
             description = "Test plugin"
             author = "Test"
 
@@ -492,7 +492,7 @@ class TestListPlugins(TestMockPlugin):
         result = manager.list_plugins()
 
         assert "test_plugin" in result
-        assert result["test_plugin"]["version"] == "1.0.0"
+        assert result["test_plugin"]["version"] == "0.5.0"
         assert result["test_plugin"]["enabled"] is True
 
 

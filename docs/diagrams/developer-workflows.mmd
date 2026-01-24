@@ -1,0 +1,256 @@
+# Victor AI Developer Workflows
+
+## Contribution Workflow
+
+```mermaid
+flowchart LR
+    Start([Start]) --> Fork["Fork Repository"]
+    Fork --> Clone["Clone Locally"]
+    Clone --> Setup["Setup Environment<br/>pip install -e '.[dev]'"]
+
+    Setup --> Branch["Create Feature Branch<br/>git checkout -b feature/name"]
+
+    Branch --> Develop["Develop & Test<br/>make test<br/>make lint"]
+    Develop --> Commit["Commit Changes<br/>git commit -m 'feat: description'"]
+
+    Commit --> Push["Push to Fork<br/>git push origin feature/name"]
+    Push --> PR["Create Pull Request"]
+
+    PR --> Review{CI/CD Checks}
+    Review -->|Fail| Fix["Fix Issues"]
+    Fix --> Develop
+
+    Review -->|Pass| Merge["Merge Request"]
+    Merge --> Clean["Clean Branch<br/>git checkout main<br/>git pull"]
+
+    Clean --> End([Done])
+
+    classDef startStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef processStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef decisionStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef endStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+
+    class Start,End,Clean startStyle
+    class Fork,Clone,Setup,Branch,Develop,Commit,Push,PR,Merge processStyle
+    class Review decisionStyle
+    class Fix endStyle
+```
+
+## Testing Strategy
+
+```mermaid
+graph TB
+    subgraph TestPyramid["Test Pyramid"]
+        Unit["Unit Tests<br/>━━━━━━━━━━━━<br/>Fast<br/>Isolated<br/>pytest tests/unit/"]
+        Integration["Integration Tests<br/>━━━━━━━━━━━━<br/>Slower<br/>Real Services<br/>pytest tests/integration/"]
+        E2E["E2E Tests<br/>━━━━━━━━━━━━<br/>Slowest<br/>Full Flow<br/>pytest tests/e2e/"]
+    end
+
+    subgraph TestTypes["Test Types"]
+        UnitTypes["@pytest.mark.unit<br/>━━━━━━━━━━━━<br/>Fast, Isolated"]
+        IntegrationTypes["@pytest.mark.integration<br/>━━━━━━━━━━━━<br/>External Services"]
+        SlowTypes["@pytest.mark.slow<br/>━━━━━━━━━━━━<br/>Deselect -m 'not slow'"]
+        WorkflowTypes["@pytest.mark.workflows<br/>━━━━━━━━━━━━<br/>Workflow Tests"]
+        HITLTypes["@pytest.mark.hitl<br/>━━━━━━━━━━━━<br/>Human-in-the-Loop"]
+    end
+
+    subgraph Fixtures["Key Fixtures"]
+        Reset["reset_singletons<br/>━━━━━━━━━━━━<br/>Auto-reset state"]
+        Isolate["isolate_environment<br/>━━━━━━━━━━━━<br/>Isolate .env"]
+        MockDocker["mock_docker<br/>━━━━━━━━━━━━<br/>Mock Docker"]
+        OllamaCheck["requires_ollama<br/>━━━━━━━━━━━━<br/>Check Ollama"]
+    end
+
+    Unit --> UnitTypes
+    Integration --> IntegrationTypes
+    E2E --> HITLTypes
+
+    UnitTypes --> Fixtures
+    IntegrationTypes --> Fixtures
+
+    classDef pyramidStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef typeStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef fixtureStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+
+    class Unit,Integration,E2E pyramidStyle
+    class UnitTypes,IntegrationTypes,SlowTypes,WorkflowTypes,HITLTypes typeStyle
+    class Reset,Isolate,MockDocker,OllamaCheck fixtureStyle
+```
+
+## Code Quality Workflow
+
+```mermaid
+flowchart LR
+    Code([Write Code]) --> Lint["Lint<br/>make lint<br/>ruff + black + mypy"]
+    Lint --> Format{Format Issues?}
+    Format -->|Yes| FixFormat["Fix Format<br/>make format<br/>black + ruff --fix"]
+    FixFormat --> TypeCheck["Type Check<br/>mypy victor"]
+    Format -->|No| TypeCheck
+
+    TypeCheck --> Types{Type Errors?}
+    Types -->|Yes| FixTypes["Fix Types<br/>Add Hints"]
+    FixTypes --> Test["Run Tests<br/>make test<br/>pytest tests/unit/"]
+    Types -->|No| Test
+
+    Test --> Coverage{Coverage > 80%?}
+    Coverage -->|No| AddTests["Add Tests"]
+    AddTests --> Test
+    Coverage -->|Yes| PreCommit["Pre-commit Hooks<br/>pre-commit run --all-files"]
+
+    PreCommit --> Ready([Ready for PR])
+
+    classDef startStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef processStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef decisionStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef endStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+
+    class Code,Ready startStyle
+    class Lint,FixFormat,TypeCheck,FixTypes,Test,AddTests,PreCommit processStyle
+    class Format,Types,Coverage decisionStyle
+    class endStyle
+```
+
+## Release Process
+
+```mermaid
+stateDiagram-v2
+    [*] --> Develop: Development
+    Develop --> Feature: Feature Complete
+    Feature --> PR: Pull Request
+    PR --> Review: Code Review
+    Review --> Tests: CI/CD Tests
+    Tests --> Merge: Approved
+    Merge --> Branch: Merge to main
+
+    Branch --> Version: Bump Version
+    Version --> Tag: Create Tag
+    Tag --> Changelog: Update Changelog
+    Changelog --> Build: Build Package
+    Build --> Publish: Publish to PyPI
+
+    Publish --> Docker: Build Docker Image
+    Docker --> Push: Push to Registry
+
+    Push --> [*]: Release Complete
+
+    note right of Version
+        Semantic Versioning:
+        - MAJOR.MINOR.PATCH
+        - 0.5.1 → 0.5.2
+    end note
+```
+
+## Debugging Workflow
+
+```mermaid
+flowchart TD
+    Bug([Bug Found]) --> Isolate{Isolate Issue}
+    Isolate -->|Reproducible| Repro["Create Reproducer"]
+    Isolate -->|Not Reproducible| Gather["Gather Info<br/>Logs, Env, Version"]
+
+    Repro --> RootCause{Root Cause?}
+    RootCause -->|Known| KnownFix["Apply Known Fix"]
+    RootCause -->|Unknown| Debug["Debug<br/>pdb, breakpoint, logging"]
+
+    Debug --> Hypothesis["Form Hypothesis"]
+    Hypothesis --> Test["Test Hypothesis"]
+    Test --> RootCause
+
+    KnownFix --> Fix["Implement Fix"]
+    Fix --> TestFix["Test Fix<br/>make test<br/>pytest tests/..."]
+
+    TestFix --> Verify{Verified?}
+    Verify -->|No| Debug
+    Verify -->|Yes| Document["Add Tests<br/>Update Docs"]
+
+    Gather --> Isolate
+
+    Document --> Commit([Commit Fix])
+    Commit --> End([Done])
+
+    classDef startStyle fill:#ffebee,stroke:#c62828,stroke-width:2px
+    classDef processStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef decisionStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef successStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+
+    class Bug,End startStyle
+    class Repro,Gather,Debug,KnownFix,Fix,TestFix,Document,Commit processStyle
+    class Isolate,RootCause,Verify decisionStyle
+    class Hypothesis,Test successStyle
+```
+
+## Documentation Workflow
+
+```mermaid
+flowchart LR
+    Plan([Plan Doc]) --> Outline["Create Outline<br/>Structure & Sections"]
+    Outline --> Draft["Draft Content<br/>Clear & Concise"]
+    Draft --> Review{Review}
+    Review -->|Edits| Revise["Revise Content"]
+    Revise --> Review
+
+    Review -->|Approved| Diagrams["Add Diagrams<br/>Mermaid Format"]
+    Diagrams --> Examples["Add Examples<br/>Code Snippets"]
+    Examples --> Links["Add Links<br/>Cross-References"]
+
+    Links --> Validate{Validate}
+    Validate -->|Broken| FixLinks["Fix Links"]
+    FixLinks --> Validate
+    Validate -->|OK| Build["Build Docs<br/>mkdocs build"]
+
+    Build --> Preview["Preview<br/>mkdocs serve"]
+    Preview --> Publish([Publish])
+
+    classDef startStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef processStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef decisionStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef endStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+
+    class Plan,Publish startStyle
+    class Outline,Draft,Revise,Diagrams,Examples,Links,FixLinks,Build,Preview processStyle
+    class Review,Validate decisionStyle
+    class endStyle
+```
+
+## CI/CD Pipeline
+
+```mermaid
+flowchart TB
+    Start([Push/PR]) --> Trigger["GitHub Actions"]
+    Trigger --> Parallel
+
+    subgraph Parallel["Parallel Checks"]
+        Lint["Lint<br/>ruff check"]
+        Format["Format<br/>black --check"]
+        TypeCheck["Type Check<br/>mypy"]
+        Security["Security<br/>bandit, safety"]
+    end
+
+    Parallel --> AllChecks{All Pass?}
+    AllChecks -->|No| Fail([Fail])
+    AllChecks -->|Yes| Tests["Run Tests<br/>pytest"]
+
+    Tests --> Coverage{Coverage OK?}
+    Coverage -->|No| Fail
+    Coverage -->|Yes| Build["Build Package<br/>python -m build"]
+
+    Build --> DockerBuild["Build Docker<br/>docker build"]
+    DockerBuild --> IntTests["Integration Tests<br/>make test-all"]
+
+    IntTests --> Success{Success?}
+    Success -->|No| Fail
+    Success -->|Yes| Deploy["Deploy<br/>───<br/>Merge: Publish<br/>PR: Draft Release"]
+
+    Deploy --> End([Complete])
+
+    classDef startStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef checkStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef decisionStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef failStyle fill:#ffebee,stroke:#c62828,stroke-width:2px
+    classDef successStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+
+    class Start,End startStyle
+    class Trigger,Lint,Format,TypeCheck,Security,Tests,Build,DockerBuild,IntTests,Deploy checkStyle
+    class AllChecks,Coverage,Success decisionStyle
+    class Fail failStyle
+```

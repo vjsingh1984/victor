@@ -453,5 +453,5 @@ This ensures benchmarks measure coordination overhead, not external dependencies
 ---
 
 **Report Generated:** 2025-01-20
-**Victor AI Version:** 0.5.1
-**Benchmark Version:** 1.0.0
+**Victor AI Version:** 0.5.0
+**Benchmark Version:** 0.5.0

@@ -215,29 +215,21 @@ class MessagingEvent:
         - "tool.*" matches "tool.call", "tool.result"
         - "*.error" matches "tool.error", "agent.error"
         - "*" matches everything
+        - "tool.**" matches "tool.call.sub" (multi-segment)
 
         Args:
             pattern: Pattern string with optional wildcards
 
         Returns:
             True if topic matches pattern
+
+        Note:
+            Uses the centralized pattern_matcher module for consistency
+            across all event backends.
         """
-        if pattern == "*":
-            return True
+        from victor.core.events.pattern_matcher import matches_topic_pattern
 
-        pattern_parts = pattern.split(".")
-        topic_parts = self.topic.split(".")
-
-        if len(pattern_parts) != len(topic_parts):
-            # Handle trailing wildcard
-            if pattern_parts[-1] == "*" and len(pattern_parts) <= len(topic_parts):
-                return all(
-                    p == "*" or p == t
-                    for p, t in zip(pattern_parts[:-1], topic_parts[: len(pattern_parts) - 1])
-                )
-            return False
-
-        return all(p == "*" or p == t for p, t in zip(pattern_parts, topic_parts))
+        return matches_topic_pattern(self.topic, pattern)
 
     async def ack(self) -> None:
         """Acknowledge successful processing of this event.

@@ -5,7 +5,7 @@
 metadata:
   name: base_vertical
   description: "Base template for creating new verticals"
-  version: "1.0.0"
+  version: "0.5.0"
   author: "Victor Team"
   license: "Apache-2.0"
   category: general

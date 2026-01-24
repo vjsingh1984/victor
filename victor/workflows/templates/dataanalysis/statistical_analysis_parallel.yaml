@@ -28,7 +28,7 @@ long_description: |
   domain expert provides context-specific insights.
 
   Ideal for rigorous data analysis, research projects, and business intelligence.
-version: "1.0.0"
+version: "0.5.0"
 author: "Victor AI"
 vertical: "dataanalysis"
 formation: "parallel"

@@ -28,7 +28,7 @@ Example:
     # Register a persona
     PersonaProvider.register_persona(
         name="senior_developer",
-        version="1.0.0",
+        version="0.5.0",
         persona=CodingPersonaTraits(...),
         category="execution",
         description="Senior software engineer persona"
@@ -65,7 +65,7 @@ class PersonaMetadata:
 
     Attributes:
         name: Unique persona name
-        version: Semantic version string (e.g., "1.0.0")
+        version: Semantic version string (e.g., "0.5.0")
         description: Human-readable description
         category: Persona category (research, planning, execution, review)
         tags: List of tags for discovery
@@ -168,7 +168,7 @@ class FrameworkPersonaProvider(BaseCapabilityProvider["PersonaTraits"]):
 
         Args:
             name: Unique persona name
-            version: Semantic version string (e.g., "1.0.0")
+            version: Semantic version string (e.g., "0.5.0")
             persona: PersonaTraits instance
             category: Persona category (research, planning, execution, review, other)
             description: Human-readable description

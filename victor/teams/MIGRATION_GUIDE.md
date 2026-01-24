@@ -279,7 +279,7 @@ result = await coordinator.execute_task("Complex task", {})
 - 📢 Encourage migration to new APIs
 - 🔄 Update examples and documentation
 
-### Future (v1.0.0)
+### Future (v0.5.0)
 - ❌ FrameworkTeamCoordinator may be removed
 - ✅ Only new APIs supported
 - 📚 Full migration to new architecture complete

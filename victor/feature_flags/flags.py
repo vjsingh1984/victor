@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Feature flag definitions for Victor 1.0.0 capabilities.
+"""Feature flag definitions for Victor 0.5.0 capabilities.
 
 This module defines all feature flags for gradual rollout of new capabilities.
 Each flag includes metadata for documentation, validation, and rollout strategy.
@@ -43,7 +43,7 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "rollout_strategy": "gradual",
         "dependencies": [],
         "category": "planning",
-        "since": "1.0.0",
+        "since": "0.5.0",
         "stable": False,
         "tags": ["planning", "decomposition", "agent"],
         "metadata": {
@@ -62,7 +62,7 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "rollout_strategy": "gradual",
         "dependencies": [],
         "category": "memory",
-        "since": "1.0.0",
+        "since": "0.5.0",
         "stable": False,
         "tags": ["memory", "episodic", "semantic", "consolidation"],
         "metadata": {
@@ -82,7 +82,7 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "rollout_strategy": "gradual",
         "dependencies": [],
         "category": "skills",
-        "since": "1.0.0",
+        "since": "0.5.0",
         "stable": False,
         "tags": ["skills", "discovery", "composition", "tools"],
         "metadata": {
@@ -98,7 +98,7 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "rollout_strategy": "gradual",
         "dependencies": ["dynamic_skills_enabled"],
         "category": "skills",
-        "since": "1.0.0",
+        "since": "0.5.0",
         "stable": False,
         "tags": ["self-improvement", "proficiency", "learning", "rl"],
         "metadata": {
@@ -117,7 +117,7 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "rollout_strategy": "gradual",
         "dependencies": [],
         "category": "multimodal",
-        "since": "1.0.0",
+        "since": "0.5.0",
         "stable": False,
         "tags": ["multimodal", "vision", "image", "analysis"],
         "metadata": {
@@ -132,7 +132,7 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "rollout_strategy": "gradual",
         "dependencies": [],
         "category": "multimodal",
-        "since": "1.0.0",
+        "since": "0.5.0",
         "stable": False,
         "tags": ["multimodal", "audio", "speech", "transcription"],
         "metadata": {
@@ -150,7 +150,7 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "rollout_strategy": "gradual",
         "dependencies": [],
         "category": "personas",
-        "since": "1.0.0",
+        "since": "0.5.0",
         "stable": False,
         "tags": ["personas", "adaptation", "context", "behavior"],
         "metadata": {
@@ -169,7 +169,7 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "rollout_strategy": "immediate",
         "dependencies": [],
         "category": "performance",
-        "since": "1.0.0",
+        "since": "0.5.0",
         "stable": True,
         "tags": ["performance", "lazy", "initialization", "startup"],
         "metadata": {
@@ -184,7 +184,7 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "rollout_strategy": "immediate",
         "dependencies": [],
         "category": "performance",
-        "since": "1.0.0",
+        "since": "0.5.0",
         "stable": True,
         "tags": ["performance", "parallel", "concurrency", "speedup"],
         "metadata": {

@@ -53,9 +53,9 @@ class TestPackageSpec:
 
     def test_parse_with_version(self):
         """Test parsing package with version constraint."""
-        spec = PackageSpec.parse("victor-security>=1.0.0")
+        spec = PackageSpec.parse("victor-security>=0.5.0")
         assert spec.name == "victor-security"
-        assert spec.version == ">=1.0.0"
+        assert spec.version == ">=0.5.0"
         assert spec.source == PackageSourceType.PYPI
 
     def test_parse_git_url(self):
@@ -86,8 +86,8 @@ class TestPackageSpec:
 
     def test_to_pip_string_pypi(self):
         """Test converting PyPI spec to pip string."""
-        spec = PackageSpec(name="victor-security", version=">=1.0.0")
-        assert spec.to_pip_string() == "victor-security>=1.0.0"
+        spec = PackageSpec(name="victor-security", version=">=0.5.0")
+        assert spec.to_pip_string() == "victor-security>=0.5.0"
 
     def test_to_pip_string_git(self):
         """Test converting git spec to pip string."""
@@ -147,7 +147,7 @@ class TestVerticalRegistryManager:
         # Mock importlib.metadata
         with patch("importlib.metadata.distributions") as mock_dists:
             mock_dist = Mock()
-            mock_dist.version = "1.0.0"
+            mock_dist.version = "0.5.0"
             mock_dist.locate_file.return_value = Path("/fake/location")
 
             mock_ep = Mock()
@@ -159,7 +159,7 @@ class TestVerticalRegistryManager:
 
         assert len(verticals) == 1
         assert verticals[0].name == "security"
-        assert verticals[0].version == "1.0.0"
+        assert verticals[0].version == "0.5.0"
         assert not verticals[0].is_builtin
 
     def test_search_by_name(self):
@@ -170,11 +170,11 @@ class TestVerticalRegistryManager:
         verticals = [
             InstalledVertical(
                 name="security",
-                version="1.0.0",
+                version="0.5.0",
                 location=Path("/fake"),
                 metadata=VerticalPackageMetadata(
                     name="security",
-                    version="1.0.0",
+                    version="0.5.0",
                     description="Security analysis",
                     authors=[AuthorInfo(name="Test")],
                     license="Apache-2.0",
@@ -206,11 +206,11 @@ class TestVerticalRegistryManager:
         verticals = [
             InstalledVertical(
                 name="security",
-                version="1.0.0",
+                version="0.5.0",
                 location=Path("/fake"),
                 metadata=VerticalPackageMetadata(
                     name="security",
-                    version="1.0.0",
+                    version="0.5.0",
                     description="Security analysis and vulnerability scanning",
                     authors=[AuthorInfo(name="Test")],
                     license="Apache-2.0",
@@ -236,11 +236,11 @@ class TestVerticalRegistryManager:
         verticals = [
             InstalledVertical(
                 name="security",
-                version="1.0.0",
+                version="0.5.0",
                 location=Path("/fake"),
                 metadata=VerticalPackageMetadata(
                     name="security",
-                    version="1.0.0",
+                    version="0.5.0",
                     description="Security analysis",
                     authors=[AuthorInfo(name="Test")],
                     license="Apache-2.0",
@@ -267,7 +267,7 @@ class TestVerticalRegistryManager:
         verticals = [
             InstalledVertical(
                 name="security",
-                version="1.0.0",
+                version="0.5.0",
                 location=Path("/fake"),
                 metadata=None,
             ),
@@ -450,7 +450,7 @@ class TestVerticalCommands:
             ),
             InstalledVertical(
                 name="security",
-                version="1.0.0",
+                version="0.5.0",
                 location=Path("/fake"),
                 is_builtin=False,
                 metadata=None,
@@ -476,11 +476,11 @@ class TestVerticalCommands:
         mock_search.return_value = [
             InstalledVertical(
                 name="security",
-                version="1.0.0",
+                version="0.5.0",
                 location=Path("/fake"),
                 metadata=VerticalPackageMetadata(
                     name="security",
-                    version="1.0.0",
+                    version="0.5.0",
                     description="Security analysis",
                     authors=[AuthorInfo(name="Test")],
                     license="Apache-2.0",
@@ -503,11 +503,11 @@ class TestVerticalCommands:
         """Test info command for existing vertical."""
         mock_info.return_value = InstalledVertical(
             name="security",
-            version="1.0.0",
+            version="0.5.0",
             location=Path("/fake"),
             metadata=VerticalPackageMetadata(
                 name="security",
-                version="1.0.0",
+                version="0.5.0",
                 description="Security analysis",
                 authors=[AuthorInfo(name="Test")],
                 license="Apache-2.0",
@@ -523,7 +523,7 @@ class TestVerticalCommands:
 
         assert result.exit_code == 0
         assert "security" in result.stdout
-        assert "1.0.0" in result.stdout
+        assert "0.5.0" in result.stdout
 
     @patch("victor.core.verticals.registry_manager.VerticalRegistryManager.get_info")
     def test_info_command_not_found(self, mock_info):
@@ -556,12 +556,12 @@ class TestVerticalFiltering:
         mock_list.return_value = [
             InstalledVertical(
                 name="security",
-                version="1.0.0",
+                version="0.5.0",
                 location=Path("/fake"),
                 is_builtin=False,
                 metadata=VerticalPackageMetadata(
                     name="security",
-                    version="1.0.0",
+                    version="0.5.0",
                     description="Security analysis",
                     authors=[AuthorInfo(name="Test")],
                     license="Apache-2.0",
@@ -606,12 +606,12 @@ class TestVerticalFiltering:
         mock_list.return_value = [
             InstalledVertical(
                 name="security",
-                version="1.0.0",
+                version="0.5.0",
                 location=Path("/fake"),
                 is_builtin=False,
                 metadata=VerticalPackageMetadata(
                     name="security",
-                    version="1.0.0",
+                    version="0.5.0",
                     description="Security analysis",
                     authors=[AuthorInfo(name="Test")],
                     license="Apache-2.0",
@@ -636,12 +636,12 @@ class TestVerticalFiltering:
         mock_list.return_value = [
             InstalledVertical(
                 name="security",
-                version="1.0.0",
+                version="0.5.0",
                 location=Path("/fake"),
                 is_builtin=False,
                 metadata=VerticalPackageMetadata(
                     name="security",
-                    version="1.0.0",
+                    version="0.5.0",
                     description="Security analysis",
                     authors=[AuthorInfo(name="Test")],
                     license="Apache-2.0",
@@ -809,11 +809,11 @@ class TestVerticalSearch:
         mock_search.return_value = [
             InstalledVertical(
                 name="security",
-                version="1.0.0",
+                version="0.5.0",
                 location=Path("/fake"),
                 metadata=VerticalPackageMetadata(
                     name="security",
-                    version="1.0.0",
+                    version="0.5.0",
                     description="Security analysis",
                     authors=[AuthorInfo(name="Test")],
                     license="Apache-2.0",
@@ -848,11 +848,11 @@ class TestVerticalSearch:
         mock_search.return_value = [
             InstalledVertical(
                 name="security",
-                version="1.0.0",
+                version="0.5.0",
                 location=Path("/fake"),
                 metadata=VerticalPackageMetadata(
                     name="security",
-                    version="1.0.0",
+                    version="0.5.0",
                     description="Security analysis",
                     authors=[AuthorInfo(name="Test")],
                     license="Apache-2.0",

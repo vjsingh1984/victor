@@ -2,7 +2,7 @@
 """
 Victor Migration Validation Script
 
-This script validates that a migration from Victor 0.5.x to 1.0.0 was successful.
+This script validates that a migration from Victor 0.5.x to 0.5.0 was successful.
 
 Usage:
     python scripts/migration/validate_migration.py [--directory ./]
@@ -19,7 +19,7 @@ from typing import List, Tuple
 
 
 class MigrationValidator:
-    """Validates Victor 0.5.x to 1.0.0 migration."""
+    """Validates Victor 0.5.x to 0.5.0 migration."""
 
     def __init__(self, directory: Path = None):
         self.directory = directory or Path.cwd()
@@ -210,7 +210,7 @@ class MigrationValidator:
                     print(f"✓ Victor version: {version}")
                     return True
                 else:
-                    print(f"✗ Victor version {version} is not 1.0.0+")
+                    print(f"✗ Victor version {version} is not 0.5.0+")
                     return False
             except:
                 print(f"⚠ Could not parse Victor version: {version}")
@@ -256,7 +256,7 @@ class MigrationValidator:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Validate Victor migration from 0.5.x to 1.0.0"
+        description="Validate Victor migration from 0.5.x to 0.5.0"
     )
     parser.add_argument(
         "--directory",

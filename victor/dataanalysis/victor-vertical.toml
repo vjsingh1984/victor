@@ -1,6 +1,6 @@
 [vertical]
 name = "dataanalysis"
-version = "0.5.1"
+version = "0.5.0"
 description = "Data Analysis vertical for pandas, visualization, and statistical analysis"
 authors = [{name = "Vijaykumar Singh", email = "singhvjd@gmail.com"}]
 license = "Apache-2.0"

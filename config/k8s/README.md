@@ -168,7 +168,7 @@ kubectl describe hpa victor-api-hpa -n victor
 
 ```bash
 kubectl set image deployment/victor-api \
-  victor-api=vijayksingh/victor:v0.5.1 \
+  victor-api=vijayksingh/victor:v0.5.0 \
   -n victor
 
 # Watch rollout

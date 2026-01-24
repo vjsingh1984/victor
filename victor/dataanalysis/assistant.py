@@ -46,7 +46,7 @@ class DataAnalysisAssistant(VerticalBase):
 
     name = "data_analysis"
     description = "Data exploration, statistical analysis, visualization, and ML insights"
-    version = "1.0.0"
+    version = "0.5.0"
 
     @classmethod
     def get_tools(cls) -> List[str]:

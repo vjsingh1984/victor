@@ -39,7 +39,7 @@ workflows:
         }
         
         compiler = UnifiedWorkflowCompiler()
-        compiled = compiler.compile_yaml(yaml_content, "linear_test", handlers=handlers)
+        compiled = compiler.compile_yaml_content(yaml_content, "linear_test", handlers=handlers)
         # Note: Actual execution would require orchestrator
         assert compiled is not None
 
@@ -77,7 +77,7 @@ workflows:
         }
         
         compiler = UnifiedWorkflowCompiler()
-        compiled = compiler.compile_yaml(yaml_content, "parallel_test", handlers=handlers)
+        compiled = compiler.compile_yaml_content(yaml_content, "parallel_test", handlers=handlers)
         assert compiled is not None
 
     def test_conditional_workflow_execution(self):
@@ -114,7 +114,7 @@ workflows:
         }
         
         compiler = UnifiedWorkflowCompiler()
-        compiled = compiler.compile_yaml(yaml_content, "conditional_test", handlers=handlers)
+        compiled = compiler.compile_yaml_content(yaml_content, "conditional_test", handlers=handlers)
         assert compiled is not None
 
 
@@ -152,8 +152,8 @@ workflows:
         handler: identity
 """
         compiler = UnifiedWorkflowCompiler()
-        compiled_v1 = compiler.compile_yaml(yaml_content_v1, "cached")
-        compiled_v2 = compiler.compile_yaml(yaml_content_v2, "cached")
+        compiled_v1 = compiler.compile_yaml_content(yaml_content_v1, "cached")
+        compiled_v2 = compiler.compile_yaml_content(yaml_content_v2, "cached")
         
         assert compiled_v1 is not None
         assert compiled_v2 is not None
@@ -187,6 +187,6 @@ workflows:
         }
         
         compiler = UnifiedWorkflowCompiler()
-        compiled = compiler.compile_yaml(yaml_content, "error_test", handlers=handlers)
+        compiled = compiler.compile_yaml_content(yaml_content, "error_test", handlers=handlers)
         # Compilation should succeed, execution would fail
         assert compiled is not None

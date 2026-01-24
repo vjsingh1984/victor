@@ -239,6 +239,11 @@ async def _get_or_build_index(
 
     default_persist_dir = str(get_project_paths(root).embeddings_dir)
 
+    # Prepare extra_config with rebuild_on_corruption flag
+    extra_config = {}
+    if force_reindex:
+        extra_config["rebuild_on_corruption"] = True
+
     embedding_config = {
         "vector_store": getattr(settings, "codebase_vector_store", "lancedb"),
         "embedding_model_type": getattr(
@@ -251,19 +256,21 @@ async def _get_or_build_index(
         ),
         "persist_directory": getattr(settings, "codebase_persist_directory", None)
         or default_persist_dir,
-        "extra_config": {},
+        "extra_config": extra_config,
     }
 
     graph_store_name = getattr(settings, "codebase_graph_store", "sqlite")
     graph_path = getattr(settings, "codebase_graph_path", None)
 
     # Create new index - it will load from disk if available
+    # Pass rebuild_on_corruption flag to handle corrupted databases
     index = CodebaseIndex(
         root_path=str(root),
         use_embeddings=True,
         embedding_config=embedding_config,
         graph_store_name=graph_store_name,
         graph_path=Path(graph_path) if graph_path else None,
+        rebuild_on_corruption=force_reindex,
     )
 
     # Only do full index if forced or no persistent data exists

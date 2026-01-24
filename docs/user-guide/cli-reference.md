@@ -628,7 +628,7 @@ Manage vertical packages (plugins).
 ```bash
 # Installation
 victor vertical install victor-security
-victor vertical install "victor-security>=1.0.0"
+victor vertical install "victor-security>=0.5.0"
 victor vertical install git+https://github.com/user/victor-security.git
 victor vertical install ./local/path
 

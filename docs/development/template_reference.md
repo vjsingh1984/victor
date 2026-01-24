@@ -72,7 +72,7 @@ extends: string         # Optional: Parent template name
 metadata:
   name: my_vertical           # Required: Vertical identifier (snake_case)
   description: "Description"  # Required: Human-readable description
-  version: "1.0.0"           # Required: Semantic version
+  version: "0.5.0"           # Required: Semantic version
 ```
 
 ### Optional Fields
@@ -107,7 +107,7 @@ metadata:
 |-------|------|----------|-------------|
 | `name` | string | Yes | Vertical identifier (use snake_case) |
 | `description` | string | Yes | Human-readable description |
-| `version` | string | Yes | Semantic version (e.g., "1.0.0") |
+| `version` | string | Yes | Semantic version (e.g., "0.5.0") |
 | `author` | string | No | Author name or email |
 | `license` | string | No | License name (default: "Apache-2.0") |
 | `category` | string | No | Vertical category |
@@ -765,7 +765,7 @@ Available variables in file templates:
 | `{vertical_name}` | Vertical name | `my_vertical` |
 | `{vertical_class_name}` | Class name | `MyVertical` |
 | `{description}` | Description | `My custom vertical` |
-| `{version}` | Version | `1.0.0` |
+| `{version}` | Version | `0.5.0` |
 | `{author}` | Author | `Your Name` |
 | `{tools_list}` | Tools list | `['tool1', 'tool2']` |
 | `{system_prompt}` | System prompt | `You are an expert...` |
@@ -782,7 +782,7 @@ extends: base_vertical
 metadata:
   name: child_vertical
   description: "Child vertical"
-  version: "1.0.0"
+  version: "0.5.0"
 
 # Add to inherited tools
 tools:
@@ -901,7 +901,7 @@ python scripts/generate_vertical.py --validate template.yaml
 metadata:
   name: complete_vertical
   description: "Complete example vertical"
-  version: "1.0.0"
+  version: "0.5.0"
   author: "Your Name"
   license: "Apache-2.0"
   category: development

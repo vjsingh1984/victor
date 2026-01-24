@@ -216,7 +216,7 @@ init_msg = {
     "id": "1",
     "method": "initialize",
     "params": {
-        "clientInfo": {"name": "MyClient", "version": "1.0.0"}
+        "clientInfo": {"name": "MyClient", "version": "0.5.0"}
     }
 }
 process.stdin.write(json.dumps(init_msg) + "\n")

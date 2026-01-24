@@ -1,6 +1,6 @@
 # Victor AI: Migration Guides
 
-**Version**: 0.5.1
+**Version**: 0.5.0
 **Last Updated**: January 18, 2026
 **Audience**: Developers, Architects
 
@@ -22,9 +22,9 @@
 
 ## Overview
 
-### What Changed in Victor 0.5.1
+### What Changed in Victor 0.5.0
 
-Victor 0.5.1 introduces major architectural improvements:
+Victor 0.5.0 introduces major architectural improvements:
 
 - **Protocol-Based Design**: 98 protocols for loose coupling
 - **Dependency Injection**: ServiceContainer with 55+ services
@@ -398,7 +398,7 @@ class MyVerticalAssistant(VerticalBase):
 metadata:
   name: "my_vertical"
   description: "My custom vertical"
-  version: "1.0.0"
+  version: "0.5.0"
   author: "Your Name"
 
 tools:
@@ -500,7 +500,7 @@ See [vertical_template_guide.md](../vertical_template_guide.md) for complete exa
 
 ### Understanding Event-Driven Design
 
-Victor 0.5.1 supports 5 pluggable event backends:
+Victor 0.5.0 supports 5 pluggable event backends:
 - In-Memory (default)
 - Kafka (distributed)
 - SQS (serverless)
@@ -674,7 +674,7 @@ executor = ToolExecutor(event_bus)  # No coupling!
 
 ### Understanding ServiceContainer
 
-Victor 0.5.1 includes a dependency injection container with 55+ registered services.
+Victor 0.5.0 includes a dependency injection container with 55+ registered services.
 
 ### Scenario: Using ServiceContainer
 
@@ -1146,5 +1146,5 @@ class MyComponent:
 ---
 
 **Last Updated**: January 18, 2026
-**Version**: 0.5.1
+**Version**: 0.5.0
 **Status**: COMPLETE

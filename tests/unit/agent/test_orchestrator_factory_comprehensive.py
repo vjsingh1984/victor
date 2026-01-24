@@ -1142,7 +1142,7 @@ class TestOrchestratorFactoryHelperMethods:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.get_observability_bus"):
+        with patch("victor.core.events.get_observability_bus"):
             tracers = factory.create_tracers()
 
         assert tracers is not None

@@ -18,7 +18,7 @@
 workflows:
   comprehensive_team_review:
     description: "Multi-agent team code review with parallel analysis"
-    version: "1.0.0"
+    version: "0.5.0"
     vertical: "coding"
 
     metadata:

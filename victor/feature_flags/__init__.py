@@ -15,7 +15,7 @@
 """Feature flag system for gradual rollout of new capabilities.
 
 This module provides a comprehensive feature flag system for controlling
-the availability of new Victor 1.0.0 capabilities, enabling gradual rollout,
+the availability of new Victor 0.5.0 capabilities, enabling gradual rollout,
 A/B testing, and instant rollback without deployment.
 
 Key Features:

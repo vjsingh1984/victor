@@ -1,0 +1,281 @@
+# Victor AI Coordinator Architecture
+
+## Two-Layer Coordinator System
+
+```mermaid
+graph TB
+    subgraph ApplicationLayer["Application Layer<br/>(Victor-Specific Business Logic)"]
+        direction TB
+        ChatCoord["ChatCoordinator<br/>━━━━━━━━━━━━━━<br/>• LLM chat operations<br/>• Streaming responses<br/>• Message handling"]
+        ToolCoord["ToolCoordinator<br/>━━━━━━━━━━━━━━<br/>• Tool validation<br/>• Budget enforcement<br/>• Execution orchestration"]
+        ContextCoord["ContextCoordinator<br/>━━━━━━━━━━━━━━<br/>• Context management<br/>• Compaction strategies<br/>• Window optimization"]
+        PromptCoord["PromptCoordinator<br/>━━━━━━━━━━━━━━<br/>• System prompts<br/>• Contributor management<br/>• Prompt building"]
+        SessionCoord["SessionCoordinator<br/>━━━━━━━━━━━━━━<br/>• Conversation lifecycle<br/>• State management<br/>• Session persistence"]
+        ProviderCoord["ProviderCoordinator<br/>━━━━━━━━━━━━━━<br/>• Provider switching<br/>• Context preservation<br/>• Model management"]
+        ModeCoord["ModeCoordinator<br/>━━━━━━━━━━━━━━<br/>• Agent modes<br/>• Exploration tuning<br/>• Edit permissions"]
+        AnalyticsCoord["AnalyticsCoordinator<br/>━━━━━━━━━━━━━━<br/>• Session metrics<br/>• Usage analytics<br/>• Performance tracking"]
+        SelectionCoord["ToolSelectionCoordinator<br/>━━━━━━━━━━━━━━<br/>• Semantic selection<br/>• Tool ranking<br/>• Query optimization"]
+        CheckpointCoord["CheckpointCoordinator<br/>━━━━━━━━━━━━━━<br/>• Workflow checkpoints<br/>• State persistence<br/>• Recovery management"]
+    end
+
+    subgraph FrameworkLayer["Framework Layer<br/>(Domain-Agnostic Infrastructure)"]
+        direction TB
+        YAMLCoord["YAMLWorkflowCoordinator<br/>━━━━━━━━━━━━━━<br/>• YAML loading<br/>• Compilation<br/>• Execution orchestration"]
+        GraphCoord["GraphExecutionCoordinator<br/>━━━━━━━━━━━━━━<br/>• StateGraph execution<br/>• Node routing<br/>• Branch handling"]
+        HITLCoord["HITLCoordinator<br/>━━━━━━━━━━━━━━<br/>• Human-in-the-loop<br/>• Approval handling<br/>• Timeout management"]
+        CacheCoord["CacheCoordinator<br/>━━━━━━━━━━━━━━<br/>• Workflow caching<br/>• Invalidation<br/>• TTL management"]
+    end
+
+    Orchestrator["AgentOrchestrator<br/>━━━━━━━━━━━━━━<br/>FACADE PATTERN"]
+
+    Orchestrator --> ApplicationLayer
+    Orchestrator --> FrameworkLayer
+
+    classDef appStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:3px,color:#000
+    classDef frameworkStyle fill:#fce4ec,stroke:#880e4f,stroke-width:3px,color:#000
+    classDef orchestratorStyle fill:#fff3e0,stroke:#e65100,stroke-width:4px,color:#000
+
+    class ChatCoord,ToolCoord,ContextCoord,PromptCoord,SessionCoord,ProviderCoord,ModeCoord,AnalyticsCoord,SelectionCoord,CheckpointCoord appStyle
+    class YAMLCoord,GraphCoord,HITLCoord,CacheCoord frameworkStyle
+    class Orchestrator orchestratorStyle
+```
+
+## Coordinator Interaction Patterns
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Orchestrator
+    participant ChatCoord
+    participant ToolCoord
+    participant ProviderCoord
+    participant ContextCoord
+
+    User->>Orchestrator: Send Message
+    Orchestrator->>ChatCoord: Initialize Chat
+    ChatCoord->>ProviderCoord: Get Current Provider
+    ProviderCoord-->>ChatCoord: Provider Info
+
+    ChatCoord->>ContextCoord: Get Context
+    ContextCoord-->>ChatCoord: Context Window
+
+    ChatCoord->>ToolCoord: Should Use Tools?
+    ToolCoord-->>ChatCoord: Tool Decision
+
+    alt Tools Required
+        ChatCoord->>ToolCoord: Execute Tools
+        ToolCoord->>ToolCoord: Validate & Execute
+        ToolCoord-->>ChatCoord: Tool Results
+    end
+
+    ChatCoord->>ProviderCoord: Call LLM
+    ProviderCoord-->>ChatCoord: LLM Response
+
+    ChatCoord-->>Orchestrator: Final Response
+    Orchestrator-->>User: Display Result
+```
+
+## Tool Coordinator Flow
+
+```mermaid
+flowchart TD
+    Start([Tool Request]) --> Select{Selection Strategy}
+    Select -->|Keyword| Keyword["Keyword Matching"]
+    Select -->|Semantic| Semantic["Semantic Embedding"]
+    Select -->|Hybrid| Hybrid["Hybrid Approach"]
+
+    Keyword --> Validate1
+    Semantic --> Validate1
+    Hybrid --> Validate1
+
+    Validate1["Validate Tools"] --> Budget{Budget Check}
+    Budget -->|Exceeded| Reject([Reject Tools])
+    Budget -->|Available| Cache{Cache Check}
+
+    Cache -->|Hit| Retrieve["Retrieve Cached"]
+    Cache -->|Miss| Execute["Execute Tools"]
+
+    Retrieve --> Aggregate
+    Execute --> Monitor["Monitor Execution"]
+    Monitor --> Aggregate["Aggregate Results"]
+
+    Aggregate --> Publish["Publish Metrics"]
+    Publish --> Complete([Return Results])
+
+    Reject --> End
+    Complete --> End
+
+    classDef startStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef processStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef decisionStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef endStyle fill:#ffebee,stroke:#c62828,stroke-width:2px
+
+    class Start,Complete,Reject startStyle
+    class Keyword,Semantic,Hybrid,Validate1,Retrieve,Execute,Monitor,Aggregate,Publish processStyle
+    class Select,Budget,Cache decisionStyle
+    class End endStyle
+```
+
+## Context Coordinator Strategies
+
+```mermaid
+graph LR
+    subgraph Input["Input Strategies"]
+        Recent["Recent Messages<br/>━━━━━━━━━━━━<br/>Last N messages"]
+        Semantic["Semantic<br/>━━━━━━━━━━━━<br/>Embedding-based"]
+        Summary["Summary<br/>━━━━━━━━━━━━<br/>Compressed history"]
+    end
+
+    subgraph Processing["Processing"]
+        TokenCount["Token Counting"]
+        PriorityScoring["Priority Scoring"]
+        Deduplication["Deduplication"]
+    end
+
+    subgraph Output["Output Strategies"]
+        Trim["Trim Old"]
+        Compress["Compress"]
+        Summarize["Summarize"]
+    end
+
+    Input --> Processing
+    Processing --> Output
+
+    classDef strategyStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef processStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef outputStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+
+    class Recent,Semantic,Summary strategyStyle
+    class TokenCount,PriorityScoring,Deduplication processStyle
+    class Trim,Compress,Summarize outputStyle
+```
+
+## Provider Switching Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> Active: Initial Provider
+
+    Active --> Switching: /provider Command
+    Switching --> Saving: Save Context
+    Saving --> Disconnecting: Disconnect Current
+    Disconnecting --> Connecting: Connect New
+    Connecting --> Restoring: Restore Context
+    Restoring --> Active: Resume
+
+    note right of Saving
+        Preserve:
+        - Message history
+        - Tool state
+        - Session data
+    end note
+
+    note right of Restoring
+        Restore:
+        - Conversation flow
+        - Active tools
+        - User preferences
+    end note
+```
+
+## Workflow Coordinator Flow
+
+```mermaid
+flowchart TD
+    Start([Workflow Start]) --> Parse["Parse YAML"]
+    Parse --> Validate["Validate Schema"]
+    Validate --> Compile["Compile Graph"]
+
+    Compile --> Checkpoint{Checkpointing?}
+    Checkpoint -->|Yes| LoadState["Load State"]
+    Checkpoint -->|No| Execute
+
+    LoadState --> Execute["Execute Graph"]
+
+    Execute --> Node{Next Node?}
+    Node -->|Yes| HITL{HITL Required?}
+    Node -->|No| Save
+
+    HITL -->|Yes| Approve{Approved?}
+    HITL -->|No| ProcessNode
+
+    Approve -->|Yes| ProcessNode["Process Node"]
+    Approve -->|No| Reject([Reject])
+
+    ProcessNode --> Cache{Cache Check}
+    Cache -->|Hit| Retrieve["Retrieve Cached"]
+    Cache -->|Miss| RunNode["Run Node"]
+
+    Retrieve --> Result
+    RunNode --> Result["Collect Result"]
+
+    Result --> Node
+
+    Save --> Persist["Persist State"]
+    Persist --> End([Workflow Complete])
+
+    classDef startStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef processStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef decisionStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef endStyle fill:#ffebee,stroke:#c62828,stroke-width:2px
+
+    class Start,End,Reject startStyle
+    class Parse,Validate,Compile,LoadState,Execute,ProcessNode,RunNode,Retrieve,Result,Persist processStyle
+    class Checkpoint,Node,HITL,Approve,Cache decisionStyle
+    class Save endStyle
+```
+
+## Coordinator Dependencies
+
+```mermaid
+graph TD
+    subgraph Core["Core Dependencies"]
+        Container["ServiceContainer<br/>Dependency Injection"]
+        EventBus["EventBus<br/>Event System"]
+        ToolRegistry["ToolRegistry<br/>Tool Management"]
+    end
+
+    subgraph AppCoords["Application Coordinators"]
+        Chat["ChatCoordinator"]
+        Tool["ToolCoordinator"]
+        Context["ContextCoordinator"]
+        Prompt["PromptCoordinator"]
+        Session["SessionCoordinator"]
+        Provider["ProviderCoordinator"]
+        Mode["ModeCoordinator"]
+    end
+
+    subgraph FrameworkCoords["Framework Coordinators"]
+        YAML["YAMLWorkflowCoordinator"]
+        Graph["GraphExecutionCoordinator"]
+        HITL["HITLCoordinator"]
+        Cache["CacheCoordinator"]
+    end
+
+    Container --> AppCoords
+    Container --> FrameworkCoords
+    EventBus --> AppCoords
+    EventBus --> FrameworkCoords
+    ToolRegistry --> Tool
+
+    Chat --> Tool
+    Chat --> Context
+    Chat --> Provider
+    Chat --> Prompt
+
+    Tool --> Context
+    Session --> Chat
+    Mode --> Chat
+
+    YAML --> Graph
+    Graph --> HITL
+    Graph --> Cache
+
+    classDef coreStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:3px
+    classDef appStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef frameworkStyle fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+
+    class Container,EventBus,ToolRegistry coreStyle
+    class Chat,Tool,Context,Prompt,Session,Provider,Mode appStyle
+    class YAML,Graph,HITL,Cache frameworkStyle
+```

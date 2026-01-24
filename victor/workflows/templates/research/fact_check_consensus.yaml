@@ -28,7 +28,7 @@ long_description: |
   team reaches accurate, well-supported conclusions.
 
   Ideal for fact verification, claim validation, and misinformation detection.
-version: "1.0.0"
+version: "0.5.0"
 author: "Victor AI"
 vertical: "research"
 formation: "consensus"

@@ -250,6 +250,8 @@ from victor.agent.orchestrator_imports import (
     CoordinatorAdapter,
     IntelligentPipelineAdapter,
     ResultConverters,
+    OrchestratorProtocolAdapter,
+    create_orchestrator_protocol_adapter,
     # Logger
     logger,
 )
@@ -1060,6 +1062,69 @@ class AgentOrchestrator(
                 validation_coordinator=self._validation_coordinator,
             )
         return self._intelligent_pipeline_adapter_instance
+
+    @property
+    def _protocol_adapter(self) -> OrchestratorProtocolAdapter:
+        """Adapter for protocol implementations (extracted from orchestrator)."""
+        if not hasattr(self, "_protocol_adapter_instance"):
+            self._protocol_adapter_instance = create_orchestrator_protocol_adapter(
+                orchestrator=self,
+                state_coordinator=self._state_coordinator,
+                provider_coordinator=self._provider_coordinator,
+                tools=self.tools,
+                conversation=self.conversation,
+                mode_controller=getattr(self, "mode_controller", None),
+                unified_tracker=getattr(self, "unified_tracker", None),
+                tool_selector=getattr(self, "tool_selector", None),
+                tool_access_config_coordinator=self._tool_access_config_coordinator,
+                vertical_context=self._vertical_context,
+                conversation_state=self.conversation_state,
+                prompt_builder=getattr(self, "prompt_builder", None),
+            )
+        return self._protocol_adapter_instance
+
+
+    def __getattr__(self, name: str) -> Any:
+        """Dynamic delegation to coordinators.
+
+        This method provides automatic delegation to coordinators for methods
+        that were extracted during refactoring, maintaining backward compatibility
+        without requiring explicit wrapper methods.
+
+        Delegates to:
+        - _chat_coordinator for chat/streaming methods
+        - _state_coordinator for state management methods
+
+        Args:
+            name: Attribute name being accessed
+
+        Returns:
+            The attribute from the appropriate coordinator
+
+        Raises:
+            AttributeError: If attribute not found in any coordinator
+        """
+        # Prevent infinite recursion during __init__
+        if name.startswith("_") and not name.startswith("__"):
+            # For private attributes, raise AttributeError normally
+            pass
+
+        # Delegate to ChatCoordinator for chat/streaming methods
+        if "_chat_coordinator" in self.__dict__:
+            chat_coordinator = self._chat_coordinator
+            if hasattr(chat_coordinator, name):
+                return getattr(chat_coordinator, name)
+
+        # Delegate to StateCoordinator for state methods
+        if "_state_coordinator" in self.__dict__:
+            state_coordinator = self._state_coordinator
+            if hasattr(state_coordinator, name):
+                return getattr(state_coordinator, name)
+
+        # Not found in any coordinator
+        raise AttributeError(
+            f"'{type(self).__name__}' object has no attribute '{name}'"
+        )
 
     # =====================================================================
     # Mode-Workflow-Team Coordination
@@ -3171,172 +3236,6 @@ class AgentOrchestrator(
             return False
 
     # =====================================================================
-    # Delegation Methods for ChatCoordinator
-    # =====================================================================
-    # These methods delegate to ChatCoordinator for test compatibility
-    # during the Phase 2 refactoring (TD-002 God Class elimination).
-
-    def _apply_intent_guard(self, user_message: str) -> None:
-        """Apply intent guard via ChatCoordinator.
-
-
-        Args:
-            user_message: The user's message to analyze
-        """
-        self._chat_coordinator._apply_intent_guard(user_message)
-
-    def _apply_task_guidance(
-        self,
-        user_message: str,
-        unified_task_type: "TrackerTaskType",
-        is_analysis_task: bool,
-        is_action_task: bool,
-        needs_execution: bool,
-        max_exploration_iterations: int,
-    ) -> None:
-        """Apply task guidance via ChatCoordinator.
-
-
-        Args:
-            user_message: The user's message
-            unified_task_type: The detected task type
-            is_analysis_task: Whether this is an analysis task
-            is_action_task: Whether this is an action task
-            needs_execution: Whether execution is needed
-            max_exploration_iterations: Maximum exploration iterations
-        """
-        self._chat_coordinator._apply_task_guidance(
-            user_message=user_message,
-            unified_task_type=unified_task_type,
-            is_analysis_task=is_analysis_task,
-            is_action_task=is_action_task,
-            needs_execution=needs_execution,
-            max_exploration_iterations=max_exploration_iterations,
-        )
-
-    def _handle_cancellation(self, elapsed: float) -> Optional["StreamChunk"]:
-        """Handle cancellation check via ChatCoordinator.
-
-
-        Args:
-            elapsed: Time elapsed in seconds
-
-        Returns:
-            StreamChunk if cancellation detected, None otherwise
-        """
-        return self._chat_coordinator._handle_cancellation(elapsed)
-
-    def _check_time_limit_with_handler(
-        self, ctx: "StreamingChatContext"
-    ) -> Optional["StreamChunk"]:
-        """Check time limit via ChatCoordinator.
-
-
-        Args:
-            ctx: The streaming context
-
-        Returns:
-            StreamChunk if limit exceeded, None otherwise
-        """
-        return self._chat_coordinator._check_time_limit_with_handler(ctx)
-
-    def _check_progress_with_handler(self, ctx: "StreamingChatContext") -> bool:
-        """Check progress via ChatCoordinator.
-
-
-        Args:
-            ctx: The streaming context
-
-        Returns:
-            True if force completion should be triggered, False otherwise
-        """
-        return self._chat_coordinator._check_progress_with_handler(ctx)
-
-    def _handle_force_completion_with_handler(
-        self, ctx: "StreamingChatContext"
-    ) -> Optional["StreamChunk"]:
-        """Handle force completion via ChatCoordinator.
-
-
-        Args:
-            ctx: The streaming context
-
-        Returns:
-            StreamChunk with force completion message, or None if not forcing
-        """
-        return self._chat_coordinator._handle_force_completion_with_handler(ctx)
-
-    def _create_recovery_context(self, stream_ctx: "StreamingChatContext") -> Any:
-        """Create RecoveryContext via ChatCoordinator.
-
-
-        Args:
-            stream_ctx: The streaming context
-
-        Returns:
-            StreamingRecoveryContext with all necessary state for recovery
-        """
-        return self._chat_coordinator._create_recovery_context(stream_ctx)
-
-    async def _handle_budget_exhausted(self, stream_ctx: "StreamingChatContext") -> Any:
-        """Handle budget exhausted condition via ChatCoordinator.
-
-
-        Args:
-            stream_ctx: The streaming context
-
-        Yields:
-            StreamChunk objects for budget exhausted response
-        """
-        async for chunk in self._chat_coordinator._handle_budget_exhausted(stream_ctx):
-            yield chunk
-
-    async def _handle_force_final_response(self, stream_ctx: "StreamingChatContext") -> Any:
-        """Handle force final response via ChatCoordinator.
-
-
-        Args:
-            stream_ctx: The streaming context
-
-        Yields:
-            StreamChunk objects for force final response
-        """
-        async for chunk in self._chat_coordinator._handle_force_final_response(stream_ctx):
-            yield chunk
-
-    async def _execute_extracted_tool_call(
-        self,
-        stream_ctx: "StreamingChatContext",
-        extracted_call: Any,
-    ) -> Any:
-        """Execute an ExtractedToolCall from text parsing.
-
-
-        Args:
-            stream_ctx: The streaming context
-            extracted_call: ExtractedToolCall with tool_name and arguments
-
-        Yields:
-            StreamChunk objects from tool execution
-        """
-        async for chunk in self._chat_coordinator._execute_extracted_tool_call(
-            stream_ctx, extracted_call
-        ):
-            yield chunk
-
-    def _get_rate_limit_wait_time(self, exc: Exception, attempt: int) -> float:
-        """Get rate limit wait time via ChatCoordinator.
-
-
-        Args:
-            exc: The exception that occurred
-            attempt: The retry attempt number
-
-        Returns:
-            Wait time in seconds
-        """
-        return self._chat_coordinator._get_rate_limit_wait_time(exc, attempt)
-
     # =====================================================================
     # Memory Management
     # =====================================================================
@@ -3438,6 +3337,9 @@ class AgentOrchestrator(
     # These methods implement the stable interface contract defined in
     # victor/framework/protocols.py, enabling the framework layer to
     # interact with the orchestrator without duck-typing.
+    #
+    # Protocol implementations are delegated to OrchestratorProtocolAdapter
+    # to reduce orchestrator size and improve modularity.
 
     # --- ConversationStateProtocol ---
 
@@ -3446,15 +3348,8 @@ class AgentOrchestrator(
 
         Returns:
             Current ConversationStage enum value
-
-        Note:
-            Framework layer converts this to framework.state.Stage
         """
-        # StateCoordinator returns stage name, convert to enum
-        stage_name = self._state_coordinator.get_stage()
-        if stage_name:
-            return ConversationStage[stage_name]
-        return ConversationStage.INITIAL
+        return self._protocol_adapter.get_stage()
 
     def get_tool_calls_count(self) -> int:
         """Get total tool calls made (protocol method).
@@ -3462,9 +3357,7 @@ class AgentOrchestrator(
         Returns:
             Non-negative count of tool calls in this session
         """
-        if self.unified_tracker:
-            return self.unified_tracker.tool_calls_used
-        return getattr(self, "tool_calls_used", 0)
+        return self._protocol_adapter.get_tool_calls_count()
 
     def get_tool_budget(self) -> int:
         """Get tool call budget (protocol method).
@@ -3472,9 +3365,7 @@ class AgentOrchestrator(
         Returns:
             Maximum allowed tool calls
         """
-        if self.unified_tracker:
-            return self.unified_tracker.tool_budget
-        return getattr(self, "tool_budget", 50)
+        return self._protocol_adapter.get_tool_budget()
 
     def get_observed_files(self) -> Set[str]:
         """Get files observed/read during conversation (protocol method).
@@ -3482,7 +3373,7 @@ class AgentOrchestrator(
         Returns:
             Set of absolute file paths
         """
-        return self._state_coordinator.observed_files
+        return self._protocol_adapter.get_observed_files()
 
     def get_modified_files(self) -> Set[str]:
         """Get files modified during conversation (protocol method).
@@ -3490,9 +3381,7 @@ class AgentOrchestrator(
         Returns:
             Set of absolute file paths
         """
-        if self.conversation_state and hasattr(self.conversation_state, "state"):
-            return set(getattr(self.conversation_state.state, "modified_files", []))
-        return set()
+        return self._protocol_adapter.get_modified_files()
 
     def get_iteration_count(self) -> int:
         """Get current agent loop iteration count (protocol method).
@@ -3500,9 +3389,7 @@ class AgentOrchestrator(
         Returns:
             Non-negative iteration count
         """
-        if self.unified_tracker:
-            return self.unified_tracker.iteration_count
-        return 0
+        return self._protocol_adapter.get_iteration_count()
 
     def get_max_iterations(self) -> int:
         """Get maximum allowed iterations (protocol method).
@@ -3510,9 +3397,7 @@ class AgentOrchestrator(
         Returns:
             Max iteration limit
         """
-        if self.unified_tracker:
-            return self.unified_tracker.max_iterations
-        return 25
+        return self._protocol_adapter.get_max_iterations()
 
     # --- ProviderProtocol ---
 
@@ -3523,7 +3408,7 @@ class AgentOrchestrator(
         Returns:
             Provider identifier (e.g., "anthropic", "openai")
         """
-        return self.provider_name
+        return self._protocol_adapter.current_provider
 
     @property
     def current_model(self) -> str:
@@ -3532,7 +3417,7 @@ class AgentOrchestrator(
         Returns:
             Model identifier
         """
-        return self.model
+        return self._protocol_adapter.current_model
 
     async def switch_provider(
         self,
@@ -3541,7 +3426,6 @@ class AgentOrchestrator(
         on_switch: Optional[Any] = None,
     ) -> bool:
         """Switch to a different provider/model (protocol method).
-
 
         Args:
             provider: Target provider name
@@ -3554,37 +3438,7 @@ class AgentOrchestrator(
         Raises:
             ProviderNotFoundError: If provider not found
         """
-        result = await self._provider_coordinator._manager.switch_provider(
-            provider_name=provider,
-            model=model,
-        )
-
-        if result:
-            self._provider_coordinator._notify_post_switch_hooks()
-            # Sync orchestrator's attributes with provider manager state
-            self.model = self._provider_manager.model
-            self.provider_name = self._provider_manager.provider_name
-            if on_switch:
-                on_switch(self.provider_name, self.model)
-
-        return result
-
-    async def switch_model(self, model: str) -> bool:
-        """Switch to a different model on the current provider (protocol method).
-
-
-        Args:
-            model: Target model name
-
-        Returns:
-            True if switch was successful, False otherwise
-        """
-        result = await self._provider_manager.switch_model(model)
-        if result:
-            self._provider_coordinator._notify_post_switch_hooks()
-            # Sync orchestrator's model attribute with provider manager state
-            self.model = self._provider_manager.model
-        return result
+        return await self._protocol_adapter.switch_provider(provider, model, on_switch)
 
     # --- ToolsProtocol ---
 
@@ -3594,27 +3448,7 @@ class AgentOrchestrator(
         Returns:
             Set of tool names available in registry
         """
-        if self.tools:
-            return set(self.tools.list_tools())
-        return set()
-
-    def _build_tool_access_context(self) -> "ToolAccessContext":
-        """Build ToolAccessContext for unified access control checks.
-
-        Returns:
-            ToolAccessContext with session tools and current mode
-        """
-        if hasattr(self, "_tool_access_config_coordinator"):
-            return self._tool_access_config_coordinator.build_tool_access_context(
-                session_enabled_tools=getattr(self, "_enabled_tools", None),
-            )
-        # Fallback to direct implementation
-        from victor.agent.protocols import ToolAccessContext
-
-        return ToolAccessContext(
-            session_enabled_tools=getattr(self, "_enabled_tools", None),
-            current_mode=self.current_mode_name if self.mode_controller else None,
-        )
+        return self._protocol_adapter.get_available_tools()
 
     def get_enabled_tools(self) -> Set[str]:
         """Get currently enabled tool names (protocol method).
@@ -3622,12 +3456,7 @@ class AgentOrchestrator(
         Returns:
             Set of enabled tool names for this session
         """
-        if hasattr(self, "_tool_access_config_coordinator"):
-            return self._tool_access_config_coordinator.get_enabled_tools(
-                session_enabled_tools=getattr(self, "_enabled_tools", None),
-            )
-        # Fallback to direct implementation
-        return set()
+        return self._protocol_adapter.get_enabled_tools()
 
     def set_enabled_tools(self, tools: Set[str], tiered_config: Any = None) -> None:
         """Set which tools are enabled for this session (protocol method).
@@ -3636,27 +3465,7 @@ class AgentOrchestrator(
             tools: Set of tool names to enable
             tiered_config: Optional TieredToolConfig to propagate for stage filtering.
         """
-        if hasattr(self, "_tool_access_config_coordinator"):
-            self._tool_access_config_coordinator.set_enabled_tools(
-                tools=tools,
-                session_enabled_tools_attr=getattr(self, "_enabled_tools", None),
-                tool_selector=getattr(self, "tool_selector", None),
-                vertical_context=getattr(self, "_vertical_context", None),
-                tiered_config=tiered_config,
-            )
-        else:
-            # Fallback to direct implementation
-            self._enabled_tools = tools
-
-    def _get_vertical_tiered_config(self) -> Any:
-        """Get TieredToolConfig from active vertical if available.
-
-        Returns:
-            TieredToolConfig or None
-        """
-        if hasattr(self, "_tool_access_config_coordinator"):
-            return self._tool_access_config_coordinator._get_vertical_tiered_config()
-        return None
+        self._protocol_adapter.set_enabled_tools(tools, tiered_config)
 
     def is_tool_enabled(self, tool_name: str) -> bool:
         """Check if a specific tool is enabled (protocol method).
@@ -3667,14 +3476,7 @@ class AgentOrchestrator(
         Returns:
             True if tool is enabled
         """
-        if hasattr(self, "_tool_access_config_coordinator"):
-            return self._tool_access_config_coordinator.is_tool_enabled(
-                tool_name=tool_name,
-                session_enabled_tools=getattr(self, "_enabled_tools", None),
-            )
-        # Fallback to direct implementation
-        enabled = self.get_enabled_tools()
-        return tool_name in enabled
+        return self._protocol_adapter.is_tool_enabled(tool_name)
 
     # --- SystemPromptProtocol ---
 
@@ -3684,9 +3486,7 @@ class AgentOrchestrator(
         Returns:
             Complete system prompt string
         """
-        if self.prompt_builder:
-            return self.prompt_builder.build()
-        return ""
+        return self._protocol_adapter.get_system_prompt()
 
     def set_system_prompt(self, prompt: str) -> None:
         """Set custom system prompt (protocol method).
@@ -3694,8 +3494,7 @@ class AgentOrchestrator(
         Args:
             prompt: New system prompt (replaces existing)
         """
-        if self.prompt_builder and hasattr(self.prompt_builder, "set_custom_prompt"):
-            self.prompt_builder.set_custom_prompt(prompt)
+        self._protocol_adapter.set_system_prompt(prompt)
 
     def append_to_system_prompt(self, content: str) -> None:
         """Append content to system prompt (protocol method).
@@ -3703,18 +3502,9 @@ class AgentOrchestrator(
         Args:
             content: Content to append
         """
-        current = self.get_system_prompt()
-        self.set_system_prompt(current + "\n\n" + content)
+        self._protocol_adapter.append_to_system_prompt(content)
 
     # --- MessagesProtocol ---
-
-    def get_messages(self) -> List[Dict[str, Any]]:
-        """Get conversation messages (protocol method).
-
-        Returns:
-            List of message dictionaries
-        """
-        return [{"role": m.role, "content": m.content} for m in self.conversation.messages]
 
     def get_message_count(self) -> int:
         """Get message count (protocol method).
@@ -3722,7 +3512,7 @@ class AgentOrchestrator(
         Returns:
             Number of messages in conversation
         """
-        return len(self.conversation.messages)
+        return self._protocol_adapter.get_message_count()
 
     # --- Health Check Methods ---
 
@@ -3733,65 +3523,9 @@ class AgentOrchestrator(
         was never initialized, blocking ALL chat functionality.
 
         Returns:
-            Dictionary with health status:
-                - healthy: bool - True if selector is ready
-                - strategy: str - Tool selection strategy
-                - initialized: bool - Whether embeddings are initialized
-                - message: str - Status message
-                - can_auto_recover: bool - Whether auto-recovery is possible
+            Dictionary with health status
         """
-        if not hasattr(self, "tool_selector") or self.tool_selector is None:
-            return {
-                "healthy": False,
-                "strategy": None,
-                "initialized": False,
-                "message": "Tool selector not created during initialization",
-                "can_auto_recover": False,
-            }
-
-        # Get selector strategy
-        strategy = getattr(self.tool_selector, "strategy", "unknown")
-        strategy_name = strategy.value if hasattr(strategy, "value") else str(strategy)
-
-        # Check if initialization is needed
-        needs_init = hasattr(self.tool_selector, "initialize_tool_embeddings")
-        is_initialized = (
-            hasattr(self.tool_selector, "_embeddings_initialized")
-            and self.tool_selector._embeddings_initialized
-        )
-
-        # If selector doesn't need initialization (e.g., keyword), it's healthy
-        if not needs_init:
-            return {
-                "healthy": True,
-                "strategy": strategy_name,
-                "initialized": True,
-                "message": f"Tool selector ready (strategy: {strategy_name})",
-                "can_auto_recover": False,
-            }
-
-        # Semantic/hybrid selector - check initialization
-        if is_initialized:
-            return {
-                "healthy": True,
-                "strategy": strategy_name,
-                "initialized": True,
-                "message": f"Tool selector ready (strategy: {strategy_name}, embeddings initialized)",
-                "can_auto_recover": False,
-            }
-
-        # Not initialized - this is the bug condition
-        return {
-            "healthy": False,
-            "strategy": strategy_name,
-            "initialized": False,
-            "message": (
-                f"Tool selector NOT initialized (strategy: {strategy_name}). "
-                "This will cause ValueError on first tool selection. "
-                "Call start_embedding_preload() or initialize_tool_embeddings() to fix."
-            ),
-            "can_auto_recover": True,
-        }
+        return self._protocol_adapter.check_tool_selector_health()
 
     async def ensure_tool_selector_initialized(self) -> None:
         """Ensure tool selector is initialized before first use.
@@ -3804,28 +3538,7 @@ class AgentOrchestrator(
         Raises:
             RuntimeError: If initialization fails
         """
-        health = self.check_tool_selector_health()
-        if health["healthy"]:
-            return
-
-        if not health["can_auto_recover"]:
-            raise RuntimeError(f"Tool selector cannot be recovered: {health['message']}")
-
-        logger.debug(f"Tool selector initialization pending, auto-recovering: {health['message']}")
-
-        # Attempt initialization
-        if hasattr(self.tool_selector, "initialize_tool_embeddings"):
-            try:
-                await self.tool_selector.initialize_tool_embeddings(self.tools)
-                logger.info("Tool selector successfully initialized via health check recovery")
-            except Exception as e:
-                raise RuntimeError(
-                    f"Failed to initialize tool selector during health check recovery: {e}"
-                ) from e
-        else:
-            raise RuntimeError(
-                "Tool selector needs initialization but has no initialize_tool_embeddings method"
-            )
+        await self._protocol_adapter.ensure_tool_selector_initialized()
 
     # --- Lifecycle Methods ---
     # Note: is_streaming() already exists at line ~5285

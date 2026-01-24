@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from typing import Dict, Any, List
 import os
 
-app = FastAPI(title="Victor Workflow Editor", version="1.0.0")
+app = FastAPI(title="Victor Workflow Editor", version="0.5.0")
 
 # Enable CORS
 app.add_middleware(
@@ -45,7 +45,7 @@ async def root():
 @app.get("/api/health")
 async def health():
     """Health check endpoint."""
-    return {"status": "healthy", "version": "1.0.0"}
+    return {"status": "healthy", "version": "0.5.0"}
 
 
 @app.get("/api/node-types")

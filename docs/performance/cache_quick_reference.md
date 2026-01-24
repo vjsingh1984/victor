@@ -242,6 +242,6 @@ kubectl cp victor-ai-prod/deployment/victor-ai:/app/.victor/cache/tool_selection
 
 ---
 
-**Version:** 0.5.1
+**Version:** 0.5.0
 **Last Updated:** 2025-01-21
 **Track:** 5.3 - Production Caching

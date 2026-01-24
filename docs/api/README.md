@@ -1,4 +1,4 @@
-# Victor AI 0.5.1 API Documentation
+# Victor AI 0.5.0 API Documentation
 
 Complete API reference documentation for Victor AI's public interfaces.
 
@@ -300,6 +300,6 @@ export VICTOR_SEMANTIC_SIMILARITY_THRESHOLD=0.25
 
 ---
 
-**Version:** 0.5.1
+**Version:** 0.5.0
 **Last Updated:** January 18, 2026
 **License:** Apache 2.0

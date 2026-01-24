@@ -176,6 +176,14 @@ from victor.core.verticals.prompt_adapter import PromptContributorAdapter
 
 from victor.framework.protocols import CapabilityRegistryProtocol
 
+# Import ISP compliance protocols (Phase 1 SOLID Remediation)
+from victor.protocols import (
+    CapabilityContainerProtocol,
+    WorkflowProviderProtocol,
+    TieredConfigProviderProtocol,
+    ExtensionProviderProtocol,
+)
+
 
 logger = logging.getLogger(__name__)
 
@@ -229,6 +237,7 @@ def _check_capability(obj: Any, capability_name: str, strict_mode: bool = False)
     )
 
     # Legacy fallback with public method mappings
+    # Note: This path is only used for objects not implementing CapabilityRegistryProtocol
     public_methods = {
         "enabled_tools": "set_enabled_tools",
         "prompt_builder": "prompt_builder",
@@ -239,6 +248,12 @@ def _check_capability(obj: Any, capability_name: str, strict_mode: bool = False)
     }
 
     method_name = public_methods.get(capability_name, capability_name)
+
+    # Use protocol-based check if available (ISP compliance)
+    if isinstance(obj, CapabilityContainerProtocol):
+        return obj.has_capability(capability_name)
+
+    # Fallback to hasattr for legacy code (deprecated path)
     return hasattr(obj, method_name) and (
         callable(getattr(obj, method_name, None))
         or not callable(getattr(obj, method_name, None))  # Allow properties
@@ -348,8 +363,17 @@ def get_tiered_config(vertical: Any) -> Optional[Any]:
     """
 
     def _is_tiered_config(obj: Any) -> bool:
-        """Check if object is a valid TieredToolConfig-like object."""
-        # Must have mandatory attribute (basic duck typing)
+        """Check if object is a valid TieredToolConfig-like object.
+
+        SOLID Compliance (ISP):
+        - Uses TieredConfigProviderProtocol for type safety
+        - Replaces hasattr() duck typing with protocol-based check
+        """
+        # Use protocol-based check (ISP compliance)
+        if isinstance(obj, TieredConfigProviderProtocol):
+            return True
+
+        # Fallback to hasattr for legacy code (deprecated)
         return obj is not None and hasattr(obj, "mandatory")
 
     def _try_get_config(vertical: Any, method_name: str) -> Optional[Any]:
@@ -1121,15 +1145,18 @@ class FrameworkStepHandler(BaseStepHandler):
             context: Vertical context
             result: Result to update
         """
-        # Check if vertical has workflow provider using protocol
+        # Check if vertical has workflow provider using protocol (ISP compliance)
         workflow_provider = None
-        if hasattr(vertical, "get_workflow_provider"):
-            workflow_provider = vertical.get_workflow_provider()
 
-        # Also check if vertical itself is a WorkflowProviderProtocol
-        if workflow_provider is None and isinstance(vertical, type):
-            if hasattr(vertical, "get_workflows"):
-                workflow_provider = vertical
+        # First check if vertical implements WorkflowProviderProtocol
+        if isinstance(vertical, WorkflowProviderProtocol):
+            workflow_provider = vertical
+        # Fallback to hasattr() for legacy code (deprecated)
+        elif hasattr(vertical, "get_workflow_provider"):
+            workflow_provider = vertical.get_workflow_provider()
+        elif isinstance(vertical, type) and hasattr(vertical, "get_workflows"):
+            # Vertical itself is a workflow provider (class-level check)
+            workflow_provider = vertical
 
         if workflow_provider is None:
             return

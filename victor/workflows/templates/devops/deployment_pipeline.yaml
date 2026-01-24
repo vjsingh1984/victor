@@ -28,7 +28,7 @@ long_description: |
   each stage, this ensures reliable production deployments.
 
   Ideal for production deployments, infrastructure changes, and release management.
-version: "1.0.0"
+version: "0.5.0"
 author: "Victor AI"
 vertical: "devops"
 formation: "pipeline"

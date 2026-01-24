@@ -79,7 +79,7 @@ class TestMCPServerInit:
         """Test initialization with default values."""
         server = MCPServer()
         assert server.name == "Victor MCP Server"
-        assert server.version == "1.0.0"
+        assert server.version == "0.5.0"
         assert server.initialized is False
         assert server.resources == []
 
@@ -434,7 +434,7 @@ class TestMCPServerHelpers:
         info = server.get_server_info()
 
         assert info["name"] == "Victor MCP Server"
-        assert info["version"] == "1.0.0"
+        assert info["version"] == "0.5.0"
         assert info["tools_count"] == 1
         assert info["resources_count"] == 1
 

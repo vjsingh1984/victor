@@ -99,7 +99,7 @@ Provides comprehensive health status of all components.
 {
   "status": "healthy",
   "timestamp": "2025-01-18T12:34:56.789Z",
-  "version": "0.5.1",
+  "version": "0.5.0",
   "uptime_seconds": 3600.5,
   "components": {
     "provider.anthropic": {
@@ -240,12 +240,12 @@ from victor.core.health import HealthChecker, create_default_health_checker
 
 # Create with default checks
 checker = create_default_health_checker(
-    version="0.5.1",
+    version="0.5.0",
     include_memory=True,
 )
 
 # Or create custom
-checker = HealthChecker(cache_ttl=5.0, version="0.5.1")
+checker = HealthChecker(cache_ttl=5.0, version="0.5.0")
 
 # Add checks
 checker.add_check(ProviderHealthCheck("anthropic", provider))
@@ -298,7 +298,7 @@ spec:
     spec:
       containers:
         - name: victor
-          image: victor-ai:0.5.1
+          image: victor-ai:0.5.0
           ports:
             - containerPort: 8080
               name: http

@@ -1,6 +1,6 @@
 [vertical]
 name = "coding"
-version = "0.5.1"
+version = "0.5.0"
 description = "Core coding vertical with code editing, refactoring, and testing capabilities"
 authors = [{name = "Vijaykumar Singh", email = "singhvjd@gmail.com"}]
 license = "Apache-2.0"

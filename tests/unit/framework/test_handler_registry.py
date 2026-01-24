@@ -484,3 +484,253 @@ class TestModuleLevelEnhancedFunctions:
 
         assert count > 0
         assert get_handler("code_validation") is not None
+
+
+# =============================================================================
+# Phase 1.3: @handler_decorator Tests
+# =============================================================================
+
+
+class TestHandlerDecoratorClass:
+    """Tests for @handler_decorator class decorator (Phase 1.3)."""
+
+    @pytest.fixture(autouse=True)
+    def reset_registry(self):
+        """Reset singleton before each test."""
+        HandlerRegistry.reset_instance()
+        yield
+        HandlerRegistry.reset_instance()
+
+    def test_decorator_registers_handler(self):
+        """Decorator should register handler with registry."""
+        from victor.framework.handler_registry import handler_decorator
+        from dataclasses import dataclass
+        from typing import Any, Tuple
+
+        @dataclass
+        class MockHandler:
+            async def execute(self, node, context, registry) -> Tuple[Any, int]:
+                return {}, 0
+
+        # Apply decorator
+        handler_decorator("decorated_test_handler")(MockHandler)
+
+        # Verify registration
+        registry = get_handler_registry()
+        assert registry.has("decorated_test_handler")
+
+    def test_decorator_returns_class_unchanged(self):
+        """Decorator should return the class unchanged."""
+        from victor.framework.handler_registry import handler_decorator
+        from dataclasses import dataclass
+        from typing import Any, Tuple
+
+        @dataclass
+        class MockHandler:
+            async def execute(self, node, context, registry) -> Tuple[Any, int]:
+                return {}, 0
+
+        # Apply decorator
+        decorated = handler_decorator("test_handler_unchanged")(MockHandler)
+
+        # Class should be unchanged
+        assert decorated is MockHandler
+
+    def test_decorator_with_explicit_vertical(self):
+        """Decorator should use explicit vertical when provided."""
+        from victor.framework.handler_registry import handler_decorator
+        from dataclasses import dataclass
+
+        @dataclass
+        class MockHandler:
+            pass
+
+        # Apply decorator with explicit vertical
+        handler_decorator("explicit_vertical_handler", vertical="custom_vertical")(MockHandler)
+
+        # Verify vertical
+        registry = get_handler_registry()
+        entry = registry.get_entry("explicit_vertical_handler")
+        assert entry is not None
+        assert entry.vertical == "custom_vertical"
+
+    def test_decorator_with_description(self):
+        """Decorator should accept optional description."""
+        from victor.framework.handler_registry import handler_decorator
+        from dataclasses import dataclass
+
+        @dataclass
+        class MockHandler:
+            pass
+
+        handler_decorator(
+            "described_handler",
+            vertical="test",
+            description="Test handler description",
+        )(MockHandler)
+
+        registry = get_handler_registry()
+        entry = registry.get_entry("described_handler")
+        assert entry is not None
+        assert entry.description == "Test handler description"
+
+    def test_decorator_creates_instance(self):
+        """Decorator should register a handler instance, not class."""
+        from victor.framework.handler_registry import handler_decorator
+        from dataclasses import dataclass
+        from typing import Any, Tuple
+
+        @dataclass
+        class MockHandler:
+            async def execute(self, node, context, registry) -> Tuple[Any, int]:
+                return {"result": "test"}, 1
+
+        handler_decorator("instance_handler")(MockHandler)
+
+        registry = get_handler_registry()
+        handler = registry.get("instance_handler")
+
+        # Should be an instance, not a class
+        assert handler is not None
+        assert isinstance(handler, MockHandler)
+
+    def test_decorator_replace_option(self):
+        """Decorator should support replace option."""
+        from victor.framework.handler_registry import handler_decorator
+        from dataclasses import dataclass
+
+        @dataclass
+        class Handler1:
+            name: str = "handler1"
+
+        @dataclass
+        class Handler2:
+            name: str = "handler2"
+
+        # Register first handler
+        handler_decorator("replaceable_handler")(Handler1)
+
+        # Try to register second without replace - should raise
+        with pytest.raises(ValueError):
+            handler_decorator("replaceable_handler")(Handler2)
+
+        # With replace=True, should succeed
+        handler_decorator("replaceable_handler", replace=True)(Handler2)
+
+        # Verify second handler is registered
+        registry = get_handler_registry()
+        handler = registry.get("replaceable_handler")
+        assert isinstance(handler, Handler2)
+
+    def test_decorator_can_be_used_inline(self):
+        """Decorator should work as inline decorator."""
+        from victor.framework.handler_registry import handler_decorator
+        from dataclasses import dataclass
+        from typing import Any, Tuple
+
+        @handler_decorator("inline_handler", vertical="test")
+        @dataclass
+        class InlineHandler:
+            async def execute(self, node, context, registry) -> Tuple[Any, int]:
+                return {}, 0
+
+        registry = get_handler_registry()
+        assert registry.has("inline_handler")
+        assert isinstance(registry.get("inline_handler"), InlineHandler)
+
+
+class TestGetVerticalFromModule:
+    """Tests for get_vertical_from_module helper (Phase 1.3)."""
+
+    def test_extracts_vertical_from_victor_path(self):
+        """Should extract vertical name from victor.X.handlers path."""
+        from victor.framework.handler_registry import get_vertical_from_module
+
+        assert get_vertical_from_module("victor.coding.handlers") == "coding"
+        assert get_vertical_from_module("victor.coding.handlers.custom") == "coding"
+        assert get_vertical_from_module("victor.research.handlers") == "research"
+        assert get_vertical_from_module("victor.devops.handlers") == "devops"
+        assert get_vertical_from_module("victor.dataanalysis.handlers") == "dataanalysis"
+        assert get_vertical_from_module("victor.rag.handlers") == "rag"
+
+    def test_handles_non_vertical_paths(self):
+        """Should return None for non-vertical paths."""
+        from victor.framework.handler_registry import get_vertical_from_module
+
+        assert get_vertical_from_module("victor.framework.handlers") is None
+        assert get_vertical_from_module("victor.core.handlers") is None
+        assert get_vertical_from_module("victor.tools.handlers") is None
+
+    def test_handles_short_paths(self):
+        """Should return None for paths too short to be verticals."""
+        from victor.framework.handler_registry import get_vertical_from_module
+
+        assert get_vertical_from_module("victor") is None
+        assert get_vertical_from_module("victor.coding") is None
+
+    def test_handles_unknown_module(self):
+        """Should return None for unknown module paths."""
+        from victor.framework.handler_registry import get_vertical_from_module
+
+        assert get_vertical_from_module("unknown.module") is None
+
+
+class TestHandlerDecoratorIntegration:
+    """Integration tests for decorator with registry (Phase 1.3)."""
+
+    @pytest.fixture(autouse=True)
+    def reset_registries(self):
+        """Reset singleton and executor handlers before each test."""
+        HandlerRegistry.reset_instance()
+        from victor.workflows import executor
+        executor._compute_handlers.clear()
+        yield
+        HandlerRegistry.reset_instance()
+        executor._compute_handlers.clear()
+
+    def test_multiple_handlers_different_verticals(self):
+        """Should support multiple handlers from different verticals."""
+        from victor.framework.handler_registry import handler_decorator
+        from dataclasses import dataclass
+
+        @dataclass
+        class CodingHandler:
+            pass
+
+        @dataclass
+        class ResearchHandler:
+            pass
+
+        handler_decorator("coding_handler", vertical="coding")(CodingHandler)
+        handler_decorator("research_handler", vertical="research")(ResearchHandler)
+
+        registry = get_handler_registry()
+
+        coding_handlers = registry.list_by_vertical("coding")
+        research_handlers = registry.list_by_vertical("research")
+
+        assert "coding_handler" in coding_handlers
+        assert "research_handler" in research_handlers
+
+    def test_decorator_works_with_existing_registry_handlers(self):
+        """Decorator handlers should coexist with manual registrations."""
+        from victor.framework.handler_registry import handler_decorator
+        from dataclasses import dataclass
+
+        registry = get_handler_registry()
+
+        # Manual registration
+        manual_handler = MagicMock()
+        registry.register("manual_handler", manual_handler, vertical="test")
+
+        # Decorator registration
+        @dataclass
+        class DecoratorHandler:
+            pass
+
+        handler_decorator("decorator_handler", vertical="test")(DecoratorHandler)
+
+        # Both should be present
+        assert registry.has("manual_handler")
+        assert registry.has("decorator_handler")
+        assert len(registry.list_by_vertical("test")) == 2

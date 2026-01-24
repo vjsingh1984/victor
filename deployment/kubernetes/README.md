@@ -379,7 +379,7 @@ kubectl describe pod <pod-name> -n victor-ai-prod | grep -A 5 Limits
 
 ```bash
 # Check if image exists
-docker pull victorai/victor:0.5.1
+docker pull victorai/victor:0.5.0
 
 # Check image pull secrets
 kubectl get secrets -n victor-ai-prod

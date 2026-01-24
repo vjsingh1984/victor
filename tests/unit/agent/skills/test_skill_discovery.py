@@ -70,7 +70,7 @@ def mock_tool():
     tool.cost_tier = CostTier.LOW
     tool.enabled = True
     tool.category = "testing"
-    tool.version = "1.0.0"
+    tool.version = "0.5.0"
     tool.author = "test"
     return tool
 
@@ -834,7 +834,7 @@ class TestSkillComposition:
 
         metadata = {
             "author": "test",
-            "version": "1.0.0",
+            "version": "0.5.0",
             "priority": "high",
         }
 

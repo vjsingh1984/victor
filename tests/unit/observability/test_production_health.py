@@ -161,13 +161,13 @@ class TestProductionHealthChecker:
             status="healthy",
             checks={"test": {"status": "ok"}},
             uptime_seconds=10.0,
-            version="1.0.0",
+            version="0.5.0",
         )
 
         data = response.to_dict()
         assert data["status"] == "healthy"
         assert data["uptime_seconds"] == 10.0
-        assert data["version"] == "1.0.0"
+        assert data["version"] == "0.5.0"
         assert "checks" in data
 
 

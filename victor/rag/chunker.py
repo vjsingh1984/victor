@@ -295,8 +295,11 @@ class DocumentChunker:
         """
         chunks = []
         current_pos = 0
+        iteration_count = 0
+        max_iterations = len(content) * 2  # Safety limit to prevent infinite loops
 
-        while current_pos < len(content):
+        while current_pos < len(content) and iteration_count < max_iterations:
+            iteration_count += 1
             # Determine chunk end position
             chunk_end = min(current_pos + self.config.chunk_size, len(content))
 
@@ -321,9 +324,13 @@ class DocumentChunker:
                 chunks.append((chunk_text, current_pos, chunk_end))
 
             # Move to next chunk with overlap
-            current_pos = chunk_end - self.config.chunk_overlap
+            # Ensure current_pos always advances to prevent infinite loop
+            current_pos = max(current_pos + 1, chunk_end - self.config.chunk_overlap)
             if current_pos >= len(content) - self.config.min_chunk_size:
                 break
+
+        if iteration_count >= max_iterations:
+            logger.warning(f"_chunk_text exceeded max iterations for content length {len(content)}")
 
         return chunks
 

@@ -168,7 +168,7 @@ async def demo_playwright_connection(transport_override: str = None):
     # Create MCP client
     client = MCPClient(
         name="Victor-Playwright-Demo",
-        version="1.0.0",
+        version="0.5.0",
         health_check_interval=0,  # Disable health checks for demo
     )
 
@@ -262,7 +262,7 @@ async def demo_playwright_screenshot(transport_override: str = None):
 
     client = MCPClient(
         name="Victor-Playwright-Screenshot",
-        version="1.0.0",
+        version="0.5.0",
         health_check_interval=0,
     )
 
@@ -373,7 +373,7 @@ async def demo_playwright_navigation(transport_override: str = None):
 
     client = MCPClient(
         name="Victor-Playwright-Navigation",
-        version="1.0.0",
+        version="0.5.0",
         health_check_interval=0,
     )
 
@@ -465,7 +465,7 @@ async def demo_playwright_scraping(transport_override: str = None):
 
     client = MCPClient(
         name="Victor-Playwright-Scraper",
-        version="1.0.0",
+        version="0.5.0",
         health_check_interval=0,
     )
 

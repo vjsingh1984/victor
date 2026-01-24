@@ -157,7 +157,7 @@ class CheckpointStore:
         # Create checkpoint
         checkpoint = store.create_checkpoint(
             learner_name="tool_selector",
-            version="v1.0.0",
+            version="v0.5.0",
             state=learner.export_state(),
             metadata={"success_rate": 0.85},
         )

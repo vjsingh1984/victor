@@ -159,104 +159,160 @@ __all__ = [
 ]
 
 
-def _register_builtin_verticals() -> None:
-    """Register all built-in verticals with the registry using lazy loading.
+def _register_and_discover_verticals() -> None:
+    """Register and discover all verticals using the PluginDiscovery system.
 
-    Lazy loading defers the actual import of vertical classes until they are
-    first accessed, significantly improving startup time.
+    This function replaces the old hardcoded vertical registration with a
+    flexible plugin discovery system that supports:
+    - Built-in verticals (always available)
+    - Entry point discovery (Python standard for plugins)
+    - YAML fallback (for air-gapped environments)
 
-    To disable lazy loading and load all verticals eagerly, set the environment
-    variable: VICTOR_LAZY_LOADING=false
+    Phase 3 OCP Compliance:
+    This implementation follows the Open/Closed Principle by allowing verticals
+    to be added without modifying core code (via entry points or YAML).
+
+    To disable plugin discovery and use the old hardcoded registration, set:
+    export VICTOR_USE_PLUGIN_DISCOVERY=false
+
+    To enable air-gapped mode (entry points disabled, YAML fallback enabled):
+    export VICTOR_AIRGAPPED=true
     """
     import os
-    from victor.core.verticals.naming import normalize_vertical_name
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    # Check if plugin discovery is enabled (default: true)
+    use_plugin_discovery = os.getenv("VICTOR_USE_PLUGIN_DISCOVERY", "true").lower() == "true"
 
     # Check if lazy loading is enabled (default: true)
     lazy_loading_enabled = os.getenv("VICTOR_LAZY_LOADING", "true").lower() == "true"
+
+    if use_plugin_discovery:
+        # NEW: Use PluginDiscovery system (Phase 3 OCP Compliance)
+        try:
+            from victor.core.verticals.plugin_discovery import get_plugin_discovery
+
+            discovery = get_plugin_discovery()
+            result = discovery.discover_all()
+
+            # Register discovered verticals
+            if lazy_loading_enabled:
+                # Register lazy imports from discovery result
+                for name, lazy_import in result.lazy_imports.items():
+                    try:
+                        VerticalRegistry.register_lazy_import(name, lazy_import)
+                        logger.debug(f"Registered lazy import for vertical '{name}'")
+                    except Exception as e:
+                        logger.warning(f"Failed to register lazy import for '{name}': {e}")
+
+                # Register any non-lazy verticals (from entry points or YAML)
+                for name, vertical_class in result.verticals.items():
+                    if vertical_class is not None:  # Not a lazy import
+                        try:
+                            VerticalRegistry.register(vertical_class)
+                            logger.debug(f"Registered vertical '{name}' from {result.sources.get(name, 'unknown')}")
+                        except Exception as e:
+                            logger.warning(f"Failed to register vertical '{name}': {e}")
+            else:
+                # Eager loading - import and register all verticals immediately
+                for name, lazy_import in result.lazy_imports.items():
+                    try:
+                        module_path, class_name = lazy_import.split(":")
+                        module = __import__(module_path, fromlist=[class_name])
+                        vertical_class = getattr(module, class_name)
+                        VerticalRegistry.register(vertical_class)
+                        logger.debug(f"Eagerly loaded and registered vertical '{name}'")
+                    except Exception as e:
+                        logger.warning(f"Failed to eagerly load vertical '{name}': {e}")
+
+                # Register any non-lazy verticals
+                for name, vertical_class in result.verticals.items():
+                    if vertical_class is not None:
+                        try:
+                            VerticalRegistry.register(vertical_class)
+                            logger.debug(f"Registered vertical '{name}' from {result.sources.get(name, 'unknown')}")
+                        except Exception as e:
+                            logger.warning(f"Failed to register vertical '{name}': {e}")
+
+            logger.info(f"Plugin discovery completed: {len(result.lazy_imports)} lazy, {len([v for v in result.verticals.values() if v is not None])} eager")
+
+        except Exception as e:
+            logger.error(f"Plugin discovery failed, falling back to hardcoded registration: {e}")
+            # Fall back to old hardcoded registration
+            _register_builtin_verticals_fallback(lazy_loading_enabled)
+    else:
+        # OLD: Use hardcoded registration (backward compatibility)
+        logger.debug("Using hardcoded vertical registration (plugin discovery disabled)")
+        _register_builtin_verticals_fallback(lazy_loading_enabled)
+
+
+def _register_builtin_verticals_fallback(lazy_loading_enabled: bool) -> None:
+    """Fallback function for hardcoded vertical registration (backward compatibility).
+
+    This function is only used when plugin discovery is disabled or fails.
+    """
+    import logging
+
+    logger = logging.getLogger(__name__)
 
     if lazy_loading_enabled:
         # Register lazy imports - verticals will be loaded on first access
         VerticalRegistry.register_lazy_import("coding", "victor.coding:CodingAssistant")
         VerticalRegistry.register_lazy_import("research", "victor.research:ResearchAssistant")
         VerticalRegistry.register_lazy_import("devops", "victor.devops:DevOpsAssistant")
-        VerticalRegistry.register_lazy_import(
-            "dataanalysis", "victor.dataanalysis:DataAnalysisAssistant"
-        )
+        VerticalRegistry.register_lazy_import("dataanalysis", "victor.dataanalysis:DataAnalysisAssistant")
         VerticalRegistry.register_lazy_import("rag", "victor.rag:RAGAssistant")
         VerticalRegistry.register_lazy_import("benchmark", "victor.benchmark:BenchmarkVertical")
+        logger.debug("Registered 6 built-in verticals with lazy loading")
     else:
         # Eager loading - import all verticals immediately (legacy behavior)
-        try:
-            from victor.coding import CodingAssistant
+        verticals_to_load = [
+            ("coding", "victor.coding", "CodingAssistant"),
+            ("research", "victor.research", "ResearchAssistant"),
+            ("devops", "victor.devops", "DevOpsAssistant"),
+            ("dataanalysis", "victor.dataanalysis", "DataAnalysisAssistant"),
+            ("rag", "victor.rag", "RAGAssistant"),
+            ("benchmark", "victor.benchmark", "BenchmarkVertical"),
+        ]
 
-            VerticalRegistry.register(CodingAssistant)
-        except ImportError:
-            pass
-
-        try:
-            from victor.research import ResearchAssistant
-
-            VerticalRegistry.register(ResearchAssistant)
-        except ImportError:
-            pass
-
-        try:
-            from victor.devops import DevOpsAssistant
-
-            VerticalRegistry.register(DevOpsAssistant)
-        except ImportError:
-            pass
-
-        try:
-            from victor.dataanalysis import DataAnalysisAssistant
-
-            VerticalRegistry.register(DataAnalysisAssistant)
-        except ImportError:
-            pass
-
-        try:
-            from victor.rag import RAGAssistant
-
-            VerticalRegistry.register(RAGAssistant)
-        except ImportError:
-            pass
-
-        try:
-            from victor.benchmark import BenchmarkVertical
-
-            VerticalRegistry.register(BenchmarkVertical)
-        except ImportError:
-            pass
+        for name, module_path, class_name in verticals_to_load:
+            try:
+                module = __import__(module_path, fromlist=[class_name])
+                vertical_class = getattr(module, class_name)
+                VerticalRegistry.register(vertical_class)
+                logger.debug(f"Eagerly loaded vertical '{name}'")
+            except ImportError:
+                logger.warning(f"Failed to import vertical '{name}' from {module_path}")
+                pass
 
 
 def _discover_external_verticals() -> None:
     """Discover and register external verticals from entry points.
 
-    This function scans installed packages for the 'victor.verticals'
-    entry point group and registers any valid vertical classes found.
+    DEPRECATED: This function is kept for backward compatibility but is no longer
+    used. The new PluginDiscovery system handles external vertical discovery
+    internally.
 
-    External packages can register verticals by adding an entry point
-    to their pyproject.toml:
-
-        [project.entry-points."victor.verticals"]
-        my_vertical = "my_package:MyVerticalAssistant"
-
-    The vertical class must inherit from VerticalBase and implement
-    the required abstract methods (get_tools, get_system_prompt).
+    This function will be removed in a future release.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    logger.debug("External vertical discovery is now handled by PluginDiscovery system")
     try:
         VerticalRegistry.discover_external_verticals()
     except Exception:
         # Silently ignore discovery failures during import
-        # Errors are logged by discover_external_verticals()
         pass
 
 
-# Register built-in verticals on import
-_register_builtin_verticals()
+# Register and discover all verticals on import (Phase 3 OCP Compliance)
+_register_and_discover_verticals()
 
-# Discover and register external verticals from entry points
-_discover_external_verticals()
+# Legacy external discovery (now handled by PluginDiscovery, kept for compatibility)
+# _discover_external_verticals()  # Commented out - redundant with PluginDiscovery
 
 
 def get_vertical(name: str | None) -> type[VerticalBase] | None:

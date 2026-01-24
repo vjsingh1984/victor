@@ -1,0 +1,36 @@
+# External Vertical Configuration for Air-Gapped Environments
+#
+# This file enables plugin discovery in air-gapped environments where Python
+# entry points are not available. External verticals can be registered here
+# as a fallback when VICTOR_AIRGAPPED=true.
+#
+# Phase 3 OCP Compliance:
+# This YAML-based plugin registration follows the Open/Closed Principle by
+# allowing verticals to be added without modifying core code.
+#
+# Usage in Air-Gapped Mode:
+#   export VICTOR_AIRGAPPED=true
+#   victor  # Will load verticals from this YAML file
+#
+# Format:
+#   verticals:
+#     - name: vertical_name
+#       module: python.module.path
+#       class: VerticalClassName
+#       display_name: "Display Name"
+#       description: "Vertical description"
+
+verticals:
+  # Example external vertical (commented out)
+  # - name: security
+  #   module: victor_security.verticals
+  #   class: SecurityAssistant
+  #   display_name: "Security Analysis"
+  #   description: "Security vulnerability scanning and analysis"
+
+  # Add your external verticals below following the format above
+  # - name: your_vertical
+  #   module: your_package.your_module
+  #   class: YourVerticalClass
+  #   display_name: "Your Vertical"
+  #   description: "Description of your vertical"

@@ -53,7 +53,7 @@ class MyTool(BaseTool):
 
 class Plugin(ToolPlugin):
     name = "my_plugin"
-    version = "1.0.0"
+    version = "0.5.0"
     description = "My custom plugin"
 
     def get_tools(self):
@@ -107,7 +107,7 @@ from typing import List, Dict, Any
 class Plugin(ToolPlugin):
     # Required metadata
     name = "my_plugin"
-    version = "1.0.0"
+    version = "0.5.0"
     description = "Description of what the plugin does"
 
     # Optional metadata
@@ -355,7 +355,7 @@ async def add_numbers(a: int, b: int) -> int:
 # Create plugin from functions
 plugin = FunctionToolPlugin(
     name="math_tools",
-    version="1.0.0",
+    version="0.5.0",
     tool_functions=[hello_world, add_numbers],
     description="Simple math utilities"
 )
@@ -483,7 +483,7 @@ Include helpful information:
 ```python
 class Plugin(ToolPlugin):
     name = "my_plugin"
-    version = "1.0.0"
+    version = "0.5.0"
     description = "Provides database tools for PostgreSQL"
     author = "Your Name <you@example.com>"
     homepage = "https://github.com/you/victor-db-plugin"

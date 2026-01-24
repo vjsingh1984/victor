@@ -1,6 +1,6 @@
 # Victor Migration Documentation
 
-Complete migration guides and resources for upgrading from Victor 0.5.x to 1.0.0.
+Complete migration guides and resources for upgrading from Victor 0.5.x to 0.5.0.
 
 ## Quick Start
 
@@ -93,7 +93,7 @@ python scripts/migration/migrate_workflows.py --source ./old_workflows --dest ./
 
 **Features**:
 - Migrates Python workflows to YAML
-- Updates workflow structure to 1.0.0 format
+- Updates workflow structure to 0.5.0 format
 - Validates migrated workflows
 - Preserves directory structure
 
@@ -237,7 +237,7 @@ orchestrator = bootstrap_orchestrator(Settings())
 | Version | Status | Support Until |
 |---------|--------|--------------|
 | 0.5.x | Maintenance | 2025-06-01 |
-| 1.0.0 | Current | 2026-01-01 |
+| 0.5.0 | Current | 2026-01-01 |
 
 ## What's Next
 
@@ -252,6 +252,6 @@ After completing the migration:
 ---
 
 **Last Updated**: 2025-01-21
-**Version**: 1.0.0
+**Version**: 0.5.0
 
 Need help? See the [Main Migration Guide](./MIGRATION_GUIDE.md) or [Rollback Guide](./ROLLBACK_GUIDE.md).

@@ -76,7 +76,7 @@ Create a `doc_config.yaml` in your project:
 # Documentation configuration
 project:
   name: "My Project"
-  version: "1.0.0"
+  version: "0.5.0"
   description: "Project description"
 
 documentation:

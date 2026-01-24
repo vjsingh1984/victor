@@ -170,7 +170,7 @@ class TestVersion:
 
     def test_parse_with_prerelease(self):
         """Test parsing version with prerelease."""
-        v = Version.parse("1.0.0-alpha.1")
+        v = Version.parse("0.5.0-alpha.1")
         assert v.major == 1
         assert v.minor == 0
         assert v.patch == 0
@@ -178,13 +178,13 @@ class TestVersion:
 
     def test_parse_with_build(self):
         """Test parsing version with build metadata."""
-        v = Version.parse("1.0.0+build.123")
+        v = Version.parse("0.5.0+build.123")
         assert v.major == 1
         assert v.build == "build.123"
 
     def test_parse_with_prerelease_and_build(self):
         """Test parsing version with both prerelease and build."""
-        v = Version.parse("1.0.0-rc.1+build.456")
+        v = Version.parse("0.5.0-rc.1+build.456")
         assert v.prerelease == "rc.1"
         assert v.build == "build.456"
 
@@ -203,17 +203,17 @@ class TestVersion:
     def test_str_with_prerelease(self):
         """Test __str__ with prerelease."""
         v = Version(1, 0, 0, prerelease="alpha")
-        assert str(v) == "1.0.0-alpha"
+        assert str(v) == "0.5.0-alpha"
 
     def test_str_with_build(self):
         """Test __str__ with build."""
         v = Version(1, 0, 0, build="build.1")
-        assert str(v) == "1.0.0+build.1"
+        assert str(v) == "0.5.0+build.1"
 
     def test_str_with_prerelease_and_build(self):
         """Test __str__ with both prerelease and build."""
         v = Version(1, 0, 0, prerelease="rc.1", build="123")
-        assert str(v) == "1.0.0-rc.1+123"
+        assert str(v) == "0.5.0-rc.1+123"
 
     def test_lt_comparison(self):
         """Test less than comparison."""
@@ -260,7 +260,7 @@ class TestVersion:
     def test_eq_comparison_with_non_version(self):
         """Test equality comparison with non-Version object."""
         v = Version(1, 0, 0)
-        assert v != "1.0.0"
+        assert v != "0.5.0"
 
 
 class TestDependency:
@@ -281,7 +281,7 @@ class TestDependency:
 
     def test_is_outdated_true(self):
         """Test is_outdated when package is outdated."""
-        dep = Dependency(name="test", installed_version="1.0.0", latest_version="2.0.0")
+        dep = Dependency(name="test", installed_version="0.5.0", latest_version="2.0.0")
         assert dep.is_outdated is True
 
     def test_is_outdated_false(self):
@@ -296,12 +296,12 @@ class TestDependency:
 
     def test_is_outdated_no_latest(self):
         """Test is_outdated when no latest version."""
-        dep = Dependency(name="test", installed_version="1.0.0")
+        dep = Dependency(name="test", installed_version="0.5.0")
         assert dep.is_outdated is False
 
     def test_update_available_when_outdated(self):
         """Test update_available when outdated."""
-        dep = Dependency(name="test", installed_version="1.0.0", latest_version="2.0.0")
+        dep = Dependency(name="test", installed_version="0.5.0", latest_version="2.0.0")
         assert dep.update_available == "2.0.0"
 
     def test_update_available_when_current(self):
@@ -339,12 +339,12 @@ class TestDependencyVulnerability:
         """Test required fields."""
         vuln = DependencyVulnerability(
             package="test",
-            installed_version="1.0.0",
+            installed_version="0.5.0",
             vulnerability_id="CVE-2024-1234",
             severity="high",
         )
         assert vuln.package == "test"
-        assert vuln.installed_version == "1.0.0"
+        assert vuln.installed_version == "0.5.0"
         assert vuln.vulnerability_id == "CVE-2024-1234"
         assert vuln.severity == "high"
 
@@ -352,7 +352,7 @@ class TestDependencyVulnerability:
         """Test default values."""
         vuln = DependencyVulnerability(
             package="test",
-            installed_version="1.0.0",
+            installed_version="0.5.0",
             vulnerability_id="CVE-2024-1234",
             severity="medium",
         )
@@ -368,17 +368,17 @@ class TestDependencyUpdate:
     def test_required_fields(self):
         """Test required fields."""
         update = DependencyUpdate(
-            package="test", current_version="1.0.0", new_version="2.0.0", change_type="major"
+            package="test", current_version="0.5.0", new_version="2.0.0", change_type="major"
         )
         assert update.package == "test"
-        assert update.current_version == "1.0.0"
+        assert update.current_version == "0.5.0"
         assert update.new_version == "2.0.0"
         assert update.change_type == "major"
 
     def test_default_values(self):
         """Test default values."""
         update = DependencyUpdate(
-            package="test", current_version="1.0.0", new_version="1.1.0", change_type="minor"
+            package="test", current_version="0.5.0", new_version="1.1.0", change_type="minor"
         )
         assert update.breaking is False
         assert update.changelog_url is None

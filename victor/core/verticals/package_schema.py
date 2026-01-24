@@ -69,7 +69,7 @@ class VerticalPackageMetadata(BaseModel):
 
     Attributes:
         name: Vertical name (must be unique, lowercase, alphanumeric)
-        version: Semantic version (e.g., "1.0.0")
+        version: Semantic version (e.g., "0.5.0")
         description: Brief description of the vertical
         authors: List of authors
         license: SPDX license identifier

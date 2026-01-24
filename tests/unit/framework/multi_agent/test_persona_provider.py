@@ -171,15 +171,15 @@ class TestFrameworkPersonaProviderRegistration:
 
         provider.register_persona(
             name="test_persona",
-            version="1.0.0",
+            version="0.5.0",
             persona=sample_persona,
             category="research",
             description="Test persona",
         )
 
         assert "test_persona" in provider._personas
-        assert "1.0.0" in provider._personas["test_persona"]
-        assert provider._personas["test_persona"]["1.0.0"] is sample_persona
+        assert "0.5.0" in provider._personas["test_persona"]
+        assert provider._personas["test_persona"]["0.5.0"] is sample_persona
 
     def test_register_persona_with_metadata(self, sample_persona):
         """Should store persona metadata correctly."""
@@ -187,7 +187,7 @@ class TestFrameworkPersonaProviderRegistration:
 
         provider.register_persona(
             name="test_persona",
-            version="1.0.0",
+            version="0.5.0",
             persona=sample_persona,
             category="execution",
             description="Test execution persona",
@@ -197,9 +197,9 @@ class TestFrameworkPersonaProviderRegistration:
             deprecated=False,
         )
 
-        metadata = provider._metadata["test_persona"]["1.0.0"]
+        metadata = provider._metadata["test_persona"]["0.5.0"]
         assert metadata.name == "test_persona"
-        assert metadata.version == "1.0.0"
+        assert metadata.version == "0.5.0"
         assert metadata.description == "Test execution persona"
         assert metadata.category == "execution"
         assert metadata.tags == ["execution", "testing"]
@@ -213,7 +213,7 @@ class TestFrameworkPersonaProviderRegistration:
 
         provider.register_persona(
             name="test_planner",
-            version="1.0.0",
+            version="0.5.0",
             persona=sample_persona,
             category="planning",
             description="Test planner",
@@ -229,7 +229,7 @@ class TestFrameworkPersonaProviderRegistration:
 
         provider.register_persona(
             name="test_cap",
-            version="1.0.0",
+            version="0.5.0",
             persona=sample_persona,
             category="review",
             description="Test capability",
@@ -246,10 +246,10 @@ class TestFrameworkPersonaProviderRegistration:
 
         provider.register_persona(
             name="multi_version",
-            version="1.0.0",
+            version="0.5.0",
             persona=sample_persona,
             category="research",
-            description="Version 1.0.0",
+            description="Version 0.5.0",
         )
 
         # Create modified version
@@ -271,9 +271,9 @@ class TestFrameworkPersonaProviderRegistration:
             description="Version 2.0.0",
         )
 
-        assert "1.0.0" in provider._personas["multi_version"]
+        assert "0.5.0" in provider._personas["multi_version"]
         assert "2.0.0" in provider._personas["multi_version"]
-        assert provider._personas["multi_version"]["1.0.0"] is sample_persona
+        assert provider._personas["multi_version"]["0.5.0"] is sample_persona
         assert provider._personas["multi_version"]["2.0.0"] is v2_persona
 
 
@@ -289,7 +289,7 @@ class TestSemVerValidation:
         """Should accept valid basic SemVer."""
         provider = FrameworkPersonaProvider()
 
-        valid_versions = ["1.0.0", "2.1.3", "0.1.0", "10.20.30"]
+        valid_versions = ["0.5.0", "2.1.3", "0.1.0", "10.20.30"]
 
         for version in valid_versions:
             provider.register_persona(
@@ -305,7 +305,7 @@ class TestSemVerValidation:
         """Should accept SemVer with pre-release identifiers."""
         provider = FrameworkPersonaProvider()
 
-        valid_versions = ["1.0.0-alpha", "2.0.0-beta.1", "1.0.0-rc.1", "3.0.0-alpha.1.beta.2"]
+        valid_versions = ["0.5.0-alpha", "2.0.0-beta.1", "0.5.0-rc.1", "3.0.0-alpha.1.beta.2"]
 
         for version in valid_versions:
             provider.register_persona(
@@ -320,7 +320,7 @@ class TestSemVerValidation:
         """Should accept SemVer with build metadata."""
         provider = FrameworkPersonaProvider()
 
-        valid_versions = ["1.0.0+20130313144700", "1.0.0+build.1"]
+        valid_versions = ["0.5.0+20130313144700", "0.5.0+build.1"]
 
         for version in valid_versions:
             provider.register_persona(
@@ -338,11 +338,11 @@ class TestSemVerValidation:
         invalid_versions = [
             "1",  # Missing minor and patch
             "1.0",  # Missing patch
-            "1.0.0.0",  # Too many parts
-            "01.0.0",  # Leading zero
-            "v1.0.0",  # Prefix
+            "0.5.0.0",  # Too many parts
+            "00.5.0",  # Leading zero
+            "v0.5.0",  # Prefix
             "1.0.",  # Trailing dot
-            ".1.0.0",  # Leading dot
+            ".0.5.0",  # Leading dot
             "a.b.c",  # Non-numeric
             "",  # Empty string
         ]
@@ -359,10 +359,10 @@ class TestSemVerValidation:
 
     def test_is_valid_semver_static_method(self):
         """_is_valid_semver static method should work correctly."""
-        assert FrameworkPersonaProvider._is_valid_semver("1.0.0") is True
+        assert FrameworkPersonaProvider._is_valid_semver("0.5.0") is True
         assert FrameworkPersonaProvider._is_valid_semver("2.1.3") is True
-        assert FrameworkPersonaProvider._is_valid_semver("1.0.0-alpha") is True
-        assert FrameworkPersonaProvider._is_valid_semver("1.0.0+build") is True
+        assert FrameworkPersonaProvider._is_valid_semver("0.5.0-alpha") is True
+        assert FrameworkPersonaProvider._is_valid_semver("0.5.0+build") is True
         assert FrameworkPersonaProvider._is_valid_semver("1.0") is False
         assert FrameworkPersonaProvider._is_valid_semver("invalid") is False
         assert FrameworkPersonaProvider._is_valid_semver("") is False
@@ -378,30 +378,30 @@ class TestSemVerSorting:
 
     def test_semver_key_basic(self):
         """_semver_key should convert versions to comparable tuples."""
-        assert FrameworkPersonaProvider._semver_key("1.0.0") == (1, 0, 0)
+        assert FrameworkPersonaProvider._semver_key("0.5.0") == (1, 0, 0)
         assert FrameworkPersonaProvider._semver_key("2.1.3") == (2, 1, 3)
         assert FrameworkPersonaProvider._semver_key("10.20.30") == (10, 20, 30)
 
     def test_semver_key_ignores_pre_release_and_build(self):
         """_semver_key should strip pre-release and build metadata."""
-        assert FrameworkPersonaProvider._semver_key("1.0.0-alpha") == (1, 0, 0)
-        assert FrameworkPersonaProvider._semver_key("1.0.0+build") == (1, 0, 0)
-        assert FrameworkPersonaProvider._semver_key("1.0.0-alpha+build") == (1, 0, 0)
+        assert FrameworkPersonaProvider._semver_key("0.5.0-alpha") == (1, 0, 0)
+        assert FrameworkPersonaProvider._semver_key("0.5.0+build") == (1, 0, 0)
+        assert FrameworkPersonaProvider._semver_key("0.5.0-alpha+build") == (1, 0, 0)
 
     def test_get_latest_version_basic(self):
         """_get_latest_version should return the highest version."""
-        versions = ["1.0.0", "1.1.0", "2.0.0", "1.0.1"]
+        versions = ["0.5.0", "1.1.0", "2.0.0", "1.0.1"]
         latest = FrameworkPersonaProvider._get_latest_version(versions)
 
         assert latest == "2.0.0"
 
     def test_get_latest_version_with_prerelease(self):
         """_get_latest_version should handle pre-release versions."""
-        versions = ["1.0.0", "1.0.0-alpha", "1.0.0-beta", "2.0.0-alpha"]
+        versions = ["0.5.0", "0.5.0-alpha", "0.5.0-beta", "2.0.0-alpha"]
         latest = FrameworkPersonaProvider._get_latest_version(versions)
 
         # Should strip pre-release and return highest version
-        # After stripping: 1.0.0, 1.0.0, 1.0.0, 2.0.0 -> highest is 2.0.0-alpha
+        # After stripping: 0.5.0, 0.5.0, 0.5.0, 2.0.0 -> highest is 2.0.0-alpha
         assert latest == "2.0.0-alpha"
 
     def test_get_latest_version_empty_list(self):
@@ -427,7 +427,7 @@ class TestCategoryValidation:
         for i, category in enumerate(valid_categories):
             provider.register_persona(
                 name=f"test_{category}",
-                version="1.0.0",
+                version="0.5.0",
                 persona=sample_persona,
                 category=category,
                 description=f"Test {category}",
@@ -441,7 +441,7 @@ class TestCategoryValidation:
         with pytest.raises(ValueError, match="Invalid category"):
             provider.register_persona(
                 name="invalid_category",
-                version="1.0.0",
+                version="0.5.0",
                 persona=sample_persona,
                 category="invalid_category_name",
                 description="Invalid category",
@@ -465,7 +465,7 @@ class TestFrameworkPersonaProviderRetrieval:
 
         provider.register_persona(
             name="single_version",
-            version="1.0.0",
+            version="0.5.0",
             persona=sample_persona,
             category="research",
             description="Single version",
@@ -474,7 +474,7 @@ class TestFrameworkPersonaProviderRetrieval:
         # Register multiple versions
         provider.register_persona(
             name="multi_version",
-            version="1.0.0",
+            version="0.5.0",
             persona=sample_persona,
             category="execution",
             description="Multi v1",
@@ -529,7 +529,7 @@ class TestFrameworkPersonaProviderRetrieval:
 
     def test_get_persona_with_version(self, populated_provider):
         """Should retrieve specific version."""
-        persona = populated_provider.get_persona("multi_version", version="1.0.0")
+        persona = populated_provider.get_persona("multi_version", version="0.5.0")
 
         assert persona is not None
         assert persona.name == "Test Researcher"
@@ -548,7 +548,7 @@ class TestFrameworkPersonaProviderRetrieval:
 
         assert metadata is not None
         assert metadata.name == "single_version"
-        assert metadata.version == "1.0.0"
+        assert metadata.version == "0.5.0"
         assert metadata.description == "Single version"
         assert metadata.category == "research"
 
@@ -591,7 +591,7 @@ class TestFrameworkPersonaProviderListing:
 
         provider.register_persona(
             name="researcher_1",
-            version="1.0.0",
+            version="0.5.0",
             persona=sample_persona,
             category="research",
             description="Researcher 1",
@@ -599,7 +599,7 @@ class TestFrameworkPersonaProviderListing:
 
         provider.register_persona(
             name="planner_1",
-            version="1.0.0",
+            version="0.5.0",
             persona=sample_persona,
             category="planning",
             description="Planner 1",
@@ -607,7 +607,7 @@ class TestFrameworkPersonaProviderListing:
 
         provider.register_persona(
             name="executor_1",
-            version="1.0.0",
+            version="0.5.0",
             persona=sample_persona,
             category="execution",
             description="Executor 1",
@@ -615,7 +615,7 @@ class TestFrameworkPersonaProviderListing:
 
         provider.register_persona(
             name="reviewer_1",
-            version="1.0.0",
+            version="0.5.0",
             persona=sample_persona,
             category="review",
             description="Reviewer 1",
@@ -652,7 +652,7 @@ class TestFrameworkPersonaProviderListing:
 
         provider.register_persona(
             name="versioned",
-            version="1.0.0",
+            version="0.5.0",
             persona=sample_persona,
             category="research",
             description="v1",
@@ -677,7 +677,7 @@ class TestFrameworkPersonaProviderListing:
         versions = provider.list_persona_versions("versioned")
 
         # Should be sorted descending (latest first)
-        assert versions == ["2.0.0", "1.5.0", "1.0.0"]
+        assert versions == ["2.0.0", "1.5.0", "0.5.0"]
 
     def test_list_persona_versions_not_exists(self):
         """Should return empty list for non-existent persona."""
@@ -702,7 +702,7 @@ class TestBaseCapabilityProviderIntegration:
 
         provider.register_persona(
             name="cap_1",
-            version="1.0.0",
+            version="0.5.0",
             persona=sample_persona,
             category="research",
             description="Capability 1",
@@ -711,7 +711,7 @@ class TestBaseCapabilityProviderIntegration:
 
         provider.register_persona(
             name="cap_2",
-            version="1.0.0",
+            version="0.5.0",
             persona=sample_persona,
             category="execution",
             description="Capability 2",
@@ -740,7 +740,7 @@ class TestBaseCapabilityProviderIntegration:
         cap1_meta = metadata["cap_1"]
         assert cap1_meta.name == "cap_1"
         assert cap1_meta.description == "Capability 1"
-        assert cap1_meta.version == "1.0.0"
+        assert cap1_meta.version == "0.5.0"
         assert cap1_meta.tags == ["research", "analysis"]
 
     def test_has_capability(self, populated_provider):
@@ -798,7 +798,7 @@ class TestRegistryStatistics:
         # Register personas across categories
         provider.register_persona(
             name="res_1",
-            version="1.0.0",
+            version="0.5.0",
             persona=sample_persona,
             category="research",
             description="Research 1",
@@ -814,7 +814,7 @@ class TestRegistryStatistics:
 
         provider.register_persona(
             name="plan_1",
-            version="1.0.0",
+            version="0.5.0",
             persona=sample_persona,
             category="planning",
             description="Planning 1",
@@ -822,7 +822,7 @@ class TestRegistryStatistics:
 
         provider.register_persona(
             name="exec_1",
-            version="1.0.0",
+            version="0.5.0",
             persona=sample_persona,
             category="execution",
             description="Execution 1",
@@ -856,7 +856,7 @@ class TestThreadSafety:
             try:
                 provider.register_persona(
                     name=f"persona_{index}",
-                    version="1.0.0",
+                    version="0.5.0",
                     persona=sample_persona,
                     category="research",
                     description=f"Persona {index}",
@@ -890,7 +890,7 @@ class TestThreadSafety:
         for i in range(5):
             provider.register_persona(
                 name=f"persona_{i}",
-                version="1.0.0",
+                version="0.5.0",
                 persona=sample_persona,
                 category="research",
                 description=f"Persona {i}",
@@ -930,11 +930,11 @@ class TestPersonaMetadata:
     def test_create_with_required_fields(self):
         """Should create metadata with required fields."""
         metadata = PersonaMetadata(
-            name="test", version="1.0.0", description="Test", category="research"
+            name="test", version="0.5.0", description="Test", category="research"
         )
 
         assert metadata.name == "test"
-        assert metadata.version == "1.0.0"
+        assert metadata.version == "0.5.0"
         assert metadata.description == "Test"
         assert metadata.category == "research"
         assert metadata.tags == []
@@ -963,10 +963,10 @@ class TestPersonaMetadata:
     def test_metadata_equality(self):
         """Two PersonaMetadata with same values should be equal."""
         metadata1 = PersonaMetadata(
-            name="test", version="1.0.0", description="Test", category="research"
+            name="test", version="0.5.0", description="Test", category="research"
         )
         metadata2 = PersonaMetadata(
-            name="test", version="1.0.0", description="Test", category="research"
+            name="test", version="0.5.0", description="Test", category="research"
         )
 
         assert metadata1 == metadata2
@@ -974,7 +974,7 @@ class TestPersonaMetadata:
     def test_metadata_inequality(self):
         """Two PersonaMetadata with different values should not be equal."""
         metadata1 = PersonaMetadata(
-            name="test1", version="1.0.0", description="Test1", category="research"
+            name="test1", version="0.5.0", description="Test1", category="research"
         )
         metadata2 = PersonaMetadata(
             name="test2", version="2.0.0", description="Test2", category="execution"

@@ -1,6 +1,6 @@
 # Victor AI Design Patterns Documentation
 
-**Version**: 0.5.1
+**Version**: 0.5.0
 **Last Updated**: January 18, 2026
 **Audience**: Architects, Senior Developers, Contributors
 **Purpose**: Comprehensive documentation of design patterns used in Victor AI

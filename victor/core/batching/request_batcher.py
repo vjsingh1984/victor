@@ -503,8 +503,16 @@ class ToolCallBatcher:
             batch_timeout: Batch timeout in seconds
         """
         self.executor = executor
+        # Create key function that handles both positional and keyword args
+        def _tool_key_func(*args, **kwargs):
+            # If called with positional arg (tool_name), use it
+            if args:
+                return args[0]
+            # Otherwise, get from kwargs
+            return kwargs.get("tool", "")
+
         self.batcher = RequestBatcher(
-            key_func=lambda tool_name=None, **kwargs: tool_name or kwargs.get("tool", ""),
+            key_func=_tool_key_func,
             batch_func=self._execute_tool_batch,
             max_batch_size=max_batch_size,
             batch_timeout=batch_timeout,

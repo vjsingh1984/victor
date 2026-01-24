@@ -41,7 +41,7 @@ Usage:
     registry.register(workflow)
 
     # Get specific version
-    v1 = registry.get("data_pipeline", "1.0.0")
+    v1 = registry.get("data_pipeline", "0.5.0")
 
     # Get latest version
     latest = registry.get_latest("data_pipeline")
@@ -52,7 +52,7 @@ YAML Configuration:
         version: "2.0.0"
         description: "Process data pipeline"
         migrations:
-          from_version: "1.0.0"
+          from_version: "0.5.0"
           changes:
             - type: add_node
               node_id: validation_step
@@ -127,7 +127,7 @@ class WorkflowVersion:
         """Parse a semver string.
 
         Args:
-            version_str: Version string (e.g., "1.2.3", "1.0.0-beta")
+            version_str: Version string (e.g., "1.2.3", "0.5.0-beta")
 
         Returns:
             WorkflowVersion instance
@@ -140,7 +140,7 @@ class WorkflowVersion:
         match = re.match(pattern, version_str.strip())
 
         if not match:
-            # Try simple format "1.0" -> "1.0.0"
+            # Try simple format "1.0" -> "0.5.0"
             simple_pattern = r"^(\d+)\.(\d+)$"
             simple_match = re.match(simple_pattern, version_str.strip())
             if simple_match:
@@ -396,13 +396,13 @@ class WorkflowVersionRegistry:
         ))
 
         # Get specific version
-        v1 = registry.get("pipeline", "1.0.0")
+        v1 = registry.get("pipeline", "0.5.0")
 
         # Get latest
         latest = registry.get_latest("pipeline")
 
         # Migrate state
-        migrated = registry.migrate_state("pipeline", state, "1.0.0", "2.0.0")
+        migrated = registry.migrate_state("pipeline", state, "0.5.0", "2.0.0")
     """
 
     def __init__(self):

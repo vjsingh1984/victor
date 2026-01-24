@@ -22,7 +22,7 @@
 # =============================================================================
 metadata:
   name: devops
-  version: "1.0.0"
+  version: "0.5.0"
   description: "Infrastructure automation, container management, CI/CD, and deployment"
 
 # =============================================================================

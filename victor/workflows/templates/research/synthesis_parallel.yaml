@@ -28,7 +28,7 @@ long_description: |
   diverse perspectives.
 
   Ideal for research synthesis, report generation, and knowledge integration.
-version: "1.0.0"
+version: "0.5.0"
 author: "Victor AI"
 vertical: "research"
 formation: "parallel"

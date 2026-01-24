@@ -1,7 +1,7 @@
 # Workflow Diagram Cleanup Report
 
 **Date**: 2025-01-18
-**Branch**: 0.5.1-agent-coderbranch
+**Branch**: 0.5.0-agent-coderbranch
 **Location**: `/Users/vijaysingh/code/codingagent/docs/workflow-diagrams/`
 
 ---

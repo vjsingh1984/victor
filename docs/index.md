@@ -2,7 +2,7 @@
 
 # Victor AI Documentation Index
 
-**Complete navigation for Victor AI 0.5.1**
+**Complete navigation for Victor AI 0.5.0**
 
 [![Version](https://badge.fury.io/py/victor-ai.svg)](https://pypi.org/project/victor-ai/)
 [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](./index.md)
@@ -13,15 +13,15 @@
 
 ## Welcome to Victor AI Documentation
 
-Victor AI is an open-source AI coding assistant supporting **21 LLM providers** with **55 specialized tools** across **5 domain verticals**. This documentation hub contains **369 markdown files** with **132,000+ lines** of documentation organized by audience and topic.
+Victor AI is an open-source AI coding assistant supporting **21 LLM providers** with **55 specialized tools** across **5 domain verticals**. This documentation hub contains **comprehensive documentation** organized by audience and topic.
 
 ### Documentation Statistics
 
-- **Total Files**: 369 markdown documents
-- **Total Lines**: 132,020 lines
-- **Total Size**: 13 MB
-- **Last Updated**: January 18, 2026
-- **Version**: 0.5.1
+- **Total Diagrams**: 30 Mermaid diagrams (version-controlled)
+- **Archive Files**: 202 historical documents organized
+- **Last Updated**: January 24, 2026
+- **Version**: 0.5.0
+- **Status**: Professional OSS Quality ✨
 
 ---
 
@@ -33,44 +33,14 @@ New to Victor? Start with these essential documents:
 
 | Document | Description | Reading Time |
 |----------|-------------|--------------|
-| [Quick Start](./QUICKSTART.md) | Get started in 5 minutes | 5 min |
 | [Installation](./getting-started/installation.md) | Install Victor via pip, pipx, or Docker | 5 min |
 | [First Run](./getting-started/first-run.md) | Initialize your Victor environment | 3 min |
+| [Local Models](./getting-started/local-models.md) | Local model setup (Ollama, LM Studio) | 10 min |
+| [Cloud Models](./getting-started/cloud-models.md) | Cloud provider setup (17 providers) | 10 min |
 | [Configuration](./getting-started/configuration.md) | Configure providers, profiles, and settings | 10 min |
 | [User Guide Index](./user-guide/index.md) | Comprehensive user documentation | 30 min |
-| [FAQ](./user-guide/faq.md) | Frequently asked questions | 5 min |
-| [Troubleshooting](./TROUBLESHOOTING.md) | Common issues and solutions | 10 min |
-
-### For Architects
-
-System design and architecture documentation:
-
-| Document | Description | Reading Time |
-|----------|-------------|--------------|
-| [Architect Quick Start](./ARCHITECT_QUICKSTART.md) | Architecture overview for architects | 15 min |
-| [Architecture Overview](./architecture/overview.md) | High-level system architecture | 20 min |
-| [Architecture README](./architecture/README.md) | Architecture documentation hub | 5 min |
-| [Design Patterns](./architecture/DESIGN_PATTERNS.md) | SOLID patterns and best practices | 30 min |
-| [Component Reference](./architecture/COMPONENT_REFERENCE.md) | Detailed component documentation | 45 min |
-| [Protocols Reference](./architecture/PROTOCOLS_REFERENCE.md) | Protocol definitions and usage | 25 min |
-| [Best Practices](./architecture/BEST_PRACTICES.md) | Architecture best practices | 20 min |
-| [Refactoring Overview](./architecture/REFACTORING_OVERVIEW.md) | Recent refactoring summary | 15 min |
-
-### For Developers
-
-Implementation and extension documentation:
-
-| Document | Description | Reading Time |
-|----------|-------------|--------------|
-| [Contributor Quick Start](./CONTRIBUTOR_QUICKSTART.md) | Start contributing in 10 minutes | 10 min |
-| [Developer Onboarding](./DEVELOPER_ONBOARDING.md) | Complete developer guide | 30 min |
-| [Development Setup](./development/setup.md) | Development environment setup | 15 min |
-| [Code Style](./development/code-style.md) | Coding standards and conventions | 10 min |
-| [Testing Guide](./development/testing.md) | Testing strategy and guidelines | 20 min |
-| [API Reference](./api/README.md) | Python API documentation hub | 10 min |
-| [Extension Development](./extensions/README.md) | Plugin and extension development | 25 min |
-| [Vertical Creation Guide](./development/vertical_creation_guide.md) | Create domain verticals | 30 min |
-| [Tool Composition Guide](./TOOL_COMPOSITION_GUIDE.md) | Build and compose tools | 20 min |
+| [FAQ](./FAQ.md) | Frequently asked questions | 5 min |
+| [Troubleshooting](./getting-started/troubleshooting.md) | Common issues and solutions | 10 min |
 
 ### For Contributors
 
@@ -90,10 +60,10 @@ Community and contribution documentation:
 
 ### Architecture & Design
 
-Comprehensive architecture documentation (180 KB, 19 files):
+Comprehensive architecture documentation with 30 Mermaid diagrams:
 
 - [Architecture Overview](./architecture/overview.md) - System architecture introduction
-- [Architecture README](./architecture/README.md) - Architecture documentation hub
+- [Architecture Index](./architecture/INDEX.md) - Architecture documentation hub
 - [ARCHITECTURE.md](./architecture/ARCHITECTURE.md) - Complete architecture documentation
 - [Design Patterns](./architecture/DESIGN_PATTERNS.md) - SOLID design patterns
 - [Component Reference](./architecture/COMPONENT_REFERENCE.md) - Detailed component docs
@@ -103,22 +73,19 @@ Comprehensive architecture documentation (180 KB, 19 files):
 - [Coordinator Separation](./architecture/coordinator_separation.md) - Separation concerns
 - [Refactoring Overview](./architecture/REFACTORING_OVERVIEW.md) - Refactoring summary
 - [Migration Guides](./architecture/MIGRATION_GUIDES.md) - Architecture migrations
-- [ISP Migration Guide](./architecture/ISP_MIGRATION_GUIDE.md) - Interface segregation
-- [Refactoring Migration Guide](./architecture/REFACTORING_MIGRATION_GUIDE.md) - Refactoring migrations
-- [Track 2 ISP Summary](./architecture/TRACK2_ISP_SUMMARY.md) - ISP compliance
-- [Workflow Consolidation](./architecture/WORKFLOW_CONSOLIDATION.md) - Workflow system
-- [Victor Framework Analysis](./architecture/VICTOR_FRAMEWORK_ANALYSIS.md) - Framework analysis
-- [Architecture Decision Records](./adr/) - ADRs (5 documents)
+- [Diagrams](./diagrams/) - 30 Mermaid diagrams for all major systems
 
 ### API & Reference
 
-Complete API documentation (110 KB, 5 files):
+Complete API documentation:
 
-- [API README](./api/README.md) - API documentation hub
-- [API Reference](./api/API_REFERENCE.md) - Complete API reference
-- [Protocol Reference](./api/PROTOCOL_REFERENCE.md) - Protocol documentation
-- [Provider Reference](./api/PROVIDER_REFERENCE.md) - Provider API
-- [Configuration Reference](./api/CONFIGURATION_REFERENCE.md) - Configuration API
+- [API Reference](./reference/api.md) - Unified API documentation hub
+- [Quick Reference](./reference/quick-reference.md) - Essential commands and patterns
+- [CLI Reference](./user-guide/cli-reference.md) - Command-line interface reference
+- [Configuration Reference](./reference/configuration/) - Configuration options
+- [Provider Reference](./reference/providers/) - All 21 LLM providers
+- [Tool Reference](./reference/tools/) - 55+ tools
+- [Internal APIs](./reference/internals/) - Protocol and component APIs
 
 ### Performance & Optimization
 
@@ -188,8 +155,6 @@ End-user documentation:
 - [TUI Mode](./user-guide/tui-mode.md) - Terminal interface
 - [Session Management](./user-guide/session-management.md) - Session management
 - [Troubleshooting](./user-guide/troubleshooting.md) - User troubleshooting
-- [Troubleshooting Detailed](./user-guide/troubleshooting-detailed.md) - Detailed troubleshooting
-- [Troubleshooting Legacy](./user-guide/troubleshooting-legacy.md) - Legacy troubleshooting
 - [FAQ](./user-guide/faq.md) - Frequently asked questions
 
 ### Getting Started
@@ -197,51 +162,36 @@ End-user documentation:
 Quick start documentation:
 
 - [Installation](./getting-started/installation.md) - Installation guide
-- [Quick Start](./getting-started/quickstart.md) - 5-minute quick start
+- [First Run](./getting-started/first-run.md) - Get started quickly
+- [Local Models](./getting-started/local-models.md) - Local model setup
+- [Cloud Models](./getting-started/cloud-models.md) - Cloud provider setup
+- [Docker](./getting-started/docker.md) - Docker deployment
 - [Configuration](./getting-started/configuration.md) - Configuration guide
-- [First Run](./getting-started/first-run.md) - First run guide
-- [Basic Usage](./getting-started/basic-usage.md) - Basic usage
-- [Getting Started Index](./getting-started/index.md) - Getting started hub
-- [Coordinator Mode Quick Start](./getting-started/coordinator_mode_quickstart.md) - Coordinator mode
-- [Multi-Provider Quick Start](./getting-started/multi_provider_quickstart.md) - Multiple providers
-- [Plugin Development Quick Start](./getting-started/plugin_development_quickstart.md) - Plugin development
+- [Troubleshooting](./getting-started/troubleshooting.md) - Quick troubleshooting
 
-### Reference Documentation
+### Historical Archive
 
-Reference materials:
+Archived documentation (202 files):
 
-- [CLI Commands](./reference/cli-commands.md) - Command reference
-- [Configuration Options](./reference/configuration-options.md) - Configuration reference
-- [Environment Variables](./reference/environment-variables.md) - Environment variables
-- [API Reference](./api-reference/) - API documentation
+- [Archive Index](./archive/README.md) - Historical implementation reports
+- [Reports](./archive/reports/) - Implementation milestones (70 files)
+- [Development Reports](./archive/development-reports/) - Technical reports (10 files)
+- [Quickstarts](./archive/quickstarts/) - Archived quickstart guides (6 files)
+- [Troubleshooting](./archive/troubleshooting/) - Archived troubleshooting (3 files)
+- [Migration Guides](./archive/migration-guides/) - Archived migrations (2 files)
+- [Root-Level Reports](./archive/root-level-reports/) - Comprehensive guides (111 files)
 
-### Tutorials
+---
 
-Hands-on tutorials:
+<div align="center">
 
-- [Build a Custom Tool](./tutorials/build-custom-tool.md) - Create custom tools
-- [Create a Workflow](./tutorials/create-workflow.md) - Design workflows
-- [Integrate a Provider](./tutorials/integrate-provider.md) - Add providers
+**[← Back to Top](#victor-ai-documentation-index)**
 
-### Features
+**Victor AI Documentation**
 
-Feature documentation:
+*Professional Open-Source Quality ✨*
 
-- [Advanced Features](./ADVANCED_FEATURES.md) - Advanced features
-- [Advanced RAG Guide](./ADVANCED_RAG_GUIDE.md) - RAG capabilities
-- [Agent Swarming Guide](./AGENT_SWARMING_GUIDE.md) - Multi-agent coordination
-- [Multimodal Guide](./MULTIMODAL_GUIDE.md) - Multimodal capabilities
-
-### Deployment & Operations
-
-Deployment and operations:
-
-- [Deployment Guide](./DEPLOYMENT_GUIDE.md) - Deployment documentation
-- [Docker Setup](./DOCKER_SETUP.md) - Docker deployment
-- [Kubernetes Setup](./KUBERNETES_SETUP.md) - Kubernetes deployment
-- [CI/CD Setup](./CI_CD_SETUP.md) - CI/CD configuration
-- [Production Monitoring](./production_monitoring.md) - Monitoring guide
-- [Scalability Report](./SCALABILITY_REPORT.md) - Scalability analysis
+</div>
 
 ### Security
 
@@ -327,7 +277,7 @@ Migration documentation:
 Reference documentation:
 
 - [Reference Index](./reference/README.md) - Reference hub
-- [CLI Commands](./reference/cli-commands.md) - CLI reference
+- [CLI Reference](./user-guide/cli-reference.md) - CLI reference
 - [Configuration Options](./reference/configuration-options.md) - Configuration
 - [Environment Variables](./reference/environment-variables.md) - Environment variables
 
@@ -446,8 +396,8 @@ Archived documentation:
 
 Version history:
 
-- [CHANGELOG 0.5.1](./CHANGELOG_0.5.1.md) - Version 0.5.1 changelog
-- [Release Notes 0.5.1](./RELEASE_NOTES_0.5.1.md) - Release notes
+- [CHANGELOG 0.5.0](./CHANGELOG_0.5.0.md) - Version 0.5.0 changelog
+- [Release Notes 0.5.0](./RELEASE_NOTES_0.5.0.md) - Release notes
 
 ### Project Documentation
 
@@ -658,7 +608,7 @@ All migration guides in one place:
 ---
 
 **Last Updated**: January 18, 2026
-**Version**: 0.5.1
+**Version**: 0.5.0
 **Maintained By**: Victor AI Community
 
 ---

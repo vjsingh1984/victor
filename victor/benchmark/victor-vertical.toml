@@ -1,6 +1,6 @@
 [vertical]
 name = "benchmark"
-version = "0.5.1"
+version = "0.5.0"
 description = "Benchmark vertical for SWE-bench, HumanEval, and code generation evaluation"
 authors = [{name = "Vijaykumar Singh", email = "singhvjd@gmail.com"}]
 license = "Apache-2.0"

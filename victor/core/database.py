@@ -848,11 +848,12 @@ class ProjectDatabaseManager:
         "file_changes",
     }
 
-    def __init__(self, project_path: Optional[Path] = None):
+    def __init__(self, project_path: Optional[Path] = None, force_rebuild: bool = False):
         """Initialize project database manager.
 
         Args:
             project_path: Path to project root. If None, uses current directory.
+            force_rebuild: If True, rebuild corrupted database.
         """
         if project_path is None:
             project_path = Path.cwd()
@@ -866,44 +867,104 @@ class ProjectDatabaseManager:
         self._migrated = False
 
         # Ensure database exists
-        self._ensure_database()
+        self._ensure_database(force_rebuild=force_rebuild)
 
         logger.info(f"ProjectDatabaseManager initialized: {self.db_path}")
 
-    def _ensure_database(self) -> None:
-        """Ensure database exists and is up to date."""
+    def _ensure_database(self, force_rebuild: bool = False) -> None:
+        """Ensure database exists and is up to date.
+
+        Args:
+            force_rebuild: If True, delete corrupted database and recreate.
+        """
         from victor.core.schema import Schema
 
-        conn = self._get_raw_connection()
+        try:
+            conn = self._get_raw_connection()
 
-        # Enable WAL mode for better concurrency
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
-        conn.execute("PRAGMA foreign_keys=ON")
+            # Enable WAL mode for better concurrency
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
+            conn.execute("PRAGMA foreign_keys=ON")
 
-        # Create metadata table
-        conn.execute(
+            # Create metadata table
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS _project_metadata (
+                    key TEXT PRIMARY KEY,
+                    value TEXT,
+                    updated_at TEXT
+                )
             """
-            CREATE TABLE IF NOT EXISTS _project_metadata (
-                key TEXT PRIMARY KEY,
-                value TEXT,
-                updated_at TEXT
             )
+
+            # Create project-level tables (graph, etc.)
+            for schema_sql in Schema.get_project_schemas():
+                conn.execute(schema_sql)
+
+            # Create project-level indexes
+            for index_sql in Schema.get_project_indexes():
+                conn.executescript(index_sql)
+
+            conn.commit()
+
+            # Run migrations if needed
+            self._run_migrations(conn)
+
+        except sqlite3.DatabaseError as e:
+            error_msg = str(e).lower()
+            if "malformed" in error_msg or "corrupted" in error_msg or "database disk image" in error_msg:
+                if force_rebuild:
+                    logger.warning(f"Database corrupted: {e}. Rebuilding...")
+                    self._rebuild_database()
+                    # Try again after rebuild
+                    return self._ensure_database(force_rebuild=False)
+                else:
+                    raise RuntimeError(
+                        f"Project database is corrupted. Run 'victor index --force' to rebuild.\n"
+                        f"Database path: {self.db_path}\n"
+                        f"Original error: {e}"
+                    ) from e
+            raise
+
+    def _rebuild_database(self) -> None:
+        """Rebuild the corrupted database from scratch.
+
+        This deletes the corrupted database file and recreates it.
         """
-        )
+        import shutil
 
-        # Create project-level tables (graph, etc.)
-        for schema_sql in Schema.get_project_schemas():
-            conn.execute(schema_sql)
+        logger.warning(f"Rebuilding corrupted database: {self.db_path}")
 
-        # Create project-level indexes
-        for index_sql in Schema.get_project_indexes():
-            conn.executescript(index_sql)
+        # Close existing connection
+        if hasattr(self._local, "conn") and self._local.conn is not None:
+            try:
+                self._local.conn.close()
+            except Exception:
+                pass
+            self._local.conn = None
 
-        conn.commit()
+        # Delete corrupted database files
+        files_to_remove = [self.db_path]
+        # Also remove WAL and journal files
+        for suffix in ["-wal", "-shm", "-journal"]:
+            journal_file = self.db_path.with_suffix(self.db_path.suffix + suffix)
+            files_to_remove.append(journal_file)
 
-        # Run migrations if needed
-        self._run_migrations(conn)
+        removed_files = []
+        for file_path in files_to_remove:
+            if file_path.exists():
+                try:
+                    file_path.unlink()
+                    removed_files.append(file_path.name)
+                except Exception as e:
+                    logger.debug(f"Could not remove {file_path}: {e}")
+
+        if removed_files:
+            logger.info(f"Removed corrupted database files: {', '.join(removed_files)}")
+
+        # Reset migrated flag so migrations will run
+        self._migrated = False
 
     def _get_raw_connection(self) -> sqlite3.Connection:
         """Get raw SQLite connection (thread-local)."""
@@ -1220,8 +1281,13 @@ def get_project_database(project_path: Optional[Path] = None) -> ProjectDatabase
         project_path = Path.cwd()
 
     project_key = str(project_path.resolve())
+
+    # Check environment variable for force rebuild (set by CLI --force)
+    import os
+    force_rebuild = os.environ.get("VICTOR_DATABASE_FORCE_REBUILD") == "1"
+
     if project_key not in _project_databases:
-        _project_databases[project_key] = ProjectDatabaseManager(project_path)
+        _project_databases[project_key] = ProjectDatabaseManager(project_path, force_rebuild=force_rebuild)
     return _project_databases[project_key]
 
 

@@ -406,14 +406,14 @@ class TestGlobalStateManagerImpl:
 
         # Set up global state
         await manager.set("app_name", "Victor")
-        await manager.set("version", "1.0.0")
+        await manager.set("version", "0.5.0")
         await manager.set("debug", True)
 
         # Create snapshot
         snapshot = await manager.snapshot()
         assert snapshot == {
             "app_name": "Victor",
-            "version": "1.0.0",
+            "version": "0.5.0",
             "debug": True,
         }
 
@@ -423,7 +423,7 @@ class TestGlobalStateManagerImpl:
         # Restore from snapshot
         await manager.restore(snapshot)
 
-        assert await manager.get("version") == "1.0.0"
+        assert await manager.get("version") == "0.5.0"
         assert await manager.get("app_name") == "Victor"
         assert await manager.get("debug") is True
 

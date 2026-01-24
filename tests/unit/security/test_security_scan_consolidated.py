@@ -70,7 +70,7 @@ async def test_security_scan_dependencies():
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create a requirements file with vulnerable packages
         req_file = Path(tmpdir) / "requirements.txt"
-        req_file.write_text("django==2.2.0\n" "flask==1.0.0\n" "requests==2.25.0\n")
+        req_file.write_text("django==2.2.0\n" "flask==0.5.0\n" "requests==2.25.0\n")
 
         # Run dependency scan with dependency_scan=True (requires pip-audit)
         result = await scan(

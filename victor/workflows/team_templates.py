@@ -196,7 +196,7 @@ class TeamTemplate:
     description: str
     formation: str
     members: List[TeamMemberSpec]
-    version: str = "1.0.0"
+    version: str = "0.5.0"
     author: str = "Victor AI"
     vertical: str = "general"
     long_description: str = ""
@@ -361,7 +361,7 @@ class TeamTemplate:
             display_name=data.get("display_name", data["name"]),
             description=data.get("description", ""),
             long_description=data.get("long_description", ""),
-            version=data.get("version", "1.0.0"),
+            version=data.get("version", "0.5.0"),
             author=data.get("author", "Victor AI"),
             vertical=data.get("vertical", "general"),
             formation=data.get("formation", "sequential"),

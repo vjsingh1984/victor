@@ -329,13 +329,13 @@ class TestWorkflowBuilder:
         """set_metadata adds metadata."""
         workflow = (
             WorkflowBuilder("test")
-            .set_metadata("version", "1.0.0")
+            .set_metadata("version", "0.5.0")
             .set_metadata("author", "test")
             .add_agent("a", "executor", "A")
             .build()
         )
 
-        assert workflow.metadata["version"] == "1.0.0"
+        assert workflow.metadata["version"] == "0.5.0"
         assert workflow.metadata["author"] == "test"
 
     def test_duplicate_node_raises(self):

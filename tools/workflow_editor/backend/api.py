@@ -27,7 +27,7 @@ sys.path.insert(0, str(project_root))
 
 from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 from victor.workflows.yaml_loader import load_workflow_from_file, YAMLWorkflowConfig
-from victor.workflows.definition import WorkflowDefinition, validate_workflow
+from victor.workflows.definition import WorkflowDefinition
 from victor.core.errors import ConfigurationValidationError
 
 logger = logging.getLogger(__name__)
@@ -501,23 +501,28 @@ def graph_to_definition(graph: WorkflowGraph) -> WorkflowDefinition:
         WorkflowDefinition,
     )
 
-    nodes = []
+    # WorkflowDefinition expects nodes as Dict[str, WorkflowNode]
+    nodes_dict = {}
+    first_node_id = None
+
     for node in graph.nodes:
+        if first_node_id is None:
+            first_node_id = node.id
+
         if node.type == "agent":
-            nodes.append(
-                AgentNode(
-                    id=node.id,
-                    name=node.name,
-                    role=node.config.get("role", "assistant"),
-                    goal=node.config.get("goal", ""),
-                    tool_budget=node.config.get("tool_budget", 25),
-                )
+            nodes_dict[node.id] = AgentNode(
+                id=node.id,
+                name=node.name,
+                role=node.config.get("role", "assistant"),
+                goal=node.config.get("goal", ""),
+                tool_budget=node.config.get("tool_budget", 25),
             )
         # Add other node types...
 
     return WorkflowDefinition(
         name=graph.metadata.get("name", "workflow"),
-        nodes=nodes,
+        nodes=nodes_dict,
+        start_node=first_node_id,
     )
 
 
@@ -534,7 +539,8 @@ def definition_to_graph(workflow_def: WorkflowDefinition) -> WorkflowGraph:
     nodes = []
     edges = []
 
-    for node in workflow_def.nodes:
+    # workflow_def.nodes is Dict[str, WorkflowNode]
+    for node_id, node in workflow_def.nodes.items():
         nodes.append(
             WorkflowNode(
                 id=node.id,

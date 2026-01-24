@@ -93,7 +93,7 @@ class RAGAssistant(VerticalBase):
 
     name = "rag"
     description = "Retrieval-Augmented Generation assistant for document Q&A"
-    version = "1.0.0"
+    version = "0.5.0"
 
     @classmethod
     def get_tools(cls) -> List[str]:

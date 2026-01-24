@@ -72,7 +72,7 @@ class BenchmarkVertical(VerticalBase):
 
     name = "benchmark"
     description = "AI coding benchmark evaluation and performance testing"
-    version = "1.0.0"
+    version = "0.5.0"
 
     # Benchmark-specific stages
     STAGE_UNDERSTANDING = "UNDERSTANDING"

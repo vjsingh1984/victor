@@ -113,6 +113,9 @@ __all__ = [
     "TeamCoordinator",
     # Legacy API
     "LegacyAPIMixin",
+    # Protocol Adapter
+    "OrchestratorProtocolAdapter",
+    "create_orchestrator_protocol_adapter",
 ]
 
 # =============================================================================
@@ -400,6 +403,10 @@ from victor.agent.adapters import (
     CoordinatorAdapter,
     IntelligentPipelineAdapter,
     ResultConverters,
+)
+from victor.agent.coordinators.protocol_adapter import (
+    OrchestratorProtocolAdapter,
+    create_orchestrator_protocol_adapter,
 )
 
 # =============================================================================

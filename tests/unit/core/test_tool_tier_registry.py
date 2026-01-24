@@ -419,7 +419,7 @@ class TestToolTierRegistrySerialization:
             parent="base",
             description="Test entry",
             metadata={"key": "value"},
-            version="1.0.0",
+            version="0.5.0",
         )
 
         d = entry.to_dict()

@@ -73,13 +73,13 @@ class TestServiceMetadata:
         metadata = ServiceMetadata(
             name="test_service",
             service_type="sqlite",
-            version="1.0.0",
+            version="0.5.0",
             description="Test service",
             tags=["test", "database"],
         )
         assert metadata.name == "test_service"
         assert metadata.service_type == "sqlite"
-        assert metadata.version == "1.0.0"
+        assert metadata.version == "0.5.0"
         assert metadata.tags == ["test", "database"]
 
 

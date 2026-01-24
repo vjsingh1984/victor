@@ -1,0 +1,321 @@
+# Victor AI Verticals and Deployment
+
+## Vertical Architecture
+
+```mermaid
+graph TB
+    subgraph Verticals["5 Domain Verticals"]
+        direction TB
+
+        Coding["Coding Vertical<br/>━━━━━━━━━━━━━━━━━━━━━━<br/>📝 Code Analysis<br/>🔧 Refactoring<br/>✅ Testing<br/>📊 Code Review<br/>🔍 Code Search"]
+        CodingTools["Tools: read, write, edit, grep,<br/>run_tests, refactor, review"]
+
+        DevOps["DevOps Vertical<br/>━━━━━━━━━━━━━━━━━━━━━━<br/>🐳 Docker Operations<br/>☸️ Kubernetes<br/>🔄 CI/CD<br/>📦 Deployment<br/>🎛️ Infrastructure"]
+        DevOpsTools["Tools: docker, kubectl,<br/>terraform, deploy, monitor"]
+
+        RAG["RAG Vertical<br/>━━━━━━━━━━━━━━━━━━━━━━<br/>📚 Document Search<br/>🔍 Retrieval<br/>💬 Q&A<br/>📖 Knowledge Base<br/>🎯 Semantic Search"]
+        RAGTools["Tools: vector_search, doc_qa,<br/>knowledge_base, embed"]
+
+        Data["Data Analysis Vertical<br/>━━━━━━━━━━━━━━━━━━━━━━<br/>📊 Pandas Operations<br/>📈 Visualization<br/>📉 Statistics<br/>🔢 Data Processing<br/>📋 Data Cleaning"]
+        DataTools["Tools: pandas_query, visualize,<br/>statistics, clean_data"]
+
+        Research["Research Vertical<br/>━━━━━━━━━━━━━━━━━━━━━━<br/>🔬 Literature Search<br/>📝 Analysis<br/>📚 Synthesis<br/>📖 Paper Review<br/>🎓 Knowledge Discovery"]
+        ResearchTools["Tools: search_papers, analyze,<br/>synthesize, cite_sources"]
+    end
+
+    subgraph Shared["Shared Capabilities"]
+        Tools["55+ Specialized Tools"]
+        Protocols["98 Protocols"]
+        Config["YAML Configuration"]
+        Integration["Step Handlers"]
+    end
+
+    subgraph Extension["Extension Points"]
+        Plugins["External Plugins<br/>━━━━━━━━━━━━━━<br/>Entry Points"]
+        CustomTools["Custom Tools<br/>━━━━━━━━━━━━━━<br/>VerticalBase"]
+        CustomPrompts["Custom Prompts<br/>━━━━━━━━━━━━━━<br/>System Prompt"]
+    end
+
+    Coding --> Shared
+    CodingTools -.-> Coding
+    DevOps --> Shared
+    DevOpsTools -.-> DevOps
+    RAG --> Shared
+    RAGTools -.-> RAG
+    Data --> Shared
+    DataTools -.-> Data
+    Research --> Shared
+    ResearchTools -.-> Research
+
+    Shared --> Extension
+
+    classDef verticalStyle fill:#e3f2fd,stroke:#0d47a1,stroke-width:3px,color:#000
+    classDef toolsStyle fill:#e0f2f1,stroke:#004d40,stroke-width:2px,color:#000
+    classDef sharedStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#000
+    classDef extStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px,color:#000
+
+    class Coding,DevOps,RAG,Data,Research verticalStyle
+    class CodingTools,DevOpsTools,RAGTools,DataTools,ResearchTools toolsStyle
+    class Tools,Protocols,Config,Integration sharedStyle
+    class Plugins,CustomTools,CustomPrompts extStyle
+```
+
+## Vertical Integration Pipeline
+
+```mermaid
+flowchart LR
+    subgraph Vertical["Vertical Base"]
+        Base["VerticalBase<br/>━━━━━━━━━━━━<br/>Abstract Class"]
+        Name["name: str"]
+        GetTools["get_tools()<br/>List[BaseTool]"]
+        GetPrompt["get_system_prompt()<br/>str"]
+    end
+
+    subgraph Pipeline["Step Handler Pipeline"]
+        direction TB
+        S1["1. Capability Config<br/>order=5"]
+        S2["2. Tool Filter<br/>order=10"]
+        S3["3. Tiered Config<br/>order=15"]
+        S4["4. System Prompt<br/>order=20"]
+        S5["5. Stages & Modes<br/>order=40"]
+        S6["6. Extensions<br/>order=45"]
+        S7["7. Middleware<br/>order=50"]
+        S8["8. Framework<br/>order=60"]
+        S9["9. Context<br/>order=100"]
+    end
+
+    subgraph Orchestrator["Agent Orchestrator"]
+        Tools["Tool Registry"]
+        Prompt["Prompt Builder"]
+        Config["Configuration"]
+    end
+
+    Base --> Pipeline
+    Pipeline --> Orchestrator
+
+    classDef baseStyle fill:#e3f2fd,stroke:#0d47a1,stroke-width:2px
+    classDef stepStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef orchStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+
+    class Base,Name,GetTools,GetPrompt baseStyle
+    class S1,S2,S3,S4,S5,S6,S7,S8,S9 stepStyle
+    class Tools,Prompt,Config orchStyle
+```
+
+## Deployment Architecture
+
+```mermaid
+graph TB
+    subgraph User["User Access"]
+        CLI["CLI/TUI<br/>Local Machine"]
+        IDE["IDE Plugin<br/>VS Code, JetBrains"]
+        API["HTTP Client<br/>REST API"]
+    end
+
+    subgraph Deployment["Deployment Options"]
+        direction LR
+
+        subgraph Local["Local Deployment"]
+            DockerCompose["Docker Compose<br/>━━━━━━━━━━━━━━<br/>Single Machine<br/>Development"]
+            Direct["Direct Install<br/>━━━━━━━━━━━━━━<br/>pip install victor-ai"]
+        end
+
+        subgraph Cloud["Cloud Deployment"]
+            subgraph Container["Container Orchestration"]
+                K8s["Kubernetes<br/>━━━━━━━━━━━━━━<br/>Multi-node<br/>Production"]
+                Swarm["Docker Swarm<br/>━━━━━━━━━━━━━━<br/>Simplified Orchestration"]
+            end
+
+            subgraph Serverless["Serverless"]
+                Lambda["AWS Lambda<br/>━━━━━━━━━━━━━━<br/>On-demand"]
+                Functions["Azure Functions<br/>━━━━━━━━━━━━━━<br/>Event-driven"]
+            end
+
+            subgraph Managed["Managed Services"]
+                ECS["AWS ECS<br/>━━━━━━━━━━━━━━<br/>Container Service"]
+                AppRunner["AWS App Runner<br/>━━━━━━━━━━━━━━<br/>PAAS"]
+            end
+        end
+    end
+
+    subgraph Infrastructure["Infrastructure"]
+        Storage["Storage<br/>━━━━━━━━━━━━<br/>S3, EFS, Azure Blob"]
+        Database["Database<br/>━━━━━━━━━━━━<br/>PostgreSQL, MongoDB"]
+        Cache["Cache<br/>━━━━━━━━━━━━<br/>Redis, ElastiCache"]
+        Queue["Queue<br/>━━━━━━━━━━━━<br/>SQS, Kafka, RabbitMQ"]
+    end
+
+    subgraph Monitoring["Monitoring & Observability"]
+        Metrics["Metrics<br/>━━━━━━━━━━━━<br/>Prometheus, CloudWatch"]
+        Logs["Logs<br/>━━━━━━━━━━━━<br/>ELK, Cloud Logging"]
+        Traces["Traces<br/>━━━━━━━━━━━━<br/>Jaeger, X-Ray"]
+    end
+
+    User --> Deployment
+    Deployment --> Infrastructure
+    Deployment --> Monitoring
+
+    classDef userStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef localStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef cloudStyle fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef infraStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef monitorStyle fill:#ffebee,stroke:#c62828,stroke-width:2px
+
+    class CLI,IDE,API userStyle
+    class DockerCompose,Direct localStyle
+    class K8s,Swarm,Lambda,Functions,ECS,AppRunner cloudStyle
+    class Storage,Database,Cache,Queue infraStyle
+    class Metrics,Logs,Traces monitorStyle
+```
+
+## Production Deployment
+
+```mermaid
+graph TB
+    subgraph Frontend["Client Layer"]
+        Web["Web UI<br/>━━━━━━━━━━━━<br/>React/Vue App"]
+        CLI["CLI/TUI<br/>━━━━━━━━━━━━<br/>Terminal Interface"]
+        IDEPlugin["IDE Plugins<br/>━━━━━━━━━━━━<br/>VS Code, JetBrains"]
+    end
+
+    subgraph API["API Gateway"]
+        Gateway["API Gateway<br/>━━━━━━━━━━━━<br/>Authentication<br/>Rate Limiting<br/>Load Balancing"]
+    end
+
+    subgraph Services["Victor Services"]
+        Orchestrator["Orchestrator Service<br/>━━━━━━━━━━━━━━<br/>Stateless<br/>Scalable"]
+        Worker["Worker Service<br/>━━━━━━━━━━━━━━<br/>Async Jobs<br/>Tool Execution"]
+        WebSocket["WebSocket Service<br/>━━━━━━━━━━━━━━<br/>Real-time<br/>Streaming"]
+    end
+
+    subgraph Data["Data Layer"]
+        PostgreSQL[(("PostgreSQL<br/>━━━━━━━━━━━━<br/>Sessions<br/>Checkpoints"))]
+        Redis[(("Redis<br/>━━━━━━━━━━━━<br/>Cache<br/>Pub/Sub"))]
+        S3[(("S3<br/>━━━━━━━━━━━━<br/>Artifacts<br/>Logs"))]
+        Vector[(("Vector DB<br/>━━━━━━━━━━━━<br/>LanceDB<br/>ChromaDB"))]
+    end
+
+    subgraph Messaging["Messaging Layer"]
+        Kafka["Kafka<br/>━━━━━━━━━━━━<br/>Event Bus<br/>Distributed"]
+        SQS["SQS<br/>━━━━━━━━━━━━<br/>Task Queue<br/>Serverless"]
+    end
+
+    subgraph Monitoring["Monitoring Stack"]
+        Prometheus["Prometheus<br/>━━━━━━━━━━━━<br/>Metrics"]
+        Grafana["Grafana<br/>━━━━━━━━━━━━<br/>Dashboards"]
+        ELK["ELK Stack<br/>━━━━━━━━━━━━<br/>Logs"]
+        Jaeger["Jaeger<br/>━━━━━━━━━━━━<br/>Traces"]
+    end
+
+    Frontend --> Gateway
+    Gateway --> Services
+
+    Services --> Data
+    Services --> Messaging
+    Services --> Monitoring
+
+    Orchestrator --> PostgreSQL
+    Orchestrator --> Redis
+    Orchestrator --> Vector
+
+    Worker --> SQS
+    Worker --> S3
+
+    WebSocket --> Kafka
+
+    classDef frontendStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef gatewayStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef serviceStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef dataStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef messagingStyle fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef monitorStyle fill:#ffebee,stroke:#c62828,stroke-width:2px
+
+    class Web,CLI,IDEPlugin frontendStyle
+    class Gateway gatewayStyle
+    class Orchestrator,Worker,WebSocket serviceStyle
+    class PostgreSQL,Redis,S3,Vector dataStyle
+    class Kafka,SQS messagingStyle
+    class Prometheus,Grafana,ELK,Jaeger monitorStyle
+```
+
+## Air-Gapped Deployment
+
+```mermaid
+graph TB
+    subgraph AirGapped["Air-Gapped Environment"]
+        direction TB
+
+        subgraph LocalProviders["Local Providers Only"]
+            Ollama["Ollama<br/>━━━━━━━━━━━━<br/>Local Models"]
+            LMStudio["LM Studio<br/>━━━━━━━━━━━━<br/>GUI Manager"]
+            VLLM["vLLM<br/>━━━━━━━━━━━━<br/>Production Server"]
+        end
+
+        subgraph LocalTools["Local Tools Only"]
+            FileOps["File Operations<br/>━━━━━━━━━━━━<br/>Read, Write, Edit"]
+            GitOps["Git Operations<br/>━━━━━━━━━━━━<br/>Clone, Commit, Push"]
+            TestTools["Testing<br/>━━━━━━━━━━━━<br/>Run Tests, Coverage"]
+            SearchTools["Code Search<br/>━━━━━━━━━━━━<br/>Grep, Find"]
+        end
+
+        subgraph Blocked["Blocked Services"]
+            Web["❌ Web Tools<br/>━━━━━━━━━━━━<br/>No Internet Access"]
+            CloudAPI["❌ Cloud APIs<br/>━━━━━━━━━━━━<br/>No External Calls"]
+            RemoteDB["❌ Remote DBs<br/>━━━━━━━━━━━━<br/>Local Storage Only"]
+        end
+    end
+
+    Config["airgapped_mode=True"] --> AirGapped
+
+    classDef providerStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef toolStyle fill:#e0f2f1,stroke:#004d40,stroke-width:2px
+    classDef blockedStyle fill:#ffebee,stroke:#c62828,stroke-width:2px
+    classDef configStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+
+    class Ollama,LMStudio,VLLM providerStyle
+    class FileOps,GitOps,TestTools,SearchTools toolStyle
+    class Web,CloudAPI,RemoteDB blockedStyle
+    class Config configStyle
+```
+
+## Scalability Patterns
+
+```mermaid
+graph TB
+    subgraph Horizontal["Horizontal Scaling"]
+        LB["Load Balancer"]
+        I1["Instance 1"]
+        I2["Instance 2"]
+        I3["Instance N"]
+    end
+
+    subgraph Vertical["Vertical Scaling"]
+        Small["Small<br/>━━━━━━━━━━━━<br/>2 CPU, 4GB RAM"]
+        Medium["Medium<br/>━━━━━━━━━━━━<br/>4 CPU, 8GB RAM"]
+        Large["Large<br/>━━━━━━━━━━━━<br/>8 CPU, 16GB RAM"]
+    end
+
+    subgraph Caching["Caching Strategy"]
+        RedisCache["Redis Cache<br/>━━━━━━━━━━━━<br/>Shared Cache"]
+        LocalCache["Local Cache<br/>━━━━━━━━━━━━<br/>In-Memory"]
+        CDN["CDN<br/>━━━━━━━━━━━━<br/>Static Assets"]
+    end
+
+    subgraph Database["Database Scaling"]
+        ReadReplica["Read Replicas<br/>━━━━━━━━━━━━<br/>Distribute Reads"]
+        Sharding["Sharding<br/>━━━━━━━━━━━━<br/>Distribute Data"]
+        Partitioning["Partitioning<br/>━━━━━━━━━━━━<br/>Time-based"]
+    end
+
+    LB --> I1
+    LB --> I2
+    LB --> I3
+
+    classDef scaleStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef cacheStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef dbStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+
+    class Small,Medium,Large scaleStyle
+    class RedisCache,LocalCache,CDN cacheStyle
+    class ReadReplica,Sharding,Partitioning dbStyle
+```

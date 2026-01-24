@@ -167,7 +167,7 @@ class VerticalConfigLoader:
         metadata = yaml_data.get("metadata", {})
         metadata_base = {
             "name": metadata.get("name"),
-            "version": metadata.get("version", "1.0.0"),
+            "version": metadata.get("version", "0.5.0"),
             "description": metadata.get("description"),
         }
 

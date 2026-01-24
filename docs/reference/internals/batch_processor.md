@@ -1,4 +1,4 @@
-# Rust Batch Processing Coordinator (v0.5.1)
+# Rust Batch Processing Coordinator (v0.5.0)
 
 ## Overview
 

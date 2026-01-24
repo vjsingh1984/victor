@@ -150,7 +150,7 @@ class MyAssistant(VerticalBase):
     # Required class attributes
     name = "my_vertical"
     description = "Description of my vertical"
-    version = "1.0.0"
+    version = "0.5.0"
 
     @classmethod
     def get_tools(cls) -> List[str]:

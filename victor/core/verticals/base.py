@@ -904,7 +904,7 @@ class VerticalBase(
                     return bool(self.api_key)
 
                 def get_metadata(self) -> Dict[str, Any]:
-                    return {"version": "1.0.0"}
+                    return {"version": "0.5.0"}
 
             # Register dynamically
             MyVertical.register_extension(

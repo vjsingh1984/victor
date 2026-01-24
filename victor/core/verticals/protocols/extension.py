@@ -269,7 +269,7 @@ class ExtensionMetadata:
         priority: Loading priority (lower = earlier)
     """
 
-    version: str = "1.0.0"
+    version: str = "0.5.0"
     description: str = ""
     author: str = ""
     dependencies: List[str] = field(default_factory=list)

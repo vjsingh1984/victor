@@ -127,7 +127,7 @@ default_sequence:
 metadata:
   description: "Test configuration"
   author: "Test Author"
-  version_info: "1.0.0"
+  version_info: "0.5.0"
 """
 
 

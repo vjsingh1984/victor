@@ -1,4 +1,4 @@
-# Victor AI 0.5.1 Provider Reference
+# Victor AI 0.5.0 Provider Reference
 
 Complete reference for all 21 supported LLM providers.
 

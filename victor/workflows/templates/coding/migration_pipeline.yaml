@@ -28,7 +28,7 @@ long_description: |
   approach ensures safe, reliable migrations.
 
   Ideal for framework migrations, language upgrades, and API migrations.
-version: "1.0.0"
+version: "0.5.0"
 author: "Victor AI"
 vertical: "coding"
 formation: "pipeline"

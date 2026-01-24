@@ -121,7 +121,7 @@ class SimpleMCPServer:
                 "result": {
                     "protocolVersion": "2024-11-05",
                     "capabilities": {"tools": {}, "resources": {}},
-                    "serverInfo": {"name": "test-mcp-server", "version": "1.0.0"}
+                    "serverInfo": {"name": "test-mcp-server", "version": "0.5.0"}
                 }
             }
 
@@ -248,7 +248,7 @@ class TestMCPServerClientE2E:
 
         client = MCPClient(
             name="test-client",
-            version="1.0.0",
+            version="0.5.0",
             health_check_interval=0,  # Disable health checks for test
         )
 
@@ -264,7 +264,7 @@ class TestMCPServerClientE2E:
             # Verify server info was received
             assert client.server_info is not None
             assert client.server_info.name == "test-mcp-server"
-            assert client.server_info.version == "1.0.0"
+            assert client.server_info.version == "0.5.0"
 
         finally:
             await client.cleanup()
@@ -483,7 +483,7 @@ class TestMCPProtocolHandling:
         from victor.integrations.mcp.server import MCPServer
         from victor.tools.base import ToolRegistry
 
-        server = MCPServer(name="test", version="1.0.0", tool_registry=ToolRegistry())
+        server = MCPServer(name="test", version="0.5.0", tool_registry=ToolRegistry())
 
         response = await server.handle_message(
             {
@@ -517,7 +517,7 @@ class TestMCPProtocolHandling:
         registry = ToolRegistry()
         registry.register(TestTool())
 
-        server = MCPServer(name="test", version="1.0.0", tool_registry=registry)
+        server = MCPServer(name="test", version="0.5.0", tool_registry=registry)
         server.initialized = True
 
         response = await server.handle_message(

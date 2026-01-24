@@ -341,7 +341,7 @@ If rollback required:
 
 **Deployment Command**:
 ```bash
-./deployment/scripts/deploy_production.sh --environment production --image-tag v1.0.0
+./deployment/scripts/deploy_production.sh --environment production --image-tag v0.5.0
 ```
 
 **Verification Command**:
@@ -376,7 +376,7 @@ If rollback required:
 
 ---
 
-**Checklist Version**: 1.0.0
+**Checklist Version**: 0.5.0
 **Last Updated**: 2024-01-21
 **Next Review**: 2024-02-21
 

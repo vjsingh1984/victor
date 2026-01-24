@@ -654,7 +654,7 @@ class TestRegistrationStatistics:
         """Test getting plugin info with manager."""
         mock_plugin = MagicMock()
         mock_plugin.name = "test_plugin"
-        mock_plugin.version = "1.0.0"
+        mock_plugin.version = "0.5.0"
         mock_plugin.get_tools.return_value = [MagicMock(), MagicMock()]
 
         registrar.plugin_manager = MagicMock()

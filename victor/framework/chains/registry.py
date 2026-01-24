@@ -29,14 +29,14 @@ Example:
     # Register a chain
     ChainRegistry.register_chain(
         name="safe_edit_chain",
-        version="1.0.0",
+        version="0.5.0",
         chain=safe_edit_chain,
         category="editing",
         description="Safe edit with verification"
     )
 
     # Retrieve a chain
-    chain = ChainRegistry.get_chain("safe_edit_chain", version="1.0.0")
+    chain = ChainRegistry.get_chain("safe_edit_chain", version="0.5.0")
 
     # List chains by category
     editing_chains = ChainRegistry.list_chains(category="editing")
@@ -67,7 +67,7 @@ class ChainMetadata:
 
     Attributes:
         name: Unique chain name
-        version: Semantic version string (e.g., "1.0.0")
+        version: Semantic version string (e.g., "0.5.0")
         description: Human-readable description
         category: Chain category (exploration, editing, analysis, testing)
         tags: List of tags for discovery
@@ -150,7 +150,7 @@ class ChainRegistry:
 
         Args:
             name: Unique chain name
-            version: Semantic version string (e.g., "1.0.0")
+            version: Semantic version string (e.g., "0.5.0")
             chain: LCEL Runnable chain
             category: Chain category (exploration, editing, analysis, testing, other)
             description: Human-readable description

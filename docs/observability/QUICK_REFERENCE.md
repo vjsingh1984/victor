@@ -1,6 +1,6 @@
 # Observability Quick Reference
 
-Quick reference for Victor AI 0.5.1 observability features.
+Quick reference for Victor AI 0.5.0 observability features.
 
 ## Installation
 
@@ -101,7 +101,7 @@ print(f"Status: {report.status}")
 ```yaml
 services:
   victor:
-    image: victor-ai:0.5.1
+    image: victor-ai:0.5.0
     environment:
       VICTOR_TELEMETRY_ENABLED: "true"
       VICTOR_TELEMETRY_ENDPOINT: "http://jaeger:4317"

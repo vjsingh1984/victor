@@ -322,7 +322,7 @@ Users can install verticals from various sources:
 victor vertical install victor-security
 
 # Install with version constraint
-victor vertical install "victor-security>=1.0.0"
+victor vertical install "victor-security>=0.5.0"
 
 # Install from git
 victor vertical install "git+https://github.com/user/victor-security.git"

@@ -1,0 +1,295 @@
+# Victor AI Protocols and Events
+
+## Protocol-Based Design
+
+```mermaid
+graph TB
+    subgraph Protocols["98 Protocols - Loose Coupling"]
+        direction TB
+
+        subgraph CoreProtocols["Core Protocols"]
+            Provider["ProviderProtocol<br/>━━━━━━━━━━━━━━<br/>chat(), stream()<br/>supports_tools()"]
+            Tool["ToolProtocol<br/>━━━━━━━━━━━━━━<br/>execute(), validate()<br/>get_schema()"]
+            Executor["ToolExecutorProtocol<br/>━━━━━━━━━━━━━━<br/>execute_tool()<br/>batch_execute()"]
+        end
+
+        subgraph CoordinatorProtocols["Coordinator Protocols"]
+            ChatCoord["ChatCoordinatorProtocol<br/>━━━━━━━━━━━━━━<br/>send_message()<br/>stream_response()"]
+            ToolCoord["ToolCoordinatorProtocol<br/>━━━━━━━━━━━━━━<br/>select_tools()<br/>execute_tools()"]
+            ContextCoord["ContextCoordinatorProtocol<br/>━━━━━━━━━━━━━━<br/>get_context()<br/>update_context()"]
+        end
+
+        subgraph ServiceProtocols["Service Protocols"]
+            Registry["RegistryProtocol<br/>━━━━━━━━━━━━━━<br/>register(), get()<br/>list_all()"]
+            Cache["CacheProtocol<br/>━━━━━━━━━━━━━━<br/>get(), set()<br/>invalidate()"]
+            Metrics["MetricsProtocol<br/>━━━━━━━━━━━━━━<br/>track(), record()<br/>get_metrics()"]
+        end
+    end
+
+    subgraph Implementations["Implementations"]
+        AnthropicImpl["AnthropicProvider"]
+        OpenAIImpl["OpenAIProvider"]
+        ChatImpl["ChatCoordinator"]
+        ToolImpl["ToolCoordinator"]
+    end
+
+    Protocols -.-> Implementations
+
+    classDef protocolStyle fill:#e3f2fd,stroke:#0d47a1,stroke-width:3px,color:#000
+    classDef implStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px,color:#000
+
+    class Provider,Tool,Executor,ChatCoord,ToolCoord,ContextCoord,Registry,Cache,Metrics protocolStyle
+    class AnthropicImpl,OpenAIImpl,ChatImpl,ToolImpl implStyle
+```
+
+## Dependency Injection Pattern
+
+```mermaid
+sequenceDiagram
+    participant App as Application
+    participant Container as ServiceContainer
+    participant Service as Service
+    participant Dep as Dependency
+
+    App->>Container: bootstrap()
+    Container->>Container: Register Services
+
+    Note over Container: ServiceLifetime.SINGLETON<br/>ServiceLifetime.SCOPED<br/>ServiceLifetime.TRANSIENT
+
+    App->>Container: get(ServiceProtocol)
+    Container->>Service: Create Instance
+    Service->>Container: get(DependencyProtocol)
+    Container->>Dep: Create/Get Dependency
+    Dep-->>Service: Return Dependency
+    Service-->>Container: Return Service
+    Container-->>App: Return Service
+
+    Note over App,Dep: Constructor Injection<br/>Explicit Dependencies<br/>Testable
+```
+
+## Event-Driven Architecture
+
+```mermaid
+graph TB
+    subgraph Publishers["Event Publishers"]
+        Orch["Orchestrator"]
+        Coords["Coordinators"]
+        Tools["Tools"]
+        Providers["Providers"]
+    end
+
+    subgraph EventBus["Event Bus"]
+        subgraph Backends["Pluggable Backends"]
+            Memory["In-Memory<br/>━━━━━━━━━━━━━━<br/>Single Instance<br/>Low Latency"]
+            Kafka["Kafka<br/>━━━━━━━━━━━━━━<br/>Distributed<br/>Exactly-Once"]
+            SQS["SQS<br/>━━━━━━━━━━━━━━<br/>Serverless<br/>At-Least-Once"]
+            Rabbit["RabbitMQ<br/>━━━━━━━━━━━━━━<br/>Reliable<br/>At-Least-Once"]
+            Redis["Redis<br/>━━━━━━━━━━━━━━<br/>Fast<br/>At-Least-Once"]
+        end
+    end
+
+    subgraph Topics["Event Topics"]
+        ToolStart["tool.start"]
+        ToolComplete["tool.complete"]
+        ToolError["tool.error"]
+        AgentMessage["agent.message"]
+        WorkflowStart["workflow.start"]
+        WorkflowComplete["workflow.complete"]
+    end
+
+    subgraph Subscribers["Event Subscribers"]
+        Metrics["Metrics Collector"]
+        Logging["Logging Service"]
+        Alerting["Alerting System"]
+        Cache["Cache Invalidation"]
+        Audit["Audit Log"]
+    end
+
+    Publishers -->|Publish| EventBus
+    EventBus -->|Route| Topics
+    Topics -->|Subscribe| Subscribers
+
+    classDef pubStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef busStyle fill:#fff3e0,stroke:#e65100,stroke-width:3px
+    classDef topicStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef subStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+
+    class Orch,Coords,Tools,Providers pubStyle
+    class Memory,Kafka,SQS,Rabbit,Redis busStyle
+    class ToolStart,ToolComplete,ToolError,AgentMessage,WorkflowStart,WorkflowComplete topicStyle
+    class Metrics,Logging,Alerting,Cache,Audit subStyle
+```
+
+## Event Flow Sequence
+
+```mermaid
+sequenceDiagram
+    participant Publisher
+    participant EventBus
+    participant Topic
+    participant Subscriber1
+    participant Subscriber2
+
+    Publisher->>EventBus: publish(event)
+    EventBus->>EventBus: Validate Event
+    EventBus->>EventBus: Add Correlation ID
+
+    EventBus->>Topic: route(topic)
+    Topic->>Subscriber1: deliver(event)
+    Topic->>Subscriber2: deliver(event)
+
+    par Parallel Processing
+        Subscriber1->>Subscriber1: Process Event
+        Subscriber1->>EventBus: ack()
+    and
+        Subscriber2->>Subscriber2: Process Event
+        Subscriber2->>EventBus: ack()
+    end
+
+    EventBus-->>Publisher: Published
+
+    Note over Publisher,Subscriber2: Async Communication<br/>Loose Coupling<br/>Scalable
+```
+
+## Error Handling in Events
+
+```mermaid
+flowchart TD
+    Start([Event Received]) --> Process{Process Event}
+    Process -->|Success| Ack["Acknowledge"]
+    Process -->|Temporary Error| NackRetry["Nack + Requeue"]
+    Process -->|Permanent Error| NackDrop["Nack + Drop"]
+
+    Ack --> LogSuccess["Log Success"]
+    LogSuccess --> PublishMetrics["Publish Metrics"]
+    PublishMetrics --> Complete([Complete])
+
+    NackRetry --> Backoff["Exponential Backoff"]
+    Backoff --> Retry{Retry Count}
+    Retry -->|< Max| Process
+    Retry -->|≥ Max| DeadLetter["Dead Letter Queue"]
+    DeadLetter --> Alert["Send Alert"]
+
+    NackDrop --> LogError["Log Error"]
+    LogError --> PublishError
+
+    PublishError["Publish Error Event"]
+    PublishError --> Alert
+
+    Alert --> Complete
+
+    classDef startStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef processStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef errorStyle fill:#ffebee,stroke:#c62828,stroke-width:2px
+    classDef successStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+
+    class Start,Complete startStyle
+    class Process,Ack,NackRetry,NackDrop,Backoff processStyle
+    class NackDrop,DeadLetter,LogError,Alert errorStyle
+    class LogSuccess,PublishMetrics,PublishError successStyle
+```
+
+## Protocol Composition
+
+```mermaid
+classDiagram
+    class Protocol {
+        <<interface>>
+        +method()*
+    }
+
+    class CacheProtocol {
+        <<interface>>
+        +get(key) Optional~Any~
+        +set(key, value) None
+        +delete(key) None
+    }
+
+    class MetricsProtocol {
+        <<interface>>
+        +track(operation) None
+        +record(metric, value) None
+        +get_metrics() Dict
+    }
+
+    class SmartCacheProtocol {
+        <<interface>>
+    }
+
+    class LRUCache {
+        +get(key) Optional~Any~
+        +set(key, value) None
+        +delete(key) None
+        +track(operation) None
+        +record(metric, value) None
+        +get_metrics() Dict
+    }
+
+    SmartCacheProtocol --|> CacheProtocol : inherits
+    SmartCacheProtocol --|> MetricsProtocol : inherits
+    LRUCache ..|> SmartCacheProtocol : implements
+
+    note for SmartCacheProtocol "Protocol Composition<br/>Combine multiple protocols<br/>for complex interfaces"
+```
+
+## Service Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> Registered: register()
+    Registered --> Resolved: get()
+    Resolved --> Initialized: __init__()
+    Initialized --> Active: Ready
+
+    Active --> Active: Use Service
+    Active --> ScopedEnd: Scope Ends
+
+    ScopedEnd --> Resolved: Scoped
+    ScopedEnd --> [*]: Singleton/Transient
+
+    note right of Registered
+        ServiceLifetime:
+        - SINGLETON: One instance
+        - SCOPED: One per scope
+        - TRANSIENT: New each get()
+    end note
+
+    note right of Active
+        Service is ready:
+        - Dependencies injected
+        - Fully initialized
+        - Ready to use
+    end note
+```
+
+## Event Bus Backend Selection
+
+```mermaid
+graph TB
+    Start([Choose Backend]) --> UseCase{Primary Use Case?}
+
+    UseCase -->|Observability| Memory["In-Memory<br/>━━━━━━━━━━━━━━<br/>High Volume<br/>Lossy OK<br/>Low Latency"]
+    UseCase -->|Agent Messaging| Reliable["Reliable Backend<br/>━━━━━━━━━━━━━━<br/>Guaranteed Delivery"]
+    UseCase -->|Distributed| Distributed["Distributed Backend<br/>━━━━━━━━━━━━━━<br/>Multi-Instance"]
+
+    Reliable --> Choice1{Infrastructure?}
+    Choice1 -->|AWS| SQS["SQS<br/>━━━━━━━━━━━━━━<br/>Serverless<br/>Managed"]
+    Choice1 -->|Self-Hosted| Rabbit["RabbitMQ<br/>━━━━━━━━━━━━━━<br/>Reliable<br/>Mature"]
+    Choice1 -->|Fast Cache| Redis["Redis<br/>━━━━━━━━━━━━━━<br/>Fast<br/>Simple"]
+
+    Distributed --> Kafka["Kafka<br/>━━━━━━━━━━━━━━<br/>Distributed<br/>Exactly-Once<br/>High Throughput"]
+
+    Memory --> End([Selected])
+    SQS --> End
+    Rabbit --> End
+    Redis --> End
+    Kafka --> End
+
+    classDef decisionStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef backendStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef endStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+
+    class UseCase,Choice1 decisionStyle
+    class Memory,SQS,Rabbit,Redis,Kafka backendStyle
+    class Start,End endStyle
+```

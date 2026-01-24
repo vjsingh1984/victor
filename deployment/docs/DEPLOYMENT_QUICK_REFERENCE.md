@@ -8,7 +8,7 @@ Quick reference guide for the master deployment orchestration script.
 ```bash
 ./deployment/scripts/deploy_production_complete.sh \
   --environment production \
-  --image-tag v1.0.0
+  --image-tag v0.5.0
 ```
 
 ### Staging Deployment (Fast)

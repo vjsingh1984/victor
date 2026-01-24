@@ -6,7 +6,7 @@ workflows:
   # Example 1: Use code review template directly in workflow
   pr_review_with_template:
     description: "Pull request review using code review template"
-    version: "1.0.0"
+    version: "0.5.0"
     vertical: "coding"
 
     metadata:
@@ -141,7 +141,7 @@ workflows:
   # Example 2: Use multiple templates in sequence
   comprehensive_feature_development:
     description: "Full feature development using multiple templates"
-    version: "1.0.0"
+    version: "0.5.0"
     vertical: "coding"
 
     nodes:
@@ -300,7 +300,7 @@ workflows:
   # Example 3: Use hierarchical template for complex debugging
   complex_bug_investigation:
     description: "Complex bug investigation using hierarchical team"
-    version: "1.0.0"
+    version: "0.5.0"
     vertical: "coding"
 
     nodes:

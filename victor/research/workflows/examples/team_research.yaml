@@ -19,7 +19,7 @@
 workflows:
   comprehensive_team_research:
     description: "Multi-agent team research with pipeline knowledge building"
-    version: "1.0.0"
+    version: "0.5.0"
     vertical: "research"
 
     metadata:
@@ -382,7 +382,7 @@ workflows:
   # ===========================================================================
   quick_team_research:
     description: "Rapid research with smaller team for time-sensitive needs"
-    version: "1.0.0"
+    version: "0.5.0"
     vertical: "research"
 
     metadata:

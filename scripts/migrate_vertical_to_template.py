@@ -133,7 +133,7 @@ class VerticalExtractor:
         return VerticalMetadata(
             name=self.vertical_class.name,
             description=self.vertical_class.description,
-            version=getattr(self.vertical_class, "version", "1.0.0"),
+            version=getattr(self.vertical_class, "version", "0.5.0"),
             author=getattr(self.vertical_class, "author", None),
             license=getattr(self.vertical_class, "license", "Apache-2.0"),
             category=config.metadata.get("category", "general"),

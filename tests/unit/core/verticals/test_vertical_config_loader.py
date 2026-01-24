@@ -189,7 +189,7 @@ provider_hints:
         # Create a vertical class with escape hatch
         yaml_config = """
 name: custom
-version: 1.0.0
+version: 0.5.0
 description: "Custom vertical with escape hatch"
 
 tools:

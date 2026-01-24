@@ -1,6 +1,6 @@
 # Victor AI Component Reference
 
-**Version**: 0.5.1
+**Version**: 0.5.0
 **Last Updated**: January 18, 2026
 **Audience**: Developers, Contributors
 **Purpose**: Comprehensive reference for all major Victor AI components

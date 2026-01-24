@@ -1,6 +1,6 @@
 # Tool Selection Caching Strategy
 
-**Version**: 0.5.1+
+**Version**: 0.5.0+
 **Author**: Victor AI Team
 **Last Updated**: 2025-01-18
 
@@ -195,7 +195,7 @@ python scripts/benchmark_tool_selection.py report --format markdown
 
 ## Changelog
 
-### Version 0.5.1 (2025-01-18)
+### Version 0.5.0 (2025-01-18)
 - Added selection latency tracking
 - Implemented cache warming (20 common patterns)
 - Enhanced metrics with latency savings

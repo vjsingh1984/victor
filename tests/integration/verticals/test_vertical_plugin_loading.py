@@ -40,7 +40,7 @@ class ValidExternalVertical(VerticalBase):
 
     name = "external_test"
     description = "A test external vertical"
-    version = "1.0.0"
+    version = "0.5.0"
 
     @classmethod
     def get_tools(cls) -> List[str]:

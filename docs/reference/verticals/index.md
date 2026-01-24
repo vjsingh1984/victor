@@ -264,7 +264,7 @@ class MLOpsAssistant(VerticalBase):
 
     name = "mlops"
     description = "Machine learning operations assistant"
-    version = "1.0.0"
+    version = "0.5.0"
 
     @classmethod
     def get_tools(cls):
@@ -387,7 +387,7 @@ from victor.verticals.base import VerticalConfig
 config = VerticalConfig(
     name="my_vertical",
     description="Custom vertical",
-    version="1.0.0",
+    version="0.5.0",
     tools=["read", "write", "shell"],
     system_prompt="You are a helpful assistant...",
     stages={"STAGE1": stage_def, ...},

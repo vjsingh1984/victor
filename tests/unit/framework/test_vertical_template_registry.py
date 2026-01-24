@@ -51,7 +51,7 @@ def valid_template():
         metadata=VerticalMetadata(
             name="test_vertical",
             description="Test vertical for registry",
-            version="1.0.0",
+            version="0.5.0",
             category="testing",
             tags=["test"],
         ),
@@ -93,7 +93,7 @@ def sample_template_yaml(temp_dir):
         "metadata": {
             "name": "yaml_test",
             "description": "Test from YAML",
-            "version": "1.0.0",
+            "version": "0.5.0",
             "category": "test",
         },
         "tools": ["read", "write"],
@@ -312,7 +312,7 @@ class TestVerticalTemplateRegistry:
                 "metadata": {
                     "name": f"test_{i}",
                     "description": f"Test {i}",
-                    "version": "1.0.0",
+                    "version": "0.5.0",
                 },
                 "tools": ["read"],
                 "system_prompt": "Test",
@@ -415,7 +415,7 @@ class TestVerticalTemplateRegistry:
             "metadata": {
                 "name": "imported",
                 "description": "Imported template",
-                "version": "1.0.0",
+                "version": "0.5.0",
             },
             "tools": ["read"],
             "system_prompt": "Test",

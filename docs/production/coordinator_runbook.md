@@ -3,7 +3,7 @@
 This runbook provides operational guidance for troubleshooting and maintaining the coordinator-based orchestrator in production.
 
 **Last Updated**: 2025-01-14
-**Version**: 0.5.1
+**Version**: 0.5.0
 **Environment**: Production
 
 ---

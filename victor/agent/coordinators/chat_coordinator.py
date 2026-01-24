@@ -167,10 +167,12 @@ class ChatCoordinator:
             # This enables accurate token tracking for evaluations/benchmarks
             if hasattr(orch, "_current_stream_context") and orch._current_stream_context:
                 ctx = orch._current_stream_context
-                if hasattr(ctx, "cumulative_usage"):
-                    for key in orch._cumulative_token_usage:
-                        if key in ctx.cumulative_usage:
-                            orch._cumulative_token_usage[key] += ctx.cumulative_usage[key]
+                if hasattr(ctx, "cumulative_usage") and ctx.cumulative_usage:
+                    # Check if cumulative_usage is dict-like (not a Mock)
+                    if hasattr(ctx.cumulative_usage, "__contains__") and hasattr(ctx.cumulative_usage, "__getitem__"):
+                        for key in orch._cumulative_token_usage:
+                            if key in ctx.cumulative_usage:
+                                orch._cumulative_token_usage[key] += ctx.cumulative_usage[key]
                     # Calculate total if not tracked by provider
                     if orch._cumulative_token_usage["total_tokens"] == 0:
                         orch._cumulative_token_usage["total_tokens"] = (
@@ -1501,7 +1503,7 @@ class ChatCoordinator:
             if chunk.tool_calls:
                 logger.debug(f"Received tool_calls in chunk: {chunk.tool_calls}")
                 tool_calls = chunk.tool_calls
-                stream_ctx.stream_metrics.tool_calls_count += len(chunk.tool_calls)
+                stream_ctx.stream_metrics.total_tool_calls += len(chunk.tool_calls)
 
             if chunk.usage:
                 for key in stream_ctx.cumulative_usage:

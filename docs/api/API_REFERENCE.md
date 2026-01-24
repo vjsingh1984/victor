@@ -1,4 +1,4 @@
-# Victor AI 0.5.1 API Reference
+# Victor AI 0.5.0 API Reference
 
 Complete API reference documentation for Victor AI's public interfaces.
 

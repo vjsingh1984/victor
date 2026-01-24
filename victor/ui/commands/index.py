@@ -37,6 +37,10 @@ def index(
             console.print(f"[red]Error:[/red] Path '{path}' is not a directory")
             raise typer.Exit(1)
 
+        # Set environment variable for database rebuild if --force is used
+        if force:
+            os.environ["VICTOR_DATABASE_FORCE_REBUILD"] = "1"
+
         console.print(f"[dim]Indexing codebase at: {cwd}[/dim]")
 
         async def _build_index() -> bool:

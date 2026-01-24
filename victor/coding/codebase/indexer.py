@@ -1006,6 +1006,7 @@ class CodebaseIndex:
         graph_store_name: Optional[str] = None,
         graph_path: Optional[Path] = None,
         parallel_workers: int = 0,
+        rebuild_on_corruption: bool = False,
     ):
         """Initialize codebase indexer.
 
@@ -1028,8 +1029,11 @@ class CodebaseIndex:
             parallel_workers: Number of parallel workers for file indexing.
                 0 = auto-detect (min(cpu_count, 8)), 1 = sequential (default: 0)
                 Use parallel processing for 3-8x speedup on large codebases.
+            rebuild_on_corruption: If True, rebuild corrupted embedding database.
+                Set this when using --force flag.
         """
         self.root = Path(root_path).resolve()
+        self._rebuild_on_corruption = rebuild_on_corruption
 
         # Parallel indexing configuration
         if parallel_workers == 0:
@@ -2639,6 +2643,12 @@ class CodebaseIndex:
             settings = load_settings()
             default_persist_dir = get_project_paths(self.root).embeddings_dir
 
+            # Merge extra_config to preserve rebuild_on_corruption flag
+            extra_config = config.get("extra_config", {}).copy()
+            # Pass rebuild_on_corruption flag through config
+            if self._rebuild_on_corruption:
+                extra_config["rebuild_on_corruption"] = True
+
             # Use settings as defaults, allow config to override
             embedding_config = EmbeddingConfig(
                 vector_store=config.get(
@@ -2654,7 +2664,7 @@ class CodebaseIndex:
                     getattr(settings, "codebase_embedding_model", "BAAI/bge-small-en-v1.5"),
                 ),
                 persist_directory=config.get("persist_directory", str(default_persist_dir)),
-                extra_config=config.get("extra_config", {}),
+                extra_config=extra_config,
             )
 
             # Create embedding provider
@@ -2703,7 +2713,7 @@ class CodebaseIndex:
 
         # Ensure provider is initialized
         if not self.embedding_provider._initialized:
-            await self.embedding_provider.initialize()
+            await self.embedding_provider.initialize(rebuild_on_corruption=self._rebuild_on_corruption)
 
         # Query expansion to improve recall (fix false negatives)
         queries_to_search = [query]

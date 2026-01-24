@@ -25,8 +25,8 @@ Domain-specific handlers for benchmark workflows:
 - syntax_check: Verify syntax correctness
 
 Usage:
-    from victor.benchmark import handlers
-    handlers.register_handlers()
+    # Handlers are auto-registered via @handler_decorator
+    # Just import this module to register them
 
     # In YAML workflow:
     - id: run_tests
@@ -47,12 +47,15 @@ import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+from victor.framework.workflows.base_handler import BaseHandler
+from victor.framework.handler_registry import handler_decorator
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
+    from victor.workflows.executor import WorkflowContext
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +65,9 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
+@handler_decorator("test_runner", description="Execute tests and return results")
 @dataclass
-class TestRunnerHandler:
+class TestRunnerHandler(BaseHandler):
     """Execute tests and return results.
 
     Runs the test suite against generated solutions.
@@ -81,14 +85,13 @@ class TestRunnerHandler:
 
     default_timeout: int = 60
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
+    ) -> Tuple[Any, int]:
+        """Execute test runner."""
         start_time = time.time()
 
         test_file = node.input_mapping.get("test_file", "")
@@ -101,12 +104,7 @@ class TestRunnerHandler:
             test_command = context.get(test_command[5:]) or test_command
 
         if not test_command and not test_file:
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error="No test file or command specified",
-                duration_seconds=time.time() - start_time,
-            )
+            raise ValueError("No test file or command specified")
 
         # Build command
         if test_command:
@@ -118,44 +116,22 @@ class TestRunnerHandler:
         else:
             cmd = f"python {test_file}"
 
-        try:
-            result = await tool_registry.execute("shell", command=cmd, timeout=timeout + 10)
+        result = await tool_registry.execute("shell", command=cmd, timeout=timeout + 10)
 
-            output_text = result.output if hasattr(result, "output") else str(result)
-            test_output = self._parse_test_output(output_text, framework)
+        output_text = result.output if hasattr(result, "output") else str(result)
+        test_output = self._parse_test_output(output_text, framework)
 
-            output = {
-                "success": result.success if hasattr(result, "success") else False,
-                "passed": test_output.get("passed", 0),
-                "failed": test_output.get("failed", 0),
-                "total": test_output.get("total", 0),
-                "errors": test_output.get("errors", []),
-                "pass_rate": test_output.get("pass_rate", 0),
-                "raw_output": output_text[:5000],  # Truncate for context
-            }
+        output = {
+            "success": result.success if hasattr(result, "success") else False,
+            "passed": test_output.get("passed", 0),
+            "failed": test_output.get("failed", 0),
+            "total": test_output.get("total", 0),
+            "errors": test_output.get("errors", []),
+            "pass_rate": test_output.get("pass_rate", 0),
+            "raw_output": output_text[:5000],  # Truncate for context
+        }
 
-            output_key = node.output_key or node.id
-            context.set(output_key, output)
-
-            status = (
-                ExecutorNodeStatus.COMPLETED if output["success"] else ExecutorNodeStatus.FAILED
-            )
-
-            return NodeResult(
-                node_id=node.id,
-                status=status,
-                output=output,
-                duration_seconds=time.time() - start_time,
-                tool_calls_used=1,
-            )
-
-        except Exception as e:
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
-            )
+        return output, 1
 
     def _parse_test_output(self, output: str, framework: str) -> Dict[str, Any]:
         """Parse test output to extract results."""
@@ -205,8 +181,9 @@ class TestRunnerHandler:
 # =============================================================================
 
 
+@handler_decorator("environment_setup", description="Set up execution environment for benchmarks")
 @dataclass
-class EnvironmentSetupHandler:
+class EnvironmentSetupHandler(BaseHandler):
     """Set up execution environment for benchmarks.
 
     Creates virtual environment and installs dependencies.
@@ -222,16 +199,13 @@ class EnvironmentSetupHandler:
           output: env_setup
     """
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
-        start_time = time.time()
-
+    ) -> Tuple[Any, int]:
+        """Execute environment setup."""
         language = node.input_mapping.get("language", "python")
         dependencies = node.input_mapping.get("dependencies", [])
         workspace = node.input_mapping.get("workspace", "")
@@ -249,43 +223,24 @@ class EnvironmentSetupHandler:
             "ready": False,
         }
 
-        try:
-            # Create workspace directory
-            Path(workspace).mkdir(parents=True, exist_ok=True)
+        # Create workspace directory
+        Path(workspace).mkdir(parents=True, exist_ok=True)
 
-            if language == "python" and dependencies:
-                # Install dependencies
-                deps_str = " ".join(dependencies)
-                result = await tool_registry.execute(
-                    "shell",
-                    command=f"pip install {deps_str}",
-                    timeout=120,
-                )
-                output["dependencies_installed"] = (
-                    result.success if hasattr(result, "success") else False
-                )
-
-            output["ready"] = True
-            output_key = node.output_key or node.id
-            context.set(output_key, output)
-
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.COMPLETED,
-                output=output,
-                duration_seconds=time.time() - start_time,
-                tool_calls_used=1,
+        if language == "python" and dependencies:
+            # Install dependencies
+            deps_str = " ".join(dependencies)
+            result = await tool_registry.execute(
+                "shell",
+                command=f"pip install {deps_str}",
+                timeout=120,
+            )
+            output["dependencies_installed"] = (
+                result.success if hasattr(result, "success") else False
             )
 
-        except Exception as e:
-            output["error"] = str(e)
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error=str(e),
-                output=output,
-                duration_seconds=time.time() - start_time,
-            )
+        output["ready"] = True
+
+        return output, 1 if dependencies else 0
 
 
 # =============================================================================
@@ -293,8 +248,9 @@ class EnvironmentSetupHandler:
 # =============================================================================
 
 
+@handler_decorator("live_executor", description="Execute code with real-time feedback")
 @dataclass
-class LiveExecutorHandler:
+class LiveExecutorHandler(BaseHandler):
     """Execute code with real-time feedback.
 
     For LiveCodeBench-style evaluations.
@@ -311,16 +267,13 @@ class LiveExecutorHandler:
           output: execution_result
     """
 
-    async def __call__(
+    async def execute(
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
-        start_time = time.time()
-
+    ) -> Tuple[Any, int]:
+        """Execute live code with real-time feedback."""
         code = node.input_mapping.get("code", "")
         language = node.input_mapping.get("language", "python")
         test_input = node.input_mapping.get("test_input", "")
@@ -331,64 +284,39 @@ class LiveExecutorHandler:
             code = context.get(code[5:]) or ""
 
         if not code:
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error="No code provided",
-                duration_seconds=time.time() - start_time,
-            )
+            raise ValueError("No code provided")
 
-        try:
-            # Write code to temporary file
-            suffix = ".py" if language == "python" else f".{language}"
-            with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as f:
-                f.write(code)
-                code_file = f.name
+        # Write code to temporary file
+        suffix = ".py" if language == "python" else f".{language}"
+        with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as f:
+            f.write(code)
+            code_file = f.name
 
-            # Execute with input
-            if language == "python":
-                cmd = f"python {code_file}"
-            else:
-                cmd = f"{language} {code_file}"
+        # Execute with input
+        if language == "python":
+            cmd = f"python {code_file}"
+        else:
+            cmd = f"{language} {code_file}"
 
-            if test_input:
-                cmd = f"echo '{test_input}' | {cmd}"
+        if test_input:
+            cmd = f"echo '{test_input}' | {cmd}"
 
-            result = await tool_registry.execute("shell", command=cmd, timeout=timeout)
+        result = await tool_registry.execute("shell", command=cmd, timeout=timeout)
 
-            output = {
-                "success": result.success if hasattr(result, "success") else False,
-                "stdout": result.output if hasattr(result, "output") else "",
-                "exit_code": getattr(result, "exit_code", 0),
-                "language": language,
-            }
+        output = {
+            "success": result.success if hasattr(result, "success") else False,
+            "stdout": result.output if hasattr(result, "output") else "",
+            "exit_code": getattr(result, "exit_code", 0),
+            "language": language,
+        }
 
-            # Check for common error patterns
-            stdout = output.get("stdout", "")
-            if "Error" in stdout or "Exception" in stdout or "Traceback" in stdout:
-                output["success"] = False
-                output["error_type"] = "runtime_error"
+        # Check for common error patterns
+        stdout = output.get("stdout", "")
+        if "Error" in stdout or "Exception" in stdout or "Traceback" in stdout:
+            output["success"] = False
+            output["error_type"] = "runtime_error"
 
-            output_key = node.output_key or node.id
-            context.set(output_key, output)
-
-            return NodeResult(
-                node_id=node.id,
-                status=(
-                    ExecutorNodeStatus.COMPLETED if output["success"] else ExecutorNodeStatus.FAILED
-                ),
-                output=output,
-                duration_seconds=time.time() - start_time,
-                tool_calls_used=1,
-            )
-
-        except Exception as e:
-            return NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.FAILED,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
-            )
+        return output, 1
 
 
 # =============================================================================
@@ -396,8 +324,9 @@ class LiveExecutorHandler:
 # =============================================================================
 
 
+@handler_decorator("language_detector", description="Detect programming language from files")
 @dataclass
-class LanguageDetectorHandler:
+class LanguageDetectorHandler(BaseHandler):
     """Detect programming language from files.
 
     Example YAML:

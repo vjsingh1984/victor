@@ -545,5 +545,5 @@ python examples/multi_provider_workflow.py
 
 - [Provider Configuration](../user-guide/providers.md)
 - [Workflow System](../user-guide/workflows.md)
-- [Settings Reference](../reference/configuration-options.md)
+- [Settings Reference](../reference/configuration/)
 - [Agent API](../api-reference/agents.md)

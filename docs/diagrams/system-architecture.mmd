@@ -1,0 +1,339 @@
+# Victor AI System Architecture
+
+## Overview Diagram
+
+```mermaid
+graph TB
+    subgraph Clients["Client Layer"]
+        CLI["CLI/TUI<br/>victor | vic"]
+        HTTP["HTTP API<br/>VS Code | JetBrains"]
+        MCP["MCP Server<br/>IDE Integration"]
+        API["API Server<br/>REST Endpoints"]
+    end
+
+    subgraph DI["Dependency Injection Layer"]
+        Container["ServiceContainer<br/>55+ Services<br/>Singleton | Scoped | Transient"]
+    end
+
+    subgraph Orchestrator["Orchestration Layer"]
+        Orch["AgentOrchestrator<br/>Facade Pattern"]
+    end
+
+    subgraph Coordinators["Two-Layer Coordinator System"]
+        direction TB
+        subgraph AppLayer["Application Layer<br/>(Victor-Specific)"]
+            Chat["ChatCoordinator"]
+            Tool["ToolCoordinator"]
+            Context["ContextCoordinator"]
+            Prompt["PromptCoordinator"]
+            Session["SessionCoordinator"]
+            Provider["ProviderCoordinator"]
+            Mode["ModeCoordinator"]
+        end
+
+        subgraph FrameworkLayer["Framework Layer<br/>(Domain-Agnostic)"]
+            YAML["YAMLWorkflowCoordinator"]
+            Graph["GraphExecutionCoordinator"]
+            HITL["HITLCoordinator"]
+            Cache["CacheCoordinator"]
+        end
+    end
+
+    subgraph Providers["Provider Layer"]
+        Anthropic["Anthropic"]
+        OpenAI["OpenAI"]
+        Google["Google"]
+        Ollama["Ollama"]
+        Local["Local<br/>LM Studio | vLLM"]
+        Cloud["Cloud<br/>Azure | AWS | xAI"]
+    end
+
+    subgraph Tools["Tool Layer"]
+        File["File Operations"]
+        Git["Git Operations"]
+        Test["Testing"]
+        Search["Code Search"]
+        Web["Web Tools"]
+    end
+
+    subgraph Workflows["Workflow Layer"]
+        StateGraph["StateGraph DSL"]
+        YAMLWorkflow["YAML Workflows"]
+        Checkpoint["Checkpointing"]
+    end
+
+    subgraph Verticals["Verticals"]
+        Coding["Coding"]
+        DevOps["DevOps"]
+        RAG["RAG"]
+        Data["Data Analysis"]
+        Research["Research"]
+    end
+
+    subgraph Events["Event Bus Layer"]
+        subgraph Backends["5 Backends"]
+            Memory["In-Memory"]
+            Kafka["Kafka"]
+            SQS["SQS"]
+            Rabbit["RabbitMQ"]
+            Redis["Redis"]
+        end
+    end
+
+    Clients --> DI
+    DI --> Orch
+    Orch --> Coordinators
+    Coordinators --> Providers
+    Coordinators --> Tools
+    Coordinators --> Workflows
+    Coordinators --> Verticals
+    Coordinators --> Events
+
+    classDef clientStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef diStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef orchestratorStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef appCoordStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef frameworkCoordStyle fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    classDef providerStyle fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef toolStyle fill:#e0f2f1,stroke:#004d40,stroke-width:2px
+    classDef workflowStyle fill:#f1f8e9,stroke:#33691e,stroke-width:2px
+    classDef verticalStyle fill:#e3f2fd,stroke:#0d47a1,stroke-width:2px
+    classDef eventStyle fill:#efebe9,stroke:#3e2723,stroke-width:2px
+
+    class CLI,HTTP,MCP,API clientStyle
+    class Container diStyle
+    class Orch orchestratorStyle
+    class Chat,Tool,Context,Prompt,Session,Provider,Mode appCoordStyle
+    class YAML,Graph,HITL,Cache frameworkCoordStyle
+    class Anthropic,OpenAI,Google,Ollama,Local,Cloud providerStyle
+    class File,Git,Test,Search,Web toolStyle
+    class StateGraph,YAMLWorkflow,Checkpoint workflowStyle
+    class Coding,DevOps,RAG,Data,Research verticalStyle
+    class Memory,Kafka,SQS,Rabbit,Redis eventStyle
+```
+
+## Data Flow
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Client
+    participant Orchestrator
+    participant Coordinators
+    participant Provider
+    participant Tools
+    participant EventBus
+
+    User->>Client: Send Request
+    Client->>Orchestrator: Create Agent
+    Orchestrator->>Coordinators: Initialize
+
+    alt Chat Request
+        Coordinators->>Provider: Stream Chat
+        Provider-->>Coordinators: Response Chunks
+        Coordinators->>EventBus: Publish Events
+    end
+
+    alt Tool Call
+        Coordinators->>Tools: Validate & Execute
+        Tools-->>Coordinators: Results
+        Coordinators->>EventBus: Publish Metrics
+    end
+
+    alt Provider Switch
+        Coordinators->>Coordinators: Preserve Context
+        Coordinators->>Provider: New Provider
+        Provider-->>Coordinators: Connected
+    end
+
+    Coordinators-->>Client: Response
+    Client-->>User: Display Result
+```
+
+## Coordinator Communication
+
+```mermaid
+graph LR
+    subgraph Request["Request Flow"]
+        Chat[Chat Coordinator]
+        Tool[Tool Coordinator]
+        Context[Context Coordinator]
+    end
+
+    subgraph State["State Management"]
+        Session[Session Coordinator]
+        Mode[Mode Coordinator]
+        Provider[Provider Coordinator]
+    end
+
+    subgraph Config["Configuration"]
+        Prompt[Prompt Coordinator]
+    end
+
+    Chat --> Tool
+    Chat --> Context
+    Tool --> Context
+
+    Session <--> Chat
+    Mode <--> Chat
+    Provider <--> Chat
+
+    Prompt -.-> Chat
+
+    classDef coordStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    class Chat,Tool,Context,Session,Mode,Provider,Prompt coordStyle
+```
+
+## Provider System
+
+```mermaid
+graph TB
+    subgraph Providers["21 LLM Providers"]
+        direction LR
+        subgraph CloudProviders["Cloud Providers"]
+            A[Anthropic]
+            O[OpenAI]
+            G[Google]
+            AZ[Azure]
+            AWS[AWS Bedrock]
+            X[xAI]
+            D[DeepSeek]
+            M[Mistral]
+            C[Cohere]
+            Gr[Groq]
+            T[Together AI]
+            F[Fireworks AI]
+            OR[OpenRouter]
+            R[Replicate]
+            H[Hugging Face]
+            Mo[Moonshot]
+            Ce[Cerebras]
+        end
+
+        subgraph LocalProviders["Local Providers"]
+            Ol[Ollama]
+            LM[LM Studio]
+            V[vLLM]
+            L[llama.cpp]
+        end
+    end
+
+    subgraph Features["Features"]
+        Tools["Tool Calling"]
+        Vision["Vision Support"]
+        Stream["Streaming"]
+    end
+
+    CloudProviders --> Features
+    LocalProviders --> Features
+
+    classDef cloudStyle fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef localStyle fill:#e0f2f1,stroke:#004d40,stroke-width:2px
+    classDef featureStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+
+    class A,O,G,AZ,AWS,X,D,M,C,Gr,T,F,OR,R,H,Mo,Ce cloudStyle
+    class Ol,LM,V,L localStyle
+    class Tools,Vision,Stream featureStyle
+```
+
+## Event Bus Architecture
+
+```mermaid
+graph TB
+    subgraph Publishers["Event Publishers"]
+        Orch["Orchestrator"]
+        Coords["Coordinators"]
+        Tools["Tools"]
+    end
+
+    subgraph EventBus["Event Bus"]
+        subgraph Backends["Pluggable Backends"]
+            M["In-Memory<br/>Single Instance"]
+            K["Kafka<br/>Distributed"]
+            S["SQS<br/>Serverless"]
+            R["RabbitMQ<br/>Reliable"]
+            Red["Redis<br/>Fast"]
+        end
+    end
+
+    subgraph Subscribers["Event Subscribers"]
+        Metrics["Metrics Collector"]
+        Logging["Logging Service"]
+        Alerting["Alerting System"]
+        Cache["Cache Invalidation"]
+    end
+
+    Publishers --> EventBus
+    EventBus --> Subscribers
+
+    classDef pubStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef busStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef subStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+
+    class Orch,Coords,Tools pubStyle
+    class M,K,S,R,Red busStyle
+    class Metrics,Logging,Alerting,Cache subStyle
+```
+
+## Vertical Architecture
+
+```mermaid
+graph TB
+    subgraph Verticals["5 Domain Verticals"]
+        Coding["Coding Vertical<br/>- Code Analysis<br/>- Refactoring<br/>- Testing"]
+        DevOps["DevOps Vertical<br/>- Docker<br/>- Kubernetes<br/>- CI/CD"]
+        RAG["RAG Vertical<br/>- Document Search<br/>- Retrieval<br/>- Q&A"]
+        Data["Data Analysis Vertical<br/>- Pandas<br/>- Visualization<br/>- Statistics"]
+        Research["Research Vertical<br/>- Literature Search<br/>- Analysis<br/>- Synthesis"]
+    end
+
+    subgraph Shared["Shared Capabilities"]
+        Tools["55+ Tools"]
+        Protocols["98 Protocols"]
+        Coords["20 Coordinators"]
+    end
+
+    subgraph Extension["Extension Points"]
+        Plugins["External Plugins"]
+        CustomTools["Custom Tools"]
+        CustomPrompts["Custom Prompts"]
+    end
+
+    Verticals --> Shared
+    Shared --> Extension
+
+    classDef verticalStyle fill:#e3f2fd,stroke:#0d47a1,stroke-width:2px
+    classDef sharedStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef extStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+
+    class Coding,DevOps,RAG,Data,Research verticalStyle
+    class Tools,Protocols,Coords sharedStyle
+    class Plugins,CustomTools,CustomPrompts extStyle
+```
+
+## Workflow Execution
+
+```mermaid
+stateDiagram-v2
+    [*] --> Parsing: YAML Definition
+    Parsing --> Validation: Parse YAML
+    Validation --> Compilation: Validate Schema
+    Compilation --> Execution: Compile Graph
+    Execution --> Running: Invoke Graph
+
+    state Running {
+        [*] --> NodeStart
+        NodeStart --> NodeExecute: Execute Node
+        NodeExecute --> NodeSuccess: Success
+        NodeExecute --> NodeError: Error
+        NodeSuccess --> Checkpoint: Save State
+        NodeError --> Retry: Retry?
+        Retry --> NodeExecute: Yes
+        Retry --> Failed: No
+        Checkpoint --> NextNode: Next Node
+        NextNode --> NodeStart: Has Next
+        NextNode --> [*]: Complete
+    }
+
+    Execution --> [*]: Workflow Complete
+```

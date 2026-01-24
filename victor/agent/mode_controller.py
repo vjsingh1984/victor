@@ -407,6 +407,19 @@ class AgentModeController:
         """
         return self.config.tool_priorities.get(tool_name, 1.0)
 
+    def get_exploration_multiplier(self) -> float:
+        """Get exploration limit multiplier for current mode.
+
+        Higher multipliers allow more exploration iterations.
+        - BUILD: 5.0x (reading before writing)
+        - PLAN: 10.0x (thorough analysis)
+        - EXPLORE: 20.0x (exploration is primary goal)
+
+        Returns:
+            Multiplier value
+        """
+        return self.config.exploration_multiplier
+
     def get_system_prompt_addition(self) -> str:
         """Get additional system prompt text for current mode.
 

@@ -33,7 +33,7 @@ class PythonTextChunker(InstrumentedAccelerator):
 
     def __init__(self) -> None:
         super().__init__(backend="python")
-        self._version = "1.0.0"
+        self._version = "0.5.0"
 
     def get_version(self) -> Optional[str]:
         return self._version

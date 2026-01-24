@@ -98,7 +98,7 @@ class EmbeddingRegistry:
                 "Install with: pip install victor-ai[vector-experimental]. "
                 "Using LanceDB as fallback."
             )
-            # Fallback to LanceDB
+            # Fallback to LanceDB - preserve extra_config (includes rebuild_on_corruption flag)
             from victor.coding.codebase.embeddings.base import EmbeddingConfig as Config
 
             config = Config(
@@ -107,6 +107,7 @@ class EmbeddingRegistry:
                 embedding_model_type=config.embedding_model_type,
                 embedding_model=config.embedding_model,
                 distance_metric=config.distance_metric,
+                extra_config=config.extra_config,  # Preserve extra_config
             )
 
         provider_class = cls.get(config.vector_store)

@@ -2,7 +2,7 @@
 # Automatically builds and publishes releases when a tag is pushed
 #
 # Triggers:
-#   - Push tag: v* (e.g., v0.1.0, v1.0.0-beta)
+#   - Push tag: v* (e.g., v0.1.0, v0.5.0-beta)
 #   - Manual dispatch for testing
 #
 # Outputs:

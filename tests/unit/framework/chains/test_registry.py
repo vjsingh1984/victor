@@ -41,14 +41,14 @@ class TestChainMetadata:
         """ChainMetadata should store basic attributes."""
         metadata = ChainMetadata(
             name="test_chain",
-            version="1.0.0",
+            version="0.5.0",
             description="Test chain",
             category="testing",
             tags=["test", "unit"],
         )
 
         assert metadata.name == "test_chain"
-        assert metadata.version == "1.0.0"
+        assert metadata.version == "0.5.0"
         assert metadata.description == "Test chain"
         assert metadata.category == "testing"
         assert metadata.tags == ["test", "unit"]
@@ -57,7 +57,7 @@ class TestChainMetadata:
         """ChainMetadata should store author."""
         metadata = ChainMetadata(
             name="chain",
-            version="1.0.0",
+            version="0.5.0",
             description="Test",
             category="testing",
             author="Test Author",
@@ -69,7 +69,7 @@ class TestChainMetadata:
         """ChainMetadata should store deprecated flag."""
         metadata1 = ChainMetadata(
             name="chain",
-            version="1.0.0",
+            version="0.5.0",
             description="Test",
             category="testing",
             deprecated=False,
@@ -90,7 +90,7 @@ class TestChainMetadata:
         """ChainMetadata should have sensible defaults."""
         metadata = ChainMetadata(
             name="test",
-            version="1.0.0",
+            version="0.5.0",
             description="Test",
             category="testing",
         )
@@ -179,13 +179,13 @@ class TestChainRegistryRegistration:
 
         registry.register_chain(
             name="test_chain",
-            version="1.0.0",
+            version="0.5.0",
             chain=mock_chain,
             category="testing",
             description="Test chain",
         )
 
-        retrieved = registry.get_chain("test_chain", version="1.0.0")
+        retrieved = registry.get_chain("test_chain", version="0.5.0")
         assert retrieved is mock_chain
 
     def test_register_chain_with_tags(self):
@@ -195,13 +195,13 @@ class TestChainRegistryRegistration:
 
         registry.register_chain(
             name="tagged_chain",
-            version="1.0.0",
+            version="0.5.0",
             chain=mock_chain,
             category="testing",
             tags=["tag1", "tag2"],
         )
 
-        metadata = registry.get_chain_metadata("tagged_chain", version="1.0.0")
+        metadata = registry.get_chain_metadata("tagged_chain", version="0.5.0")
         assert metadata.tags == ["tag1", "tag2"]
 
     def test_register_chain_with_author(self):
@@ -211,13 +211,13 @@ class TestChainRegistryRegistration:
 
         registry.register_chain(
             name="authored_chain",
-            version="1.0.0",
+            version="0.5.0",
             chain=mock_chain,
             category="testing",
             author="Test Author",
         )
 
-        metadata = registry.get_chain_metadata("authored_chain", version="1.0.0")
+        metadata = registry.get_chain_metadata("authored_chain", version="0.5.0")
         assert metadata.author == "Test Author"
 
     def test_register_chain_deprecated(self):
@@ -227,13 +227,13 @@ class TestChainRegistryRegistration:
 
         registry.register_chain(
             name="deprecated_chain",
-            version="1.0.0",
+            version="0.5.0",
             chain=mock_chain,
             category="testing",
             deprecated=True,
         )
 
-        metadata = registry.get_chain_metadata("deprecated_chain", version="1.0.0")
+        metadata = registry.get_chain_metadata("deprecated_chain", version="0.5.0")
         assert metadata.deprecated is True
 
     def test_register_multiple_versions(self):
@@ -244,7 +244,7 @@ class TestChainRegistryRegistration:
 
         registry.register_chain(
             name="multi_chain",
-            version="1.0.0",
+            version="0.5.0",
             chain=chain_v1,
             category="testing",
         )
@@ -256,7 +256,7 @@ class TestChainRegistryRegistration:
             category="testing",
         )
 
-        assert registry.get_chain("multi_chain", version="1.0.0") is chain_v1
+        assert registry.get_chain("multi_chain", version="0.5.0") is chain_v1
         assert registry.get_chain("multi_chain", version="2.0.0") is chain_v2
 
 
@@ -285,7 +285,7 @@ class TestChainRegistrySemVerValidation:
         # Should not raise
         registry.register_chain(
             name="test",
-            version="1.0.0",
+            version="0.5.0",
             chain=mock_chain,
             category="testing",
         )
@@ -297,12 +297,12 @@ class TestChainRegistrySemVerValidation:
 
         registry.register_chain(
             name="test",
-            version="1.0.0-alpha",
+            version="0.5.0-alpha",
             chain=mock_chain,
             category="testing",
         )
 
-        chain = registry.get_chain("test", version="1.0.0-alpha")
+        chain = registry.get_chain("test", version="0.5.0-alpha")
         assert chain is mock_chain
 
     def test_valid_semver_with_build_metadata(self):
@@ -312,12 +312,12 @@ class TestChainRegistrySemVerValidation:
 
         registry.register_chain(
             name="test",
-            version="1.0.0+build.1",
+            version="0.5.0+build.1",
             chain=mock_chain,
             category="testing",
         )
 
-        chain = registry.get_chain("test", version="1.0.0+build.1")
+        chain = registry.get_chain("test", version="0.5.0+build.1")
         assert chain is mock_chain
 
     def test_invalid_semver_raises_error(self):
@@ -397,7 +397,7 @@ class TestChainRegistryCategoryValidation:
 
         registry.register_chain(
             name="test",
-            version="1.0.0",
+            version="0.5.0",
             chain=mock_chain,
             category="exploration",
         )
@@ -411,7 +411,7 @@ class TestChainRegistryCategoryValidation:
 
         registry.register_chain(
             name="test",
-            version="1.0.0",
+            version="0.5.0",
             chain=mock_chain,
             category="editing",
         )
@@ -425,7 +425,7 @@ class TestChainRegistryCategoryValidation:
 
         registry.register_chain(
             name="test",
-            version="1.0.0",
+            version="0.5.0",
             chain=mock_chain,
             category="analysis",
         )
@@ -439,7 +439,7 @@ class TestChainRegistryCategoryValidation:
 
         registry.register_chain(
             name="test",
-            version="1.0.0",
+            version="0.5.0",
             chain=mock_chain,
             category="testing",
         )
@@ -453,7 +453,7 @@ class TestChainRegistryCategoryValidation:
 
         registry.register_chain(
             name="test",
-            version="1.0.0",
+            version="0.5.0",
             chain=mock_chain,
             category="other",
         )
@@ -468,7 +468,7 @@ class TestChainRegistryCategoryValidation:
         with pytest.raises(ValueError, match="Invalid category"):
             registry.register_chain(
                 name="test",
-                version="1.0.0",
+                version="0.5.0",
                 chain=mock_chain,
                 category="invalid_category",
             )
@@ -498,19 +498,19 @@ class TestChainRegistryRetrieval:
 
         registry.register_chain(
             name="test",
-            version="1.0.0",
+            version="0.5.0",
             chain=mock_chain,
             category="testing",
         )
 
-        retrieved = registry.get_chain("test", version="1.0.0")
+        retrieved = registry.get_chain("test", version="0.5.0")
         assert retrieved is mock_chain
 
     def test_get_chain_returns_none_for_missing(self):
         """get_chain() should return None for missing chain."""
         registry = ChainRegistry()
 
-        retrieved = registry.get_chain("nonexistent", version="1.0.0")
+        retrieved = registry.get_chain("nonexistent", version="0.5.0")
         assert retrieved is None
 
     def test_get_chain_latest_version(self):
@@ -519,7 +519,7 @@ class TestChainRegistryRetrieval:
         chain_v1 = MagicMock(name="ChainV1")
         chain_v2 = MagicMock(name="ChainV2")
 
-        registry.register_chain("test", "1.0.0", chain_v1, "testing")
+        registry.register_chain("test", "0.5.0", chain_v1, "testing")
         registry.register_chain("test", "2.0.0", chain_v2, "testing")
 
         retrieved = registry.get_chain("test")
@@ -532,7 +532,7 @@ class TestChainRegistryRetrieval:
 
         registry.register_chain(
             name="test",
-            version="1.0.0",
+            version="0.5.0",
             chain=mock_chain,
             category="testing",
             description="Test chain",
@@ -540,11 +540,11 @@ class TestChainRegistryRetrieval:
             author="Author",
         )
 
-        metadata = registry.get_chain_metadata("test", version="1.0.0")
+        metadata = registry.get_chain_metadata("test", version="0.5.0")
 
         assert metadata is not None
         assert metadata.name == "test"
-        assert metadata.version == "1.0.0"
+        assert metadata.version == "0.5.0"
         assert metadata.description == "Test chain"
         assert metadata.tags == ["tag1"]
         assert metadata.author == "Author"
@@ -561,7 +561,7 @@ class TestChainRegistryRetrieval:
         registry = ChainRegistry()
         mock_chain = MagicMock()
 
-        registry.register_chain("test", "1.0.0", mock_chain, "testing")
+        registry.register_chain("test", "0.5.0", mock_chain, "testing")
         registry.register_chain("test", "2.0.0", mock_chain, "testing")
         registry.register_chain("test", "1.5.0", mock_chain, "testing")
 
@@ -597,9 +597,9 @@ class TestChainRegistryListing:
         """list_chains() should return all chain names."""
         registry = ChainRegistry()
 
-        registry.register_chain("chain1", "1.0.0", MagicMock(), "testing")
-        registry.register_chain("chain2", "1.0.0", MagicMock(), "editing")
-        registry.register_chain("chain3", "1.0.0", MagicMock(), "analysis")
+        registry.register_chain("chain1", "0.5.0", MagicMock(), "testing")
+        registry.register_chain("chain2", "0.5.0", MagicMock(), "editing")
+        registry.register_chain("chain3", "0.5.0", MagicMock(), "analysis")
 
         chains = registry.list_chains()
 
@@ -612,9 +612,9 @@ class TestChainRegistryListing:
         """list_chains() should filter by category."""
         registry = ChainRegistry()
 
-        registry.register_chain("test1", "1.0.0", MagicMock(), "testing")
-        registry.register_chain("edit1", "1.0.0", MagicMock(), "editing")
-        registry.register_chain("test2", "1.0.0", MagicMock(), "testing")
+        registry.register_chain("test1", "0.5.0", MagicMock(), "testing")
+        registry.register_chain("edit1", "0.5.0", MagicMock(), "editing")
+        registry.register_chain("test2", "0.5.0", MagicMock(), "testing")
 
         testing_chains = registry.list_chains(category="testing")
 
@@ -634,7 +634,7 @@ class TestChainRegistryListing:
         """list_chain_versions() should return all versions sorted descending."""
         registry = ChainRegistry()
 
-        registry.register_chain("test", "1.0.0", MagicMock(), "testing")
+        registry.register_chain("test", "0.5.0", MagicMock(), "testing")
         registry.register_chain("test", "2.0.0", MagicMock(), "testing")
         registry.register_chain("test", "1.5.0", MagicMock(), "testing")
 
@@ -644,7 +644,7 @@ class TestChainRegistryListing:
         # Should be sorted descending (latest first)
         assert versions[0] == "2.0.0"
         assert versions[1] == "1.5.0"
-        assert versions[2] == "1.0.0"
+        assert versions[2] == "0.5.0"
 
     def test_list_chain_versions_missing_chain(self):
         """list_chain_versions() should return empty list for missing chain."""
@@ -677,20 +677,20 @@ class TestChainRegistryRemoval:
         chain_v1 = MagicMock()
         chain_v2 = MagicMock()
 
-        registry.register_chain("test", "1.0.0", chain_v1, "testing")
+        registry.register_chain("test", "0.5.0", chain_v1, "testing")
         registry.register_chain("test", "2.0.0", chain_v2, "testing")
 
-        result = registry.remove_chain("test", version="1.0.0")
+        result = registry.remove_chain("test", version="0.5.0")
 
         assert result is True
-        assert registry.get_chain("test", version="1.0.0") is None
+        assert registry.get_chain("test", version="0.5.0") is None
         assert registry.get_chain("test", version="2.0.0") is chain_v2
 
     def test_remove_chain_all_versions(self):
         """remove_chain() should remove all versions when version is None."""
         registry = ChainRegistry()
 
-        registry.register_chain("test", "1.0.0", MagicMock(), "testing")
+        registry.register_chain("test", "0.5.0", MagicMock(), "testing")
         registry.register_chain("test", "2.0.0", MagicMock(), "testing")
 
         result = registry.remove_chain("test")
@@ -709,7 +709,7 @@ class TestChainRegistryRemoval:
         """remove_chain() should remove chain from category."""
         registry = ChainRegistry()
 
-        registry.register_chain("test", "1.0.0", MagicMock(), "testing")
+        registry.register_chain("test", "0.5.0", MagicMock(), "testing")
 
         assert "test" in registry._categories["testing"]
 
@@ -753,9 +753,9 @@ class TestChainRegistryStatistics:
         """get_registry_stats() should return correct stats."""
         registry = ChainRegistry()
 
-        registry.register_chain("test1", "1.0.0", MagicMock(), "testing")
-        registry.register_chain("test2", "1.0.0", MagicMock(), "testing")
-        registry.register_chain("edit1", "1.0.0", MagicMock(), "editing")
+        registry.register_chain("test1", "0.5.0", MagicMock(), "testing")
+        registry.register_chain("test2", "0.5.0", MagicMock(), "testing")
+        registry.register_chain("edit1", "0.5.0", MagicMock(), "editing")
         registry.register_chain("test1", "2.0.0", MagicMock(), "testing")
 
         stats = registry.get_registry_stats()
@@ -807,14 +807,14 @@ class TestChainRegistrySemVerSorting:
 
     def test_get_latest_version_basic(self):
         """_get_latest_version() should return highest version."""
-        versions = ["1.0.0", "2.0.0", "1.5.0"]
+        versions = ["0.5.0", "2.0.0", "1.5.0"]
         latest = ChainRegistry._get_latest_version(versions)
 
         assert latest == "2.0.0"
 
     def test_get_latest_version_with_pre_release(self):
         """_get_latest_version() should handle pre-release."""
-        versions = ["1.0.0", "1.0.0-alpha", "2.0.0"]
+        versions = ["0.5.0", "0.5.0-alpha", "2.0.0"]
         latest = ChainRegistry._get_latest_version(versions)
 
         assert latest == "2.0.0"
@@ -828,7 +828,7 @@ class TestChainRegistrySemVerSorting:
     def test_get_latest_version_complex(self):
         """_get_latest_version() should handle complex versions."""
         versions = [
-            "1.0.0",
+            "0.5.0",
             "2.1.0",
             "1.10.0",
             "2.0.5",
@@ -866,7 +866,7 @@ class TestChainRegistryThreadSafety:
                 for i in range(count):
                     registry.register_chain(
                         name=f"{prefix}_chain_{i}",
-                        version="1.0.0",
+                        version="0.5.0",
                         chain=MagicMock(),
                         category="testing",
                     )
@@ -893,14 +893,14 @@ class TestChainRegistryThreadSafety:
         errors = []
 
         # Pre-populate
-        registry.register_chain("chain_0", "1.0.0", MagicMock(), "testing")
+        registry.register_chain("chain_0", "0.5.0", MagicMock(), "testing")
 
         def writer():
             try:
                 for i in range(1, 50):
                     registry.register_chain(
                         name=f"chain_{i}",
-                        version="1.0.0",
+                        version="0.5.0",
                         chain=MagicMock(),
                         category="testing",
                     )

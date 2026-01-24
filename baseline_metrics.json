@@ -1,0 +1,58 @@
+{
+  "startup": {
+    "total_time_seconds": 0.0855109691619873,
+    "import_time_seconds": 0.0855109691619873,
+    "init_time_seconds": 0.0,
+    "verticals_loaded": 4,
+    "lazy_initializations": 0
+  },
+  "caches": {},
+  "feature_flags": {
+    "VICTOR_USE_NEW_PROTOCOLS": {
+      "enabled": false,
+      "value": "",
+      "source": "environment"
+    },
+    "VICTOR_USE_CONTEXT_CONFIG": {
+      "enabled": false,
+      "value": "",
+      "source": "environment"
+    },
+    "VICTOR_USE_PLUGIN_DISCOVERY": {
+      "enabled": false,
+      "value": "",
+      "source": "environment"
+    },
+    "VICTOR_USE_TYPE_SAFE_LAZY": {
+      "enabled": false,
+      "value": "",
+      "source": "environment"
+    },
+    "VICTOR_LAZY_INITIALIZATION": {
+      "enabled": false,
+      "value": "",
+      "source": "environment"
+    },
+    "VICTOR_AIRGAPPED": {
+      "enabled": false,
+      "value": "",
+      "source": "environment"
+    }
+  },
+  "errors": {
+    "total_errors": 0,
+    "errors_by_type": {},
+    "last_error": null,
+    "last_error_time": null
+  },
+  "collector": {
+    "uptime_seconds": 2.4080276489257812e-05,
+    "collection_count": 0,
+    "timestamp": "2026-01-23T18:56:41.896929"
+  },
+  "_metadata": {
+    "type": "baseline",
+    "timestamp": "2026-01-23T18:56:41.896929",
+    "version": "0.5.0"
+  }
+}

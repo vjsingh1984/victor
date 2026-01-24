@@ -88,10 +88,10 @@ class TestMCPModels:
         """Test MCPServerInfo model."""
         info = MCPServerInfo(
             name="test_server",
-            version="1.0.0",
+            version="0.5.0",
         )
         assert info.name == "test_server"
-        assert info.version == "1.0.0"
+        assert info.version == "0.5.0"
 
     def test_mcp_capabilities(self):
         """Test MCPCapabilities model.
@@ -122,10 +122,10 @@ class TestMCPModels:
         """Test MCPClientInfo model."""
         info = MCPClientInfo(
             name="test_client",
-            version="1.0.0",
+            version="0.5.0",
         )
         assert info.name == "test_client"
-        assert info.version == "1.0.0"
+        assert info.version == "0.5.0"
 
     def test_mcp_message_type_enum(self):
         """Test MCPMessageType enum."""

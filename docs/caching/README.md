@@ -1,4 +1,4 @@
-# Advanced Caching System for Victor AI 0.5.1
+# Advanced Caching System for Victor AI 0.5.0
 
 Comprehensive, production-ready caching system with multi-level hierarchy, intelligent warming, semantic similarity, and advanced monitoring.
 
@@ -44,10 +44,10 @@ Comprehensive, production-ready caching system with multi-level hierarchy, intel
 
 ## Installation
 
-The caching system is included with Victor AI 0.5.1+:
+The caching system is included with Victor AI 0.5.0+:
 
 ```bash
-pip install victor-ai>=0.5.1
+pip install victor-ai>=0.5.0
 ```
 
 ## Quick Start

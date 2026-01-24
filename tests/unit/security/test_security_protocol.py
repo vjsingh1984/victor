@@ -534,7 +534,7 @@ class TestSecurityPolicy:
         """Test policy fails on low when configured."""
         policy = SecurityPolicy(fail_on_low=True)
         cve = CVE("CVE-2022-9999", "Low", Severity.LOW)
-        dep = Dependency("package", "1.0.0", "pypi")
+        dep = Dependency("package", "0.5.0", "pypi")
         result = SecurityScanResult(vulnerabilities=[Vulnerability(cve, dep)])
 
         passed, failures = policy.check(result)
@@ -578,7 +578,7 @@ class TestSecurityPolicy:
         """Test policy fails when exceeding max low."""
         policy = SecurityPolicy(max_low=0)
         cve = CVE("CVE-2022-9999", "Low", Severity.LOW)
-        dep = Dependency("package", "1.0.0", "pypi")
+        dep = Dependency("package", "0.5.0", "pypi")
         result = SecurityScanResult(vulnerabilities=[Vulnerability(cve, dep)])
 
         passed, failures = policy.check(result)

@@ -278,7 +278,7 @@ ci:
 
 # # License header checking
 # - repo: https://github.com/Lucas-C/pre-commit-hooks-license
-#   rev: v1.0.0
+#   rev: v0.5.0
 #   hooks:
 #     - id: license
 #       name: Check Apache 2.0 license header

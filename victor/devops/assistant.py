@@ -56,7 +56,7 @@ class DevOpsAssistant(VerticalBase):
 
     name = "devops"
     description = "Infrastructure automation, container management, CI/CD, and deployment"
-    version = "1.0.0"
+    version = "0.5.0"
 
     @classmethod
     def get_tools(cls) -> List[str]:

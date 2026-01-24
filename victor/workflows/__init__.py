@@ -451,6 +451,11 @@ from victor.workflows.team_tracing import (
     export_trace_to_dict,
     get_all_traces,
 )
+from victor.workflows.template_registry import (
+    WorkflowTemplateRegistry,
+    get_workflow_template_registry,
+    register_default_templates,
+)
 
 # Register framework handlers on module load
 # Domain-specific handlers are registered by each vertical when loaded
@@ -742,4 +747,8 @@ __all__ = [
     "set_trace_id",
     "export_trace_to_dict",
     "get_all_traces",
+    # Template Registry (Phase 5: Workflow Consolidation)
+    "WorkflowTemplateRegistry",
+    "get_workflow_template_registry",
+    "register_default_templates",
 ]

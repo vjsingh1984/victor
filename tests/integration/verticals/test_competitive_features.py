@@ -501,9 +501,9 @@ class TestModeConfigFeatures:
 
         # Then default modes should be available
         assert quick_mode is not None
-        assert quick_mode.tool_budget == 5
+        assert quick_mode.tool_budget == 10  # Quick mode has lower budget for fast tasks
         assert standard_mode is not None
-        assert standard_mode.tool_budget == 15
+        assert standard_mode.tool_budget == 50  # Standard mode has balanced budget
 
     @pytest.mark.asyncio
     @pytest.mark.integration

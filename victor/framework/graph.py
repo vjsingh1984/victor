@@ -117,7 +117,7 @@ START = "__start__"
 
 
 class CopyOnWriteState(Generic[StateType]):
-    """Copy-on-write wrapper for workflow state.
+    """Copy-on-write wrapper for workflow state with full thread-safety.
 
     MIGRATION NOTICE: For persistent state storage across workflow executions,
     use the canonical state management system:
@@ -127,31 +127,35 @@ class CopyOnWriteState(Generic[StateType]):
     CopyOnWriteState is kept as a performance optimization for workflow graphs,
     providing copy-on-write semantics for state within a single execution.
 
-    ⚠️ THREAD SAFETY WARNING ⚠️:
-        This class is NOT thread-safe and must NOT be shared across threads.
+    ✅ THREAD SAFETY:
+        This class IS thread-safe and can be safely shared across threads.
+        All read and write operations are protected by an RLock, ensuring
+        consistent state access from multiple threads.
 
-        Each thread MUST have its own CopyOnWriteState wrapper instance.
-        Sharing the same wrapper instance between threads will lead to
-        race conditions, data corruption, and undefined behavior.
+        The implementation uses a reentrant lock (RLock) to allow nested
+        operations while protecting against concurrent modifications.
 
-        Example of CORRECT usage:
-            # Thread 1
-            cow_state_1 = CopyOnWriteState(shared_state_dict)
-            result_1 = await node1.execute(cow_state_1)
+        Example of CORRECT usage (multi-threaded):
+            cow_state = CopyOnWriteState(initial_state)
 
-            # Thread 2 (different wrapper!)
-            cow_state_2 = CopyOnWriteState(shared_state_dict)
-            result_2 = await node2.execute(cow_state_2)
+            # Thread 1 - safe concurrent read
+            value1 = cow_state["key"]
 
-        Example of INCORRECT usage (will cause race conditions):
-            cow_state = CopyOnWriteState(shared_state_dict)
-            # ❌ DO NOT share cow_state between threads
-            await thread1.run(cow_state)  # UNSAFE!
-            await thread2.run(cow_state)  # UNSAFE!
+            # Thread 2 - safe concurrent write
+            cow_state["other_key"] = "value"
+
+            # Thread 3 - safe concurrent read after write
+            value2 = cow_state.get("other_key")
+
+        For graph-level parallelism with branch isolation, create separate
+        wrappers per branch:
+            # Branch A gets its own isolated copy
+            branch_a_state = CopyOnWriteState(shared_state)
+
+            # Branch B gets its own isolated copy
+            branch_b_state = CopyOnWriteState(shared_state)
 
     ---
-
-    Legacy Documentation:
 
     Delays deep copy of state until the first mutation, reducing overhead
     for read-heavy workflows where nodes often only read state.
@@ -194,9 +198,10 @@ class CopyOnWriteState(Generic[StateType]):
         await state.set("status", "running", scope=StateScope.WORKFLOW)
 
     Performance characteristics:
-        - Read operations: O(1), no copy overhead
+        - Read operations (unmodified): O(1), no copy, no lock contention
+        - Read operations (modified): O(1), lock-protected for consistency
         - First write: O(n) deep copy where n is state size
-        - Subsequent writes: O(1), no additional copy
+        - Subsequent writes: O(1), lock-protected
     """
 
     __slots__ = ("_source", "_copy", "_modified", "_lock")
@@ -210,30 +215,44 @@ class CopyOnWriteState(Generic[StateType]):
         self._source: StateType = source
         self._copy: Optional[StateType] = None
         self._modified: bool = False
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()  # RLock for reentrant thread-safety
 
     def _ensure_copy(self) -> StateType:
         """Ensure we have a mutable copy of the state (thread-safe).
 
         Uses double-checked locking for thread-safety while maintaining
-        performance for read-heavy workloads.
+        performance for read-heavy workloads. Must be called within the lock
+        for write operations.
 
         Returns:
             The mutable copy of the state
         """
-        # Fast path: no lock if already modified
+        # Fast path: no lock needed if already modified (immutable after set)
         if self._modified:
             return self._copy  # type: ignore
 
-        # Slow path: lock and recheck
+        # Slow path: lock and recheck (RLock allows nested calls)
         with self._lock:
             if not self._modified:
                 self._copy = copy.deepcopy(self._source)
                 self._modified = True
             return self._copy  # type: ignore
 
+    def _get_current_state(self) -> StateType:
+        """Get current state reference (thread-safe read).
+
+        Returns:
+            The current state (copy if modified, source otherwise)
+        """
+        # Fast path for unmodified - source is immutable
+        if not self._modified:
+            return self._source
+        # For modified state, lock ensures consistent read
+        with self._lock:
+            return self._copy  # type: ignore
+
     def __getitem__(self, key: str) -> Any:
-        """Get item without copying.
+        """Get item (thread-safe).
 
         Args:
             key: Key to look up
@@ -244,21 +263,25 @@ class CopyOnWriteState(Generic[StateType]):
         Raises:
             KeyError: If key is not found
         """
-        if self._modified:
+        # Fast path for unmodified - no lock needed, source is immutable
+        if not self._modified:
+            return self._source[key]
+        # Lock for consistent read from modified state
+        with self._lock:
             return self._copy[key]  # type: ignore
-        return self._source[key]
 
     def __setitem__(self, key: str, value: Any) -> None:
-        """Set item, triggering copy on first mutation.
+        """Set item, triggering copy on first mutation (thread-safe).
 
         Args:
             key: Key to set
             value: Value to associate with key
         """
-        self._ensure_copy()[key] = value
+        with self._lock:
+            self._ensure_copy()[key] = value
 
     def __delitem__(self, key: str) -> None:
-        """Delete item, triggering copy on first mutation.
+        """Delete item, triggering copy on first mutation (thread-safe).
 
         Args:
             key: Key to delete
@@ -266,10 +289,11 @@ class CopyOnWriteState(Generic[StateType]):
         Raises:
             KeyError: If key is not found
         """
-        del self._ensure_copy()[key]
+        with self._lock:
+            del self._ensure_copy()[key]
 
     def __contains__(self, key: object) -> bool:
-        """Check if key exists without copying.
+        """Check if key exists (thread-safe).
 
         Args:
             key: Key to check
@@ -277,32 +301,41 @@ class CopyOnWriteState(Generic[StateType]):
         Returns:
             True if key exists, False otherwise
         """
-        if self._modified:
+        # Fast path for unmodified
+        if not self._modified:
+            return key in self._source
+        with self._lock:
             return key in self._copy  # type: ignore
-        return key in self._source
 
     def __len__(self) -> int:
-        """Get length without copying.
+        """Get length (thread-safe).
 
         Returns:
             Number of items in state
         """
-        if self._modified:
+        # Fast path for unmodified
+        if not self._modified:
+            return len(self._source)
+        with self._lock:
             return len(self._copy)  # type: ignore
-        return len(self._source)
 
     def __iter__(self):
-        """Iterate over keys without copying.
+        """Iterate over keys (thread-safe snapshot).
 
-        Yields:
-            Keys from the state
+        Returns a snapshot of keys to avoid issues with concurrent modification.
+
+        Returns:
+            Iterator over keys from the state
         """
-        if self._modified:
-            return iter(self._copy)  # type: ignore
-        return iter(self._source)
+        # Fast path for unmodified
+        if not self._modified:
+            return iter(list(self._source.keys()))  # type: ignore
+        # Return snapshot to avoid concurrent modification issues
+        with self._lock:
+            return iter(list(self._copy.keys()))  # type: ignore
 
     def get(self, key: str, default: Any = None) -> Any:
-        """Get with default without copying.
+        """Get with default (thread-safe).
 
         Args:
             key: Key to look up
@@ -311,50 +344,59 @@ class CopyOnWriteState(Generic[StateType]):
         Returns:
             Value associated with key, or default
         """
-        if self._modified:
+        # Fast path for unmodified
+        if not self._modified:
+            return self._source.get(key, default)
+        with self._lock:
             return self._copy.get(key, default)  # type: ignore
-        return self._source.get(key, default)
 
     def keys(self):
-        """Get keys without copying.
+        """Get keys (thread-safe snapshot).
 
         Returns:
-            View of keys in the state
+            List of keys in the state (snapshot for thread-safety)
         """
-        if self._modified:
-            return self._copy.keys()  # type: ignore
-        return self._source.keys()
+        # Fast path for unmodified
+        if not self._modified:
+            return list(self._source.keys())  # type: ignore
+        with self._lock:
+            return list(self._copy.keys())  # type: ignore
 
     def values(self):
-        """Get values without copying.
+        """Get values (thread-safe snapshot).
 
         Returns:
-            View of values in the state
+            List of values in the state (snapshot for thread-safety)
         """
-        if self._modified:
-            return self._copy.values()  # type: ignore
-        return self._source.values()
+        # Fast path for unmodified
+        if not self._modified:
+            return list(self._source.values())  # type: ignore
+        with self._lock:
+            return list(self._copy.values())  # type: ignore
 
     def items(self):
-        """Get items without copying.
+        """Get items (thread-safe snapshot).
 
         Returns:
-            View of (key, value) pairs in the state
+            List of (key, value) pairs in the state (snapshot for thread-safety)
         """
-        if self._modified:
-            return self._copy.items()  # type: ignore
-        return self._source.items()
+        # Fast path for unmodified
+        if not self._modified:
+            return list(self._source.items())  # type: ignore
+        with self._lock:
+            return list(self._copy.items())  # type: ignore
 
     def update(self, other: Dict[str, Any]) -> None:
-        """Update state, triggering copy.
+        """Update state, triggering copy (thread-safe).
 
         Args:
             other: Dictionary of items to update
         """
-        self._ensure_copy().update(other)
+        with self._lock:
+            self._ensure_copy().update(other)
 
     def setdefault(self, key: str, default: Any = None) -> Any:
-        """Set default value, may trigger copy.
+        """Set default value, may trigger copy (thread-safe).
 
         If key is not present, sets it to default (triggering copy).
         If key is present, returns its value without copying.
@@ -366,13 +408,14 @@ class CopyOnWriteState(Generic[StateType]):
         Returns:
             Value associated with key (existing or default)
         """
-        if key not in self:
-            self._ensure_copy()[key] = default
-            return default
-        return self[key]
+        with self._lock:
+            if key not in self:
+                self._ensure_copy()[key] = default
+                return default
+            return self[key]
 
     def pop(self, key: str, *args: Any) -> Any:
-        """Pop item, triggering copy.
+        """Pop item, triggering copy (thread-safe).
 
         Args:
             key: Key to pop
@@ -384,30 +427,37 @@ class CopyOnWriteState(Generic[StateType]):
         Raises:
             KeyError: If key is not found and no default provided
         """
-        return self._ensure_copy().pop(key, *args)
+        with self._lock:
+            return self._ensure_copy().pop(key, *args)
 
     def copy(self) -> Dict[str, Any]:
-        """Create a shallow copy of the current state.
+        """Create a shallow copy of the current state (thread-safe).
 
         Returns:
             Shallow copy of the state dictionary
         """
-        if self._modified:
+        # Fast path for unmodified
+        if not self._modified:
+            return self._source.copy()  # type: ignore
+        with self._lock:
             return self._copy.copy()  # type: ignore
-        return self._source.copy()  # type: ignore
 
     def get_state(self) -> StateType:
-        """Get the final state.
+        """Get the final state (thread-safe).
 
         Returns the modified copy if mutations occurred,
         otherwise returns the original source.
 
+        Note: Returns the internal reference. For thread-safe access
+        to the returned dict, use copy() or to_dict() instead.
+
         Returns:
             The current state (modified copy or original source)
         """
-        if self._modified:
+        if not self._modified:
+            return self._source
+        with self._lock:
             return self._copy  # type: ignore
-        return self._source
 
     @property
     def was_modified(self) -> bool:
@@ -419,12 +469,13 @@ class CopyOnWriteState(Generic[StateType]):
         return self._modified
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to regular dictionary.
+        """Convert to regular dictionary (thread-safe deep copy).
 
         Returns:
             Dictionary copy of the current state
         """
-        return dict(self.get_state())
+        with self._lock:
+            return dict(self.get_state())
 
     def __repr__(self) -> str:
         """String representation for debugging.
@@ -433,7 +484,9 @@ class CopyOnWriteState(Generic[StateType]):
             Debug string showing modification status
         """
         status = "modified" if self._modified else "unmodified"
-        return f"CopyOnWriteState({status}, keys={list(self.keys())})"
+        with self._lock:
+            keys = list(self.keys())
+        return f"CopyOnWriteState({status}, keys={keys})"
 
 
 class EdgeType(Enum):
@@ -441,6 +494,7 @@ class EdgeType(Enum):
 
     NORMAL = "normal"
     CONDITIONAL = "conditional"
+    PARALLEL = "parallel"  # Fork into parallel branches
 
 
 class FrameworkNodeStatus(Enum):
@@ -502,18 +556,22 @@ class Edge:
 
     Attributes:
         source: Source node ID
-        target: Target node ID (or dict for conditional)
-        edge_type: Normal or conditional
+        target: Target node ID (or dict for conditional, or list for parallel)
+        edge_type: Normal, conditional, or parallel
         condition: Condition function for conditional edges
+        merge_func: Function to merge parallel branch results
+        join_node: Node ID where parallel branches converge
     """
 
     source: str
-    target: Union[str, Dict[str, str]]
+    target: Union[str, Dict[str, str], List[str]]
     edge_type: EdgeType = EdgeType.NORMAL
     condition: Optional[Callable[[Any], str]] = None
+    merge_func: Optional[Callable[[List[Any]], Any]] = None
+    join_node: Optional[str] = None
 
     def get_target(self, state: Any) -> Optional[str]:
-        """Get target node based on state.
+        """Get target node based on state (for non-parallel edges).
 
         Args:
             state: Current state
@@ -524,6 +582,10 @@ class Edge:
         if self.edge_type == EdgeType.NORMAL:
             return self.target if isinstance(self.target, str) else None
 
+        if self.edge_type == EdgeType.PARALLEL:
+            # Parallel edges return None here - use get_parallel_targets instead
+            return None
+
         if self.condition is None:
             return None
 
@@ -531,6 +593,22 @@ class Edge:
         if isinstance(self.target, dict):
             return self.target.get(branch)
         return None
+
+    def get_parallel_targets(self) -> List[str]:
+        """Get all parallel targets for a parallel edge.
+
+        Returns:
+            List of target node IDs for parallel execution
+        """
+        if self.edge_type != EdgeType.PARALLEL:
+            return []
+        if isinstance(self.target, list):
+            return self.target
+        return []
+
+    def is_parallel(self) -> bool:
+        """Check if this is a parallel edge."""
+        return self.edge_type == EdgeType.PARALLEL
 
 
 @dataclass
@@ -724,6 +802,319 @@ class RLCheckpointerAdapter:
             )
             for cp in policy_cps
         ]
+
+
+@dataclass
+class BatchingCheckpointerConfig:
+    """Configuration for BatchingCheckpointer.
+
+    Attributes:
+        batch_size: Number of checkpoints to accumulate before flushing.
+                   Default 10 balances latency vs I/O reduction.
+        flush_interval: Maximum seconds between flushes. Default 5.0.
+                       Set to None to disable time-based flushing.
+        flush_on_load: Whether to flush pending writes before load operations.
+                      Default True ensures consistency.
+        keep_latest_only: If True, only persist the latest checkpoint per thread
+                         when flushing (reduces storage). Default False.
+    """
+
+    batch_size: int = 10
+    flush_interval: Optional[float] = 5.0
+    flush_on_load: bool = True
+    keep_latest_only: bool = False
+
+
+class BatchingCheckpointer:
+    """Batching wrapper for checkpoint persistence to reduce I/O pressure.
+
+    Wraps another CheckpointerProtocol implementation and batches writes
+    to reduce the frequency of I/O operations. This is particularly useful
+    when using persistent backends (SQLite, Redis, PostgreSQL) where each
+    write incurs latency.
+
+    The StateGraph engine checkpoints after EVERY node execution. For workflows
+    with many nodes, this can become a bottleneck. BatchingCheckpointer accumulates
+    checkpoints in memory and flushes them in batches.
+
+    Features:
+        - Configurable batch size (default: 10 checkpoints)
+        - Time-based auto-flush (default: every 5 seconds)
+        - Explicit flush() for graph completion
+        - Consistent reads (optional flush before load)
+        - Latest-only mode to reduce storage
+
+    Example:
+        # Wrap a persistent checkpointer
+        sqlite_checkpointer = SQLiteCheckpointer("checkpoints.db")
+        batching = BatchingCheckpointer(
+            backend=sqlite_checkpointer,
+            config=BatchingCheckpointerConfig(
+                batch_size=20,
+                flush_interval=10.0,
+            ),
+        )
+
+        # Use with StateGraph
+        compiled = graph.compile(checkpointer=batching)
+        result = await compiled.invoke(state)
+
+        # Ensure all checkpoints are persisted
+        await batching.flush()
+
+    Thread Safety:
+        This class uses asyncio.Lock for async safety. It is safe to use
+        from multiple asyncio tasks but NOT from multiple threads.
+    """
+
+    def __init__(
+        self,
+        backend: CheckpointerProtocol,
+        config: Optional[BatchingCheckpointerConfig] = None,
+    ):
+        """Initialize batching checkpointer.
+
+        Args:
+            backend: Underlying checkpointer to write to
+            config: Batching configuration (uses defaults if None)
+        """
+        self._backend = backend
+        self._config = config or BatchingCheckpointerConfig()
+
+        # Pending checkpoints per thread: thread_id -> list of checkpoints
+        self._pending: Dict[str, List[WorkflowCheckpoint]] = {}
+
+        # Track latest checkpoint per thread for fast reads
+        self._latest: Dict[str, WorkflowCheckpoint] = {}
+
+        # Async lock for thread safety
+        self._lock = asyncio.Lock()
+
+        # Track total pending count
+        self._pending_count = 0
+
+        # Last flush time for interval-based flushing
+        self._last_flush_time = time.time()
+
+        # Background flush task (if interval-based flushing enabled)
+        self._flush_task: Optional[asyncio.Task] = None
+        self._shutdown = False
+
+    async def save(self, checkpoint: WorkflowCheckpoint) -> None:
+        """Save checkpoint to batch (may trigger flush).
+
+        Adds checkpoint to the pending batch. Automatically flushes if:
+        - Batch size is reached
+        - Flush interval has elapsed
+
+        Args:
+            checkpoint: Checkpoint to save
+        """
+        async with self._lock:
+            thread_id = checkpoint.thread_id
+
+            # Add to pending list
+            if thread_id not in self._pending:
+                self._pending[thread_id] = []
+            self._pending[thread_id].append(checkpoint)
+            self._pending_count += 1
+
+            # Update latest reference
+            self._latest[thread_id] = checkpoint
+
+            # Check if we should flush
+            should_flush = False
+
+            # Batch size trigger
+            if self._pending_count >= self._config.batch_size:
+                should_flush = True
+
+            # Time interval trigger
+            if (
+                self._config.flush_interval is not None
+                and time.time() - self._last_flush_time >= self._config.flush_interval
+            ):
+                should_flush = True
+
+            if should_flush:
+                await self._flush_unlocked()
+
+    async def load(self, thread_id: str) -> Optional[WorkflowCheckpoint]:
+        """Load latest checkpoint for thread.
+
+        Returns the most recent checkpoint, checking both pending
+        (in-memory) and persisted checkpoints.
+
+        Args:
+            thread_id: Thread identifier
+
+        Returns:
+            Latest checkpoint or None if no checkpoints exist
+        """
+        async with self._lock:
+            # Optionally flush before read for consistency
+            if self._config.flush_on_load and self._pending_count > 0:
+                await self._flush_unlocked()
+
+            # Check in-memory latest first (most recent)
+            if thread_id in self._latest:
+                return self._latest[thread_id]
+
+            # Fall back to backend
+            return await self._backend.load(thread_id)
+
+    async def list(self, thread_id: str) -> List[WorkflowCheckpoint]:
+        """List all checkpoints for thread.
+
+        Combines pending (in-memory) and persisted checkpoints,
+        sorted by timestamp.
+
+        Args:
+            thread_id: Thread identifier
+
+        Returns:
+            List of all checkpoints for the thread
+        """
+        async with self._lock:
+            # Optionally flush before read
+            if self._config.flush_on_load and self._pending_count > 0:
+                await self._flush_unlocked()
+
+            # Get persisted checkpoints
+            persisted = await self._backend.list(thread_id)
+
+            # Add any pending checkpoints not yet flushed
+            pending = self._pending.get(thread_id, [])
+
+            # Combine and sort by timestamp
+            all_checkpoints = persisted + pending
+            all_checkpoints.sort(key=lambda cp: cp.timestamp)
+
+            return all_checkpoints
+
+    async def flush(self) -> int:
+        """Flush all pending checkpoints to backend.
+
+        Call this at the end of graph execution to ensure all
+        checkpoints are persisted.
+
+        Returns:
+            Number of checkpoints flushed
+        """
+        async with self._lock:
+            return await self._flush_unlocked()
+
+    async def _flush_unlocked(self) -> int:
+        """Internal flush (must be called with lock held).
+
+        Returns:
+            Number of checkpoints flushed
+        """
+        if self._pending_count == 0:
+            return 0
+
+        flushed = 0
+
+        for thread_id, checkpoints in self._pending.items():
+            if not checkpoints:
+                continue
+
+            if self._config.keep_latest_only:
+                # Only save the latest checkpoint per thread
+                latest = checkpoints[-1]
+                await self._backend.save(latest)
+                flushed += 1
+            else:
+                # Save all pending checkpoints
+                for checkpoint in checkpoints:
+                    await self._backend.save(checkpoint)
+                    flushed += 1
+
+        # Clear pending
+        self._pending.clear()
+        self._pending_count = 0
+        self._last_flush_time = time.time()
+
+        logger.debug(f"BatchingCheckpointer flushed {flushed} checkpoints")
+        return flushed
+
+    async def start_background_flush(self) -> None:
+        """Start background flush task for interval-based flushing.
+
+        This is optional - interval-based flushing also happens
+        automatically on save() calls. Use this for long-running
+        workflows where save() calls may be infrequent.
+        """
+        if self._flush_task is not None:
+            return  # Already running
+
+        if self._config.flush_interval is None:
+            return  # Interval-based flushing disabled
+
+        self._shutdown = False
+        self._flush_task = asyncio.create_task(self._background_flush_loop())
+
+    async def stop_background_flush(self) -> None:
+        """Stop background flush task and flush remaining checkpoints."""
+        self._shutdown = True
+
+        if self._flush_task is not None:
+            self._flush_task.cancel()
+            try:
+                await self._flush_task
+            except asyncio.CancelledError:
+                pass
+            self._flush_task = None
+
+        # Final flush
+        await self.flush()
+
+    async def _background_flush_loop(self) -> None:
+        """Background loop for interval-based flushing."""
+        while not self._shutdown:
+            try:
+                await asyncio.sleep(self._config.flush_interval or 5.0)
+                if self._pending_count > 0:
+                    await self.flush()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.warning(f"Background flush error: {e}")
+
+    @property
+    def pending_count(self) -> int:
+        """Get number of pending (unflushed) checkpoints."""
+        return self._pending_count
+
+    @property
+    def backend(self) -> CheckpointerProtocol:
+        """Get the underlying backend checkpointer."""
+        return self._backend
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get batching statistics.
+
+        Returns:
+            Dictionary with stats including pending count, threads, etc.
+        """
+        return {
+            "pending_count": self._pending_count,
+            "pending_threads": len(self._pending),
+            "batch_size": self._config.batch_size,
+            "flush_interval": self._config.flush_interval,
+            "keep_latest_only": self._config.keep_latest_only,
+            "last_flush_time": self._last_flush_time,
+            "background_flush_active": self._flush_task is not None,
+        }
+
+    async def __aenter__(self) -> "BatchingCheckpointer":
+        """Async context manager entry."""
+        await self.start_background_flush()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Async context manager exit - ensures flush on completion."""
+        await self.stop_background_flush()
 
 
 # Note: GraphConfig is now imported from victor.framework.graph.config
@@ -970,6 +1361,285 @@ class NodeExecutor:
             return False, str(e), state
 
 
+@dataclass
+class ParallelBranchResult:
+    """Result from executing a single parallel branch.
+
+    Attributes:
+        branch_id: ID of the branch (target node ID)
+        success: Whether the branch executed successfully
+        state: Final state from the branch
+        error: Error message if failed
+        node_history: List of nodes executed in this branch
+    """
+
+    branch_id: str
+    success: bool
+    state: Any
+    error: Optional[str] = None
+    node_history: List[str] = field(default_factory=list)
+
+
+class ParallelBranchExecutor:
+    """Executes parallel branches of a graph concurrently (SRP: Single Responsibility).
+
+    Handles forking state into parallel branches, executing them concurrently,
+    and merging results at join nodes.
+
+    Thread-safety is guaranteed by:
+    - Each branch gets its own CopyOnWriteState wrapper
+    - CopyOnWriteState is now thread-safe (uses RLock)
+    - Results are merged atomically after all branches complete
+    """
+
+    def __init__(
+        self,
+        nodes: Dict[str, Node],
+        edges: Dict[str, List[Edge]],
+        use_copy_on_write: bool,
+    ):
+        """Initialize parallel branch executor.
+
+        Args:
+            nodes: Dictionary of all nodes
+            edges: Dictionary of all edges
+            use_copy_on_write: Whether to use copy-on-write optimization
+        """
+        self.nodes = nodes
+        self.edges = edges
+        self.use_copy_on_write = use_copy_on_write
+
+    async def execute_parallel_branches(
+        self,
+        branch_targets: List[str],
+        state: Any,
+        join_node: Optional[str],
+        merge_func: Optional[Callable[[List[Any]], Any]],
+        timeout_manager: TimeoutManager,
+        max_iterations: int = 100,
+    ) -> tuple[bool, Optional[str], Any, List[str]]:
+        """Execute multiple branches in parallel.
+
+        Each branch runs independently with its own copy of state.
+        Results are merged using the merge function at the join node.
+
+        Args:
+            branch_targets: List of node IDs to execute in parallel
+            state: Current state to fork
+            join_node: Node ID where branches converge (or None)
+            merge_func: Function to merge branch states
+            timeout_manager: Timeout manager for execution limits
+            max_iterations: Max iterations per branch
+
+        Returns:
+            Tuple of (success, error_message, merged_state, combined_node_history)
+        """
+        if not branch_targets:
+            return True, None, state, []
+
+        # Create tasks for parallel execution
+        tasks = [
+            self._execute_branch(
+                start_node=target,
+                state=copy.deepcopy(state),  # Each branch gets its own copy
+                join_node=join_node,
+                timeout_manager=timeout_manager,
+                max_iterations=max_iterations,
+            )
+            for target in branch_targets
+        ]
+
+        # Execute all branches concurrently
+        results: List[ParallelBranchResult] = await asyncio.gather(*tasks)
+
+        # Check for failures
+        failed_branches = [r for r in results if not r.success]
+        if failed_branches:
+            errors = "; ".join(
+                f"{r.branch_id}: {r.error}" for r in failed_branches
+            )
+            return False, f"Parallel branch failures: {errors}", state, []
+
+        # Merge states from all branches
+        branch_states = [r.state for r in results]
+        if merge_func:
+            try:
+                merged_state = merge_func(branch_states)
+            except Exception as e:
+                return False, f"State merge failed: {e}", state, []
+        else:
+            # Default merge: deep merge dictionaries
+            merged_state = self._default_merge(branch_states)
+
+        # Combine node histories
+        combined_history: List[str] = []
+        for result in results:
+            combined_history.extend(result.node_history)
+
+        return True, None, merged_state, combined_history
+
+    async def _execute_branch(
+        self,
+        start_node: str,
+        state: Any,
+        join_node: Optional[str],
+        timeout_manager: TimeoutManager,
+        max_iterations: int,
+    ) -> ParallelBranchResult:
+        """Execute a single branch until it reaches the join node or END.
+
+        Args:
+            start_node: Starting node for this branch
+            state: Branch's copy of state
+            join_node: Node where branch should stop (join point)
+            timeout_manager: Timeout manager
+            max_iterations: Maximum iterations for this branch
+
+        Returns:
+            ParallelBranchResult with execution outcome
+        """
+        current_node = start_node
+        node_history: List[str] = []
+        iterations = 0
+
+        node_executor = NodeExecutor(
+            nodes=self.nodes,
+            use_copy_on_write=self.use_copy_on_write,
+        )
+
+        try:
+            while current_node != END and iterations < max_iterations:
+                # Stop at join node (don't execute it - main loop will)
+                if join_node and current_node == join_node:
+                    break
+
+                # Check timeout
+                if timeout_manager.is_expired():
+                    return ParallelBranchResult(
+                        branch_id=start_node,
+                        success=False,
+                        state=state,
+                        error="Branch timeout",
+                        node_history=node_history,
+                    )
+
+                # Execute node
+                success, error, state = await node_executor.execute(
+                    node_id=current_node,
+                    state=state,
+                    timeout_manager=timeout_manager,
+                )
+
+                if not success:
+                    return ParallelBranchResult(
+                        branch_id=start_node,
+                        success=False,
+                        state=state,
+                        error=error,
+                        node_history=node_history,
+                    )
+
+                node_history.append(current_node)
+                iterations += 1
+
+                # Get next node
+                current_node = self._get_next_node(current_node, state)
+
+            return ParallelBranchResult(
+                branch_id=start_node,
+                success=True,
+                state=state,
+                node_history=node_history,
+            )
+
+        except Exception as e:
+            return ParallelBranchResult(
+                branch_id=start_node,
+                success=False,
+                state=state,
+                error=str(e),
+                node_history=node_history,
+            )
+
+    def _get_next_node(self, current_node: str, state: Any) -> str:
+        """Determine next node for a branch.
+
+        Args:
+            current_node: Current node ID
+            state: Current state
+
+        Returns:
+            Next node ID or END
+        """
+        edges = self.edges.get(current_node, [])
+        if not edges:
+            return END
+
+        for edge in edges:
+            # Skip parallel edges in branch execution
+            if edge.is_parallel():
+                continue
+            target = edge.get_target(state)
+            if target:
+                return target
+
+        return END
+
+    def _default_merge(self, states: List[Any]) -> Any:
+        """Default state merge strategy: deep merge dictionaries.
+
+        Later states override earlier ones for conflicting keys.
+        Lists are concatenated, dicts are recursively merged.
+
+        Args:
+            states: List of states to merge
+
+        Returns:
+            Merged state
+        """
+        if not states:
+            return {}
+
+        if len(states) == 1:
+            return states[0]
+
+        result = copy.deepcopy(states[0])
+
+        for state in states[1:]:
+            if isinstance(state, dict) and isinstance(result, dict):
+                result = self._deep_merge_dicts(result, state)
+            else:
+                # Non-dict states: last one wins
+                result = state
+
+        return result
+
+    def _deep_merge_dicts(
+        self, base: Dict[str, Any], override: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Recursively merge two dictionaries.
+
+        Args:
+            base: Base dictionary
+            override: Dictionary to merge on top
+
+        Returns:
+            Merged dictionary
+        """
+        result = copy.deepcopy(base)
+
+        for key, value in override.items():
+            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+                result[key] = self._deep_merge_dicts(result[key], value)
+            elif key in result and isinstance(result[key], list) and isinstance(value, list):
+                # Concatenate lists
+                result[key] = result[key] + value
+            else:
+                result[key] = copy.deepcopy(value)
+
+        return result
+
+
 class GraphCheckpointManager:
     """Manages state checkpointing for graph workflows (SRP: Single Responsibility).
 
@@ -1163,6 +1833,55 @@ class GraphEventEmitter:
             )
         except Exception as e:
             logger.debug(f"Failed to emit graph_error event: {e}")
+
+    def emit_parallel_start(
+        self, source_node: str, branch_count: int, branch_targets: List[str]
+    ):
+        """Emit parallel execution start event."""
+        if not self.emit_events:
+            return
+
+        try:
+            from victor.core.events import get_observability_bus as get_event_bus
+
+            bus = get_event_bus()
+            bus.emit_lifecycle_event(
+                "parallel_start",
+                {
+                    "graph_id": self.graph_id,
+                    "source": "StateGraph",
+                    "source_node": source_node,
+                    "branch_count": branch_count,
+                    "branch_targets": branch_targets,
+                },
+            )
+        except Exception as e:
+            logger.debug(f"Failed to emit parallel_start event: {e}")
+
+    def emit_parallel_complete(
+        self, source_node: str, branch_count: int, success: bool, duration: float
+    ):
+        """Emit parallel execution complete event."""
+        if not self.emit_events:
+            return
+
+        try:
+            from victor.core.events import get_observability_bus as get_event_bus
+
+            bus = get_event_bus()
+            bus.emit_lifecycle_event(
+                "parallel_complete",
+                {
+                    "graph_id": self.graph_id,
+                    "source": "StateGraph",
+                    "source_node": source_node,
+                    "branch_count": branch_count,
+                    "success": success,
+                    "duration": duration,
+                },
+            )
+        except Exception as e:
+            logger.debug(f"Failed to emit parallel_complete event: {e}")
 
 
 class CompiledGraph(Generic[StateType]):
@@ -1429,8 +2148,69 @@ class CompiledGraph(Generic[StateType]):
                         node_history=node_history,
                     )
 
-                # Get next node
-                current_node = self._get_next_node(current_node, state)
+                # Check for parallel edges and execute branches concurrently
+                parallel_edge = self._get_parallel_edge(current_node)
+                if parallel_edge:
+                    parallel_executor = ParallelBranchExecutor(
+                        nodes=self._nodes,
+                        edges=self._edges,
+                        use_copy_on_write=use_cow,
+                    )
+
+                    branch_targets = parallel_edge.get_parallel_targets()
+                    logger.debug(
+                        f"Executing parallel branches: {branch_targets} "
+                        f"(join: {parallel_edge.join_node})"
+                    )
+
+                    # Emit parallel execution start event
+                    event_emitter.emit_parallel_start(
+                        source_node=current_node,
+                        branch_count=len(branch_targets),
+                        branch_targets=branch_targets,
+                    )
+
+                    parallel_start_time = time.time()
+                    (
+                        parallel_success,
+                        parallel_error,
+                        state,
+                        branch_history,
+                    ) = await parallel_executor.execute_parallel_branches(
+                        branch_targets=branch_targets,
+                        state=state,
+                        join_node=parallel_edge.join_node,
+                        merge_func=parallel_edge.merge_func,
+                        timeout_manager=timeout_manager,
+                        max_iterations=exec_config.execution.max_iterations,
+                    )
+
+                    # Emit parallel execution complete event
+                    event_emitter.emit_parallel_complete(
+                        source_node=current_node,
+                        branch_count=len(branch_targets),
+                        success=parallel_success,
+                        duration=time.time() - parallel_start_time,
+                    )
+
+                    if not parallel_success:
+                        return GraphExecutionResult(
+                            state=state,
+                            success=False,
+                            error=parallel_error,
+                            iterations=iteration_controller.iterations,
+                            duration=timeout_manager.get_elapsed(),
+                            node_history=node_history,
+                        )
+
+                    # Add branch histories to main history
+                    node_history.extend(branch_history)
+
+                    # Continue from join node or END
+                    current_node = parallel_edge.join_node or END
+                else:
+                    # Get next node (normal or conditional edge)
+                    current_node = self._get_next_node(current_node, state)
 
             # Emit RL event for successful completion
             self._emit_graph_completed_event(
@@ -1510,6 +2290,21 @@ class CompiledGraph(Generic[StateType]):
             return edges[0].target if isinstance(edges[0].target, str) else END
 
         return END
+
+    def _get_parallel_edge(self, current_node: str) -> Optional[Edge]:
+        """Get parallel edge from current node if one exists.
+
+        Args:
+            current_node: Current node ID
+
+        Returns:
+            Parallel edge if found, None otherwise
+        """
+        edges = self._edges.get(current_node, [])
+        for edge in edges:
+            if edge.is_parallel():
+                return edge
+        return None
 
     async def _save_checkpoint(
         self,
@@ -1752,6 +2547,61 @@ class StateGraph(Generic[StateType]):
         logger.debug(f"Added conditional edge: {source} -> {list(branches.values())}")
         return self
 
+    def add_parallel_edges(
+        self,
+        source: str,
+        targets: List[str],
+        join_node: Optional[str] = None,
+        merge_func: Optional[Callable[[List[StateType]], StateType]] = None,
+    ) -> "StateGraph[StateType]":
+        """Add parallel edges that fork execution into concurrent branches.
+
+        Creates a fork point where execution splits into multiple parallel branches.
+        Each branch executes independently with its own copy of state.
+        Branches converge at the optional join node where states are merged.
+
+        Args:
+            source: Source node ID (fork point)
+            targets: List of target node IDs to execute in parallel
+            join_node: Optional node ID where branches converge.
+                      If specified, all branches stop at this node and
+                      the main execution continues from here after merging.
+            merge_func: Optional function to merge branch states.
+                       Signature: (List[StateType]) -> StateType
+                       Default: deep merge dictionaries, concatenate lists
+
+        Returns:
+            Self for chaining
+
+        Example:
+            # Fork into three parallel branches, join at "aggregate"
+            graph.add_parallel_edges(
+                "start",
+                ["branch_a", "branch_b", "branch_c"],
+                join_node="aggregate",
+                merge_func=lambda states: {"results": [s["result"] for s in states]}
+            )
+
+            # Or without explicit join (branches run to END independently)
+            graph.add_parallel_edges("fork", ["task1", "task2"])
+        """
+        if source not in self._edges:
+            self._edges[source] = []
+
+        if len(targets) < 2:
+            raise ValueError("Parallel edges require at least 2 targets")
+
+        edge = Edge(
+            source=source,
+            target=targets,
+            edge_type=EdgeType.PARALLEL,
+            merge_func=merge_func,
+            join_node=join_node,
+        )
+        self._edges[source].append(edge)
+        logger.debug(f"Added parallel edges: {source} -> {targets} (join: {join_node})")
+        return self
+
     def set_entry_point(self, node_id: str) -> "StateGraph[StateType]":
         """Set the entry point node.
 
@@ -1875,6 +2725,12 @@ class StateGraph(Generic[StateType]):
                     to_visit.append(edge.target)
                 elif isinstance(edge.target, dict):
                     to_visit.extend(edge.target.values())
+                elif isinstance(edge.target, list):
+                    # Parallel edges: all targets are reachable
+                    to_visit.extend(edge.target)
+                    # Also add join node if specified
+                    if edge.join_node:
+                        to_visit.append(edge.join_node)
 
         return reachable
 

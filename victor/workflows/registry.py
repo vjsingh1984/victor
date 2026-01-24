@@ -57,7 +57,7 @@ class WorkflowMetadata:
     total_budget: int = 0
     tags: Set[str] = field(default_factory=set)
     created_at: datetime = field(default_factory=datetime.now)
-    version: str = "1.0.0"
+    version: str = "0.5.0"
 
     @classmethod
     def from_definition(cls, defn: WorkflowDefinition) -> "WorkflowMetadata":
@@ -68,7 +68,7 @@ class WorkflowMetadata:
             agent_count=defn.get_agent_count(),
             total_budget=defn.get_total_budget(),
             tags=set(defn.metadata.get("tags", [])),
-            version=defn.metadata.get("version", "1.0.0"),
+            version=defn.metadata.get("version", "0.5.0"),
         )
 
     def to_dict(self) -> Dict[str, Any]:

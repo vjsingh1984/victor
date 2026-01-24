@@ -1,4 +1,4 @@
-# Victor AI 0.5.1 Configuration Reference
+# Victor AI 0.5.0 Configuration Reference
 
 Complete reference for all configuration options in Victor AI.
 

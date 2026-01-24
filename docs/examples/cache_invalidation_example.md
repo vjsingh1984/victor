@@ -207,7 +207,7 @@ extensions:
 
 metadata:
   name: myvertical
-  version: "1.0.0"
+  version: "0.5.0"
   description: "My custom vertical with middleware"
 
 core:

@@ -61,7 +61,7 @@ This documentation package provides a comprehensive summary of the Victor AI ref
 ### 2. Roadmap
 
 #### roadmap/future_roadmap.md (22KB)
-**Purpose**: Detailed roadmap from 75% to 100% completion (v1.0.0)
+**Purpose**: Detailed roadmap from 75% to 100% completion (v0.5.0)
 **Audience**: Project managers, developers
 **Contents**:
 - Phase 1: Core Completion (2 weeks)
@@ -73,7 +73,7 @@ This documentation package provides a comprehensive summary of the Victor AI ref
 - Resource allocation
 
 **Key Highlights**:
-- 8 weeks to v1.0.0
+- 8 weeks to v0.5.0
 - 33 prioritized items
 - Clear dependencies
 - Resource budget: $105,600
@@ -284,7 +284,7 @@ This documentation package provides a comprehensive summary of the Victor AI ref
 
 ### Long-Term (8 Weeks)
 
-1. **Reach v1.0.0**
+1. **Reach v0.5.0**
    - Complete all phases
    - 90%+ test coverage
    - Production hardened
@@ -316,7 +316,7 @@ This documentation package represents a comprehensive record of the Victor AI re
 
 **Status**: ✅ Complete
 **Quality**: Professional
-**Recommendation**: Approve and proceed with v1.0.0 roadmap
+**Recommendation**: Approve and proceed with v0.5.0 roadmap
 
 ---
 

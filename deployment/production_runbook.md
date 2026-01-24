@@ -78,7 +78,7 @@ For most deployments, use the blue-green strategy for zero downtime:
 ```bash
 ./deployment/scripts/deploy_production.sh \
   --environment production \
-  --image-tag v1.0.0 \
+  --image-tag v0.5.0 \
   --strategy blue-green
 ```
 
@@ -125,7 +125,7 @@ Test deployment without making changes:
 ```bash
 ./deployment/scripts/deploy_production.sh \
   --environment production \
-  --image-tag v1.0.0 \
+  --image-tag v0.5.0 \
   --dry-run
 ```
 
@@ -628,7 +628,7 @@ Rollback immediately if:
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0.0 | 2024-01-21 | Initial production runbook |
+| 0.5.0 | 2024-01-21 | Initial production runbook |
 
 ---
 
@@ -638,7 +638,7 @@ Rollback immediately if:
 
 ```bash
 # Quick deployment
-./deployment/scripts/deploy_production.sh --environment production --image-tag v1.0.0
+./deployment/scripts/deploy_production.sh --environment production --image-tag v0.5.0
 
 # Quick rollback
 ./deployment/scripts/rollback_production.sh production

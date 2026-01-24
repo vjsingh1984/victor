@@ -1,6 +1,6 @@
 # Legacy API Migration Guide
 
-**Version**: 0.5.1
+**Version**: 0.5.0
 **Removal Target**: v0.7.0
 **Status**: Active Migration Period
 
@@ -543,11 +543,11 @@ pytest tests/ -W default::DeprecationWarning 2>&1 | grep -c "DeprecationWarning"
 
 | Version | Milestone | Action Required |
 |---------|-----------|-----------------|
-| v0.5.1 | Deprecation | Warnings issued for all legacy APIs |
+| v0.5.0 | Deprecation | Warnings issued for all legacy APIs |
 | v0.6.0 | Soft Removal | LegacyAPIMixin marked for removal |
 | v0.7.0 | Hard Removal | LegacyAPIMixin and all deprecated methods removed |
 
-**Migration Period**: v0.5.1 - v0.7.0 (approximately 4-6 months)
+**Migration Period**: v0.5.0 - v0.7.0 (approximately 4-6 months)
 
 **Recommendation**: Complete migration by v0.6.0 to allow testing buffer.
 

@@ -53,7 +53,7 @@ class TestHelperFunctions:
 
     def test_version_satisfies_less_than(self):
         """Test version constraint checking."""
-        assert _version_satisfies("1.0.0", "<2.0.0") is True
+        assert _version_satisfies("0.5.0", "<2.0.0") is True
         assert _version_satisfies("2.0.0", "<2.0.0") is False
         assert _version_satisfies("2.5.0", "<2.0.0") is False
 
@@ -166,7 +166,7 @@ class TestDependencySecurity:
         mock_packages = [
             {"name": "django", "version": "2.2.0"},
             {"name": "pillow", "version": "8.0.0"},
-            {"name": "safe-package", "version": "1.0.0"},
+            {"name": "safe-package", "version": "0.5.0"},
         ]
 
         with patch(
@@ -183,7 +183,7 @@ class TestDependencySecurity:
     async def test_dependency_security_all_safe(self):
         """Test security check with no vulnerabilities."""
         mock_packages = [
-            {"name": "safe-package-1", "version": "1.0.0"},
+            {"name": "safe-package-1", "version": "0.5.0"},
             {"name": "safe-package-2", "version": "2.0.0"},
         ]
 

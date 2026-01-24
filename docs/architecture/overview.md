@@ -1,606 +1,331 @@
 # Victor Architecture Overview
 
-This document provides a comprehensive overview of Victor's architecture, covering high-level design, core components, key patterns, data flow, and extension points.
+Victor is a provider-agnostic AI coding assistant built with **protocol-based design**, **event-driven communication**, and a **two-layer coordinator architecture**.
 
-## Table of Contents
+## Quick Stats
 
-- [High-Level Architecture](#high-level-architecture)
-- [Core Components](#core-components)
-- [Key Patterns](#key-patterns)
-- [Data Flow](#data-flow)
-- [Extension Points](#extension-points)
-- [Design Principles](#design-principles)
-- [Related Documentation](#related-documentation)
+| Metric | Value |
+|--------|-------|
+| **Providers** | 21 (cloud + local) |
+| **Tools** | 55+ specialized tools |
+| **Verticals** | 5 domain verticals |
+| **Protocols** | 98 protocols |
+| **Coordinators** | 20 (10 app + 10 framework) |
+| **Test Coverage** | 92.13% |
+| **Services** | 55+ in DI container |
 
----
-
-## High-Level Architecture
-
-Victor is a provider-agnostic AI coding assistant supporting 21 LLM providers with 55+ specialized tools across 6 domain verticals. The architecture follows a layered design with clear separation of concerns.
-
-### System Architecture Diagram
-
-```
-+-------------------------------------------------------------------------+
-|                              CLIENTS                                      |
-|   +----------+    +-----------+    +-----------+    +------------+       |
-|   | CLI/TUI  |    | VS Code   |    |MCP Server |    | API Server |       |
-|   +----+-----+    | (HTTP)    |    +-----+-----+    +-----+------+       |
-|        |          +-----+-----+          |                |              |
-+--------|----------------|----------------|----------------|---------------+
-         |                |                |                |
-         v                v                v                v
-+-------------------------------------------------------------------------+
-|                     AGENT ORCHESTRATOR (Facade)                          |
-|                                                                          |
-|   Delegates to:                                                          |
-|   +---------------------+  +---------------+  +-------------------+      |
-|   |ConversationController|  | ToolPipeline |  |StreamingController|      |
-|   +---------------------+  +---------------+  +-------------------+      |
-|   +---------------+  +---------------+  +-----------------+              |
-|   |ProviderManager|  | ToolRegistrar |  |  TaskAnalyzer   |              |
-|   +---------------+  +---------------+  +-----------------+              |
-+-----------------------------+--------------------------------------------+
-                              |
-         +--------------------+--------------------+
-         |                    |                    |
-         v                    v                    v
-+----------------+   +----------------+   +-------------------+
-|   PROVIDERS    |   |     TOOLS      |   |    WORKFLOWS      |
-|      (21)      |   |      (55+)     |   |    StateGraph     |
-|                |   |                |   |    + YAML         |
-| - Anthropic    |   | - File Ops     |   |                   |
-| - OpenAI       |   | - Git          |   | +---------------+ |
-| - Google       |   | - Shell        |   | |UnifiedCompiler| |
-| - Ollama       |   | - Web          |   | +---------------+ |
-| - DeepSeek     |   | - Search       |   |                   |
-| - 16 more...   |   | - Analysis     |   | +---------------+ |
-+----------------+   +----------------+   | |WorkflowEngine | |
-                                          | +---------------+ |
-         +--------------------------------+-------------------+
-         |
-         v
-+-------------------------------------------------------------------------+
-|                           VERTICALS (6)                                  |
-|                                                                          |
-|   +----------+  +----------+  +------+  +-------------+  +----------+   |
-|   |  Coding  |  | DevOps   |  | RAG  |  |DataAnalysis |  | Research |   |
-|   +----------+  +----------+  +------+  +-------------+  +----------+   |
-|   +------------+                                                         |
-|   | Benchmark  |                                                         |
-|   +------------+                                                         |
-+-------------------------------------------------------------------------+
-```
-
-### Mermaid Diagram
+## System Architecture
 
 ```mermaid
-flowchart TB
-    subgraph Clients["CLIENTS"]
-        CLI["CLI/TUI"]
-        HTTP["HTTP API"]
-        MCP["MCP Server"]
-        VSCODE["VS Code Extension"]
-    end
-
-    subgraph Orchestrator["AGENT ORCHESTRATOR (Facade)"]
-        ORC["AgentOrchestrator"]
-        CC["ConversationController"]
-        TP["ToolPipeline"]
-        SC["StreamingController"]
-        PM["ProviderManager"]
-        TR["ToolRegistrar"]
-    end
-
-    subgraph Providers["PROVIDERS (21)"]
-        ANT["Anthropic"]
-        OAI["OpenAI"]
-        GGL["Google"]
-        OLL["Ollama"]
-        MORE["..."]
-    end
-
-    subgraph Tools["TOOLS (55+)"]
-        FILE["File Ops"]
-        GIT["Git"]
-        SHELL["Shell"]
-        WEB["Web"]
-        SEARCH["Search"]
-    end
-
-    subgraph Workflows["WORKFLOWS"]
-        SG["StateGraph DSL"]
-        YAML["YAML Workflows"]
-        UC["UnifiedCompiler"]
-    end
-
-    subgraph Verticals["VERTICALS (6)"]
-        COD["Coding"]
-        DEV["DevOps"]
-        RAG["RAG"]
-        DATA["Data Analysis"]
-        RES["Research"]
-        BENCH["Benchmark"]
-    end
-
-    Clients --> Orchestrator
-    ORC --> CC
-    ORC --> TP
-    ORC --> SC
-    ORC --> PM
-    ORC --> TR
-    Orchestrator --> Providers
-    Orchestrator --> Tools
-    Orchestrator --> Workflows
-    Orchestrator --> Verticals
-
-    style Clients fill:#e0e7ff,stroke:#4f46e5
-    style Orchestrator fill:#d1fae5,stroke:#10b981
-    style Providers fill:#fef3c7,stroke:#f59e0b
-    style Tools fill:#cffafe,stroke:#06b6d4
-    style Workflows fill:#fce7f3,stroke:#ec4899
-    style Verticals fill:#f3e8ff,stroke:#a855f7
+graph TB
+    Clients[CLI/TUI, HTTP, MCP] --> Container[ServiceContainer<br/>55+ Services]
+    Container --> Orchestrator[AgentOrchestrator<br/>Facade]
+    Orchestrator --> Coordinators[20 Coordinators]
+    Coordinators --> Providers[21 Providers]
+    Coordinators --> Tools[55+ Tools]
+    Coordinators --> Workflows[StateGraph + YAML]
+    Coordinators --> Verticals[5 Verticals]
+    Coordinators --> Events[EventBus<br/>5 Backends]
 ```
 
----
+## Two-Layer Coordinator Design
 
-## Core Components
+### Application Layer (`victor/agent/coordinators/`)
+Victor-specific business logic:
 
-### AgentOrchestrator
+| Coordinator | Responsibility |
+|-------------|---------------|
+| ChatCoordinator | LLM chat operations, streaming |
+| ToolCoordinator | Tool validation, budgeting, execution |
+| ContextCoordinator | Context management, compaction |
+| PromptCoordinator | System prompt building |
+| SessionCoordinator | Conversation lifecycle |
+| ProviderCoordinator | Provider switching |
+| ModeCoordinator | Agent modes (build, plan, explore) |
 
-**Location:** `victor/agent/orchestrator.py`
+### Framework Layer (`victor/framework/coordinators/`)
+Domain-agnostic infrastructure:
 
-The AgentOrchestrator is the central **Facade** that coordinates all other components. It acts as a thin coordination layer, delegating work to specialized components.
+| Coordinator | Responsibility |
+|-------------|---------------|
+| YAMLWorkflowCoordinator | YAML workflow loading/execution |
+| GraphExecutionCoordinator | StateGraph execution/routing |
+| HITLCoordinator | Human-in-the-loop workflows |
+| CacheCoordinator | Workflow caching/invalidation |
 
-**Responsibilities:**
-- High-level chat flow coordination
-- Configuration loading and validation
-- Session lifecycle management
-- Provider/model switching hooks
+**Benefits**: Single responsibility, clear boundaries, reusability across verticals, independent testing.
 
-**Key Methods:**
-- `run()` - Main entry point for chat sessions
-- `process_message()` - Handle single message processing
-- `cancel()` - Graceful cancellation of operations
+## Protocol-Based Design
+
+Victor uses **98 protocols** for loose coupling:
 
 ```python
-from victor.agent.orchestrator import AgentOrchestrator
+from victor.agent.protocols import ToolExecutorProtocol
+from victor.core.container import ServiceContainer
 
-orchestrator = AgentOrchestrator(
-    provider_name="anthropic",
-    model="claude-sonnet-4-5",
-    settings=settings,
+container = ServiceContainer()
+executor = container.get(ToolExecutorProtocol)
+```
+
+### Key Protocol Categories
+- **Provider**: `ProviderProtocol`, `StreamProtocol`
+- **Tool**: `ToolProtocol`, `ToolExecutorProtocol`
+- **Coordinator**: `ChatCoordinatorProtocol`, `ToolCoordinatorProtocol`
+- **Service**: `RegistryProtocol`, `CacheProtocol`, `MetricsProtocol`
+
+## Dependency Injection
+
+**ServiceContainer** manages 55+ services:
+
+| Lifetime | Description | Use Cases |
+|----------|-------------|-----------|
+| Singleton | One instance for app lifetime | Stateless services |
+| Scoped | One instance per scope | Session-specific state |
+| Transient | New instance each get | Rarely used |
+
+```python
+container.register(
+    ToolRegistryProtocol,
+    lambda c: ToolRegistry(),
+    ServiceLifetime.SINGLETON,
 )
-result = await orchestrator.process_message("Analyze this code")
 ```
 
-### ConversationController
+## Event-Driven Architecture
 
-**Location:** `victor/agent/conversation_controller.py`
+**5 pluggable event backends** for async communication:
 
-Manages the conversation state, message history, and context tracking throughout a session.
+| Backend | Best For | Delivery |
+|---------|----------|----------|
+| In-Memory | Single-instance, low latency | None (lossy) |
+| Kafka | Distributed, high throughput | Exactly-once |
+| SQS | Serverless, managed | At-least-once |
+| RabbitMQ | Reliable messaging | At-least-once |
+| Redis | Fast, simple | At-least-once |
 
-**Responsibilities:**
-- Message history management
-- Context window tracking
-- Stage-based state transitions
-- Context retrieval for prompts
+### Event Topics
+```
+tool.start         # Tool execution started
+tool.complete      # Tool execution completed
+tool.error         # Tool execution failed
+agent.message      # Agent message sent
+workflow.start     # Workflow started
+workflow.complete  # Workflow completed
+```
 
-**Key Methods:**
-- `add_message()` - Add message to history
-- `get_context()` - Retrieve conversation context
-- `get_stage()` - Get current conversation stage
+## Providers
 
-### ToolPipeline
+### Cloud (17)
+Anthropic, OpenAI, Google, Azure, AWS Bedrock, xAI, DeepSeek, Mistral, Cohere, Groq, Together AI, Fireworks AI, OpenRouter, Replicate, Hugging Face, Moonshot, Cerebras
 
-**Location:** `victor/agent/tool_pipeline.py`
+### Local (4)
+Ollama, LM Studio, vLLM, llama.cpp
 
-Handles tool validation, selection, and execution with budget enforcement.
-
-**Responsibilities:**
-- Tool validation against schemas
-- Tool execution coordination
-- Budget tracking and enforcement
-- Result processing and formatting
-
-**Key Methods:**
-- `execute()` - Execute a tool call
-- `validate()` - Validate tool parameters
-- `get_available_tools()` - List tools for current context
-
-### ProviderManager
-
-**Location:** `victor/agent/provider_manager.py`
-
-Manages LLM provider initialization, switching, health checks, and fallback strategies.
-
-**Responsibilities:**
-- Provider initialization
-- Mid-conversation provider switching
-- Health monitoring and circuit breaker
-- Fallback provider selection
-
-**Key Methods:**
-- `get_provider()` - Get current provider instance
-- `switch()` - Switch to different provider/model
-- `check_health()` - Provider health check
-
-### ServiceProvider
-
-**Location:** `victor/agent/service_provider.py`
-
-Implements dependency injection for component management.
-
-**Responsibilities:**
-- Component registration and resolution
-- Lifecycle management
-- Singleton pattern enforcement
-
+### Provider Interface
 ```python
-from victor.agent.service_provider import ServiceProvider
-
-provider = ServiceProvider()
-tool_registry = provider.resolve(ToolRegistry)
+class BaseProvider(Protocol):
+    def chat(self, messages: List[Message]) -> ChatResponse: ...
+    async def stream_chat(self, messages: List[Message]) -> AsyncIterator[StreamChunk]: ...
+    def supports_tools(self) -> bool: ...
+    @property
+    def name(self) -> str: ...
 ```
 
-### ToolRegistrar
+## Tools
 
-**Location:** `victor/agent/tool_registrar.py`
+| Category | Tools | Examples |
+|----------|-------|----------|
+| File Operations | 8 | read, write, edit, grep |
+| Git Operations | 6 | clone, commit, push, status |
+| Testing | 5 | run_tests, coverage, lint |
+| Web Tools | 4 | search, scrape, fetch |
+| Analysis | 12 | complexity, refactor, review |
 
-Handles dynamic tool discovery, registration, and plugin integration.
-
-**Responsibilities:**
-- Default tool registration
-- Plugin discovery and loading
-- MCP (Model Context Protocol) integration
-- Tool filtering and selection
-
----
-
-## Key Patterns
-
-### Facade Pattern (Orchestrator)
-
-The AgentOrchestrator implements the Facade pattern, providing a simplified interface to the complex subsystem of components.
-
-```
-                    +-------------------+
-     User Request   |                   |
-    --------------> | AgentOrchestrator |
-                    |     (Facade)      |
-                    +--------+----------+
-                             |
-         +-------------------+-------------------+
-         |                   |                   |
-         v                   v                   v
-+------------------+ +---------------+ +-----------------+
-|Conversation      | | ToolPipeline  | | ProviderManager |
-|Controller        | |               | |                 |
-+------------------+ +---------------+ +-----------------+
-```
-
-**Benefits:**
-- Simplified client interaction
-- Reduced coupling between subsystems
-- Easy to swap implementations
-
-### Protocol-Based Design (ISP Compliance)
-
-Victor uses Python Protocols for interface segregation, ensuring components depend only on what they need.
-
+### Tool Interface
 ```python
-# victor/agent/subagents/protocols.py
-class SubAgentContext(Protocol):
-    """Minimal interface for SubAgent dependencies."""
-
-    @property
-    def settings(self) -> Any: ...
-
-    @property
-    def provider_name(self) -> str: ...
-
-    @property
-    def model(self) -> str: ...
-
-    @property
-    def tool_registry(self) -> Any: ...
+class BaseTool(Protocol):
+    name: str
+    description: str
+    parameters: dict  # JSON Schema
+    cost_tier: CostTier
+    async def execute(self, **kwargs) -> ToolResult: ...
 ```
 
-**Key Protocols:**
-- `SubAgentContext` - ISP-compliant SubAgent dependencies
-- `CapabilityRegistryProtocol` - Capability discovery
-- `OrchestratorVerticalProtocol` - Vertical integration
-- `StepHandlerProtocol` - Handler substitutability
+## Workflows
 
-### YAML-First Configuration
+### StateGraph DSL
+```python
+from victor.framework import StateGraph, START, END
 
-Workflows and configurations prefer YAML for structure with Python escape hatches for complex logic.
+graph = StateGraph(AgentState)
+graph.add_node("analyze", analyze_fn)
+graph.add_conditional_edges("analyze", should_continue)
+compiled = graph.compile()
+```
 
+### YAML Workflows
 ```yaml
-# victor/{vertical}/workflows/example.yaml
-workflows:
-  example_workflow:
-    nodes:
-      - id: start
-        type: agent
-        role: analyzer
-        goal: "Analyze the input"
-        next: [process]
-
-      - id: process
-        type: compute
-        handler: process_data  # Python escape hatch
-        next: [check_quality]
-
-      - id: check_quality
-        type: condition
-        condition: "quality_check"  # Python function
-        branches:
-          "pass": complete
-          "fail": retry
+name: code_review
+nodes:
+  - id: analyze
+    type: agent
+    provider: anthropic
+    tools: [read, grep]
+  - id: review
+    type: agent
+    depends_on: [analyze]
 ```
 
-### Vertical Architecture
+## Verticals
 
-Self-contained domain modules that encapsulate tools, prompts, workflows, and configurations.
+| Vertical | Focus | Tools |
+|----------|-------|-------|
+| Coding | Code analysis, refactoring, testing | 15 tools |
+| DevOps | Docker, Kubernetes, CI/CD | 12 tools |
+| RAG | Document search, retrieval, Q&A | 8 tools |
+| Data Analysis | Pandas, visualization, statistics | 10 tools |
+| Research | Literature search, synthesis | 8 tools |
 
-```
-victor/{vertical}/
-    __init__.py           # Vertical class definition
-    assistant.py          # Main VerticalBase implementation
-    safety.py             # Safety patterns
-    prompts.py            # Domain-specific prompts
-    escape_hatches.py     # YAML workflow conditions
-    workflows/
-        __init__.py
-        workflow.yaml
-```
-
----
-
-## Data Flow
-
-### Request Processing Flow
-
-```
-+--------+    +-------------+    +----------+    +-------+    +--------+
-|  User  |--->| Orchestrator|--->| Provider |--->| LLM   |--->| Tools  |
-+--------+    +-------------+    +----------+    +-------+    +--------+
-                    |                                ^             |
-                    |                                |             |
-                    +--------------------------------+-------------+
-                              Tool Results
-```
-
-### Detailed Sequence
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant O as Orchestrator
-    participant TS as ToolSelector
-    participant P as Provider
-    participant LLM as LLM API
-    participant T as Tools
-
-    U->>O: User Query
-    O->>TS: Select relevant tools
-    TS-->>O: Tool list
-    O->>P: Send query + tools
-    P->>LLM: API call
-    LLM-->>P: Tool call request
-    P-->>O: Parse tool calls
-    O->>T: Execute tool(s)
-    T-->>O: Tool results
-    O->>P: Send results
-    P->>LLM: Continue
-    LLM-->>P: Final response
-    P-->>O: Response
-    O-->>U: Display response
-```
-
-### Data Flow by Layer
-
-| Layer | Input | Output | Components |
-|-------|-------|--------|------------|
-| **Client** | User input | Displayed response | CLI/TUI, HTTP, MCP |
-| **Orchestrator** | Message | Structured response | Orchestrator, Controllers |
-| **Provider** | Messages + Tools | Completion/Tool calls | ProviderManager, Adapters |
-| **Tool** | Tool parameters | Execution result | ToolPipeline, Tools |
-| **Vertical** | Context | Domain config | VerticalLoader, Extensions |
-
----
-
-## Extension Points
-
-### Custom Providers
-
-Create new LLM providers by inheriting from `BaseProvider`.
-
-**Location:** `victor/providers/base.py`
-
-```python
-from victor.providers.base import BaseProvider, ChatResponse
-
-class MyProvider(BaseProvider):
-    @property
-    def name(self) -> str:
-        return "my_provider"
-
-    async def chat(self, messages, tools=None, **kwargs) -> ChatResponse:
-        # Implementation
-        ...
-
-    async def stream_chat(self, messages, tools=None, **kwargs):
-        # Streaming implementation
-        ...
-
-    def supports_tools(self) -> bool:
-        return True
-```
-
-**Registration:**
-```python
-# victor/providers/registry.py
-from victor.providers.registry import ProviderRegistry
-ProviderRegistry.register("my_provider", MyProvider)
-```
-
-### Custom Tools
-
-Create new tools by inheriting from `BaseTool`.
-
-**Location:** `victor/tools/base.py`
-
-```python
-from victor.tools.base import BaseTool, CostTier, ToolResult
-
-class MyTool(BaseTool):
-    name = "my_tool"
-    description = "Does something useful"
-    cost_tier = CostTier.LOW
-
-    parameters = {
-        "type": "object",
-        "properties": {
-            "input": {"type": "string", "description": "Input parameter"}
-        },
-        "required": ["input"]
-    }
-
-    async def execute(self, **kwargs) -> ToolResult:
-        # Implementation
-        return ToolResult(success=True, data={"result": "..."})
-```
-
-### Custom Verticals
-
-Create domain-specific assistants by inheriting from `VerticalBase`.
-
-**Location:** `victor/core/verticals/base.py`
-
+### Vertical Extension
 ```python
 from victor.core.verticals import VerticalBase
 
-class SecurityAssistant(VerticalBase):
+class SecurityVertical(VerticalBase):
     name = "security"
-    description = "Security analysis assistant"
 
     @classmethod
-    def get_tools(cls) -> list[str]:
-        return ["read", "grep", "shell", "web_search"]
+    def get_tools(cls) -> List[BaseTool]:
+        return [security_scan, vulnerability_check]
 
     @classmethod
     def get_system_prompt(cls) -> str:
-        return "You are a security analyst..."
+        return "You are a security expert..."
 ```
 
-**External Plugin Registration:**
-```toml
-# pyproject.toml
-[project.entry-points."victor.verticals"]
-security = "victor_security:SecurityAssistant"
+## Configuration
+
+YAML-first configuration for modes, teams, capabilities, personas:
+
+```yaml
+# config/modes/build.yaml
+name: build
+exploration_multiplier: 1.0
+allow_edits: true
+tools: [read, write, edit, run_tests]
 ```
 
-### Workflow Escape Hatches
+```yaml
+# config/teams/code-review.yaml
+name: code_review_team
+formation: parallel
+roles:
+  - name: security_reviewer
+    persona: "You are a security expert..."
+  - name: quality_reviewer
+    persona: "You are a code quality expert..."
+```
 
-Add Python logic to YAML workflows for complex conditions.
+## Key Design Patterns
 
+| Pattern | Implementation |
+|---------|----------------|
+| Facade | AgentOrchestrator simplifies complex subsystems |
+| Strategy | Tool selection: keyword, semantic, hybrid |
+| Observer | Event bus for pub/sub communication |
+| Factory | OrchestratorFactory for configured instances |
+| Template Method | VerticalBase defines integration template |
+
+## Data Flow
+
+```mermaid
+sequenceDiagram
+    User->>CLI: Send Request
+    CLI->>Orchestrator: Create Agent
+    Orchestrator->>ChatCoord: Initialize
+    ChatCoord->>ProviderCoord: Get Provider
+    ChatCoord->>ContextCoord: Get Context
+    ChatCoord->>ToolCoord: Check Tools
+    ToolCoord->>Tools: Execute
+    Tools-->>ToolCoord: Results
+    ChatCoord->>Provider: Call LLM
+    Provider-->>ChatCoord: Response
+    ChatCoord-->>Orchestrator: Result
+    Orchestrator-->>CLI: Display
+```
+
+## Security
+
+### Air-Gapped Mode
 ```python
-# victor/{vertical}/escape_hatches.py
-
-def quality_check(ctx: dict) -> str:
-    """Escape hatch for quality checking."""
-    score = ctx.get("quality_score", 0)
-    if score >= 0.9:
-        return "high_quality"
-    elif score >= 0.5:
-        return "acceptable"
-    return "needs_improvement"
-
-CONDITIONS = {
-    "quality_check": quality_check,
-}
+agent = await Agent.create(
+    provider="ollama",
+    airgapped_mode=True  # Only local providers and tools
+)
 ```
 
----
+- Only local providers (Ollama, LM Studio, vLLM)
+- No web tools
+- Full functionality without internet
 
-## Design Principles
+### API Key Management
+- Load from `.env` file
+- Use environment variables
+- Never hardcode in source
 
-### SOLID Compliance
+### Tool Validation
+- All tools validated before execution
+- Budget enforcement prevents abuse
+- Sandboxed code execution
 
-Victor's architecture adheres to SOLID principles:
+## Performance
 
-| Principle | Implementation |
-|-----------|----------------|
-| **Single Responsibility (SRP)** | Each StepHandler handles one concern; Orchestrator is a thin facade |
-| **Open/Closed (OCP)** | ExtensionHandlerRegistry for pluggable components; Plugin system for providers/tools |
-| **Liskov Substitution (LSP)** | Protocol-based interfaces ensure substitutability |
-| **Interface Segregation (ISP)** | Focused protocols like `SubAgentContext` |
-| **Dependency Inversion (DIP)** | Protocol-first capability invocation |
+| Metric | Value |
+|--------|-------|
+| Test Coverage | 92.13% |
+| Test Count | 1,149 tests |
+| Startup Time | 2.3s (with lazy loading) |
+| Tool Execution | <100ms average |
 
-### Provider Agnosticism
+## Scalability
 
-Victor supports 21 LLM providers through a unified interface:
+### Horizontal Scaling
+- Stateless orchestrator instances
+- Shared cache (Redis)
+- Event bus (Kafka)
 
-- **Cloud Providers:** Anthropic, OpenAI, Google, Azure, AWS Bedrock, Cohere
-- **Local Providers:** Ollama, LM Studio, vLLM (air-gapped capable)
-- **Specialized:** Groq (fast inference), DeepSeek (thinking tags)
+### Vertical Scaling
+- Larger instance types
+- More CPU/memory
+- Faster storage (SSD)
 
-Switch providers mid-conversation without losing context:
-```
-/provider openai --model gpt-4o
-```
+### Caching
+- Tool result caching
+- LLM response caching
+- Embedding caching
 
-### Air-Gapped Capability
+## Monitoring
 
-When `airgapped_mode=True`:
-- Only local providers available (Ollama, LM Studio, vLLM)
-- No web tools (web_search, web_fetch disabled)
-- Local embeddings for semantic search
-- Full functionality without internet access
+### Metrics
+- Tool usage metrics
+- LLM latency tracking
+- Error rate monitoring
 
-### Performance Optimizations
+### Observability
+- OpenTelemetry integration
+- Structured logging
+- Distributed tracing
 
-| Optimization | Impact | Location |
-|--------------|--------|----------|
-| **Lazy Tool Loading** | Faster startup | `victor/tools/composition/lazy.py` |
-| **AOT Manifest Cache** | 50-100ms startup savings | `victor/core/aot_manifest.py` |
-| **Extension Caching** | One-time initialization | `VerticalBase._get_cached_extension()` |
-| **Two-Level Workflow Cache** | Definition + execution caching | `victor/workflows/unified_compiler.py` |
-| **RL Cache Eviction** | Smart cache management | `victor/storage/cache/rl_eviction_policy.py` |
+## Diagrams
 
----
+- [System Architecture](../diagrams/system-architecture.mmd)
+- [Coordinator Architecture](../diagrams/coordinator-architecture.mmd)
+- [Verticals & Deployment](../diagrams/verticals-and-deployment.mmd)
+- [Protocols & Events](../diagrams/protocols-and-events.mmd)
+- [Developer Workflows](../diagrams/developer-workflows.mmd)
 
-## Related Documentation
+## Further Reading
 
-### Architecture Deep Dives
-- [Component Details](../development/architecture/component-details.md) - Detailed component documentation
-- [Deep Dive](../development/architecture/deep-dive.md) - Architecture deep dive with diagrams
-- [Data Flow](../development/architecture/data-flow.md) - Request execution flow
-- [State Machine](../development/architecture/state-machine.md) - Conversation stage management
-- [Framework Integration](../development/architecture/framework-vertical-integration.md) - Vertical integration protocols
-
-### Extension Guides
-- [Vertical Development](../development/extending/verticals.md) - Creating custom verticals
-- [Plugin Development](../development/extending/plugins.md) - Creating plugins
-
-### Reference
-- [Tool Catalog](../reference/tools/catalog.md) - Complete tool reference
-- [Provider Comparison](../reference/providers/comparison.md) - Provider capabilities
-- [Configuration Keys](../reference/configuration/keys.md) - All configuration options
-
----
-
-## Quick Reference
-
-| Aspect | Details |
-|--------|---------|
-| **Architecture Pattern** | Facade with extracted components |
-| **Provider Count** | 21 (cloud + local) |
-| **Tool Count** | 55+ specialized tools |
-| **Vertical Count** | 6 built-in (Coding, DevOps, RAG, Data Analysis, Research, Benchmark) |
-| **Key Entry Point** | `AgentOrchestrator.process_message()` |
-| **Configuration** | YAML profiles + Python settings |
-| **Extension Mechanism** | Entry points (`victor.verticals`, `victor.providers`) |
-| **Air-Gapped Support** | Yes (Ollama, LM Studio, vLLM) |
+- [Best Practices](BEST_PRACTICES.md) - Usage patterns
+- [Coordinator Separation](coordinator_separation.md) - Two-layer design
+- [Protocol Reference](PROTOCOLS_REFERENCE.md) - Protocol documentation
+- [Migration Guides](MIGRATION_GUIDES.md) - Upgrading guide

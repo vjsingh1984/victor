@@ -1,6 +1,6 @@
-# API Migration Guide: Victor 0.5.x to 1.0.0
+# API Migration Guide: Victor 0.5.x to 0.5.0
 
-This guide provides detailed information about API changes in Victor 1.0.0, with before/after examples for all major changes.
+This guide provides detailed information about API changes in Victor 0.5.0, with before/after examples for all major changes.
 
 ## Table of Contents
 
@@ -24,11 +24,11 @@ This guide provides detailed information about API changes in Victor 1.0.0, with
 1. **Critical Changes** - Breaking changes that require code updates
 2. **Moderate Changes** - Changes to function signatures or behavior
 3. **Minor Changes** - Import path changes or deprecations
-4. **New APIs** - New functionality available in 1.0.0
+4. **New APIs** - New functionality available in 0.5.0
 
 ### API Versioning Policy
 
-- **Major version (1.0.0)**: Breaking changes allowed
+- **Major version (0.5.0)**: Breaking changes allowed
 - **Minor version (1.x.0)**: New features, backward compatible
 - **Patch version (1.0.x)**: Bug fixes only
 
@@ -61,7 +61,7 @@ orchestrator = AgentOrchestrator(
 )
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 from victor.core.bootstrap import bootstrap_orchestrator
 from victor.config.settings import Settings
@@ -101,7 +101,7 @@ config.temperature = 0.7
 config.tool_budget = 100
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 from victor.config.settings import Settings
 
@@ -127,7 +127,7 @@ settings = Settings()
 
 ### 3. DI Container API
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```python
 from victor.core.container import ServiceContainer, ServiceLifetime
 from victor.protocols import ToolRegistryProtocol, ObservabilityProtocol
@@ -172,7 +172,7 @@ openai = OpenAIProvider(api_key="sk-...")
 anthropic = AnthropicProvider(api_key="sk-ant-...")
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 from victor.providers.openai_provider import OpenAIProvider
 from victor.providers.anthropic_provider import AnthropicProvider
@@ -211,7 +211,7 @@ anthropic = AnthropicProvider(settings=settings)
 orchestrator.provider = new_provider
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 from victor.agent.coordinators import ProviderCoordinator
 
@@ -238,7 +238,7 @@ new_orchestrator = bootstrap_orchestrator(
 
 ### 3. Provider Context Limits
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```python
 from victor.providers.base import BaseProvider
 
@@ -286,7 +286,7 @@ tools = registry.get_tools()
 tool = registry.get_tool("read_file")
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 from victor.core.container import ServiceContainer
 from victor.protocols import ToolRegistryProtocol
@@ -326,7 +326,7 @@ result = orchestrator.execute_tool(
 )
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 from victor.agent.coordinators import ToolCoordinator
 from victor.protocols import ToolCoordinatorProtocol
@@ -367,7 +367,7 @@ tools = selector.select_tools(
 )
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 from victor.protocols import IToolSelector
 from victor.core.container import ServiceContainer
@@ -421,7 +421,7 @@ result = orchestrator.chat(
 )
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 from victor.core.bootstrap import bootstrap_orchestrator
 
@@ -466,7 +466,7 @@ print(state)  # "READING"
 history = sm.get_history()
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 from victor.protocols import IConversationStateMachine
 from victor.core.container import ServiceContainer
@@ -497,7 +497,7 @@ can_transition = await sm.can_transition_to(Stage.EXECUTING)
 
 ### 3. Memory API
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```python
 from victor.agent.coordinators import MemoryCoordinator
 
@@ -553,7 +553,7 @@ result = await executor.execute(
 )
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
@@ -593,7 +593,7 @@ workflow:
       goal: "Research topic"
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```yaml
 # new_workflow.yaml
 workflows:
@@ -629,7 +629,7 @@ workflows:
 
 ### 3. YAML Workflow Provider
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```python
 from victor.framework.workflows import BaseYAMLWorkflowProvider
 
@@ -677,7 +677,7 @@ def handler(event):
     print(f"Event: {event.topic}, Data: {event.data}")
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 from victor.core.events import create_event_backend, MessagingEvent
 from victor.config.events import BackendConfig
@@ -715,7 +715,7 @@ await backend.unsubscribe(handle)
 
 ### 2. Event Backend Types
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```python
 from victor.core.events import BackendType, BackendConfig
 
@@ -765,7 +765,7 @@ await backend.connect()
 
 ### 1. Tool Coordinator Protocol
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```python
 from victor.protocols import ToolCoordinatorProtocol
 from typing import Protocol
@@ -806,7 +806,7 @@ await coordinator.select_and_execute(query, context)
 
 ### 2. New Protocols
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 
 ```python
 # Provider coordination
@@ -844,7 +844,7 @@ def execute_tool(tool_name: str, arguments: Dict) -> Any:
     ...
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 async def execute_tool(
     tool: BaseTool,
@@ -874,7 +874,7 @@ def chat(
     ...
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 async def chat(
     self,
@@ -914,7 +914,7 @@ while True:
     print(f"Bot: {response}")
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 import asyncio
 from victor.core.bootstrap import bootstrap_orchestrator
@@ -951,7 +951,7 @@ registry = SharedToolRegistry.get_instance()
 registry.register(MyTool())
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 from victor.tools.base import BaseTool, ToolMetadata
 from victor.framework.capabilities import register_capability
@@ -1000,7 +1000,7 @@ workflow = {
 result = await executor.execute(workflow, context)
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 from victor.core.bootstrap import bootstrap_orchestrator
@@ -1053,4 +1053,4 @@ Use this checklist to ensure you've migrated all API usage:
 ---
 
 **Last Updated**: 2025-01-21
-**Version**: 1.0.0
+**Version**: 0.5.0

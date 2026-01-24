@@ -54,7 +54,7 @@ class ResearchAssistant(VerticalBase):
 
     name = "research"
     description = "Web research, fact-checking, literature synthesis, and report generation"
-    version = "1.0.0"
+    version = "0.5.0"
 
     @classmethod
     def get_tools(cls) -> List[str]:

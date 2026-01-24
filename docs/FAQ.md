@@ -804,7 +804,7 @@ pytest
 
 ## Version Information
 
-- **Current Version**: 0.5.1
+- **Current Version**: 0.5.0
 - **Python Required**: 3.10+
 - **License**: Apache 2.0
 - **Last Updated**: January 20, 2026
@@ -839,5 +839,5 @@ pytest
 
 ---
 
-**Version**: 0.5.1
+**Version**: 0.5.0
 **Last Updated**: January 20, 2026

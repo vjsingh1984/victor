@@ -1,7 +1,7 @@
 # Victor Vertical Package Specification
 
 **Status**: Draft
-**Version**: 1.0.0
+**Version**: 0.5.0
 **Author**: Vijaykumar Singh <singhvjd@gmail.com>
 **Created**: 2025-01-09
 
@@ -44,7 +44,7 @@ victor-security/
 ```toml
 [vertical]
 name = "security"              # Unique identifier (lowercase, alphanumeric)
-version = "1.0.0"              # Semantic version
+version = "0.5.0"              # Semantic version
 description = "Security analysis and vulnerability scanning"
 authors = [{name = "Author Name", email = "author@example.com"}]
 license = "Apache-2.0"
@@ -109,7 +109,7 @@ post_install = "victor vertical info security"
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | string | Yes | Unique vertical identifier (lowercase, alphanumeric, must start with letter) |
-| `version` | string | Yes | Semantic version (e.g., "1.0.0") |
+| `version` | string | Yes | Semantic version (e.g., "0.5.0") |
 | `description` | string | Yes | Brief description of the vertical's purpose |
 | `authors` | array | Yes | List of author objects with `name` and optional `email` |
 | `license` | string | Yes | SPDX license identifier |
@@ -200,7 +200,7 @@ This allows Victor to discover and load the vertical automatically.
 ```toml
 [vertical]
 name = "security"
-version = "1.0.0"
+version = "0.5.0"
 description = "Security analysis and vulnerability scanning for codebases"
 authors = [
     {name = "Vijaykumar Singh", email = "singhvjd@gmail.com"}
@@ -237,7 +237,7 @@ provides_capabilities = ["security_analysis"]
 python = [
     "bandit>=1.7.0",
     "safety>=2.0.0",
-    "semgrep>=1.0.0"
+    "semgrep>=0.5.0"
 ]
 verticals = ["coding"]
 
@@ -342,7 +342,7 @@ The following names are reserved and cannot be used as vertical names:
 
 ## Changelog
 
-### 1.0.0 (2025-01-09)
+### 0.5.0 (2025-01-09)
 - Initial specification
 - Define TOML structure and validation rules
 - Document integration with Victor CLI

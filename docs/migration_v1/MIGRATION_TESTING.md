@@ -1,6 +1,6 @@
-# Testing Migration Guide: Victor 0.5.x to 1.0.0
+# Testing Migration Guide: Victor 0.5.x to 0.5.0
 
-This guide explains how to migrate your tests from Victor 0.5.x to 1.0.0.
+This guide explains how to migrate your tests from Victor 0.5.x to 0.5.0.
 
 ## Table of Contents
 
@@ -28,7 +28,7 @@ This guide explains how to migrate your tests from Victor 0.5.x to 1.0.0.
 
 ### 1. Test Factories
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```python
 # tests/factories.py
 from victor.testing.factories import (
@@ -65,7 +65,7 @@ provider = Mock(spec=OpenAIProvider)
 provider.chat.return_value = "Mock response"
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 from tests.mocks import MockProvider
 from victor.protocols import BaseProviderProtocol
@@ -81,7 +81,7 @@ provider = ProviderFactory.create_mock_provider("openai")
 
 ### 3. Test Utilities
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```python
 from victor.testing.utils import (
     create_test_orchestrator,
@@ -120,7 +120,7 @@ def orchestrator():
     return AgentOrchestrator(provider=provider)
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 import pytest
 from victor.testing.fixtures import test_orchestrator
@@ -152,7 +152,7 @@ def mock_provider():
     return provider
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 # Use built-in fixture
 @pytest.fixture
@@ -172,7 +172,7 @@ def custom_provider():
 
 ### 3. Context Fixture
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```python
 @pytest.fixture
 def test_context():
@@ -186,7 +186,7 @@ def test_context():
 
 ### 4. Environment Isolation
 
-**Enhanced in 1.0.0**:
+**Enhanced in 0.5.0**:
 ```python
 # Automatic environment isolation
 @pytest.mark.asyncio
@@ -223,7 +223,7 @@ provider.stream_chat.return_value = iter([
 ])
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 from tests.mocks.providers import MockProvider
 
@@ -251,7 +251,7 @@ async def test_with_mock():
 
 ### 2. Provider Factory
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```python
 from victor.testing.factories import ProviderFactory
 
@@ -289,7 +289,7 @@ def test_chat():
     assert result == "expected"
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 import pytest
 from victor.testing.fixtures import test_orchestrator
@@ -313,7 +313,7 @@ def test_tool_execution():
     assert result["content"] == "file content"
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 @pytest.mark.asyncio
 async def test_tool_execution(test_orchestrator):
@@ -337,7 +337,7 @@ def test_provider():
     assert result == "response"
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 @pytest.mark.asyncio
 async def test_provider():
@@ -358,7 +358,7 @@ def test_workflow():
     assert result["status"] == "complete"
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 @pytest.mark.asyncio
 async def test_workflow(test_orchestrator):
@@ -376,7 +376,7 @@ async def test_workflow(test_orchestrator):
 
 ### 1. Protocol-Based Testing
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```python
 from victor.protocols import ToolRegistryProtocol
 from unittest.mock import Mock
@@ -397,7 +397,7 @@ async def test_with_protocol_mock(mock_tool_registry):
 
 ### 2. Async Test Patterns
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```python
 import pytest
 
@@ -418,7 +418,7 @@ async def test_async_streaming():
 
 ### 3. Integration Test Patterns
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```python
 @pytest.mark.integration
 @pytest.mark.requires_network
@@ -433,7 +433,7 @@ async def test_integration_with_real_provider():
 
 ### 4. Property-Based Testing
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```python
 import hypothesis
 from hypothesis import strategies as st
@@ -454,7 +454,7 @@ async def test_property_based(text_input):
 
 ### Enhanced Markers
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```python
 # Test type markers
 @pytest.mark.unit
@@ -552,7 +552,7 @@ async def test_provider_chat():
 
 ### Reset Singletons
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```python
 @pytest.fixture(autouse=True)
 def reset_singletons():
@@ -566,7 +566,7 @@ def reset_singletons():
 
 ### Auto-Mock Docker
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```python
 # Automatically applied for orchestrator tests
 @pytest.fixture(autouse=True)
@@ -578,7 +578,7 @@ def auto_mock_docker():
 
 ### Environment Isolation
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```python
 @pytest.fixture(autouse=True)
 def isolate_env():
@@ -617,4 +617,4 @@ Use this checklist to ensure you've migrated all tests:
 ---
 
 **Last Updated**: 2025-01-21
-**Version**: 1.0.0
+**Version**: 0.5.0

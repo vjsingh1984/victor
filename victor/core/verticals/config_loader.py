@@ -379,7 +379,7 @@ class VerticalConfigLoader:
 
         # Extract metadata
         name = metadata.get("name", yaml_data.get("name", ""))
-        version = metadata.get("version", yaml_data.get("version", "1.0.0"))
+        version = metadata.get("version", yaml_data.get("version", "0.5.0"))
         description = metadata.get("description", yaml_data.get("description", ""))
 
         # Extract tools from core.tools.list

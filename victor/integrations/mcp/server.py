@@ -53,7 +53,7 @@ class MCPServer:
     def __init__(
         self,
         name: str = "Victor MCP Server",
-        version: str = "1.0.0",
+        version: str = "0.5.0",
         tool_registry: Optional[ToolRegistry] = None,
     ):
         """Initialize MCP server.
@@ -624,7 +624,7 @@ def create_mcp_server_from_orchestrator(
     """
     return MCPServer(
         name=name,
-        version="1.0.0",
+        version="0.5.0",
         tool_registry=orchestrator.tools,
     )
 
@@ -686,7 +686,7 @@ async def run_mcp_server_stdio() -> None:
 
     server = MCPServer(
         name="Victor MCP Server",
-        version="1.0.0",
+        version="0.5.0",
         tool_registry=registry,
     )
 

@@ -2536,7 +2536,7 @@ def create_hitl_app(
     app = FastAPI(
         title=title,
         description="Human-in-the-Loop API for Victor workflow approvals",
-        version="1.0.0",
+        version="0.5.0",
         lifespan=lifespan,
     )
 
@@ -2561,7 +2561,7 @@ def create_hitl_app(
     async def root():
         return {
             "name": "Victor HITL API",
-            "version": "1.0.0",
+            "version": "0.5.0",
             "ui": "/hitl/ui",
             "docs": "/docs",
         }

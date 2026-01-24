@@ -945,7 +945,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import logging
 
-app = FastAPI(title="User API", version="1.0.0")
+app = FastAPI(title="User API", version="0.5.0")
 
 class User(BaseModel):
     id: int

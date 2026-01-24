@@ -78,15 +78,15 @@ tree-sitter-go = "0.21"
 tree-sitter-rust = "0.21"
 tree-sitter-cpp = "0.21"
 
-# File operations (v0.5.1 - high-performance parallel file system operations)
+# File operations (v0.5.0 - high-performance parallel file system operations)
 walkdir = "2.5"
 ignore = "0.4"
 glob = "0.3"
 
-# Async runtime for batch processing (v0.5.1)
+# Async runtime for batch processing (v0.5.0)
 tokio = { version = "1.40", features = ["sync", "rt", "time"] }
 
-# JSONPath querying for serialization module (v0.5.1)
+# JSONPath querying for serialization module (v0.5.0)
 jsonpath_lib = "0.3"
 
 [profile.release]

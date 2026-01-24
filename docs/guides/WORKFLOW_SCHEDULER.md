@@ -356,10 +356,10 @@ Victor uses semantic versioning (semver):
 MAJOR.MINOR.PATCH[-prerelease][+build]
 
 Examples:
-  1.0.0
+  0.5.0
   2.1.0
-  1.0.0-beta.1
-  1.0.0+build.123
+  0.5.0-beta.1
+  0.5.0+build.123
 ```
 
 ### Creating Versioned Workflows
@@ -390,7 +390,7 @@ registry.register(workflow_v1)
 registry.register(workflow_v2)
 
 # Get specific version
-v1 = registry.get("data_pipeline", "1.0.0")
+v1 = registry.get("data_pipeline", "0.5.0")
 
 # Get latest version
 latest = registry.get_latest("data_pipeline")
@@ -458,7 +458,7 @@ old_state = {"old_field_name": "data", "deprecated_field": "unused"}
 new_state, applied = registry.migrate_state(
     "data_pipeline",
     old_state,
-    from_version="1.0.0",
+    from_version="0.5.0",
     to_version="2.0.0",
 )
 # new_state = {"new_field_name": "data", "new_field": "default_value"}
@@ -501,11 +501,11 @@ path = registry.get_migration_path(
 ```python
 registry.deprecate(
     workflow_name="old_pipeline",
-    version="1.0.0",
+    version="0.5.0",
     message="Use v2.0.0 instead. See migration guide.",
 )
 
-workflow = registry.get("old_pipeline", "1.0.0")
+workflow = registry.get("old_pipeline", "0.5.0")
 if workflow.is_deprecated():
     print(workflow.deprecation_message)
 ```

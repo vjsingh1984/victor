@@ -39,7 +39,7 @@ class MockVertical(VerticalBase):
 
     name = "test_integration_vertical"
     description = "Integration test vertical"
-    version = "1.0.0"
+    version = "0.5.0"
 
     @classmethod
     def get_tools(cls):

@@ -1099,7 +1099,7 @@ workflows:
     description: "Multi-stage code review with specialized teams"
 
     metadata:
-      version: "1.0.0"
+      version: "0.5.0"
       vertical: "coding"
 
     execution:
@@ -1294,7 +1294,7 @@ workflows:
     description: "Research new technology and implement POC"
 
     metadata:
-      version: "1.0.0"
+      version: "0.5.0"
 
     nodes:
       # Phase 1: Research team (parallel)

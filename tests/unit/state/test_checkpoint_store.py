@@ -53,7 +53,7 @@ class TestPolicyCheckpoint:
         checkpoint = PolicyCheckpoint(
             checkpoint_id="ckpt_test_1",
             learner_name="tool_selector",
-            version="v1.0.0",
+            version="v0.5.0",
             state={"q_values": {"ctx1": 0.7}},
             metadata={"success_rate": 0.85},
             tags=["production"],
@@ -61,7 +61,7 @@ class TestPolicyCheckpoint:
 
         assert checkpoint.checkpoint_id == "ckpt_test_1"
         assert checkpoint.learner_name == "tool_selector"
-        assert checkpoint.version == "v1.0.0"
+        assert checkpoint.version == "v0.5.0"
         assert checkpoint.state["q_values"]["ctx1"] == 0.7
 
     def test_checkpoint_state_hash(self) -> None:
@@ -189,13 +189,13 @@ class TestCheckpointStore:
         """Test creating a checkpoint."""
         checkpoint = store.create_checkpoint(
             learner_name="tool_selector",
-            version="v1.0.0",
+            version="v0.5.0",
             state={"q_values": {"ctx1": 0.7}},
             metadata={"success_rate": 0.85},
         )
 
         assert checkpoint.learner_name == "tool_selector"
-        assert checkpoint.version == "v1.0.0"
+        assert checkpoint.version == "v0.5.0"
         assert "ckpt_tool_selector_" in checkpoint.checkpoint_id
 
     def test_create_checkpoint_increments_id(self, store: CheckpointStore) -> None:
@@ -223,12 +223,12 @@ class TestCheckpointStore:
 
     def test_get_checkpoint(self, store: CheckpointStore) -> None:
         """Test getting a checkpoint."""
-        store.create_checkpoint("learner", "v1.0.0", {"state": "test"})
+        store.create_checkpoint("learner", "v0.5.0", {"state": "test"})
 
-        retrieved = store.get_checkpoint("learner", "v1.0.0")
+        retrieved = store.get_checkpoint("learner", "v0.5.0")
 
         assert retrieved is not None
-        assert retrieved.version == "v1.0.0"
+        assert retrieved.version == "v0.5.0"
         assert retrieved.state == {"state": "test"}
 
     def test_get_checkpoint_not_found(self, store: CheckpointStore) -> None:
@@ -368,16 +368,16 @@ class TestCheckpointStore:
     def test_file_persistence(self, temp_storage_path: Path) -> None:
         """Test checkpoints are persisted to files."""
         store = CheckpointStore(storage_path=temp_storage_path)
-        store.create_checkpoint("learner", "v1.0.0", {"state": "test"})
+        store.create_checkpoint("learner", "v0.5.0", {"state": "test"})
 
         # Check file exists
-        file_path = temp_storage_path / "learner" / "v1.0.0.json.gz"
+        file_path = temp_storage_path / "learner" / "v0.5.0.json.gz"
         assert file_path.exists()
 
         # Read and verify
         with gzip.open(file_path, "rt") as f:
             data = json.load(f)
-            assert data["version"] == "v1.0.0"
+            assert data["version"] == "v0.5.0"
 
     def test_file_loading(self, temp_storage_path: Path) -> None:
         """Test loading checkpoints from files."""
@@ -427,11 +427,11 @@ class TestCheckpointStore:
 
     def test_special_characters_in_version(self, store: CheckpointStore) -> None:
         """Test version strings with special characters."""
-        store.create_checkpoint("learner", "v1.0.0/rc1", {"state": 1})
+        store.create_checkpoint("learner", "v0.5.0/rc1", {"state": 1})
 
-        checkpoint = store.get_checkpoint("learner", "v1.0.0/rc1")
+        checkpoint = store.get_checkpoint("learner", "v0.5.0/rc1")
         assert checkpoint is not None
-        assert checkpoint.version == "v1.0.0/rc1"
+        assert checkpoint.version == "v0.5.0/rc1"
 
 
 class TestGlobalSingleton:

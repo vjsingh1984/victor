@@ -1,6 +1,6 @@
-# Breaking Changes Checklist: Victor 0.5.x to 1.0.0
+# Breaking Changes Checklist: Victor 0.5.x to 0.5.0
 
-This document provides a comprehensive checklist of all breaking changes in Victor 1.0.0.
+This document provides a comprehensive checklist of all breaking changes in Victor 0.5.0.
 
 ## Severity Levels
 
@@ -24,7 +24,7 @@ This document provides a comprehensive checklist of all breaking changes in Vict
 from victor.agent.orchestrator import AgentOrchestrator
 orchestrator = AgentOrchestrator(provider=OpenAIProvider(api_key="..."))
 
-# After (1.0.0)
+# After (0.5.0)
 from victor.core.bootstrap import bootstrap_orchestrator
 orchestrator = bootstrap_orchestrator(Settings())
 ```
@@ -53,7 +53,7 @@ grep -r "AgentOrchestrator(" --include="*.py" .
 # Before (0.5.x)
 provider = OpenAIProvider(api_key="sk-...")
 
-# After (1.0.0)
+# After (0.5.0)
 import os
 os.environ["OPENAI_API_KEY"] = "sk-..."
 provider = OpenAIProvider()
@@ -84,7 +84,7 @@ grep -r "api_key=" --include="*.py" .
 from victor.tools.registry import SharedToolRegistry
 registry = SharedToolRegistry.get_instance()
 
-# After (1.0.0)
+# After (0.5.0)
 from victor.core.container import ServiceContainer
 from victor.protocols import ToolRegistryProtocol
 container = ServiceContainer()
@@ -117,7 +117,7 @@ from victor.observability.event_bus import EventBus
 bus = EventBus()
 bus.publish("tool.complete", data={...})
 
-# After (1.0.0)
+# After (0.5.0)
 from victor.core.events import create_event_backend, MessagingEvent
 backend = create_event_backend()
 await backend.publish(MessagingEvent(topic="tool.complete", data={...}))
@@ -148,7 +148,7 @@ grep -r "EventBus" --include="*.py" .
 # Before (0.5.x)
 result = orchestrator.chat("Hello")
 
-# After (1.0.0)
+# After (0.5.0)
 result = await orchestrator.chat("Hello")
 ```
 
@@ -180,7 +180,7 @@ from victor.workflows.executor import WorkflowExecutor
 executor = WorkflowExecutor(orchestrator)
 result = await executor.execute(workflow, context)
 
-# After (1.0.0)
+# After (0.5.0)
 from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 compiler = UnifiedWorkflowCompiler(orchestrator)
 compiled = compiler.compile(workflow)
@@ -207,7 +207,7 @@ from victor.agent.tool_selector import ToolSelector
 selector = ToolSelector(strategy="keyword")
 tools = selector.select_tools(query, context)
 
-# After (1.0.0)
+# After (0.5.0)
 from victor.protocols import IToolSelector
 selector = container.get(IToolSelector)
 tools = await selector.select_tools(query, context)
@@ -234,7 +234,7 @@ sm = ConversationStateMachine()
 sm.transition_to("READING")
 state = sm.get_state()
 
-# After (1.0.0)
+# After (0.5.0)
 from victor.protocols import IConversationStateMachine
 from victor.framework import Stage
 sm = container.get(IConversationStateMachine)
@@ -285,7 +285,7 @@ state = await sm.get_state()
 def execute_tool(tool: BaseTool, args: Dict) -> Any:
     ...
 
-# After (1.0.0)
+# After (0.5.0)
 async def execute_tool(
     tool: BaseTool,
     arguments: Dict[str, Any],
@@ -462,4 +462,4 @@ python scripts/detect_breaking_changes.py --fix
 ---
 
 **Last Updated**: 2025-01-21
-**Version**: 1.0.0
+**Version**: 0.5.0

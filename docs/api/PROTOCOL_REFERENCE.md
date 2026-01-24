@@ -1,4 +1,4 @@
-# Victor AI 0.5.1 Protocol Reference
+# Victor AI 0.5.0 Protocol Reference
 
 Complete reference for all protocol interfaces in Victor AI.
 

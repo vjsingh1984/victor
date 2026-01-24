@@ -41,7 +41,7 @@ Usage:
     results = manager.search("security")
 
     # Install a vertical
-    spec = PackageSpec.parse("victor-security>=1.0.0")
+    spec = PackageSpec.parse("victor-security>=0.5.0")
     success, message = manager.install(spec)
 
     # Install from git
@@ -110,7 +110,7 @@ class PackageSpec:
         Args:
             spec_str: Package spec like:
                 - "victor-security"
-                - "victor-security>=1.0.0"
+                - "victor-security>=0.5.0"
                 - "git+https://github.com/user/victor-security.git"
                 - "/path/to/local/package"
                 - "victor-security[extra1,extra2]"

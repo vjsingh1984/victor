@@ -1,4 +1,4 @@
-# Observability Suite for Victor AI 0.5.1
+# Observability Suite for Victor AI 0.5.0
 
 Production-ready observability features including OpenTelemetry tracing, Prometheus metrics, and structured logging.
 
@@ -234,7 +234,7 @@ version: '3.8'
 
 services:
   victor:
-    image: victor-ai:0.5.1
+    image: victor-ai:0.5.0
     ports:
       - "8080:8080"
       - "9090:9090"

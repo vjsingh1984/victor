@@ -174,7 +174,7 @@ async def demo_aws_mcp_direct():
     # Create MCP client
     client = MCPClient(
         name="Victor-AWS-Demo",
-        version="1.0.0",
+        version="0.5.0",
         health_check_interval=0,  # Disable health checks for demo
     )
 
@@ -377,7 +377,7 @@ async def demo_aws_cdk_workflow():
 
     client = MCPClient(
         name="Victor-CDK-Demo",
-        version="1.0.0",
+        version="0.5.0",
         health_check_interval=0,
     )
 

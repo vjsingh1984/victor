@@ -101,6 +101,12 @@ from victor.core.events.protocols import (
     EventSubscriptionError,
 )
 
+# Pattern matching utility (shared across all backends)
+from victor.core.events.pattern_matcher import (
+    matches_topic_pattern,
+    clear_pattern_cache,
+)
+
 from victor.core.events.backends import (
     # Backends
     InMemoryEventBackend,
@@ -128,6 +134,23 @@ except ImportError:
     _LIGHTWEIGHT_AVAILABLE = False
     SQLiteEventBackend = None  # type: ignore
     register_lightweight_backends = None  # type: ignore
+
+# Distributed backends (optional - require additional dependencies)
+try:
+    from victor.core.events.redis_backend import RedisEventBackend
+
+    _REDIS_BACKEND_AVAILABLE = True
+except ImportError:
+    _REDIS_BACKEND_AVAILABLE = False
+    RedisEventBackend = None  # type: ignore
+
+try:
+    from victor.core.events.kafka_backend import KafkaEventBackend
+
+    _KAFKA_BACKEND_AVAILABLE = True
+except ImportError:
+    _KAFKA_BACKEND_AVAILABLE = False
+    KafkaEventBackend = None  # type: ignore
 
 # Adapters for bridging with existing systems
 from victor.core.events.adapter import (
@@ -177,6 +200,9 @@ __all__ = [
     # Protocol-based - Exceptions
     "EventPublishError",
     "EventSubscriptionError",
+    # Pattern matching utility
+    "matches_topic_pattern",
+    "clear_pattern_cache",
     # Protocol-based - Backends
     "InMemoryEventBackend",
     # Protocol-based - Specialized buses
@@ -192,6 +218,9 @@ __all__ = [
     # Lightweight backends (optional)
     "SQLiteEventBackend",
     "register_lightweight_backends",
+    # Distributed backends (optional)
+    "RedisEventBackend",
+    "KafkaEventBackend",
     # Adapters for bridging (simple versions)
     "victor_event_to_event_simple",
     "event_to_victor_event_simple",

@@ -92,7 +92,7 @@ class HealthCheckResponse:
     checks: Dict[str, Dict[str, Any]]
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     uptime_seconds: Optional[float] = None
-    version: str = "1.0.0"
+    version: str = "0.5.0"
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON response.
@@ -157,7 +157,7 @@ class ProductionHealthChecker:
     def __init__(
         self,
         startup_timeout: float = 60.0,
-        service_version: str = "1.0.0",
+        service_version: str = "0.5.0",
     ) -> None:
         """Initialize production health checker.
 
@@ -602,7 +602,7 @@ class ProductionHealthChecker:
 
 def create_production_health_checker(
     startup_timeout: float = 60.0,
-    service_version: str = "1.0.0",
+    service_version: str = "0.5.0",
 ) -> ProductionHealthChecker:
     """Create a production health checker.
 

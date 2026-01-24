@@ -128,7 +128,7 @@ class TestHealthReport:
 
         assert report.status == HealthStatus.HEALTHY
         assert report.timestamp == now
-        assert report.version == "1.0.0"
+        assert report.version == "0.5.0"
 
     def test_is_healthy(self):
         """Test is_healthy property."""

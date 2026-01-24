@@ -22,7 +22,7 @@
 # =============================================================================
 metadata:
   name: rag
-  version: "1.0.0"
+  version: "0.5.0"
   description: "Retrieval-Augmented Generation assistant for document Q&A"
   vector_store: "lancedb"
   supported_formats:

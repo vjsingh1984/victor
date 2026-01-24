@@ -55,7 +55,7 @@ cluster_name   = "victor-ai-prod-eks"
 # vpc_cidr       = "10.0.0.0/16"
 
 # Image configuration
-image_tag     = "0.5.1"
+image_tag     = "0.5.0"
 replica_count = 6
 
 # Database configuration

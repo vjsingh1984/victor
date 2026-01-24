@@ -48,7 +48,7 @@ class VerticalMetadataProvider(ABC):
     # Subclasses must define these
     name: str = ""
     description: str = ""
-    version: str = "1.0.0"
+    version: str = "0.5.0"
 
     @classmethod
     def get_provider_hints(cls) -> Dict[str, Any]:

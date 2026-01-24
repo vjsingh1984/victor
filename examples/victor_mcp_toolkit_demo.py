@@ -244,7 +244,7 @@ async def run_demo():
     print("-" * 40)
     server = MCPServer(
         name="Victor MCP Toolkit",
-        version="1.0.0",
+        version="0.5.0",
         tool_registry=registry,
     )
     print(f"   Server: {server.name} v{server.version}")
@@ -283,7 +283,7 @@ async def run_demo():
         "jsonrpc": "2.0",
         "id": "1",
         "method": "initialize",
-        "params": {"clientInfo": {"name": "Demo Client", "version": "1.0.0"}},
+        "params": {"clientInfo": {"name": "Demo Client", "version": "0.5.0"}},
     })
     print(f"   Initialize: {init_response['result']['serverInfo']['name']}")
 
@@ -364,7 +364,7 @@ async def run_stdio_server(
     # Create MCP server
     server = MCPServer(
         name="Victor MCP Toolkit",
-        version="1.0.0",
+        version="0.5.0",
         tool_registry=registry,
     )
 

@@ -1,6 +1,6 @@
 metadata:
   name: research
-  version: "1.0.0"
+  version: "0.5.0"
   description: "Web research, fact-checking, literature synthesis, and report generation"
 
 core:

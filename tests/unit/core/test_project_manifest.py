@@ -179,7 +179,7 @@ class TestProjectMetadata:
         """Test custom values."""
         meta = ProjectMetadata(
             name="myproject",
-            version="1.0.0",
+            version="0.5.0",
             language="python",
             framework="fastapi",
             dependencies={"fastapi": "^0.100.0"},
@@ -233,7 +233,7 @@ class TestProjectManifest:
             # Create package.json
             package_json = {
                 "name": "test-app",
-                "version": "1.0.0",
+                "version": "0.5.0",
                 "description": "Test NPM project",
                 "dependencies": {"react": "^18.0.0"},
                 "devDependencies": {"jest": "^29.0.0"},
@@ -377,7 +377,7 @@ class TestProjectManifest:
         """Test loading metadata from package.json."""
         manifest = await ProjectManifest.build(str(temp_npm_project))
         assert manifest.metadata.name == "test-app"
-        assert manifest.metadata.version == "1.0.0"
+        assert manifest.metadata.version == "0.5.0"
         assert manifest.metadata.language == "javascript"
         assert manifest.metadata.package_manager == "npm"
         assert "react" in manifest.metadata.dependencies

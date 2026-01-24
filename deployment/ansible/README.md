@@ -58,9 +58,9 @@ redis_host=victor-ai-redis-prod
 Create `group_vars/all.yml`:
 
 ```yaml
-victor_version: "0.5.1"
+victor_version: "0.5.0"
 victor_user: "victor"
-docker_image: "victorai/victor:0.5.1"
+docker_image: "victorai/victor:0.5.0"
 
 # Database
 db_host: "localhost"
@@ -338,7 +338,7 @@ ansible-playbook -i inventory.ini playbook.yml \
 ```bash
 # Rollback to previous version
 ansible-playbook -i inventory.ini playbook.yml \
-  -e "victor_version=0.5.1" \
+  -e "victor_version=0.5.0" \
   --tags update \
   --limit production
 ```
@@ -471,7 +471,7 @@ ansible-playbook -i inventory.ini playbook.yml -e "ansible_ignore_errors=yes"
 - name: Check condition
   debug:
     msg: "Condition matched"
-  when: victor_version == "0.5.1"
+  when: victor_version == "0.5.0"
 ```
 
 ## Best Practices

@@ -83,7 +83,7 @@ def sample_extension():
 
         def get_metadata(self) -> Dict[str, Any]:
             return {
-                "version": "1.0.0",
+                "version": "0.5.0",
                 "description": "Sample extension for testing",
             }
 
@@ -127,7 +127,7 @@ def mock_vertical():
 
         name = "mock"
         description = "Mock vertical for testing"
-        version = "1.0.0"
+        version = "0.5.0"
 
         @classmethod
         def get_tools(cls) -> List[str]:

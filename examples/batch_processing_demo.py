@@ -95,7 +95,7 @@ def test_process_data():
         "config.yaml": """
 app:
   name: Victor Demo
-  version: 1.0.0
+  version: 0.5.0
   # TODO: Add more config
   debug: true
 """,

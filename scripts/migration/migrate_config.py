@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Victor Configuration Migration Script (0.5.x to 1.0.0)
+Victor Configuration Migration Script (0.5.x to 0.5.0)
 
-This script automatically migrates configuration from Victor 0.5.x to 1.0.0 format.
+This script automatically migrates configuration from Victor 0.5.x to 0.5.0 format.
 
 Usage:
     python scripts/migration/migrate_config.py --source ./old_config.py --dest ./victor/config
@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 class ConfigMigrator:
-    """Migrates Victor configuration from 0.5.x to 1.0.0."""
+    """Migrates Victor configuration from 0.5.x to 0.5.0."""
 
     def __init__(self, source: Path, dest: Optional[Path] = None):
         self.source = source
@@ -29,7 +29,7 @@ class ConfigMigrator:
         self.changes_made = []
 
     def migrate_python_config(self, source_file: Path) -> Dict[str, Any]:
-        """Migrate Python configuration file to 1.0.0 format."""
+        """Migrate Python configuration file to 0.5.0 format."""
         config = {}
 
         # Read old config
@@ -56,7 +56,7 @@ class ConfigMigrator:
         return config
 
     def migrate_env_file(self, env_file: Path) -> Dict[str, str]:
-        """Migrate .env file to 1.0.0 format."""
+        """Migrate .env file to 0.5.0 format."""
         env_vars = {}
 
         if not env_file.exists():
@@ -98,7 +98,7 @@ class ConfigMigrator:
         # Create settings.yaml
         settings_file = dest_dir / "settings.yaml"
         with open(settings_file, 'w') as f:
-            f.write("# Victor 1.0.0 Configuration\n")
+            f.write("# Victor 0.5.0 Configuration\n")
             f.write("# Migrated from 0.5.x\n\n")
 
             f.write("agent:\n")
@@ -123,7 +123,7 @@ class ConfigMigrator:
     def update_env_file(self, env_vars: Dict[str, str], env_file: Path) -> None:
         """Update .env file with new variable names."""
         with open(env_file, 'w') as f:
-            f.write("# Victor 1.0.0 Environment Variables\n")
+            f.write("# Victor 0.5.0 Environment Variables\n")
             f.write("# Migrated from 0.5.x\n\n")
 
             for key, value in sorted(env_vars.items()):
@@ -253,7 +253,7 @@ class ConfigMigrator:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Migrate Victor configuration from 0.5.x to 1.0.0"
+        description="Migrate Victor configuration from 0.5.x to 0.5.0"
     )
     parser.add_argument(
         "--source",

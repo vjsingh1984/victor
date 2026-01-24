@@ -804,7 +804,7 @@ def _register_research_personas() -> None:
 
         provider = FrameworkPersonaProvider()
 
-        # Register each persona with version 1.0.0
+        # Register each persona with version 0.5.0
         for persona_key, persona in RESEARCH_PERSONAS.items():
             # Convert to framework traits
             framework_traits = persona.traits.to_framework_traits(
@@ -832,7 +832,7 @@ def _register_research_personas() -> None:
             # Register with provider
             provider.register_persona(
                 name=persona_key,
-                version="1.0.0",
+                version="0.5.0",
                 persona=framework_traits,
                 category=category,
                 description=persona.approach,

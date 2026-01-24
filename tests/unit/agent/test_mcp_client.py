@@ -31,7 +31,7 @@ class TestMCPClientInit:
         client = MCPClient()
 
         assert client.name == "Victor MCP Client"
-        assert client.version == "1.0.0"
+        assert client.version == "0.5.0"
         assert client.server_info is None
         assert client.tools == []
         assert client.resources == []

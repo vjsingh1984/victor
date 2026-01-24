@@ -62,7 +62,7 @@ def sample_yaml_config() -> Dict[str, Any]:
     return {
         "metadata": {
             "name": "test_vertical",
-            "version": "1.0.0",
+            "version": "0.5.0",
             "description": "Test vertical for unit tests",
         },
         "core": {
@@ -108,7 +108,7 @@ class TestYAMLLoading:
 
         assert config is not None
         assert config.name == "test_vertical"
-        assert config.version == "1.0.0"
+        assert config.version == "0.5.0"
         assert config.description == "Test vertical for unit tests"
 
     def test_load_missing_file(self, config_loader: VerticalConfigLoader):
@@ -525,7 +525,7 @@ class TestLegacyFormat:
         """Test loading legacy flat YAML format."""
         yaml_config = {
             "name": "test_vertical",
-            "version": "1.0.0",
+            "version": "0.5.0",
             "description": "Test vertical",
             "tools": ["read", "write"],
             "system_prompt": {"source": "inline", "text": "Test prompt"},
@@ -548,7 +548,7 @@ class TestLegacyFormat:
         yaml_config = {
             "metadata": {
                 "name": "test_vertical",
-                "version": "1.0.0",
+                "version": "0.5.0",
                 "description": "Test vertical",
             },
             "core": {

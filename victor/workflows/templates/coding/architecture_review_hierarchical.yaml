@@ -28,7 +28,7 @@ long_description: |
   into actionable recommendations.
 
   Ideal for architecture design reviews, system evaluations, and technical assessments.
-version: "1.0.0"
+version: "0.5.0"
 author: "Victor AI"
 vertical: "coding"
 formation: "hierarchical"

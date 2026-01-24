@@ -1,6 +1,6 @@
 # Victor AI - Future Roadmap
 
-**Version**: 0.5.x → 1.0.0
+**Version**: 0.5.x → 0.5.0
 **Last Updated**: 2025-01-14
 **Status**: 75% Complete - Roadmap to 100%
 
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-Victor AI is 75% complete with major architectural refactoring finished. This roadmap outlines the remaining 25% of work to reach version 1.0.0, prioritized by impact, dependencies, and strategic value.
+Victor AI is 75% complete with major architectural refactoring finished. This roadmap outlines the remaining 25% of work to reach version 0.5.0, prioritized by impact, dependencies, and strategic value.
 
 ### Current Status
 
@@ -19,7 +19,7 @@ Victor AI is 75% complete with major architectural refactoring finished. This ro
 - **Performance**: ✅ 3-5% overhead (excellent)
 - **Integration**: ✅ Production-ready
 
-### Target for v1.0.0
+### Target for v0.5.0
 
 - **100% feature completeness**
 - **90%+ test coverage**
@@ -33,9 +33,9 @@ Victor AI is 75% complete with major architectural refactoring finished. This ro
 
 ### Priority Levels
 
-- **P0 - Critical**: Must have for v1.0.0, blocks release
-- **P1 - High**: Important for v1.0.0, significant impact
-- **P2 - Medium**: Nice to have for v1.0.0, can defer to v1.1
+- **P0 - Critical**: Must have for v0.5.0, blocks release
+- **P1 - High**: Important for v0.5.0, significant impact
+- **P2 - Medium**: Nice to have for v0.5.0, can defer to v1.1
 - **P3 - Low**: Future consideration, backlog items
 
 ### Effort Estimates
@@ -64,7 +64,7 @@ Victor AI is 75% complete with major architectural refactoring finished. This ro
 
 ## Phase 1: Core Completion (Weeks 1-2)
 
-**Goal**: Complete all P0 critical features required for v1.0.0
+**Goal**: Complete all P0 critical features required for v0.5.0
 **Duration**: 2 weeks
 **Team Size**: 2-3 developers
 **Effort**: 12-15 developer-days
@@ -636,7 +636,7 @@ Victor AI is 75% complete with major architectural refactoring finished. This ro
 
 ## Backlog Items (P3)
 
-These items are deferred to post-v1.0.0 releases.
+These items are deferred to post-v0.5.0 releases.
 
 ### B1. Cloud Native Deployment (2 weeks)
 - Kubernetes manifests
@@ -753,7 +753,7 @@ Phase 4 (Polish)
 1. **Performance**: Benchmark after every major change
 2. **Compatibility**: Comprehensive integration tests
 3. **Security**: Regular audits, dependency scanning
-4. **Scope**: P0 only for v1.0.0, everything else deferred
+4. **Scope**: P0 only for v0.5.0, everything else deferred
 5. **Resources**: 2-3 developers, clear assignments
 
 ---
@@ -788,7 +788,7 @@ Phase 4 (Polish)
 - [ ] Examples comprehensive
 - [ ] Release ready
 
-### Overall v1.0.0 Success
+### Overall v0.5.0 Success
 
 - [ ] 100% of P0 items complete
 - [ ] 80%+ of P1 items complete
@@ -830,7 +830,7 @@ Week 8: Phase 4 - Polish
 ├── W8D4: Performance Tuning
 └── W8D5: Release Prep
 
-Milestone: v1.0.0 Release 🎉
+Milestone: v0.5.0 Release 🎉
 ```
 
 ---
@@ -905,11 +905,11 @@ Milestone: v1.0.0 Release 🎉
 
 ## Conclusion
 
-This roadmap provides a clear path from 75% to 100% completion of Victor AI v1.0.0. The plan is achievable in 8 weeks with a team of 2-3 developers, focusing on high-priority items that deliver maximum value.
+This roadmap provides a clear path from 75% to 100% completion of Victor AI v0.5.0. The plan is achievable in 8 weeks with a team of 2-3 developers, focusing on high-priority items that deliver maximum value.
 
 ### Key Takeaways
 
-1. **Focus on P0 items first** - These are critical for v1.0.0
+1. **Focus on P0 items first** - These are critical for v0.5.0
 2. **Parallelize where possible** - Reduce calendar time
 3. **Maintain quality** - Don't sacrifice quality for speed
 4. **Test continuously** - Catch issues early

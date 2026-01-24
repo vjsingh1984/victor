@@ -475,7 +475,7 @@ registry.register(MyTool())
 
 [project]
 name = "victor-custom-tools"
-version = "1.0.0"
+version = "0.5.0"
 
 [project.entry-points."victor.tools"]
 my_tool = "my_package.tools:MyTool"

@@ -1,6 +1,6 @@
 [vertical]
 name = "devops"
-version = "0.5.1"
+version = "0.5.0"
 description = "DevOps vertical for infrastructure, CI/CD, and container management"
 authors = [{name = "Vijaykumar Singh", email = "singhvjd@gmail.com"}]
 license = "Apache-2.0"

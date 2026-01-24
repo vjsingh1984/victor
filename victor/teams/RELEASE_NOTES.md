@@ -115,7 +115,7 @@ All existing code continues to work without modifications:
 
 ### ⚠️ FrameworkTeamCoordinator
 
-**Status**: Deprecated (wrapper provided, will be removed in v1.0.0)
+**Status**: Deprecated (wrapper provided, will be removed in v0.5.0)
 
 **Migration**:
 ```python
@@ -361,7 +361,7 @@ All tests passing. No known issues.
 - 📢 Encourage migration to new APIs
 - 🔄 Update all examples
 
-### v1.0.0 (Future)
+### v0.5.0 (Future)
 - ❌ FrameworkTeamCoordinator removed
 - ✅ Only new APIs supported
 - 📚 Full migration complete

@@ -189,7 +189,7 @@ workflows:
 
     # Workflow metadata
     metadata:
-      version: "1.0.0"
+      version: "0.5.0"
       author: "Victor AI"
       tags: [collaboration, code-review, negotiation, consensus]
       estimated_duration: "5-10 minutes"

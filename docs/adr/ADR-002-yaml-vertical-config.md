@@ -61,7 +61,7 @@ Adopt **YAML-First Configuration** for verticals with Python escape hatches:
 # victor/coding/config/vertical.yaml
 name: coding
 description: "Coding and development assistance"
-version: "1.0.0"
+version: "0.5.0"
 
 # Tools (with auto-discovery)
 tools:

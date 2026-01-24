@@ -262,7 +262,7 @@ class TestPluginLoaderGetPluginInfo:
         # Mock plugin manager with plugins
         mock_plugin1 = MagicMock()
         mock_plugin1.name = "plugin1"
-        mock_plugin1.version = "1.0.0"
+        mock_plugin1.version = "0.5.0"
         mock_plugin1.get_tools.return_value = [MagicMock(), MagicMock()]
 
         mock_plugin2 = MagicMock()
@@ -307,7 +307,7 @@ class TestPluginLoaderGetSummary:
         # Mock plugin manager
         mock_plugin = MagicMock()
         mock_plugin.name = "test_plugin"
-        mock_plugin.version = "1.0.0"
+        mock_plugin.version = "0.5.0"
         mock_plugin.get_tools.return_value = [MagicMock(), MagicMock(), MagicMock()]
 
         loader._plugin_manager = MagicMock()
@@ -318,5 +318,5 @@ class TestPluginLoaderGetSummary:
         assert result["total"] == 1
         assert len(result["plugins"]) == 1
         assert result["plugins"][0]["name"] == "test_plugin"
-        assert result["plugins"][0]["version"] == "1.0.0"
+        assert result["plugins"][0]["version"] == "0.5.0"
         assert result["plugins"][0]["tools"] == 3

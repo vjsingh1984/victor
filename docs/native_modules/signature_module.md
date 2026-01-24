@@ -2,7 +2,7 @@
 
 **Module**: `victor.native.rust.signature`
 
-**Version**: v0.5.1
+**Version**: v0.5.0
 
 **Purpose**: High-performance tool call signature computation for deduplication, achieving 10x speedup over Python implementation.
 
@@ -551,7 +551,7 @@ maturin develop --release
 
 ## Changelog
 
-### v0.5.1 (2025-01-17)
+### v0.5.0 (2025-01-17)
 
 **Added:**
 - Initial implementation of signature computation module

@@ -166,7 +166,7 @@ class TestReplaceOperation:
                         "type": "replace",
                         "path": temp_path,
                         "old_str": '    @property\n    def name(self):\n        return "foo"',
-                        "new_str": '    @property\n    def name(self):\n        return "foo"\n\n    @property\n    def version(self):\n        return "1.0.0"',
+                        "new_str": '    @property\n    def name(self):\n        return "foo"\n\n    @property\n    def version(self):\n        return "0.5.0"',
                     }
                 ]
             )
@@ -174,7 +174,7 @@ class TestReplaceOperation:
 
             content = Path(temp_path).read_text()
             assert "def version(self)" in content
-            assert 'return "1.0.0"' in content
+            assert 'return "0.5.0"' in content
         finally:
             Path(temp_path).unlink(missing_ok=True)
             Path(temp_dir).rmdir()

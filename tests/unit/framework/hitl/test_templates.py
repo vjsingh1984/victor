@@ -437,10 +437,10 @@ class TestBuiltinTemplates:
         result = render_template(
             "confirmation.deployment",
             environment="staging",
-            version="1.0.0",
+            version="0.5.0",
             services="web, api, worker",
         )
 
         assert "staging" in result
-        assert "1.0.0" in result
+        assert "0.5.0" in result
         assert "web, api, worker" in result

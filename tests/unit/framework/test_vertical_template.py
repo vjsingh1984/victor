@@ -54,7 +54,7 @@ class TestVerticalMetadata:
 
         assert metadata.name == "test"
         assert metadata.description == "Test vertical"
-        assert metadata.version == "1.0.0"
+        assert metadata.version == "0.5.0"
         assert metadata.license == "Apache-2.0"
         assert metadata.category == "general"
         assert metadata.tags == []
@@ -633,7 +633,7 @@ class TestVerticalTemplate:
             metadata=VerticalMetadata(
                 name="complete",
                 description="Complete test vertical",
-                version="1.0.0",
+                version="0.5.0",
                 tags=["test", "complete"],
             ),
             tools=["read", "write", "grep"],

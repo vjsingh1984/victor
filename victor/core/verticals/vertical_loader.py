@@ -157,14 +157,18 @@ class VerticalLoader:
 
         # Return lazy proxy if lazy mode enabled
         if use_lazy:
-            from victor.core.verticals.lazy_loader import LazyVerticalProxy
+            from victor.core.verticals.lazy_proxy import LazyProxy, LazyProxyType
 
             def _load_vertical():
                 self._activate(vertical)
                 return vertical
 
-            proxy = LazyVerticalProxy(vertical_name=name, loader=_load_vertical)
-            logger.debug(f"Created lazy proxy for vertical: {name}")
+            proxy = LazyProxy[Type[VerticalBase]](
+                vertical_name=name,
+                loader=_load_vertical,
+                proxy_type=LazyProxyType.LAZY
+            )
+            logger.debug(f"Created type-safe lazy proxy for vertical: {name}")
             return proxy
 
         # Eager mode: activate immediately

@@ -1,75 +1,68 @@
 # Getting Started with Victor
 
-Welcome to Victor! This guide will help you install, configure, and run Victor in under 5 minutes.
+Welcome to Victor! Get up and running in minutes.
 
 ## What is Victor?
 
-**Victor** is a provider-agnostic AI coding assistant that supports 21 LLM providers (both local and cloud) through a unified CLI/TUI interface.
+**Victor** is a provider-agnostic AI coding assistant supporting 21 LLM providers through a unified interface.
 
 **Key Features:**
 - **21 LLM Providers**: Cloud (Anthropic, OpenAI, Google) and local (Ollama, LM Studio, vLLM)
-- **Provider Switching**: Switch between any provider mid-conversation without losing context
-- **No API Key Required**: Use local models by default for privacy and cost savings
+- **Provider Switching**: Switch providers mid-conversation without losing context
 - **55+ Tools**: File operations, code editing, git, testing, search, and more
-- **5 Domain Verticals**: Specialized assistants for Coding, DevOps, RAG, Data Analysis, Research
-- **YAML Workflows**: Define multi-step automation with scheduling and versioning
-- **Multi-Agent Teams**: Coordinate specialized AI agents for complex tasks
-
-## Choose Your Path
-
-Select the guide that matches your situation:
-
-| Your Goal | Guide | Time |
-|-----------|-------|------|
-| **Quick start** | [Quickstart](quickstart.md) | 5 min |
-| **Full installation options** | [Installation](installation.md) | 10 min |
-| **Configure Victor** | [Configuration](configuration.md) | 10 min |
-| **Troubleshoot issues** | [Troubleshooting](../user-guide/troubleshooting.md) | As needed |
+- **5 Domain Verticals**: Coding, DevOps, RAG, Data Analysis, Research
+- **YAML Workflows**: Multi-step automation with scheduling
 
 ## Fastest Path to Running Victor
 
 ### Local Model (No API Key)
 
 ```bash
-# 1. Install Victor
+# Install Victor
 pipx install victor-ai
 
-# 2. Install and start Ollama
+# Install and start Ollama
 brew install ollama  # macOS
-# or: curl -fsSL https://ollama.com/install.sh | sh  # Linux
 ollama serve
 
-# 3. Pull a model
+# Pull a model
 ollama pull qwen2.5-coder:7b
 
-# 4. Start Victor
+# Start Victor
 victor chat "Hello, Victor!"
 ```
 
 ### Cloud Provider (API Key Required)
 
 ```bash
-# 1. Install Victor
+# Install Victor
 pipx install victor-ai
 
-# 2. Set API key
+# Set API key
 export ANTHROPIC_API_KEY=sk-ant-your-key
 
-# 3. Start Victor
+# Start Victor
 victor chat --provider anthropic "Hello, Victor!"
 ```
 
 ### Docker
 
 ```bash
-# Pull and run
 docker pull ghcr.io/vjsingh1984/victor:latest
-docker run -it \
-  -v ~/.victor:/root/.victor \
-  -v "$(pwd)":/workspace \
-  -w /workspace \
-  ghcr.io/vjsingh1984/victor:latest chat
+docker run -it -v ~/.victor:/root/.victor ghcr.io/vjsingh1984/victor:latest
 ```
+
+## Getting Started Guides
+
+| Guide | Description | Time |
+|-------|-------------|------|
+| [Installation](installation.md) | Install Victor (pipx, pip, Docker) | 5 min |
+| [First Run](first-run.md) | First steps and basic usage | 5 min |
+| [Local Models](local-models.md) | Ollama, LM Studio, vLLM setup | 10 min |
+| [Cloud Models](cloud-models.md) | Cloud provider setup (17 providers) | 10 min |
+| [Docker](docker.md) | Docker deployment | 5 min |
+| [Configuration](configuration.md) | Advanced configuration | 10 min |
+| [Troubleshooting](troubleshooting.md) | Solve common issues | As needed |
 
 ## System Requirements
 
@@ -81,8 +74,6 @@ docker run -it \
 | **OS** | Linux, macOS, Windows (WSL2) | Linux or macOS |
 
 ## Quick Verification
-
-After installation, verify Victor is working:
 
 ```bash
 # Check version
@@ -98,38 +89,23 @@ victor chat "Hello, Victor!"
 victor
 ```
 
-## Getting Started Guides
+## Common Tasks
 
-### 1. [Installation Guide](installation.md)
+```bash
+# Explore codebase
+victor "Summarize this repository"
 
-Complete installation instructions including:
-- System requirements
-- Installation methods (pipx, pip, Docker, development)
-- Optional dependencies
-- Platform-specific instructions (macOS, Linux, Windows)
-- Troubleshooting common issues
+# Get help with code
+victor "Explain what main() does"
 
-### 2. [Quickstart Guide](quickstart.md)
+# Make changes
+victor "Add error handling to db.py"
 
-Get productive quickly:
-- First run experience
-- Interface modes (TUI, CLI, API)
-- Essential commands
-- Common workflows
-- Quick reference card
-
-### 3. [Configuration Guide](configuration.md)
-
-Customize Victor for your needs:
-- Environment variables and API keys
-- Profiles configuration
-- Global settings
-- Project context files (.victor.md, CLAUDE.md)
-- Modes (BUILD, PLAN, EXPLORE)
+# Run tests
+victor "Run tests and summarize failures"
+```
 
 ## What's Next?
-
-After getting started:
 
 1. **[User Guide](../user-guide/)** - Daily usage patterns and workflows
 2. **[Provider Reference](../reference/providers/)** - All 21 providers detailed
@@ -138,11 +114,11 @@ After getting started:
 
 ## Need Help?
 
-- **Troubleshooting**: [Troubleshooting Guide](../user-guide/troubleshooting.md)
+- **Troubleshooting**: [Troubleshooting Guide](troubleshooting.md)
 - **Documentation**: [Full docs](../README.md)
 - **Community**: [GitHub Discussions](https://github.com/vjsingh1984/victor/discussions)
 - **Issues**: [Report bugs](https://github.com/vjsingh1984/victor/issues)
 
 ---
 
-**Next**: [Installation Guide](installation.md) | [Quickstart](quickstart.md) | [Configuration](configuration.md)
+**Next**: [Installation](installation.md) | [First Run](first-run.md) | [Local Models](local-models.md) | [Cloud Models](cloud-models.md)

@@ -785,7 +785,7 @@ def register_data_analysis_personas() -> int:
             # Register with provider
             provider.register_persona(
                 name=persona_name,
-                version="1.0.0",
+                version="0.5.0",
                 persona=framework_traits,
                 category=category,
                 description=persona.approach,

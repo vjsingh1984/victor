@@ -66,14 +66,29 @@ from victor.core.tool_dependency_loader import create_vertical_tool_dependency_p
 # Create canonical provider for coding vertical
 CodingToolDependencyProvider = create_vertical_tool_dependency_provider("coding")
 
+# Import lazy initializer for eliminating import side-effects
+from victor.framework.lazy_initializer import get_initializer_for_vertical
 
-# Auto-register escape hatches (OCP-compliant)
+
+# Lazy register escape hatches (Phase 5: Eliminate import side-effects)
 def _register_escape_hatches() -> None:
     """Register coding vertical's escape hatches with the global registry.
 
-    This function runs on module import to automatically register escape hatches.
-    Using the registry's discover_from_all_verticals() method is the OCP-compliant
-    approach, as it doesn't require the framework to know about specific verticals.
+    Phase 5 Import Side-Effects Remediation:
+    This function now uses lazy initialization via LazyInitializer to eliminate
+    import-time side effects. Registration occurs on first use, not on import.
+
+    Old Pattern (import side-effect):
+        _register_escape_hatches()  # Called immediately on import ❌
+
+    New Pattern (lazy initialization):
+        _lazy_init.get_or_initialize()  # Called on first use ✅
+
+    Benefits:
+    - No import side effects
+    - Thread-safe initialization
+    - Initialization only when needed
+    - Faster startup times
     """
     try:
         from victor.framework.escape_hatch_registry import EscapeHatchRegistry
@@ -93,8 +108,13 @@ def _register_escape_hatches() -> None:
         pass
 
 
-# Register on import
-_register_escape_hatches()
+# Create lazy initializer (no import side-effect)
+_lazy_init = get_initializer_for_vertical(
+    "coding",
+    _register_escape_hatches
+)
+# Note: Registration happens on first call to _lazy_init.get_or_initialize()
+# This eliminates import-time side effects while maintaining backward compatibility
 
 __all__ = [
     # Main vertical

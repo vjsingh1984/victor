@@ -28,7 +28,7 @@ long_description: |
   measurable, data-driven performance gains.
 
   Ideal for application optimization, bottleneck resolution, and efficiency improvements.
-version: "1.0.0"
+version: "0.5.0"
 author: "Victor AI"
 vertical: "coding"
 formation: "sequential"

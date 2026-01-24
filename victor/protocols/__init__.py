@@ -58,6 +58,18 @@ from victor.protocols.mode_aware import (
     create_mode_aware_mixin,
 )
 
+# Mode Controller (Phase 1.1)
+from victor.protocols.mode_controller import (
+    ModeControllerProtocol,
+    ExtendedModeControllerProtocol,
+)
+
+# Provider Lifecycle (Phase 1.2)
+from victor.protocols.provider_lifecycle import ProviderLifecycleProtocol
+
+# Capability Provider (Phase 1.4)
+from victor.protocols.capability_provider import FileOperationsCapabilityProtocol
+
 # Path Resolution
 from victor.protocols.path_resolver import (
     IPathResolver,
@@ -297,6 +309,15 @@ from victor.protocols.classification import (
     IKeywordMatch,
 )
 
+# ISP Compliance Protocols (Phase 1 SOLID Remediation)
+from victor.protocols.capability import (
+    CapabilityContainerProtocol,
+    get_capability_registry,
+)
+from victor.protocols.workflow_provider import WorkflowProviderProtocol
+from victor.protocols.tiered_config import TieredConfigProviderProtocol
+from victor.protocols.extension_provider import ExtensionProviderProtocol
+
 __all__ = [
     # Provider Adapter
     "IProviderAdapter",
@@ -330,6 +351,13 @@ __all__ = [
     "ModeInfo",
     "ModeAwareMixin",
     "create_mode_aware_mixin",
+    # Mode Controller (Phase 1.1)
+    "ModeControllerProtocol",
+    "ExtendedModeControllerProtocol",
+    # Provider Lifecycle (Phase 1.2)
+    "ProviderLifecycleProtocol",
+    # Capability Provider (Phase 1.4)
+    "FileOperationsCapabilityProtocol",
     # Path Resolution
     "IPathResolver",
     "PathResolution",
@@ -499,4 +527,10 @@ __all__ = [
     # Classification Protocol
     "IClassificationResult",
     "IKeywordMatch",
+    # ISP Compliance Protocols (Phase 1 SOLID Remediation)
+    "CapabilityContainerProtocol",
+    "get_capability_registry",
+    "WorkflowProviderProtocol",
+    "TieredConfigProviderProtocol",
+    "ExtensionProviderProtocol",
 ]

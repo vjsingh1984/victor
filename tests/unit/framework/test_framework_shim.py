@@ -42,7 +42,7 @@ class MockVertical(VerticalBase):
 
     name = "framework_shim_mock_vertical"
     description = "Test vertical for unit tests"
-    version = "1.0.0"
+    version = "0.5.0"
 
     @classmethod
     def get_tools(cls):

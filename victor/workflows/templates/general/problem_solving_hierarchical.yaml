@@ -28,7 +28,7 @@ long_description: |
   Specialists provide expertise in analysis, creativity, and pragmatism.
 
   Ideal for complex challenges requiring diverse perspectives and expertise.
-version: "1.0.0"
+version: "0.5.0"
 author: "Victor AI"
 vertical: "general"
 formation: "hierarchical"

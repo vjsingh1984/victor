@@ -79,7 +79,7 @@ async def _run_mcp_server() -> None:
 
     server = MCPServer(
         name="Victor MCP Server",
-        version="1.0.0",
+        version="0.5.0",
         tool_registry=registry,
     )
 

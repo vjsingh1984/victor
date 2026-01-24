@@ -654,7 +654,7 @@ def _register_chains_with_framework() -> None:
     # Register exploration chains
     registry.register_chain(
         name="explore_file_chain",
-        version="1.0.0",
+        version="0.5.0",
         chain=explore_file_chain,
         category="exploration",
         description="Explore a file with context (read + ls + grep)",
@@ -664,7 +664,7 @@ def _register_chains_with_framework() -> None:
 
     registry.register_chain(
         name="search_with_context_chain",
-        version="1.0.0",
+        version="0.5.0",
         chain=search_with_context_chain,
         category="exploration",
         description="Search codebase with surrounding context",
@@ -675,7 +675,7 @@ def _register_chains_with_framework() -> None:
     # Register analysis chains
     registry.register_chain(
         name="analyze_function_chain",
-        version="1.0.0",
+        version="0.5.0",
         chain=analyze_function_chain,
         category="analysis",
         description="Analyze a function with symbol extraction",
@@ -685,7 +685,7 @@ def _register_chains_with_framework() -> None:
 
     registry.register_chain(
         name="review_analysis_chain",
-        version="1.0.0",
+        version="0.5.0",
         chain=review_analysis_chain,
         category="analysis",
         description="Parallel analysis for code review (read + symbols)",
@@ -696,7 +696,7 @@ def _register_chains_with_framework() -> None:
     # Register editing chains
     registry.register_chain(
         name="safe_edit_chain",
-        version="1.0.0",
+        version="0.5.0",
         chain=safe_edit_chain,
         category="editing",
         description="Safe edit with verification (read + edit + read)",
@@ -707,7 +707,7 @@ def _register_chains_with_framework() -> None:
     # Register testing chains
     registry.register_chain(
         name="test_discovery_chain",
-        version="1.0.0",
+        version="0.5.0",
         chain=test_discovery_chain,
         category="testing",
         description="Discover and analyze tests for code",
@@ -717,7 +717,7 @@ def _register_chains_with_framework() -> None:
 
     registry.register_chain(
         name="lint_chain",
-        version="1.0.0",
+        version="0.5.0",
         chain=lint_chain,
         category="testing",
         description="Branching chain for lint analysis",
@@ -728,7 +728,7 @@ def _register_chains_with_framework() -> None:
     # Register git chains
     registry.register_chain(
         name="git_status_chain",
-        version="1.0.0",
+        version="0.5.0",
         chain=git_status_chain,
         category="exploration",
         description="Parallel git status and branch info",

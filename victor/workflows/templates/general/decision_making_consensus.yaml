@@ -28,7 +28,7 @@ long_description: |
   decisions are thoroughly considered from multiple angles.
 
   Ideal for architecture decisions, technology selection, and strategic choices.
-version: "1.0.0"
+version: "0.5.0"
 author: "Victor AI"
 vertical: "general"
 formation: "consensus"

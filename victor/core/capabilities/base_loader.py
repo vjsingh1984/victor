@@ -67,7 +67,7 @@ class Capability:
         name: str,
         type: str,
         description: str = "",
-        version: str = "1.0.0",
+        version: str = "0.5.0",
         enabled: bool = True,
         dependencies: List[str] | None = None,
         handler: str | None = None,

@@ -28,7 +28,7 @@ long_description: |
   ensures a wide range of creative ideas.
 
   Ideal for feature ideation, problem solving, and innovation.
-version: "1.0.0"
+version: "0.5.0"
 author: "Victor AI"
 vertical: "general"
 formation: "parallel"

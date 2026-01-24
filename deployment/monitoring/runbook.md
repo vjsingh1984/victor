@@ -1,6 +1,6 @@
 # Victor AI Monitoring Runbook
 
-**Version**: 0.5.1
+**Version**: 0.5.0
 **Last Updated**: 2026-01-21
 **Purpose**: Operational guide for Victor AI production monitoring stack
 

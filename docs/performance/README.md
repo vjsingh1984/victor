@@ -1,6 +1,6 @@
 # Victor AI Performance Benchmark Suite
 
-Production-ready benchmarking suite for Victor AI 0.5.1 to measure and validate performance improvements from refactoring work.
+Production-ready benchmarking suite for Victor AI 0.5.0 to measure and validate performance improvements from refactoring work.
 
 ## Overview
 

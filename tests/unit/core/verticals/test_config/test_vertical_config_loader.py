@@ -303,7 +303,7 @@ def full_yaml(tmp_path):
 metadata:
   name: full
   description: Full vertical
-  version: "1.0.0"
+  version: "0.5.0"
 
 core:
   tools:

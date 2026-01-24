@@ -1,0 +1,501 @@
+# Common Workflow Stage Templates
+# ================================
+# Reusable stage definitions that can be referenced across workflows.
+# These templates provide consistent behavior and reduce duplication.
+#
+# Usage:
+#   In workflow YAML, use stage: "read_stage" to reference this template.
+#   Override specific fields with overrides: section.
+#
+# Template Types:
+#   - compute: Deterministic operations (no LLM)
+#   - agent: LLM-powered reasoning
+#   - transform: Data transformations
+#   - condition: Branching logic
+#   - hitl: Human-in-the-loop interactions
+
+version: "1.0"
+
+stage_templates:
+  # ==============================================================================
+  # Read/Gather Stages
+  # ==============================================================================
+
+  read_stage:
+    description: "Read files and gather context"
+    type: agent
+    role: reader
+    name: "Read Context"
+    goal: |
+      Read the relevant files and gather context for the task:
+      - Identify which files to read based on the task
+      - Read file contents
+      - Search for relevant code patterns
+      - Gather necessary context
+    tools: [read, search, grep, find]
+    tool_budget: 15
+    llm_config:
+      temperature: 0.2
+    timeout: 120
+
+  gather_changes_stage:
+    description: "Gather code changes (git diff)"
+    type: compute
+    name: "Gather Code Changes"
+    tools: [shell]
+    inputs:
+      command: $ctx.diff_command
+    output: changes
+    constraints: [llm, write]
+    timeout: 60
+
+  # ==============================================================================
+  # Analysis Stages
+  # ==============================================================================
+
+  analyze_stage:
+    description: "Analyze code/data and extract insights"
+    type: agent
+    role: analyst
+    name: "Analyze"
+    goal: |
+      Analyze the provided information:
+      - Extract key insights
+      - Identify patterns and relationships
+      - Note potential issues
+      - Provide structured analysis
+    tools: [read, grep, code_search]
+    tool_budget: 20
+    llm_config:
+      temperature: 0.3
+    timeout: 180
+
+  security_analysis_stage:
+    description: "Security vulnerability analysis"
+    type: agent
+    role: security_analyst
+    name: "Security Analysis"
+    goal: |
+      Analyze for security vulnerabilities:
+      - OWASP Top 10 vulnerabilities
+      - Injection attacks
+      - Authentication/authorization issues
+      - Data exposure risks
+      - Cryptography issues
+    tools: [read, grep, code_search]
+    tool_budget: 25
+    llm_config:
+      temperature: 0.2
+    timeout: 240
+
+  performance_analysis_stage:
+    description: "Performance and optimization analysis"
+    type: agent
+    role: performance_analyst
+    name: "Performance Analysis"
+    goal: |
+      Analyze for performance issues:
+      - Algorithmic complexity
+      - Database query efficiency
+      - Caching opportunities
+      - Resource usage patterns
+      - Scalability concerns
+    tools: [read, grep, code_search]
+    tool_budget: 20
+    llm_config:
+      temperature: 0.3
+    timeout: 180
+
+  quality_analysis_stage:
+    description: "Code quality and maintainability analysis"
+    type: agent
+    role: quality_analyst
+    name: "Quality Analysis"
+    goal: |
+      Analyze code quality:
+      - Code duplication
+      - Design patterns
+      - SOLID principles
+      - Maintainability
+      - Technical debt
+    tools: [read, grep, code_search]
+    tool_budget: 20
+    llm_config:
+      temperature: 0.3
+    timeout: 180
+
+  # ==============================================================================
+  # Modify/Write Stages
+  # ==============================================================================
+
+  modify_stage:
+    description: "Make changes to files"
+    type: agent
+    role: executor
+    name: "Apply Changes"
+    goal: |
+      Make the necessary changes:
+      - Apply minimal, targeted edits
+      - Preserve existing logic
+      - Add comments explaining changes
+      - Follow project conventions
+    tools: [read, edit, write]
+    tool_budget: 30
+    llm_config:
+      temperature: 0.1
+    timeout: 300
+
+  refactor_stage:
+    description: "Refactor code for better structure"
+    type: agent
+    role: refactored
+    name: "Refactor Code"
+    goal: |
+      Refactor the code to:
+      - Improve structure and organization
+      - Reduce duplication
+      - Enhance readability
+      - Apply design patterns appropriately
+      - Maintain functionality
+    tools: [read, edit, write, grep]
+    tool_budget: 40
+    llm_config:
+      temperature: 0.2
+    timeout: 600
+
+  # ==============================================================================
+  # Verify/Test Stages
+  # ==============================================================================
+
+  verify_stage:
+    description: "Verify changes with tests and checks"
+    type: compute
+    name: "Run Verification"
+    tools: [shell]
+    inputs:
+      commands:
+        - $ctx.test_command
+        - $ctx.lint_command
+        - $ctx.type_check_command
+    output: verification_results
+    constraints: [llm]
+    timeout: 300
+
+  lint_check_stage:
+    description: "Run linters for code quality"
+    type: compute
+    name: "Run Linters"
+    tools: [shell]
+    inputs:
+      commands:
+        - $ctx.lint_command
+        - $ctx.format_check_command
+    output: lint_results
+    constraints: [llm, write]
+    timeout: 180
+
+  type_check_stage:
+    description: "Run type checker"
+    type: compute
+    name: "Type Check"
+    tools: [shell]
+    inputs:
+      command: $ctx.type_check_command
+    output: type_results
+    constraints: [llm, write]
+    timeout: 180
+
+  test_stage:
+    description: "Run test suite"
+    type: compute
+    name: "Run Tests"
+    tools: [shell]
+    inputs:
+      command: $ctx.test_command
+    output: test_results
+    constraints: [llm]
+    timeout: 300
+
+  # ==============================================================================
+  # Review Stages
+  # ==============================================================================
+
+  review_stage:
+    description: "Review and provide feedback"
+    type: agent
+    role: reviewer
+    name: "Review"
+    goal: |
+      Review the work focusing on:
+      - Correctness and logic
+      - Code quality
+      - Best practices
+      - Potential issues
+      - Suggestions for improvement
+    tools: [read, grep, code_search]
+    tool_budget: 20
+    llm_config:
+      temperature: 0.4
+    timeout: 240
+
+  # ==============================================================================
+  # Deployment Stages
+  # ==============================================================================
+
+  pre_deploy_stage:
+    description: "Pre-deployment validation"
+    type: compute
+    name: "Pre-Deployment Checks"
+    tools: [shell, read]
+    inputs:
+      checks:
+        - config_validation
+        - dependency_check
+        - health_check
+    output: pre_deploy_results
+    constraints: [llm, write]
+    timeout: 180
+
+  deploy_stage:
+    description: "Execute deployment"
+    type: compute
+    name: "Deploy"
+    tools: [shell]
+    inputs:
+      command: $ctx.deploy_command
+      environment: $ctx.target_env
+    output: deploy_results
+    constraints: [llm]
+    timeout: 600
+
+  post_deploy_stage:
+    description: "Post-deployment verification"
+    type: compute
+    name: "Post-Deployment Checks"
+    tools: [shell]
+    inputs:
+      checks:
+        - health_check
+        - smoke_test
+        - monitor_check
+    output: post_deploy_results
+    constraints: [llm]
+    timeout: 300
+
+  # ==============================================================================
+  # Research/Analysis Stages
+  # ==============================================================================
+
+  search_stage:
+    description: "Search for information"
+    type: agent
+    role: researcher
+    name: "Search"
+    goal: |
+      Search for and collect relevant information:
+      - Use multiple sources
+      - Evaluate source quality
+      - Extract key information
+      - Organize findings
+    tools: [web_search, web_fetch, read]
+    tool_budget: 25
+    llm_config:
+      temperature: 0.2
+    timeout: 300
+
+  synthesis_stage:
+    description: "Synthesize findings into report"
+    type: agent
+    role: synthesizer
+    name: "Synthesize"
+    goal: |
+      Synthesize the gathered information:
+      - Identify themes and patterns
+      - Resolve contradictions
+      - Draw conclusions
+      - Generate comprehensive report
+    tools: [read, write]
+    tool_budget: 30
+    llm_config:
+      temperature: 0.4
+    timeout: 600
+
+  # ==============================================================================
+  # Data Processing Stages
+  # ==============================================================================
+
+  data_quality_stage:
+    description: "Assess data quality"
+    type: compute
+    name: "Quality Assessment"
+    tools: [shell]
+    inputs:
+      data_path: $ctx.data_path
+      metrics:
+        - missing_values
+        - duplicates
+        - outliers
+        - consistency
+    output: quality_report
+    constraints: [llm]
+    timeout: 180
+
+  data_cleaning_stage:
+    description: "Clean and preprocess data"
+    type: compute
+    name: "Clean Data"
+    tools: [shell]
+    inputs:
+      data_path: $ctx.data_path
+      operations:
+        - handle_missing
+        - remove_duplicates
+        - handle_outliers
+        - normalize_types
+    output: cleaned_data
+    constraints: [llm]
+    timeout: 600
+
+  # ==============================================================================
+  # Human-in-the-Loop Stages
+  # ==============================================================================
+
+  approval_stage:
+    description: "Request human approval"
+    type: hitl
+    name: "Request Approval"
+    hitl_type: approval
+    prompt: |
+      ## Approval Required
+
+      **Summary:** {summary}
+
+      **Details:** {details}
+
+      Do you approve?
+    context_keys:
+      - summary
+      - details
+    timeout: 900
+    fallback: continue
+
+  input_stage:
+    description: "Request human input"
+    type: hitl
+    name: "Request Input"
+    hitl_type: input
+    prompt: |
+      ## Input Required
+
+      {prompt_text}
+
+      **Context:** {context}
+    context_keys:
+      - prompt_text
+      - context
+    timeout: 600
+    fallback: continue
+
+  choice_stage:
+    description: "Request human choice from options"
+    type: hitl
+    name: "Request Choice"
+    hitl_type: choice
+    prompt: |
+      ## Choice Required
+
+      {prompt_text}
+
+      **Options:**
+      {options}
+    context_keys:
+      - prompt_text
+      - options
+    timeout: 600
+    fallback: continue
+
+  # ==============================================================================
+  # Condition Stages
+  # ==============================================================================
+
+  check_success_stage:
+    description: "Check if operation succeeded"
+    type: condition
+    name: "Check Success"
+    condition: "status == 'success'"
+    branches:
+      "true": continue
+      "false": handle_error
+
+  check_errors_stage:
+    description: "Check for errors"
+    type: condition
+    name: "Check for Errors"
+    condition: "error_count > 0"
+    branches:
+      "true": handle_error
+      "false": continue
+
+  # ==============================================================================
+  # Transform Stages
+  # ==============================================================================
+
+  aggregate_results_stage:
+    description: "Aggregate results from parallel operations"
+    type: transform
+    name: "Aggregate Results"
+    transform: |
+      aggregated = merge(*results)
+      summary = {
+        "total": len(aggregated),
+        "success_count": count_success(aggregated),
+        "error_count": count_errors(aggregated)
+      }
+    output: aggregated_results
+
+  complete_stage:
+    description: "Mark workflow as complete"
+    type: transform
+    name: "Complete"
+    transform: |
+      status = "completed"
+      end_time = current_timestamp()
+      output = final_results
+
+# Override Presets
+# ================
+# Common override configurations for quick customization
+
+override_presets:
+  quick_review:
+    description: "Fast review with reduced tool budget"
+    tool_budget: 15
+    llm_config:
+      temperature: 0.3
+      model_hint: claude-3-haiku
+
+  thorough_review:
+    description: "Detailed review with increased tool budget"
+    tool_budget: 40
+    llm_config:
+      temperature: 0.4
+
+  strict_verification:
+    description: "Strict verification with all checks"
+    tools: [shell]
+    inputs:
+      commands:
+        - $ctx.test_command
+        - $ctx.lint_command
+        - $ctx.type_check_command
+        - $ctx.security_scan_command
+    timeout: 600
+
+  safe_deployment:
+    description: "Deployment with rollback preparation"
+    tools: [shell]
+    inputs:
+      backup_before: true
+      rollback_enabled: true
+      health_checks: extensive
+    timeout: 1200

@@ -805,7 +805,7 @@ def _register_personas_with_framework() -> None:
         # Register with framework
         provider.register_persona(
             name=persona_id,
-            version="1.0.0",
+            version="0.5.0",
             persona=framework_traits,
             category=category,
             description=f"{persona.name} - {persona.role}",

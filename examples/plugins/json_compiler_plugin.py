@@ -161,7 +161,7 @@ class JsonCompilerPlugin(WorkflowCompilerPlugin):
                 workflow_def['metadata'] = {}
 
             if 'version' not in workflow_def['metadata']:
-                workflow_def['metadata']['version'] = '1.0.0'
+                workflow_def['metadata']['version'] = '0.5.0'
 
         return data
 

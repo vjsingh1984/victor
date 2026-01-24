@@ -367,5 +367,5 @@ For issues or questions:
 ---
 
 **Created**: 2025-01-15
-**Version**: 1.0.0
+**Version**: 0.5.0
 **Status**: Production Ready

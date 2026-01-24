@@ -32,7 +32,7 @@ Example:
         metadata=VerticalMetadata(
             name="security",
             description="Security analysis and vulnerability detection",
-            version="1.0.0",
+            version="0.5.0",
         ),
         tools=["read", "grep", "security_scan"],
         system_prompt="You are a security expert...",
@@ -68,7 +68,7 @@ class VerticalMetadata:
     Attributes:
         name: Vertical identifier (e.g., "coding", "research")
         description: Human-readable description
-        version: Semantic version (e.g., "1.0.0")
+        version: Semantic version (e.g., "0.5.0")
         author: Optional author name
         license: License name (default: "Apache-2.0")
         category: Vertical category (coding, devops, rag, etc.)
@@ -79,7 +79,7 @@ class VerticalMetadata:
 
     name: str
     description: str
-    version: str = "1.0.0"
+    version: str = "0.5.0"
     author: Optional[str] = None
     license: str = "Apache-2.0"
     category: str = "general"
@@ -107,7 +107,7 @@ class VerticalMetadata:
         return cls(
             name=data["name"],
             description=data["description"],
-            version=data.get("version", "1.0.0"),
+            version=data.get("version", "0.5.0"),
             author=data.get("author"),
             license=data.get("license", "Apache-2.0"),
             category=data.get("category", "general"),

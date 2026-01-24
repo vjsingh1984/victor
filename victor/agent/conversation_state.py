@@ -269,6 +269,7 @@ class ConversationStateMachine:
         max_history_size: int = 100,
         event_bus: Optional[ObservabilityBus] = None,
         state_manager: Optional[Any] = None,
+        use_transition_engine: bool = True,
     ) -> None:
         """Initialize the state machine.
 
@@ -279,6 +280,7 @@ class ConversationStateMachine:
             event_bus: Optional ObservabilityBus instance. If None, uses DI container.
             state_manager: Optional ConversationStateManager for canonical state storage.
                           If provided, state will be synced to the manager.
+            use_transition_engine: Whether to use StageTransitionEngine for validation.
         """
         self.state = ConversationState()
         self._last_transition_time: float = 0.0
@@ -290,6 +292,20 @@ class ConversationStateMachine:
         self._event_bus = event_bus or self._get_default_bus()
         self._state_manager = state_manager  # Optional canonical state manager
 
+        # Initialize StageTransitionEngine for validated transitions and tool priorities
+        self._use_transition_engine = use_transition_engine
+        if use_transition_engine:
+            from victor.agent.stage_transition_engine import StageTransitionEngine
+
+            self._transition_engine = StageTransitionEngine(
+                initial_stage=self.state.stage,
+                cooldown_seconds=self.TRANSITION_COOLDOWN_SECONDS,
+                event_bus=self._event_bus,
+            )
+            logger.debug("StageTransitionEngine initialized for ConversationStateMachine")
+        else:
+            self._transition_engine = None
+
         # Sync initial state to manager if provided
         if self._state_manager:
             self._sync_state_to_manager()
@@ -300,6 +316,10 @@ class ConversationStateMachine:
         self._transition_history.clear()
         self._transition_count = 0
         self._last_transition_time = 0.0
+
+        # Reset transition engine if initialized
+        if self._transition_engine:
+            self._transition_engine.reset()
 
         # Reset manager state if provided
         if self._state_manager:
@@ -378,6 +398,32 @@ class ConversationStateMachine:
     def get_current_stage(self) -> ConversationStage:
         """Backward-compatible alias for orchestrator integrations."""
         return self.get_stage()
+
+    def get_valid_transitions(self) -> List[ConversationStage]:
+        """Get list of valid transition targets from current stage.
+
+        Returns:
+            List of stages that can be transitioned to
+        """
+        if self._transition_engine:
+            return self._transition_engine.get_valid_transitions()
+        # Fallback: all stages
+        return list(ConversationStage)
+
+    def can_transition_to(self, target_stage: ConversationStage, confidence: float = 0.5) -> bool:
+        """Check if transition to target stage is valid.
+
+        Args:
+            target_stage: Stage to check
+            confidence: Confidence level for backward transitions
+
+        Returns:
+            True if transition is valid
+        """
+        if self._transition_engine:
+            return self._transition_engine.can_transition(target_stage, confidence)
+        # Fallback: always allow
+        return True
 
     def get_stage_tools(self) -> Set[str]:
         """Get tools relevant to the current stage.
@@ -573,6 +619,8 @@ class ConversationStateMachine:
         Note: Transitions are rate-limited by TRANSITION_COOLDOWN_SECONDS to
         prevent rapid stage thrashing observed in analysis tasks.
 
+        Uses StageTransitionEngine for validation if enabled.
+
         Hook invocation order (Observer Pattern):
         1. on_exit hooks for old_stage
         2. Stage update
@@ -583,37 +631,67 @@ class ConversationStateMachine:
 
         old_stage = self.state.stage
 
-        # Don't transition backwards unless confidence is high
-        # Use class constant for threshold
-        # Compare stage order (not string values) to determine backward transition
-        if (
-            STAGE_ORDER[new_stage] < STAGE_ORDER[old_stage]
-            and confidence < self.BACKWARD_TRANSITION_THRESHOLD
-        ):
-            logger.debug(
-                f"_transition_to: Backward transition blocked {old_stage.name} -> {new_stage.name}, "
-                f"confidence={confidence:.2f} < threshold={self.BACKWARD_TRANSITION_THRESHOLD}"
-            )
-            return
-
-        if new_stage != old_stage:
-            # Enforce cooldown to prevent stage thrashing
-            current_time = time.time()
-            time_since_last = current_time - self._last_transition_time
-
-            if time_since_last < self.TRANSITION_COOLDOWN_SECONDS:
+        # Use StageTransitionEngine for validation if enabled
+        if self._transition_engine:
+            # Check if transition is valid using the engine's graph
+            if not self._transition_engine.can_transition(new_stage, confidence):
                 logger.debug(
-                    f"Stage transition blocked by cooldown: {old_stage.name} -> {new_stage.name} "
-                    f"(waited {time_since_last:.1f}s, need {self.TRANSITION_COOLDOWN_SECONDS}s)"
+                    f"_transition_to: Transition blocked by StageTransitionEngine: "
+                    f"{old_stage.name} -> {new_stage.name} (confidence={confidence:.2f})"
                 )
                 return
 
-            logger.info(
-                f"Stage transition: {old_stage.name} -> {new_stage.name} "
-                f"(confidence: {confidence:.2f})"
-            )
+            # Use the engine's transition method (handles cooldown and events)
+            if not self._transition_engine.transition_to(new_stage, confidence):
+                logger.debug(
+                    f"_transition_to: Transition rejected by StageTransitionEngine: "
+                    f"{old_stage.name} -> {new_stage.name}"
+                )
+                return
 
-            # Build context for hooks
+            # Engine handled the transition, now sync our state
+            self.state.stage = self._transition_engine.current_stage
+            self.state._stage_confidence = confidence
+            self._last_transition_time = self._transition_engine._last_transition_time
+            self._transition_count = self._transition_engine.transition_count
+        else:
+            # Legacy transition logic (without engine)
+            # Don't transition backwards unless confidence is high
+            if (
+                STAGE_ORDER[new_stage] < STAGE_ORDER[old_stage]
+                and confidence < self.BACKWARD_TRANSITION_THRESHOLD
+            ):
+                logger.debug(
+                    f"_transition_to: Backward transition blocked {old_stage.name} -> {new_stage.name}, "
+                    f"confidence={confidence:.2f} < threshold={self.BACKWARD_TRANSITION_THRESHOLD}"
+                )
+                return
+
+            if new_stage != old_stage:
+                # Enforce cooldown to prevent stage thrashing
+                current_time = time.time()
+                time_since_last = current_time - self._last_transition_time
+
+                if time_since_last < self.TRANSITION_COOLDOWN_SECONDS:
+                    logger.debug(
+                        f"Stage transition blocked by cooldown: {old_stage.name} -> {new_stage.name} "
+                        f"(waited {time_since_last:.1f}s, need {self.TRANSITION_COOLDOWN_SECONDS}s)"
+                    )
+                    return
+
+                logger.info(
+                    f"Stage transition: {old_stage.name} -> {new_stage.name} "
+                    f"(confidence: {confidence:.2f})"
+                )
+
+                # Update state
+                self.state.stage = new_stage
+                self.state._stage_confidence = confidence
+                self._last_transition_time = current_time
+                self._transition_count += 1
+
+        # Build context for hooks (only if we actually transitioned)
+        if self.state.stage != old_stage:
             hook_context = self._build_hook_context(confidence)
 
             # Fire hooks if registered (Observer Pattern)
@@ -624,18 +702,12 @@ class ConversationStateMachine:
                     hook_context,
                 )
 
-            # Update state
-            self.state.stage = new_stage
-            self.state._stage_confidence = confidence
-            self._last_transition_time = current_time
-            self._transition_count += 1
-
             # Sync to canonical state manager if provided
             if self._state_manager:
                 self._sync_state_to_manager()
 
-            # Emit STATE event for stage transition
-            if self._event_bus:
+            # Emit STATE event for stage transition (only if using legacy path)
+            if not self._transition_engine and self._event_bus:
                 try:
                     from victor.core.events.emit_helper import emit_event_sync
 
@@ -817,7 +889,26 @@ class ConversationStateMachine:
 
         Returns:
             Boost value (0.0 to 0.2) to add to similarity score
+
+        Note:
+            If StageTransitionEngine is enabled, uses its detailed
+            STAGE_TOOL_PRIORITIES configuration. Falls back to legacy
+            logic for tools not in the engine's priorities.
         """
+        # Use StageTransitionEngine's detailed priorities if available
+        if self._transition_engine:
+            multiplier = self._transition_engine.get_tool_priority_multiplier(tool_name)
+            # If engine has a specific multiplier (not default 1.0), use it
+            if multiplier != 1.0:
+                # Convert multiplier (1.0-2.0) to boost (0.0-0.2)
+                # multiplier 1.0 -> boost 0.0 (no change)
+                # multiplier 1.5 -> boost 0.1 (medium boost)
+                # multiplier 2.0 -> boost 0.2 (high boost)
+                boost = (multiplier - 1.0) * 0.2
+                return max(0.0, min(0.2, boost))
+            # Tool not in engine's priorities, fall through to legacy logic
+
+        # Legacy boost logic (for tools not in engine or when engine is disabled)
         if tool_name in self.get_stage_tools():
             return 0.15  # High boost for stage-relevant tools
 

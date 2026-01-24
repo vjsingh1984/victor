@@ -105,7 +105,7 @@ class ChainMetadata:
     output_type: Optional[str] = None
     tags: List[str] = field(default_factory=list)
     is_factory: bool = False
-    version: str = "1.0.0"
+    version: str = "0.5.0"
 
     @property
     def full_name(self) -> str:
@@ -259,7 +259,7 @@ class ChainRegistry:
         input_type: Optional[str] = None,
         output_type: Optional[str] = None,
         tags: Optional[List[str]] = None,
-        version: str = "1.0.0",
+        version: str = "0.5.0",
         replace: bool = False,
     ) -> None:
         """Register a chain factory for deferred creation.
@@ -663,7 +663,7 @@ def chain(
     input_type: Optional[str] = None,
     output_type: Optional[str] = None,
     tags: Optional[List[str]] = None,
-    version: str = "1.0.0",
+    version: str = "0.5.0",
     replace: bool = False,
 ) -> Callable[[F], F]:
     """Decorator for registering a chain factory function.

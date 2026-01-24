@@ -1,6 +1,6 @@
-# Workflow Migration Guide: Victor 0.5.x to 1.0.0
+# Workflow Migration Guide: Victor 0.5.x to 0.5.0
 
-This guide explains how to migrate your workflows from Victor 0.5.x to 1.0.0.
+This guide explains how to migrate your workflows from Victor 0.5.x to 0.5.0.
 
 ## Table of Contents
 
@@ -44,7 +44,7 @@ graph.set_finish_point("write")
 compiled = graph.compile()
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```yaml
 # workflow.yaml
 workflows:
@@ -83,7 +83,7 @@ class WorkflowState(TypedDict):
     summary: str
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 from victor.framework import State
 
@@ -107,7 +107,7 @@ executor = WorkflowExecutor(orchestrator)
 result = await executor.execute(workflow, context)
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```python
 from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
@@ -125,7 +125,7 @@ result = await compiled.invoke(
 
 ### 2. Caching
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```python
 # Two-level caching
 compiler = UnifiedWorkflowCompiler(
@@ -154,7 +154,7 @@ nodes:
     prompt: "Research this topic"
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```yaml
 nodes:
   - id: research
@@ -168,7 +168,7 @@ nodes:
 
 ### 2. Compute Nodes
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```yaml
 nodes:
   - id: process_data
@@ -189,7 +189,7 @@ nodes:
 
 ### 3. Condition Nodes
 
-**Enhanced in 1.0.0**:
+**Enhanced in 0.5.0**:
 ```yaml
 nodes:
   - id: check_quality
@@ -206,7 +206,7 @@ nodes:
 
 ### 4. Parallel Nodes
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```yaml
 nodes:
   - id: parallel_analysis
@@ -232,7 +232,7 @@ nodes:
 
 ### 5. HITL Nodes
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```yaml
 nodes:
   - id: approval
@@ -258,7 +258,7 @@ nodes:
 graph.add_edge("node1", "node2")
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```yaml
 nodes:
   - id: node1
@@ -281,7 +281,7 @@ graph.add_conditional_edge(
 )
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```yaml
 nodes:
   - id: node1
@@ -298,7 +298,7 @@ nodes:
 
 ### 3. Parallel Edges
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```yaml
 nodes:
   - id: parallel_step
@@ -340,7 +340,7 @@ compiled = graph.compile()
 result = await compiled.invoke({"query": "AI trends"})
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```yaml
 # simple_workflow.yaml
 workflows:
@@ -386,7 +386,7 @@ graph.add_conditional_edge(
 )
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```yaml
 # conditional_workflow.yaml
 workflows:
@@ -430,7 +430,7 @@ workflows:
 # No built-in support in 0.5.x
 ```
 
-**After (1.0.0)**:
+**After (0.5.0)**:
 ```yaml
 # parallel_workflow.yaml
 workflows:
@@ -475,7 +475,7 @@ workflows:
 
 ### 1. Checkpointing
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```python
 # Invoke with checkpointing
 result = await compiled.invoke(
@@ -494,7 +494,7 @@ result = await compiled.invoke(
 
 ### 2. Streaming
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```python
 # Stream workflow execution
 async for event in compiled.stream(context):
@@ -506,7 +506,7 @@ async for event in compiled.stream(context):
 
 ### 3. Error Recovery
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```yaml
 nodes:
   - id: risky_operation
@@ -527,12 +527,12 @@ nodes:
 
 ### 4. Workflow Metadata
 
-**New in 1.0.0**:
+**New in 0.5.0**:
 ```yaml
 workflows:
   my_workflow:
     metadata:
-      version: "1.0.0"
+      version: "0.5.0"
       author: "Team"
       description: "Does something great"
       tags: [research, writing]
@@ -635,4 +635,4 @@ nodes:
 ---
 
 **Last Updated**: 2025-01-21
-**Version**: 1.0.0
+**Version**: 0.5.0

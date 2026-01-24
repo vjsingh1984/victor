@@ -54,7 +54,7 @@ class MyVertical(VerticalBase):
 
     name = "my_vertical"  # Unique vertical identifier
     description = "Description of what this vertical does"
-    version = "1.0.0"
+    version = "0.5.0"
 
     def get_tools(self) -> List[Any]:
         """Return list of tools provided by this vertical."""
@@ -107,7 +107,7 @@ class SecurityVertical(VerticalBase):
 
     name = "security"
     description = "Security-focused code analysis and vulnerability detection"
-    version = "1.0.0"
+    version = "0.5.0"
 
     def get_tools(self) -> List[type[BaseTool]]:
         """Import and return security tools."""
@@ -353,7 +353,7 @@ __all__ = ["SecurityVertical"]
 
 [project]
 name = "victor-security"
-version = "1.0.0"
+version = "0.5.0"
 
 [project.entry-points."victor.verticals"]
 security = "my_vertical:SecurityVertical"
@@ -648,7 +648,7 @@ def security_vertical():
 def test_vertical_properties(security_vertical):
     """Test vertical properties."""
     assert security_vertical.name == "security"
-    assert security_vertical.version == "1.0.0"
+    assert security_vertical.version == "0.5.0"
 
 def test_get_tools(security_vertical):
     """Test tool retrieval."""
@@ -722,7 +722,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "victor-security"
-version = "1.0.0"
+version = "0.5.0"
 description = "Security analysis vertical for Victor AI"
 authors = [{name = "Your Name", email = "your.email@example.com"}]
 license = {text = "MIT"}
@@ -741,7 +741,7 @@ dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
     "black>=23.0.0",
-    "mypy>=1.0.0",
+    "mypy>=0.5.0",
 ]
 
 [project.urls]
@@ -782,7 +782,7 @@ class SecurityVertical(VerticalBase):
 
     name = "security"
     description = "Security-focused code analysis and auditing"
-    version = "1.0.0"
+    version = "0.5.0"
 
     def get_tools(self) -> List[type[BaseTool]]:
         """Return security tools."""
@@ -817,7 +817,7 @@ class DevOpsVertical(VerticalBase):
 
     name = "devops"
     description = "CI/CD, Docker, Kubernetes automation"
-    version = "1.0.0"
+    version = "0.5.0"
 
     def get_tools(self):
         """Return DevOps tools."""

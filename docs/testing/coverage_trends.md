@@ -1,7 +1,7 @@
 # Coverage Trends and Historical Data
 
 **Generated**: 2026-01-14
-**Version**: 0.5.1
+**Version**: 0.5.0
 
 ## Overview
 
@@ -15,7 +15,7 @@ This document tracks test coverage trends over time, providing insights into pro
 |------|---------|----------------|---------------|-------------|-------|-------|
 | **2024-12-01** | 0.4.0 | 8% | 14,575 | 182,186 | ~18,000 | Baseline (before Phases 1-4) |
 | **2025-01-06** | 0.5.0 | 10% | 18,219 | 182,186 | ~20,000 | After Phase 1-2: +2,000 tests |
-| **2026-01-14** | 0.5.1 | 11% | 20,171 | 182,186 | ~21,496 | After Phase 4: +1,496 tests |
+| **2026-01-14** | 0.5.0 | 11% | 20,171 | 182,186 | ~21,496 | After Phase 4: +1,496 tests |
 | **2026-02-14** | 0.5.2 | 25% | 45,547 | 182,186 | ~23,000 | **Target** (End of Sprint 1-2) |
 | **2026-03-14** | 0.5.3 | 50% | 91,093 | 182,186 | ~24,000 | **Target** (End of Sprint 3-4) |
 | **2026-03-31** | 0.6.0 | 80% | 145,749 | 182,186 | ~25,000 | **Target** (End of Q1) |

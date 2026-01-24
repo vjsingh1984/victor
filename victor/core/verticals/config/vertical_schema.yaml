@@ -1,5 +1,5 @@
 # YAML Configuration Schema for Victor Verticals
-# Version: 1.0.0
+# Version: 0.5.0
 #
 # This schema defines the structure for YAML-based vertical configuration.
 # Verticals can define their configuration in YAML instead of implementing
@@ -24,8 +24,8 @@ metadata:
   # Human-readable description (required)
   description: "Vertical description"
 
-  # Vertical version (optional, default: "1.0.0")
-  version: "1.0.0"
+  # Vertical version (optional, default: "0.5.0")
+  version: "0.5.0"
 
   # Author/maintainer (optional)
   author: "optional"

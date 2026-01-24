@@ -33,7 +33,7 @@ cd scripts
 ```bash
 # Build Docker image
 cd scripts/docker
-./build.sh 1.0.0 --push --scan
+./build.sh 0.5.0 --push --scan
 
 # Deploy
 cd ..
@@ -263,13 +263,13 @@ Failed:         0
 
 ```bash
 # Build with version tag
-./build.sh 1.0.0
+./build.sh 0.5.0
 
 # Build and push to registry
-./build.sh 1.0.0 --push
+./build.sh 0.5.0 --push
 
 # Build, push, and scan
-./build.sh 1.0.0 --push --scan
+./build.sh 0.5.0 --push --scan
 
 # Use git tag as version
 ./build.sh $(git describe --tags)
@@ -281,8 +281,8 @@ Failed:         0
 **Tags Created**:
 
 ```bash
-# For version 1.0.0
-victorai/victor:1.0.0          # Version tag
+# For version 0.5.0
+victorai/victor:0.5.0          # Version tag
 victorai/victor:abc1234        # Git SHA
 victorai/victor:main           # Branch name
 victorai/victor:latest         # Latest (if production)
@@ -292,7 +292,7 @@ victorai/victor:latest         # Latest (if production)
 
 | Argument | Description | Example |
 |----------|-------------|---------|
-| `VERSION` | Application version | `1.0.0` |
+| `VERSION` | Application version | `0.5.0` |
 | `GIT_SHA` | Git commit SHA | `abc1234` |
 | `GIT_BRANCH` | Git branch name | `main` |
 | `BUILD_DATE` | Build timestamp | `2024-01-20T15:30:00Z` |
@@ -301,13 +301,13 @@ victorai/victor:latest         # Latest (if production)
 
 ```bash
 # View image details
-docker images victorai/victor:1.0.0
+docker images victorai/victor:0.5.0
 
 # View image layers
-docker history victorai/victor:1.0.0
+docker history victorai/victor:0.5.0
 
 # Inspect image
-docker inspect victorai/victor:1.0.0
+docker inspect victorai/victor:0.5.0
 ```
 
 **Vulnerability Scanning**:
@@ -318,10 +318,10 @@ brew install trivy  # macOS
 apt install trivy  # Ubuntu
 
 # Scan image
-trivy image victorai/victor:1.0.0
+trivy image victorai/victor:0.5.0
 
 # With script
-./build.sh 1.0.0 --scan
+./build.sh 0.5.0 --scan
 ```
 
 ---
@@ -608,8 +608,8 @@ helm search repo victor
 4. **Use Version Tags**
    ```bash
    # Use git tags for production
-   git tag -a v1.0.0 -m "Release v1.0.0"
-   git push origin v1.0.0
+   git tag -a v0.5.0 -m "Release v0.5.0"
+   git push origin v0.5.0
    ```
 
 5. **Enable Health Checks**
@@ -634,4 +634,4 @@ For issues or questions:
 ---
 
 **Last Updated**: 2025-01-20
-**Version**: 0.5.1
+**Version**: 0.5.0

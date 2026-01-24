@@ -59,7 +59,7 @@ class TestExtensionMetadata:
         """Test creating metadata with defaults."""
         metadata = ExtensionMetadata()
 
-        assert metadata.version == "1.0.0"
+        assert metadata.version == "0.5.0"
         assert metadata.description == ""
         assert metadata.author == ""
         assert metadata.dependencies == []
@@ -117,7 +117,7 @@ class MockExtension(IExtension):
                 "description": self.metadata.description,
                 "author": self.metadata.author,
             }
-        return {"version": "1.0.0"}
+        return {"version": "0.5.0"}
 
 
 class TestExtensionImplementations:

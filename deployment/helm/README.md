@@ -70,7 +70,7 @@ The Helm chart uses the following default values (see `values.yaml`):
 replicaCount: 3
 image:
   repository: victorai/victor
-  tag: "0.5.1"
+  tag: "0.5.0"
   pullPolicy: Always
 
 # Service

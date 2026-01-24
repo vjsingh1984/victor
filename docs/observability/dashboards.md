@@ -796,7 +796,7 @@ For issues and questions:
 
 ## Changelog
 
-### Version 1.0.0 (2025-01-15)
+### Version 0.5.0 (2025-01-15)
 
 - Initial release of team observability dashboards
 - 4 dashboards: Overview, Performance, Recursion, Members

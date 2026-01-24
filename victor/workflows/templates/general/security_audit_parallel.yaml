@@ -28,7 +28,7 @@ long_description: |
   protection. Results are synthesized into a complete security assessment.
 
   Ideal for security audits, vulnerability assessments, and compliance reviews.
-version: "1.0.0"
+version: "0.5.0"
 author: "Victor AI"
 vertical: "general"
 formation: "parallel"

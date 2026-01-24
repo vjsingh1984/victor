@@ -174,7 +174,7 @@ class VerticalExtractor:
         return VerticalMetadata(
             name=vertical_class.name,
             description=vertical_class.description,
-            version=getattr(vertical_class, "version", "1.0.0"),
+            version=getattr(vertical_class, "version", "0.5.0"),
             category=getattr(vertical_class, "category", "general"),
         )
 

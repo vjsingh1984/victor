@@ -23,7 +23,7 @@ Example:
     # Register a chain
     ChainRegistry.register_chain(
         name="safe_edit_chain",
-        version="1.0.0",
+        version="0.5.0",
         chain=safe_edit_chain,
         category="editing",
         description="Safe edit with verification"

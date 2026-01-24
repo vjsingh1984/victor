@@ -254,7 +254,7 @@ name: my_custom_template
 display_name: "My Custom Team"
 description: "Does X, Y, Z"
 long_description: "Detailed description..."
-version: "1.0.0"
+version: "0.5.0"
 author: "Your Name"
 vertical: "coding"
 formation: "parallel"

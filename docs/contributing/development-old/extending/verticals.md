@@ -69,7 +69,7 @@ class MyVertical(VerticalBase):
 | Member | Default | Description |
 |--------|---------|-------------|
 | `description` | `""` | Human-readable description |
-| `version` | `"1.0.0"` | Semantic version of the vertical |
+| `version` | `"0.5.0"` | Semantic version of the vertical |
 | `get_stages()` | 7-stage workflow | Stage definitions for task progression |
 | `get_provider_hints()` | Default hints | Provider selection preferences |
 | `get_evaluation_criteria()` | Basic criteria | Quality evaluation criteria |
@@ -99,7 +99,7 @@ class SecurityAssistant(VerticalBase):
 
     name = "security"
     description = "Security analysis, vulnerability assessment, and code auditing"
-    version = "1.0.0"
+    version = "0.5.0"
 
     @classmethod
     def get_tools(cls) -> List[str]:
@@ -542,7 +542,7 @@ victor-security/
 # pyproject.toml
 [project]
 name = "victor-security"
-version = "1.0.0"
+version = "0.5.0"
 dependencies = ["victor-ai>=0.4.0"]
 
 [project.entry-points."victor.verticals"]

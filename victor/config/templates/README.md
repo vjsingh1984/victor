@@ -232,7 +232,7 @@ All templates follow this structure:
 metadata:
   name: vertical_name
   description: "Description"
-  version: "1.0.0"
+  version: "0.5.0"
   author: "Author"
   category: category
   tags: [tags]

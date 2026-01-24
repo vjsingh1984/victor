@@ -27,7 +27,7 @@ docker-compose -f deployment/docker/docker-compose.prod.yml down
 
 ```bash
 # Pull the image
-docker pull victorai/victor:0.5.1
+docker pull victorai/victor:0.5.0
 
 # Run Victor AI
 docker run -d \
@@ -36,7 +36,7 @@ docker run -d \
   -e VICTOR_PROFILE=production \
   -e DATABASE_URL="postgresql://user:pass@host:5432/db" \
   -e ANTHROPIC_API_KEY="your-key" \
-  victorai/victor:0.5.1
+  victorai/victor:0.5.0
 
 # View logs
 docker logs -f victor-ai
@@ -77,16 +77,16 @@ The Dockerfile uses a multi-stage build for optimization:
 
 ```bash
 # Build slim image (recommended)
-docker build -f deployment/docker/Dockerfile --target slim -t victorai/victor:0.5.1 .
+docker build -f deployment/docker/Dockerfile --target slim -t victorai/victor:0.5.0 .
 
 # Build with build args
 docker build \
   -f deployment/docker/Dockerfile \
   --target slim \
-  --build-arg VERSION=0.5.1 \
+  --build-arg VERSION=0.5.0 \
   --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
   --build-arg VCS_REF=$(git rev-parse --short HEAD) \
-  -t victorai/victor:0.5.1 .
+  -t victorai/victor:0.5.0 .
 ```
 
 ### Build for development
@@ -108,7 +108,7 @@ docker buildx build \
   -f deployment/docker/Dockerfile \
   --platform linux/amd64,linux/arm64 \
   --target slim \
-  -t victorai/victor:0.5.1 \
+  -t victorai/victor:0.5.0 \
   --push .
 ```
 
@@ -244,7 +244,7 @@ Logs are output to stdout in JSON format:
   "level": "INFO",
   "message": "Starting Victor AI",
   "context": {
-    "version": "0.5.1",
+    "version": "0.5.0",
     "profile": "production"
   }
 }
@@ -305,7 +305,7 @@ docker run -d \
   --tmpfs /tmp \
   --tmpfs /app/.cache \
   -p 8000:8000 \
-  victorai/victor:0.5.1
+  victorai/victor:0.5.0
 ```
 
 ### Secrets Management
@@ -316,7 +316,7 @@ docker run -d \
 docker run -d \
   -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
   -e DATABASE_URL="$DATABASE_URL" \
-  victorai/victor:0.5.1
+  victorai/victor:0.5.0
 ```
 
 **Option 2: Docker secrets**
@@ -336,7 +336,7 @@ docker run -d \
   --cap-add=IPC_LOCK \
   -e 'VAULT_ADDR=http://vault:8200' \
   -e 'VAULT_TOKEN=your-token' \
-  victorai/victor:0.5.1
+  victorai/victor:0.5.0
 ```
 
 ## Performance Tuning
@@ -350,7 +350,7 @@ docker run -d \
   --memory-swap="2g" \
   --cpus="2.0" \
   -p 8000:8000 \
-  victorai/victor:0.5.1
+  victorai/victor:0.5.0
 ```
 
 ### Docker Daemon Optimization
@@ -414,7 +414,7 @@ docker stats victor-ai
 docker update victor-ai --cpus="4.0"
 
 # Enable multi-threading
-docker run -e VICTOR_MAX_WORKERS=8 victorai/victor:0.5.1
+docker run -e VICTOR_MAX_WORKERS=8 victorai/victor:0.5.0
 ```
 
 ## Best Practices

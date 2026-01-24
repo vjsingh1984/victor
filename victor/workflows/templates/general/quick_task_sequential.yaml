@@ -27,7 +27,7 @@ long_description: |
   for speed and simplicity.
 
   Ideal for quick fixes, simple updates, and routine maintenance.
-version: "1.0.0"
+version: "0.5.0"
 author: "Victor AI"
 vertical: "general"
 formation: "sequential"

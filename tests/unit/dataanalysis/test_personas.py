@@ -216,7 +216,7 @@ class TestPersonaRegistration:
         metadata = provider.get_persona_metadata("data_engineer")
         assert metadata is not None
         assert metadata.vertical == "dataanalysis"
-        assert metadata.version == "1.0.0"
+        assert metadata.version == "0.5.0"
         assert metadata.category == "execution"
 
         # Check statistician metadata
