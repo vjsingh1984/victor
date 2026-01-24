@@ -150,42 +150,47 @@ class IToolSelector(Protocol):
 
     Implementations should be stateless or thread-safe, as selectors
     may be shared across multiple concurrent sessions.
+
+    Note: All methods are async to support async I/O operations
+    (e.g., embedding generation, HTTP requests) in implementations.
+
+    Signature Flexibility:
+        Implementations may have different parameter names (task vs prompt)
+        and return types (ToolSelectionResult vs List[ToolDefinition]) due to
+        evolution of the codebase. The protocol accepts these variations for
+        backward compatibility while defining the core interface contract.
     """
 
-    def select_tools(
+    async def select_tools(
         self,
-        task: str,
-        *,
-        limit: int = 10,
-        min_score: float = 0.0,
-        context: Optional[ToolSelectionContext] = None,
-    ) -> ToolSelectionResult:
+        prompt: str,
+        context: "ToolSelectionContext",
+        **kwargs: Any,
+    ) -> Union[ToolSelectionResult, List["ToolDefinition"]]:
         """Select relevant tools for a task.
 
         Args:
-            task: Task description or query to match tools against
-            limit: Maximum number of tools to return
-            min_score: Minimum relevance score threshold (0.0-1.0)
-            context: Optional additional context for selection
+            prompt: Task description or query to match tools against
+            context: Tool selection context with conversation state
+            **kwargs: Additional optional parameters (for protocol flexibility)
 
         Returns:
-            ToolSelectionResult with ranked tool names and scores
+            ToolSelectionResult or List[ToolDefinition] with ranked tools
         """
         ...
 
-    def get_tool_score(
+    async def get_tool_score(
         self,
         tool_name: str,
         task: str,
-        *,
-        context: Optional[ToolSelectionContext] = None,
+        **kwargs: Any,
     ) -> float:
         """Get relevance score for a specific tool.
 
         Args:
             tool_name: Name of the tool to score
             task: Task description to score against
-            context: Optional additional context
+            **kwargs: Additional optional parameters (e.g., context)
 
         Returns:
             Relevance score from 0.0 (not relevant) to 1.0 (highly relevant)
