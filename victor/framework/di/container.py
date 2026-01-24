@@ -98,7 +98,7 @@ class DIError(Exception):
 class ServiceNotFoundError(DIError):
     """Raised when a requested service is not registered."""
 
-    def __init__(self, service_type: Type[Any], chain: Optional[list[Type]] = None):
+    def __init__(self, service_type: type[Any], chain: Optional[list[type[Any]]] = None):
         self.service_type = service_type
         self.chain = chain or []
         name = getattr(service_type, "__name__", str(service_type))
@@ -115,7 +115,7 @@ class ServiceNotFoundError(DIError):
 class CircularDependencyError(DIError):
     """Raised when a circular dependency is detected."""
 
-    def __init__(self, chain: list[Type]):
+    def __init__(self, chain: list[type[Any]]):
         self.chain = chain
         chain_str = " -> ".join(getattr(t, "__name__", str(t)) for t in chain)
         super().__init__(f"Circular dependency detected: {chain_str}")
@@ -124,7 +124,7 @@ class CircularDependencyError(DIError):
 class ServiceAlreadyRegisteredError(DIError):
     """Raised when trying to register a service that already exists."""
 
-    def __init__(self, service_type: Type[Any]):
+    def __init__(self, service_type: type[Any]):
         self.service_type = service_type
         super().__init__(f"Service already registered: {service_type.__name__}")
 
@@ -199,10 +199,10 @@ class DIContainer:
 
     def __init__(self) -> None:
         """Initialize empty container."""
-        self._descriptors: Dict[Type, ServiceDescriptor] = {}
+        self._descriptors: Dict[type[Any], ServiceDescriptor[Any]] = {}
         self._lock = threading.RLock()
         self._disposed = False
-        self._resolution_stack: list[Type] = []
+        self._resolution_stack: list[type[Any]] = []
 
     def register(
         self,
@@ -210,7 +210,7 @@ class DIContainer:
         factory: Optional[Callable[..., T]] = None,
         lifetime: ServiceLifetime = ServiceLifetime.TRANSIENT,
         implementation: Optional[Type[T]] = None,
-        as_interfaces: Optional[list[Type]] = None,
+        as_interfaces: Optional[list[type[Any]]] = None,
     ) -> "DIContainer":
         """Register a service with optional auto-resolution.
 
