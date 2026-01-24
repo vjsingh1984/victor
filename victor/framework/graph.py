@@ -80,10 +80,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import (
     Any,
+    AsyncIterator,
     Awaitable,
     Callable,
     Dict,
     Generic,
+    Iterator,
     List,
     Optional,
     Protocol,
@@ -108,6 +110,7 @@ from victor.framework.config import (
 )
 
 # Type variables for generic state
+StateType_contra = TypeVar("StateType_contra", contravariant=True)
 StateType = TypeVar("StateType", bound=Dict[str, Any])
 T = TypeVar("T")
 
@@ -229,6 +232,7 @@ class CopyOnWriteState(Generic[StateType]):
         """
         # Fast path: no lock needed if already modified (immutable after set)
         if self._modified:
+            assert self._copy is not None
             return self._copy
 
         # Slow path: lock and recheck (RLock allows nested calls)
@@ -236,6 +240,7 @@ class CopyOnWriteState(Generic[StateType]):
             if not self._modified:
                 self._copy = copy.deepcopy(self._source)
                 self._modified = True
+            assert self._copy is not None
             return self._copy
 
     def _get_current_state(self) -> StateType:
@@ -319,7 +324,7 @@ class CopyOnWriteState(Generic[StateType]):
         with self._lock:
             return len(self._copy)  # type: ignore
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Any]:
         """Iterate over keys (thread-safe snapshot).
 
         Returns a snapshot of keys to avoid issues with concurrent modification.
@@ -332,6 +337,7 @@ class CopyOnWriteState(Generic[StateType]):
             return iter(list(self._source.keys()))
         # Return snapshot to avoid concurrent modification issues
         with self._lock:
+            assert self._copy is not None
             return iter(list(self._copy.keys()))
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -350,7 +356,7 @@ class CopyOnWriteState(Generic[StateType]):
         with self._lock:
             return self._copy.get(key, default)  # type: ignore
 
-    def keys(self):
+    def keys(self) -> List[Any]:
         """Get keys (thread-safe snapshot).
 
         Returns:
@@ -360,9 +366,10 @@ class CopyOnWriteState(Generic[StateType]):
         if not self._modified:
             return list(self._source.keys())
         with self._lock:
+            assert self._copy is not None
             return list(self._copy.keys())
 
-    def values(self):
+    def values(self) -> List[Any]:
         """Get values (thread-safe snapshot).
 
         Returns:
@@ -372,9 +379,10 @@ class CopyOnWriteState(Generic[StateType]):
         if not self._modified:
             return list(self._source.values())
         with self._lock:
+            assert self._copy is not None
             return list(self._copy.values())
 
-    def items(self):
+    def items(self) -> List[Tuple[Any, Any]]:
         """Get items (thread-safe snapshot).
 
         Returns:
@@ -384,6 +392,7 @@ class CopyOnWriteState(Generic[StateType]):
         if not self._modified:
             return list(self._source.items())
         with self._lock:
+            assert self._copy is not None
             return list(self._copy.items())
 
     def update(self, other: Dict[str, Any]) -> None:
@@ -440,6 +449,7 @@ class CopyOnWriteState(Generic[StateType]):
         if not self._modified:
             return self._source.copy()
         with self._lock:
+            assert self._copy is not None
             return self._copy.copy()
 
     def get_state(self) -> StateType:
@@ -541,13 +551,13 @@ class NodeFunctionProtocol(Protocol[StateType]):
 
 
 @runtime_checkable
-class ConditionFunctionProtocol(Protocol[StateType]):
+class ConditionFunctionProtocol(Protocol[StateType_contra]):
     """Protocol for condition functions.
 
     Condition functions receive state and return a branch name.
     """
 
-    def __call__(self, state: StateType) -> str: ...
+    def __call__(self, state: StateType_contra) -> str: ...
 
 
 @dataclass
@@ -712,7 +722,7 @@ class MemoryCheckpointer:
     Suitable for development and testing.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._checkpoints: Dict[str, List[WorkflowCheckpoint]] = {}
 
     async def save(self, checkpoint: WorkflowCheckpoint) -> None:
@@ -738,16 +748,16 @@ class RLCheckpointerAdapter:
     victor.agent.rl.checkpoint_store.CheckpointStore infrastructure.
     """
 
-    def __init__(self, learner_name: str = "state_graph"):
+    def __init__(self, learner_name: str = "state_graph") -> None:
         """Initialize adapter.
 
         Args:
             learner_name: Name to use in checkpoint store (default: "state_graph")
         """
         self.learner_name = learner_name
-        self._store = None
+        self._store: Optional[Any] = None
 
-    def _get_store(self):
+    def _get_store(self) -> Any:
         """Lazy load checkpoint store."""
         if self._store is None:
             from victor.framework.rl.checkpoint_store import get_checkpoint_store
@@ -897,7 +907,7 @@ class BatchingCheckpointer:
         self._last_flush_time = time.time()
 
         # Background flush task (if interval-based flushing enabled)
-        self._flush_task: Optional[asyncio.Task] = None
+        self._flush_task: Optional[asyncio.Task[None]] = None
         self._shutdown = False
 
     async def save(self, checkpoint: WorkflowCheckpoint) -> None:
@@ -1194,7 +1204,7 @@ class IterationController:
 
         return True, None
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset iteration state."""
         self.iterations = 0
         self.visited_count.clear()
@@ -1215,7 +1225,7 @@ class TimeoutManager:
         self.timeout = timeout
         self.start_time: Optional[float] = None
 
-    def start(self):
+    def start(self) -> None:
         """Start timeout tracking."""
         self.start_time = time.time()
 
@@ -1332,9 +1342,7 @@ class NodeExecutor:
             if self.use_copy_on_write:
                 cow_state: CopyOnWriteState[StateType] = CopyOnWriteState(state)
                 if remaining is not None:
-                    result = await asyncio.wait_for(
-                        node.execute(cow_state), timeout=remaining
-                    )
+                    result = await asyncio.wait_for(node.execute(cow_state), timeout=remaining)
                 else:
                     result = await node.execute(cow_state)
 
@@ -1342,7 +1350,7 @@ class NodeExecutor:
                 if isinstance(result, CopyOnWriteState):
                     state = result.get_state()
                 elif isinstance(result, dict):
-                    state = result
+                    state = result  # type: ignore[assignment]
                 else:
                     # Node returned something else, use COW state
                     state = cow_state.get_state()
@@ -1675,7 +1683,7 @@ class GraphCheckpointManager:
             checkpoint = await self.checkpointer.load(thread_id)
             if checkpoint:
                 logger.info(f"Resuming from checkpoint at node: {checkpoint.node_id}")
-                return checkpoint.state.copy(), checkpoint.node_id
+                return checkpoint.state.copy(), checkpoint.node_id  # type: ignore[return-value]
 
         # No checkpoint, use input state
         return copy.deepcopy(input_state), entry_point
@@ -1717,7 +1725,7 @@ class GraphEventEmitter:
         self.graph_id = graph_id
         self.emit_events = emit_events
 
-    def emit_graph_started(self, entry_point: str, node_count: int, thread_id: str):
+    async def emit_graph_started(self, entry_point: str, node_count: int, thread_id: str) -> None:
         """Emit graph started event."""
         if not self.emit_events:
             return
@@ -1726,9 +1734,9 @@ class GraphEventEmitter:
             from victor.core.events import get_observability_bus as get_event_bus
 
             bus = get_event_bus()
-            bus.emit_lifecycle_event(
-                "graph_started",
-                {
+            await bus.emit(
+                topic="lifecycle.graph_started",
+                data={
                     "graph_id": self.graph_id,
                     "source": "StateGraph",
                     "entry_point": entry_point,
@@ -1739,7 +1747,7 @@ class GraphEventEmitter:
         except Exception as e:
             logger.debug(f"Failed to emit graph_started event: {e}")
 
-    def emit_node_start(self, node_id: str, iteration: int):
+    async def emit_node_start(self, node_id: str, iteration: int) -> None:
         """Emit node start event."""
         if not self.emit_events:
             return
@@ -1748,9 +1756,9 @@ class GraphEventEmitter:
             from victor.core.events import get_observability_bus as get_event_bus
 
             bus = get_event_bus()
-            bus.emit_lifecycle_event(
-                "node_start",
-                {
+            await bus.emit(
+                topic="lifecycle.node_start",
+                data={
                     "graph_id": self.graph_id,
                     "source": "StateGraph",
                     "node_id": node_id,
@@ -1760,7 +1768,7 @@ class GraphEventEmitter:
         except Exception as e:
             logger.debug(f"Failed to emit node_start event: {e}")
 
-    def emit_node_complete(self, node_id: str, iteration: int, duration: float):
+    async def emit_node_complete(self, node_id: str, iteration: int, duration: float) -> None:
         """Emit node complete event."""
         if not self.emit_events:
             return
@@ -1769,9 +1777,9 @@ class GraphEventEmitter:
             from victor.core.events import get_observability_bus as get_event_bus
 
             bus = get_event_bus()
-            bus.emit_lifecycle_event(
-                "node_end",
-                {
+            await bus.emit(
+                topic="lifecycle.node_end",
+                data={
                     "graph_id": self.graph_id,
                     "source": "StateGraph",
                     "node_id": node_id,
@@ -1783,9 +1791,9 @@ class GraphEventEmitter:
         except Exception as e:
             logger.debug(f"Failed to emit node_end event: {e}")
 
-    def emit_graph_completed(
+    async def emit_graph_completed(
         self, success: bool, iterations: int, duration: float, node_count: int
-    ):
+    ) -> None:
         """Emit graph completed event."""
         if not self.emit_events:
             return
@@ -1794,9 +1802,9 @@ class GraphEventEmitter:
             from victor.core.events import get_observability_bus as get_event_bus
 
             bus = get_event_bus()
-            bus.emit_lifecycle_event(
-                "graph_completed",
-                {
+            await bus.emit(
+                topic="lifecycle.graph_completed",
+                data={
                     "graph_id": self.graph_id,
                     "source": "StateGraph",
                     "success": success,
@@ -1808,7 +1816,7 @@ class GraphEventEmitter:
         except Exception as e:
             logger.debug(f"Failed to emit graph_completed event: {e}")
 
-    def emit_graph_error(self, error: str, iterations: int, duration: float):
+    async def emit_graph_error(self, error: str, iterations: int, duration: float) -> None:
         """Emit graph error event."""
         if not self.emit_events:
             return
@@ -1817,9 +1825,9 @@ class GraphEventEmitter:
             from victor.core.events import get_observability_bus as get_event_bus
 
             bus = get_event_bus()
-            bus.emit_lifecycle_event(
-                "graph_error",
-                {
+            await bus.emit(
+                topic="lifecycle.graph_error",
+                data={
                     "graph_id": self.graph_id,
                     "source": "StateGraph",
                     "error": error,
@@ -1830,7 +1838,9 @@ class GraphEventEmitter:
         except Exception as e:
             logger.debug(f"Failed to emit graph_error event: {e}")
 
-    def emit_parallel_start(self, source_node: str, branch_count: int, branch_targets: List[str]):
+    async def emit_parallel_start(
+        self, source_node: str, branch_count: int, branch_targets: List[str]
+    ) -> None:
         """Emit parallel execution start event."""
         if not self.emit_events:
             return
@@ -1839,9 +1849,9 @@ class GraphEventEmitter:
             from victor.core.events import get_observability_bus as get_event_bus
 
             bus = get_event_bus()
-            bus.emit_lifecycle_event(
-                "parallel_start",
-                {
+            await bus.emit(
+                topic="lifecycle.parallel_start",
+                data={
                     "graph_id": self.graph_id,
                     "source": "StateGraph",
                     "source_node": source_node,
@@ -1852,9 +1862,9 @@ class GraphEventEmitter:
         except Exception as e:
             logger.debug(f"Failed to emit parallel_start event: {e}")
 
-    def emit_parallel_complete(
+    async def emit_parallel_complete(
         self, source_node: str, branch_count: int, success: bool, duration: float
-    ):
+    ) -> None:
         """Emit parallel execution complete event."""
         if not self.emit_events:
             return
@@ -1863,9 +1873,9 @@ class GraphEventEmitter:
             from victor.core.events import get_observability_bus as get_event_bus
 
             bus = get_event_bus()
-            bus.emit_lifecycle_event(
-                "parallel_complete",
-                {
+            await bus.emit(
+                topic="lifecycle.parallel_complete",
+                data={
                     "graph_id": self.graph_id,
                     "source": "StateGraph",
                     "source_node": source_node,
@@ -1952,7 +1962,7 @@ class CompiledGraph(Generic[StateType]):
             # Default to True if settings can't be loaded
             return True
 
-    def _emit_event(
+    async def _emit_event(
         self,
         event_type: str,
         graph_id: str,
@@ -1974,9 +1984,9 @@ class CompiledGraph(Generic[StateType]):
             from victor.core.events import get_observability_bus as get_event_bus
 
             bus = get_event_bus()
-            bus.emit_lifecycle_event(
-                event_type,
-                {
+            await bus.emit(
+                topic=f"lifecycle.{event_type}",
+                data={
                     "graph_id": graph_id,
                     "source": "StateGraph",
                     **data,
@@ -2050,7 +2060,7 @@ class CompiledGraph(Generic[StateType]):
 
         # Start timeout tracking and emit graph started event
         timeout_manager.start()
-        event_emitter.emit_graph_started(
+        await event_emitter.emit_graph_started(
             entry_point=self._entry_point,
             node_count=len(self._nodes),
             thread_id=thread_id,
@@ -2091,7 +2101,7 @@ class CompiledGraph(Generic[StateType]):
 
                 # Emit node start event
                 node_start_time = time.time()
-                event_emitter.emit_node_start(
+                await event_emitter.emit_node_start(
                     node_id=current_node,
                     iteration=iteration_controller.iterations,
                 )
@@ -2122,7 +2132,7 @@ class CompiledGraph(Generic[StateType]):
                 node_history.append(current_node)
 
                 # Emit node complete event
-                event_emitter.emit_node_complete(
+                await event_emitter.emit_node_complete(
                     node_id=current_node,
                     iteration=iteration_controller.iterations,
                     duration=time.time() - node_start_time,
@@ -2158,7 +2168,7 @@ class CompiledGraph(Generic[StateType]):
                     )
 
                     # Emit parallel execution start event
-                    event_emitter.emit_parallel_start(
+                    await event_emitter.emit_parallel_start(
                         source_node=current_node,
                         branch_count=len(branch_targets),
                         branch_targets=branch_targets,
@@ -2180,7 +2190,7 @@ class CompiledGraph(Generic[StateType]):
                     )
 
                     # Emit parallel execution complete event
-                    event_emitter.emit_parallel_complete(
+                    await event_emitter.emit_parallel_complete(
                         source_node=current_node,
                         branch_count=len(branch_targets),
                         success=parallel_success,
@@ -2214,7 +2224,7 @@ class CompiledGraph(Generic[StateType]):
             )
 
             # Emit graph completed event
-            event_emitter.emit_graph_completed(
+            await event_emitter.emit_graph_completed(
                 success=True,
                 iterations=iteration_controller.iterations,
                 duration=timeout_manager.get_elapsed(),
@@ -2230,7 +2240,7 @@ class CompiledGraph(Generic[StateType]):
             )
 
         except asyncio.TimeoutError:
-            event_emitter.emit_graph_error(
+            await event_emitter.emit_graph_error(
                 error="Execution timeout",
                 iterations=iteration_controller.iterations,
                 duration=timeout_manager.get_elapsed(),
@@ -2246,7 +2256,7 @@ class CompiledGraph(Generic[StateType]):
 
         except Exception as e:
             logger.error(f"Graph execution failed: {e}", exc_info=True)
-            event_emitter.emit_graph_error(
+            await event_emitter.emit_graph_error(
                 error=str(e),
                 iterations=iteration_controller.iterations,
                 duration=timeout_manager.get_elapsed(),
@@ -2366,7 +2376,7 @@ class CompiledGraph(Generic[StateType]):
         *,
         config: Optional[GraphConfig] = None,
         thread_id: Optional[str] = None,
-    ):
+    ) -> AsyncIterator[Tuple[str, StateType]]:
         """Stream execution yielding state after each node.
 
         Args:
@@ -2654,7 +2664,7 @@ class StateGraph(Generic[StateType]):
         return CompiledGraph(
             nodes=self._nodes.copy(),
             edges={k: list(v) for k, v in self._edges.items()},
-            entry_point=self._entry_point,
+            entry_point=self._entry_point or "",
             state_schema=self._state_schema,
             config=config,
         )
@@ -2882,7 +2892,7 @@ class StateGraph(Generic[StateType]):
 
             elif node_type == "passthrough":
                 # Passthrough node (identity function)
-                def passthrough_func(state):
+                def passthrough_func(state: StateType) -> StateType:
                     return state
 
                 metadata = {k: v for k, v in node_def.items() if k not in ["id", "type"]}
@@ -2891,10 +2901,12 @@ class StateGraph(Generic[StateType]):
             elif node_type == "agent":
                 # Agent node - placeholder for workflow execution
                 # The actual agent execution is handled by the workflow executor
-                def create_agent_placeholder(node_config):
-                    def agent_placeholder(state):
+                def create_agent_placeholder(
+                    node_config: Dict[str, Any],
+                ) -> Callable[[StateType], StateType]:
+                    def agent_placeholder(state: StateType) -> StateType:
                         # Store node config in state for executor to use
-                        return {
+                        return {  # type: ignore[return-value]
                             **state,
                             "_pending_agent": node_config,
                         }
@@ -2907,10 +2919,12 @@ class StateGraph(Generic[StateType]):
             elif node_type == "compute":
                 # Compute node - placeholder for handler execution
                 # The actual compute execution is handled by the workflow executor
-                def create_compute_placeholder(node_config):
-                    def compute_placeholder(state):
+                def create_compute_placeholder(
+                    node_config: Dict[str, Any],
+                ) -> Callable[[StateType], StateType]:
+                    def compute_placeholder(state: StateType) -> StateType:
                         # Store node config in state for executor to use
-                        return {
+                        return {  # type: ignore[return-value]
                             **state,
                             "_pending_compute": node_config,
                         }
