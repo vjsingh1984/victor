@@ -624,7 +624,7 @@ class LegacyAPIMixin:
             Set of absolute file paths
         """
         if self._state_coordinator is not None:
-            return self._state_coordinator.observed_files
+            return self._state_coordinator.observed_files  # type: ignore[no-any-return]
         return set()
 
     @deprecated(
@@ -665,7 +665,7 @@ class LegacyAPIMixin:
             Non-negative count of tool calls in this session
         """
         if self.unified_tracker:
-            return self.unified_tracker.tool_calls_used
+            return self.unified_tracker.tool_calls_used  # type: ignore[no-any-return]
         return getattr(self, "tool_calls_used", 0)
 
     @deprecated(
@@ -683,7 +683,7 @@ class LegacyAPIMixin:
             Maximum allowed tool calls
         """
         if self.unified_tracker:
-            return self.unified_tracker.tool_budget
+            return self.unified_tracker.tool_budget  # type: ignore[no-any-return]
         return getattr(self, "tool_budget", 50)
 
     @deprecated(
@@ -701,7 +701,7 @@ class LegacyAPIMixin:
             Non-negative iteration count
         """
         if self.unified_tracker:
-            return self.unified_tracker.iteration_count
+            return self.unified_tracker.iteration_count  # type: ignore[no-any-return]
         return 0
 
     @deprecated(
@@ -719,7 +719,7 @@ class LegacyAPIMixin:
             Max iteration limit
         """
         if self.unified_tracker:
-            return self.unified_tracker.max_iterations
+            return self.unified_tracker.max_iterations  # type: ignore[no-any-return]
         return 25
 
     # =========================================================================
@@ -825,7 +825,7 @@ class LegacyAPIMixin:
             True if tool is enabled
         """
         if self._tool_access_coordinator is not None:
-            return self._tool_access_coordinator.is_tool_enabled(tool_name)
+            return self._tool_access_coordinator.is_tool_enabled(tool_name)  # type: ignore[no-any-return]
         return False
 
     # =========================================================================
@@ -848,7 +848,7 @@ class LegacyAPIMixin:
             Complete system prompt string
         """
         if self.prompt_builder:
-            return self.prompt_builder.build()
+            return self.prompt_builder.build()  # type: ignore[no-any-return]
         return ""
 
     @deprecated(
@@ -949,7 +949,7 @@ class LegacyAPIMixin:
             Dictionary with routing recommendation
         """
         if self._search_coordinator is not None:
-            return self._search_coordinator.route_search_query(query)
+            return self._search_coordinator.route_search_query(query)  # type: ignore[no-any-return]
         return {"tool": "unknown", "confidence": 0.0}
 
     @deprecated(
@@ -970,7 +970,7 @@ class LegacyAPIMixin:
             Tool name: "code_search", "semantic_code_search", or "both"
         """
         if self._search_coordinator is not None:
-            return self._search_coordinator.get_recommended_search_tool(query)
+            return self._search_coordinator.get_recommended_search_tool(query)  # type: ignore[no-any-return]
         return "code_search"
 
     # =========================================================================

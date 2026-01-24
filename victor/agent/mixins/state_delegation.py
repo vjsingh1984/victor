@@ -209,7 +209,7 @@ class StateDelegationMixin:
         super().__init_subclass__(**kwargs)
 
         # Get all delegations from class hierarchy
-        delegations: Dict[str, Tuple[str, str, Optional[str]]] = {}
+        delegations: Dict[str, Tuple[str, Optional[str], str]] = {}
 
         # Collect from all base classes (in reverse MRO order)
         for base in reversed(cls.__mro__):
