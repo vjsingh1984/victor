@@ -129,10 +129,10 @@ class IntelligentFormatSelector:
     # Minimum samples for historical data to be considered reliable
     MIN_SAMPLES_FOR_LEARNING = 5
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize selector."""
         self._format_cache: Dict[str, SerializationFormat] = {}
-        self._tool_format_stats: Dict[str, Dict[str, float]] = {}
+        self._tool_format_stats: Dict[str, Dict[str, Dict[str, float]]] = {}
 
     def select_best_format(
         self,
@@ -249,10 +249,11 @@ class IntelligentFormatSelector:
         stats = self._tool_format_stats.get(cache_key, {})
         format_key = fmt.value
 
-        if format_key in stats:
+        if format_key in stats and isinstance(stats[format_key], dict):
             # Normalize savings to 0-1 scale
-            avg_savings = stats[format_key].get("avg_savings", 0)
-            usage_count = stats[format_key].get("count", 0)
+            format_stats = stats[format_key]
+            avg_savings = format_stats.get("avg_savings", 0)
+            usage_count = format_stats.get("count", 0)
 
             if usage_count >= self.MIN_SAMPLES_FOR_LEARNING:
                 # More samples = more confidence

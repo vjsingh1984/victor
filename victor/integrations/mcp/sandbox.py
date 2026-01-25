@@ -180,7 +180,7 @@ class SandboxedProcess:
             config: Sandbox configuration
         """
         self.config = config or SandboxConfig()
-        self._processes: Dict[int, subprocess.Popen] = {}
+        self._processes: Dict[int, subprocess.Popen[str]] = {}
 
     def _create_preexec_fn(self) -> Callable[[], None]:
         """Create preexec function for subprocess.
@@ -190,7 +190,7 @@ class SandboxedProcess:
         """
         config = self.config
 
-        def preexec():
+        def preexec() -> None:
             # Set resource limits
             _set_resource_limits(config)
 
@@ -208,7 +208,7 @@ class SandboxedProcess:
         command: List[str],
         cwd: Optional[str] = None,
         env: Optional[Dict[str, str]] = None,
-    ) -> subprocess.Popen:
+    ) -> subprocess.Popen[str]:
         """Start a sandboxed subprocess.
 
         Args:
@@ -262,7 +262,7 @@ class SandboxedProcess:
         command: List[str],
         cwd: Optional[str],
         env: Dict[str, str],
-    ) -> subprocess.Popen:
+    ) -> subprocess.Popen[str]:
         """Start process with basic resource limits.
 
         Args:
@@ -290,7 +290,7 @@ class SandboxedProcess:
         command: List[str],
         cwd: Optional[str],
         env: Dict[str, str],
-    ) -> subprocess.Popen:
+    ) -> subprocess.Popen[str]:
         """Start process with macOS sandbox-exec.
 
         Args:
@@ -334,7 +334,7 @@ class SandboxedProcess:
         command: List[str],
         cwd: Optional[str],
         env: Dict[str, str],
-    ) -> subprocess.Popen:
+    ) -> subprocess.Popen[str]:
         """Start process with Linux sandboxing.
 
         Args:
@@ -358,7 +358,7 @@ class SandboxedProcess:
                 ns_flags = [f for f in ns_flags if f]
 
                 if ns_flags:
-                    command = ["unshare"] + ns_flags + ["--"] + command
+                    command = ["unshare"] + ns_flags + ["--"] + command  # type: ignore[assignment]
             except Exception as e:
                 logger.warning(f"Namespace isolation not available: {e}")
 
@@ -409,7 +409,7 @@ class SandboxedProcess:
 
     async def communicate(
         self,
-        process: subprocess.Popen,
+        process: subprocess.Popen[str],
         input_data: Optional[str] = None,
     ) -> tuple[str, str]:
         """Communicate with sandboxed process.
@@ -436,7 +436,7 @@ class SandboxedProcess:
             await self.terminate(process)
             raise
 
-    async def terminate(self, process: subprocess.Popen) -> None:
+    async def terminate(self, process: subprocess.Popen[str]) -> None:
         """Terminate sandboxed process gracefully.
 
         Args:
@@ -522,20 +522,23 @@ def create_sandboxed_mcp_client(
         def __init__(self, sandbox_config: Optional[SandboxConfig] = None, **kwargs: Any):
             super().__init__(**kwargs)
             self._sandbox = SandboxedProcess(sandbox_config)
+            # Override process type to match our sandbox (uses text=True)
+            self.process: Optional[subprocess.Popen[str]] = None  # type: ignore[assignment]
 
         async def connect(self, command: List[str]) -> bool:
             """Connect using sandboxed process."""
             self._command = command
 
             try:
-                self.process = await self._sandbox.start(command)
+                self.process = await self._sandbox.start(command)  # type: ignore[assignment]
                 success = await self.initialize()
 
                 if success:
                     self._running = True
                     return True
 
-                await self._sandbox.terminate(self.process)
+                if self.process is not None:
+                    await self._sandbox.terminate(self.process)
                 return False
 
             except Exception as e:
@@ -548,7 +551,7 @@ def create_sandboxed_mcp_client(
 
             if self.process:
                 asyncio.create_task(self._sandbox.terminate(self.process))
-                self.process = None
+                self.process = None  # type: ignore[assignment]
                 self.initialized = False
 
     return SandboxedMCPClient(config)

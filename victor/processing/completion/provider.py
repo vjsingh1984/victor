@@ -222,7 +222,7 @@ class CachingCompletionProvider(BaseCompletionProvider):
         """
         super().__init__(priority)
         self._cache_ttl = cache_ttl
-        self._cache: dict[str, tuple[float]] = {}
+        self._cache: dict[str, tuple[float, CompletionList]] = {}
 
     def _cache_key(self, params: CompletionParams) -> str:
         """Generate cache key for completion params."""
@@ -236,7 +236,7 @@ class CachingCompletionProvider(BaseCompletionProvider):
 
         key = self._cache_key(params)
         if key in self._cache:
-            timestamp, result = self._cache[key]
+            timestamp, result = self._cache[key]  # type: ignore[assignment]
             if time.time() - timestamp < self._cache_ttl:
                 return result
             del self._cache[key]
@@ -247,7 +247,7 @@ class CachingCompletionProvider(BaseCompletionProvider):
         import time
 
         key = self._cache_key(params)
-        self._cache[key] = (time.time(), result)
+        self._cache[key] = (time.time(), result)  # type: ignore[assignment]
 
     def clear_cache(self) -> None:
         """Clear all cached completions."""

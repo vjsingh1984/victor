@@ -487,7 +487,8 @@ class AdaptiveSerializer:
                 encoder_scores[fmt] = encoder.suitability_score(characteristics, config)
 
         if not encoder_scores:
-            self._metrics.selection_reason = "no_suitable_encoders"
+            if self._metrics is not None:
+                self._metrics.selection_reason = "no_suitable_encoders"
             return config.fallback_format
 
         # Build intelligent selection context
@@ -515,7 +516,8 @@ class AdaptiveSerializer:
             encoder_scores=encoder_scores,
         )
 
-        self._metrics.selection_reason = reason
+        if self._metrics is not None:
+            self._metrics.selection_reason = reason
         return selected_format
 
     def _encode(
@@ -573,6 +575,9 @@ class AdaptiveSerializer:
             result: Encoding result
             characteristics: Data characteristics
         """
+        if self._metrics is None:
+            return
+
         self._metrics.serialized_chars = len(result.content)
         self._metrics.serialized_tokens = result.metadata.get(
             "estimated_tokens", len(result.content) // 4
