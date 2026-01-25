@@ -113,10 +113,10 @@ def _map_capability_type(framework_type: FrameworkCapabilityType) -> str:
         FrameworkCapabilityType.TOOL: CapabilityType.TOOL,
         FrameworkCapabilityType.PROMPT: CapabilityType.TOOL,  # Map PROMPT to TOOL
         FrameworkCapabilityType.MODE: CapabilityType.TOOL,  # Map MODE to TOOL
-        FrameworkCapabilityType.SAFETY: CapabilityType.MIDDLEWARE,  # Map SAFETY to MIDDLEWARE
+        FrameworkCapabilityType.SAFETY: CapabilityType.TOOL,  # Map SAFETY to TOOL (MIDDLEWARE doesn't exist)
         FrameworkCapabilityType.RL: CapabilityType.TOOL,  # Map RL to TOOL
     }
-    return mapping.get(framework_type, CapabilityType.TOOL)
+    return mapping.get(framework_type, CapabilityType.TOOL)  # type: ignore[return-value]
 
 
 @dataclass
