@@ -339,6 +339,15 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                     "formation": self._formation.value,
                 }
 
+        # Should never reach here, but satisfy type checker
+        return {
+            "success": False,
+            "error": "Unexpected execution flow",
+            "member_results": {},
+            "final_output": "",
+            "formation": self._formation.value,
+        }
+
     async def broadcast(self, message: AgentMessage) -> List[Optional[AgentMessage]]:
         """Broadcast a message to all team members.
 

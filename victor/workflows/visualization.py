@@ -1010,7 +1010,7 @@ class WorkflowVisualizer:
             self._to_png_graphviz(output_path)
         else:
             # Try in order
-            from typing import Callable
+            from typing import Callable, cast
             for method in [self._to_png_d2, self._to_png_kroki, self._to_png_graphviz]:
                 try:
                     cast(Callable[[str], None], method)(output_path)

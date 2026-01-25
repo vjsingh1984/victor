@@ -613,9 +613,11 @@ class GraphStructureValidator:
         self, nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]
     ) -> Dict[str, List[str]]:
         """Build adjacency list representation."""
-        graph: Dict[str, List[str]] = {
-            node.get("id"): [] for node in nodes if "id" in node and node.get("id") is not None
-        }
+        graph: Dict[str, List[str]] = {}
+        for node in nodes:
+            node_id = node.get("id")
+            if node_id is not None and isinstance(node_id, str):
+                graph[node_id] = []
 
         for edge in edges:
             source = edge.get("source")

@@ -233,11 +233,11 @@ class TemporalContext:
     period_type: str = "quarters"  # days, weeks, months, quarters, years
     include_end_date: bool = True
 
-    def get_date_range(self) -> tuple["datetime", "datetime"]:
+    def get_date_range(self) -> tuple[str, str]:
         """Calculate start and end dates based on lookback.
 
         Returns:
-            Tuple of (start_date, end_date) as strings
+            Tuple of (start_date, end_date) as ISO format strings
         """
         from datetime import datetime, timedelta
 

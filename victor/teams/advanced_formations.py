@@ -1158,8 +1158,8 @@ Rationale: [your reasoning]
             consensus = total_votes / len(votes) if votes else 0.0
 
         # Cast distribution to expected type for return
-        distribution_typed: Dict[str, int] = {k: int(v) if v is not None else 0 for k, v in distribution.items()}  # type: ignore[assignment]
-        return winner, distribution_typed, consensus  # type: ignore[return-value]
+        distribution_typed: Dict[str, int] = {k: int(v) if v is not None else 0 for k, v in distribution.items()}
+        return winner, distribution_typed, consensus
 
     def _apply_tiebreaker(self, distribution: Dict[str, int]) -> Optional[str]:
         """Apply tiebreaker rule.

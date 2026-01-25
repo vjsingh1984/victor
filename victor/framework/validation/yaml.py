@@ -449,11 +449,11 @@ class ValidatorFactory:
             transform = _trim_transform2
         else:
 
-            def _strip_transform(x: Any) -> Any:
+            def _default_strip_transform(x: Any) -> Any:
                 """Strip whitespace from strings."""
                 return x.strip() if isinstance(x, str) else x
 
-            transform: Callable[[Any], Any] = _strip_transform
+            transform: Callable[[Any], Any] = _default_strip_transform
 
         return TransformingValidator(
             validator=cast(BaseValidator, inner),

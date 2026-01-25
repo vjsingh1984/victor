@@ -245,10 +245,10 @@ def get_capability_or_create(
     capability = injector.get_capability(capability_name)
     if capability is None:
         logger.debug(f"Capability '{capability_name}' not in injector, creating with factory")
-        from typing import cast
-        capability = cast(T, factory())
-        return capability
-    return capability
+        created = factory()
+        # Type ignore needed because factory() returns Any but we need T
+        return created  # type: ignore[no-any-return]
+    return capability  # type: ignore[no-any-return]
 
 
 # =============================================================================

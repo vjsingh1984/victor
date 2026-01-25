@@ -41,7 +41,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, Optional, Type
+from typing import Any, Dict, List, Optional, Type
 
 from victor.workflows.definition import WorkflowDefinition
 from victor.workflows.yaml_loader import (
@@ -121,7 +121,7 @@ class ModeWorkflowProvider(WorkflowProviderProtocol):
         """
         workflows = self._load_workflows()
         # Convert WorkflowDefinition to type for compatibility
-        return {k: type(v) for k, v in workflows.items()}  # type: ignore[return-value]
+        return {k: type(v) for k, v in workflows.items()}
 
     def get_auto_workflows(self) -> List[Any]:
         """Get automatically triggered workflows.
@@ -174,9 +174,12 @@ def get_mode_workflow(mode: str) -> Optional[WorkflowDefinition]:
 
     if _mode_workflows_cache is None:
         try:
-            _mode_workflows_cache = load_workflow_from_file(str(MODE_WORKFLOWS_PATH))
-            if isinstance(_mode_workflows_cache, WorkflowDefinition):
-                _mode_workflows_cache = {_mode_workflows_cache.name: _mode_workflows_cache}
+            loaded = load_workflow_from_file(str(MODE_WORKFLOWS_PATH))
+            # Convert single workflow to dict
+            if isinstance(loaded, WorkflowDefinition):
+                _mode_workflows_cache = {loaded.name: loaded}
+            else:
+                _mode_workflows_cache = loaded
         except Exception as e:
             logger.warning(f"Failed to load mode workflows: {e}")
             _mode_workflows_cache = {}
@@ -203,9 +206,12 @@ def get_all_mode_workflows() -> Dict[str, WorkflowDefinition]:
 
     if _mode_workflows_cache is None:
         try:
-            _mode_workflows_cache = load_workflow_from_file(str(MODE_WORKFLOWS_PATH))
-            if isinstance(_mode_workflows_cache, WorkflowDefinition):
-                _mode_workflows_cache = {_mode_workflows_cache.name: _mode_workflows_cache}
+            loaded = load_workflow_from_file(str(MODE_WORKFLOWS_PATH))
+            # Convert single workflow to dict
+            if isinstance(loaded, WorkflowDefinition):
+                _mode_workflows_cache = {loaded.name: loaded}
+            else:
+                _mode_workflows_cache = loaded
         except Exception as e:
             logger.warning(f"Failed to load mode workflows: {e}")
             _mode_workflows_cache = {}

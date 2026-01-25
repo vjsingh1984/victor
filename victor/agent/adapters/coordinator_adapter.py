@@ -44,16 +44,13 @@ if TYPE_CHECKING:
 try:
     from victor.agent.coordinators.state_coordinator import StateScope
 except ImportError:
-    # Fallback for testing - create a simple enum
-    StateScope = type(
-        "StateScope",
-        (),
-        {
-            "CHECKPOINT": "checkpoint",
-            "ROLLBACK": "rollback",
-            "SNAPSHOT": "snapshot",
-        },
-    )
+    # Fallback for testing - create a simple type
+    class StateScope:
+        """Fallback StateScope for testing."""
+
+        CHECKPOINT = "checkpoint"
+        ROLLBACK = "rollback"
+        SNAPSHOT = "snapshot"
 
 logger = logging.getLogger(__name__)
 

@@ -211,7 +211,7 @@ class StateGraphExecutor:
             from victor.core.container import ServiceContainer
 
             container = ServiceContainer()
-            return container.get(ToolRegistry) if container.has(ToolRegistry) else None
+            return container.get(ToolRegistry)
         except Exception:
             return None
 

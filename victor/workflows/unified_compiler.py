@@ -70,6 +70,7 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    cast,
 )
 
 if TYPE_CHECKING:

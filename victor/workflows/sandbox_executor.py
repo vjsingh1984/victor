@@ -282,22 +282,22 @@ class SandboxedExecutor:
             )
 
             # Communicate with process
-            input_bytes = input_data.encode() if input_data else None  # type: ignore[arg-type]
             stdout, stderr = await asyncio.wait_for(
                 asyncio.get_event_loop().run_in_executor(
                     None,
-                    lambda: process.communicate(input_bytes),
+                    lambda: process.communicate(input_data),
                 ),
                 timeout=limits.timeout_seconds,
             )
 
             await sandbox.terminate(process)
 
+            # stdout and stderr are already strings from text=True in Popen
             return SandboxExecutionResult(
                 success=process.returncode == 0,
-                output=stdout.decode("utf-8", errors="replace") if stdout else "",
+                output=stdout if stdout else "",
                 error=(
-                    stderr.decode("utf-8", errors="replace")
+                    stderr
                     if stderr and process.returncode != 0
                     else ""
                 ),

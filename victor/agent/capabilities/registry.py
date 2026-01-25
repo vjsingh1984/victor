@@ -36,11 +36,12 @@ from typing import Any, Dict, Optional
 
 from victor.agent.capabilities.base import CapabilitySpec
 
+# Import entry_points function (avoid name conflicts)
 try:
-    from importlib.metadata import entry_points as import_entry_points
+    import importlib.metadata as ilmd
 except ImportError:
     # Python < 3.8
-    from importlib_metadata import entry_points as import_entry_points
+    import importlib_metadata as ilmd
 
 logger = logging.getLogger(__name__)
 
@@ -106,13 +107,13 @@ class DynamicCapabilityRegistry:
             This ensures the registry remains functional even if some plugins fail.
         """
         try:
-            eps = import_entry_points()
+            eps = ilmd.entry_points()
             # Python 3.10+ uses select() method, older versions have different API
             if hasattr(eps, "select"):
                 capability_eps = eps.select(group="victor.capabilities")
             else:
                 # Python 3.9 and earlier
-                capability_eps = eps.get("victor.capabilities", [])  # type: ignore[attr-defined]
+                capability_eps = eps.get("victor.capabilities", [])
 
             for ep in capability_eps:
                 try:

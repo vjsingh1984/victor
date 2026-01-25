@@ -811,7 +811,7 @@ class PolicySerializer:
         return sorted(policies)
 
 
-class EnhancedRLCoordinator:
+class EnhancedRLCoordinator(Generic[S, A]):
     """Enhanced RL coordinator with advanced learning algorithms.
 
     Integrates Q-learning, policy gradients, experience replay, target networks,
