@@ -1770,7 +1770,7 @@ class AgentOrchestrator(
 
         except Exception as e:
             logger.warning(f"Failed to initialize ConversationEmbeddingStore: {e}")
-            self._conversation_embedding_store = None
+            self._conversation_embedding_store = None  # type: ignore[assignment]
 
     def _finalize_stream_metrics(
         self, usage_data: Optional[Dict[str, int]] = None
@@ -1803,7 +1803,7 @@ class AgentOrchestrator(
         """
         if self._metrics_coordinator is None:
             return None
-        return self._metrics_coordinator.get_streaming_metrics_summary()
+        return self._metrics_coordinator.get_streaming_metrics_summary()  # type: ignore[union-attr]
 
     def get_streaming_metrics_history(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent streaming metrics history.
@@ -1816,24 +1816,24 @@ class AgentOrchestrator(
         """
         if self._metrics_coordinator is None:
             return []
-        return self._metrics_coordinator.get_streaming_metrics_history(limit)
+        return self._metrics_coordinator.get_streaming_metrics_history(limit)  # type: ignore[union-attr]
 
     def get_session_cost_summary(self) -> Dict[str, Any]:
         """Get session cost summary."""
         if self._metrics_coordinator is None:
             return {}
-        return self._metrics_coordinator.get_session_cost_summary()
+        return self._metrics_coordinator.get_session_cost_summary()  # type: ignore[union-attr]
 
     def get_session_cost_formatted(self) -> str:
         """Get formatted session cost string (e.g., "$0.0123")."""
         if self._metrics_coordinator is None:
             return "$0.00"
-        return self._metrics_coordinator.get_session_cost_formatted()
+        return self._metrics_coordinator.get_session_cost_formatted()  # type: ignore[union-attr]
 
     def export_session_costs(self, path: str, format: str = "json") -> None:
         """Export session costs to file."""
         if self._metrics_coordinator is not None:
-            self._metrics_coordinator.export_session_costs(path, format)
+            self._metrics_coordinator.export_session_costs(path, format)  # type: ignore[union-attr]
 
     async def _preload_embeddings(self) -> None:
         """Preload tool embeddings in background to avoid blocking first query.
@@ -1850,14 +1850,14 @@ class AgentOrchestrator(
         # ToolSelector owns the initialization state
         if (
             hasattr(self.tool_selector, "_embeddings_initialized")
-            and self.tool_selector._embeddings_initialized
+            and self.tool_selector._embeddings_initialized  # type: ignore[union-attr]
         ):
             return
 
         try:
             logger.info("Starting background embedding preload...")
             # Initialize the actual tool_selector (not the deprecated semantic_selector)
-            await self.tool_selector.initialize_tool_embeddings(self.tools)
+            await self.tool_selector.initialize_tool_embeddings(self.tools)  # type: ignore[union-attr]
             logger.info(
                 f"{self._presentation.icon('success')} Tool embeddings preloaded successfully in background"
             )
@@ -2042,8 +2042,8 @@ class AgentOrchestrator(
             - Cost tracking (by tier and total)
             - Overall metrics
         """
-        return self._metrics_coordinator.get_tool_usage_stats(  # type: ignore[no-any-return]
-            conversation_state_summary=self.conversation_state.get_state_summary()
+        return self._metrics_coordinator.get_tool_usage_stats(  # type: ignore[union-attr]
+            conversation_state_summary=self.conversation_state.get_state_summary()  # type: ignore[union-attr]
         )
 
     def get_token_usage(self) -> "TokenUsage":
@@ -2055,7 +2055,7 @@ class AgentOrchestrator(
         Returns:
             TokenUsage dataclass with input/output/total token counts
         """
-        return self._metrics_coordinator.get_token_usage()  # type: ignore[no-any-return]
+        return self._metrics_coordinator.get_token_usage()  # type: ignore[union-attr]
 
     def reset_token_usage(self) -> None:
         """Reset cumulative token usage tracking.
@@ -2544,7 +2544,7 @@ class AgentOrchestrator(
             if hasattr(self, "_task_analyzer"):
                 # Get the last analyzed complexity from the task analyzer
                 # Note: This requires the task analyzer to have analyzed the current task
-                task_complexity = getattr(self._task_analyzer, "_last_complexity", None)
+                task_complexity = getattr(self._task_analyzer, "_last_complexity", None)  # type: ignore[union-attr]
                 if task_complexity:
                     task_complexity = (
                         task_complexity.value
@@ -2574,7 +2574,7 @@ class AgentOrchestrator(
             unified_tracker_config=self.unified_tracker.config,
             task_completion_signals=None,  # Legacy caller doesn't use this
             # Task Completion Detection Enhancement (Phase 2 - Feature Flag Protected)
-            task_completion_detector=self._task_completion_detector,
+            task_completion_detector=self._task_completion_detector,  # type: ignore[call-arg]
             # Progress Metrics for intelligent continuation decisions
             progress_metrics=self._progress_metrics,
             # Complexity-based continuation thresholds
@@ -2738,7 +2738,7 @@ class AgentOrchestrator(
         """
         # Use coordinator if available
         if self.tool_retry_coordinator:
-            result = await self.tool_retry_coordinator.execute_tool(
+            result = await self.tool_retry_coordinator.execute_tool(  # type: ignore[union-attr]
                 tool_name=tool_name,
                 tool_args=tool_args,
                 context=context,
@@ -3079,7 +3079,7 @@ class AgentOrchestrator(
 
             # Update counters and tracking
             self.tool_calls_used += 1
-            self.executed_tools.append(tool_name)
+            self.executed_tools.append(tool_name)  # type: ignore[union-attr]
             if tool_name == "read" and "path" in normalized_args:
                 self.observed_files.add(str(normalized_args.get("path")))
 
@@ -3111,13 +3111,13 @@ class AgentOrchestrator(
             self._record_tool_execution(tool_name, success, elapsed_ms, error_type=error_type)
 
             # Update conversation state machine for stage detection
-            self.conversation_state.record_tool_execution(tool_name, normalized_args)
+            self.conversation_state.record_tool_execution(tool_name, normalized_args)  # type: ignore[union-attr]
 
             # Update unified tracker for milestone tracking (single source of truth)
             result_dict = {"success": success}
             if hasattr(exec_result, "result") and exec_result.result:
                 result_dict["result"] = exec_result.result
-            self.unified_tracker.update_from_tool_call(tool_name, normalized_args, result_dict)
+            self.unified_tracker.update_from_tool_call(tool_name, normalized_args, result_dict)  # type: ignore[union-attr]
 
             # ToolExecutionResult stores actual output in .result field
             output = exec_result.result if success else None
@@ -3229,7 +3229,7 @@ class AgentOrchestrator(
         Safe to call even if not streaming. The cancellation will take
         effect at the next check point in the stream loop.
         """
-        self._metrics_coordinator.request_cancellation()
+        self._metrics_coordinator.request_cancellation()  # type: ignore[union-attr]
 
     def is_streaming(self) -> bool:
         """Check if a streaming operation is currently in progress.
@@ -3237,7 +3237,7 @@ class AgentOrchestrator(
         Returns:
             True if streaming, False otherwise.
         """
-        return self._metrics_coordinator.is_streaming()  # type: ignore[no-any-return]
+        return self._metrics_coordinator.is_streaming()  # type: ignore[union-attr]
 
     def _check_cancellation(self) -> bool:
         """Check if cancellation has been requested.
@@ -3345,13 +3345,13 @@ class AgentOrchestrator(
         """
         # Fall back to in-memory messages if memory manager is not enabled or no session
         if self._memory_manager_wrapper is None or not self._memory_session_id:
-            return [msg.model_dump() for msg in self.conversation.messages]
+            return [msg.model_dump() for msg in self.conversation.messages]  # type: ignore[union-attr]
         # Delegate to MemoryManager wrapper with exception handling
         try:
             return self._memory_manager_wrapper.get_context(max_tokens=max_tokens)
         except Exception as e:
             logger.warning(f"Failed to get memory context, falling back to in-memory: {e}")
-            return [msg.model_dump() for msg in self.conversation.messages]
+            return [msg.model_dump() for msg in self.conversation.messages]  # type: ignore[union-attr]
 
     def get_session_stats(self) -> Dict[str, Any]:
         """Get statistics for the current memory session.
@@ -3374,7 +3374,7 @@ class AgentOrchestrator(
             }
 
         try:
-            stats = self.memory_manager.get_session_stats(self._memory_session_id)
+            stats = self.memory_manager.get_session_stats(self._memory_session_id)  # type: ignore[call-arg]
             # Handle empty stats (session not found)
             if not stats or not any(k in stats for k in ("message_count", "total_tokens", "found")):
                 return {
@@ -3485,7 +3485,7 @@ class AgentOrchestrator(
     # --- ProviderProtocol ---
 
     @property
-    def current_provider(self) -> str:
+    def current_provider(self) -> str:  # type: ignore[override]
         """Get current provider name (protocol property).
 
         Returns:
@@ -3494,7 +3494,7 @@ class AgentOrchestrator(
         return self._protocol_adapter.current_provider
 
     @property
-    def current_model(self) -> str:
+    def current_model(self) -> str:  # type: ignore[override]
         """Get current model name (protocol property).
 
         Returns:
@@ -3649,9 +3649,9 @@ class AgentOrchestrator(
         if components.attributes:
             orchestrator.__dict__.update(components.attributes)
         else:
-            orchestrator.provider = components.provider.provider
-            orchestrator.model = components.provider.model
-            orchestrator.provider_name = components.provider.provider_name
+            orchestrator.provider = components.provider.provider  # type: ignore[assignment]
+            orchestrator.model = components.provider.model  # type: ignore[assignment]
+            orchestrator.provider_name = components.provider.provider_name  # type: ignore[assignment]
             orchestrator.tool_adapter = components.provider.tool_adapter
             orchestrator._tool_calling_caps_internal = components.provider.tool_calling_caps
 
