@@ -1188,14 +1188,14 @@ class VictorAPIServer:
                             ext = entry.suffix.lower()
                             file_counts_dict = overview["file_counts"]
                             assert isinstance(file_counts_dict, dict)
-                            file_counts_dict[ext] = file_counts_dict.get(ext, 0) + 1  # type: ignore[index]
+                            file_counts_dict[ext] = file_counts_dict.get(ext, 0) + 1  # type: ignore[attr-defined, operator]
                             total_files_val = overview.get("total_files", 0)
                             assert isinstance(total_files_val, int)
-                            overview["total_files"] = total_files_val + 1  # type: ignore[index]
+                            overview["total_files"] = total_files_val + 1  # type: ignore[index, operator]
                             try:
                                 total_size_val = overview.get("total_size", 0)
                                 assert isinstance(total_size_val, int)
-                                overview["total_size"] = total_size_val + entry.stat().st_size  # type: ignore[index]
+                                overview["total_size"] = total_size_val + entry.stat().st_size  # type: ignore[index, operator]
                             except OSError:
                                 pass
 
@@ -1272,15 +1272,15 @@ class VictorAPIServer:
                                 lines = len(f.readlines())
                                 loc_val = metrics.get("lines_of_code", 0)
                                 assert isinstance(loc_val, int)
-                                metrics["lines_of_code"] = loc_val + lines
+                                metrics["lines_of_code"] = loc_val + lines  # type: ignore[operator, index]
                                 files_by_type = metrics["files_by_type"]
                                 assert isinstance(files_by_type, dict)
-                                files_by_type[ext] = files_by_type.get(ext, 0) + 1
+                                files_by_type[ext] = files_by_type.get(ext, 0) + 1  # type: ignore[index]
                                 file_sizes.append(
                                     {
                                         "path": str(path.relative_to(root)),
                                         "lines": lines,
-                                        "size": path.stat().st_size,
+                                        "size": path.stat().st_size,  # type: ignore[call-overload]
                                     }
                                 )
                         except Exception:
@@ -1402,7 +1402,7 @@ class VictorAPIServer:
                             line = line.strip()
                             if line and not line.startswith("#"):
                                 deps.append(line.split("==")[0].split(">=")[0].split("<")[0])
-                        dependencies["python"] = {  # type: ignore[index]
+                        dependencies["python"] = {  # type: ignore[assignment]
                             "file": req_file,
                             "count": len(deps),
                             "packages": deps[:20],
@@ -1416,7 +1416,7 @@ class VictorAPIServer:
                     pkg_data = json.loads(pkg_json.read_text())
                     deps = list(pkg_data.get("dependencies", {}).keys())
                     dev_deps = list(pkg_data.get("devDependencies", {}).keys())
-                    dependencies["node"] = {  # type: ignore[index]
+                    dependencies["node"] = {  # type: ignore[assignment]
                         "file": "package.json",
                         "dependencies": len(deps),
                         "devDependencies": len(dev_deps),
@@ -1428,7 +1428,7 @@ class VictorAPIServer:
             # Rust dependencies
             cargo_toml = root / "Cargo.toml"
             if cargo_toml.exists():
-                dependencies["rust"] = {  # type: ignore[index]
+                dependencies["rust"] = {  # type: ignore[assignment]
                     "file": "Cargo.toml",
                     "exists": True,
                 }
@@ -1436,7 +1436,7 @@ class VictorAPIServer:
             # Go dependencies
             go_mod = root / "go.mod"
             if go_mod.exists():
-                dependencies["go"] = {  # type: ignore[index]
+                dependencies["go"] = {  # type: ignore[assignment]
                     "file": "go.mod",
                     "exists": True,
                 }

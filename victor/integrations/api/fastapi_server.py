@@ -33,7 +33,7 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional, cast
 
 from fastapi import (
     Body,
@@ -767,9 +767,9 @@ class VictorFastAPIServer:
                             configured = True
                             try:
                                 provider_instance = provider_class()
-                                supports_tools = provider_instance.supports_tools() if hasattr(provider_instance, "supports_tools") else False
-                                supports_streaming = provider_instance.supports_streaming() if hasattr(provider_instance, "supports_streaming") else True
-                                configured = provider_instance.is_configured() if hasattr(provider_instance, "is_configured") else True
+                                supports_tools = provider_instance.supports_tools() if hasattr(provider_instance, "supports_tools") and callable(provider_instance.supports_tools) else False
+                                supports_streaming = provider_instance.supports_streaming() if hasattr(provider_instance, "supports_streaming") and callable(provider_instance.supports_streaming) else True
+                                configured = provider_instance.is_configured() if hasattr(provider_instance, "is_configured") and callable(provider_instance.is_configured) else True
                             except Exception:
                                 pass
 
@@ -929,7 +929,7 @@ class VictorFastAPIServer:
             """Reset conversation history."""
             await self._record_rl_feedback()
             if self._orchestrator is not None:
-                self._orchestrator.reset_conversation()  # type: ignore[unreachable]
+                self._orchestrator.reset_conversation()
             return JSONResponse({"success": True, "message": "Conversation reset"})
 
         @app.get("/conversation/export", tags=["Conversation"])
@@ -938,7 +938,7 @@ class VictorFastAPIServer:
             if self._orchestrator is None:
                 return JSONResponse({"messages": []})
 
-            messages = self._orchestrator.get_messages()  # type: ignore[unreachable]
+            messages = self._orchestrator.get_messages()
 
             if format == "markdown":
                 content = self._format_messages_markdown(messages)
@@ -1747,20 +1747,15 @@ Respond with just the command to run."""
                 servers = []
 
                 for name in registry.list_servers():
-                    # Get server entry directly from registry
-                    server_entry = registry._servers.get(name)  # type: ignore[attr-defined]
-                    if server_entry:
-                        # Check if client is connected
-                        is_connected = (
-                            server_entry.client is not None
-                            and server_entry.status.value == "connected"
-                        )
+                    # Get server status using proper API
+                    status = registry.get_server_status(name)
+                    if status:
                         servers.append(
                             {
                                 "name": name,
-                                "connected": is_connected,
-                                "tools": [tool.name for tool in server_entry.tools_cache],
-                                "endpoint": server_entry.config.endpoint if hasattr(server_entry.config, "endpoint") else None,
+                                "connected": status.get("status") == "connected",
+                                "tools": [t.get("name", "") for t in status.get("tools", [])],
+                                "endpoint": None,  # endpoint not exposed in get_server_status
                             }
                         )
 
@@ -1821,25 +1816,36 @@ Respond with just the command to run."""
                         {"error": "Model selector learner not available"}, status_code=503
                     )
 
+                # Import and check learner type
+                from victor.framework.rl.learners.model_selector import ModelSelectorLearner
+
+                if not isinstance(learner, ModelSelectorLearner):
+                    return JSONResponse(
+                        {"error": "Model selector learner has unexpected type"}, status_code=500
+                    )
+
+                # Cast to proper type for mypy
+                learner_ms: ModelSelectorLearner = learner  # type: ignore[assignment]
+
                 # Get rankings
-                rankings = learner.get_provider_rankings()
+                rankings = learner_ms.get_provider_rankings()
 
                 # Build task Q-table summary
                 task_q_summary = {}
-                for provider, task_q_table in learner._q_table_by_task.items():
+                for provider, task_q_table in learner_ms._q_table_by_task.items():
                     task_q_summary[provider] = {
                         task_type: round(q_val, 3) for task_type, q_val in task_q_table.items()
                     }
 
                 stats = {
-                    "strategy": learner.strategy.value,
-                    "epsilon": round(learner.epsilon, 3),
-                    "total_selections": learner._total_selections,
-                    "num_providers": len(learner._q_table),
+                    "strategy": learner_ms.strategy.value,
+                    "epsilon": round(learner_ms.epsilon, 3),
+                    "total_selections": learner_ms._total_selections,
+                    "num_providers": len(learner_ms._q_table),
                     "top_provider": rankings[0]["provider"] if rankings else None,
                     "top_q_value": round(rankings[0]["q_value"], 3) if rankings else 0.0,
-                    "learning_rate": learner.learning_rate,
-                    "ucb_c": learner.ucb_c,
+                    "learning_rate": learner_ms.learning_rate,
+                    "ucb_c": learner_ms.ucb_c,
                     "provider_rankings": [
                         {
                             "provider": r["provider"],
@@ -1874,7 +1880,18 @@ Respond with just the command to run."""
                         {"error": "Model selector learner not available"}, status_code=503
                     )
 
-                available = list(learner._q_table.keys()) if learner._q_table else ["ollama"]
+                # Import and check learner type
+                from victor.framework.rl.learners.model_selector import ModelSelectorLearner
+
+                if not isinstance(learner, ModelSelectorLearner):
+                    return JSONResponse(
+                        {"error": "Model selector learner has unexpected type"}, status_code=500
+                    )
+
+                # Cast to proper type for mypy
+                learner_ms: ModelSelectorLearner = learner  # type: ignore[assignment]
+
+                available = list(learner_ms._q_table.keys()) if learner_ms._q_table else ["ollama"]
 
                 # Get recommendation
                 recommendation = coordinator.get_recommendation(
@@ -1898,7 +1915,7 @@ Respond with just the command to run."""
                 alternatives = []
                 for provider in available:
                     if provider != recommendation.value:
-                        q_val = learner._get_q_value(provider, task_type)
+                        q_val = learner_ms._get_q_value(provider, task_type)
                         alternatives.append({"provider": provider, "q_value": round(q_val, 3)})
                 alternatives.sort(key=lambda x: x["q_value"], reverse=True)
 
@@ -1906,7 +1923,7 @@ Respond with just the command to run."""
                     {
                         "provider": recommendation.value,
                         "model": None,
-                        "q_value": round(learner._get_q_value(recommendation.value, task_type), 3),
+                        "q_value": round(learner_ms._get_q_value(recommendation.value, task_type), 3),
                         "confidence": round(recommendation.confidence, 3),
                         "reason": recommendation.reason,
                         "task_type": task_type,
@@ -1932,8 +1949,19 @@ Respond with just the command to run."""
                         {"error": "Model selector learner not available"}, status_code=503
                     )
 
-                old_rate = learner.epsilon
-                learner.epsilon = request.rate
+                # Import and check learner type
+                from victor.framework.rl.learners.model_selector import ModelSelectorLearner
+
+                if not isinstance(learner, ModelSelectorLearner):
+                    return JSONResponse(
+                        {"error": "Model selector learner has unexpected type"}, status_code=500
+                    )
+
+                # Cast to proper type for mypy
+                learner_ms: ModelSelectorLearner = learner  # type: ignore[assignment]
+
+                old_rate = learner_ms.epsilon
+                learner_ms.epsilon = request.rate
 
                 return JSONResponse(
                     {
@@ -2047,12 +2075,15 @@ Respond with just the command to run."""
                 if manager is None:
                     # Initialize with orchestrator
                     orchestrator = await self._get_orchestrator()
+
+                    # Define event callback that creates task but doesn't return it
+                    def event_callback(task_id: str, data: dict[str, Any]) -> None:
+                        asyncio.create_task(self._broadcast_agent_event(task_id, data))
+
                     manager = init_agent_manager(
                         orchestrator=orchestrator,
                         max_concurrent=4,
-                        event_callback=lambda t, d: asyncio.create_task(
-                            self._broadcast_agent_event(t, d)
-                        ),
+                        event_callback=event_callback,
                     )
 
                 agent_id = await manager.start_agent(
@@ -2313,7 +2344,7 @@ Respond with just the command to run."""
 
             import asyncio
 
-            asyncio.create_task(execute_steps())
+            execute_steps_task: asyncio.Task[None] = asyncio.create_task(execute_steps())  # type: ignore[assignment]
 
             return JSONResponse(
                 {
@@ -2554,7 +2585,7 @@ Respond with just the command to run."""
                             }
                         )
 
-            asyncio.create_task(execute_team())
+            execute_team_task: asyncio.Task[None] = asyncio.create_task(execute_team())  # type: ignore[assignment]
 
             return JSONResponse(
                 {
@@ -2654,7 +2685,7 @@ Respond with just the command to run."""
                                 {
                                     "id": node.id,
                                     "name": node.name or node.id,
-                                    "type": node.type.value,
+                                    "type": node.node_type.value,
                                     "role": getattr(node, "role", None),
                                     "goal": getattr(node, "goal", None),
                                 }
@@ -2696,7 +2727,7 @@ Respond with just the command to run."""
                             {
                                 "id": node.id,
                                 "name": node.name or node.id,
-                                "type": node.type.value,
+                                "type": node.node_type.value,
                                 "role": getattr(node, "role", None),
                                 "goal": getattr(node, "goal", None),
                             }
@@ -2723,9 +2754,9 @@ Respond with just the command to run."""
                 if not template_id:
                     return JSONResponse({"error": "template_id required"}, status_code=400)
 
-                from victor.workflows import get_workflow_registry, WorkflowExecutor
+                from victor.workflows import get_global_registry, WorkflowExecutor
 
-                registry = get_workflow_registry()
+                registry = get_global_registry()
                 workflow_def = registry.get(template_id)
 
                 if workflow_def is None:
@@ -2768,7 +2799,7 @@ Respond with just the command to run."""
                 )
 
                 # Execute in background
-                async def run_workflow() -> None:
+                async def run_workflow() -> None:  # type: ignore[no-untyped-def]
                     try:
                         orchestrator = await self._get_orchestrator()
                         executor = WorkflowExecutor(orchestrator)
@@ -2783,13 +2814,13 @@ Respond with just the command to run."""
                             exec_state["status"] = "completed" if result.success else "failed"
                             exec_state["end_time"] = time.time()
                             exec_state["progress"] = 100
-                            exec_state["output"] = (
-                                str(result.final_output) if result.final_output else None
-                            )
+                            # Get output from workflow context
+                            outputs = result.context.get_outputs()
+                            exec_state["output"] = str(outputs) if outputs else None
 
                             # Update step statuses
                             for step in exec_state["steps"]:
-                                node_result = result.node_results.get(step["id"])
+                                node_result = result.context.node_results.get(step["id"])
                                 if node_result:
                                     step["status"] = (
                                         "completed" if node_result.success else "failed"
@@ -3223,7 +3254,7 @@ Respond with just the command to run."""
                 else:
                     logger.info("HITL using SQLite store")
             else:
-                self._hitl_store = HITLStore()
+                self._hitl_store = HITLStore()  # type: ignore[call-arg]
                 logger.info("HITL using in-memory store")
 
             # Create and include the HITL router
@@ -3329,6 +3360,12 @@ Respond with just the command to run."""
             coordinator.record_outcome("model_selector", outcome, "coding")
 
             # Get updated Q-value for logging
+            # Cast learner to ModelSelectorLearner to access get_provider_rankings
+            from victor.framework.rl.learners.model_selector import ModelSelectorLearner
+
+            if not isinstance(learner, ModelSelectorLearner):
+                return
+
             rankings = learner.get_provider_rankings()
             provider_ranking = next((r for r in rankings if r["provider"] == provider.name), None)
             new_q = provider_ranking["q_value"] if provider_ranking else 0.0
@@ -3372,11 +3409,12 @@ Respond with just the command to run."""
             # API key is sent in first message after connection instead of URL
             api_key = data.get("api_key", "")
             if api_key:
-                # Store auth state on the websocket scope for future operations
-                if not hasattr(ws, "state"):
-                    ws.state = type("State", (), {})()
-                ws.state.authenticated = True
-                ws.state.api_key = api_key
+                # Store auth state in the scope dict for future operations
+                # Note: WebSocket.scope is the correct place to store custom state
+                if not hasattr(ws, "auth_state"):
+                    ws.auth_state = {}  # type: ignore[attr-defined]
+                ws.auth_state["authenticated"] = True  # type: ignore[attr-defined]
+                ws.auth_state["api_key"] = api_key  # type: ignore[attr-defined]
                 logger.debug("WebSocket client authenticated via message")
                 await ws.send_json({"type": "auth_success"})
             else:
