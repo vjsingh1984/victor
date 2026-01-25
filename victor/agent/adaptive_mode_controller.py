@@ -1166,17 +1166,21 @@ class AdaptiveModeController:
         """
         # Get from local store
         local_stats = self._q_store.get_task_stats(task_type)
-        local_budget = local_stats.get(
+        local_budget: int = local_stats.get(
             "optimal_tool_budget", self.DEFAULT_TOOL_BUDGETS.get(task_type, 10)
         )
-        local_samples = local_stats.get("sample_count", 0)
+        local_samples: int = local_stats.get("sample_count", 0)
 
         # Try unified learner if available
         if self._mode_transition_learner:
             try:
-                learner_budget = self._mode_transition_learner.get_optimal_budget(task_type)
+                learner_budget_result = self._mode_transition_learner.get_optimal_budget(task_type)
                 learner_stats = self._mode_transition_learner.get_task_stats(task_type)
-                learner_samples = learner_stats.get("sample_count", 0)
+                learner_samples_result = learner_stats.get("sample_count", 0)
+
+                # Ensure types
+                learner_budget: int = int(learner_budget_result) if learner_budget_result is not None else local_budget
+                learner_samples: int = int(learner_samples_result) if learner_samples_result is not None else 0
 
                 # Prefer source with more samples
                 if learner_samples > local_samples:
@@ -1184,12 +1188,12 @@ class AdaptiveModeController:
                         f"RL: Using ModeTransitionLearner budget ({learner_budget}) "
                         f"over local ({local_budget}) for {task_type}"
                     )
-                    return learner_budget
+                    return int(learner_budget)
 
             except Exception as e:
                 logger.debug(f"RL: Could not get budget from learner: {e}")
 
-        return local_budget
+        return int(local_budget) if local_budget is not None else self.DEFAULT_TOOL_BUDGETS.get(task_type, 10)
 
     def should_continue(
         self,

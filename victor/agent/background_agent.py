@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 """Background Agent Manager for async task execution.
 
 This module provides infrastructure for running AI agents in the background,
@@ -49,7 +51,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Literal, Optional, Set
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +104,7 @@ class BackgroundAgent:
     error: Optional[str] = None
 
     # Internal state
-    _task: Optional[asyncio.Task] = field(default=None, repr=False)
+    _task: "Optional[asyncio.Task[None]]" = field(default=None, repr=False)
     _cancelled: bool = field(default=False, repr=False)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -277,10 +279,14 @@ class BackgroundAgentManager:
 
                 # Convert to UnifiedAgentConfig if needed
                 if not isinstance(config, UnifiedAgentConfig):
+                    # Cast mode to Literal type for UnifiedAgentConfig
+                    mode_type: Literal["build", "plan", "explore"] = (
+                        "build" if mode == "build" else "plan" if mode == "plan" else "explore"
+                    )
                     config = UnifiedAgentConfig(
                         mode="background",
                         task=task,
-                        mode_type=mode,
+                        mode_type=mode_type,
                     )
 
                 # Use factory to create agent wrapper (gets orchestrator)

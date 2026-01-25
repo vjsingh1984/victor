@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 """Auto-commit integration for AI-assisted code changes.
 
 This module provides:
@@ -103,7 +105,7 @@ class AutoCommitter:
         self.auto_commit = auto_commit
         self.use_conventional_commits = use_conventional_commits
 
-    def _run_git(self, *args: str, check: bool = True) -> subprocess.CompletedProcess:
+    def _run_git(self, *args: str, check: bool = True) -> "subprocess.CompletedProcess[str]":
         """Run a git command.
 
         Args:

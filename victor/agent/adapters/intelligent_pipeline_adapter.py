@@ -33,7 +33,7 @@ Design Patterns:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator_integration import OrchestratorIntegration
@@ -147,7 +147,10 @@ class IntelligentPipelineAdapter:
                 f"Intelligent request prepared for task_type={task_type}: "
                 f"recommendations={bool(result)}"
             )
-            return result
+            if result is None:
+                return None
+            # Ensure we return a proper dict, not Any
+            return cast("dict[str, Any] | None", result)
         except Exception as e:
             logger.warning(f"Intelligent request preparation failed: {e}")
             return None
@@ -185,7 +188,7 @@ class IntelligentPipelineAdapter:
 
         try:
             # Delegate to validation coordinator
-            result: "IntelligentValidationResult" = (
+            validation_result = (
                 await self._validation_coordinator.validate_intelligent_response(
                     response=response,
                     query=query,
@@ -195,8 +198,10 @@ class IntelligentPipelineAdapter:
             )
 
             # Return None if validation was skipped (backward compatibility)
-            if result is None:
+            if validation_result is None:
                 return None
+
+            result: IntelligentValidationResult = validation_result
 
             # Convert result to dict format for backward compatibility
             result_dict = ResultConverters.intelligent_validation_to_dict(result)
@@ -228,7 +233,12 @@ class IntelligentPipelineAdapter:
 
         try:
             if hasattr(self._intelligent_integration, "should_continue_intelligent"):
-                return self._intelligent_integration.should_continue_intelligent()
+                result = self._intelligent_integration.should_continue_intelligent()
+                # Ensure tuple[bool, str] return type
+                if isinstance(result, tuple) and len(result) == 2:
+                    should_continue, reason = result
+                    return (bool(should_continue), str(reason))
+                return (True, "Invalid return type")
         except Exception as e:
             logger.warning(f"Intelligent continuation check failed: {e}")
 

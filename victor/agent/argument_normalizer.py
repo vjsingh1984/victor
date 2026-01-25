@@ -25,7 +25,9 @@ try:
 except ImportError:
     _NATIVE_AVAILABLE = False
 
-    def native_coerce_string_type(value: str) -> tuple:
+    # Stub when native extensions not available - signature matches native
+    # Use exact signature to avoid conditional function variant error
+    def native_coerce_string_type(value: str) -> tuple[str, str, str | None]:
         """Fallback stub when native not available."""
         return ("string", value, None)
 
@@ -100,7 +102,7 @@ class ArgumentNormalizer:
             "failures": 0,
             "by_tool": {},
         }
-        self._alias_stats = {"total": 0, "aliased": 0, "by_tool": {}}
+        self._alias_stats: Dict[str, Any] = {"total": 0, "aliased": 0, "by_tool": {}}
 
     def normalize_parameter_aliases(
         self, arguments: Dict[str, Any], tool_name: str
@@ -141,11 +143,18 @@ class ArgumentNormalizer:
                 normalized[param] = value
 
         if was_aliased:
-            self._alias_stats["total"] += 1
-            self._alias_stats["aliased"] += 1
-            if tool_name not in self._alias_stats["by_tool"]:
-                self._alias_stats["by_tool"][tool_name] = 0
-            self._alias_stats["by_tool"][tool_name] += 1
+            total = self._alias_stats.get("total", 0)
+            aliased = self._alias_stats.get("aliased", 0)
+            by_tool = self._alias_stats.get("by_tool", {})
+
+            self._alias_stats["total"] = total + 1 if isinstance(total, int) else 1
+            self._alias_stats["aliased"] = aliased + 1 if isinstance(aliased, int) else 1
+
+            if isinstance(by_tool, dict):
+                if tool_name not in by_tool:
+                    by_tool[tool_name] = 0
+                by_tool[tool_name] = by_tool[tool_name] + 1
+                self._alias_stats["by_tool"] = by_tool
             logger.info(
                 f"[{self.provider_name}] Normalized parameter aliases for {tool_name}: "
                 f"{list(set(arguments.keys()) - set(normalized.keys()))} -> "
