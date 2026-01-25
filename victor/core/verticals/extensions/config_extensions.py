@@ -149,7 +149,9 @@ class ConfigExtensions:
             List of learner type names
         """
         config = self.get_rl_settings()
-        return config.get("active_learners", [])
+        result = config.get("active_learners", [])
+        from typing import cast
+        return cast(list[str], result)
 
     def get_quality_thresholds(self) -> Dict[str, float]:
         """Get task-specific quality thresholds.
@@ -158,7 +160,9 @@ class ConfigExtensions:
             Dict mapping task types to quality threshold values
         """
         config = self.get_rl_settings()
-        return config.get("quality_thresholds", {})
+        result = config.get("quality_thresholds", {})
+        from typing import cast
+        return cast(dict[str, float], result)
 
     def get_rl_hooks(self) -> Optional[Any]:
         """Get RL hooks for outcome recording.

@@ -163,8 +163,8 @@ class MutableVerticalContext(VerticalContext):
         # Update config (but don't mutate orchestrator directly)
         if self.config is not None:
             if "_applied_capabilities" not in self.config:
-                (self.config)["_applied_capabilities"] = {}  # type: ignore[index]
-            (self.config)["_applied_capabilities"][capability_name] = kwargs  # type: ignore[index]
+                (self.config)["_applied_capabilities"] = {}
+            (self.config)["_applied_capabilities"][capability_name] = kwargs
         else:
             # Initialize config if it's None
             self.config = {"_applied_capabilities": {capability_name: kwargs}}  # type: ignore[assignment]

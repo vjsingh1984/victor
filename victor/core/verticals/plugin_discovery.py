@@ -63,7 +63,8 @@ from typing import Dict, Type, Optional, Any, TYPE_CHECKING, cast, List
 try:
     from importlib.metadata import EntryPoint, entry_points
 except ImportError:
-    from importlib_metadata import EntryPoint, entry_points
+    from importlib_metadata import EntryPoint as EntryPoint  # type: ignore[misc]
+    from importlib_metadata import entry_points as entry_points  # type: ignore[misc]
 
 try:
     import yaml

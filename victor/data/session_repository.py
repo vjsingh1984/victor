@@ -189,7 +189,8 @@ class SQLiteSessionRepository:
         """
         # Session objects have to_dict() method
         if hasattr(session, "to_dict"):
-            return session.to_dict()
+            from typing import cast
+            return cast(Dict[str, Any], session.to_dict())
 
         # Fallback: try to convert manually
         return {

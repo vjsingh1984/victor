@@ -8,8 +8,9 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 if TYPE_CHECKING:
     from victor.framework.prompt_builder import PromptBuilder
 
-from victor.core.verticals.base import StageDefinition, VerticalBase
+from victor.core.verticals.base import VerticalBase
 from victor.core.verticals.protocols import ToolDependencyProviderProtocol
+from victor.core.vertical_types import StageDefinition
 
 # Phase 3: Import framework capabilities
 from victor.framework.capabilities import FileOperationsCapability
@@ -201,10 +202,10 @@ class DataAnalysisAssistant(VerticalBase):
             Tool dependency provider
         """
 
-        def _create():
+        def _create() -> ToolDependencyProviderProtocol:
             from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
 
-            return create_vertical_tool_dependency_provider(cls.name)
+            return create_vertical_tool_dependency_provider(cls.name)  # type: ignore[no-any-return]
 
         return cls._get_cached_extension("tool_dependency_provider", _create)
 
