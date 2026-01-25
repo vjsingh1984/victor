@@ -491,7 +491,7 @@ def timed(
         name = operation_name or func.__name__
 
         @wraps(func)
-        async def async_wrapper(*args, **kwargs):
+        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
             start_time = time.perf_counter()
             try:
                 result = await func(*args, **kwargs)
@@ -504,7 +504,7 @@ def timed(
                 raise
 
         @wraps(func)
-        def sync_wrapper(*args, **kwargs):
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
             start_time = time.perf_counter()
             try:
                 result = func(*args, **kwargs)

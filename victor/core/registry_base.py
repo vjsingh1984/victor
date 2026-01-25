@@ -57,7 +57,7 @@ from typing import Any, ClassVar, Dict, Generic, List, Optional, Set, TypeVar, c
 logger = logging.getLogger(__name__)
 
 # Type variable for self-referential generic typing
-T = TypeVar("T", bound="SingletonRegistry")
+T = TypeVar("T", bound="SingletonRegistry[Any]")
 
 
 class SingletonRegistry(ABC, Generic[T]):

@@ -42,7 +42,7 @@ class QueryEnhancementRegistry:
     Supports lazy initialization of strategy instances.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize empty registry."""
         self._strategies: Dict[EnhancementTechnique, Type[IQueryEnhancementStrategy]] = {}
         self._instances: Dict[EnhancementTechnique, IQueryEnhancementStrategy] = {}
@@ -126,7 +126,7 @@ def get_default_registry() -> QueryEnhancementRegistry:
     global _default_registry
 
     if _default_registry is None:
-        _default_registry = QueryEnhancementRegistry()
+        _default_registry: "QueryEnhancementRegistry" = QueryEnhancementRegistry()  # type: ignore[no-untyped-call]
         _register_default_strategies(_default_registry)
 
     return _default_registry

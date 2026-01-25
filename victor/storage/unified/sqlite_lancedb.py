@@ -33,6 +33,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from victor.storage.unified.protocol import (
     GraphEdge,
     GraphNode,
+    GraphStoreProtocol,
     SearchMode,
     SearchParams,
     UnifiedSearchResult,

@@ -817,7 +817,8 @@ class WorkflowVisualizer:
                 self._to_svg_matplotlib,
             ]:
                 try:
-                    return method(output_path)
+                    from typing import cast
+                    return cast(str, method(output_path))
                 except (ImportError, FileNotFoundError, RuntimeError):
                     continue
             raise ImportError("No SVG rendering backend available")
@@ -893,7 +894,7 @@ class WorkflowVisualizer:
                 with open(output_path, "w") as f:
                     f.write(svg_content)
 
-            return svg_content
+            return str(svg_content)
 
         except URLError as e:
             raise RuntimeError(f"Kroki API error: {e}. Check network or use local backend.")
@@ -1006,9 +1007,10 @@ class WorkflowVisualizer:
             self._to_png_graphviz(output_path)
         else:
             # Try in order
+            from typing import Callable
             for method in [self._to_png_d2, self._to_png_kroki, self._to_png_graphviz]:
                 try:
-                    method(output_path)
+                    cast(Callable[[str], None], method)(output_path)
                     return
                 except (ImportError, FileNotFoundError, RuntimeError):
                     continue

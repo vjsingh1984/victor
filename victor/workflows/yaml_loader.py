@@ -306,7 +306,7 @@ class LLMConfig:
     stop_sequences: Optional[List[str]] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        result = {}
+        result: Dict[str, Any] = {}
         if self.temperature is not None:
             result["temperature"] = self.temperature
         if self.model_hint is not None:
@@ -429,7 +429,7 @@ class ServiceConfigYAML:
     k8s_config: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        result = {
+        result: Dict[str, Any] = {
             "name": self.name,
             "provider": self.provider,
         }
@@ -497,9 +497,9 @@ class ServiceConfigYAML:
         # Use preset if specified
         if self.preset:
             preset_factory = getattr(ServicePresets, self.preset, None)
-            if preset_factory:
+            if preset_factory and callable(preset_factory):
                 # Get base config from preset
-                base_config = preset_factory(name=self.name)
+                base_config: ServiceConfig = preset_factory(name=self.name)
                 # Override with YAML settings
                 if self.environment:
                     base_config.environment.update(self.environment)
@@ -532,8 +532,8 @@ class ServiceConfigYAML:
                 parts = vol_spec.split(":")
                 volume_mounts.append(
                     VolumeMount(
-                        host_path=parts[0],
-                        container_path=parts[1],
+                        source=parts[0],
+                        target=parts[1],
                         read_only=len(parts) > 2 and parts[2] == "ro",
                     )
                 )
@@ -545,7 +545,7 @@ class ServiceConfigYAML:
             health_check = HealthCheckConfig(
                 type=HealthCheckType(hc_type),
                 port=self.health_check.get("port"),
-                path=self.health_check.get("path"),
+                path=self.health_check.get("path", "/health"),
                 interval=self.health_check.get("interval", 5.0),
                 timeout=self.health_check.get("timeout", 30.0),
                 retries=self.health_check.get("retries", 3),
@@ -557,15 +557,15 @@ class ServiceConfigYAML:
             lifecycle = LifecycleConfig(
                 startup_order=self.lifecycle.get("startup_order", 0),
                 startup_timeout=self.lifecycle.get("startup_timeout", 60.0),
-                shutdown_timeout=self.lifecycle.get("shutdown_timeout", 30.0),
+                shutdown_grace=self.lifecycle.get("shutdown_timeout", 30.0),
                 restart_policy=self.lifecycle.get("restart_policy", "no"),
             )
 
         return ServiceConfig(
             name=self.name,
-            provider=self.provider,
+            provider=self.provider,  # type: ignore[arg-type]
             image=self.image,
-            command=self.command,
+            command=[self.command] if self.command else None,  # type: ignore[arg-type]
             ports=port_mappings,
             environment=self.environment,
             volumes=volume_mounts,
@@ -722,14 +722,14 @@ def _resolve_ref(
     # Extract specific node or return first node
     if node_id:
         # Look for node in "nodes" list
-        nodes = file_data.get("nodes", [])
+        nodes: List[Dict[str, Any]] = file_data.get("nodes", [])
         for node in nodes:
             if node.get("id") == node_id:
                 return node
         raise YAMLWorkflowError(f"Node '{node_id}' not found in {full_path}")
     else:
         # Return first node from file
-        nodes = file_data.get("nodes", [])
+        nodes: List[Dict[str, Any]] = file_data.get("nodes", [])
         if not nodes:
             raise YAMLWorkflowError(f"No nodes found in {full_path}")
         return nodes[0]
@@ -914,9 +914,9 @@ class YAMLWorkflowConfig:
     # Base directory for relative imports
     base_dir: Optional[Path] = None
     # Custom condition functions
-    condition_registry: Dict[str, Callable[[Dict[str, Any]], str]] = None
+    condition_registry: Optional[Dict[str, Callable[[Dict[str, Any]], str]]] = None
     # Custom transform functions
-    transform_registry: Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]] = None
+    transform_registry: Optional[Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]]] = None
 
     def __post_init__(self) -> None:
         if self.condition_registry is None:
@@ -961,7 +961,7 @@ def _create_simple_condition(expr: str) -> Callable[[Dict[str, Any]], str]:
             # Parse value
             value = _parse_value(value_str)
 
-            def condition(ctx: Dict[str, Any], k=key, v=value, o=op) -> str:
+            def condition(ctx: Dict[str, Any], k: str = key, v: Any = value, o: Any = op) -> str:
                 ctx_value = ctx.get(k)
                 try:
                     return "true" if o(ctx_value, v) else "false"
@@ -977,7 +977,7 @@ def _create_simple_condition(expr: str) -> Callable[[Dict[str, Any]], str]:
         values_str = in_match.group(2)
         values = [_parse_value(v.strip()) for v in values_str.split(",")]
 
-        def in_condition(ctx: Dict[str, Any], k=key, vs=values) -> str:
+        def in_condition(ctx: Dict[str, Any], k: str = key, vs: Any = values) -> str:
             return "true" if ctx.get(k) in vs else "false"
 
         return in_condition
@@ -985,7 +985,7 @@ def _create_simple_condition(expr: str) -> Callable[[Dict[str, Any]], str]:
     # Simple truthy check
     if re.match(r"^\w+$", expr):
 
-        def truthy_condition(ctx: Dict[str, Any], k=expr) -> str:
+        def truthy_condition(ctx: Dict[str, Any], k: str = expr) -> str:
             return "true" if ctx.get(k) else "false"
 
         return truthy_condition
@@ -1047,7 +1047,7 @@ def _create_transform(expr: str) -> Callable[[Dict[str, Any]], Dict[str, Any]]:
         if value_str.startswith("ctx."):
             ref_key = value_str[4:]
 
-            def ref_transform(ctx: Dict[str, Any], k=key, rk=ref_key) -> Dict[str, Any]:
+            def ref_transform(ctx: Dict[str, Any], k: str = key, rk: str = ref_key) -> Dict[str, Any]:
                 result = ctx.copy()
                 result[k] = ctx.get(rk)
                 return result
@@ -1057,7 +1057,7 @@ def _create_transform(expr: str) -> Callable[[Dict[str, Any]], Dict[str, Any]]:
         # Literal value
         value = _parse_value(value_str)
 
-        def literal_transform(ctx: Dict[str, Any], k=key, v=value) -> Dict[str, Any]:
+        def literal_transform(ctx: Dict[str, Any], k: str = key, v: Any = value) -> Dict[str, Any]:
             result = ctx.copy()
             result[k] = v
             return result
@@ -1876,7 +1876,7 @@ class YAMLWorkflowProvider:
     def __init__(
         self,
         workflows: Dict[str, WorkflowDefinition],
-        auto_workflows: Optional[List[tuple]] = None,
+        auto_workflows: Optional[List[tuple[str, str]]] = None,
     ):
         """Initialize provider with pre-loaded workflows.
 
@@ -1935,7 +1935,7 @@ class YAMLWorkflowProvider:
         """Get a specific workflow by name."""
         return self._workflows.get(name)
 
-    def get_auto_workflows(self) -> List[tuple]:
+    def get_auto_workflows(self) -> List[tuple[str, str]]:
         """Get auto-selection workflow mappings."""
         return self._auto_workflows.copy()
 
@@ -2067,7 +2067,8 @@ class WorkflowArgument:
                 return self.default
 
         # Type conversion
-        type_map = {
+        from typing import Callable
+        type_map: Dict[str, Callable[[Any], Any]] = {
             "str": str,
             "int": int,
             "float": float,
@@ -2076,7 +2077,7 @@ class WorkflowArgument:
         }
         converter = type_map.get(self.type, str)
         try:
-            converted = converter(value)
+            converted = converter(value)  # type: ignore[arg-type]
         except (ValueError, TypeError) as e:
             raise YAMLWorkflowError(f"Invalid value for argument '{self.name}': {e}")
 

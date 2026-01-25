@@ -93,7 +93,7 @@ class ChunkingRegistry:
             return strategy
 
         # Default to text strategy
-        return self._strategies.get("text") or TextChunkingStrategy(self.config)  # type: ignore[name-defined]
+        return self._strategies.get("text") or TextChunkingStrategy(self.config)
 
     def chunk(
         self,

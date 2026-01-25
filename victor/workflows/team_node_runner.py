@@ -295,7 +295,7 @@ class TeamNodeRunner:
                     )
 
                 # Emit event for recursion depth exceeded
-                self._emit_recursion_depth_event(node.id, recursion_ctx)
+                await self._emit_recursion_depth_event(node.id, recursion_ctx)
 
                 # Re-raise recursion depth errors as-is
                 raise
@@ -379,7 +379,7 @@ class TeamNodeRunner:
             f"budget={tool_budget}, tools={allowed_tools}"
         )
 
-    def _emit_recursion_depth_event(
+    async def _emit_recursion_depth_event(
         self,
         team_id: str,
         recursion_ctx: RecursionContext,

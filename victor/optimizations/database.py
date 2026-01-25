@@ -35,7 +35,7 @@ import logging
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, cast
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, TypeVar, cast
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -505,7 +505,7 @@ class DatabaseOptimizer:
 
 def cached_query(
     cache_ttl: int = 300,
-) -> Callable[[Callable[..., T]], Callable[..., Coroutine[Any, Any, T]]]:
+) -> Callable[[Callable[..., Awaitable[T]]], Callable[..., Awaitable[T]]]:
     """Decorator for caching database query results.
 
     Args:
@@ -518,7 +518,7 @@ def cached_query(
     """
     _cache: Dict[str, Tuple[Any, float]] = {}
 
-    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+    def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
         @functools.wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> T:
             # Generate cache key
@@ -526,12 +526,12 @@ def cached_query(
 
             # Check cache
             if key in _cache:
-                result, timestamp = _cache[key]
+                cached_result, timestamp = _cache[key]
                 if time.time() - timestamp < cache_ttl:
-                    return cast(T, result)
+                    return cast(T, cached_result)
 
             # Execute function
-            result: T = await func(*args, **kwargs)
+            result = await func(*args, **kwargs)
 
             # Cache result
             _cache[key] = (result, time.time())

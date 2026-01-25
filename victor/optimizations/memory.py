@@ -151,15 +151,15 @@ class ObjectPool(Generic[T]):
         with self._lock:
             self._pool.clear()
 
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self) -> Dict[str, float]:
         """Get pool statistics."""
         with self._lock:
             return {
-                "pool_size": len(self._pool),
-                "max_size": self._max_size,
-                "created": self._created,
-                "acquired": self._acquired,
-                "reused": self._reused,
+                "pool_size": float(len(self._pool)),
+                "max_size": float(self._max_size),
+                "created": float(self._created),
+                "acquired": float(self._acquired),
+                "reused": float(self._reused),
                 "reuse_rate": float(self._reused / self._acquired if self._acquired > 0 else 0.0),
             }
 
@@ -405,7 +405,7 @@ class MemoryOptimizer:
         stats.gc_counts = gc.get_count()
 
         # Get pool stats
-        stats.pool_stats = {name: pool.get_stats() for name, pool in self._pools.items()}
+        stats.pool_stats = {name: pool.get_stats() for name, pool in self._pools.items()}  # type: ignore[assignment]
 
         return stats
 

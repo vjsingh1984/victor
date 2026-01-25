@@ -204,9 +204,11 @@ class BaseQueryEnhancementStrategy(ABC):
 
             # Extract content from response (handles different response types)
             if hasattr(response, "content"):
-                return response.content.strip()
+                from typing import cast
+                return cast(str, response.content).strip()
             elif hasattr(response, "message"):
-                return response.message.get("content", "").strip()
+                from typing import cast
+                return cast(str, response.message.get("content", "")).strip()
             return str(response).strip()
 
         except Exception as e:

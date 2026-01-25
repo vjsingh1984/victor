@@ -42,7 +42,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
 
@@ -420,7 +420,7 @@ class QueryEnhancer:
         enhanced_query = self._fallback_rewrite(query, entities)
         variants = []
         hypothetical = None
-        all_metadata = {"entities": [e.name for e in (entities or [])]}
+        all_metadata: Dict[str, Any] = {"entities": [e.name for e in (entities or [])]}
 
         for technique in techniques:
             if technique == EnhancementTechnique.REWRITE:

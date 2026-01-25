@@ -467,7 +467,7 @@ def retry(
     max_delay: float = 60.0,
     exponential_base: float = 2.0,
     exceptions: Tuple[Type[Exception], ...] = (Exception,),
-):
+) -> Callable[..., Any]:
     """Decorator to retry function with exponential backoff.
 
     Retries function on failure with exponentially increasing delay.
@@ -529,7 +529,7 @@ def async_retry(
     max_delay: float = 60.0,
     exponential_base: float = 2.0,
     exceptions: Tuple[Type[Exception], ...] = (Exception,),
-):
+) -> Callable[..., Any]:
     """Decorator to retry async function with exponential backoff.
 
     Async version of retry decorator.
@@ -544,7 +544,7 @@ def async_retry(
 
     def decorator(func: F) -> F:
         @wraps(func)
-        async def wrapped(*args, **kwargs):
+        async def wrapped(*args: Any, **kwargs: Any) -> Any:
             last_exception = None
             delay = base_delay
 

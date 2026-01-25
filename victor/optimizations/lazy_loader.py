@@ -75,7 +75,10 @@ from typing import (
     List,
     Optional,
     Set,
+    TypeVar,
 )
+
+F = TypeVar("F", bound=Callable[..., Any])
 
 from victor.core.container import ServiceContainer
 
@@ -594,7 +597,9 @@ class LazyComponentLoader:
             return descriptor.instance
 
         with self._lock:
-            # Triple-check after acquiring lock
+            # Triple-check after acquiring lock (another thread may have loaded it)
+            # Access descriptor again to avoid mypy unreachable error
+            descriptor = self._get_descriptor(key)
             if descriptor.loaded:
                 return descriptor.instance
 
@@ -772,7 +777,7 @@ class LazyComponentLoader:
         return dfs(key)
 
 
-def lazy_load(component_key: str) -> Callable[[F], F]:
+def lazy_load(component_key: str) -> Callable[[F], Any]:  # Return Any to avoid wrapped function type mismatch
     """Decorator for lazy-loading component dependencies.
 
     This decorator wraps a function or method to lazily load

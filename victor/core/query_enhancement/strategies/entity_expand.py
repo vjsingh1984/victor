@@ -55,7 +55,7 @@ class EntityExpandStrategy(BaseQueryEnhancementStrategy):
     # Maximum number of expansion terms to add
     MAX_EXPANSION_TERMS = 6
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         """Initialize strategy (ignores LLM parameters)."""
         # Don't call super().__init__ to avoid LLM setup
         self._prompt_templates = {}

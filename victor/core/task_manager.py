@@ -69,13 +69,13 @@ class TaskManager:
     def __init__(self) -> None:
         """Initialize the TaskManager."""
         # Use a set to track tasks efficiently
-        self._background_tasks: Set[asyncio.Task] = set()
+        self._background_tasks: Set[asyncio.Task[Any]] = set()
 
     def create_tracked_task(
         self,
         coro: Awaitable[Any],
         name: Optional[str] = None,
-    ) -> asyncio.Task:
+    ) -> asyncio.Task[Any]:
         """Create a task and track it for cleanup.
 
         The task will be automatically tracked and removed from the tracking
