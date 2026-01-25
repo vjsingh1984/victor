@@ -160,14 +160,13 @@ class MutableVerticalContext(VerticalContext):
         self._mutations.append(mutation)
         self._capability_values[capability_name] = kwargs
 
-        # Update config (but don't mutate orchestrator directly)
-        if self.config is not None:
-            if "_applied_capabilities" not in self.config:
-                (self.config)["_applied_capabilities"] = {}
-            (self.config)["_applied_capabilities"][capability_name] = kwargs
-        else:
-            # Initialize config if it's None
-            self.config = {"_applied_capabilities": {capability_name: kwargs}}  # type: ignore[assignment]
+        # Update config metadata if available (VerticalConfig is a dataclass, not dict)
+        # The capability values are already stored in _capability_values, so we just
+        # update the config's metadata dict for serialization/debugging purposes
+        if self.config is not None and hasattr(self.config, "metadata"):
+            if "_applied_capabilities" not in self.config.metadata:
+                self.config.metadata["_applied_capabilities"] = {}
+            self.config.metadata["_applied_capabilities"][capability_name] = kwargs
 
     def get_capability(self, capability_name: str) -> Optional[Any]:
         """Get applied capability value.
@@ -246,9 +245,10 @@ class MutableVerticalContext(VerticalContext):
             # Remove from capability values
             self._capability_values.pop(mutation.capability, None)
 
-            # Remove from config
-            if self.config is not None and "_applied_capabilities" in self.config:
-                self.config["_applied_capabilities"].pop(mutation.capability, None)
+            # Remove from config metadata
+            if self.config is not None and hasattr(self.config, "metadata"):
+                if "_applied_capabilities" in self.config.metadata:
+                    self.config.metadata["_applied_capabilities"].pop(mutation.capability, None)
 
         # Truncate mutations list
         self._mutations = self._mutations[: mutation_index + 1]
@@ -271,9 +271,10 @@ class MutableVerticalContext(VerticalContext):
         # Remove from capability values
         self._capability_values.pop(last_mutation.capability, None)
 
-        # Remove from config
-        if self.config is not None and "_applied_capabilities" in self.config:
-            self.config["_applied_capabilities"].pop(last_mutation.capability, None)
+        # Remove from config metadata
+        if self.config is not None and hasattr(self.config, "metadata"):
+            if "_applied_capabilities" in self.config.metadata:
+                self.config.metadata["_applied_capabilities"].pop(last_mutation.capability, None)
 
         # Pop from rollback stack
         if self._rollback_stack:
@@ -293,8 +294,9 @@ class MutableVerticalContext(VerticalContext):
         self._mutations.clear()
         self._capability_values.clear()
         self._rollback_stack.clear()
-        if self.config is not None and "_applied_capabilities" in self.config:
-            del self.config["_applied_capabilities"]  # type: ignore[attr-defined]
+        # Clear applied capabilities from config metadata
+        if self.config is not None and hasattr(self.config, "metadata"):
+            self.config.metadata.pop("_applied_capabilities", None)
 
     def get_mutations_by_capability(self, capability_name: str) -> List[CapabilityMutation]:
         """Get all mutations for a specific capability.
