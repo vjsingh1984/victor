@@ -57,12 +57,12 @@ class EnhancementSpinner:
 
     FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
-    def __init__(self, message: str = "Enhancing query"):
+    def __init__(self, message: str = "Enhancing query") -> None:
         self._message = message
-        self._task: Optional[asyncio.Task] = None
+        self._task: Optional["asyncio.Task[None]"] = None
         self._running = False
 
-    async def _spin(self):
+    async def _spin(self) -> None:
         """Animate spinner."""
         frame_idx = 0
         try:
@@ -80,12 +80,12 @@ class EnhancementSpinner:
             sys.stderr.write("\r" + " " * (len(self._message) + 10) + "\r")
             sys.stderr.flush()
 
-    def start(self):
+    def start(self) -> None:
         """Start the spinner animation."""
         self._running = True
         self._task = asyncio.create_task(self._spin())
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the spinner animation."""
         self._running = False
         if self._task:

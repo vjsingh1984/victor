@@ -52,6 +52,7 @@ from typing import (
     Set,
     TYPE_CHECKING,
     Union,
+    cast,
 )
 
 if TYPE_CHECKING:
@@ -620,7 +621,9 @@ class ErrorRecovery:
                         raise
 
         # Should not reach here
-        raise last_error
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("Execution failed without error being set")
 
 
 # =============================================================================
@@ -687,7 +690,7 @@ class ExecutionHistory:
         """
         # Search for execution file
         for file_path in self.storage_path.glob(f"*_{execution_id}.json"):
-            return json.loads(file_path.read_text())
+            return cast("Dict[str, Any]", json.loads(file_path.read_text()))
 
         return None
 
@@ -705,7 +708,7 @@ class ExecutionHistory:
         Returns:
             List of execution summaries
         """
-        executions = []
+        executions: List[Dict[str, Any]] = []
 
         for file_path in sorted(self.storage_path.glob("*.json"), reverse=True):
             if len(executions) >= limit:
@@ -889,7 +892,7 @@ class WorkflowExecutor:
 
     async def execute(
         self,
-        workflow: Union["CachedCompiledGraph", "WorkflowDefinition", "CompiledGraph"],
+        workflow: Union["CachedCompiledGraph[Any]", "WorkflowDefinition", "CompiledGraph[Any]"],
         inputs: Optional[Dict[str, Any]] = None,
         breakpoints: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
@@ -946,11 +949,11 @@ class WorkflowExecutor:
 
             # Handle polymorphic result
             if hasattr(result, "state"):
-                final_state = result.state
+                final_state = cast("Dict[str, Any]", result.state)
             elif isinstance(result, dict):
-                final_state = result
+                final_state = cast("Dict[str, Any]", result)
             else:
-                final_state = {"result": result}
+                final_state = cast("Dict[str, Any]", {"result": result})
 
             self._context.current_state = final_state
 

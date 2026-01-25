@@ -90,7 +90,9 @@ class QueryEnhancementRegistry:
         # Otherwise use cached instance
         if provider or model:
             strategy_class = self._strategies[technique]
-            return strategy_class(provider=provider, model=model)
+            # Note: provider and model parameters are not used by base protocol
+            # Strategy implementations that need them should get from context
+            return strategy_class()
 
         # Use cached instance
         if technique not in self._instances:
