@@ -406,7 +406,7 @@ class TeamTracer:
                     # Use parent's OpenTelemetry span as context
                     otel_span = self._otel_tracer.start_span(
                         name,
-                        links=[trace.Link(parent_span._otel_span.context)]  # type: ignore
+                        links=[trace.Link(parent_span._otel_span.context)]
                     )
                 else:
                     otel_span = self._otel_tracer.start_span(name)

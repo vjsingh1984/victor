@@ -368,9 +368,9 @@ class ComputeNodeRunner(BaseNodeRunner):
                 # TODO: Create proper ComputeNode and WorkflowContext objects
                 if self._tool_registry is None:
                     raise ValueError("ToolRegistry is required but not set")
-                result = await handler(  # type: ignore[call-arg, arg-type]
-                    inputs,  # type: ignore[arg-type]
-                    context,  # type: ignore[arg-type]
+                result = await handler(
+                    inputs,
+                    context,
                     self._tool_registry,
                 )
 

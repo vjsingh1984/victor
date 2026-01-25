@@ -652,7 +652,7 @@ class SlackTransport(BaseTransport):
         actions_block: Dict[str, Any] = {
             "type": "actions",
             "block_id": f"hitl_{request.request_id}",
-            "elements": button_elements,  # type: ignore[dict-item]
+            "elements": button_elements,
         }
         blocks.append(actions_block)
 
@@ -666,7 +666,7 @@ class SlackTransport(BaseTransport):
         ]
         context_block: Dict[str, Any] = {
             "type": "context",
-            "elements": context_elements,  # type: ignore[dict-item]
+            "elements": context_elements,
         }
         blocks.append(context_block)
 

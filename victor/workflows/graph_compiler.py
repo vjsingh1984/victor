@@ -95,8 +95,8 @@ logger = logging.getLogger(__name__)
 # Use the State-bound TypeVar from graph_dsl or define our own
 if TYPE_CHECKING:
     from victor.workflows.graph_dsl import State as GraphState
-    # State is a Protocol/ABC, not a concrete type, so use Dict[str, Any] as bound
-    S = TypeVar("S", bound="Dict[str, Any]")
+    # State is a Protocol/ABC, not a concrete type, so use State as bound
+    S = TypeVar("S", bound="GraphState")
 else:
     # For runtime, use unbounded TypeVar
     S = TypeVar("S")
@@ -274,9 +274,9 @@ class WorkflowGraphCompiler(Generic[S]):
 
     def compile(
         self,
-        graph: "WorkflowGraph[S]",
+        graph: "WorkflowGraph[Any]",
         name: Optional[str] = None,
-    ) -> "CompiledGraph[S]":
+    ) -> "CompiledGraph[Any]":
         """Compile a WorkflowGraph to CompiledGraph.
 
         Args:
@@ -371,7 +371,7 @@ class WorkflowGraphCompiler(Generic[S]):
             edges=edges,
             entry_point=entry_point,
             state_schema=graph.state_type if self._config.preserve_state_type else None,
-        )  # type: ignore[type-var]
+        )
 
     def _create_node_function(
         self,
@@ -410,14 +410,14 @@ class WorkflowGraphCompiler(Generic[S]):
         async def state_converting_wrapper(state: Dict[str, Any]) -> Dict[str, Any]:
             # Convert dict to typed state
             if hasattr(state_type, "from_dict"):
-                typed_state = state_type.from_dict(state)
+                typed_state: Any = state_type.from_dict(state)
             else:
                 # Try direct construction
                 try:
                     typed_state = state_type(**state)
                 except TypeError:
                     # If that fails, pass dict directly
-                    typed_state = state  # type: ignore[assignment]
+                    typed_state = state
 
             # Call original function
             if asyncio.iscoroutinefunction(original_func):
@@ -427,17 +427,17 @@ class WorkflowGraphCompiler(Generic[S]):
 
             # Convert result back to dict
             if hasattr(result, "to_dict"):
-                return result.to_dict()  # type: ignore[no-any-return]
+                return result.to_dict()
             elif hasattr(result, "__dataclass_fields__"):
                 # Dataclass - convert to dict
                 from dataclasses import asdict
 
-                return asdict(result)  # type: ignore[no-any-return]
+                return asdict(result)
             elif isinstance(result, dict):
                 return result
             else:
                 # Unknown type, return as-is
-                return cast(Dict[str, Any], result)  # type: ignore[no-any-return]
+                return cast(Dict[str, Any], result)
 
         return state_converting_wrapper
 

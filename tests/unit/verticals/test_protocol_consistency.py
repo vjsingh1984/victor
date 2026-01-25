@@ -46,12 +46,12 @@ from victor.core.verticals.base import VerticalBase
 
 
 # List of built-in verticals to test
+# Note: Use actual vertical names as registered
 BUILT_IN_VERTICALS = [
     "coding",
     "devops",
     "research",
-    "rag",
-    "dataanalysis",
+    "data_analysis",  # Note: underscore in name
 ]
 
 # Required methods all verticals must implement
