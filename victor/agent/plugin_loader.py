@@ -159,9 +159,10 @@ class PluginLoader:
         try:
             from victor.tools.plugin_registry import ToolPluginRegistry
             from victor.config.settings import get_project_paths
+            from pathlib import Path
 
             # Use centralized path for plugins directory
-            plugin_dirs: List[object] = [get_project_paths().global_plugins_dir]
+            plugin_dirs: List[Path] = [get_project_paths().global_plugins_dir]
             plugin_dirs.extend(self._config.plugin_dirs)
 
             plugin_config = getattr(self._settings, "plugin_config", {})

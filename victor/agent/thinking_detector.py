@@ -177,7 +177,7 @@ STOPWORDS: frozenset[str] = frozenset(
 )
 
 # Patterns indicating circular thinking
-CIRCULAR_PATTERNS: List[re.Pattern] = [
+CIRCULAR_PATTERNS: List[re.Pattern[str]] = [
     re.compile(r"let me (read|check|look at|examine|see) (the|this) (file|code)", re.I),
     re.compile(r"i need to (read|check|look at|examine|see)", re.I),
     re.compile(r"(first|now) let me", re.I),
@@ -192,7 +192,7 @@ CIRCULAR_PATTERNS: List[re.Pattern] = [
 ]
 
 # Stalling patterns - thinking without action (common in DeepSeek)
-STALLING_PATTERNS: List[re.Pattern] = [
+STALLING_PATTERNS: List[re.Pattern[str]] = [
     re.compile(r"^let me\b", re.I),  # Starts with "let me"
     re.compile(r"^i('ll| will| need to| should)\b", re.I),  # Starts with intent
     re.compile(r"^now\b", re.I),  # Starts with "now"

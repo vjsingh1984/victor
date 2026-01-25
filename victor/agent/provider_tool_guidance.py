@@ -514,7 +514,7 @@ def get_tool_guidance_strategy(provider_name: str) -> ToolGuidanceStrategy:
     strategy_class = _provider_mappings.get(provider_key, DefaultToolGuidance)
 
     # Create and cache instance
-    strategy = strategy_class()
+    strategy: ToolGuidanceStrategy = strategy_class()  # type: ignore[assignment]
     _strategy_cache[provider_key] = strategy
 
     logger.debug(f"Created tool guidance strategy for {provider_name}: {strategy_class.__name__}")

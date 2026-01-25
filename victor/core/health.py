@@ -279,8 +279,8 @@ class CallableHealthCheck(BaseHealthCheck):
         result = self._check_fn()
         if asyncio.iscoroutine(result):
             coro_result = await result
-            return coro_result
-        return result  # type: ignore[return-value]
+            return cast(ComponentHealth, coro_result)
+        return cast(ComponentHealth, result)
 
 
 class ProviderHealthCheck(BaseHealthCheck):

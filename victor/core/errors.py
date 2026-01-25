@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, TypeVar, cast
+from typing import Any, Awaitable, Callable, Dict, List, Optional, TypeVar, cast
 
 logger = logging.getLogger(__name__)
 
@@ -1400,7 +1400,7 @@ def handle_errors_async(
                     ) from e
                 return cast(T, default_return)
 
-        return wrapper  # type: ignore[return-value]
+        return wrapper
 
     return decorator
 

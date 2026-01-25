@@ -438,7 +438,7 @@ Promoted StepHandlerRegistry as primary vertical extension surface through compr
 
 #### Migration Guide
 See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md#track-7-adopting-step-handlers)
-See also [docs/extensions/step_handler_migration.md](./extensions/step_handler_migration.md)
+See also [docs/extensions/step_handler_migration.md](../../extensions/step_handler_migration.md)
 
 #### Example
 ```python
@@ -632,7 +632,7 @@ class MyVertical(VerticalBase):
         registry.register(ToolHandler())
 ```
 
-See [docs/extensions/step_handler_migration.md](./extensions/step_handler_migration.md) for details.
+See [docs/extensions/step_handler_migration.md](../../extensions/step_handler_migration.md) for details.
 
 ### For External Vertical Developers
 
@@ -780,13 +780,13 @@ This comprehensive refactoring initiative was executed across 7 tracks, each foc
 
 ## Quick Links
 
-- [Architecture Summary](./ARCHITECTURAL_IMPROVEMENTS_SUMMARY.md)
+- [Architecture Summary](./CRITICAL_PHASE_COMPLETE.md)
 - [Migration Guide](./MIGRATION_GUIDE.md)
-- [Project Documentation](../CLAUDE.md)
-- [Architecture Best Practices](./architecture/BEST_PRACTICES.md)
-- [Coordinator Reference](./architecture/COORDINATOR_QUICK_REFERENCE.md)
-- [Step Handler Guide](./extensions/step_handler_guide.md)
-- [Lazy Loading Documentation](./performance/lazy_loading.md)
+- [Project Documentation](../../index.md)
+- [Architecture Best Practices](../../architecture/BEST_PRACTICES.md)
+- [Coordinator Reference](../../architecture/coordinator_based_architecture.md)
+- [Step Handler Guide](../../extensions/step_handler_guide.md)
+- [Lazy Loading Documentation](../../performance/lazy_loading.md)
 
 ---
 

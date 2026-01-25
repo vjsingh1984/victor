@@ -664,11 +664,6 @@ def create_mode_completion_criteria(
         Configured ModeCompletionCriteria instance
     """
     # Create concrete implementation
-    from victor.agent.budget.mode_completion_checker import ModeCompletionChecker, ModeCompletionConfig
+    from victor.agent.budget.mode_completion_checker import ModeCompletionChecker
 
-    config = ModeCompletionConfig()
-    if custom_criteria:
-        # Apply custom criteria if provided
-        for mode, criteria in custom_criteria.items():
-            setattr(config, f"{mode.lower()}_criteria", criteria)
-    return ModeCompletionChecker(config=config)
+    return ModeCompletionChecker(custom_criteria=custom_criteria)

@@ -344,7 +344,8 @@ class SystemPromptBuilder:
                 else:
                     merged[task_type] = str(task_hint)
 
-        self._merged_task_hints = merged  # type: dict[str, str]
+        # Cache the merged hints
+        self._merged_task_hints = merged
         return merged
 
     def get_vertical_grounding_rules(self) -> str:

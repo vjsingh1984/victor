@@ -1123,14 +1123,14 @@ victor workflow run workflows/complete_code_review.yaml \
 
 Now that you understand Victor workflows, explore:
 
-- **[Vertical Development Guide](/docs/VERTICAL_DEVELOPMENT_GUIDE.md)**: Create custom verticals with workflows
-- **[StateGraph DSL](/docs/reference/state-graph.md)**: Build workflows programmatically in Python
-- **[Multi-Agent Teams](/docs/guides/multi-agent-teams.md)**: Coordinate multiple agents within workflows
-- **[Workflow Scheduling](/docs/operations/scheduler.md)**: Run workflows on schedules and triggers
+- **[Vertical Development Guide](../reference/internals/VERTICAL_DEVELOPMENT_GUIDE.md)**: Create custom verticals with workflows
+- **[StateGraph API](../reference/internals/workflows-api.md#stategraph-api)**: Build workflows programmatically in Python
+- **[Multi-Agent Teams](../guides/MULTI_AGENT_TEAMS.md)**: Coordinate multiple agents within workflows
+- **[Workflow Scheduling](../guides/workflow-development/scheduling.md)**: Run workflows on schedules and triggers
 
 ## Reference
 
-- **Node Types**: [docs/reference/workflow-nodes.md](/docs/reference/workflow-nodes.md)
-- **Escape Hatches**: [victor/coding/escape_hatches.py](/victor/coding/escape_hatches.py)
-- **Example Workflows**: [victor/workflows/mode_workflows.yaml](/victor/workflows/mode_workflows.yaml)
-- **API Reference**: [docs/api-reference/workflows.md](../reference/internals/workflows-api.md)
+- **Node Types**: [Workflows API](../reference/internals/workflows-api.md#node-types-api)
+- **Escape Hatches**: `victor/coding/escape_hatches.py`
+- **Example Workflows**: `victor/workflows/mode_workflows.yaml`
+- **API Reference**: [Workflows API](../reference/internals/workflows-api.md)

@@ -355,7 +355,7 @@ def get_deduplication_tracker() -> "ToolDeduplicationTrackerProtocol":
 
     # Legacy fallback
     if _deduplication_tracker is None:
-        _deduplication_tracker = ToolDeduplicationTracker()
+        _deduplication_tracker = ToolDeduplicationTracker()  # type: ignore[abstract]
     return _deduplication_tracker
 
 

@@ -463,10 +463,10 @@ for batch in batches:
 
 ## Next Steps
 
-- Read [full documentation](./batch_processor.md) for detailed API reference
-- Check [implementation details](../BATCH_PROCESSOR_IMPLEMENTATION.md) for technical info
-- Run [unit tests](../../tests/unit/test_batch_processor.py) for examples
-- Explore [use cases](./batch_processor.md#use-cases) for real-world examples
+- Read [full documentation](../reference/internals/batch_processor.md) for detailed API reference
+- Check [implementation details](../reference/internals/batch_processor.md#implementation-details) for technical info
+- Run unit tests in `tests/unit/test_batch_processor.py` for examples
+- Explore [use cases](../reference/internals/batch_processor.md#use-cases) for real-world examples
 
 ## Support
 

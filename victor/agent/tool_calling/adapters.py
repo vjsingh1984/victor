@@ -1962,7 +1962,7 @@ class AzureOpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter
                     remaining_content=content,
                     parse_method="native",
                     confidence=1.0,
-                    warnings=warnings if warnings else None,
+                    warnings=warnings,
                 )
 
         # Fallback: Try parsing from content (using mixin)

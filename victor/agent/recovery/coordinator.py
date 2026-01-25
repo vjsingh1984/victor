@@ -271,9 +271,11 @@ class RecoveryCoordinator:
         elif self._context_compactor:
             # Get utilization from existing compactor
             try:
-                utilization = self._context_compactor.get_context_utilization()
-                if utilization > 0.85:
-                    return FailureType.CONTEXT_OVERFLOW
+                if self._context_compactor.controller is not None:
+                    metrics = self._context_compactor.controller.get_context_metrics()
+                    utilization = metrics.utilization if metrics else 0
+                    if utilization > 0.85:
+                        return FailureType.CONTEXT_OVERFLOW
             except Exception:
                 pass  # Compactor not ready
 
@@ -431,9 +433,11 @@ class RecoveryCoordinator:
         # Handle context compaction via existing compactor
         if failure_type == FailureType.CONTEXT_OVERFLOW and self._context_compactor:
             try:
-                freed = self._context_compactor.compact()
-                outcome.compaction_performed = True
-                outcome.tokens_freed = freed
+                # Use check_and_compact which performs compaction if needed
+                result = self._context_compactor.check_and_compact()
+                if result.action_taken:
+                    outcome.compaction_performed = True
+                    outcome.tokens_freed = result.tokens_saved
             except Exception as e:
                 logger.warning(f"Context compaction failed: {e}")
 
@@ -578,9 +582,9 @@ class RecoveryCoordinator:
 
         if self._context_compactor:
             try:
-                diagnostics["context_utilization"] = (
-                    self._context_compactor.get_context_utilization()
-                )
+                # Use get_statistics which includes utilization info
+                stats = self._context_compactor.get_statistics()
+                diagnostics["context_utilization"] = stats.get("total_tokens_saved", 0)
             except Exception:
                 pass
 

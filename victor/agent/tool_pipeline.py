@@ -90,7 +90,7 @@ except ImportError:
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.tools.base import ToolRegistry  # noqa: TC002
+    from victor.tools.registry import ToolRegistry
     from victor.storage.cache.tool_cache import ToolCache
     from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
     from victor.agent.signature_store import SignatureStore
@@ -1388,7 +1388,8 @@ class ToolPipeline:
             logger.debug(f"Using cached tool execution graph: {cache_key}")
 
         # Execute graph
-        result = await self._graph_engine.execute(graph, context)
+        from typing import cast
+        result = cast(PipelineExecutionResult, await self._graph_engine.execute(graph, context))
 
         # Record execution time
         result.total_time_ms = (time.monotonic() - start_time) * 1000
@@ -1644,7 +1645,8 @@ class ToolPipeline:
                 # Track failed signature
                 if self.config.enable_failed_signature_tracking:
                     # We need to get arguments back - use tool name + error as key
-                    self._failed_signatures.add((exec_result.tool_name, exec_result.error or ""))
+                    failed_key = f"{exec_result.tool_name}:{exec_result.error or ''}"
+                    self._failed_signatures.add(failed_key)
 
             # Update call count
             self._calls_used += 1

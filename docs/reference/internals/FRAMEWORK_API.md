@@ -493,8 +493,8 @@ await orchestrator.checkpoint_manager.save_checkpoint("checkpoint_1")
 ---
 
 **Quick Links**:
-- 🚀 [Quick Start](#🎯-quick-start)
-- 📖 [API Reference](#🤖-agent-api)
-- 🔧 [Tools](#🔧-tools-toolset)
-- 📊 [Events](#📊-event-system)
-- 🎭 [State](#🎭-state-observation)
+- 🚀 [Quick Start](#quick-start)
+- 📖 [API Reference](#agent-api)
+- 🔧 [Tools](#tools-toolset)
+- 📊 [Events](#event-system)
+- 🎭 [State](#state-observation)

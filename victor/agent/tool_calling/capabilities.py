@@ -235,7 +235,7 @@ class ModelCapabilityLoader:
                         break
 
                 if matching:
-                    for pattern, model_config in matching:
+                    for _, pattern, model_config in matching:
                         logger.debug(f"Applying model pattern '{pattern}'")
 
                         # 3. Apply training capabilities
@@ -306,7 +306,7 @@ class ModelCapabilityLoader:
 
         # Sort by specificity (least specific first, so more specific overrides)
         matching.sort(key=lambda x: x[0])
-        return [(pattern, config) for _, pattern, config in matching]
+        return matching
 
     def _matches_pattern(self, model_name: str, pattern: str) -> bool:
         """Check if model name matches a pattern.
@@ -470,7 +470,7 @@ class ModelCapabilityLoader:
         models = config_dict.get("models", {})
         matching = self._find_matching_model(models, model_lower)
 
-        for pattern, model_config in matching:
+        for _, pattern, model_config in matching:
             # Training
             training = model_config.get("training", {})
             if training:

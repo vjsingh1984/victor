@@ -183,7 +183,7 @@ class ProviderManager:
         # Initialize provider switcher (depends on coordinator)
         self._provider_switcher = ProviderSwitcher(
             classification_strategy=self._classification_strategy,
-            event_emitter=cast(IProviderEventEmitter, self),  # type: ignore[arg-type]
+            event_emitter=cast(IProviderEventEmitter, self),
             health_monitor=self._health_monitor,
             adapter_coordinator=self._adapter_coordinator,
         )
@@ -814,7 +814,7 @@ class ProviderManager:
         """
         history = self._model_switcher.get_switch_history()
         # Convert dict items to ModelSwitchEvent objects if needed
-        return [ModelSwitchEvent(**item) if isinstance(item, dict) else item for item in history]  # type: ignore[misc]
+        return [ModelSwitchEvent(**item) if isinstance(item, dict) else item for item in history]
 
     def add_switch_callback(self, callback: Callable[[ProviderState], None]) -> None:
         """Add callback for provider/model switches.

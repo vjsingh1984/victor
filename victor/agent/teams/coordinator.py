@@ -268,7 +268,7 @@ class TeamCoordinator(ITeamCoordinator):
             "formation": result.formation.value,
         }
 
-    async def broadcast(self, message: AgentMessage) -> List[Optional[AgentMessage]]:
+    async def broadcast(self, message: CanonicalAgentMessage) -> List[Optional[CanonicalAgentMessage]]:
         """Broadcast a message to all team members.
 
         Args:
@@ -618,8 +618,8 @@ class TeamCoordinator(ITeamCoordinator):
             # Notify team via message bus
             await execution.message_bus.send(
                 LegacyAgentMessage(
-                    sender_id=member.id,
-                    message_type=MessageType.RESULT,
+                    from_agent=member.id,
+                    type=MessageType.RESULT,
                     content=result.output[:500],
                     data={"success": result.success, "tool_calls": result.tool_calls_used},
                 )
@@ -928,9 +928,9 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
                 next_member = sorted_members[i + 1]
                 await execution.message_bus.send(
                     LegacyAgentMessage(
-                        sender_id=member.id,
-                        recipient_id=next_member.id,
-                        message_type=MessageType.HANDOFF,
+                        from_agent=member.id,
+                        to_agent=next_member.id,
+                        type=MessageType.HANDOFF,
                         content=f"Pipeline stage complete. Passing to {next_member.name}.",
                     )
                 )

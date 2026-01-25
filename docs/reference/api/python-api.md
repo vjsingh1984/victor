@@ -922,7 +922,7 @@ result = await agent.run("Task")
 - **API Overview**: [API Reference →](index.md)
 - **HTTP API**: [HTTP API →](http-api.md)
 - **MCP Server**: [MCP Server →](mcp-server.md)
-- **Configuration**: [Configuration →](../configuration/)
+- **Configuration**: [Configuration →](../configuration/index.md)
 - **Examples**: [Examples →](../../../examples/)
 
 ---

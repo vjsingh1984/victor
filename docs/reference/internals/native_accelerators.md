@@ -403,6 +403,6 @@ class MyAccelerator(InstrumentedAccelerator):
 ## References
 
 - [Tool Selector Accelerator](./tool_selector_accelerator.md) - Detailed guide for tool selection
-- [Observability Guide](./observability.md) - Metrics and tracing
-- [Performance Benchmarks](./benchmarks.md) - Detailed performance analysis
-- [Architecture Overview](./architecture/accelerators.md) - Design patterns
+- [Observability Guide](../../observability/README.md) - Metrics and tracing
+- [Performance Benchmarks](../../performance/benchmark_results.md) - Detailed performance analysis
+- [Architecture Overview](../../architecture/overview.md) - Design patterns

@@ -70,11 +70,13 @@ Usage:
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.providers.base import BaseProvider, ToolDefinition
-from victor.tools.base import ToolRegistry  # noqa: TC002
-from victor.tools.base import CostTier  # noqa: TC002
+
+if TYPE_CHECKING:
+    from victor.tools.registry import ToolRegistry
+    from victor.tools.enums import CostTier
 
 # Import specialized components (lazy to avoid circular imports)
 # These are imported at runtime in methods that use them
@@ -222,8 +224,11 @@ class ToolRegistrar:
 
     def _create_task(self, coro: Any, name: str) -> Optional[asyncio.Task[Any]]:
         """Create a background task using callback or directly."""
+        from typing import cast
+
         if self._create_background_task:
-            return self._create_background_task(coro, name)
+            result = self._create_background_task(coro, name)
+            return cast(Optional[asyncio.Task[Any]], result)
         else:
             task = asyncio.create_task(coro)
             self._mcp_tasks.append(task)

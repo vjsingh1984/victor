@@ -137,7 +137,8 @@ class LazyEmbeddingService:
         self._ensure_loaded()
         if self._model is None:
             return [[0.0] * 384 for _ in texts]  # Return zero vectors
-        return self._model.encode(texts, convert_to_numpy=False).tolist()
+        result = self._model.encode(texts, convert_to_numpy=False).tolist()
+        return cast(list[list[float]], result)
 
     def embed_single(self, text: str) -> list[float]:
         result = self.embed([text])
@@ -173,7 +174,7 @@ class UsageLoggerProtocol(Protocol):
 def bootstrap_container(
     settings: Optional[Settings] = None,
     vertical: Optional[str] = None,
-    override_services: Optional[Dict[Type, Any]] = None,
+    override_services: Optional[Dict[Type[Any], Any]] = None,
 ) -> ServiceContainer:
     """Bootstrap the DI container with default service implementations.
 
@@ -233,7 +234,7 @@ def bootstrap_container(
     # Apply overrides for testing
     if override_services:
         for service_type, instance in override_services.items():
-            factory: Callable[[ServiceContainer], Any] = lambda c, inst=instance: inst
+            factory: Callable[[ServiceContainer], Any] = lambda c, inst=instance: inst  # noqa: B023
             container.register_or_replace(
                 service_type,
                 factory,
@@ -323,15 +324,15 @@ def _register_event_services(container: ServiceContainer, settings: Settings) ->
 
     # Register ObservabilityBus as singleton
     container.register(
-        ObservabilityBus,  # type: ignore[type-abstract]
-        lambda c: ObservabilityBus(backend=c.get(IEventBackend)),  # type: ignore[type-abstract]
+        ObservabilityBus,
+        lambda c: ObservabilityBus(backend=c.get(IEventBackend)),
         ServiceLifetime.SINGLETON,
     )
 
     # Register AgentMessageBus as singleton
     container.register(
-        AgentMessageBus,  # type: ignore[type-abstract]
-        lambda c: AgentMessageBus(backend=c.get(IEventBackend)),  # type: ignore[type-abstract]
+        AgentMessageBus,
+        lambda c: AgentMessageBus(backend=c.get(IEventBackend)),
         ServiceLifetime.SINGLETON,
     )
 
@@ -398,7 +399,7 @@ def _register_signature_store(container: ServiceContainer, settings: Settings) -
 
     container.register(
         SignatureStoreProtocol,
-        lambda c: _create_signature_store(),
+        lambda c: cast(SignatureStoreProtocol, _create_signature_store()),
         ServiceLifetime.SINGLETON,
     )
 
@@ -692,7 +693,7 @@ def _ensure_vertical_activated(
             # Update the extensions in container
             extensions = loader.get_extensions()
             if extensions:
-                ext_factory: Callable[[ServiceContainer], Any] = lambda c, ext=extensions: ext
+                ext_factory: Callable[[ServiceContainer], Any] = lambda c, ext=extensions: ext  # noqa: B023
                 container.register_or_replace(
                     VerticalExtensions,
                     ext_factory,

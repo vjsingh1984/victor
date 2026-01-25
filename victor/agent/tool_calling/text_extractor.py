@@ -210,9 +210,9 @@ class PythonCallExtractor:
             return ExtractionResult(remaining_content=content)
 
         # Combine known tools with valid names for filtering
-        filter_names: Set[str] = set(valid_tool_names or self._known_tools)  # type: ignore[arg-type]
+        filter_names: Set[str] = set(valid_tool_names or self._known_tools)
         if valid_tool_names:
-            filter_names |= set(self._known_tools)  # type: ignore[arg-type]
+            filter_names |= set(self._known_tools)
 
         tool_calls: List[ExtractedToolCall] = []
         warnings: List[str] = []

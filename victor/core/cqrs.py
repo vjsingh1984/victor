@@ -465,7 +465,7 @@ class CommandBus:
     def register(
         self,
         command_type: Type[Command],
-        handler: Union[CommandHandlerFunc, CommandHandler],
+        handler: Union[CommandHandlerFunc[Command], CommandHandler[Command]],
     ) -> None:
         """Register a handler for a command type.
 
@@ -521,10 +521,10 @@ class CommandBus:
         async def final_handler(cmd: Command) -> Any:
             return await handler(cmd)
 
-        chain = final_handler
+        chain: Callable[[Command], Coroutine[Any, Any, Any]] = final_handler
         for middleware in reversed(self._middleware):
 
-            def create_next(mw: CommandMiddleware, next_fn: Callable[[Command], Awaitable[Any]]) -> Callable[[Command], Awaitable[Any]]:
+            def create_next(mw: CommandMiddleware, next_fn: Callable[[Command], Coroutine[Any, Any, Any]]) -> Callable[[Command], Coroutine[Any, Any, Any]]:
                 async def wrapped(cmd: Command) -> Any:
                     return await mw.execute(cmd, next_fn)
 
@@ -650,7 +650,7 @@ class QueryBus:
 
                 return wrapped
 
-            chain: Callable[[Query[TResult]], Awaitable[TResult]] = create_next(middleware, chain)
+            chain = create_next(middleware, chain)
 
         try:
             data = await chain(query)

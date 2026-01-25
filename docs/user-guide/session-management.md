@@ -647,4 +647,4 @@ persistence.delete_session(session_id)
 See also:
 - [CLI Reference](cli-reference.md) - All slash commands
 - [Provider Switching](../reference/providers/index.md) - Switching providers
-- [Architecture Deep Dive](../development/architecture/deep-dive.md) - Database design
+- [Architecture Overview](../architecture/overview.md) - Database design

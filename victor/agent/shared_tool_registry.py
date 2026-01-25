@@ -300,7 +300,7 @@ class SharedToolRegistry:
                         # Handle @tool decorated functions
                         if inspect.isfunction(obj) and getattr(obj, "_is_tool", False):
                             if hasattr(obj, "Tool"):
-                                tool_instance = obj.Tool  # type: ignore[attr-defined]
+                                tool_instance = getattr(obj, "Tool")  # Dynamically attached attribute
                                 tool_name = tool_instance.name
                                 # Store the class, not the instance
                                 self._tool_classes[tool_name] = type(tool_instance)
@@ -347,6 +347,8 @@ class SharedToolRegistry:
         Returns:
             List of tool instances and decorated functions ready for registration
         """
+        from typing import cast
+
         # Ensure tools are discovered
         self.get_tool_classes()
 
@@ -359,14 +361,15 @@ class SharedToolRegistry:
             self._tool_instances_cache = {}
 
         if cache_key not in self._tool_instances_cache:
-            result: list[Any] = []
+            result: List[Any] = []
 
-            # Add decorated tools (functions with @tool decorator)
-            for name, func in self.get_decorated_tools(airgapped_mode=airgapped_mode).items():
-                result.append(func)
+            # Add decorated functions first
+            decorated_names = set(self._decorated_tools.keys())
+            for name, func in self._decorated_tools.items():
+                if not airgapped_mode or not name.startswith("web_"):
+                    result.append(func)
 
-            # Add class-based tools (create fresh instances)
-            # Note: We skip tools that are already in decorated_tools to avoid duplicates
+            # Add class instances (avoiding duplicates with decorated tools)
             decorated_names = set(self._decorated_tools.keys())
             for name, cls in self.get_tool_classes(airgapped_mode=airgapped_mode).items():
                 if name not in decorated_names:
@@ -384,4 +387,21 @@ class SharedToolRegistry:
         else:
             logger.debug(f"Using cached tool instances (mode={cache_key})")
 
-        return self._tool_instances_cache[cache_key]
+        return cast(List[Any], self._tool_instances_cache.get(cache_key, []))
+
+    def get_tool_classes(self, airgapped_mode: bool = False) -> Dict[str, type]:
+        """Get discovered tool classes, optionally filtered by mode.
+
+        Args:
+            airgapped_mode: If True, filter out web tools that require network
+
+        Returns:
+            Dictionary mapping tool names to their classes
+        """
+        if airgapped_mode:
+            return {
+                name: cls
+                for name, cls in self._tool_classes.items()
+                if not name.startswith("web_")
+            }
+        return self._tool_classes.copy()

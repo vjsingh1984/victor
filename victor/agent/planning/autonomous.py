@@ -224,7 +224,7 @@ class AutonomousPlanner:
         try:
             # Use planning system prompt
             if hasattr(self.orchestrator, "set_system_prompt"):
-                self.orchestrator.set_system_prompt(PLANNING_SYSTEM_PROMPT)  # type: ignore[attr-defined]
+                self.orchestrator.set_system_prompt(PLANNING_SYSTEM_PROMPT)
 
             # Call the orchestrator
             response = await self.orchestrator.chat(prompt)
@@ -233,7 +233,7 @@ class AutonomousPlanner:
         finally:
             # Restore original prompt
             if original_prompt and hasattr(self.orchestrator, "set_system_prompt"):
-                self.orchestrator.set_system_prompt(original_prompt)  # type: ignore[attr-defined]
+                self.orchestrator.set_system_prompt(original_prompt)
 
     def _parse_plan_json(self, goal: str, json_str: str) -> ExecutionPlan:
         """Parse plan JSON into ExecutionPlan."""
@@ -410,9 +410,9 @@ class AutonomousPlanner:
         progress_callback: Optional[Callable[[PlanStep, StepStatus], None]],
     ) -> None:
         """Execute plan steps in parallel using sub-agents."""
-        from victor.agent.subagents import SubAgentRole  # type: ignore[attr-defined]
+        from victor.agent.subagents import SubAgentRole
 
-        SubAgentTask = getattr(__import__("victor.agent.subagents", fromlist=["SubAgentTask"]), "SubAgentTask", None)  # type: ignore[attr-defined]
+        SubAgentTask = getattr(__import__("victor.agent.subagents", fromlist=["SubAgentTask"]), "SubAgentTask", None)
 
         while not plan.is_complete() and not plan.is_failed():
             ready_steps = plan.get_ready_steps()
@@ -441,7 +441,7 @@ class AutonomousPlanner:
                         )
                     )
 
-                fan_out_result = await self.sub_agent_orchestrator.fan_out(tasks, max_concurrent)
+                fan_out_result = await self.sub_agent_orchestrator.fan_out(tasks, max_concurrent)  # type: ignore[arg-type]
 
                 # Process results
                 for step, subagent_result in zip(

@@ -1008,11 +1008,11 @@ victor chat --timeout 60
 
 ### Getting Help
 
-- **Documentation**: [Full docs ->](../../README.md)
+- **Documentation**: [Full docs ->](../../index.md)
 - **Issues**: [GitHub Issues ->](https://github.com/vjsingh1984/victor/issues)
 - **Discussions**: [GitHub Discussions ->](https://github.com/vjsingh1984/victor/discussions)
 - **Setup Guide**: [Detailed setup ->](setup.md)
 
 ---
 
-**Next**: [Provider Comparison ->](comparison.md) | [Tool Catalog ->](../tools/catalog.md) | [Configuration ->](../configuration/)
+**Next**: [Provider Comparison ->](comparison.md) | [Tool Catalog ->](../tools/catalog.md) | [Configuration ->](../configuration/index.md)

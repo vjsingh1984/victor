@@ -32,9 +32,8 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tupl
 import yaml
 
 from victor.agent.conversation_state import ConversationStage  # noqa: TC002
-from victor.tools.enums import SchemaLevel
+from victor.tools.enums import SchemaLevel, AccessMode, ExecutionCategory
 from victor.protocols.mode_aware import ModeAwareMixin
-from victor.tools.base import AccessMode, ExecutionCategory  # noqa: TC002
 
 # Rust-accelerated pattern matching (with Python fallback)
 _RUST_PATTERN_MATCHING = False
@@ -56,7 +55,7 @@ if TYPE_CHECKING:
         ToolSelectionStrategyProtocol,
     )
     from victor.providers.base import ToolDefinition
-    from victor.tools.base import ToolRegistry  # noqa: TC002
+    from victor.tools.registry import ToolRegistry
     from victor.tools.semantic_selector import SemanticToolSelector
 
 logger = logging.getLogger(__name__)

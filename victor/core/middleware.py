@@ -398,7 +398,7 @@ class MiddlewarePipeline(Generic[TRequest, TResponse]):
 
         async def link() -> TResponse:
             result = await middleware(context, next_chain)
-            return cast(TResponse, result)
+            return result
 
         return link
 
@@ -601,6 +601,8 @@ class RetryMiddleware(Middleware[TRequest, TResponse]):
 
         if last_error:
             raise last_error
+        # Should never reach here, but mypy needs a return
+        return cast(TResponse, None)  # type: ignore[return-value]
 
 
 class TimeoutMiddleware(Middleware[TRequest, TResponse]):
@@ -648,7 +650,7 @@ class CachingMiddleware(Middleware[TRequest, TResponse]):
     def __init__(
         self,
         cache: Dict[str, Any],
-        key_fn: Callable[[MiddlewareContext], Optional[str]],
+        key_fn: Callable[[MiddlewareContext[Any]], Optional[str]],
         ttl: float = 300.0,
     ) -> None:
         """Initialize caching middleware.
@@ -702,7 +704,7 @@ class ValidationMiddleware(Middleware[TRequest, TResponse]):
 
     def __init__(
         self,
-        validator: Callable[[MiddlewareContext], None],
+        validator: Callable[[MiddlewareContext[Any]], None],
     ) -> None:
         """Initialize validation middleware.
 

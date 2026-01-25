@@ -34,7 +34,10 @@ if TYPE_CHECKING:
     from victor.agent.conversation_controller import ConversationController
     from victor.agent.prompt_builder import SystemPromptBuilder
     from victor.config.settings import Settings
-    from victor.framework.task import TaskType
+    try:
+        from victor.storage.embeddings.task_classifier import TaskType
+    except (ImportError, AttributeError):
+        TaskType = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +93,7 @@ class TaskCoordinator:
         self._current_intent = None
         self._temperature = getattr(settings, "temperature", 0.7)
         self._tool_budget = getattr(settings, "tool_budget", 15)
-        self._observed_files = []
+        self._observed_files: list[str] = []
         self._reminder_manager = None
 
     def _get_default_bus(self) -> Optional[ObservabilityBus]:

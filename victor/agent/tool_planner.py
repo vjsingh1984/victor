@@ -28,7 +28,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from victor.agent.tool_registrar import ToolRegistrar
     from victor.agent.action_authorizer import ActionIntent
-    from victor.tools.base import ToolDefinition  # noqa: TC002
+    from victor.providers.base import ToolDefinition
     from victor.config.settings import Settings
 
 from victor.core.events import ObservabilityBus
@@ -185,7 +185,7 @@ class ToolPlanner:
                 name = tool.name
                 return str(name) if name is not None else ""
             elif isinstance(tool, dict):
-                return tool.get("name", "")
+                return str(tool.get("name", ""))
             return ""
 
         original_count = len(tools)

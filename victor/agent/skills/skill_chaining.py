@@ -1793,10 +1793,10 @@ class SkillChainer:
         current: str | None = critical_end
         while current:
             path.append(current)
-            step: ChainStep | None = step_map.get(current)
-            if step is None or not step.dependencies:
+            current_step_ref: ChainStep | None = step_map.get(current)
+            if current_step_ref is None or not current_step_ref.dependencies:
                 break
-            current = step.dependencies[0]  # Take first dependency
+            current = current_step_ref.dependencies[0]  # Take first dependency
 
         return list(reversed(path))
 

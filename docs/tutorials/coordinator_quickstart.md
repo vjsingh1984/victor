@@ -345,7 +345,7 @@ print(f"Total events: {len(analytics.events)}")
 ### Get Help
 
 - [GitHub Issues](https://github.com/your-org/victor/issues) - Report bugs or request features
-- [Documentation](../README.md) - Full documentation index
+- [Documentation](../index.md) - Full documentation index
 - [Community](https://github.com/your-org/victor/discussions) - Community discussions
 
 ---

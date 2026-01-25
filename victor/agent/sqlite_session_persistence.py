@@ -255,7 +255,7 @@ class SQLiteSessionPersistence:
                 return None
 
             row = rows[0]
-            session_data: dict[str, Any] = json.loads(  # type: ignore[no-any-return]
+            session_data: dict[str, Any] = json.loads(
                 row[5]
             )  # data column (0-indexed: id=0, name=1, provider=2, model=3, profile=4, data=5)
 

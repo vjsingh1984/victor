@@ -196,20 +196,20 @@ class ParallelToolExecutor:
             # Process results
             for idx, res in zip(batch, batch_results, strict=False):
                 if isinstance(res, Exception):
-                    exec_result = self._create_error_result(
+                    batch_exec_result = self._create_error_result(
                         tool_calls[idx].get("name", "unknown"), str(res)
                     )
                     result.failed_count += 1
                 else:
-                    exec_result: ToolExecutionResult = res  # type: ignore[assignment]
-                    if exec_result.success:
+                    batch_exec_result: ToolExecutionResult = res
+                    if batch_exec_result.success:
                         result.completed_count += 1
                     else:
                         result.failed_count += 1
-                        if exec_result.error:
-                            result.errors.append(exec_result.error)
+                        if batch_exec_result.error:
+                            result.errors.append(batch_exec_result.error)
 
-                results_by_index[idx] = exec_result
+                results_by_index[idx] = batch_exec_result
                 completed.add(idx)
                 pending.discard(idx)
 

@@ -307,7 +307,7 @@ def _has_action_keywords_fast(message: str) -> bool:
         True if action keywords are likely present
     """
     if _NATIVE_AVAILABLE and _native_module is not None:
-        return _native_module.has_action_keywords(message)  # type: ignore[attr-defined]
+        return bool(_native_module.has_action_keywords(message))
     # Fallback to quick string check
     message_lower = message.lower()
     quick_action = ["run", "execute", "deploy", "build", "test", "commit", "push"]
@@ -324,7 +324,7 @@ def _has_analysis_keywords_fast(message: str) -> bool:
         True if analysis keywords are likely present
     """
     if _NATIVE_AVAILABLE and _native_module is not None:
-        return _native_module.has_analysis_keywords(message)  # type: ignore[attr-defined]
+        return bool(_native_module.has_analysis_keywords(message))
     message_lower = message.lower()
     quick_analysis = ["analyze", "explore", "review", "understand", "explain"]
     return any(kw in message_lower for kw in quick_analysis)
@@ -340,7 +340,7 @@ def _has_negation_fast(message: str) -> bool:
         True if negation patterns are present
     """
     if _NATIVE_AVAILABLE and _native_module is not None:
-        return _native_module.has_negation(message)  # type: ignore[attr-defined]
+        return bool(_native_module.has_negation(message))
     message_lower = message.lower()
     negations = ["don't", "do not", "not", "never", "skip", "without", "avoid"]
     return any(neg in message_lower for neg in negations)

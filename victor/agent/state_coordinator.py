@@ -61,8 +61,8 @@ from typing import (
 
 from victor.agent.conversation_state import (
     ConversationStage,
-    ConversationState,  # type: ignore[attr-defined]
-    STAGE_ORDER,  # type: ignore[attr-defined]
+    ConversationState,
+    STAGE_ORDER,
 )
 
 if TYPE_CHECKING:
