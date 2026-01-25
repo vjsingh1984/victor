@@ -186,7 +186,7 @@ class Episode:
         access_boost = min(self.access_count * 0.05, 0.2)  # Max 20% boost
 
         effective = min(decayed_importance + reward_boost + access_boost, 1.0)
-        return max(effective, 0.0)
+        return float(max(effective, 0.0))
 
     def __repr__(self) -> str:
         """String representation of episode."""

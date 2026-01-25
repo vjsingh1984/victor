@@ -100,8 +100,8 @@ class OrchestratorProtocolAdapter:
         orchestrator: Any,
         state_coordinator: StateCoordinator,
         provider_coordinator: Any,
-        tools: ToolRegistry,
-        conversation: Conversation,
+        tools: Optional[ToolRegistry],
+        conversation: Optional[Conversation],
         mode_controller: Optional[AgentModeController],
         unified_tracker: Optional[UnifiedTaskTracker],
         tool_selector: Optional[ToolSelector],
@@ -116,8 +116,8 @@ class OrchestratorProtocolAdapter:
             orchestrator: Reference to the orchestrator for fallback access
             state_coordinator: State management coordinator
             provider_coordinator: Provider switching coordinator
-            tools: Tool registry
-            conversation: Conversation object
+            tools: Tool registry (optional)
+            conversation: Conversation object (optional)
             mode_controller: Mode management controller
             unified_tracker: Unified task tracker
             tool_selector: Tool selection component
@@ -495,8 +495,8 @@ def create_orchestrator_protocol_adapter(
     orchestrator: Any,
     state_coordinator: StateCoordinator,
     provider_coordinator: Any,
-    tools: ToolRegistry,
-    conversation: Conversation,
+    tools: Optional[ToolRegistry] = None,
+    conversation: Optional[Conversation] = None,
     mode_controller: Optional[AgentModeController] = None,
     unified_tracker: Optional[UnifiedTaskTracker] = None,
     tool_selector: Optional[ToolSelector] = None,
@@ -511,8 +511,8 @@ def create_orchestrator_protocol_adapter(
         orchestrator: Reference to the orchestrator for fallback access
         state_coordinator: State management coordinator
         provider_coordinator: Provider switching coordinator
-        tools: Tool registry
-        conversation: Conversation object
+        tools: Tool registry (optional)
+        conversation: Conversation object (optional)
         mode_controller: Optional mode management controller
         unified_tracker: Optional unified task tracker
         tool_selector: Optional tool selection component

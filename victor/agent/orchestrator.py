@@ -1633,7 +1633,8 @@ class AgentOrchestrator(
         if self._team_coordinator is None:
             return {}
 
-        return self._team_coordinator.get_team_specs()
+        team_specs = self._team_coordinator.get_team_specs()
+        return team_specs if team_specs is not None else {}
 
     def _get_model_context_window(self) -> int:
         """Get context window size for the current model.
@@ -1783,7 +1784,8 @@ class AgentOrchestrator(
         """
         if self._metrics_coordinator is None:
             return None
-        return self._metrics_coordinator.finalize_stream_metrics(usage_data)
+        metrics = self._metrics_coordinator.finalize_stream_metrics(usage_data)
+        return metrics if metrics is not None else None
 
     def get_last_stream_metrics(self) -> Optional[StreamMetrics]:
         """Get metrics from the last streaming session.
@@ -1793,7 +1795,8 @@ class AgentOrchestrator(
         """
         if self._metrics_coordinator is None:
             return None
-        return self._metrics_coordinator.get_last_stream_metrics()
+        metrics = self._metrics_coordinator.get_last_stream_metrics()
+        return metrics if metrics is not None else None
 
     def get_streaming_metrics_summary(self) -> Optional[Dict[str, Any]]:
         """Get comprehensive streaming metrics summary.
@@ -1803,7 +1806,8 @@ class AgentOrchestrator(
         """
         if self._metrics_coordinator is None:
             return None
-        return self._metrics_coordinator.get_streaming_metrics_summary()  # type: ignore[union-attr]
+        summary = self._metrics_coordinator.get_streaming_metrics_summary()
+        return summary if summary is not None else None
 
     def get_streaming_metrics_history(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent streaming metrics history.
@@ -1816,24 +1820,27 @@ class AgentOrchestrator(
         """
         if self._metrics_coordinator is None:
             return []
-        return self._metrics_coordinator.get_streaming_metrics_history(limit)  # type: ignore[union-attr]
+        history = self._metrics_coordinator.get_streaming_metrics_history(limit)
+        return history if history is not None else []
 
     def get_session_cost_summary(self) -> Dict[str, Any]:
         """Get session cost summary."""
         if self._metrics_coordinator is None:
             return {}
-        return self._metrics_coordinator.get_session_cost_summary()  # type: ignore[union-attr]
+        summary = self._metrics_coordinator.get_session_cost_summary()
+        return summary if summary is not None else {}
 
     def get_session_cost_formatted(self) -> str:
         """Get formatted session cost string (e.g., "$0.0123")."""
         if self._metrics_coordinator is None:
             return "$0.00"
-        return self._metrics_coordinator.get_session_cost_formatted()  # type: ignore[union-attr]
+        formatted = self._metrics_coordinator.get_session_cost_formatted()
+        return formatted if formatted is not None else "$0.00"
 
     def export_session_costs(self, path: str, format: str = "json") -> None:
         """Export session costs to file."""
         if self._metrics_coordinator is not None:
-            self._metrics_coordinator.export_session_costs(path, format)  # type: ignore[union-attr]
+            self._metrics_coordinator.export_session_costs(path, format)
 
     async def _preload_embeddings(self) -> None:
         """Preload tool embeddings in background to avoid blocking first query.
@@ -1850,14 +1857,15 @@ class AgentOrchestrator(
         # ToolSelector owns the initialization state
         if (
             hasattr(self.tool_selector, "_embeddings_initialized")
-            and self.tool_selector._embeddings_initialized  # type: ignore[union-attr]
+            and getattr(self.tool_selector, "_embeddings_initialized", False)
         ):
             return
 
         try:
             logger.info("Starting background embedding preload...")
             # Initialize the actual tool_selector (not the deprecated semantic_selector)
-            await self.tool_selector.initialize_tool_embeddings(self.tools)  # type: ignore[union-attr]
+            if hasattr(self.tool_selector, "initialize_tool_embeddings"):
+                await self.tool_selector.initialize_tool_embeddings(self.tools)
             logger.info(
                 f"{self._presentation.icon('success')} Tool embeddings preloaded successfully in background"
             )
@@ -1945,7 +1953,15 @@ class AgentOrchestrator(
             route = orchestrator.route_search_query("how does error handling work")
             # Returns: {"recommended_tool": "semantic_code_search", "confidence": 0.9, ...}
         """
-        return self._search_coordinator.route_search_query(query)  # type: ignore[no-any-return]
+        if self._search_coordinator is None:
+            # Default fallback routing
+            return {
+                "recommended_tool": "code_search",
+                "confidence": 0.5,
+                "reason": "Search coordinator not available",
+                "search_type": "keyword"
+            }
+        return self._search_coordinator.route_search_query(query)
 
     def get_recommended_search_tool(self, query: str) -> str:
         """Get the recommended search tool name for a query.
@@ -1958,7 +1974,9 @@ class AgentOrchestrator(
         Returns:
             Tool name: "code_search", "semantic_code_search", or "both"
         """
-        return self._search_coordinator.get_recommended_search_tool(query)  # type: ignore[no-any-return]
+        if self._search_coordinator is None:
+            return "code_search"
+        return self._search_coordinator.get_recommended_search_tool(query)
 
     def _record_tool_execution(
         self,
@@ -2042,9 +2060,18 @@ class AgentOrchestrator(
             - Cost tracking (by tier and total)
             - Overall metrics
         """
-        return self._metrics_coordinator.get_tool_usage_stats(  # type: ignore[union-attr]
-            conversation_state_summary=self.conversation_state.get_state_summary()  # type: ignore[union-attr]
-        )
+        if self._metrics_coordinator is None:
+            return {
+                "total_calls": 0,
+                "successful_calls": 0,
+                "failed_calls": 0,
+                "selection_stats": {},
+                "tool_stats": {},
+                "cost_by_tier": {},
+                "total_cost": 0.0
+            }
+        conv_summary = self.conversation_state.get_state_summary() if self.conversation_state else {}
+        return self._metrics_coordinator.get_tool_usage_stats(conversation_state_summary=conv_summary)
 
     def get_token_usage(self) -> "TokenUsage":
         """Get cumulative token usage for evaluation tracking.
@@ -2055,7 +2082,11 @@ class AgentOrchestrator(
         Returns:
             TokenUsage dataclass with input/output/total token counts
         """
-        return self._metrics_coordinator.get_token_usage()  # type: ignore[union-attr]
+        if self._metrics_coordinator is None:
+            # Return empty TokenUsage if coordinator not available
+            from victor.providers.base import TokenUsage
+            return TokenUsage(input_tokens=0, output_tokens=0, total_tokens=0)
+        return self._metrics_coordinator.get_token_usage()
 
     def reset_token_usage(self) -> None:
         """Reset cumulative token usage tracking.
@@ -2541,10 +2572,10 @@ class AgentOrchestrator(
         # Get task complexity from task analyzer if available
         task_complexity = None
         try:
-            if hasattr(self, "_task_analyzer"):
+            if self._task_analyzer is not None:
                 # Get the last analyzed complexity from the task analyzer
                 # Note: This requires the task analyzer to have analyzed the current task
-                task_complexity = getattr(self._task_analyzer, "_last_complexity", None)  # type: ignore[union-attr]
+                task_complexity = getattr(self._task_analyzer, "_last_complexity", None)
                 if task_complexity:
                     task_complexity = (
                         task_complexity.value
@@ -2604,7 +2635,9 @@ class AgentOrchestrator(
         )
 
         # Delegate to the extracted formatter
-        return self._tool_output_formatter.format_tool_output(  # type: ignore[union-attr]
+        if self._tool_output_formatter is None:
+            return output
+        return self._tool_output_formatter.format_tool_output(
             tool_name=tool_name,
             args=args,
             output=output,
@@ -2737,8 +2770,8 @@ class AgentOrchestrator(
             Tuple of (result, success, error_message or None)
         """
         # Use coordinator if available
-        if self.tool_retry_coordinator:
-            result = await self.tool_retry_coordinator.execute_tool(  # type: ignore[union-attr]
+        if self.tool_retry_coordinator is not None:
+            result = await self.tool_retry_coordinator.execute_tool(
                 tool_name=tool_name,
                 tool_args=tool_args,
                 context=context,
@@ -3079,9 +3112,11 @@ class AgentOrchestrator(
 
             # Update counters and tracking
             self.tool_calls_used += 1
-            self.executed_tools.append(tool_name)  # type: ignore[union-attr]
+            if self.executed_tools is not None:
+                self.executed_tools.append(tool_name)
             if tool_name == "read" and "path" in normalized_args:
-                self.observed_files.add(str(normalized_args.get("path")))
+                if self.observed_files is not None:
+                    self.observed_files.add(str(normalized_args.get("path")))
 
             # Reset continuation prompts counter on successful tool call
             # This allows the model to get fresh continuation prompts if it pauses again
@@ -3111,13 +3146,15 @@ class AgentOrchestrator(
             self._record_tool_execution(tool_name, success, elapsed_ms, error_type=error_type)
 
             # Update conversation state machine for stage detection
-            self.conversation_state.record_tool_execution(tool_name, normalized_args)  # type: ignore[union-attr]
+            if self.conversation_state is not None:
+                self.conversation_state.record_tool_execution(tool_name, normalized_args)
 
             # Update unified tracker for milestone tracking (single source of truth)
             result_dict = {"success": success}
             if hasattr(exec_result, "result") and exec_result.result:
                 result_dict["result"] = exec_result.result
-            self.unified_tracker.update_from_tool_call(tool_name, normalized_args, result_dict)  # type: ignore[union-attr]
+            if self.unified_tracker is not None:
+                self.unified_tracker.update_from_tool_call(tool_name, normalized_args, result_dict)
 
             # ToolExecutionResult stores actual output in .result field
             output = exec_result.result if success else None
@@ -3229,7 +3266,8 @@ class AgentOrchestrator(
         Safe to call even if not streaming. The cancellation will take
         effect at the next check point in the stream loop.
         """
-        self._metrics_coordinator.request_cancellation()  # type: ignore[union-attr]
+        if self._metrics_coordinator is not None:
+            self._metrics_coordinator.request_cancellation()
 
     def is_streaming(self) -> bool:
         """Check if a streaming operation is currently in progress.
@@ -3237,7 +3275,9 @@ class AgentOrchestrator(
         Returns:
             True if streaming, False otherwise.
         """
-        return self._metrics_coordinator.is_streaming()  # type: ignore[union-attr]
+        if self._metrics_coordinator is None:
+            return False
+        return self._metrics_coordinator.is_streaming()
 
     def _check_cancellation(self) -> bool:
         """Check if cancellation has been requested.
@@ -3345,13 +3385,17 @@ class AgentOrchestrator(
         """
         # Fall back to in-memory messages if memory manager is not enabled or no session
         if self._memory_manager_wrapper is None or not self._memory_session_id:
-            return [msg.model_dump() for msg in self.conversation.messages]  # type: ignore[union-attr]
+            if self.conversation is not None:
+                return [msg.model_dump() for msg in self.conversation.messages]
+            return []
         # Delegate to MemoryManager wrapper with exception handling
         try:
             return self._memory_manager_wrapper.get_context(max_tokens=max_tokens)
         except Exception as e:
             logger.warning(f"Failed to get memory context, falling back to in-memory: {e}")
-            return [msg.model_dump() for msg in self.conversation.messages]  # type: ignore[union-attr]
+            if self.conversation is not None:
+                return [msg.model_dump() for msg in self.conversation.messages]
+            return []
 
     def get_session_stats(self) -> Dict[str, Any]:
         """Get statistics for the current memory session.

@@ -45,6 +45,7 @@ from unittest.mock import Mock
 
 from victor.framework.task import TaskComplexity
 from victor.agent.unified_task_tracker import TrackerTaskType
+from victor.agent.unified_classifier import ClassifierTaskType
 from victor.agent.response_completer import ToolFailureContext
 from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
 from victor.providers.base import CompletionResponse, StreamChunk
@@ -761,7 +762,7 @@ class ChatCoordinator:
 
         # PERF: Start background compaction for async context management
         if orch._context_manager is not None and hasattr(orch._context_manager, "start_background_compaction"):
-            await orch._context_manager.start_background_compaction(interval_seconds=15.0)  # type: ignore[attr-defined]
+            await orch._context_manager.start_background_compaction(interval_seconds=15.0)
 
         # Local aliases for frequently-used values
         max_total_iterations = (
@@ -795,7 +796,7 @@ class ChatCoordinator:
 
         # Extract prompt requirements for dynamic budgets
         prompt_requirements = extract_prompt_requirements(user_message)
-        if prompt_requirements.has_explicit_requirements():
+        if prompt_requirements.has_explicit_requirements() and orch.unified_tracker is not None:
             orch.unified_tracker._progress.has_prompt_requirements = True  # type: ignore[attr-defined]
 
             if (
@@ -827,7 +828,11 @@ class ChatCoordinator:
         )
 
         # Get exploration iterations from unified tracker
-        max_exploration_iterations = orch.unified_tracker.max_exploration_iterations  # type: ignore[attr-defined]
+        max_exploration_iterations = (
+            orch.unified_tracker.max_exploration_iterations
+            if orch.unified_tracker is not None
+            else 30  # Default fallback
+        )
 
         # Task prep: hints, complexity, reminders
         task_classification, complexity_tool_budget = self._prepare_task(
@@ -901,7 +906,11 @@ class ChatCoordinator:
         ctx.cumulative_usage = cumulative_usage
         ctx.total_iterations = total_iterations
         ctx.force_completion = force_completion
-        ctx.unified_task_type = unified_task_type
+        # Map TrackerTaskType to ClassifierTaskType by value
+        try:
+            ctx.unified_task_type = ClassifierTaskType(unified_task_type.value)
+        except ValueError:
+            ctx.unified_task_type = ClassifierTaskType.DEFAULT
         ctx.task_classification = task_classification  # type: ignore[assignment]
         ctx.complexity_tool_budget = complexity_tool_budget
 
@@ -922,7 +931,10 @@ class ChatCoordinator:
             )
 
         # Set goals for tool selection
-        ctx.goals = orch._tool_planner.infer_goals_from_message(user_message)  # type: ignore[attr-defined]
+        if orch._tool_planner is not None:
+            ctx.goals = orch._tool_planner.infer_goals_from_message(user_message)
+        else:
+            ctx.goals = []
 
         # Sync tool tracking from orchestrator to context
         ctx.tool_budget = orch.tool_budget
@@ -952,14 +964,19 @@ class ChatCoordinator:
         orch = self._orch()
 
         # Wire reminder_manager dependency if not already set
-        if orch.task_coordinator._reminder_manager is None:  # type: ignore[attr-defined]
+        if (
+            orch.task_coordinator is not None
+            and orch.task_coordinator._reminder_manager is None  # type: ignore[attr-defined]
+        ):
             orch.task_coordinator.set_reminder_manager(orch.reminder_manager)  # type: ignore[attr-defined]
 
         # Delegate to TaskCoordinator
-        result = orch.task_coordinator.prepare_task(  # type: ignore[attr-defined]
-            user_message, unified_task_type, orch.conversation_controller  # type: ignore[attr-defined]
-        )
-        return result  # type: ignore[no-any-return]
+        if orch.task_coordinator is not None:
+            result = orch.task_coordinator.prepare_task(  # type: ignore[attr-defined]
+                user_message, unified_task_type, orch.conversation_controller  # type: ignore[attr-defined]
+            )
+            return result  # type: ignore[no-any-return]
+        return None
 
     def _classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
         """Classify task based on keywords in the user message.

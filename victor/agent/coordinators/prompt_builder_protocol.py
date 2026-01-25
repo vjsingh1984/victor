@@ -21,7 +21,7 @@ including mode-specific prompts, hints, and thinking mode handling.
 from typing import Any, Dict, List, Optional, Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.framework import ToolSet
+    from victor.framework.tools import ToolSet
 
 
 class PromptContext:
