@@ -898,7 +898,7 @@ def compute_plugin_hash(plugin_path: Path) -> Optional[str]:
         return None
 
 
-def load_plugin_trust_store() -> dict:
+def load_plugin_trust_store() -> Dict[str, Any]:
     """Load the plugin trust store.
 
     Returns:

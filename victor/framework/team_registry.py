@@ -503,7 +503,7 @@ def get_team_registry() -> TeamSpecRegistry:
     if _registry_instance is None:
         with _registry_lock:
             if _registry_instance is None:
-                _registry_instance = TeamSpecRegistry()  # type: ignore[no-untyped-call]
+                _registry_instance = TeamSpecRegistry()
 
     return _registry_instance
 

@@ -236,7 +236,7 @@ class CachingCompletionProvider(BaseCompletionProvider):
 
         key = self._cache_key(params)
         if key in self._cache:
-            timestamp, result = self._cache[key]  # type: ignore[assignment]
+            timestamp, result = self._cache[key]
             if time.time() - timestamp < self._cache_ttl:
                 return result
             del self._cache[key]
@@ -247,7 +247,7 @@ class CachingCompletionProvider(BaseCompletionProvider):
         import time
 
         key = self._cache_key(params)
-        self._cache[key] = (time.time(), result)  # type: ignore[assignment]
+        self._cache[key] = (time.time(), result)
 
     def clear_cache(self) -> None:
         """Clear all cached completions."""

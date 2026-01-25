@@ -57,10 +57,11 @@ from victor.framework.vertical_integration import (
 )
 
 if TYPE_CHECKING:
-    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
+    from victor.agent.orchestrator import AgentOrchestrator as ConcreteAgentOrchestrator
     from victor.config.settings import Settings
-    from victor.observability.integration import ObservabilityIntegration
+    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
     from victor.core.verticals.base import VerticalBase, VerticalConfig
+    from victor.observability.integration import ObservabilityIntegration
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +132,7 @@ class FrameworkShim:
         self._enable_cqrs_bridge = enable_cqrs_bridge
 
         # Set after create_orchestrator()
-        self._orchestrator: Optional["AgentOrchestrator"] = None
+        self._orchestrator: Optional["ConcreteAgentOrchestrator"] = None
         self._observability: Optional["ObservabilityIntegration"] = None
         self._vertical_config: Optional["VerticalConfig"] = None
 
@@ -210,7 +211,7 @@ class FrameworkShim:
 
         logger.debug(f"FrameworkShim created orchestrator: session_id={self._session_id}")
 
-        return self._orchestrator  # type: ignore[return-value]
+        return self._orchestrator
 
     def _apply_vertical(self, vertical: Type["VerticalBase"]) -> None:
         """Apply vertical configuration to orchestrator.
@@ -270,11 +271,12 @@ class FrameworkShim:
             enable_cqrs_bridge=self._enable_cqrs_bridge,
         )
         if self._orchestrator is not None:
-            self._observability.wire_orchestrator(self._orchestrator)
+            from typing import cast
+            self._observability.wire_orchestrator(cast(AgentOrchestrator, self._orchestrator))
 
             # Store reference on orchestrator for access
             if hasattr(self._orchestrator, 'observability'):
-                self._orchestrator.observability = self._observability  # type: ignore[union-attr]
+                self._orchestrator.observability = self._observability
 
         logger.debug(
             f"Wired observability: session_id={self._session_id}, "

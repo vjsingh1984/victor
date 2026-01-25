@@ -30,22 +30,20 @@ logger = logging.getLogger(__name__)
 
 
 # Default set of write tools (can be extended via OCP)
-DEFAULT_WRITE_TOOLS: Set[str] = set(  # type: ignore[assignment]
-    {
-        "write_file",
-        "write",
-        "edit_files",
-        "edit",
-        "shell",
-        "bash",
-        "execute_bash",
-        "git_commit",
-        "git_push",
-        "delete_file",
-        "create_directory",
-        "mkdir",
-    }
-)
+DEFAULT_WRITE_TOOLS: Set[str] = {
+    "write_file",
+    "write",
+    "edit_files",
+    "edit",
+    "shell",
+    "bash",
+    "execute_bash",
+    "git_commit",
+    "git_push",
+    "delete_file",
+    "create_directory",
+    "mkdir",
+}
 
 
 class ToolCallClassifier(IToolCallClassifier):

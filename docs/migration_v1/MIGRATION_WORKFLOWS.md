@@ -629,8 +629,8 @@ nodes:
 
 - [Main Migration Guide](./MIGRATION_GUIDE.md)
 - [API Migration Guide](./MIGRATION_API.md)
-- [Workflow Reference](../architecture/WORKFLOW_REFERENCE.md)
-- [YAML Workflow Guide](../architecture/YAML_WORKFLOWS.md)
+- [Workflow Reference](../reference/internals/workflows-api.md)
+- [YAML Workflow Guide](../guides/workflow-development/dsl.md)
 
 ---
 

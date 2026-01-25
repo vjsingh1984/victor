@@ -204,7 +204,7 @@ class DynamicModuleLoader:
         self._debounce_timer = DebouncedReloadTimer(delay=debounce_delay)
 
         # File watcher state
-        self._observer: Optional[BaseObserver] = None  # type: ignore[valid-type]
+        self._observer: Optional[BaseObserver] = None
         self._file_handler: Optional[Any] = None
 
         # Module tracking
@@ -401,8 +401,8 @@ class DynamicModuleLoader:
                 if not event.is_directory:
                     handler_self._handle_change(event.src_path, "deleted")
 
-        self._observer = Observer()  # type: ignore[call-arg]
-        self._file_handler = ModuleFileHandler()  # type: ignore[call-arg]
+        self._observer = Observer()
+        self._file_handler = ModuleFileHandler()
 
         # Watch all directories
         watched_count = 0
@@ -567,7 +567,7 @@ class DynamicModuleLoader:
         self._watch_dirs.append(path)
 
         # Add to active watcher if running
-        if self._observer is not None and path.exists():
+        if self._observer is not None and self._file_handler is not None and path.exists():
             self._observer.schedule(
                 self._file_handler,
                 str(path),
@@ -773,8 +773,9 @@ class EntryPointCache:
             packages = []
             for dist in distributions():
                 # PackageMetadata doesn't have get() method, use getattr with default
-                name = getattr(dist.metadata, "get", lambda x, y=None: x)("Name", "unknown")  # type: ignore[attr-defined]
-                version = getattr(dist.metadata, "get", lambda x, y=None: x)("Version", "0.0.0")  # type: ignore[attr-defined]
+                metadata_get = getattr(dist.metadata, "get", lambda x, y=None: x)
+                name = metadata_get("Name", "unknown")
+                version = metadata_get("Version", "0.0.0")
                 packages.append(f"{name}=={version}")
 
             packages.sort()

@@ -122,7 +122,7 @@ class ProtocolImplementationEntry:
         ttl: Time-to-live in seconds (None = no expiration)
     """
 
-    protocol_type: Type  # type: ignore[valid-type]
+    protocol_type: Type[Any]  # type: ignore[valid-type]
     implementation: Type[Any]
     cached_result: Any = None
     timestamp: float = field(default_factory=lambda: __import__("time").time())

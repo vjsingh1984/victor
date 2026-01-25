@@ -32,10 +32,12 @@ import uuid
 from typing import (
     Any,
     AsyncIterator,
+    Awaitable,
     Dict,
     Generic,
     Optional,
     TYPE_CHECKING,
+    cast,
 )
 
 if TYPE_CHECKING:
@@ -136,7 +138,7 @@ class StateGraphExecutor(Generic[StateType]):
         thread_id = thread_id or uuid.uuid4().hex
 
         logger.info(
-            f"Executing workflow {self._graph.graph_id or '(unknown)'} "
+            f"Executing workflow {getattr(self._graph, 'graph_id', '(unknown)') or '(unknown)'} "
             f"(thread_id={thread_id[:8]}...)"
         )
 
@@ -144,7 +146,7 @@ class StateGraphExecutor(Generic[StateType]):
         # The compiled graph already has all the execution logic,
         # including iteration control, timeout management, etc.
         result = await self._graph.invoke(
-            initial_state,
+            cast(Any, initial_state),
             config=exec_config,
             thread_id=thread_id,
         )
@@ -155,7 +157,7 @@ class StateGraphExecutor(Generic[StateType]):
             f"duration={result.duration:.2f}s"
         )
 
-        return result
+        return cast("ExecutionResultProtocol", result)
 
     async def stream(
         self,
@@ -199,17 +201,17 @@ class StateGraphExecutor(Generic[StateType]):
         thread_id = thread_id or uuid.uuid4().hex
 
         logger.info(
-            f"Streaming workflow {self._graph.graph_id or '(unknown)'} "
+            f"Streaming workflow {getattr(self._graph, 'graph_id', '(unknown)') or '(unknown)'} "
             f"(thread_id={thread_id[:8]}...)"
         )
 
         # Stream execution events from the compiled graph
         async for event in self._graph.stream(
-            initial_state,
+            cast(Any, initial_state),
             config=exec_config,
             thread_id=thread_id,
         ):
-            yield event
+            yield cast("ExecutionEventProtocol", event)
 
     def get_execution_context(
         self,
@@ -231,17 +233,48 @@ class StateGraphExecutor(Generic[StateType]):
             context = executor.get_execution_context()
             print(f"Thread ID: {context.thread_id}")
         """
-        from victor.workflows.compiler_protocols import ExecutionContextProtocol
+        from dataclasses import dataclass
+        from typing import Any astyping_Any
 
         thread_id = thread_id or uuid.uuid4().hex
 
-        # Create a simple execution context
-        # In a full implementation, this would query actual execution state
-        return ExecutionContextProtocol(
+        # Create a concrete implementation of ExecutionContextProtocol
+        @dataclass
+        class _ExecutionContextImpl:
+            """Concrete implementation of ExecutionContextProtocol."""
+            _thread_id: str
+            _graph_id: str
+            _start_time: float
+
+            @property
+            def orchestrator(self) -> typing_Any:
+                return None
+
+            @property
+            def settings(self) -> typing_Any:
+                return None
+
+            @property
+            def services(self) -> typing_Any:
+                return None
+
+            @property
+            def thread_id(self) -> str:
+                return self._thread_id
+
+            @property
+            def graph_id(self) -> str:
+                return self._graph_id
+
+            @property
+            def start_time(self) -> float:
+                return self._start_time
+
+        return _ExecutionContextImpl(
             thread_id=thread_id,
-            graph_id=self._graph.graph_id or "unknown",
+            graph_id=getattr(self._graph, 'graph_id', None) or "unknown",
             start_time=time.time(),
-        )
+        )  # type: ignore[return-value]
 
 
 __all__ = [

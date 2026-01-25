@@ -172,7 +172,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
 
         container.register_or_replace(
             ModeConfigProviderProtocol,
-            create_mode_config,
+            create_mode_config,  # type: ignore[arg-type]
             ServiceLifetime.SINGLETON,
         )
 
@@ -195,7 +195,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
 
         container.register_or_replace(
             ToolDependencyProviderProtocol,
-            create_tool_deps,
+            create_tool_deps,  # type: ignore[arg-type]
             ServiceLifetime.SINGLETON,
         )
 

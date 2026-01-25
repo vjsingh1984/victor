@@ -23,7 +23,8 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from victor.workflows.definition import ParallelNode, WorkflowState
+    from victor.workflows.definition import ParallelNode
+    from victor.workflows.yaml_to_graph_compiler import WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,17 @@ class ParallelNodeExecutor:
             This node serves as a join point and applies the join strategy.
         """
         import time
-        from victor.framework.graph import GraphNodeResult
+        from dataclasses import dataclass, field
+        from typing import Any, Dict, Optional
+
+        @dataclass
+        class GraphNodeResult:
+            """Result from a graph node execution."""
+            node_id: str
+            status: str
+            result: Optional[Dict[str, Any]] = None
+            error: Optional[str] = None
+            metadata: Dict[str, Any] = field(default_factory=dict)
 
         logger.info(f"Executing parallel node: {node.id}")
         start_time = time.time()

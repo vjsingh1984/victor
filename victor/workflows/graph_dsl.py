@@ -792,7 +792,7 @@ class WorkflowGraph(Generic[S]):
                 condition_node = ConditionNode(
                     id=from_node,
                     name=original.name,
-                    condition=lambda ctx, r=router, st=self.state_type: r(st.from_dict(ctx)),
+                    condition=lambda ctx, r=router, st=self.state_type: r(st.from_dict(ctx)),  # type: ignore[misc]
                     branches={k: v for k, v in routes.items() if v != self.END},
                     next_nodes=[],  # Conditions use branches, not next_nodes
                 )

@@ -88,7 +88,7 @@ class ToolCategory(str, Enum):
 # The YAML loader falls back to hardcoded defaults if the file is unavailable.
 
 
-def _load_builtin_category_tools() -> dict[str, Any]:
+def _load_builtin_category_tools() -> dict[ToolCategory, set[str]]:
     """Load category-to-tools mapping from YAML configuration.
 
     Returns:
@@ -135,10 +135,10 @@ def _load_builtin_category_tools() -> dict[str, Any]:
 
 
 # Lazy-loaded category tools (populated on first access)
-_BUILTIN_CATEGORY_TOOLS: Optional[dict[str, Any]] = None
+_BUILTIN_CATEGORY_TOOLS: Optional[dict[ToolCategory, set[str]]] = None
 
 
-def _get_builtin_category_tools() -> dict[str, Any]:
+def _get_builtin_category_tools() -> dict[ToolCategory, set[str]]:
     """Get the builtin category tools, loading from YAML if needed."""
     global _BUILTIN_CATEGORY_TOOLS
     if _BUILTIN_CATEGORY_TOOLS is None:

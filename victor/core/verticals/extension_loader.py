@@ -244,15 +244,15 @@ class VerticalExtensionLoader(ABC):
             # Only add if not already defined in the class
             if method_name not in cls.__dict__:
 
-                def _make_getter(ext_type: str, mod_suffix: str, cls_suffix: str) -> classmethod[type[Any]]:
+                def _make_getter(ext_type: str, mod_suffix: str, cls_suffix: str) -> classmethod[Any]:  # type: ignore[misc]
                     """Factory to create getter methods with proper closure."""
 
-                    def _getter(subcls: type) -> Any:
+                    def _getter(subcls: type[Any]) -> Any:
                         """Auto-generated getter method."""
                         # Build import path from vertical name
                         from victor.core.verticals.naming import get_vertical_module_name
 
-                        vertical_name = get_vertical_module_name(subcls.name)
+                        vertical_name = get_vertical_module_name(getattr(subcls, "name", ""))
 
                         # Skip if vertical name is empty (abstract base class)
                         if not vertical_name:
@@ -279,15 +279,15 @@ class VerticalExtensionLoader(ABC):
             # Only add if not already defined in the class
             if method_name not in cls.__dict__:
 
-                def _make_cached_getter(ext_type: str) -> classmethod[type[Any]]:
+                def _make_cached_getter(ext_type: str) -> classmethod[Any]:  # type: ignore[misc]
                     """Factory to create cached getter methods with proper closure."""
 
-                    def _getter(subcls: type) -> Any:
+                    def _getter(subcls: type[Any]) -> Any:
                         """Auto-generated cached getter method."""
                         # Skip if vertical name is empty (abstract base class)
                         from victor.core.verticals.naming import get_vertical_module_name
 
-                        vertical_name = get_vertical_module_name(subcls.name)
+                        vertical_name = get_vertical_module_name(getattr(subcls, "name", ""))
                         if not vertical_name:
                             # Return default value for abstract base class
                             return [] if ext_type == "middleware" else None
@@ -837,7 +837,7 @@ class VerticalExtensionLoader(ABC):
                 vertical_name=cls.name if hasattr(cls, "name") else cls.__name__,
                 loader=lambda: cls._load_extensions_eager(use_cache=use_cache, strict=strict),
                 trigger=trigger,
-            )
+            )  # type: ignore[return-value]
 
         # Eager loading path (legacy behavior)
         return cls._load_extensions_eager(use_cache=use_cache, strict=strict)

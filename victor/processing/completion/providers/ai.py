@@ -106,9 +106,9 @@ class AICompletionProvider(StreamingCompletionProvider):
 
         # Set FIM template
         if isinstance(fim_template, dict):
-            self._fim_template: dict[str, str] = fim_template  # type: ignore[assignment]
+            self._fim_template: dict[str, str] = fim_template
         else:
-            self._fim_template = FIM_TEMPLATES.get(fim_template, FIM_TEMPLATES["default"])  # type: ignore[assignment]
+            self._fim_template = FIM_TEMPLATES.get(fim_template, FIM_TEMPLATES["default"])
 
     @property
     def name(self) -> str:
@@ -336,7 +336,8 @@ class AICompletionProvider(StreamingCompletionProvider):
         if hasattr(response, "text"):
             return str(response.text) if response.text else ""
         if isinstance(response, dict):
-            return response.get("content", response.get("text", ""))
+            content = response.get("content", response.get("text", ""))
+            return str(content) if content is not None else ""
         return str(response) if response else ""
 
     def _clean_completion(self, completion: str, suffix: str) -> str:
@@ -392,13 +393,13 @@ class AICompletionProvider(StreamingCompletionProvider):
         # Update FIM template based on model
         model_lower = model.lower()
         if "codellama" in model_lower:
-            self._fim_template = FIM_TEMPLATES["codellama"]  # type: ignore[assignment]
+            self._fim_template = FIM_TEMPLATES["codellama"]
         elif "starcoder" in model_lower:
-            self._fim_template = FIM_TEMPLATES["starcoder"]  # type: ignore[assignment]
+            self._fim_template = FIM_TEMPLATES["starcoder"]
         elif "deepseek" in model_lower:
-            self._fim_template = FIM_TEMPLATES["deepseek"]  # type: ignore[assignment]
+            self._fim_template = FIM_TEMPLATES["deepseek"]
         elif "qwen" in model_lower:
-            self._fim_template = FIM_TEMPLATES["qwen"]  # type: ignore[assignment]
+            self._fim_template = FIM_TEMPLATES["qwen"]
 
     def set_provider(self, provider: Any) -> None:
         """Set the LLM provider.

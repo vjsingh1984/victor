@@ -182,7 +182,7 @@ class FormationPredictor:
 
         # Predict probabilities
         if self._model is not None:
-            probs = self._model.predict_proba([feature_vector])[0]  # type: ignore[union-attr]
+            probs = self._model.predict_proba([feature_vector])[0]
         else:
             raise RuntimeError("Model not trained")
 
@@ -402,9 +402,13 @@ class FormationPredictor:
             y.append(self._formations.index(formation.value))
             weights.append(2.0 if success else 1.0)
 
-        X: list[Any] = np.array(X).tolist()  # type: ignore[assignment]
-        y: list[Any] = np.array(y).tolist()  # type: ignore[assignment]
-        weights: list[float] = np.array(weights).tolist()  # type: ignore[assignment]
+        X_array = np.array(X)
+        y_array = np.array(y)
+        weights_array = np.array(weights)
+
+        X: list[Any] = X_array.tolist()
+        y: list[Any] = y_array.tolist()
+        weights: list[float] = weights_array.tolist()
 
         # Scale features
         self._scaler = StandardScaler()

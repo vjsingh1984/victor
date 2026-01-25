@@ -40,7 +40,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 from .protocols import TaskClassification, TaskClassifierProtocol, TaskComplexity
 
@@ -328,8 +328,8 @@ class TaskComplexityService:
         self.use_semantic = use_semantic
         self.semantic_threshold = semantic_threshold
         self.use_rl = use_rl
-        self._semantic_classifier = None
-        self._rl_learner = None
+        self._semantic_classifier: Optional["TaskTypeClassifier"] = None
+        self._rl_learner: Optional[Any] = None
 
         # Compile regex patterns
         self._patterns: Dict[TaskComplexity, List[Tuple[re.Pattern[str], float, str]]] = {

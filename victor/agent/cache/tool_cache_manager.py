@@ -193,7 +193,7 @@ class ToolCacheManager:
         # File watching support
         self._enable_file_watching = enable_file_watching
         self._file_watcher: Optional[Any] = None  # FileWatcher instance
-        self._file_watch_task: Optional[asyncio.Task[Any]] = None  # type: ignore[type-arg]
+        self._file_watch_task: Optional[asyncio.Task[Any]] = None
         self._logger = logging.getLogger(__name__)
 
     def _make_cache_key(

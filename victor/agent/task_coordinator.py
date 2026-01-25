@@ -25,6 +25,7 @@ Extracted from CRITICAL-001 Phase 2D: Extract TaskCoordinator
 import logging
 from typing import Any, Optional, TYPE_CHECKING
 
+from victor.agent.unified_task_tracker import TrackerTaskType
 from victor.core.events import ObservabilityBus
 from victor.core.events.emit_helper import emit_event_sync
 
@@ -34,10 +35,6 @@ if TYPE_CHECKING:
     from victor.agent.conversation_controller import ConversationController
     from victor.agent.prompt_builder import SystemPromptBuilder
     from victor.config.settings import Settings
-    try:
-        from victor.storage.embeddings.task_classifier import TaskType
-    except (ImportError, AttributeError):
-        TaskType = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -261,7 +258,7 @@ class TaskCoordinator:
     def apply_task_guidance(
         self,
         user_message: str,
-        unified_task_type: "TaskType",
+        unified_task_type: "TrackerTaskType",
         is_analysis_task: bool,
         is_action_task: bool,
         needs_execution: bool,

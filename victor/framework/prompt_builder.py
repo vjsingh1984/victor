@@ -66,9 +66,9 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 # Python 3.11+ has typing.Self, 3.10 needs typing_extensions
 try:
-    from typing import Self  # type: ignore[attr-defined]
+    from typing import Self
 except ImportError:
-    from typing_extensions import Self  # type: ignore[no-redef]
+    from typing_extensions import Self
 
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import PromptContributorProtocol

@@ -48,7 +48,7 @@ from __future__ import annotations
 
 import importlib
 import logging
-from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, TypeVar
+from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, TypeVar, cast
 
 logger = logging.getLogger(__name__)
 
@@ -289,7 +289,7 @@ class EscapeHatchRegistry:
         if transforms:
             for name, fn in transforms.items():
                 # Explicitly cast to avoid protocol confusion
-                transform_fn = cast(TransformFunction, fn)
+                transform_fn: TransformFunction = cast(TransformFunction, fn)
                 self.register_transform(name, transform_fn, vertical=vertical, replace=replace)
                 trans_count += 1
 

@@ -72,7 +72,6 @@ def mock_agents() -> Any:
 
 
 @pytest.fixture
-def sample_task() -> Any:
 def team_context(mock_agents: Any) -> Any:
     """Create a team context with mock agents."""
     shared_state = {f"agent_{i}": agent for i, agent in enumerate(mock_agents)}
@@ -84,7 +83,6 @@ def team_context(mock_agents: Any) -> Any:
 
 
 @pytest.fixture
-def sample_task() -> Any:
 def sample_training_data(tmp_path: Any) -> Any:
     """Create sample training data for testing."""
     examples = [

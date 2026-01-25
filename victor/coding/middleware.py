@@ -215,10 +215,12 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
         Returns:
             True if code validation should be applied
         """
+        from typing import cast
+
         inner = self._get_inner()
         if inner is None:
             return False
-        return inner.should_validate(tool_name)
+        return cast(bool, inner.should_validate(tool_name))
 
     def validate_and_fix(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
         """Validate and optionally fix code in arguments.
@@ -265,10 +267,12 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
         Returns:
             Modified arguments with corrections applied
         """
+        from typing import cast
+
         inner = self._get_inner()
         if inner is None:
             return arguments
-        return inner.apply_correction(arguments, correction_result)
+        return cast(Dict[str, Any], inner.apply_correction(arguments, correction_result))
 
     async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
         """Validate and optionally fix code before tool execution.

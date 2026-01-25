@@ -170,23 +170,17 @@ class SwitchingCriteria:
         """Compare values using specified operator."""
         try:
             if comparison == ">":
-                result = actual > expected
-                return bool(result)  # type: ignore[no-any-return]
+                return bool(actual > expected)
             elif comparison == "<":
-                result = actual < expected
-                return bool(result)  # type: ignore[no-any-return]
+                return bool(actual < expected)
             elif comparison == ">=":
-                result = actual >= expected
-                return bool(result)  # type: ignore[no-any-return]
+                return bool(actual >= expected)
             elif comparison == "<=":
-                result = actual <= expected
-                return bool(result)  # type: ignore[no-any-return]
+                return bool(actual <= expected)
             elif comparison == "==":
-                result = actual == expected
-                return bool(result)  # type: ignore[no-any-return]
+                return bool(actual == expected)
             elif comparison == "!=":
-                result = actual != expected
-                return bool(result)  # type: ignore[no-any-return]
+                return bool(actual != expected)
             else:
                 logger.warning(f"Unknown comparison operator: {comparison}")
                 return False
@@ -292,10 +286,12 @@ class SwitchingFormation:
                 self.switch_count += 1
 
                 if self.track_switches:
+                    from_val = old_formation.value if old_formation else None
+                    to_val = new_formation.value if new_formation else None
                     self.switch_history.append(
                         {
-                            "from": old_formation.value if old_formation else None,  # type: ignore[union-attr]
-                            "to": new_formation.value if new_formation else None,  # type: ignore[union-attr]
+                            "from": from_val,
+                            "to": to_val,
                             "timestamp": time.time(),
                             "context": dict(execution_context),
                             "criteria_index": (
@@ -305,7 +301,7 @@ class SwitchingFormation:
                     )
 
                 logger.info(
-                    f"Switched formation: {old_formation.value if old_formation else None} -> {new_formation.value if new_formation else None} "  # type: ignore[union-attr]
+                    f"Switched formation: {old_formation.value if old_formation else None} -> {new_formation.value if new_formation else None} "
                     f"(switch #{self.switch_count})"
                 )
 
@@ -1112,7 +1108,7 @@ Rationale: [your reasoning]
             return None, {}, 0.0
 
         # Count votes
-        distribution = dict.fromkeys(choices, 0)
+        distribution: dict[Any, int | float] = dict.fromkeys(choices, 0)
         for vote in votes:
             if vote.choice in distribution:
                 if self.voting_method == VotingMethod.WEIGHTED:
@@ -1125,7 +1121,7 @@ Rationale: [your reasoning]
         consensus = 0.0
 
         if self.voting_method == VotingMethod.MAJORITY:
-            winner = max(distribution, key=distribution.get)  # type: ignore[arg-type]
+            winner = max(distribution, key=lambda k: distribution[k] if distribution[k] is not None else 0)
             total_votes = sum(distribution.values())
             consensus = distribution[winner] / total_votes if total_votes > 0 else 0.0
 
@@ -1138,8 +1134,8 @@ Rationale: [your reasoning]
                     break
 
             if not winner:
-                winner = max(distribution, key=distribution.get)  # type: ignore[arg-type]
-                consensus = distribution[winner] / sum(distribution.values())
+                winner = max(distribution, key=lambda k: distribution[k] if distribution[k] is not None else 0)
+                consensus = distribution.get(winner, 0) / sum(distribution.values())
 
         elif self.voting_method == VotingMethod.UNANIMOUS:
             unanimous = all(vote.choice == votes[0].choice for vote in votes)
@@ -1149,15 +1145,15 @@ Rationale: [your reasoning]
             else:
                 # Use tiebreaker
                 winner = self._apply_tiebreaker(distribution)
-                consensus = distribution.get(winner, 0) / sum(distribution.values())  # type: ignore[arg-type]
+                consensus = distribution.get(winner, 0) / sum(distribution.values())
 
         elif self.voting_method == VotingMethod.WEIGHTED:
-            winner = max(distribution, key=distribution.get)  # type: ignore[arg-type]
+            winner = max(distribution, key=lambda k: distribution[k] if distribution[k] is not None else 0)
             total_weight = sum(distribution.values())
             consensus = distribution[winner] / total_weight if total_weight > 0 else 0.0
 
         else:  # RANKED_CHOICE or default
-            winner = max(distribution, key=distribution.get)
+            winner = max(distribution, key=lambda k: distribution[k] if distribution[k] is not None else 0)
             total_votes = sum(1 for vote in votes if vote.choice == winner)
             consensus = total_votes / len(votes) if votes else 0.0
 

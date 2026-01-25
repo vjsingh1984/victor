@@ -385,6 +385,8 @@ class OrchestratorProtocolAdapter:
         Returns:
             Number of messages in conversation
         """
+        if self._conversation is None:
+            return 0
         return len(self._conversation.messages)
 
     # ========================================================================

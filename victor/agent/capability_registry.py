@@ -637,10 +637,10 @@ class CapabilityRegistryMixin:
         if hasattr(self, "prompt_builder") and self.prompt_builder:
             if hasattr(self.prompt_builder, "get_custom_prompt"):
                 result = self.prompt_builder.get_custom_prompt()
-                return result if result is not None else None  # type: ignore[no-any-return]
+                return result
             elif hasattr(self.prompt_builder, "_custom_prompt"):
                 result = self.prompt_builder._custom_prompt
-                return result if result is not None else None  # type: ignore[no-any-return]
+                return result
         return None
 
     def _set_task_type_hints_via_builder(self, hints: Dict[str, Any]) -> None:
@@ -857,7 +857,7 @@ class CapabilityRegistryMixin:
             )
 
         result = loader.apply_to(self, capability_names)
-        return result if result is not None else []  # type: ignore[no-any-return]
+        return result if result is not None else []
 
 
 __all__ = ["CapabilityRegistryMixin"]

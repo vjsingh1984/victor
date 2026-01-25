@@ -107,7 +107,7 @@ class RLMixin:
 
             hooks = get_rl_hooks()
             if hooks:
-                hooks.emit(  # type: ignore[attr-defined]
+                hooks.emit(
                     RLEvent(
                         type=RLEventType.TEAM_COMPLETED,
                         team_formation=formation,

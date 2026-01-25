@@ -180,7 +180,7 @@ class BudgetTracker(IBudgetTracker):
             if self._on_exhausted:
                 self._on_exhausted(budget_type)
 
-        return bool(was_available)  # type: ignore[no-any-return]
+        return was_available
 
     def is_exhausted(self, budget_type: BudgetType) -> bool:
         """Check if a budget is exhausted.

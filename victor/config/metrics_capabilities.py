@@ -238,7 +238,8 @@ def _get_model_pricing(
         if fnmatch.fnmatch(model, pattern):
             pricing = model_config.get("cost_metrics", {}).get("pricing")
             if pricing and isinstance(pricing, dict):
-                return pricing
+                from typing import cast
+                return cast(Dict[str, float], pricing)
 
     # Check provider pricing
     providers = config.get("providers", {})

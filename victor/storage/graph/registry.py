@@ -13,9 +13,9 @@ if TYPE_CHECKING:
 
 try:
     from victor.storage.graph.duckdb_store import DuckDBGraphStore as _DuckDBGraphStore
-    DuckDBGraphStore = _DuckDBGraphStore
+    DuckDBGraphStore: type[_DuckDBGraphStore] | None = _DuckDBGraphStore
 except Exception:
-    DuckDBGraphStore = None  # type: ignore[assignment]
+    DuckDBGraphStore = None
 
 
 def create_graph_store(
@@ -41,5 +41,5 @@ def create_graph_store(
             raise ValueError("DuckDB graph backend requested but duckdb is not installed")
         if project_path is None:
             raise ValueError("DuckDB graph backend requires a project_path")
-        return DuckDBGraphStore(project_path)  # type: ignore[arg-type]
+        return DuckDBGraphStore(project_path)
     raise ValueError(f"Unsupported graph store backend: {name}")

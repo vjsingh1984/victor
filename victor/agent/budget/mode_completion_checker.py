@@ -274,3 +274,25 @@ class ModeCompletionChecker(IModeCompletionChecker):
         """
         self._custom_criteria[mode.upper()] = criteria
         logger.debug(f"ModeCompletionChecker: set custom criteria for {mode}")
+
+    def should_early_exit(self, mode: str, response: str) -> tuple[bool, str]:
+        """Check if should exit mode early.
+
+        Protocol-required method. Delegates to check_early_exit with default values.
+
+        Args:
+            mode: Current mode
+            response: Response to check
+
+        Returns:
+            Tuple of (should_exit, reason)
+        """
+        # Use default values for files_read, files_written, iterations
+        # This method is for backward compatibility with the protocol
+        return self.check_early_exit(
+            mode=mode,
+            files_read=0,
+            files_written=0,
+            iterations=0,
+            response_text=response,
+        )

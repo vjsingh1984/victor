@@ -617,6 +617,6 @@ processor = AstProcessorAccelerator(max_cache_size=500)
 ## See Also
 
 - [Tree-sitter Query Language](https://tree-sitter.github.io/tree-sitter/using-parsers#query-syntax)
-- [Native Extensions](./native_extensions.md)
-- [Performance Optimization](./performance.md)
-- [API Reference](../api/native.md)
+- [Native Extensions](../reference/internals/native_accelerators.md)
+- [Performance Optimization](../performance/optimization_guide.md)
+- [API Reference](../reference/api/index.md)

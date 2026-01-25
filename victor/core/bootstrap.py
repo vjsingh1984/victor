@@ -33,7 +33,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional, Protocol, Type, TypeVar, Callable
+from typing import Any, Callable, Dict, Optional, Protocol, Type, TypeVar, cast
 
 from victor.config.settings import Settings, load_settings, get_project_paths
 from victor.core.container import (
@@ -134,6 +134,8 @@ class LazyEmbeddingService:
             self._model = None
 
     def embed(self, texts: list[str]) -> list[list[float]]:
+        from typing import cast
+
         self._ensure_loaded()
         if self._model is None:
             return [[0.0] * 384 for _ in texts]  # Return zero vectors
@@ -234,10 +236,12 @@ def bootstrap_container(
     # Apply overrides for testing
     if override_services:
         for service_type, instance in override_services.items():
-            factory: Callable[[ServiceContainer], Any] = lambda c, inst=instance: inst  # noqa: B023
+            def make_factory(c: ServiceContainer, inst: Any = instance) -> Any:  # noqa: B023
+                return inst
+
             container.register_or_replace(
                 service_type,
-                factory,
+                make_factory,
                 ServiceLifetime.SINGLETON,
             )
 
@@ -325,14 +329,14 @@ def _register_event_services(container: ServiceContainer, settings: Settings) ->
     # Register ObservabilityBus as singleton
     container.register(
         ObservabilityBus,
-        lambda c: ObservabilityBus(backend=c.get(IEventBackend)),
+        lambda c: ObservabilityBus(backend=c.get(IEventBackend)),  # type: ignore[arg-type]
         ServiceLifetime.SINGLETON,
     )
 
     # Register AgentMessageBus as singleton
     container.register(
         AgentMessageBus,
-        lambda c: AgentMessageBus(backend=c.get(IEventBackend)),
+        lambda c: AgentMessageBus(backend=c.get(IEventBackend)),  # type: ignore[arg-type]
         ServiceLifetime.SINGLETON,
     )
 
@@ -399,7 +403,7 @@ def _register_signature_store(container: ServiceContainer, settings: Settings) -
 
     container.register(
         SignatureStoreProtocol,
-        lambda c: cast(SignatureStoreProtocol, _create_signature_store()),
+        lambda c: _create_signature_store(),  # type: ignore[arg-type]
         ServiceLifetime.SINGLETON,
     )
 
@@ -693,10 +697,12 @@ def _ensure_vertical_activated(
             # Update the extensions in container
             extensions = loader.get_extensions()
             if extensions:
-                ext_factory: Callable[[ServiceContainer], Any] = lambda c, ext=extensions: ext  # noqa: B023
+                def make_ext_factory(c: ServiceContainer, ext: Any = extensions) -> Any:  # noqa: B023
+                    return ext
+
                 container.register_or_replace(
                     VerticalExtensions,
-                    ext_factory,
+                    make_ext_factory,
                     ServiceLifetime.SINGLETON,
                 )
 

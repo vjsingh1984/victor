@@ -52,7 +52,7 @@ Example (YAML):
             goal: "Analyze data patterns"
 """
 
-from typing import Optional
+from typing import Optional, Set
 
 from victor.workflows.base import BaseWorkflow
 from victor.workflows.definition import (
@@ -168,15 +168,17 @@ class WorkflowCacheManager(_LegacyWorkflowCacheManager):
         self,
         workflow_name: str,
         config: Optional[_LegacyWorkflowCacheConfig] = None,
-    ) -> Optional["WorkflowCache"]:
+    ) -> Optional["victor.workflows.cache.WorkflowCache"]:
         """Get or create cache for a workflow (package-level behavior)."""
+        from victor.workflows.cache import WorkflowCache as CacheImpl
+
         with self._lock:
             cache = self._caches.get(workflow_name)
             if cache is None:
                 cache_config = config or self._default_config
-                cache = WorkflowCache(cache_config)
+                cache = CacheImpl(cache_config)  # type: ignore[assignment]
                 self._caches[workflow_name] = cache
-            return cache
+            return cache  # type: ignore[return-value]
 
 
 _package_workflow_cache_manager: Optional[WorkflowCacheManager] = None

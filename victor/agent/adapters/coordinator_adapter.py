@@ -45,11 +45,15 @@ try:
     from victor.agent.coordinators.state_coordinator import StateScope
 except ImportError:
     # Fallback for testing - create a simple enum
-    StateScope = type("StateScope", (), {  # type: ignore[misc]
-        "CHECKPOINT": "checkpoint",
-        "ROLLBACK": "rollback",
-        "SNAPSHOT": "snapshot",
-    })
+    StateScope = type(  # type: ignore[misc]
+        "StateScope",
+        (),
+        {
+            "CHECKPOINT": "checkpoint",
+            "ROLLBACK": "rollback",
+            "SNAPSHOT": "snapshot",
+        },
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -152,8 +156,8 @@ class CoordinatorAdapter:
 
         try:
             # Get base state from StateCoordinator
-            scope_value = StateScope.CHECKPOINT if isinstance(StateScope, type) else "CHECKPOINT"  # type: ignore[attr-defined]
-            base_state = self._state_coordinator.get_state(scope=scope_value, include_metadata=False)  # type: ignore[arg-type]
+            scope_value = StateScope.CHECKPOINT if isinstance(StateScope, type) else "CHECKPOINT"
+            base_state = self._state_coordinator.get_state(scope=scope_value, include_metadata=False)
 
             # Merge with orchestrator-specific state
             checkpoint_state = {

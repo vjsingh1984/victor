@@ -650,8 +650,11 @@ class PerformancePredictor:
             X.append(feature_vector)
             y.append(value)
 
-        X: list[Any] = np.array(X).tolist()  # type: ignore[assignment]
-        y: list[Any] = np.array(y).tolist()  # type: ignore[assignment]
+        X_array = np.array(X)
+        y_array = np.array(y)
+
+        X: list[Any] = X_array.tolist()
+        y: list[Any] = y_array.tolist()
 
         # Scale features
         scaler = StandardScaler()

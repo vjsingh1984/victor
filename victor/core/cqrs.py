@@ -77,6 +77,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    Coroutine,
     Dict,
     Generic,
     List,
@@ -183,7 +184,7 @@ class QueryHandler(ABC, Generic[TResult]):
 # =============================================================================
 
 CommandHandlerFunc: TypeAlias = Callable[[Command], Awaitable[Any]]
-QueryHandlerFunc: TypeAlias = Callable[[Query[TResult]], Awaitable[TResult]]
+QueryHandlerFunc: TypeAlias = Callable[[Query[TResult]], Awaitable[TResult]]  # type: ignore[misc]
 
 
 # =============================================================================
@@ -638,7 +639,7 @@ class QueryBus:
             result = await handler(q)
             return cast(TResult, result)
 
-        chain = final_handler
+        chain: Callable[[Query[TResult]], Awaitable[TResult]] = final_handler
         for middleware in reversed(self._middleware):
 
             def create_next(
@@ -650,7 +651,7 @@ class QueryBus:
 
                 return wrapped
 
-            chain = create_next(middleware, chain)
+            chain = create_next(middleware, chain)  # type: ignore[assignment]
 
         try:
             data = await chain(query)

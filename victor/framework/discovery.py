@@ -253,7 +253,7 @@ class VerticalDiscovery:
                     victor_eps = eps.select(group="victor.verticals")
                 else:
                     # Python 3.9
-                    victor_eps = eps.get("victor.verticals", [])
+                    victor_eps = list(eps.get("victor.verticals", []))
 
                 for ep in victor_eps:
                     try:

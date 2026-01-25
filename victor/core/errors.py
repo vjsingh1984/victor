@@ -1384,7 +1384,7 @@ def handle_errors_async(
             handler = ErrorHandler()
             try:
                 result = await func(*args, **kwargs)
-                return cast(T, result)
+                return result
             except VictorError:
                 raise
             except Exception as e:

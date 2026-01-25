@@ -293,7 +293,7 @@ class VerticalConfigLoader:
             file_path = base_path / file_path
 
             if file_path.exists():
-                return cast(str, file_path.read_text())
+                return file_path.read_text()
             else:
                 logger.warning(f"Prompt file not found: {file_path}")
                 return ""

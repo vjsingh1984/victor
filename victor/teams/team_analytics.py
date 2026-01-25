@@ -605,7 +605,7 @@ class TeamAnalytics:
         Returns:
             List of (member_id, score) tuples sorted by score
         """
-        member_scores: Dict[str, float] = {}
+        member_scores: Dict[str, Dict[str, list]] = {}
 
         if team_id:
             execution_ids = self._team_executions.get(team_id, [])
@@ -630,9 +630,9 @@ class TeamAnalytics:
             if not stats["success"]:
                 continue
 
-            success_rate = np.mean(stats["success"])
-            avg_time = np.mean(stats["time"])
-            avg_tool_calls = np.mean(stats["tool_calls"])
+            success_rate = float(np.mean(stats["success"]))
+            avg_time = float(np.mean(stats["time"]))
+            avg_tool_calls = float(np.mean(stats["tool_calls"]))
 
             # Composite score: prioritize success, then speed, then efficiency
             score = (

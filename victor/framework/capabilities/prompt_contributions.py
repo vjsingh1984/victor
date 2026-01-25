@@ -14,7 +14,7 @@
 
 """Generic prompt contribution capability provider (Phase 3)."""
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
 

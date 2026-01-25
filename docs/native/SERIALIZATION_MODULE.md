@@ -668,6 +668,6 @@ Apache License 2.0 - See LICENSE file for details
 
 ## See Also
 
-- [Victor Native Extensions](../README.md)
-- [Performance Benchmarks](BENCHMARKS.md)
+- [Victor Native Extensions](../index.md)
+- [Performance Benchmarks](../performance/benchmark_results.md)
 - [API Documentation](https://victor-ai.dev/docs/api/serialization)

@@ -150,10 +150,10 @@ class HITLStore:
     For production, consider Redis or database-backed store.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._requests: Dict[str, StoredRequest] = {}
         self._events: Dict[str, asyncio.Event] = {}
-        self._subscribers: Dict[str, Set[Callable]] = {}
+        self._subscribers: Dict[str, Set[Callable[..., Any]]] = {}
         self._lock = asyncio.Lock()
 
     async def store_request(
@@ -1080,7 +1080,7 @@ def create_hitl_router(
     hitl_store = store or get_global_store()
     expected_token = auth_token or os.environ.get("HITL_AUTH_TOKEN")
 
-    async def verify_auth(authorization: Optional[str] = Header(None)):
+    async def verify_auth(authorization: Optional[str] = Header(None)) -> bool:
         """Verify authentication if required."""
         if not require_auth:
             return
@@ -1095,14 +1095,14 @@ def create_hitl_router(
             raise HTTPException(status_code=401, detail="Invalid token")
 
     @router.get("/requests")
-    async def list_requests(authorization: Optional[str] = Header(None)):
+    async def list_requests(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
         """List all pending HITL requests."""
         await verify_auth(authorization)
         pending = await hitl_store.list_pending()
         return {"requests": [r.to_dict() for r in pending], "count": len(pending)}
 
     @router.get("/requests/{request_id}")
-    async def get_request(request_id: str, authorization: Optional[str] = Header(None)):
+    async def get_request(request_id: str, authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
         """Get a specific HITL request."""
         await verify_auth(authorization)
         stored = await hitl_store.get_request(request_id)
@@ -1115,7 +1115,7 @@ def create_hitl_router(
         request_id: str,
         body: ResponseSubmit = Body(...),
         authorization: Optional[str] = Header(None),
-    ):
+    ) -> Dict[str, Any]:
         """Submit a response to a HITL request."""
         await verify_auth(authorization)
         response = await hitl_store.submit_response(
@@ -1130,12 +1130,12 @@ def create_hitl_router(
         return {"success": True, "response": response.to_dict()}
 
     @router.get("/ui", response_class=HTMLResponse)
-    async def hitl_ui():
+    async def hitl_ui() -> HTMLResponse:
         """Serve the HITL approval web UI."""
         return HTMLResponse(content=get_hitl_ui_html())
 
     @router.get("/ui/request/{request_id}", response_class=HTMLResponse)
-    async def hitl_request_ui(request_id: str):
+    async def hitl_request_ui(request_id: str) -> HTMLResponse:
         """Serve the HITL approval UI for a specific request."""
         return HTMLResponse(content=get_hitl_request_ui_html(request_id))
 

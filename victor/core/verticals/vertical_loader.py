@@ -86,7 +86,7 @@ class VerticalLoader:
         self._extensions: Optional["VerticalExtensions"] = None
         self._registered_services: bool = False
         self._discovered_verticals: Optional[Dict[str, Type[VerticalBase]]] = None
-        self._discovered_tools: Optional[Dict[str, Type]] = None
+        self._discovered_tools: Optional[Dict[str, Type[Any]]] = None
         self._lazy_mode: bool = False  # Track if lazy loading is enabled
 
     @property
@@ -308,7 +308,7 @@ class VerticalLoader:
 
         module = importlib.import_module(module_name)
         result = getattr(module, attr_name)
-        return result  # type: ignore[return-value]
+        return result  # type: ignore[no-any-return]
 
     def discover_tools(
         self,
@@ -609,7 +609,7 @@ async def discover_vertical_plugins_async() -> Dict[str, Type[VerticalBase]]:
     return await get_vertical_loader().discover_verticals_async()
 
 
-async def discover_tool_plugins_async() -> Dict[str, Type]:
+async def discover_tool_plugins_async() -> Dict[str, Type[Any]]:
     """Discover tool plugins asynchronously (convenience function).
 
     Non-blocking version that offloads entry point scanning to thread pool.

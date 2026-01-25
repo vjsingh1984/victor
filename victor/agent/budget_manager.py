@@ -516,7 +516,7 @@ class ExtendedBudgetManager(BudgetManager):
         tool_lower = tool_name.lower()
         if tool_lower in {"read", "read_file"}:
             self.record_file_read()
-        elif self._tool_classifier and self._tool_classifier.is_write_operation(tool_name):  # type: ignore[union-attr]
+        elif self._tool_classifier and self._tool_classifier.is_write_operation(tool_name):
             self.record_file_write()
 
         return super().record_tool_call(tool_name, is_write_operation)

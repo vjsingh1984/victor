@@ -382,7 +382,7 @@ DEPLOYMENT_HITL_COMPATIBILITY = {
 }
 
 
-def get_supported_hitl_modes(deployment_target: str) -> list:
+def get_supported_hitl_modes(deployment_target: str) -> list[HITLMode]:
     """Get supported HITL modes for a deployment target.
 
     Args:
@@ -662,7 +662,7 @@ class HITLExecutor:
         self._responses: Dict[str, HITLResponse] = {}
         self._external_refs: Dict[str, str] = {}  # request_id -> external_ref
 
-    def _get_transport(self):
+    def _get_transport(self) -> Any:
         """Get or create the transport adapter."""
         if self._transport is None and self.mode not in [
             HITLMode.CLI,
@@ -673,7 +673,7 @@ class HITLExecutor:
         ]:
             from victor.workflows.hitl_transports import get_transport
 
-            self._transport = get_transport(self.mode, self.transport_config)
+            self._transport: Any = get_transport(self.mode, self.transport_config)
         return self._transport
 
     def _should_use_transport(self) -> bool:
@@ -798,7 +798,7 @@ class HITLExecutor:
             timeout=node.timeout,
         )
 
-        if response:
+        if response is not None:
             return response
 
         # No response within timeout

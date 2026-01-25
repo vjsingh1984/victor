@@ -1950,7 +1950,7 @@ class CodebaseIndex:
                                         if isinstance(base, py_ast.Name):
                                             base_name_result = base.id
                                         elif isinstance(base, py_ast.Attribute):
-                                            base_name_result = f"{cast(py_ast.Name, base.value).id}.{base.attr}"  # type: ignore[attr-defined]
+                                            base_name_result = f"{cast(py_ast.Name, base.value).id}.{base.attr}"
                                         else:
                                             base_name_result = None
                             except Exception:

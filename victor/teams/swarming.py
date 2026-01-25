@@ -221,7 +221,7 @@ class AgentSwarm:
         # Extract proposals from member results
         proposals = {}
         member_results = result.get("member_results", {})
-        if isinstance(member_results, dict):  # type: ignore[attr-defined]
+        if isinstance(member_results, dict):
             for member_id, member_result in member_results.items():
                 if member_result.get("success", False):
                     proposals[member_id] = member_result.get("result")

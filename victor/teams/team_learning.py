@@ -449,7 +449,7 @@ class TeamLearningSystem:
         Returns:
             List of recommendations
         """
-        recommendations: List[str] = []
+        recommendations: List[AdaptationRecommendation] = []
         experience_ids = self._team_experiences.get(team_id, [])
         experiences = [self._experiences[eid] for eid in experience_ids if eid in self._experiences]
 

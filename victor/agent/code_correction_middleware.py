@@ -64,23 +64,19 @@ class CodeCorrectionConfig:
 
     # Use frozensets for better performance
     code_tools: Set[str] = field(
-        default_factory=lambda: set(  # type: ignore[arg-type]
-            {
-                "code_executor",
-                "execute_code",
-                "run_code",
-                "write_file",
-                "file_editor",
-                "edit_file",
-                "create_file",
-            }
-        )
+        default_factory=lambda: {
+            "code_executor",
+            "execute_code",
+            "run_code",
+            "write_file",
+            "file_editor",
+            "edit_file",
+            "create_file",
+        }
     )
 
     code_argument_names: Set[str] = field(
-        default_factory=lambda: set(  # type: ignore[arg-type]
-            {"code", "python_code", "content", "source", "script", "new_content", "file_content"}
-        )
+        default_factory=lambda: {"code", "python_code", "content", "source", "script", "new_content", "file_content"}
     )
 
 

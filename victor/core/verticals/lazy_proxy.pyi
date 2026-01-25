@@ -56,7 +56,7 @@ class LazyProxy(VerticalBase, Generic[T]):
     """
 
     # Instance attributes (defined in __init__)
-    name: str
+    # Note: 'name' is inherited as class var from VerticalMetadataProvider, overridden here as instance var
     _vertical_name: str
     _loader: Callable[[], Type[T]]
     _loaded: bool

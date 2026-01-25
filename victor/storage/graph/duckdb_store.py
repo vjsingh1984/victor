@@ -191,6 +191,115 @@ class DuckDBGraphStore(GraphStoreProtocol):
             finally:
                 conn.close()
 
+    async def search_symbols(
+        self, query: str, *, limit: int = 20, symbol_types: Iterable[str] | None = None
+    ) -> List[GraphNode]:
+        """Full-text search across symbol names, signatures, bodies, and docstrings."""
+        clauses = ["name LIKE ?"]
+        params: list[Any] = [f"%{query}%"]
+        if symbol_types:
+            placeholders = ",".join("?" for _ in symbol_types)
+            clauses.append(f"type IN ({placeholders})")
+            params.extend(symbol_types)
+
+        where = " AND ".join(clauses)
+        query_str = f"SELECT node_id, type, name, file, line, lang, embedding_ref, metadata FROM nodes WHERE {where} LIMIT ?"
+        params.append(limit)
+
+        async with self._lock:
+            conn = self._connect()
+            try:
+                cur = conn.execute(query_str, params)
+                return [
+                    GraphNode(
+                        node_id=row[0],
+                        type=row[1],
+                        name=row[2],
+                        file=row[3],
+                        line=row[4],
+                        lang=row[5],
+                        embedding_ref=row[6],
+                        metadata=json.loads(row[7]) if row[7] else {},
+                    )
+                    for row in cur.fetchall()
+                ]
+            finally:
+                conn.close()
+
+    async def get_node_by_id(self, node_id: str) -> GraphNode | None:
+        """Get a single node by its ID."""
+        async with self._lock:
+            conn = self._connect()
+            try:
+                cur = conn.execute(
+                    "SELECT node_id, type, name, file, line, lang, embedding_ref, metadata FROM nodes WHERE node_id=?",
+                    [node_id]
+                )
+                row = cur.fetchone()
+                if not row:
+                    return None
+                return GraphNode(
+                    node_id=row[0],
+                    type=row[1],
+                    name=row[2],
+                    file=row[3],
+                    line=row[4],
+                    lang=row[5],
+                    embedding_ref=row[6],
+                    metadata=json.loads(row[7]) if row[7] else {},
+                )
+            finally:
+                conn.close()
+
+    async def get_nodes_by_file(self, file: str) -> List[GraphNode]:
+        """Get all symbols in a specific file."""
+        async with self._lock:
+            conn = self._connect()
+            try:
+                cur = conn.execute(
+                    "SELECT node_id, type, name, file, line, lang, embedding_ref, metadata FROM nodes WHERE file=?",
+                    [file]
+                )
+                return [
+                    GraphNode(
+                        node_id=row[0],
+                        type=row[1],
+                        name=row[2],
+                        file=row[3],
+                        line=row[4],
+                        lang=row[5],
+                        embedding_ref=row[6],
+                        metadata=json.loads(row[7]) if row[7] else {},
+                    )
+                    for row in cur.fetchall()
+                ]
+            finally:
+                conn.close()
+
+    async def update_file_mtime(self, file: str, mtime: float) -> None:
+        """Record file modification time for staleness tracking."""
+        # For DuckDB, we'd need to create a file_mtimes table
+        # For now, we'll skip this implementation
+        pass
+
+    async def get_stale_files(self, file_mtimes: Dict[str, float]) -> List[str]:
+        """Get files that have changed since last index."""
+        # For DuckDB, we'd need to check against file_mtimes table
+        # For now, return all files as potentially stale
+        return list(file_mtimes.keys())
+
+    async def delete_by_file(self, file: str) -> None:
+        """Delete all nodes and edges for a specific file (for incremental reindex)."""
+        async with self._lock:
+            conn = self._connect()
+            try:
+                # Delete nodes for this file
+                conn.execute("DELETE FROM edges WHERE src IN (SELECT node_id FROM nodes WHERE file=?)", [file])
+                conn.execute("DELETE FROM edges WHERE dst IN (SELECT node_id FROM nodes WHERE file=?)", [file])
+                conn.execute("DELETE FROM nodes WHERE file=?", [file])
+            finally:
+                conn.close()
+
     async def delete_by_repo(self) -> None:
         async with self._lock:
             conn = self._connect()
@@ -212,5 +321,24 @@ class DuckDBGraphStore(GraphStoreProtocol):
                     "path": str(self.db_path),
                     "backend": "duckdb",
                 }
+            finally:
+                conn.close()
+
+    async def get_all_edges(self) -> List[GraphEdge]:
+        """Get all edges in the graph (bulk retrieval for loading into memory)."""
+        async with self._lock:
+            conn = self._connect()
+            try:
+                cur = conn.execute("SELECT src, dst, type, weight, metadata FROM edges")
+                return [
+                    GraphEdge(
+                        src=row[0],
+                        dst=row[1],
+                        type=row[2],
+                        weight=row[3],
+                        metadata=json.loads(row[4]) if row[4] else {},
+                    )
+                    for row in cur.fetchall()
+                ]
             finally:
                 conn.close()

@@ -273,4 +273,4 @@ For help:
 
 ## 📜 License
 
-Apache License 2.0 - see [LICENSE](../../LICENSE) for details.
+Apache License 2.0 - see `LICENSE` in the repo root for details.

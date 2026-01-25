@@ -562,8 +562,8 @@ print(modes)  # Should include 'custom'
 
 - [Main Migration Guide](./MIGRATION_GUIDE.md)
 - [API Migration Guide](./MIGRATION_API.md)
-- [Settings Reference](../architecture/SETTINGS_REFERENCE.md)
-- [YAML Configuration Guide](../architecture/YAML_CONFIG.md)
+- [Settings Reference](../reference/configuration/index.md)
+- [YAML Configuration Guide](../reference/configuration/index.md)
 
 ---
 

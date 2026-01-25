@@ -68,6 +68,7 @@ except ImportError:
 try:
     import yaml
 except ImportError:
+    _yaml: Optional[Any] = None
     yaml: Optional[Any] = None
 
 if TYPE_CHECKING:
@@ -235,7 +236,8 @@ class PluginDiscovery:
             # Handle both old and new entry_points API
             # Python 3.10+: entry_points(group=...) returns iterable directly
             # Python <3.10: _entry_points().group(...) returns iterable
-            eps_result = _entry_points(group=self.ENTRY_POINT_GROUP)
+            from importlib.metadata import entry_points as _entry_points_internal
+            eps_result = _entry_points_internal(group=self.ENTRY_POINT_GROUP)
 
             # Check if eps_result has .select() method (new API)
             if hasattr(eps_result, "select"):

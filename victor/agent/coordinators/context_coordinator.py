@@ -485,7 +485,7 @@ class SummarizationCompactionStrategy(BaseCompactionStrategy):
         max_tokens: int = budget.get("max_tokens", 4096)
 
         # Only apply if significantly over budget (by at least threshold)
-        return bool(token_count > max_tokens + self._summarize_threshold)
+        return token_count > max_tokens + self._summarize_threshold
 
     async def compact(
         self,
@@ -606,7 +606,7 @@ class SemanticCompactionStrategy(BaseCompactionStrategy):
         max_tokens: int = budget.get("max_tokens", 4096)
 
         # Apply if context exceeds budget
-        return bool(token_count > max_tokens)
+        return token_count > max_tokens
 
     async def compact(
         self,
@@ -743,7 +743,7 @@ class HybridCompactionStrategy(BaseCompactionStrategy):
         max_tokens: int = budget.get("max_tokens", 4096)
 
         # Apply if context exceeds budget
-        return bool(token_count > max_tokens)
+        return token_count > max_tokens
 
     async def compact(
         self,

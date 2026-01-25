@@ -234,14 +234,14 @@ class PromptTemplateLearner(BaseLearner):
         self._max_tracked_selections = 500
 
         # Sample counts per context
-        self._sample_counts: Dict[Tuple[str, str], int] = {}
+        self._sample_counts: Dict[str, int] = {}
 
         # Beta distributions for enrichment types per vertical
         # Key: (vertical, enrichment_type, task_type) -> BetaDistribution
         self._enrichment_posteriors: Dict[Tuple[str, str, str], BetaDistribution] = {}
 
         # Sample counts for enrichments
-        self._enrichment_sample_counts: Dict[Tuple[str, str], int] = {}
+        self._enrichment_sample_counts: Dict[str, int] = {}
 
         # Load state from database
         self._load_state()
@@ -367,7 +367,7 @@ class PromptTemplateLearner(BaseLearner):
                     alpha=row_dict["alpha"],
                     beta=row_dict["beta"],
                 )
-                context_key = (row_dict["task_type"], row_dict["provider"])
+                context_key = f"{row_dict['task_type']}:{row_dict['provider']}"
                 self._sample_counts[context_key] = max(
                     self._sample_counts.get(context_key, 0),
                     row_dict["sample_count"],
@@ -400,7 +400,7 @@ class PromptTemplateLearner(BaseLearner):
                     alpha=row_dict["alpha"],
                     beta=row_dict["beta"],
                 )
-                context_key = (row_dict["vertical"], row_dict["enrichment_type"])
+                context_key = f"{row_dict['vertical']}:{row_dict['enrichment_type']}"
                 self._enrichment_sample_counts[context_key] = max(
                     self._enrichment_sample_counts.get(context_key, 0),
                     row_dict["sample_count"],
@@ -835,7 +835,7 @@ class PromptTemplateLearner(BaseLearner):
         posterior.update(success)
 
         # Update sample count
-        context_key = (vertical.lower(), enrichment_type.lower())
+        context_key = f"{vertical.lower()}:{enrichment_type.lower()}"
         self._enrichment_sample_counts[context_key] = (
             self._enrichment_sample_counts.get(context_key, 0) + 1
         )

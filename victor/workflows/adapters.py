@@ -145,7 +145,7 @@ class WorkflowToGraphAdapter:
         self.max_iterations = max_iterations
         self.enable_cycles = enable_cycles
 
-    def adapt(self, workflow: WorkflowDefinition) -> "StateGraph":
+    def adapt(self, workflow: WorkflowDefinition) -> "StateGraph[Any]":
         """Adapt a WorkflowDefinition to StateGraph.
 
         Creates a StateGraph that mimics the behavior of the
@@ -161,7 +161,7 @@ class WorkflowToGraphAdapter:
         from victor.framework.graph import StateGraph, END
 
         # Create StateGraph with workflow state
-        graph: StateGraph[WorkflowState] = StateGraph(WorkflowState)
+        graph = StateGraph(WorkflowState)
 
         # Convert each node - workflow.nodes is a Dict[str, WorkflowNode]
         nodes_list = list(workflow.nodes.values())
@@ -239,8 +239,6 @@ class WorkflowToGraphAdapter:
             node_type=node.node_type,
             handler=create_handler(node),
             next_nodes=node.next_nodes,
-            tool_budget=node.tool_budget,
-            allowed_tools=node.allowed_tools,
         )
 
     def adapt_with_execution(
@@ -314,7 +312,7 @@ class WorkflowToGraphAdapter:
                 # Execute the node using the executor
                 # This is a simplified version - production would handle
                 # all the agent orchestration details
-                result = await executor.execute_node(node, context)
+                result = await executor.execute_by_name(node.name, workflow.id, context)
 
                 # Update state with result
                 results = dict(state.get("results", {}))
@@ -357,7 +355,7 @@ class GraphToWorkflowAdapter:
     registered in the existing workflow registry.
     """
 
-    def adapt(self, graph: "StateGraph", name: str) -> WorkflowDefinition:
+    def adapt(self, graph: "StateGraph[Any]", name: str) -> WorkflowDefinition:
         """Adapt a StateGraph to WorkflowDefinition.
 
         Args:

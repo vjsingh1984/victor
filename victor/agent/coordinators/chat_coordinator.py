@@ -226,33 +226,34 @@ class ChatCoordinator:
         stream_ctx = await self._create_stream_context(user_message)
 
         # Store context reference for handler delegation methods
-        orch._current_stream_context = stream_ctx  # type: ignore[attr-defined]
+        orch._current_stream_context = stream_ctx
 
         # Extract required files and outputs from user prompt for task completion tracking
-        orch._required_files = self._extract_required_files_from_prompt(user_message)  # type: ignore[attr-defined]
-        orch._required_outputs = self._extract_required_outputs_from_prompt(user_message)  # type: ignore[attr-defined]
-        orch._read_files_session.clear()  # type: ignore[attr-defined]
-        orch._all_files_read_nudge_sent = False  # type: ignore[attr-defined]
+        orch._required_files = self._extract_required_files_from_prompt(user_message)
+        orch._required_outputs = self._extract_required_outputs_from_prompt(user_message)
+        orch._read_files_session.clear()
+        orch._all_files_read_nudge_sent = False
         logger.debug(
-            f"Task requirements extracted - files: {orch._required_files}, "  # type: ignore[attr-defined]
-            f"outputs: {orch._required_outputs}"  # type: ignore[attr-defined]
+            f"Task requirements extracted - files: {orch._required_files}, "
+            f"outputs: {orch._required_outputs}"
         )
 
         # Emit task requirements extracted event
-        if orch._required_files or orch._required_outputs:  # type: ignore[attr-defined]
+        if orch._required_files or orch._required_outputs:
             from victor.core.events import get_observability_bus
 
             event_bus = get_observability_bus()
-            event_bus.emit(
+            # Fire and forget - don't await event emission
+            asyncio.create_task(event_bus.emit(
                 topic="state.task.requirements_extracted",
                 data={
-                    "required_files": orch._required_files,  # type: ignore[attr-defined]
-                    "required_outputs": orch._required_outputs,  # type: ignore[attr-defined]
-                    "file_count": len(orch._required_files),  # type: ignore[attr-defined]
-                    "output_count": len(orch._required_outputs),  # type: ignore[attr-defined]
+                    "required_files": orch._required_files,
+                    "required_outputs": orch._required_outputs,
+                    "file_count": len(orch._required_files),
+                    "output_count": len(orch._required_outputs),
                     "category": "state",
                 },
-            )
+            ))
 
         # Iteration limits - kept as read-only local references for readability
         max_total_iterations = stream_ctx.max_total_iterations
@@ -291,7 +292,7 @@ class ChatCoordinator:
             )
 
             if stream_ctx.needs_execution:
-                orch.add_message(  # type: ignore[attr-defined]
+                orch.add_message(
                     "system",
                     "This is an action-oriented task requiring execution. "
                     "Follow this workflow: "
@@ -301,7 +302,7 @@ class ChatCoordinator:
                     "Minimize exploration and proceed directly to create->execute->show results.",
                 )
             else:
-                orch.add_message(  # type: ignore[attr-defined]
+                orch.add_message(
                     "system",
                     "This is an action-oriented task (create/write/build). "
                     "Minimize exploration and proceed directly to creating what was requested. "
@@ -321,7 +322,7 @@ class ChatCoordinator:
         )
 
         # Reset debug logger for new conversation turn
-        orch.debug_logger.reset()  # type: ignore[attr-defined]
+        orch.debug_logger.reset()
 
         while True:
             # === ITERATION COUNTER INCREMENT ===
@@ -387,11 +388,11 @@ class ChatCoordinator:
             tool_calls, full_content = self._parse_and_validate_tool_calls(tool_calls, full_content)
 
             # Task Completion Detection Enhancement
-            if orch._task_completion_detector and full_content:  # type: ignore[attr-defined]
+            if orch._task_completion_detector and full_content:
                 from victor.agent.task_completion import CompletionConfidence
 
-                orch._task_completion_detector.analyze_response(full_content)  # type: ignore[attr-defined]
-                confidence = orch._task_completion_detector.get_completion_confidence()  # type: ignore[attr-defined]
+                orch._task_completion_detector.analyze_response(full_content)
+                confidence = orch._task_completion_detector.get_completion_confidence()
 
                 if confidence == CompletionConfidence.HIGH:
                     logger.info(
@@ -438,13 +439,13 @@ class ChatCoordinator:
 
             if full_content:
                 # Sanitize response to remove malformed patterns from local models
-                sanitized = orch.sanitizer.sanitize(full_content)  # type: ignore[attr-defined]
+                sanitized = orch.sanitizer.sanitize(full_content)
                 if sanitized:
-                    orch.add_message("assistant", sanitized)  # type: ignore[attr-defined]
+                    orch.add_message("assistant", sanitized)
                 else:
-                    plain_text = orch.sanitizer.strip_markup(full_content)  # type: ignore[attr-defined]
+                    plain_text = orch.sanitizer.strip_markup(full_content)
                     if plain_text:
-                        orch.add_message("assistant", plain_text)  # type: ignore[attr-defined]
+                        orch.add_message("assistant", plain_text)
 
                 # Log if model mentioned tools but didn't execute them
                 if mentioned_tools_detected:
@@ -456,7 +457,7 @@ class ChatCoordinator:
             elif not tool_calls:
                 # No content and no tool calls - check for natural completion
                 recovery_ctx = self._create_recovery_context(stream_ctx)
-                final_chunk = orch._recovery_coordinator.check_natural_completion(  # type: ignore[attr-defined]
+                final_chunk = orch._recovery_coordinator.check_natural_completion(
                     recovery_ctx, has_tool_calls=False, content_length=0
                 )
                 if final_chunk:
@@ -467,7 +468,7 @@ class ChatCoordinator:
                 logger.warning("Model returned empty response - attempting aggressive recovery")
 
                 recovery_ctx = self._create_recovery_context(stream_ctx)
-                recovery_chunk, should_force = orch._recovery_coordinator.handle_empty_response(  # type: ignore[attr-defined]
+                recovery_chunk, should_force = orch._recovery_coordinator.handle_empty_response(
                     recovery_ctx
                 )
                 if recovery_chunk:
@@ -490,10 +491,10 @@ class ChatCoordinator:
                         )
                 else:
                     recovery_ctx = self._create_recovery_context(stream_ctx)
-                    fallback_msg = orch._recovery_coordinator.get_recovery_fallback_message(  # type: ignore[attr-defined]
+                    fallback_msg = orch._recovery_coordinator.get_recovery_fallback_message(
                         recovery_ctx
                     )
-                    orch._record_intelligent_outcome(  # type: ignore[attr-defined]
+                    await orch._record_intelligent_outcome(
                         success=False,
                         quality_score=0.3,
                         user_satisfied=False,
@@ -547,7 +548,7 @@ class ChatCoordinator:
                         f"Force finalize triggered: {finalize_reason}. "
                         "Stopping continuation to prevent infinite loop."
                     )
-                    orch._force_finalize = True  # type: ignore[attr-defined]
+                    orch._force_finalize = True
 
             # Check for loop warning via streaming handler
             unified_loop_warning = (
@@ -797,13 +798,13 @@ class ChatCoordinator:
         # Extract prompt requirements for dynamic budgets
         prompt_requirements = extract_prompt_requirements(user_message)
         if prompt_requirements.has_explicit_requirements() and orch.unified_tracker is not None:
-            orch.unified_tracker._progress.has_prompt_requirements = True  # type: ignore[attr-defined]
+            orch.unified_tracker._progress.has_prompt_requirements = True
 
             if (
                 prompt_requirements.tool_budget
-                and prompt_requirements.tool_budget > orch.unified_tracker._progress.tool_budget  # type: ignore[attr-defined]
+                and prompt_requirements.tool_budget > orch.unified_tracker._progress.tool_budget
             ):
-                orch.unified_tracker.set_tool_budget(prompt_requirements.tool_budget)  # type: ignore[attr-defined]
+                orch.unified_tracker.set_tool_budget(prompt_requirements.tool_budget)
                 logger.info(
                     f"Dynamic budget from prompt: {prompt_requirements.tool_budget} "
                     f"(files={prompt_requirements.file_count}, fixes={prompt_requirements.fix_count})"
@@ -812,16 +813,16 @@ class ChatCoordinator:
             if (
                 prompt_requirements.iteration_budget
                 and prompt_requirements.iteration_budget
-                > orch.unified_tracker._task_config.max_exploration_iterations  # type: ignore[attr-defined]
+                > orch.unified_tracker._task_config.max_exploration_iterations
             ):
-                orch.unified_tracker.set_max_iterations(prompt_requirements.iteration_budget)  # type: ignore[attr-defined]
+                orch.unified_tracker.set_max_iterations(prompt_requirements.iteration_budget)
                 logger.info(
                     f"Dynamic iterations from prompt: {prompt_requirements.iteration_budget}"
                 )
 
         # Intelligent pipeline pre-request hook
         intelligent_task = asyncio.create_task(
-            orch._prepare_intelligent_request(  # type: ignore[attr-defined]
+            orch._prepare_intelligent_request(
                 task=user_message,
                 task_type=unified_task_type.value,
             )
@@ -843,7 +844,7 @@ class ChatCoordinator:
         intelligent_context = await intelligent_task
         if intelligent_context:
             if intelligent_context.get("system_prompt_addition"):
-                orch.add_message("system", intelligent_context["system_prompt_addition"])  # type: ignore[attr-defined]
+                orch.add_message("system", intelligent_context["system_prompt_addition"])
                 logger.debug("Injected intelligent pipeline optimized prompt")
 
         return (
@@ -941,7 +942,7 @@ class ChatCoordinator:
         ctx.tool_calls_used = orch.tool_calls_used
 
         # Task Completion Detection Enhancement
-        ctx.task_completion_detector = orch._task_completion_detector  # type: ignore[attr-defined]
+        ctx.task_completion_detector = orch._task_completion_detector
 
         return ctx
 
@@ -966,14 +967,14 @@ class ChatCoordinator:
         # Wire reminder_manager dependency if not already set
         if (
             orch.task_coordinator is not None
-            and orch.task_coordinator._reminder_manager is None  # type: ignore[attr-defined]
+            and orch.task_coordinator._reminder_manager is None
         ):
-            orch.task_coordinator.set_reminder_manager(orch.reminder_manager)  # type: ignore[attr-defined]
+            orch.task_coordinator.set_reminder_manager(orch.reminder_manager)
 
         # Delegate to TaskCoordinator
         if orch.task_coordinator is not None:
-            result = orch.task_coordinator.prepare_task(  # type: ignore[attr-defined]
-                user_message, unified_task_type, orch.conversation_controller  # type: ignore[attr-defined]
+            result = orch.task_coordinator.prepare_task(
+                user_message, unified_task_type, orch.conversation_controller
             )
             return result  # type: ignore[no-any-return]
         return None
@@ -1060,10 +1061,10 @@ class ChatCoordinator:
         orch = self._orch()
 
         # Delegate to TaskCoordinator
-        orch.task_coordinator.apply_intent_guard(user_message, orch._conversation_controller)  # type: ignore[attr-defined]
+        orch.task_coordinator.apply_intent_guard(user_message, orch._conversation_controller)
 
         # Sync current_intent back to orchestrator
-        orch._current_intent = orch.task_coordinator.current_intent  # type: ignore[attr-defined]
+        orch._current_intent = orch.task_coordinator.current_intent
 
     def _apply_task_guidance(
         self,
@@ -1160,6 +1161,9 @@ class ChatCoordinator:
         # Use new IToolSelector API with ToolSelectionContext
         from victor.protocols import ToolSelectionContext
 
+        # Convert ToolDefinition list to list of tool names
+        planned_tool_names = [tool.name for tool in planned_tools] if planned_tools else []
+
         context = ToolSelectionContext(
             task_description=context_msg,
             conversation_stage=(
@@ -1170,7 +1174,7 @@ class ChatCoordinator:
                 else None
             ),
             previous_tools=[],
-            planned_tools=planned_tools if planned_tools else [],
+            planned_tools=planned_tool_names,
         )
 
         # Graceful fallback: If tool selection fails, log and return None
@@ -1485,7 +1489,8 @@ class ChatCoordinator:
         """
         orch = self._orch()
         if orch._provider_coordinator is not None:
-            base_wait = float(orch._provider_coordinator.get_rate_limit_wait_time(exc))
+            wait_time_val = orch._provider_coordinator.get_rate_limit_wait_time(exc)
+            base_wait = float(wait_time_val) if wait_time_val is not None else 1.0
         else:
             base_wait = 1.0
         backoff_multiplier = 2**attempt
@@ -1998,7 +2003,7 @@ class ChatCoordinator:
         from victor.agent.conversation_memory import MessageRole
 
         # Collect information from conversation
-        messages = getattr(orch, "messages", [])  # type: ignore[attr-defined]
+        messages = getattr(orch, "messages", [])
         tool_calls_used = stream_ctx.tool_calls_used
         iterations = stream_ctx.total_iterations
         task_type = "analysis" if stream_ctx.is_analysis_task else "general task"

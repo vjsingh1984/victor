@@ -611,7 +611,7 @@ Use this checklist to ensure you've migrated all tests:
 
 - [Main Migration Guide](./MIGRATION_GUIDE.md)
 - [API Migration Guide](./MIGRATION_API.md)
-- [Testing Best Practices](../architecture/TESTING_BEST_PRACTICES.md)
+- [Testing Best Practices](../testing/TESTING_GUIDE.md)
 - [Pytest Documentation](https://docs.pytest.org/)
 
 ---

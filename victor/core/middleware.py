@@ -384,7 +384,8 @@ class MiddlewarePipeline(Generic[TRequest, TResponse]):
                 return result
 
             # Capture current middleware and chain in closure
-            chain: Callable[[], Awaitable[TResponse]] = self._make_chain_link(middleware, current_chain, context)
+            updated_chain: Callable[[], Awaitable[TResponse]] = self._make_chain_link(middleware, current_chain, context)
+            chain = updated_chain
 
         return chain
 
@@ -590,7 +591,8 @@ class RetryMiddleware(Middleware[TRequest, TResponse]):
 
         for attempt in range(self._max_retries + 1):
             try:
-                return await next_handler()
+                from typing import cast
+                return cast(TResponse, await next_handler())
 
             except self._retry_on as e:
                 last_error = e
@@ -602,7 +604,7 @@ class RetryMiddleware(Middleware[TRequest, TResponse]):
         if last_error:
             raise last_error
         # Should never reach here, but mypy needs a return
-        return cast(TResponse, None)  # type: ignore[return-value]
+        raise RuntimeError("Max retries exceeded without error")  # type: ignore[unreachable]
 
 
 class TimeoutMiddleware(Middleware[TRequest, TResponse]):

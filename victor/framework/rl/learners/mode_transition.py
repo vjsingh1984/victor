@@ -121,7 +121,7 @@ class ModeTransitionLearner(BaseLearner):
         # In-memory caches for fast access
         self._q_values: Dict[str, Dict[str, float]] = {}  # state_key -> {action_key -> Q-value}
         self._visit_counts: Dict[str, Dict[str, int]] = {}  # state_key -> {action_key -> count}
-        self._task_stats: Dict[str, Dict[str, float]] = {}  # task_type -> stats
+        self._task_stats: Dict[str, Dict[str, Any]] = {}  # task_type -> stats
         self._total_transitions: int = 0
 
         # Load state from database

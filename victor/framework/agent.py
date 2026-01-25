@@ -30,14 +30,15 @@ from victor.framework.task import TaskResult
 from victor.framework.tools import ToolSet, ToolsInput
 
 if TYPE_CHECKING:
+    from victor.core.container import ServiceContainer
+    from victor.core.events import ObservabilityBus
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
-    from victor.teams import TeamFormation
+    from victor.core.verticals.base import VerticalBase, VerticalConfig
     from victor.framework.agent_components import AgentSession
     from victor.framework.cqrs_bridge import CQRSBridge, FrameworkEventAdapter
     from victor.framework.teams import AgentTeam, TeamMemberSpec
     from victor.observability.integration import ObservabilityIntegration
-    from victor.core.events import ObservabilityBus
-    from victor.core.verticals.base import VerticalBase, VerticalConfig
+    from victor.teams import TeamFormation
 
 
 class Agent:
@@ -666,7 +667,9 @@ class Agent:
         """
         observability = getattr(self._orchestrator, "observability", None)
         if observability:
-            return observability.event_bus  # type: ignore[return-value]
+            event_bus = getattr(observability, "event_bus", None)
+            if event_bus:
+                return event_bus
         return None
 
     @property
@@ -913,7 +916,7 @@ class Agent:
             workflow_name, context or {}, timeout=timeout
         )
 
-        return result  # type: ignore[return-value]
+        return result if isinstance(result, dict) else {"result": result}
 
     async def run_team(
         self,
@@ -1019,7 +1022,8 @@ class Agent:
         if not workflow_provider:
             return []
 
-        return workflow_provider.get_workflow_names()
+        names = workflow_provider.get_workflow_names()
+        return names if isinstance(names, list) else []
 
     def get_available_teams(self) -> List[str]:
         """Get list of available team names from the vertical.

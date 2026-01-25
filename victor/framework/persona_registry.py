@@ -641,7 +641,9 @@ def persona(
             from typing import cast
             return cast(PersonaSpec, result)
 
-        return wrapper
+        # Cast wrapper back to F to maintain type compatibility
+        from typing import cast
+        return cast(F, wrapper)
 
     return decorator
 

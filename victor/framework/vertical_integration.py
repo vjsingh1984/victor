@@ -1158,7 +1158,9 @@ class VerticalIntegrationPipeline:
         # Run post-hooks
         for hook in self._post_hooks:
             try:
-                hook(orchestrator, result)  # type: ignore[arg-type]
+                from typing import cast
+                # Post hooks expect IntegrationResult, not type
+                hook(orchestrator, cast(type(result), result))
             except Exception as e:
                 result.add_warning(f"Post-hook error: {e}")
 
@@ -1405,9 +1407,10 @@ class VerticalIntegrationPipeline:
 
             # Save to cache
             if not hasattr(self, "_cache"):
-                self._cache: Dict[str, str] = {}
+                object.__setattr__(self, "_cache", {})
 
-            self._cache[cache_key] = data
+            dict_val = object.__getattribute__(self, "_cache")
+            dict_val[cache_key] = data
 
             # Enforce TTL by storing timestamp
             if not hasattr(self, "_cache_timestamps"):

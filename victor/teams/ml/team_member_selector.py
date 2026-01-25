@@ -209,7 +209,7 @@ class TeamMemberSelector:
 
         # Predict score
         if self._model is not None:
-            score = float(self._model.predict_proba([feature_vector])[0][1])  # type: ignore[union-attr]
+            score = float(self._model.predict_proba([feature_vector])[0][1])
         else:
             raise RuntimeError("Model not trained")
 
@@ -295,13 +295,13 @@ class TeamMemberSelector:
         features = []
 
         # Basic features
-        features.append(member.tool_budget)
+        features.append(int(member.tool_budget))
         features.append(float(member.can_delegate))
         features.append(float(member.is_manager))
         features.append(int(member.max_delegation_depth))
         features.append(float(member.memory_enabled))
-        features.append(len(member.expertise))
-        features.append(len(member.backstory))
+        features.append(int(len(member.expertise)))
+        features.append(int(len(member.backstory)))
 
         # Expertise overlap
         if task_features.required_expertise:
@@ -313,7 +313,7 @@ class TeamMemberSelector:
         # Role encoding (one-hot)
         roles = ["planner", "researcher", "executor", "reviewer", "tester"]
         for role in roles:
-            features.append(1.0 if member.role.value == role else 0.0)
+            features.append(float(1.0 if member.role.value == role else 0.0))
 
         return np.array(features)
 
@@ -353,8 +353,11 @@ class TeamMemberSelector:
             X.append(feature_vector)
             y.append(int(success))
 
-        X: list[Any] = np.array(X).tolist()  # type: ignore[assignment]
-        y: list[int] = np.array(y).tolist()  # type: ignore[assignment]
+        X_array = np.array(X)
+        y_array = np.array(y)
+
+        X: list[Any] = X_array.tolist()
+        y: list[int] = y_array.tolist()
 
         # Scale features
         self._scaler = StandardScaler()

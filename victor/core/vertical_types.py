@@ -528,12 +528,13 @@ class TieredToolConfig:
             Set of tool names for semantic selection
         """
         from victor.tools.metadata_registry import ToolMetadataRegistry
+        from typing import cast
 
         registry = ToolMetadataRegistry.get_instance()  # type: ignore[attr-defined]
         all_tools = registry.get_all_tool_names()
         # Semantic pool = all tools - base tools (mandatory + vertical_core)
         base = self.get_base_tools()
-        return cast(set[str], all_tools - base)
+        return cast(Set[str], all_tools - base)
 
     def get_effective_semantic_pool(self) -> Set[str]:
         """Get effective semantic pool, preferring registry over static.
@@ -555,11 +556,12 @@ class TieredToolConfig:
             Base tools plus stage-specific tools from registry
         """
         from victor.tools.metadata_registry import ToolMetadataRegistry
+        from typing import cast
 
         registry = ToolMetadataRegistry.get_instance()  # type: ignore[attr-defined]
         base = self.get_base_tools()
         registry_stage_tools = registry.get_tools_by_stage(stage)
-        return cast(set[str], base | registry_stage_tools)
+        return cast(Set[str], base | registry_stage_tools)
 
 
 # =============================================================================

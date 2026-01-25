@@ -67,6 +67,7 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    cast,
 )
 
 from victor.framework.graph import (
@@ -211,8 +212,8 @@ class NodeRunnerWrapper:
             # Return updated state
             if "_workflow_id" not in state:
                 # Return just the data for simple state
-                return updated_context.get("data", state)
-            return updated_context
+                return cast(Dict[str, Any], updated_context.get("data", state))
+            return cast(Dict[str, Any], updated_context)
 
         except Exception as e:
             duration = time.time() - start_time
@@ -262,7 +263,7 @@ class WorkflowGraphCompiler(Generic[S]):
         self,
         graph: "WorkflowGraph[S]",
         name: Optional[str] = None,
-    ) -> CompiledGraph:
+    ) -> "CompiledGraph[S]":
         """Compile a WorkflowGraph to CompiledGraph.
 
         Args:
@@ -327,11 +328,11 @@ class WorkflowGraphCompiler(Generic[S]):
             # Create state-aware router
             state_type = graph.state_type
 
-            def make_router(r, st):
+            def make_router(r: Callable[[S], str], st: Type[S]) -> Callable[[Dict[str, Any]], str]:
                 def wrapped_router(state: Dict[str, Any]) -> str:
                     # Convert dict state to typed state for router
                     if hasattr(st, "from_dict"):
-                        typed_state = st.from_dict(state)
+                        typed_state: S = st.from_dict(state)  # type: ignore[attr-defined]
                     else:
                         typed_state = st(**state) if isinstance(state, dict) else state
                     return r(typed_state)
@@ -396,7 +397,7 @@ class WorkflowGraphCompiler(Generic[S]):
         async def state_converting_wrapper(state: Dict[str, Any]) -> Dict[str, Any]:
             # Convert dict to typed state
             if hasattr(state_type, "from_dict"):
-                typed_state = state_type.from_dict(state)
+                typed_state: S = state_type.from_dict(state)  # type: ignore[attr-defined]
             else:
                 # Try direct construction
                 try:
@@ -413,17 +414,17 @@ class WorkflowGraphCompiler(Generic[S]):
 
             # Convert result back to dict
             if hasattr(result, "to_dict"):
-                return result.to_dict()
+                return cast(Dict[str, Any], result.to_dict())
             elif hasattr(result, "__dataclass_fields__"):
                 # Dataclass - convert to dict
                 from dataclasses import asdict
 
-                return asdict(result)
+                return cast(Dict[str, Any], asdict(result))
             elif isinstance(result, dict):
-                return result
+                return cast(Dict[str, Any], result)
             else:
                 # Unknown type, return as-is
-                return result
+                return cast(Dict[str, Any], result)
 
         return state_converting_wrapper
 
@@ -450,16 +451,16 @@ class WorkflowGraphCompiler(Generic[S]):
         if graph_node.node_type == GraphNodeType.AGENT:
             config.update(
                 {
-                    "role": graph_node.agent_role or "executor",
-                    "goal": graph_node.agent_goal or "",
-                    "tool_budget": graph_node.agent_tool_budget or 10,
+                    "role": getattr(graph_node, "agent_role", None) or "executor",
+                    "goal": getattr(graph_node, "agent_goal", None) or "",
+                    "tool_budget": getattr(graph_node, "tool_budget", None) or getattr(graph_node, "agent_tool_budget", None) or 10,
                 }
             )
         elif graph_node.node_type == GraphNodeType.COMPUTE:
             config.update(
                 {
-                    "handler": graph_node.compute_handler,
-                    "tools": graph_node.compute_tools or [],
+                    "handler": getattr(graph_node, "compute_handler", None),
+                    "tools": getattr(graph_node, "compute_tools", None) or getattr(graph_node, "tools", None) or [],
                 }
             )
         elif graph_node.node_type == GraphNodeType.TRANSFORM:
@@ -503,7 +504,7 @@ class WorkflowDefinitionCompiler:
     def compile(
         self,
         definition: "WorkflowDefinition",
-    ) -> CompiledGraph:
+    ) -> "CompiledGraph[Any]":
         """Compile a WorkflowDefinition to CompiledGraph.
 
         Args:
@@ -556,7 +557,7 @@ class WorkflowDefinitionCompiler:
                         source=node_id,
                         target=workflow_node.branches,
                         edge_type=EdgeType.CONDITIONAL,
-                        condition=lambda state, cond=workflow_node.condition: cond(state),
+                        condition=lambda state, cond=workflow_node.condition: cond(state),  # type: ignore[misc]
                     )
                 )
 
@@ -707,7 +708,7 @@ class WorkflowDefinitionCompiler:
 def compile_workflow_graph(
     graph: "WorkflowGraph[S]",
     config: Optional[CompilerConfig] = None,
-) -> CompiledGraph:
+) -> "CompiledGraph[S]":
     """Compile a WorkflowGraph to CompiledGraph.
 
     Convenience function for one-off compilation.
@@ -719,14 +720,14 @@ def compile_workflow_graph(
     Returns:
         CompiledGraph ready for execution.
     """
-    compiler = WorkflowGraphCompiler(config)
+    compiler: "WorkflowGraphCompiler[S]" = WorkflowGraphCompiler(config)
     return compiler.compile(graph)
 
 
 def compile_workflow_definition(
     definition: "WorkflowDefinition",
     runner_registry: Optional["NodeRunnerRegistry"] = None,
-) -> CompiledGraph:
+) -> "CompiledGraph[Any]":
     """Compile a WorkflowDefinition to CompiledGraph.
 
     Convenience function for one-off compilation.

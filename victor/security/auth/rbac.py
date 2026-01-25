@@ -562,7 +562,7 @@ def require_permission(permission: Permission) -> Callable[..., Any]:
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(func)
-        async def async_wrapper(*args, **kwargs) -> Any:
+        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
             # Get RBAC manager from context if available
             rbac = kwargs.pop("_rbac_manager", None)
             username = kwargs.pop("_rbac_user", None)
@@ -577,7 +577,7 @@ def require_permission(permission: Permission) -> Callable[..., Any]:
             return await func(*args, **kwargs)
 
         @wraps(func)
-        def sync_wrapper(*args, **kwargs) -> Any:
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
             rbac = kwargs.pop("_rbac_manager", None)
             username = kwargs.pop("_rbac_user", None)
 

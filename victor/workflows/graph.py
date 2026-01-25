@@ -101,7 +101,10 @@ class WorkflowNode:
         Returns:
             NodeResult with status and output.
         """
-        return await self.handler(state, context)
+        result = self.handler(state, context)
+        if isinstance(result, Awaitable):
+            return await result
+        return result  # type: ignore[return-value]
 
 
 @dataclass
@@ -558,7 +561,7 @@ class BasicWorkflowGraph:
 import warnings as _warnings
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """Provide deprecation warning for WorkflowGraph alias."""
     if name == "WorkflowGraph":
         _warnings.warn(

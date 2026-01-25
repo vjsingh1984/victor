@@ -202,7 +202,7 @@ def migrate_to_injector(
 
             # Create property that uses injector
             def make_property(cap_name: str) -> property:
-                def getter(self) -> Any:
+                def getter(self_obj: Any) -> Any:
                     return injector.get_capability(cap_name)
 
                 return property(getter)
@@ -246,8 +246,8 @@ def get_capability_or_create(
     if capability is None:
         logger.debug(f"Capability '{capability_name}' not in injector, creating with factory")
         capability = factory()
-        return cast(T, capability)
-    return cast(T, capability)
+        return capability
+    return capability
 
 
 # =============================================================================

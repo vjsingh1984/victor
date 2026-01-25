@@ -476,8 +476,9 @@ class AgentBuilder:
             return None
         try:
             from victor.framework.service_provider import ToolConfiguratorService
+            from typing import cast
 
-            return self._container.get(ToolConfiguratorService)  # type: ignore[misc]
+            return cast(ToolConfiguratorService, self._container.get(ToolConfiguratorService))
         except Exception as e:
             logger.debug(f"Could not get ToolConfigurator from container: {e}")
             return None
@@ -492,8 +493,9 @@ class AgentBuilder:
             return None
         try:
             from victor.framework.service_provider import EventRegistryService
+            from typing import cast
 
-            return self._container.get(EventRegistryService)  # type: ignore[misc]
+            return cast(EventRegistryService, self._container.get(EventRegistryService))
         except Exception as e:
             logger.debug(f"Could not get EventRegistry from container: {e}")
             return None
@@ -660,7 +662,7 @@ class AgentBuilder:
         self._options.state_hooks["on_exit"] = callback
         return self
 
-    def on_transition(self, callback: Callable[[str, str, Dict], None]) -> "AgentBuilder":
+    def on_transition(self, callback: Callable[[str, str, Dict[str, Any]], None]) -> "AgentBuilder":
         """Register callback for state transitions.
 
         Args:
@@ -778,7 +780,7 @@ class AgentBuilder:
 
         # Store metadata and container reference
         agent._builder_metadata = self._options.metadata
-        agent._presets_applied = self._presets_applied.copy()
+        agent._presets_applied = list(self._presets_applied)
         if self._container is not None:
             agent._container = self._container
 

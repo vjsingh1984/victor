@@ -37,8 +37,9 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 
 if TYPE_CHECKING:
     from victor.core.container import ServiceContainer
-    from victor.workflows.definition import WorkflowNode, WorkflowNodeType, WorkflowState
+    from victor.workflows.definition import WorkflowNode, WorkflowNodeType
     from victor.workflows.compiler_protocols import NodeExecutorFactoryProtocol
+    from victor.workflows.yaml_to_graph_compiler import WorkflowState
 
 logger = logging.getLogger(__name__)
 
