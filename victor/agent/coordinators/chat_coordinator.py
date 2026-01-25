@@ -497,7 +497,8 @@ class ChatCoordinator:
                         user_satisfied=False,
                         completed=False,
                     )
-                    yield orch._chunk_generator.generate_content_chunk(fallback_msg, is_final=True)  # type: ignore[attr-defined]
+                    if orch._chunk_generator:
+                        yield orch._chunk_generator.generate_content_chunk(fallback_msg, is_final=True)
                     return
 
             # Record tool calls in progress tracker for loop detection
@@ -519,14 +520,14 @@ class ChatCoordinator:
                     tool_calls=orch.tool_calls_used,
                     task_type=stream_ctx.unified_task_type.value,
                 )
-                if quality_result and not quality_result.get("is_grounded", True):
-                    issues = quality_result.get("grounding_issues")
+                if quality_result and not quality_result.is_grounded:
+                    issues = quality_result.grounding_issues
                     if issues:
                         logger.warning(
                             f"IntelligentPipeline detected grounding issues: {issues[:3]}"
                         )
-                    if quality_result.get("should_retry"):
-                        grounding_feedback = quality_result.get("grounding_feedback")
+                    if quality_result.should_retry:
+                        grounding_feedback = quality_result.grounding_feedback
                         if grounding_feedback:
                             logger.info(
                                 f"Injecting grounding feedback for retry: {len(grounding_feedback)} chars"
@@ -534,12 +535,12 @@ class ChatCoordinator:
                             stream_ctx.pending_grounding_feedback = grounding_feedback
 
                 if quality_result:
-                    new_score = quality_result.get("quality_score")
+                    new_score = quality_result.quality_score
                     if new_score is not None:
                         stream_ctx.update_quality_score(new_score)
 
-                if quality_result and quality_result.get("should_finalize"):
-                    finalize_reason = quality_result.get("finalize_reason") or "grounding limit exceeded"
+                if quality_result and quality_result.should_finalize:
+                    finalize_reason = quality_result.finalize_reason or "grounding limit exceeded"
                     logger.warning(
                         f"Force finalize triggered: {finalize_reason}. "
                         "Stopping continuation to prevent infinite loop."
@@ -1032,23 +1033,24 @@ class ChatCoordinator:
         orch = self._orch()
 
         # Set initial temperature and tool_budget in TaskCoordinator
-        orch.task_coordinator.temperature = orch.temperature  # type: ignore[attr-defined]
-        orch.task_coordinator.tool_budget = orch.tool_budget  # type: ignore[attr-defined]
+        if orch.task_coordinator is not None:
+            orch.task_coordinator.temperature = orch.temperature
+            orch.task_coordinator.tool_budget = orch.tool_budget
 
-        # Delegate to TaskCoordinator
-        orch.task_coordinator.apply_task_guidance(  # type: ignore[attr-defined]
-            user_message=user_message,
-            unified_task_type=unified_task_type,
-            is_analysis_task=is_analysis_task,
-            is_action_task=is_action_task,
-            needs_execution=needs_execution,
-            max_exploration_iterations=max_exploration_iterations,
-            conversation_controller=orch._conversation_controller,  # type: ignore[attr-defined]
-        )
+            # Delegate to TaskCoordinator
+            orch.task_coordinator.apply_task_guidance(
+                user_message=user_message,
+                unified_task_type=unified_task_type,
+                is_analysis_task=is_analysis_task,
+                is_action_task=is_action_task,
+                needs_execution=needs_execution,
+                max_exploration_iterations=max_exploration_iterations,
+                conversation_controller=orch._conversation_controller,
+            )
 
-        # Sync temperature and tool_budget back to orchestrator
-        orch.temperature = orch.task_coordinator.temperature  # type: ignore[misc]
-        orch.tool_budget = orch.task_coordinator.tool_budget  # type: ignore[misc]
+            # Sync temperature and tool_budget back to orchestrator
+            orch.temperature = orch.task_coordinator.temperature
+            orch.tool_budget = orch.task_coordinator.tool_budget
 
     async def _select_tools_for_turn(self, context_msg: str, goals: Any) -> Any:
         """Select and prioritize tools for the current turn.
@@ -1079,7 +1081,9 @@ class ChatCoordinator:
                     f"Health check recovery failed: {e}. " "Attempting fallback initialization..."
                 )
                 # Fallback: Try direct initialization
-                if hasattr(orch.tool_selector, "initialize_tool_embeddings"):
+                if orch.tool_selector is not None and hasattr(
+                    orch.tool_selector, "initialize_tool_embeddings"
+                ):
                     try:
                         # Use tools from orchestrator (not tool_registry which may not exist)
                         await orch.tool_selector.initialize_tool_embeddings(orch.tools)
@@ -1095,7 +1099,8 @@ class ChatCoordinator:
             available_inputs = ["query"]
             if orch.observed_files:
                 available_inputs.append("file_contents")
-            planned_tools = orch._tool_planner.plan_tools(goals, available_inputs)
+            if orch._tool_planner is not None:
+                planned_tools = orch._tool_planner.plan_tools(goals, available_inputs)
             logger.info(f"available_inputs={available_inputs}")
 
         # Use new IToolSelector API with ToolSelectionContext
@@ -1105,7 +1110,9 @@ class ChatCoordinator:
             task_description=context_msg,
             conversation_stage=(
                 orch.conversation_state.state.stage.value
-                if orch.conversation_state.state.stage
+                if orch.conversation_state is not None
+                and orch.conversation_state.state is not None
+                and orch.conversation_state.state.stage
                 else None
             ),
             previous_tools=[],
@@ -1115,16 +1122,21 @@ class ChatCoordinator:
         # Graceful fallback: If tool selection fails, log and return None
         # This prevents the bug from blocking all chat functionality
         try:
-            tools = await orch.tool_selector.select_tools(
-                context_msg,
-                context=context,
-            )
+            if orch.tool_selector is not None:
+                tools = await orch.tool_selector.select_tools(
+                    context_msg,
+                    context=context,
+                )
+            else:
+                tools = []
             logger.info(
-                f"context_msg={context_msg}\nconversation_stage={orch.conversation_state.state.stage.value if orch.conversation_state.state.stage else None}"
+                f"context_msg={context_msg}\nconversation_stage={orch.conversation_state.state.stage.value if orch.conversation_state is not None and orch.conversation_state.state is not None and orch.conversation_state.state.stage else None}"
             )
-            tools = orch.tool_selector.prioritize_by_stage(context_msg, tools)
+            if orch.tool_selector is not None:
+                tools = orch.tool_selector.prioritize_by_stage(context_msg, tools)
             current_intent = getattr(orch, "_current_intent", None)
-            tools = orch._tool_planner.filter_tools_by_intent(tools, current_intent)
+            if orch._tool_planner is not None:
+                tools = orch._tool_planner.filter_tools_by_intent(tools, current_intent)
             return tools
         except (RuntimeError, ValueError, AttributeError) as e:
             # Catch the bug condition: SemanticToolSelector not initialized
@@ -1185,7 +1197,9 @@ class ChatCoordinator:
         """
         orch = self._orch()
         # Use context_manager which has provider-aware context limits
-        return orch._context_manager.get_max_context_chars()
+        if orch._context_manager is not None:
+            return int(orch._context_manager.get_max_context_chars())
+        return 200000  # Default fallback
 
     # =====================================================================
     # Iteration Pre-Checks
@@ -1208,10 +1222,11 @@ class ChatCoordinator:
         orch = self._orch()
 
         # 1. Check for cancellation
-        if cast(bool, orch._check_cancellation()):
+        if orch._check_cancellation():
             logger.info("Stream cancelled by user request")
-            orch._metrics_coordinator.stop_streaming()
-            orch._record_intelligent_outcome(
+            if orch._metrics_coordinator is not None:
+                orch._metrics_coordinator.stop_streaming()
+            await orch._record_intelligent_outcome(
                 success=False,
                 quality_score=stream_ctx.last_quality_score,
                 user_satisfied=False,
@@ -1265,7 +1280,11 @@ class ChatCoordinator:
             max_total_iterations: Maximum iterations allowed
         """
         orch = self._orch()
-        unique_resources = orch.unified_tracker.unique_resources
+        unique_resources = (
+            orch.unified_tracker.unique_resources
+            if orch.unified_tracker is not None
+            else set()
+        )
         logger.debug(
             f"Iteration {stream_ctx.total_iterations}/{max_total_iterations}: "
             f"tool_calls_used={orch.tool_calls_used}/{orch.tool_budget}, "
@@ -1411,7 +1430,10 @@ class ChatCoordinator:
             Number of seconds to wait before retrying
         """
         orch = self._orch()
-        base_wait = cast(float, orch._provider_coordinator.get_rate_limit_wait_time(exc))
+        if orch._provider_coordinator is not None:
+            base_wait = float(orch._provider_coordinator.get_rate_limit_wait_time(exc))
+        else:
+            base_wait = 1.0
         backoff_multiplier = 2**attempt
         wait_time = base_wait * backoff_multiplier
         return min(wait_time, 300.0)
@@ -1721,9 +1743,11 @@ class ChatCoordinator:
             # Generate result chunks
             if execution_result.results:
                 for result in execution_result.results:
-                    tool_name = result.get("name", extracted_call.tool_name)
-                    output = result.get("output", "")
-                    error = result.get("error")
+                    # ToolCallResult is a TypedDict, access fields directly
+                    result_dict = cast(Dict[str, Any], result)
+                    tool_name = result_dict.get("name", extracted_call.tool_name)
+                    output = result_dict.get("output", "")
+                    error = result_dict.get("error")
 
                     if error:
                         yield StreamChunk(
@@ -1744,7 +1768,8 @@ class ChatCoordinator:
                         )
 
                         # Add tool result message to conversation
-                        self._message_adder.add_message("tool", output, tool_name=tool_name)
+                        if hasattr(orch, "_message_adder") and orch._message_adder is not None:
+                            orch._message_adder.add_message("tool", output, tool_name=tool_name)
 
         except Exception as e:
             logger.error(f"Error executing extracted tool call: {e}")
@@ -1882,7 +1907,9 @@ class ChatCoordinator:
                 logger.warning(
                     "Provider returned empty response for final summary, generating fallback"
                 )
-                fallback_summary = self._generate_fallback_summary(orch, stream_ctx)
+                fallback_summary = self._generate_fallback_summary(
+                    cast("IAgentOrchestrator", orch), stream_ctx
+                )
                 yield StreamChunk(
                     content=fallback_summary,
                     is_final=True,
@@ -1891,7 +1918,9 @@ class ChatCoordinator:
         except Exception as e:
             logger.error(f"Error generating final summary: {e}, generating fallback")
             # Generate fallback summary on error
-            fallback_summary = self._generate_fallback_summary(orch, stream_ctx)
+            fallback_summary = self._generate_fallback_summary(
+                cast("IAgentOrchestrator", orch), stream_ctx
+            )
             yield StreamChunk(
                 content=fallback_summary,
                 is_final=True,
@@ -2002,7 +2031,8 @@ class ChatCoordinator:
         """
         orch = self._orch()
         # Call handle_response with individual parameters instead of detect_and_handle
-        return await orch._recovery_integration.handle_response(
+        if orch._recovery_integration:
+            return await orch._recovery_integration.handle_response(
             content=full_content,
             tool_calls=tool_calls,
             mentioned_tools=mentioned_tools,
@@ -2048,16 +2078,20 @@ class ChatCoordinator:
 
         if recovery_action.action == "force_summary":
             stream_ctx.force_completion = True
-            return orch._chunk_generator.generate_content_chunk(
-                "Providing summary based on information gathered so far.", is_final=True
-            )
+            if orch._chunk_generator:
+                return orch._chunk_generator.generate_content_chunk(
+                    "Providing summary based on information gathered so far.", is_final=True
+                )
+            return None
         elif recovery_action.action == "retry":
             orch.add_message("system", recovery_action.message or "Please try again.")
             return None
         elif recovery_action.action == "finalize":
-            return orch._chunk_generator.generate_content_chunk(
-                recovery_action.message or "", is_final=True
-            )
+            if orch._chunk_generator:
+                return orch._chunk_generator.generate_content_chunk(
+                    recovery_action.message or "", is_final=True
+                )
+            return None
         return None
 
     async def _handle_empty_response_recovery(
@@ -2099,18 +2133,18 @@ class ChatCoordinator:
 
     async def _validate_intelligent_response(
         self,
-        response: str,
         query: str,
-        tool_calls: int,
-        task_type: str,
-    ) -> Optional[Dict[str, Any]]:
-        """Validate response quality using the intelligent pipeline.
+        response: str,
+        tool_calls: Any,
+        task_type: str = "general",
+    ) -> Any:
+        """Validate response using intelligent validation integration.
 
         Args:
-            response: The response to validate
-            query: The original query
-            tool_calls: Number of tool calls used
-            task_type: The task type
+            query: The user query
+            response: The model response
+            tool_calls: Tool calls made (if any)
+            task_type: Type of task
 
         Returns:
             Validation result dict or None
