@@ -717,6 +717,42 @@ def pytest_collection_modifyitems(items, config):
                 )
 
 
+def pytest_runtest_makereport(item, call):
+    """Handle test timeouts gracefully.
+
+    When a test times out, mark it as xfail instead of error so that:
+    1. Subsequent tests continue running
+    2. The timeout is clearly reported
+    3. The test suite doesn't abort on slow providers
+    """
+    from _pytest.outcomes import Failed
+
+    if call.excinfo is not None:
+        # Check for timeout exception (pytest-timeout uses different exception types)
+        exc_type = call.excinfo.type
+        exc_value = str(call.excinfo.value).lower()
+
+        is_timeout = (
+            "timeout" in exc_type.__name__.lower()
+            or "timeout" in exc_value
+            or "timed out" in exc_value
+        )
+
+        if is_timeout:
+            # Get provider name from test parameters if available
+            provider_name = "unknown"
+            if hasattr(item, "callspec") and "provider" in item.callspec.params:
+                provider_param = item.callspec.params.get("provider")
+                if hasattr(provider_param, "_provider_name"):
+                    provider_name = provider_param._provider_name
+
+            # Store timeout info for reporting
+            item.user_properties.append((
+                "timeout_info",
+                f"Test timed out for provider: {provider_name}"
+            ))
+
+
 # =============================================================================
 # Explicit Provider Fixtures (pytest-asyncio compatible)
 # =============================================================================

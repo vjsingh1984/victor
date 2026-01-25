@@ -98,36 +98,42 @@ def _invoke_capability(orchestrator: Any, capability_name: str, *args: Any, **kw
 def get_workflow_registry():
     """Lazy import workflow registry."""
     from victor.workflows.registry import get_global_registry
+
     return get_global_registry()
 
 
 def get_trigger_registry():
     """Lazy import trigger registry."""
     from victor.workflows.trigger_registry import get_trigger_registry
+
     return get_trigger_registry()
 
 
 def get_team_registry():
     """Lazy import team registry."""
     from victor.framework.team_registry import get_team_registry
+
     return get_team_registry()
 
 
 def get_chain_registry():
     """Lazy import chain registry."""
     from victor.framework.chain_registry import get_chain_registry
+
     return get_chain_registry()
 
 
 def get_persona_registry():
     """Lazy import persona registry."""
     from victor.framework.persona_registry import get_persona_registry
+
     return get_persona_registry()
 
 
 def get_handler_registry():
     """Lazy import handler registry."""
     from victor.framework.handler_registry import get_handler_registry
+
     return get_handler_registry()
 
 
@@ -208,9 +214,7 @@ class WorkflowStepHandler(BaseStepHandler):
                     workflow,
                     replace=True,
                 )
-            result.add_info(
-                f"Registered {workflow_count} workflows: {', '.join(workflows.keys())}"
-            )
+            result.add_info(f"Registered {workflow_count} workflows: {', '.join(workflows.keys())}")
         except ImportError:
             result.add_warning("Workflow registry not available")
         except Exception as e:
@@ -301,8 +305,7 @@ class RLConfigStepHandler(BaseStepHandler):
                     logger.debug("Applied RL hooks via set_rl_hooks")
                 else:
                     result.add_warning(
-                        "Orchestrator lacks set_rl_hooks method; "
-                        "hooks stored in context only"
+                        "Orchestrator lacks set_rl_hooks method; " "hooks stored in context only"
                     )
 
         result.add_info(f"Configured {learner_count} RL learners")

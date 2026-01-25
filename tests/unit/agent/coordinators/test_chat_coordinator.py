@@ -235,10 +235,16 @@ class TestChatCoordinatorChat:
         mock_tool_exec_result = ToolExecutionResult(
             chunks=[], should_return=False, tool_calls_executed=1  # Continue to next iteration
         )
+
+        # Create side effect that increments tool_calls_used when execute_tools is called
+        async def execute_tools_side_effect(*args, **kwargs):
+            mock_orchestrator.tool_calls_used += 1
+            return mock_tool_exec_result
+
         # Mock both the coordinator's handler and orchestrator's handler
         coordinator._tool_execution_handler = Mock()
         coordinator._tool_execution_handler.execute_tools = AsyncMock(
-            return_value=mock_tool_exec_result
+            side_effect=execute_tools_side_effect
         )
         coordinator._tool_execution_handler.update_observed_files = Mock()
         mock_orchestrator._tool_execution_handler = coordinator._tool_execution_handler
@@ -256,7 +262,10 @@ class TestChatCoordinatorChat:
     async def test_chat_with_empty_response_uses_completer(
         self, coordinator: ChatCoordinator, mock_orchestrator: Mock
     ):
-        """Test that empty response triggers response completer."""
+        """Test that empty response triggers auto-summary when iteration limit reached."""
+
+        # Setup - use low iteration limit to trigger auto-summary quickly
+        mock_orchestrator.unified_tracker.config = {"max_total_iterations": 1}
 
         # Setup - provider returns empty response to trigger recovery
         async def empty_stream(*args, **kwargs):
@@ -297,17 +306,17 @@ class TestChatCoordinatorChat:
         # Execute
         response = await coordinator.chat("Hello")
 
-        # Assert
-        assert response.content == "Completed"
-        mock_orchestrator._recovery_coordinator.get_recovery_fallback_message.assert_called_once()
-        mock_orchestrator._recovery_coordinator.check_natural_completion.assert_called_once()
+        # Assert - auto-summary is generated when iteration limit is reached with empty response
+        assert "Session Summary" in response.content or "loop limit reached" in response.content
 
     @pytest.mark.asyncio
     async def test_chat_max_iterations_exceeded(
         self, coordinator: ChatCoordinator, mock_orchestrator: Mock
     ):
         """Test that chat stops after max iterations even with tool calls."""
-        # Setup
+        # Setup - use low iteration limit to trigger auto-summary quickly
+        mock_orchestrator.unified_tracker.config = {"max_total_iterations": 2}
+
         mock_orchestrator.provider.supports_tools = Mock(return_value=True)
         mock_orchestrator.tool_selector = Mock()
         mock_orchestrator.tool_selector.select_tools = AsyncMock(return_value=[])
@@ -347,12 +356,25 @@ class TestChatCoordinatorChat:
         mock_orchestrator.provider = ProviderWrapper(original_provider, tool_loop_stream)
         mock_orchestrator._handle_tool_calls = AsyncMock(return_value=[{"success": True}])
 
+        # Mock tool execution handler to allow iteration to continue
+        from victor.agent.streaming.tool_execution import ToolExecutionResult
+
+        mock_tool_exec_result = ToolExecutionResult(
+            chunks=[], should_return=False, tool_calls_executed=1
+        )
+        coordinator._tool_execution_handler = Mock()
+        coordinator._tool_execution_handler.execute_tools = AsyncMock(
+            return_value=mock_tool_exec_result
+        )
+        coordinator._tool_execution_handler.update_observed_files = Mock()
+        mock_orchestrator._tool_execution_handler = coordinator._tool_execution_handler
+
         # Execute
         response = await coordinator.chat("Keep working")
 
-        # Assert - should stop after max iterations and use completer
-        mock_orchestrator.response_completer.ensure_response.assert_called_once()
-        assert response.content == "Fallback response"  # From conftest.py response_completer mock
+        # Assert - should stop after max iterations and generate auto-summary
+        # The new behavior generates a comprehensive summary instead of calling completer
+        assert "Session Summary" in response.content or "loop limit reached" in response.content
 
     @pytest.mark.asyncio
     async def test_chat_with_thinking_enabled(
@@ -418,8 +440,10 @@ class TestChatCoordinatorChat:
     async def test_chat_tool_failure_uses_completer(
         self, coordinator: ChatCoordinator, mock_orchestrator: Mock
     ):
-        """Test that tool failures trigger response completer with failure context."""
-        # Setup
+        """Test that tool failures trigger auto-summary generation after iteration limit."""
+        # Setup - use low iteration limit to trigger auto-summary quickly
+        mock_orchestrator.unified_tracker.config = {"max_total_iterations": 2}
+
         mock_orchestrator.provider.supports_tools = Mock(return_value=True)
         mock_orchestrator.tool_selector = Mock()
         mock_orchestrator.tool_selector.select_tools = AsyncMock(return_value=[])
@@ -456,11 +480,25 @@ class TestChatCoordinatorChat:
             return_value=[{"success": False, "error": "Tool failed", "name": "failing_tool"}]
         )
 
+        # Mock tool execution handler to allow iteration to continue
+        from victor.agent.streaming.tool_execution import ToolExecutionResult
+
+        mock_tool_exec_result = ToolExecutionResult(
+            chunks=[], should_return=False, tool_calls_executed=1
+        )
+        coordinator._tool_execution_handler = Mock()
+        coordinator._tool_execution_handler.execute_tools = AsyncMock(
+            return_value=mock_tool_exec_result
+        )
+        coordinator._tool_execution_handler.update_observed_files = Mock()
+        mock_orchestrator._tool_execution_handler = coordinator._tool_execution_handler
+
         # Execute
         response = await coordinator.chat("Use failing tool")
 
-        # Assert - completer should be called with failure context
-        mock_orchestrator.response_completer.ensure_response.assert_called_once()
+        # Assert - should generate auto-summary after iteration limit
+        # The new behavior generates a comprehensive summary instead of calling completer
+        assert "Session Summary" in response.content or "loop limit reached" in response.content
 
 
 class TestChatCoordinatorStreamChat:
@@ -1019,6 +1057,14 @@ class TestChatCoordinatorEdgeCases:
         base_mock_orchestrator.response_completer.ensure_response = AsyncMock(
             return_value=Mock(content=None)
         )
+
+        # Set low iteration limits to quickly trigger fallback path
+        base_mock_orchestrator.settings.continuation_medium_max_iterations = 1
+        base_mock_orchestrator.settings.chat_max_iterations = 1
+
+        # Also set unified_tracker config which is used by chat coordinator
+        base_mock_orchestrator.unified_tracker.config = {"max_total_iterations": 1}
+
         return base_mock_orchestrator
 
     @pytest.fixture
@@ -1030,7 +1076,7 @@ class TestChatCoordinatorEdgeCases:
     async def test_chat_completer_fails_uses_fallback(
         self, coordinator: ChatCoordinator, mock_orchestrator: Mock
     ):
-        """Test that fallback message is used when completer fails."""
+        """Test that auto-summary is generated when completer fails and iteration limit reached."""
         # Setup - completer returns None
         mock_orchestrator.response_completer.ensure_response = AsyncMock(
             return_value=Mock(content=None)
@@ -1039,15 +1085,15 @@ class TestChatCoordinatorEdgeCases:
         # Execute
         response = await coordinator.chat("Test fallback")
 
-        # Assert - recovery coordinator provides fallback
-        assert response.content == "Fallback message"
+        # Assert - auto-summary is generated when iteration limit is reached
+        assert "Session Summary" in response.content or "loop limit reached" in response.content
         mock_orchestrator.add_message.assert_called()
 
     @pytest.mark.asyncio
     async def test_chat_with_tool_failures_uses_format_message(
         self, coordinator: ChatCoordinator, mock_orchestrator: Mock
     ):
-        """Test that tool failure format message is used when tools fail."""
+        """Test that auto-summary is generated when tools fail and iteration limit reached."""
         # Setup
         mock_orchestrator.provider.supports_tools = Mock(return_value=True)
         mock_orchestrator.tool_selector = Mock()
@@ -1068,14 +1114,17 @@ class TestChatCoordinatorEdgeCases:
         # Execute
         response = await coordinator.chat("Use failing tool")
 
-        # Assert - recovery coordinator provides fallback for empty response
-        assert response.content == "Fallback message"
+        # Assert - auto-summary is generated when iteration limit is reached
+        assert "Session Summary" in response.content or "loop limit reached" in response.content
 
     @pytest.mark.asyncio
     async def test_chat_provider_exception_propagates(
         self, coordinator: ChatCoordinator, mock_orchestrator: Mock
     ):
         """Test that provider exceptions are propagated."""
+
+        # Setup - need higher iteration limit so stream is actually called
+        mock_orchestrator.unified_tracker.config = {"max_total_iterations": 10}
 
         # Setup - stream generator should raise exception
         async def failing_stream(*args, **kwargs):

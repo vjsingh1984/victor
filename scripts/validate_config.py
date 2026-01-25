@@ -104,7 +104,7 @@ class ConfigValidator:
                 "required": ["name", "display_name", "exploration", "edit_permission"],
                 "optional": ["tool_budget_multiplier", "max_iterations", "description"],
                 "enums": {
-                    "exploration": ["standard", "thorough", "minimal"],
+                    "exploration": ["standard", "thorough", "minimal", "deep"],
                     "edit_permission": ["full", "sandbox", "none"],
                 },
                 "types": {
@@ -375,47 +375,91 @@ class ConfigValidator:
         # Validate capabilities
         if "capabilities" in config:
             capabilities = config["capabilities"]
-            if not isinstance(capabilities, dict):
+
+            # Support both list format (YAML files) and dict format
+            if isinstance(capabilities, list):
+                # List format: each item has 'name' and 'capability_type'
+                for idx, cap_config in enumerate(capabilities):
+                    cap_name = cap_config.get("name", f"capability_{idx}")
+                    cap_path = f"capabilities[{idx}]"
+
+                    # Check required fields for list format
+                    if "name" not in cap_config:
+                        result.add_issue(
+                            ValidationIssue(
+                                severity=ValidationSeverity.ERROR,
+                                file_path=str(file_path),
+                                field_path=cap_path,
+                                message="Missing required field: name",
+                                suggestion="Add 'name' to capability",
+                            )
+                        )
+
+                    if "description" not in cap_config:
+                        result.add_issue(
+                            ValidationIssue(
+                                severity=ValidationSeverity.ERROR,
+                                file_path=str(file_path),
+                                field_path=f"{cap_path}.description",
+                                message="Missing required field: description",
+                                suggestion=f"Add description to capability {cap_name}",
+                            )
+                        )
+
+                    # Validate capability type (supports both 'type' and 'capability_type')
+                    cap_type = cap_config.get("capability_type") or cap_config.get("type")
+                    if cap_type and cap_type not in schema["capability_types"]:
+                        result.add_issue(
+                            ValidationIssue(
+                                severity=ValidationSeverity.ERROR,
+                                file_path=str(file_path),
+                                field_path=f"{cap_path}.capability_type",
+                                message=f"Invalid capability type: {cap_type}",
+                                suggestion=f"Must be one of: {schema['capability_types']}",
+                            )
+                        )
+
+            elif isinstance(capabilities, dict):
+                # Dict format: capability name as key
+                for cap_name, cap_config in capabilities.items():
+                    cap_path = f"capabilities.{cap_name}"
+
+                    # Check required capability fields
+                    for field in schema["capability_fields"]["required"]:
+                        if field not in cap_config:
+                            result.add_issue(
+                                ValidationIssue(
+                                    severity=ValidationSeverity.ERROR,
+                                    file_path=str(file_path),
+                                    field_path=f"{cap_path}.{field}",
+                                    message=f"Missing required field: {field}",
+                                    suggestion=f"Add {field} to capability {cap_name}",
+                                )
+                            )
+
+                    # Validate capability type
+                    if "type" in cap_config:
+                        cap_type = cap_config["type"]
+                        if cap_type not in schema["capability_types"]:
+                            result.add_issue(
+                                ValidationIssue(
+                                    severity=ValidationSeverity.ERROR,
+                                    file_path=str(file_path),
+                                    field_path=f"{cap_path}.type",
+                                    message=f"Invalid capability type: {cap_type}",
+                                    suggestion=f"Must be one of: {schema['capability_types']}",
+                                )
+                            )
+            else:
                 result.add_issue(
                     ValidationIssue(
                         severity=ValidationSeverity.ERROR,
                         file_path=str(file_path),
                         field_path="capabilities",
-                        message="'capabilities' must be a dictionary",
-                        suggestion="Convert capabilities to a dictionary",
+                        message="'capabilities' must be a list or dictionary",
+                        suggestion="Use list format with 'name' field or dictionary format with capability names as keys",
                     )
                 )
-                return
-
-            for cap_name, cap_config in capabilities.items():
-                cap_path = f"capabilities.{cap_name}"
-
-                # Check required capability fields
-                for field in schema["capability_fields"]["required"]:
-                    if field not in cap_config:
-                        result.add_issue(
-                            ValidationIssue(
-                                severity=ValidationSeverity.ERROR,
-                                file_path=str(file_path),
-                                field_path=f"{cap_path}.{field}",
-                                message=f"Missing required field: {field}",
-                                suggestion=f"Add {field} to capability {cap_name}",
-                            )
-                        )
-
-                # Validate capability type
-                if "type" in cap_config:
-                    cap_type = cap_config["type"]
-                    if cap_type not in schema["capability_types"]:
-                        result.add_issue(
-                            ValidationIssue(
-                                severity=ValidationSeverity.ERROR,
-                                file_path=str(file_path),
-                                field_path=f"{cap_path}.type",
-                                message=f"Invalid capability type: {cap_type}",
-                                suggestion=f"Must be one of: {schema['capability_types']}",
-                            )
-                        )
 
     def _validate_team_config(
         self,

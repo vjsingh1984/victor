@@ -206,7 +206,9 @@ class RLConfigFactory:
                     try:
                         with open(yaml_file, "r") as f:
                             data = yaml.safe_load(f) or {}
-                            vertical_name = data.get("vertical_name", yaml_file.stem.replace("_rl", ""))
+                            vertical_name = data.get(
+                                "vertical_name", yaml_file.stem.replace("_rl", "")
+                            )
                             cls._yaml_configs[vertical_name] = data
                     except Exception as e:
                         logger.warning(f"Failed to load {yaml_file}: {e}")

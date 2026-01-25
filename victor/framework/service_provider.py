@@ -249,30 +249,35 @@ def _create_agent_builder(container: ServiceContainer) -> "AgentBuilder":
 def _create_workflow_registry(container: ServiceContainer) -> Any:
     """Factory for creating WorkflowRegistry."""
     from victor.workflows.registry import get_global_registry
+
     return get_global_registry()
 
 
 def _create_team_registry(container: ServiceContainer) -> Any:
     """Factory for creating TeamRegistry."""
     from victor.framework.team_registry import get_team_registry
+
     return get_team_registry()
 
 
 def _create_chain_registry(container: ServiceContainer) -> Any:
     """Factory for creating ChainRegistry."""
     from victor.framework.chain_registry import get_chain_registry
+
     return get_chain_registry()
 
 
 def _create_persona_registry(container: ServiceContainer) -> Any:
     """Factory for creating PersonaRegistry."""
     from victor.framework.persona_registry import get_persona_registry
+
     return get_persona_registry()
 
 
 def _create_handler_registry(container: ServiceContainer) -> Any:
     """Factory for creating HandlerRegistry."""
     from victor.framework.handler_registry import get_handler_registry
+
     return get_handler_registry()
 
 
@@ -292,29 +297,39 @@ def _create_agent_bridge(container: ServiceContainer) -> "AgentBridge":
     # Create a minimal orchestrator wrapper for the bridge
     class MinimalOrchestrator(OrchestratorProtocol):
         """Minimal orchestrator for service container compatibility."""
+
         def chat(self, *args: Any, **kwargs: Any) -> Any:
             return None
+
         def stream_chat(self, *args: Any, **kwargs: Any) -> Any:
             return None
+
         def supports_tools(self) -> bool:
             return True
+
         def name(self) -> str:
             return "minimal"
+
         @property
         def messages(self) -> list[Any]:
             return []
+
         @property
         def tool_calls_used(self) -> int:
             return 0
+
         @property
         def model(self) -> str:
             return "minimal"
+
         @property
         def provider_name(self) -> str:
             return "minimal"
+
         @property
         def tool_budget(self) -> int:
             return 0
+
         def reset_conversation(self) -> None:
             pass
 
@@ -672,6 +687,7 @@ def get_tool_configurator(container: Optional[ServiceContainer] = None) -> Any:
         ToolConfigurator instance
     """
     from typing import cast
+
     if container is None:
         container = get_container()
     # Get the service implementation directly via factory
@@ -690,6 +706,7 @@ def get_event_registry(container: Optional[ServiceContainer] = None) -> Any:
         EventRegistry instance
     """
     from typing import cast
+
     if container is None:
         container = get_container()
     # Get the service implementation directly via factory
@@ -708,6 +725,7 @@ def create_builder(container: Optional[ServiceContainer] = None) -> Any:
         New AgentBuilder instance
     """
     from typing import cast
+
     if container is None:
         container = get_container()
     # Get the service implementation directly via factory

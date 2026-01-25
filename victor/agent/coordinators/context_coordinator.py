@@ -796,7 +796,7 @@ class HybridCompactionStrategy(BaseCompactionStrategy):
         # Calculate total tokens saved
         final_tokens = result.compacted_context if hasattr(result.compacted_context, 'get') else {"token_count": 0}
         final_token_count = final_tokens.get("token_count", 0)
-        total_tokens_saved = original_tokens - final_tokens
+        total_tokens_saved = original_tokens - final_token_count
 
         # Update metadata to reflect hybrid approach
         existing_metadata = result.metadata if isinstance(result.metadata, dict) else {}
