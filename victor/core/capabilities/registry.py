@@ -315,10 +315,10 @@ class CapabilityRegistry:
             eps = entry_points()
             if hasattr(eps, "select"):
                 # Python 3.10+ / importlib_metadata >= 3.6
-                selected = eps.select(group=group)
+                selected = eps.select(group=group)  # type: ignore[arg-type]
             else:
                 # Python 3.9 fallback
-                selected = eps.get(group, [])
+                selected = eps.get(group, [])  # type: ignore[arg-type]
 
             for ep in selected:
                 try:
