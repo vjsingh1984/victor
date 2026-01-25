@@ -2079,7 +2079,7 @@ class WorkflowArgument:
         }
         converter = type_map.get(self.type, str)
         try:
-            converted = converter(value)  # type: ignore[arg-type]
+            converted = converter(value)
         except (ValueError, TypeError) as e:
             raise YAMLWorkflowError(f"Invalid value for argument '{self.name}': {e}")
 
