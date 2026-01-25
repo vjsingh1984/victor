@@ -184,7 +184,9 @@ class ComputeNodeExecutor:
             state_dict["_node_results"] = {}
 
         # Store node result as dict for observability
-        state_dict["_node_results"][node.id] = {
+        node_results = state_dict["_node_results"]
+        if isinstance(node_results, dict):
+            node_results[node.id] = {
             "node_id": node.id,
             "status": "completed",
             "result": output,

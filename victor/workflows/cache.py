@@ -54,7 +54,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING, Union, cast
 
-from cachetools import TTLCache
+try:
+    from cachetools import TTLCache
+except ImportError:
+    # Fallback if cachetools is not installed
+    TTLCache = None
 
 if TYPE_CHECKING:
     from victor.workflows.definition import (
@@ -443,7 +447,9 @@ class WorkflowCache:
 
         # Initialize cache if enabled
         if self.config.enabled:
-            self._cache: Optional[TTLCache] = TTLCache(
+            if TTLCache is None:
+                raise ImportError("cachetools is required for workflow caching")
+            self._cache: Optional["TTLCache"] = TTLCache(
                 maxsize=self.config.max_size,
                 ttl=self.config.ttl_seconds,
             )
@@ -1043,7 +1049,9 @@ class WorkflowDefinitionCache:
         self._lock = threading.RLock()
 
         if self._config.enabled:
-            self._cache: Optional[TTLCache] = TTLCache(
+            if TTLCache is None:
+                raise ImportError("cachetools is required for workflow definition caching")
+            self._cache: Optional["TTLCache"] = TTLCache(
                 maxsize=self._config.max_size,
                 ttl=self._config.ttl_seconds,
             )

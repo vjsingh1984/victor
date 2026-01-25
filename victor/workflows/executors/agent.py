@@ -115,22 +115,18 @@ class AgentNodeExecutor:
             logger.error(f"Agent node {node.id} execution failed: {e}")
             # Store error in state and return
             if node.output_key:
-                # Use dict update for dynamic key assignment
+                # Convert to dict and create new state with error
                 state_dict = dict(state)
                 state_dict[node.output_key] = {"error": str(e), "success": False}
-                # Update state with modified dict
-                state.clear()
-                state.update(state_dict)  # type: ignore[arg-type]
+                return cast("WorkflowState", state_dict)
             return state
 
         # Step 6: Store result in state
         if node.output_key:
-            # Use dict conversion for dynamic key assignment to avoid TypedDict errors
+            # Convert to dict and create new state with result
             state_dict = dict(state)
             state_dict[node.output_key] = result
-            # Update state with modified dict
-            state.clear()
-            state.update(state_dict)  # type: ignore[arg-type]
+            state = cast("WorkflowState", state_dict)
 
         # Track node result for observability
         # Convert to regular dict for dynamic access to avoid TypedDict issues
@@ -139,23 +135,21 @@ class AgentNodeExecutor:
             state_dict["_node_results"] = {}
 
         # Create a simple dict for node result instead of using GraphNodeResult
-        state_dict["_node_results"][node.id] = {
-            "node_id": node.id,
-            "status": "completed",
-            "result": result,
-            "metadata": {
-                "role": node.role,
-                "tool_budget": node.tool_budget,
-                "profile": node.profile,
-            },
-        }
-
-        # Update state with modified dict
-        state.clear()
-        state.update(state_dict)  # type: ignore[arg-type]
+        node_results = state_dict["_node_results"]
+        if isinstance(node_results, dict):
+            node_results[node.id] = {
+                "node_id": node.id,
+                "status": "completed",
+                "result": result,
+                "metadata": {
+                    "role": node.role,
+                    "tool_budget": node.tool_budget,
+                    "profile": node.profile,
+                },
+            }
 
         logger.info(f"Agent node {node.id} completed successfully")
-        return state
+        return cast("WorkflowState", state_dict)
 
     def _get_orchestrator(self, profile: str | None) -> Any:
         """Get orchestrator based on profile.
@@ -210,10 +204,7 @@ class AgentNodeExecutor:
         if role not in role_map:
             raise ValueError(f"Unknown agent role: {role}. Must be one of {list(role_map.keys())}")
 
-        # Import SubAgentRole for typing
-        from victor.agent.subagents.base import SubAgentRole
-
-        return cast(SubAgentRole, role_map[role])
+        return role_map[role]
 
     def _substitute_context(self, template: str, context: Dict[str, Any]) -> str:
         """Substitute context variables in template string.
@@ -240,9 +231,9 @@ class AgentNodeExecutor:
 
                     return json.dumps(value)
                 # Handle primitive values
-                return str(value)
+                    return str(value)
             # Keep original if not found
-            return match.group(0)
+            return cast(str, match.group(0))
 
         return re.sub(pattern, replace_var, template)
 
