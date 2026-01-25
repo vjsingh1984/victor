@@ -37,7 +37,7 @@ Sources:
 - Enterprise coding assistant logs (anonymized patterns)
 """
 
-from typing import List, Tuple
+from typing import Any, List, Tuple
 
 # =============================================================================
 # FUNCTION COMPLETION PROMPTS (~250 entries)

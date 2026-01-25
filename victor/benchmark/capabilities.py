@@ -41,7 +41,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING, cast
 
 from victor.framework.protocols import CapabilityType, OrchestratorCapability
 from victor.framework.capability_loader import CapabilityEntry, capability
@@ -143,11 +143,12 @@ def get_passk_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Pass@k configuration dict
     """
-    return getattr(
+    config = getattr(
         orchestrator,
         "benchmark_config",
         {},
-    ).get(
+    )
+    result = config.get(
         "passk",
         {
             "k_value": 10,
@@ -157,6 +158,7 @@ def get_passk_config(orchestrator: Any) -> Dict[str, Any]:
             "stop_after_n_success": 5,
         },
     )
+    return cast(Dict[str, Any], result)
 
 
 def configure_metrics_collection(
@@ -339,10 +341,10 @@ def swe_bench_capability(
     enable_patch_generation: bool = True,
     require_test_verification: bool = True,
     **kwargs: Any,
-) -> Callable:
+) -> Callable[[Any], None]:
     """SWE-bench execution capability handler."""
 
-    def handler(orchestrator: Any) -> Callable[..., None]:
+    def handler(orchestrator: Any) -> None:
         configure_swe_bench_execution(
             orchestrator,
             enable_patch_generation=enable_patch_generation,
@@ -364,10 +366,10 @@ def passk_capability(
     k_value: int = 10,
     max_samples: int = 100,
     **kwargs: Any,
-) -> Callable:
+) -> Callable[[Any], None]:
     """Pass@k evaluation capability handler."""
 
-    def handler(orchestrator: Any) -> Callable[..., None]:
+    def handler(orchestrator: Any) -> None:
         configure_passk_evaluation(
             orchestrator,
             k_value=k_value,
@@ -389,10 +391,10 @@ def metrics_capability(
     track_token_usage: bool = True,
     track_execution_time: bool = True,
     **kwargs: Any,
-) -> Callable:
+) -> Callable[[Any], None]:
     """Metrics collection capability handler."""
 
-    def handler(orchestrator: Any) -> Callable[..., None]:
+    def handler(orchestrator: Any) -> None:
         configure_metrics_collection(
             orchestrator,
             track_token_usage=track_token_usage,
@@ -413,10 +415,10 @@ def test_generation_capability(
     test_framework: str = "pytest",
     coverage_threshold: float = 0.8,
     **kwargs: Any,
-) -> Callable:
+) -> Callable[[Any], None]:
     """Test generation capability handler."""
 
-    def handler(orchestrator: Any) -> Callable[..., None]:
+    def handler(orchestrator: Any) -> None:
         configure_test_generation(
             orchestrator,
             test_framework=test_framework,

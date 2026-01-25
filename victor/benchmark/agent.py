@@ -363,7 +363,7 @@ class BenchmarkAgent:
             final_context: Dict[str, Any] = {}
             try:
 
-                async def execute_workflow():
+                async def execute_workflow() -> None:
                     nonlocal final_context
                     # Use new unified compiler streaming API
                     async for node_id, state in provider.stream_compiled_workflow(
@@ -436,7 +436,7 @@ class BenchmarkAgent:
         if task_type:
             workflow = provider.get_workflow_for_task_type(str(task_type))
             if workflow:
-                return workflow
+                return str(workflow)
 
         # Infer from task attributes
         if hasattr(task, "repo") and task.repo:
@@ -542,7 +542,12 @@ class BenchmarkAgent:
         """Context manager entry."""
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[Any],
+    ) -> None:
         """Context manager exit."""
         await self.close()
 

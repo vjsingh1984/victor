@@ -19,9 +19,10 @@ protocols actually implemented by the vertical are registered, rather than
 inheriting from all possible protocol interfaces.
 """
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
 
-from victor.core.verticals.base import StageDefinition, VerticalBase, VerticalConfig
+from victor.core.vertical_types import StageDefinition
+from victor.core.verticals.base import VerticalBase, VerticalConfig
 from victor.tools.tool_names import ToolNames
 
 # Import ISP-compliant provider protocols
@@ -70,9 +71,11 @@ class BenchmarkVertical(VerticalBase):
         - TieredToolConfigProvider: Provides tiered tool configuration
     """
 
-    name = "benchmark"
-    description = "AI coding benchmark evaluation and performance testing"
-    version = "0.5.0"
+    # Metadata (inherited from VerticalMetadataProvider)
+    # Note: These class variables override base class instance variables (MyPy limitation)
+    name: str = "benchmark"  # type: ignore[misc]
+    description: str = "AI coding benchmark evaluation and performance testing"  # type: ignore[misc]
+    version: str = "0.5.0"  # type: ignore[misc]
 
     # Benchmark-specific stages
     STAGE_UNDERSTANDING = "UNDERSTANDING"
@@ -121,7 +124,8 @@ class BenchmarkVertical(VerticalBase):
             ]
         )
 
-        return tools
+        # Ensure all tool names are strings
+        return [str(t) for t in tools]
 
     @classmethod
     def get_system_prompt(cls) -> str:
@@ -336,7 +340,8 @@ You are being evaluated on:
         """
         from victor.benchmark.mode_config import BenchmarkModeConfigProvider
 
-        return BenchmarkModeConfigProvider()
+        provider = BenchmarkModeConfigProvider()
+        return cast(Optional["ModeConfigProviderProtocol"], provider)
 
     @classmethod
     def get_handlers(cls) -> Dict[str, Any]:

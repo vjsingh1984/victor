@@ -456,7 +456,13 @@ class ResponseSanitizer:
         r"FUNCTION_CALL\s*\{",  # Raw function call syntax
         r"</function>\s*</function>",  # Repeated closing tags
         r"<parameter[^>]*>",  # Raw parameter tags
-        r'^\s*\{\s*"name":\s*"[^"]+",\s*"arguments":',  # Raw JSON tool calls
+        # NOTE: Removed JSON tool call pattern since tool_calling/base.py now has robust
+        # JSON fallback parsing (parse_json_from_content) that handles:
+        # - Multiple consecutive JSON objects
+        # - Trailing metadata/stats
+        # - Nested JSON structures
+        # This allows local models that output JSON tool calls in content to work correctly.
+        # r'^\s*\{\s*"name":\s*"[^"]+",\s*"arguments":',  # Raw JSON tool calls (REMOVED)
         r"^\s*<IMPORTANT>",  # Instruction leakage
         r"^\s*<important>",  # Instruction leakage (lowercase)
         r"</important>",  # Instruction leakage closing tag
@@ -559,8 +565,15 @@ class ResponseSanitizer:
         Handles common issues from local models:
         - Repeated </function> or </parameter> tags
         - XML-like formatting artifacts
-        - JSON-like tool call attempts in plain text
         - Instruction/example leakage from model training
+
+        Note: JSON-like tool calls ({"name": ..., "arguments": ...}) are NO LONGER removed.
+        The tool_calling module (base.py::parse_json_from_content) now has robust JSON
+        fallback parsing that handles:
+        - Multiple consecutive JSON objects
+        - Trailing metadata/stats
+        - Nested JSON structures
+        This allows local models that output JSON tool calls in content to work correctly.
 
         Args:
             text: Raw response text from the model
@@ -591,17 +604,16 @@ class ResponseSanitizer:
         for pattern in self.LEAKAGE_PATTERNS:
             text = re.sub(pattern, "", text, flags=re.IGNORECASE | re.MULTILINE)
 
-        # Remove JSON-like tool call attempts embedded in text
-        # Pattern: {"name": "tool_name", ...}
-        text = re.sub(r'\{"name":\s*"[^"]+",\s*"arguments":\s*\{[^}]*\}\}', "", text)
+        # NOTE: JSON-like tool call removal REMOVED - see docstring above
+        # The tool_calling module now handles JSON fallback parsing robustly.
 
-        # Remove lines that are just tool call syntax
+        # Remove lines that are just orphaned closing tags
         lines = text.split("\n")
         cleaned_lines = []
         for line in lines:
             stripped = line.strip()
-            # Skip lines that look like raw tool call attempts
-            if stripped.startswith('{"name":') or stripped.startswith("</"):
+            # Skip lines that are just orphaned closing tags
+            if stripped.startswith("</") and not stripped.startswith("</parameter"):
                 continue
             # Skip lines that are just parameter= syntax
             if re.match(r"^(parameter=|<parameter)", stripped):

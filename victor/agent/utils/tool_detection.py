@@ -26,7 +26,7 @@ testability and reusability across the codebase.
 from __future__ import annotations
 
 import logging
-from typing import Any, Set
+from typing import Any, Set, cast
 
 from victor.tools.tool_names import ToolNames
 
@@ -111,7 +111,8 @@ def resolve_shell_variant(
 
     # If mode coordinator is available, delegate for mode-aware resolution
     if mode_coordinator is not None:
-        return mode_coordinator.resolve_shell_variant(tool_name)
+        result = mode_coordinator.resolve_shell_variant(tool_name)
+        return cast(str, result)
 
     # Default to canonical shell name
     return ToolNames.SHELL

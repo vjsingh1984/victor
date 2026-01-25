@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Dict, List, Optional, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 import numpy as np
