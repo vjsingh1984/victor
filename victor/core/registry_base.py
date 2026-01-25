@@ -57,7 +57,7 @@ from typing import Any, ClassVar, Dict, Generic, List, Optional, Set, TypeVar, c
 logger = logging.getLogger(__name__)
 
 # Type variable for self-referential generic typing
-T = TypeVar("T", bound="SingletonRegistry")
+T = TypeVar("T", bound="SingletonRegistry")  # type: ignore[misc]
 
 
 class SingletonRegistry(ABC, Generic[T]):
@@ -132,11 +132,11 @@ class SingletonRegistry(ABC, Generic[T]):
                     cls._instantiation_allowed = True
                     try:
                         instance = cls()
-                        cls._instance = cast(T, instance)
+                        cls._instance = instance
                         logger.debug(f"{cls.__name__} singleton instance created")
                     finally:
                         cls._instantiation_allowed = was_allowed
-        return cast(T, cls._instance)
+        return cls._instance
 
     @classmethod
     def reset_instance(cls) -> None:

@@ -827,11 +827,11 @@ class VerticalExtensionLoader(ABC):
             )
 
             # Create lazy wrapper that defers loading
-            return create_lazy_extensions(  # type: ignore[return-value]
-                vertical_name=cls.name,
+            return create_lazy_extensions(
+                vertical_name=cls.name if hasattr(cls, "name") else cls.__name__,
                 loader=lambda: cls._load_extensions_eager(use_cache=use_cache, strict=strict),
                 trigger=trigger,
-            )
+            )  # type: ignore[return-value]
 
         # Eager loading path (legacy behavior)
         return cls._load_extensions_eager(use_cache=use_cache, strict=strict)
@@ -871,11 +871,11 @@ class VerticalExtensionLoader(ABC):
             # Handle both ExtensionCacheEntry (new) and raw VerticalExtensions (old for compatibility)
             cached = cls._extensions_cache[cache_key]
             if isinstance(cached, ExtensionCacheEntry):
-                result: Any = cached.value
+                result: "VerticalExtensions" = cached.value  # type: ignore[valid-type]
             else:
-                result = cached
+                result = cached  # type: ignore[assignment]
             # Type: ignore because we're handling cached values that may be Any
-            return result  # type: ignore[return-value]
+            return result  # type: ignore[no-any-return]
 
         # Determine strict mode
         is_strict = strict if strict is not None else cls.strict_extension_loading
