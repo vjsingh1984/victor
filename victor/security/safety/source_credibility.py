@@ -227,7 +227,7 @@ class SourceCredibilityScanner:
                     for p in patterns
                     if not any(c in p for c in ["*", "+", "?", "|", "(", ")"])
                 ]
-                if literal_patterns:
+                if literal_patterns and _PatternMatcher is not None:
                     self._native_matchers[level] = _PatternMatcher(
                         literal_patterns, True  # case_insensitive=True
                     )

@@ -57,4 +57,4 @@ victor --help
 - [First Run](first-run.md) - Get started with your first query
 - [Local Models](local-models.md) - Use Ollama for free, private AI
 - [Cloud Models](cloud-models.md) - Use Anthropic, OpenAI, etc.
-- [Configuration](../user-guide/configuration.md) - Advanced configuration
+- [Configuration](./configuration.md) - Advanced configuration

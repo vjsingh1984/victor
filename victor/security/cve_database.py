@@ -245,7 +245,7 @@ class LocalCVECache:
                 )
             conn.commit()
 
-    def _serialize_cve(self, cve: CVE) -> dict:
+    def _serialize_cve(self, cve: CVE) -> dict[str, Any]:
         """Serialize CVE to dict."""
         return {
             "cve_id": cve.cve_id,
@@ -372,7 +372,7 @@ class OSVDatabase(BaseCVEDatabase):
 
             await self._rate_limit()
 
-            query = {"package": {"name": package_name, "ecosystem": osv_ecosystem}}
+            query: dict[str, Any] = {"package": {"name": package_name, "ecosystem": osv_ecosystem}}
             if version:
                 query["version"] = version
 

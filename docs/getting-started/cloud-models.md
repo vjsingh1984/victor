@@ -135,4 +135,4 @@ victor chat --provider anthropic --test
 - [Installation](installation.md) - Install Victor
 - [First Run](first-run.md) - Get started
 - [Local Models](local-models.md) - Free, private AI
-- [Configuration](../user-guide/configuration.md) - Advanced setup
+- [Configuration](./configuration.md) - Advanced setup

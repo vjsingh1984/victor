@@ -317,7 +317,7 @@ class AuditManager:
             AuditEventType.TOOL_EXECUTION if outcome == "success" else AuditEventType.TOOL_FAILURE
         )
 
-        metadata = {}
+        metadata: dict[str, Any] = {}
         if parameters:
             # Sanitize sensitive parameters
             metadata["parameters"] = self._sanitize_params(parameters)
@@ -368,7 +368,7 @@ class AuditManager:
             "credential",
         ]
 
-        sanitized = {}
+        sanitized: dict[str, Any] = {}
         for key, value in params.items():
             key_lower = key.lower()
             if any(s in key_lower for s in sensitive_keys):

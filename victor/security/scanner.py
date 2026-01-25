@@ -186,7 +186,7 @@ class PythonDependencyParser(BaseDependencyParser):
 
     def _parse_poetry_lock(self, file_path: Path) -> list[Dependency]:
         """Parse poetry.lock format."""
-        deps = []
+        deps: list[Dependency] = []
         try:
             import tomllib
         except ImportError:
@@ -377,7 +377,7 @@ class RustDependencyParser(BaseDependencyParser):
 
     def _parse_cargo_toml(self, file_path: Path) -> list[Dependency]:
         """Parse Cargo.toml."""
-        deps = []
+        deps: list[Dependency] = []
         try:
             import tomllib
         except ImportError:
@@ -417,7 +417,7 @@ class RustDependencyParser(BaseDependencyParser):
 
     def _parse_cargo_lock(self, file_path: Path) -> list[Dependency]:
         """Parse Cargo.lock."""
-        deps = []
+        deps: list[Dependency] = []
         try:
             import tomllib
         except ImportError:

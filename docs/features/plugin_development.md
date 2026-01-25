@@ -732,4 +732,4 @@ See complete examples:
 
 - [Workflow System](../user-guide/workflows.md)
 - [Creating Workflows](../tutorials/create-workflow.md)
-- [Compiler API](../api-reference/workflows.md)
+- [Compiler API](../reference/internals/workflows-api.md)

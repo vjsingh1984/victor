@@ -457,8 +457,8 @@ pipeline = VerticalIntegrationPipeline(step_registry=registry)
 
 This documentation integrates with existing Victor documentation:
 
-- ✅ **VERTICAL_DEVELOPMENT_GUIDE.md**: Creating verticals
-- ✅ **FRAMEWORK_API.md**: Framework-level APIs
+- ✅ **Vertical Development Guide**: `docs/reference/internals/VERTICAL_DEVELOPMENT_GUIDE.md`
+- ✅ **Framework API**: `docs/reference/internals/FRAMEWORK_API.md`
 - ✅ **MIGRATION_GUIDES.md**: General migration patterns
 - ✅ **architecture/REFACTORING_OVERVIEW.md**: System architecture
 - ✅ **architecture/BEST_PRACTICES.md**: Usage patterns
@@ -525,9 +525,9 @@ All cross-references verified and working.
 - [Quick Reference](step_handler_quick_reference.md) - Quick lookup (632 lines)
 
 **Code**:
-- [Implementation](../../victor/framework/step_handlers.py) - Core implementation
-- [Pipeline Integration](../../victor/framework/vertical_integration.py) - Pipeline usage
-- [Working Examples](../../examples/custom_step_handlers.py) - Runnable examples (676 lines)
+- Implementation: `victor/framework/step_handlers.py` - Core implementation
+- Pipeline Integration: `victor/framework/vertical_integration.py` - Pipeline usage
+- Working Examples: `examples/custom_step_handlers.py` - Runnable examples (676 lines)
 
 **Summaries**:
 - [Track Summary](README.md) - Track completion summary (351 lines)
@@ -535,8 +535,8 @@ All cross-references verified and working.
 - [This Report](TRACK_7_FINAL_REPORT.md) - Final verification report
 
 **Related**:
-- [Vertical Development Guide](VERTICAL_DEVELOPMENT_GUIDE.md) - Creating verticals
-- [Framework API](FRAMEWORK_API.md) - Framework-level APIs
+- [Vertical Development Guide](../reference/internals/VERTICAL_DEVELOPMENT_GUIDE.md) - Creating verticals
+- [Framework API](../reference/internals/FRAMEWORK_API.md) - Framework-level APIs
 - [Architecture Overview](../architecture/REFACTORING_OVERVIEW.md) - System architecture
 
 ---

@@ -961,6 +961,6 @@ Migrating to step handlers provides significant benefits:
 **Next Steps:**
 - Review [Step Handler Examples](step_handler_examples.md) for more patterns
 - See [Quick Reference](step_handler_quick_reference.md) for API details
-- Check [Vertical Development Guide](VERTICAL_DEVELOPMENT_GUIDE.md) for best practices
+- Check [Vertical Development Guide](../reference/internals/VERTICAL_DEVELOPMENT_GUIDE.md) for best practices
 
 **Questions?** See [Troubleshooting](step_handler_guide.md#troubleshooting) in the main guide

@@ -473,4 +473,4 @@ Use high contrast colors for accessibility:
 
 ---
 
-**Next**: [Architecture Diagrams →](architecture/) | [Workflow Diagrams →](../workflow-diagrams/) | [Sequence Diagrams →](sequences/)
+**Next**: [Architecture Diagrams →](architecture/system-overview.mmd) | [Workflow Diagrams →](../workflow-diagrams/index.md) | [Sequence Diagrams →](sequences/tool-execution.mmd)

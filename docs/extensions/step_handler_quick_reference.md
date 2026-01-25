@@ -602,7 +602,7 @@ Before committing a step handler:
 - [Step Handler Guide](step_handler_guide.md) - Detailed guide
 - [Migration Guide](step_handler_migration.md) - Migration patterns
 - [Examples](step_handler_examples.md) - Practical examples
-- [Vertical Development Guide](VERTICAL_DEVELOPMENT_GUIDE.md) - Creating verticals
+- [Vertical Development Guide](../reference/internals/VERTICAL_DEVELOPMENT_GUIDE.md) - Creating verticals
 
 ## Troubleshooting
 

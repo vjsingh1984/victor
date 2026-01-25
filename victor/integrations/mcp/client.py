@@ -102,7 +102,7 @@ class MCPClient:
         self.tools: List[MCPTool] = []
         self.resources: List[MCPResource] = []
 
-        self.process: Optional[subprocess.Popen] = None
+        self.process: Optional[subprocess.Popen[bytes]] = None
         self.initialized = False
 
         # Health monitoring configuration
@@ -119,7 +119,7 @@ class MCPClient:
         self._command: Optional[List[str]] = command  # Store for reconnection and context manager
         self._last_health_check: float = 0.0
         self._consecutive_failures: int = 0
-        self._health_task: Optional[asyncio.Task] = None
+        self._health_task: Optional[asyncio.Task[None]] = None
         self._running = False
         self._auto_connect_command: Optional[List[str]] = command  # For context manager
 
@@ -209,9 +209,9 @@ class MCPClient:
     async def _cleanup_process_async(self) -> None:
         """Clean up subprocess and its resources asynchronously."""
         # Clean up sandboxed process if used
-        if self._sandboxed_process is not None:
+        if self._sandboxed_process is not None and self.process is not None:
             try:
-                await self._sandboxed_process.terminate()
+                await self._sandboxed_process.terminate(self.process)
             except Exception as e:
                 logger.debug(f"Error terminating sandboxed process: {e}")
             self._sandboxed_process = None
@@ -249,16 +249,16 @@ class MCPClient:
     def _cleanup_process(self) -> None:
         """Clean up subprocess and its resources (sync wrapper for backwards compatibility)."""
         # Handle sandboxed process cleanup synchronously if possible
-        if self._sandboxed_process is not None:
+        if self._sandboxed_process is not None and self.process is not None:
             try:
                 # Try to get running loop and schedule cleanup
                 _loop = asyncio.get_running_loop()  # noqa: F841
                 # If we're in an async context, schedule the cleanup
-                asyncio.create_task(self._sandboxed_process.terminate())
+                asyncio.create_task(self._sandboxed_process.terminate(self.process))
             except RuntimeError:
                 # No running loop, we're in sync context
                 try:
-                    asyncio.run(self._sandboxed_process.terminate())
+                    asyncio.run(self._sandboxed_process.terminate(self.process))
                 except Exception as e:
                     logger.debug(f"Error terminating sandboxed process: {e}")
             self._sandboxed_process = None
@@ -403,7 +403,11 @@ class MCPClient:
         response = await self._send_request(MCPMessageType.READ_RESOURCE, {"uri": uri})
 
         if response and "result" in response:
-            return response["result"].get("content")
+            content = response["result"].get("content")
+            if isinstance(content, str):
+                return content
+            elif content is not None:
+                return str(content)
 
         return None
 
@@ -431,6 +435,9 @@ class MCPClient:
             (request_json + "\n").encode()
 
             # Write asynchronously using run_in_executor to avoid blocking
+            if self.process.stdin is None:
+                logger.error("Process stdin is None")
+                return None
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(
                 None,
@@ -456,7 +463,11 @@ class MCPClient:
             if response.get("id") != msg_id:
                 logger.warning(f"Response ID mismatch: {response.get('id')} != {msg_id}")
 
-            return response
+            if isinstance(response, dict):
+                return response
+            else:
+                logger.error(f"Response is not a dict: {type(response)}")
+                return None
 
         except Exception as e:
             logger.error(f"Error sending MCP request: {e}")
@@ -498,15 +509,15 @@ class MCPClient:
             self._health_task = None
 
         # Clean up sandboxed process if used
-        if self._sandboxed_process is not None:
+        if self._sandboxed_process is not None and self.process is not None:
             try:
                 # Try to get running loop and schedule cleanup
                 _loop = asyncio.get_running_loop()  # noqa: F841
-                asyncio.create_task(self._sandboxed_process.terminate())
+                asyncio.create_task(self._sandboxed_process.terminate(self.process))
             except RuntimeError:
                 # No running loop, we're in sync context
                 try:
-                    asyncio.run(self._sandboxed_process.terminate())
+                    asyncio.run(self._sandboxed_process.terminate(self.process))
                 except Exception as e:
                     logger.debug(f"Error terminating sandboxed process: {e}")
             self._sandboxed_process = None
@@ -603,9 +614,9 @@ class MCPClient:
             self._health_task = None
 
         # Clean up sandboxed process if used
-        if self._sandboxed_process is not None:
+        if self._sandboxed_process is not None and self.process is not None:
             try:
-                await self._sandboxed_process.terminate()
+                await self._sandboxed_process.terminate(self.process)
             except Exception as e:
                 logger.debug(f"Error terminating sandboxed process: {e}")
             self._sandboxed_process = None
@@ -895,7 +906,7 @@ class MCPClient:
         """
         await self.cleanup()
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Destructor to ensure cleanup on garbage collection.
 
         This is a safety net - prefer using context manager or calling close() explicitly.

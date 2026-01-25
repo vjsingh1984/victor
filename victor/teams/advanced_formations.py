@@ -1117,7 +1117,7 @@ Rationale: [your reasoning]
         consensus = 0.0
 
         if self.voting_method == VotingMethod.MAJORITY:
-            winner = max(distribution, key=distribution.get)
+            winner = max(distribution, key=distribution.get)  # type: ignore[arg-type]
             total_votes = sum(distribution.values())
             consensus = distribution[winner] / total_votes if total_votes > 0 else 0.0
 
@@ -1130,7 +1130,7 @@ Rationale: [your reasoning]
                     break
 
             if not winner:
-                winner = max(distribution, key=distribution.get)
+                winner = max(distribution, key=distribution.get)  # type: ignore[arg-type]
                 consensus = distribution[winner] / sum(distribution.values())
 
         elif self.voting_method == VotingMethod.UNANIMOUS:
@@ -1141,10 +1141,10 @@ Rationale: [your reasoning]
             else:
                 # Use tiebreaker
                 winner = self._apply_tiebreaker(distribution)
-                consensus = distribution.get(winner, 0) / sum(distribution.values())
+                consensus = distribution.get(winner, 0) / sum(distribution.values())  # type: ignore[arg-type]
 
         elif self.voting_method == VotingMethod.WEIGHTED:
-            winner = max(distribution, key=distribution.get)
+            winner = max(distribution, key=distribution.get)  # type: ignore[arg-type]
             total_weight = sum(distribution.values())
             consensus = distribution[winner] / total_weight if total_weight > 0 else 0.0
 

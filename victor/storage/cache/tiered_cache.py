@@ -20,7 +20,7 @@ import logging
 from typing import Any, Optional, Dict
 import threading
 
-from cachetools import TTLCache  # type: ignore[import-untyped]
+from cachetools import TTLCache
 import diskcache
 
 from victor.storage.cache.config import CacheConfig
@@ -401,6 +401,8 @@ class TieredCache:
             hit_count = meta.get("hit_count", 1)
 
             outcome = RLOutcome(
+                provider="cache",
+                model="tiered_cache",
                 success=True,
                 quality_score=1.0,
                 task_type="cache",
@@ -431,6 +433,8 @@ class TieredCache:
             from victor.framework.rl.base import RLOutcome
 
             outcome = RLOutcome(
+                provider="cache",
+                model="tiered_cache",
                 success=False,
                 quality_score=0.0,
                 task_type="cache",

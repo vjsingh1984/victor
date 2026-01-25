@@ -512,8 +512,8 @@ class CustomToolsHandler(BaseStepHandler):
 
 This documentation integrates with existing Victor documentation:
 
-- **VERTICAL_DEVELOPMENT_GUIDE.md**: Creating verticals
-- **FRAMEWORK_API.md**: Framework-level APIs
+- **Vertical Development Guide**: `docs/reference/internals/VERTICAL_DEVELOPMENT_GUIDE.md`
+- **Framework API**: `docs/reference/internals/FRAMEWORK_API.md`
 - **MIGRATION.md**: General migration patterns
 - **architecture/REFACTORING_OVERVIEW.md**: System architecture
 - **architecture/BEST_PRACTICES.md**: Usage patterns
@@ -581,17 +581,17 @@ All objectives have been achieved:
 - [Quick Reference](step_handler_quick_reference.md) - Quick lookup
 
 **Code**:
-- [Implementation](../../victor/framework/step_handlers.py) - Core implementation
-- [Pipeline Integration](../../victor/framework/vertical_integration.py) - Pipeline usage
-- [Working Examples](../../examples/custom_step_handlers.py) - Runnable examples
+- Implementation: `victor/framework/step_handlers.py` - Core implementation
+- Pipeline Integration: `victor/framework/vertical_integration.py` - Pipeline usage
+- Working Examples: `examples/custom_step_handlers.py` - Runnable examples
 
 **Summaries**:
 - [Track Summary](README.md) - Track completion summary
 - [Promotion Summary](STEP_HANDLER_PROMOTION_SUMMARY.md) - Detailed summary
 
 **Related**:
-- [Vertical Development Guide](VERTICAL_DEVELOPMENT_GUIDE.md) - Creating verticals
-- [Framework API](FRAMEWORK_API.md) - Framework-level APIs
+- [Vertical Development Guide](../reference/internals/VERTICAL_DEVELOPMENT_GUIDE.md) - Creating verticals
+- [Framework API](../reference/internals/FRAMEWORK_API.md) - Framework-level APIs
 - [Architecture Overview](../architecture/REFACTORING_OVERVIEW.md) - System architecture
 
 ---

@@ -89,7 +89,7 @@ def get_capability_registry() -> Optional[CapabilityContainerProtocol]:
     """
     # Lazy import to avoid circular dependencies
     try:
-        from victor.framework.capabilities import CapabilityRegistryMixin
+        from victor.framework.capabilities.registry import CapabilityRegistry  # type: ignore[attr-defined]
 
         # Try to get the global registry instance
         # This will be implemented when integrating with the existing capability system

@@ -36,7 +36,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, runtime_c
 
 if TYPE_CHECKING:
     from victor.agent.tool_pipeline import ToolCallResult
-    from victor.tools.base import CostTier
+    from victor.tools.enums import CostTier
 
 
 # =============================================================================

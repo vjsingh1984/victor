@@ -326,7 +326,7 @@ class SQLiteCheckpointBackend(CheckpointManagerProtocol):
                     (checkpoint_id,),
                 )
                 await db.commit()
-                deleted = cursor.rowcount > 0
+                deleted = bool(cursor.rowcount > 0)
 
                 if deleted:
                     logger.info(f"Deleted checkpoint {checkpoint_id}")
@@ -432,7 +432,7 @@ class SQLiteCheckpointBackend(CheckpointManagerProtocol):
                     (session_id, *keep_ids),
                 )
                 await db.commit()
-                deleted = cursor.rowcount
+                deleted = int(cursor.rowcount)
 
                 if deleted > 0:
                     logger.info(f"Cleaned up {deleted} old checkpoints for session {session_id}")

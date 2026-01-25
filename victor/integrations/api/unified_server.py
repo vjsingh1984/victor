@@ -530,7 +530,7 @@ def _include_workflow_editor_api(app: FastAPI) -> None:
 
             # Create convenience proxies for common endpoints
             @app.get("/api/v1/workflows/nodes/types", tags=["Workflows"])
-            async def get_node_types_proxy() -> JSONResponse:
+            async def get_node_types_proxy() -> JSONResponse:  # type: ignore[no-untyped-def]
                 """Get available workflow node types."""
                 from tools.workflow_editor.backend.api import get_node_types
 

@@ -270,7 +270,7 @@ def create_event(
         event_type=event_type,
         timestamp=datetime.now(),
         severity=severity,
-        actor=actor or os.getenv("USER", "system"),
+        actor=actor if actor is not None else os.getenv("USER", "system"),
         action=action,
         resource=resource,
         outcome=outcome,

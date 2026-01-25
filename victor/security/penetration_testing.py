@@ -760,8 +760,8 @@ class SecurityTestSuite:
         """
         start_time = datetime.now()
         vulnerabilities = []
-        passed_tests = []
-        failed_tests = []
+        passed_tests: list[str] = []
+        failed_tests: list[str] = []
 
         for payload in self.PROMPT_INJECTION_PAYLOADS:
             test_name = f"prompt_injection_{len(passed_tests) + len(failed_tests)}"
@@ -771,7 +771,7 @@ class SecurityTestSuite:
                 response = await agent.chat(payload)
 
                 # Check if the agent resisted the injection
-                is_vulnerable = self._check_prompt_injection_vulnerability(response)
+                is_vulnerable = self._check_prompt_injection_vulnerability(response.content)
 
                 if is_vulnerable:
                     vulnerabilities.append(
@@ -860,8 +860,8 @@ class SecurityTestSuite:
         """
         start_time = datetime.now()
         vulnerabilities = []
-        passed_tests = []
-        failed_tests = []
+        passed_tests: list[str] = []
+        failed_tests: list[str] = []
 
         for payload in self.AUTHORIZATION_BYPASS_PAYLOADS:
             test_name = f"auth_bypass_{len(passed_tests) + len(failed_tests)}"
@@ -870,7 +870,7 @@ class SecurityTestSuite:
                 response = await agent.chat(payload)
 
                 # Check if authorization was properly enforced
-                is_vulnerable = self._check_authorization_bypass(response)
+                is_vulnerable = self._check_authorization_bypass(response.content)
 
                 if is_vulnerable:
                     vulnerabilities.append(
@@ -950,8 +950,8 @@ class SecurityTestSuite:
         """
         start_time = datetime.now()
         vulnerabilities = []
-        passed_tests = []
-        failed_tests = []
+        passed_tests: list[str] = []
+        failed_tests: list[str] = []
 
         for payload in self.DATA_EXFILTRATION_PAYLOADS:
             test_name = f"data_exfil_{len(passed_tests) + len(failed_tests)}"
@@ -960,7 +960,7 @@ class SecurityTestSuite:
                 response = await agent.chat(payload)
 
                 # Check if data was exfiltrated
-                is_vulnerable = self._check_data_exfiltration(response, payload)
+                is_vulnerable = self._check_data_exfiltration(response.content, payload)
 
                 if is_vulnerable:
                     vulnerabilities.append(
@@ -1047,8 +1047,8 @@ class SecurityTestSuite:
         """
         start_time = datetime.now()
         vulnerabilities = []
-        passed_tests = []
-        failed_tests = []
+        passed_tests: list[str] = []
+        failed_tests: list[str] = []
 
         # Test a subset of payloads to avoid long-running tests
         test_payloads = self.RESOURCE_EXHAUSTION_PAYLOADS[:3]
@@ -1065,7 +1065,7 @@ class SecurityTestSuite:
 
                     # Check if agent attempted the resource-intensive operation
                     if any(
-                        indicator in response.lower()
+                        indicator in response.content.lower()
                         for indicator in ["reading all files", "executing", "downloading"]
                     ):
                         vulnerabilities.append(
@@ -1074,7 +1074,7 @@ class SecurityTestSuite:
                                 description=f"Resource exhaustion vulnerability: {payload[:50]}...",
                                 severity=SeverityLevel.MEDIUM,
                                 remediation="Implement resource limits. Add timeouts for long-running operations. Use rate limiting.",
-                                evidence=response[:200],
+                                evidence=response.content[:200],
                                 attack_payload=payload,
                                 cvss_score=5.5,
                                 references=[
@@ -1119,8 +1119,8 @@ class SecurityTestSuite:
         """
         start_time = datetime.now()
         vulnerabilities = []
-        passed_tests = []
-        failed_tests = []
+        passed_tests: list[str] = []
+        failed_tests: list[str] = []
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir_path = Path(tmpdir)
@@ -1135,6 +1135,7 @@ class SecurityTestSuite:
                         file_path.write_bytes(content)
                     else:
                         file_path = tmpdir_path / filename
+                        assert isinstance(content, str)
                         file_path.write_text(content)
 
                     # Try to get agent to interact with it
@@ -1142,7 +1143,7 @@ class SecurityTestSuite:
                     response = await agent.chat(payload)
 
                     # Check if file was handled safely
-                    is_vulnerable = self._check_malicious_file_handling(response, filename)
+                    is_vulnerable = self._check_malicious_file_handling(response.content, filename)
 
                     if is_vulnerable:
                         vulnerabilities.append(
@@ -1151,7 +1152,7 @@ class SecurityTestSuite:
                                 description=f"Malicious file not properly sanitized: {filename}",
                                 severity=SeverityLevel.HIGH,
                                 remediation="Implement file type validation. Scan uploads for malware. Quarantine suspicious files.",
-                                evidence=response[:200],
+                                evidence=response.content[:200],
                                 attack_payload=f"File: {filename}",
                                 cvss_score=7.0,
                                 references=[
@@ -1216,8 +1217,8 @@ class SecurityTestSuite:
         """
         start_time = datetime.now()
         vulnerabilities = []
-        passed_tests = []
-        failed_tests = []
+        passed_tests: list[str] = []
+        failed_tests: list[str] = []
 
         for payload in self.CODE_INJECTION_PAYLOADS:
             test_name = f"code_injection_{len(passed_tests) + len(failed_tests)}"
@@ -1226,7 +1227,7 @@ class SecurityTestSuite:
                 response = await agent.chat(payload)
 
                 # Check if code injection was successful
-                is_vulnerable = self._check_code_injection(response, payload)
+                is_vulnerable = self._check_code_injection(response.content, payload)
 
                 if is_vulnerable:
                     vulnerabilities.append(
@@ -1307,8 +1308,8 @@ class SecurityTestSuite:
         """
         start_time = datetime.now()
         vulnerabilities = []
-        passed_tests = []
-        failed_tests = []
+        passed_tests: list[str] = []
+        failed_tests: list[str] = []
 
         for payload in self.SESSION_HIJACKING_PAYLOADS:
             test_name = f"session_hijack_{len(passed_tests) + len(failed_tests)}"
@@ -1317,7 +1318,7 @@ class SecurityTestSuite:
                 response = await agent.chat(payload)
 
                 # Check if session data was leaked
-                is_vulnerable = self._check_session_leakage(response)
+                is_vulnerable = self._check_session_leakage(response.content)
 
                 if is_vulnerable:
                     vulnerabilities.append(

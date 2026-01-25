@@ -111,7 +111,7 @@ class MCPRegistry:
         self._tool_to_server: Dict[str, str] = {}  # tool_name -> server_name
         self._health_check_enabled = health_check_enabled
         self._default_health_interval = default_health_interval
-        self._health_task: Optional[asyncio.Task] = None
+        self._health_task: Optional[asyncio.Task[None]] = None
         self._running = False
         self._event_callbacks: List[Callable[[str, str, Any], None]] = []
 
@@ -759,7 +759,7 @@ class MCPRegistry:
         servers: List[MCPServerConfig] = []
 
         # Well-known MCP server executables and their configurations
-        known_servers = {
+        known_servers: Dict[str, Dict[str, Any]] = {
             # NPM-based servers (typically installed globally)
             "mcp-server-filesystem": {
                 "description": "MCP Filesystem Server - file operations",
@@ -814,9 +814,9 @@ class MCPRegistry:
                     servers.append(
                         MCPServerConfig(
                             name=server_name.replace("@", "").replace("/", "_"),
-                            command=command_template,
+                            command=list(command_template),
                             description=config.get("description", f"MCP Server: {server_name}"),
-                            tags=["auto-discovered"] + config.get("tags", []),
+                            tags=["auto-discovered"] + list(config.get("tags", [])),
                             auto_connect=False,
                         )
                     )
@@ -829,7 +829,7 @@ class MCPRegistry:
                             name=server_name.replace("-", "_"),
                             command=[executable_path],
                             description=config.get("description", f"MCP Server: {server_name}"),
-                            tags=["auto-discovered"] + config.get("tags", []),
+                            tags=["auto-discovered"] + list(config.get("tags", [])),
                             auto_connect=False,
                         )
                     )

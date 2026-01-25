@@ -206,4 +206,4 @@ ls ~/.victor/logs/
 
 - [Installation](installation.md) - Install Victor
 - [First Run](first-run.md) - Get started
-- [Configuration](../user-guide/configuration.md) - Advanced setup
+- [Configuration](./configuration.md) - Advanced setup

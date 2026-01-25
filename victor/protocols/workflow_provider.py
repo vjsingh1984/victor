@@ -23,7 +23,7 @@ class WorkflowProviderProtocol(Protocol):
         ```python
         @runtime_checkable
         class MyWorkflowProvider(WorkflowProviderProtocol, Protocol):
-            def get_workflows(self) -> Dict[str, StateGraph]:
+            def get_workflows(self) -> Dict[str, StateGraph[Any]]:
                 return self._workflows
 
             def get_workflow_provider(self) -> Optional[WorkflowProviderProtocol]:
@@ -31,7 +31,7 @@ class WorkflowProviderProtocol(Protocol):
         ```
     """
 
-    def get_workflows(self) -> Dict[str, StateGraph]:
+    def get_workflows(self) -> Dict[str, "StateGraph[Any]"]:
         """Get all available workflows.
 
         Returns:

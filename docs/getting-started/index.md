@@ -107,15 +107,15 @@ victor "Run tests and summarize failures"
 
 ## What's Next?
 
-1. **[User Guide](../user-guide/)** - Daily usage patterns and workflows
-2. **[Provider Reference](../reference/providers/)** - All 21 providers detailed
+1. **[User Guide](../user-guide/index.md)** - Daily usage patterns and workflows
+2. **[Provider Reference](../reference/providers/index.md)** - All 21 providers detailed
 3. **[Tool Catalog](../reference/tools/catalog.md)** - 55+ available tools
 4. **[Workflow DSL](../guides/workflow-development/dsl.md)** - YAML workflow automation
 
 ## Need Help?
 
 - **Troubleshooting**: [Troubleshooting Guide](troubleshooting.md)
-- **Documentation**: [Full docs](../README.md)
+- **Documentation**: [Full docs](../index.md)
 - **Community**: [GitHub Discussions](https://github.com/vjsingh1984/victor/discussions)
 - **Issues**: [Report bugs](https://github.com/vjsingh1984/victor/issues)
 

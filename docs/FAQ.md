@@ -319,7 +319,7 @@ victor team create review-team.yaml
 victor team run review-team "Review this PR"
 ```
 
-[Learn more about teams](AGENT_SWARMING_GUIDE.md)
+[Learn more about teams](guides/MULTI_AGENT_TEAMS.md)
 
 ---
 
@@ -747,7 +747,7 @@ pytest
 - [Architecture](architecture/ARCHITECTURE.md)
 
 **Examples:**
-- [Examples Directory](examples/)
+- [Examples](examples/coordinator_examples.md)
 - [GitHub Issues](https://github.com/vjsingh1984/victor/issues)
 - [GitHub Discussions](https://github.com/vjsingh1984/victor/discussions)
 
@@ -821,7 +821,7 @@ pytest
 ### Community
 - [GitHub Repository](https://github.com/vjsingh1984/victor)
 - [Contributing Guide](contributing/index.md)
-- [Code of Conduct](CODE_OF_CONDUCT.md)
+- Code of Conduct: `CODE_OF_CONDUCT.md` (repo root)
 
 ### Related Projects
 - [Ollama](https://ollama.ai/) - Local model runner

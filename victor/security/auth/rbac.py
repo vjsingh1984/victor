@@ -45,7 +45,8 @@ from pathlib import Path
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Set, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.tools.base import AccessMode, BaseTool
+    from victor.tools.enums import AccessMode
+    from victor.tools.base import BaseTool
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +84,7 @@ class Permission(Enum):
         Returns:
             Required permission for that access mode
         """
-        from victor.tools.base import AccessMode
+        from victor.tools.enums import AccessMode
 
         mapping = {
             AccessMode.READONLY: cls.READ,
@@ -544,7 +545,7 @@ class RBACManager:
             }
 
 
-def require_permission(permission: Permission) -> Callable:
+def require_permission(permission: Permission) -> Callable[..., Any]:
     """Decorator to require a permission for a function.
 
     Example:
@@ -559,9 +560,9 @@ def require_permission(permission: Permission) -> Callable:
         Decorator function
     """
 
-    def decorator(func: Callable[..., Any]) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(func)
-        async def async_wrapper(*args, **kwargs):
+        async def async_wrapper(*args, **kwargs) -> Any:
             # Get RBAC manager from context if available
             rbac = kwargs.pop("_rbac_manager", None)
             username = kwargs.pop("_rbac_user", None)
@@ -576,7 +577,7 @@ def require_permission(permission: Permission) -> Callable:
             return await func(*args, **kwargs)
 
         @wraps(func)
-        def sync_wrapper(*args, **kwargs):
+        def sync_wrapper(*args, **kwargs) -> Any:
             rbac = kwargs.pop("_rbac_manager", None)
             username = kwargs.pop("_rbac_user", None)
 

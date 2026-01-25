@@ -662,10 +662,10 @@ victor keys --set anthropic --keyring
 
 ## Next Steps
 
-- [User Guide](../user-guide/) - Daily usage patterns
-- [Provider Reference](../reference/providers/) - Current provider list
+- [User Guide](../user-guide/index.md) - Daily usage patterns
+- [Provider Reference](../reference/providers/index.md) - Current provider list
 - [Tool Catalog](../reference/tools/catalog.md) - Current tool list
-- [Workflow Guide](../guides/workflow-development/) - Automation
+- [Workflow Guide](../guides/workflow-development/dsl.md) - Automation
 
 ---
 

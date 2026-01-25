@@ -44,7 +44,7 @@ Victor AI is an open-source AI coding assistant with multiple providers, tools, 
 | [Documentation Guide](./contributing/documentation-guide.md) | Doc workflow and structure |
 | [CI/CD](./ci_cd/README.md) | CI/CD docs |
 | [Testing Hub](./testing/README.md) | Test suites and QA |
-| [Root CONTRIBUTING](../CONTRIBUTING.md) | Repo-level contribution guide |
+| [Root CONTRIBUTING](contributing/index.md) | Repo-level contribution guide |
 
 ---
 
@@ -108,8 +108,8 @@ Victor AI is an open-source AI coding assistant with multiple providers, tools, 
 
 Historical reports and internal snapshots live alongside the docs. Treat metrics and completion claims as time-bound unless explicitly tied to a release or external audit.
 
-- [Changes](./changes/README.md)
-- [Refactoring](./refactoring/README.md)
+- [Changes](changes/phase_1_1_proximadb_optional.md)
+- [Refactoring](refactoring/phase2_property_accessor_reduction.md)
 - [Internal API Docs](./reference/internals/INDEX.md)
 - [Roadmap](./roadmap/future_roadmap.md)
 - [Success Stories](./stories/SUCCESS_STORIES.md)

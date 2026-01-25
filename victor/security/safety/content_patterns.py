@@ -27,7 +27,7 @@ Performance:
 import logging
 import re
 from enum import Enum
-from typing import TYPE_CHECKING, Dict, List, NamedTuple, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Tuple
 
 if TYPE_CHECKING:
     # Type stubs for native extensions (optional)
@@ -267,7 +267,7 @@ class ContentPatternScanner:
         """
         return scan_content_warnings(content)
 
-    def get_all_risks(self, content: str) -> Dict[str, List[ContentWarningMatch]]:
+    def get_all_risks(self, content: str) -> Dict[str, Any]:
         """Get comprehensive risk assessment.
 
         Args:

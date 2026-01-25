@@ -183,13 +183,13 @@ If you want to improve ProximaDB integration:
 
 ## Related Documentation
 
-- [Vector Stores Overview](../architecture/vector_stores.md)
-- [Embedding System](../architecture/embeddings.md)
+- [Vector Stores Overview](../verticals/rag.md)
+- [Embedding System](../reference/embeddings.md)
 - [Installation Guide](../getting-started/installation.md)
-- [Configuration Reference](../reference/configuration.md)
+- [Configuration Reference](../reference/configuration/index.md)
 
 ## See Also
 
 - [LanceDB Documentation](https://lancedb.github.io/lancedb/)
 - [ProximaDB Repository](https://github.com/vjsingh1984/proximaDB)
-- [Vector Store Comparison](../performance/vector_stores.md)
+- [Vector Store Comparison](../performance/benchmark_results.md)

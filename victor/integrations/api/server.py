@@ -80,7 +80,7 @@ class VictorAPIServer:
             middleware_stack.add_authentication(api_keys=api_keys)
             logger.info(f"API key authentication enabled for {len(api_keys)} client(s)")
 
-        self._app = web.Application(middlewares=middleware_stack.build())
+        self._app = web.Application(middlewares=middleware_stack.build())  # type: ignore[arg-type]
         self._orchestrator = None
         self._shutting_down = False
         self._setup_routes()
@@ -190,7 +190,7 @@ class VictorAPIServer:
     async def _cors_middleware(self, request: Request, handler: Any) -> Response:
         """Handle CORS for browser-based clients."""
         if request.method == "OPTIONS":
-            return Response(
+            return Response(  # type: ignore[return-value]
                 headers={
                     "Access-Control-Allow-Origin": "*",
                     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -199,6 +199,8 @@ class VictorAPIServer:
             )
 
         response = await handler(request)
+        if not isinstance(response, Response):
+            response = Response(response)
         response.headers["Access-Control-Allow-Origin"] = "*"
         return response
 
@@ -524,9 +526,11 @@ class VictorAPIServer:
 
             for provider_name in ProviderRegistry.list_providers():
                 try:
-                    provider = ProviderRegistry.get(provider_name)
-                    if provider is None:
+                    provider_class = ProviderRegistry.get(provider_name)
+                    if provider_class is None:
                         continue
+                    # Create a temporary instance to check methods
+                    provider = provider_class()
                     providers_info.append(
                         {
                             "name": provider_name,
@@ -538,12 +542,12 @@ class VictorAPIServer:
                                 else True
                             ),
                             "supports_tools": (
-                                provider.supports_tools()  # type: ignore[call-arg]
+                                provider.supports_tools()
                                 if hasattr(provider, "supports_tools")
                                 else False
                             ),
                             "supports_streaming": (
-                                provider.supports_streaming()  # type: ignore[call-arg]
+                                provider.supports_streaming()
                                 if hasattr(provider, "supports_streaming")
                                 else True
                             ),
@@ -1125,7 +1129,7 @@ class VictorAPIServer:
             coordinator.record_outcome("model_selector", outcome, "coding")
 
             # Get updated Q-value for logging
-            rankings = learner.get_provider_rankings()
+            rankings = getattr(learner, "get_provider_rankings", lambda: [])()
             provider_ranking = next((r for r in rankings if r["provider"] == provider.name), None)
             new_q = provider_ranking["q_value"] if provider_ranking else 0.0
 
@@ -1860,12 +1864,13 @@ class VictorAPIServer:
             # Get provider rankings - using internal attributes
             rankings = []
             if hasattr(learner, "_q_table"):
+                selection_counts = getattr(learner, "_selection_counts", {})
                 for provider, q_value in learner._q_table.items():  # type: ignore[attr-defined]
                     rankings.append(
                         {
                             "provider": provider,
                             "q_value": q_value,
-                            "selection_count": getattr(learner, "_total_selections", {}).get(provider, 0),  # type: ignore[attr-defined]
+                            "selection_count": selection_counts.get(provider, 0),
                         }
                     )
 

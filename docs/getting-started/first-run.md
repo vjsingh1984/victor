@@ -60,4 +60,4 @@ victor chat --mode explore
 
 - [Local Models](local-models.md) - Free, private AI with Ollama
 - [Cloud Models](cloud-models.md) - Full capability with cloud providers
-- [Configuration](../user-guide/configuration.md) - Advanced setup
+- [Configuration](./configuration.md) - Advanced setup

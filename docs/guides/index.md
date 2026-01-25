@@ -6,15 +6,15 @@ Practical guides for specific Victor tasks and workflows.
 
 This section contains step-by-step guides for common tasks, from basic setup to advanced multi-agent coordination and observability.
 
-**New to Victor?** Start with [Getting Started](../getting-started/) or [User Guide](../user-guide/).
+**New to Victor?** Start with [Getting Started](../getting-started/index.md) or [User Guide](../user-guide/index.md).
 
 ## Quick Links
 
 | Guide | Description | Difficulty |
 |-------|-------------|------------|
-| [**Workflow DSL**](workflow-development/) | Define YAML workflows | Beginner |
+| [**Workflow DSL**](workflow-development/dsl.md) | Define YAML workflows | Beginner |
 | [**Multi-Agent Teams**](MULTI_AGENT_TEAMS.md) | Coordinate AI agents | Intermediate |
-| [**Observability**](observability/) | Events and metrics | Intermediate |
+| [**Observability**](observability/index.md) | Events and metrics | Intermediate |
 | [**MCP Clients**](integration/mcp-clients.md) | Using MCP servers | Intermediate |
 | [**Development Setup**](development/local-models.md) | Local model setup | Beginner |
 | [**Performance**](../operations/performance/benchmarks.md) | Optimization and tuning | Advanced |
@@ -66,7 +66,7 @@ edges:
     target: report
 ```
 
-[Full Workflow Guide →](workflow-development/)
+[Full Workflow Guide →](workflow-development/dsl.md)
 
 ## Multi-Agent Coordination
 
@@ -107,7 +107,7 @@ team = AgentTeam.hierarchical(
 result = await team.run("Implement user registration feature")
 ```
 
-[Full Multi-Agent Guide →](multi-agent/)
+[Full Multi-Agent Guide →](MULTI_AGENT_TEAMS.md)
 
 ## Observability
 
@@ -134,7 +134,7 @@ EventBus.subscribe("tool.execution", on_tool_execution)
 # Now every tool execution will trigger this callback
 ```
 
-[Full Observability Guide →](observability/)
+[Full Observability Guide →](observability/index.md)
 
 ## Integration
 
@@ -202,7 +202,7 @@ ollama pull qwen2.5-coder:7b
 victor chat --provider ollama --model qwen2.5-coder:7b
 ```
 
-[Full Development Setup →](development/)
+[Full Development Setup →](development/local-models.md)
 
 ## Performance
 
@@ -456,10 +456,10 @@ result = await orchestrator.run("Analyze this code")
 
 ## Additional Resources
 
-- **User Guide**: [Daily Usage →](../user-guide/)
-- **Reference**: [Providers →](../reference/providers/)
-- **Reference**: [Tools →](../reference/tools/)
-- **Reference**: [Configuration →](../reference/configuration/)
+- **User Guide**: [Daily Usage →](../user-guide/index.md)
+- **Reference**: [Providers →](../reference/providers/index.md)
+- **Reference**: [Tools →](../reference/tools/catalog.md)
+- **Reference**: [Configuration →](../reference/configuration/index.md)
 - **Development**: [Contributing →](../../CONTRIBUTING.md)
 - **Operations**: [Deployment →](../operations/deployment/enterprise.md)
 
