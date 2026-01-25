@@ -26,7 +26,7 @@ Design Principles:
 
 from __future__ import annotations
 
-from typing import List, Protocol, Set, Tuple, runtime_checkable
+from typing import Any, List, Protocol, Set, Tuple, runtime_checkable
 
 
 @runtime_checkable
@@ -41,6 +41,19 @@ class StateProtocol(Protocol):
         - AgentOrchestrator (via IAgentOrchestrator)
         - Mock implementations for testing
     """
+
+    @property
+    def messages(self) -> List[Any]:
+        """Get conversation messages.
+
+        Returns:
+            List of messages in the conversation
+
+        Examples:
+            >>> messages = orchestrator.messages
+            >>> print(f"Total messages: {len(messages)}")
+        """
+        ...
 
     @property
     def tool_calls_used(self) -> int:
