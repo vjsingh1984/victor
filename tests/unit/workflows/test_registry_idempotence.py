@@ -52,6 +52,7 @@ class MockWorkflow:
     def to_hash(self):
         """Return hash for idempotence testing."""
         import hashlib
+
         return hashlib.sha256(f"{self.name}:{self.description}".encode()).hexdigest()
 
 
@@ -70,18 +71,14 @@ class TestWorkflowRegistryIdempotence:
             description="Test workflow",
             nodes={
                 "node1": AgentNode(
-                    id="node1",
-                    name="Test Node",
-                    role="test_agent",
-                    goal="Do something"
+                    id="node1", name="Test Node", role="test_agent", goal="Do something"
                 )
             },
-            start_node="node1"
+            start_node="node1",
         )
 
         # Should have to_hash method
-        assert hasattr(workflow, 'to_hash'), \
-            "WorkflowDefinition should have to_hash() method"
+        assert hasattr(workflow, "to_hash"), "WorkflowDefinition should have to_hash() method"
 
         # Hash should be string
         hash_value = workflow.to_hash()
@@ -98,13 +95,10 @@ class TestWorkflowRegistryIdempotence:
             description="Test workflow",
             nodes={
                 "node1": AgentNode(
-                    id="node1",
-                    name="Test Node",
-                    role="test_agent",
-                    goal="Do something"
+                    id="node1", name="Test Node", role="test_agent", goal="Do something"
                 )
             },
-            start_node="node1"
+            start_node="node1",
         )
 
         hash1 = workflow.to_hash()
@@ -122,13 +116,10 @@ class TestWorkflowRegistryIdempotence:
             description="Test workflow",
             nodes={
                 "node1": AgentNode(
-                    id="node1",
-                    name="Test Node",
-                    role="test_agent",
-                    goal="Do something"
+                    id="node1", name="Test Node", role="test_agent", goal="Do something"
                 )
             },
-            start_node="node1"
+            start_node="node1",
         )
 
         workflow2 = WorkflowDefinition(
@@ -139,10 +130,10 @@ class TestWorkflowRegistryIdempotence:
                     id="node1",
                     name="Test Node",
                     role="test_agent",
-                    goal="Do something else"  # Changed!
+                    goal="Do something else",  # Changed!
                 )
             },
-            start_node="node1"
+            start_node="node1",
         )
 
         hash1 = workflow1.to_hash()
@@ -173,8 +164,9 @@ class TestWorkflowRegistryIdempotence:
         # But current implementation doesn't have this yet
 
         # This test will fail initially, then pass after implementation
-        assert workflow.validate_count == 1, \
-            "Second registration with same workflow should skip validation"
+        assert (
+            workflow.validate_count == 1
+        ), "Second registration with same workflow should skip validation"
 
     def test_workflow_registry_validates_when_changed(self, reset_singletons):
         """Registry should validate when workflow definition changes.
@@ -192,8 +184,7 @@ class TestWorkflowRegistryIdempotence:
         registry.register(workflow2, replace=True)
 
         # Should validate again because workflow changed
-        assert workflow2.validate_count == 1, \
-            "Modified workflow should trigger validation"
+        assert workflow2.validate_count == 1, "Modified workflow should trigger validation"
 
 
 class TestTeamSpecRegistryIdempotence:
@@ -279,6 +270,7 @@ class TestIdempotencePerformance:
 
             def to_hash(self):
                 import hashlib
+
                 return hashlib.sha256(f"{self.name}:{self.description}".encode()).hexdigest()
 
         workflow = SlowWorkflow("slow_workflow")
@@ -294,9 +286,9 @@ class TestIdempotencePerformance:
         second_duration = time.time() - start
 
         # First should have validated, second should skip
-        assert workflow.validate_count == 1, \
-            "Second registration should skip validation"
+        assert workflow.validate_count == 1, "Second registration should skip validation"
 
         # Second should be faster (no validation delay)
-        assert second_duration < first_duration / 2, \
-            f"Idempotent registration should be faster: {second_duration:.4f}s vs {first_duration:.4f}s"
+        assert (
+            second_duration < first_duration / 2
+        ), f"Idempotent registration should be faster: {second_duration:.4f}s vs {first_duration:.4f}s"

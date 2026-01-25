@@ -657,9 +657,8 @@ class TestOptimizationIntegration:
         for i in range(10):
             # Use partial application instead of lambda
             from functools import partial
-            loader.register_component(
-                f"task_component_{i}", partial(create_heavy_component, i)
-            )
+
+            loader.register_component(f"task_component_{i}", partial(create_heavy_component, i))
 
         # Create tasks that use lazy-loaded components
         async def task_with_lazy_component(idx):

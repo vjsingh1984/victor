@@ -43,7 +43,7 @@ class MockHTTPError(Exception):
         message: str,
         status_code: int = 500,
         response_text: str = "",
-        headers: dict = None,
+        headers: dict | None = None,
     ):
         super().__init__(message)
         self.status_code = status_code

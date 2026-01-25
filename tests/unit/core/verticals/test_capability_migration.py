@@ -71,8 +71,7 @@ class TestDeprecatedDirectInstantiation:
         """Test that decorator issues deprecation warning."""
 
         @deprecated_direct_instantiation(
-            "test_capability",
-            "Use get_capability_injector().get_capability('test_capability')"
+            "test_capability", "Use get_capability_injector().get_capability('test_capability')"
         )
         class TestCapability:
             def __init__(self):
@@ -87,10 +86,7 @@ class TestDeprecatedDirectInstantiation:
     def test_warning_includes_migration_guide(self):
         """Test that warning includes migration guide."""
 
-        @deprecated_direct_instantiation(
-            "test_capability",
-            "Use injector instead"
-        )
+        @deprecated_direct_instantiation("test_capability", "Use injector instead")
         class TestCapability:
             pass
 
@@ -126,10 +122,7 @@ class TestGetCapabilityOrCreate:
         injector.register_provider(MockProvider())
 
         # Should get from injector
-        capability = get_capability_or_create(
-            "test_capability",
-            _LegacyCapability
-        )
+        capability = get_capability_or_create("test_capability", _LegacyCapability)
 
         assert isinstance(capability, _MockCapability)
 
@@ -140,10 +133,7 @@ class TestGetCapabilityOrCreate:
         injector = get_capability_injector()
 
         # Capability not registered, should use factory
-        capability = get_capability_or_create(
-            "nonexistent_capability",
-            _LegacyCapability
-        )
+        capability = get_capability_or_create("nonexistent_capability", _LegacyCapability)
 
         assert isinstance(capability, _LegacyCapability)
 

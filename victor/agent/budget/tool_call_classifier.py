@@ -74,7 +74,7 @@ class ToolCallClassifier(IToolCallClassifier):
         Args:
             write_tools: Optional set of write tool names (uses default if not provided)
         """
-        self._write_tools: Set[str] = write_tools or DEFAULT_WRITE_TOOLS
+        self._write_tools: Set[str] = set(write_tools or DEFAULT_WRITE_TOOLS)
 
     def is_write_operation(self, tool_name: str) -> bool:
         """Check if a tool is a write/action operation.

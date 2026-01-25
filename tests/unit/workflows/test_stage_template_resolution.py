@@ -67,9 +67,7 @@ def reset_registry():
             "type": "compute",
             "name": "Run Linters",
             "tools": ["shell"],
-            "inputs": {
-                "commands": ["$ctx.lint_command", "$ctx.format_check_command"]
-            },
+            "inputs": {"commands": ["$ctx.lint_command", "$ctx.format_check_command"]},
             "output": "lint_results",
             "constraints": ["llm", "write"],
             "timeout": 180,

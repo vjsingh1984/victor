@@ -119,8 +119,10 @@ class TestRAGSharedDefaultsUsage:
         source = inspect.getsource(rag_assistant_module)
 
         # Look for import statement
-        has_import = "from victor.core.verticals.defaults.tool_defaults import" in source or \
-                     "from victor.core.verticals.defaults import" in source
+        has_import = (
+            "from victor.core.verticals.defaults.tool_defaults import" in source
+            or "from victor.core.verticals.defaults import" in source
+        )
 
         # This test will FAIL initially, then PASS after migration
         assert has_import, "RAG should import from victor.core.verticals.defaults"

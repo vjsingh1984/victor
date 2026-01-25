@@ -497,7 +497,7 @@ class TestChatCoordinatorStreamChat:
         async def mock_stream_impl(user_message: str):
             yield StreamChunk(content="Test response", is_final=True)
 
-        coordinator._stream_chat_impl = mock_stream_impl
+        coordinator._stream_chat_impl = mock_stream_impl  # type: ignore[method-assign]
 
         # Execute
         chunks = []
@@ -525,7 +525,7 @@ class TestChatCoordinatorStreamChat:
         async def mock_stream_impl(user_message: str):
             yield StreamChunk(content="Response", is_final=True)
 
-        coordinator._stream_chat_impl = mock_stream_impl
+        coordinator._stream_chat_impl = mock_stream_impl  # type: ignore[method-assign]
 
         # Execute
         async for _ in coordinator.stream_chat("Track tokens"):
@@ -546,7 +546,7 @@ class TestChatCoordinatorStreamChat:
         async def mock_stream_impl(user_message: str):
             yield StreamChunk(content="\n\n[Cancelled by user]\n", is_final=True)
 
-        coordinator._stream_chat_impl = mock_stream_impl
+        coordinator._stream_chat_impl = mock_stream_impl  # type: ignore[method-assign]
 
         # Execute
         chunks = []

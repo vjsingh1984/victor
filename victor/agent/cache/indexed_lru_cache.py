@@ -93,7 +93,7 @@ class IndexedLRUCache:
             ttl_seconds: Time-to-live in seconds
             dependency_extractor: Dependency extractor for auto-detecting files
         """
-        self._cache: OrderedDict = OrderedDict()
+        self._cache: OrderedDict[str, Any] = OrderedDict()
         self._timestamps: Dict[str, float] = {}
         self._file_index: Dict[str, Set[str]] = {}
         self._max_size = max_size
@@ -400,7 +400,7 @@ class IndexedLRUCache:
         with self._lock:
             return len(self._cache)
 
-    def items(self):
+    def items(self) -> List[tuple[Any, Any]]:
         """Return all non-expired items in the cache.
 
         Thread-safe: Returns snapshot of current items.

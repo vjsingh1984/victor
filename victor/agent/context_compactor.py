@@ -407,6 +407,9 @@ class ContextCompactor:
         Returns:
             CompactionAction describing what was done
         """
+        if self.controller is None:
+            raise RuntimeError("Cannot compact: no controller attached")
+
         metrics = self.controller.get_context_metrics()
         utilization = metrics.utilization
 

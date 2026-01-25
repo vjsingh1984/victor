@@ -159,6 +159,7 @@ class TestToolMetadataRegistryChangeDetection:
             # check if there's a module-level function
             try:
                 from victor.tools.metadata_registry import get_instance
+
                 registry = get_instance()
                 assert registry is not None
                 assert isinstance(registry, ToolMetadataRegistry)
@@ -219,9 +220,7 @@ class TestToolMetadataRegistryPerformance:
         """
         registry = ToolMetadataRegistry()
 
-        tools = [
-            MockTool(f"tool{i}", f"Tool {i}") for i in range(10)
-        ]
+        tools = [MockTool(f"tool{i}", f"Tool {i}") for i in range(10)]
 
         registry.refresh_from_tools(tools)
         stats = registry.get_statistics()
@@ -264,5 +263,6 @@ class TestToolMetadataRegistryPerformance:
 
         assert reindexed is False, "Second call should skip reindexing"
         # Skipping should be at least 2x faster (in practice, much more)
-        assert second_duration < first_duration / 2, \
-            f"Skipping reindex should be faster: {second_duration:.4f}s vs {first_duration:.4f}s"
+        assert (
+            second_duration < first_duration / 2
+        ), f"Skipping reindex should be faster: {second_duration:.4f}s vs {first_duration:.4f}s"

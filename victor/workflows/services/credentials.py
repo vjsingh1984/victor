@@ -70,7 +70,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Protocol, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Protocol, Tuple, Type, Union
 
 logger = logging.getLogger(__name__)
 
@@ -194,7 +194,7 @@ class MFAVerifier:
             print("Touch ID verified!")
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._verification_cache: Dict[str, datetime] = {}
 
     def is_cached(self, key: str, cache_duration: int = 300) -> bool:
@@ -223,7 +223,8 @@ class MFAVerifier:
         if not TOTP_AVAILABLE:
             raise ImportError("pyotp not available. Install with: pip install pyotp")
 
-        return pyotp.random_base32()
+        secret: str = pyotp.random_base32()
+        return secret
 
     def get_totp_uri(
         self,
@@ -245,7 +246,8 @@ class MFAVerifier:
             raise ImportError("pyotp not available")
 
         totp = pyotp.TOTP(secret)
-        return totp.provisioning_uri(name=account, issuer_name=issuer)
+        uri: str = totp.provisioning_uri(name=account, issuer_name=issuer)
+        return uri
 
     def verify_totp(self, secret: str, code: str) -> bool:
         """Verify TOTP code from authenticator.
@@ -261,7 +263,8 @@ class MFAVerifier:
             raise ImportError("pyotp not available")
 
         totp = pyotp.TOTP(secret)
-        return totp.verify(code, valid_window=1)  # Allow 30s clock skew
+        verified: bool = totp.verify(code, valid_window=1)  # Allow 30s clock skew
+        return verified
 
     # Biometric (Touch ID, Windows Hello)
     def is_biometric_available(self) -> bool:
@@ -311,7 +314,7 @@ class MFAVerifier:
             result = {"success": False}
             event = threading.Event()
 
-            def callback(success, error):
+            def callback(success: bool, error: Any) -> None:
                 result["success"] = success
                 event.set()
 
@@ -366,7 +369,7 @@ class MFAVerifier:
         self,
         config: MFAConfig,
         credential_key: str,
-        prompt_callback: Optional[callable] = None,
+        prompt_callback: Optional[Callable[[str, str], str]] = None,
     ) -> bool:
         """Verify MFA based on configuration.
 
@@ -387,7 +390,7 @@ class MFAVerifier:
             logger.debug(f"MFA cached for {credential_key}")
             return True
 
-        method = config.method
+        method: MFAMethod = config.method
         verified = False
 
         # Try primary method
@@ -408,13 +411,15 @@ class MFAVerifier:
                 verified = self.verify_biometric(f"Access credential: {credential_key}")
             else:
                 # Fall through to fallback
-                method = config.fallback_method
+                if config.fallback_method is not None:
+                    method = config.fallback_method
 
         elif method == MFAMethod.PASSKEY:
             if self.is_passkey_available():
                 verified = self.verify_passkey(credential_key)
             else:
-                method = config.fallback_method
+                if config.fallback_method is not None:
+                    method = config.fallback_method
 
         # Try fallback if primary failed and fallback configured
         if not verified and config.fallback_method and method != config.fallback_method:
@@ -988,7 +993,7 @@ class SSOAuthenticator:
         callback_result: Dict[str, Any] = {}
         callback_event = asyncio.Event()
 
-        async def handle_callback(request):
+        async def handle_callback(request: Any) -> Any:
             from aiohttp import web
 
             code = request.query.get("code")
@@ -1288,13 +1293,14 @@ class SystemAuthenticator:
             import pam
 
             p = pam.pam()
-            return p.authenticate(username, password, service=service)
+            auth_result: bool = p.authenticate(username, password, service=service)
+            return auth_result
         except ImportError:
             # Try python-pam
             try:
                 import PAM
 
-                def pam_conv(auth, query_list, userData):
+                def pam_conv(auth: Any, query_list: Any, userData: Any) -> Any:
                     resp = []
                     for query, qtype in query_list:
                         if qtype == PAM.PAM_PROMPT_ECHO_OFF:
@@ -1342,7 +1348,7 @@ class SystemAuthenticator:
             import subprocess
 
             # Use klist to check for valid tickets
-            result = subprocess.run(
+            result: subprocess.CompletedProcess[bytes] = subprocess.run(
                 ["klist", "-s"],
                 capture_output=True,
             )
@@ -1351,12 +1357,12 @@ class SystemAuthenticator:
             # Try Windows
             if platform.system() == "Windows":
                 try:
-                    result = subprocess.run(
+                    result_str: subprocess.CompletedProcess[str] = subprocess.run(
                         ["klist"],
                         capture_output=True,
                         text=True,
                     )
-                    return "Cached Tickets" in result.stdout
+                    return "Cached Tickets" in result_str.stdout
                 except FileNotFoundError:
                     pass
             return False
@@ -1452,15 +1458,15 @@ class SystemAuthenticator:
             return bytes(token) if token else None
 
         except ImportError:
-            logger.debug("gssapi not available")
+            pass  # gssapi not available
 
         # Try pyspnego (cross-platform)
         try:
-            import spnego  # type: ignore
+            import spnego
 
             ctx = spnego.client(service)
             token = ctx.step()
-            return token
+            return token if token is not None else None
 
         except ImportError:
             logger.debug("spnego not available")
@@ -1577,7 +1583,8 @@ class SystemAuthenticator:
                 )
 
                 if ctx[0]:
-                    return ctx[1][0].Buffer
+                    buffer_bytes = ctx[1][0].Buffer
+                    return bytes(buffer_bytes) if buffer_bytes is not None else None
 
             except ImportError:
                 logger.debug("sspi not available")
@@ -1587,7 +1594,8 @@ class SystemAuthenticator:
             import spnego
 
             ctx = spnego.client(service="host", hostname="localhost", protocol="ntlm")
-            return ctx.step()
+            token = ctx.step()
+            return token if token is not None else None
 
         except ImportError:
             pass
@@ -1968,9 +1976,9 @@ class AzureCredentials:
             return None
 
         return cls(
-            client_id=client_id,
-            client_secret=client_secret,
-            tenant_id=tenant_id,
+            client_id=client_id if client_id is not None else "",
+            client_secret=client_secret if client_secret is not None else "",
+            tenant_id=tenant_id if tenant_id is not None else "",
             subscription_id=os.environ.get("AZURE_SUBSCRIPTION_ID"),
             profile=profile,
         )
@@ -2231,9 +2239,10 @@ class APIKeyCredentials:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "APIKeyCredentials":
+        api_key_value = data.get("api_key") or data.get("key")
         return cls(
             name=data["name"],
-            api_key=data.get("api_key") or data.get("key"),
+            api_key=api_key_value if api_key_value is not None else "",
             secret=data.get("secret"),
             endpoint=data.get("endpoint"),
             headers=data.get("headers", {}),
@@ -2290,16 +2299,16 @@ class EnvironmentBackend(CredentialBackend):
         cred_type = parts[0]
 
         if cred_type == "aws":
-            creds = AWSCredentials.from_environment(parts[1] if len(parts) > 1 else "default")
-            return creds.to_dict() if creds else None
+            aws_creds = AWSCredentials.from_environment(parts[1] if len(parts) > 1 else "default")
+            return aws_creds.to_dict() if aws_creds else None
 
         elif cred_type == "azure":
-            creds = AzureCredentials.from_environment()
-            return creds.to_dict() if creds else None
+            azure_creds = AzureCredentials.from_environment()
+            return azure_creds.to_dict() if azure_creds else None
 
         elif cred_type == "gcp":
-            creds = GCPCredentials.from_environment()
-            return creds.to_dict() if creds else None
+            gcp_creds = GCPCredentials.from_environment()
+            return gcp_creds.to_dict() if gcp_creds else None
 
         env_key = f"VICTOR_{key.upper().replace('/', '_')}"
         if env_key in os.environ:
@@ -2329,7 +2338,7 @@ class KeyringBackend(CredentialBackend):
 
     SERVICE_NAME = "victor-credentials"
 
-    def __init__(self):
+    def __init__(self) -> None:
         if not KEYRING_AVAILABLE:
             raise ImportError("keyring not available. Install with: pip install keyring")
 
@@ -2337,7 +2346,8 @@ class KeyringBackend(CredentialBackend):
         try:
             value = keyring.get_password(self.SERVICE_NAME, key)
             if value:
-                return json.loads(value)
+                result: Dict[str, Any] = json.loads(value)
+                return result
         except Exception as e:
             logger.debug(f"Keyring get failed for {key}: {e}")
         return None
@@ -2362,7 +2372,8 @@ class KeyringBackend(CredentialBackend):
         try:
             index = keyring.get_password(self.SERVICE_NAME, index_key)
             if index:
-                return json.loads(index)
+                keys: List[str] = json.loads(index)
+                return keys
         except Exception:
             pass
         return []
@@ -2416,7 +2427,8 @@ class FileBackend(CredentialBackend):
             if self._cipher:
                 content = self._cipher.decrypt(content)
 
-            return json.loads(content.decode())
+            result: Dict[str, Any] = json.loads(content.decode())
+            return result
         except Exception as e:
             logger.error(f"Failed to load credentials file: {e}")
             return {}

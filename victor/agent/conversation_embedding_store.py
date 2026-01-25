@@ -186,7 +186,8 @@ class ConversationEmbeddingStore:
 
     def _create_table_with_first_record(self, record: Dict[str, Any]) -> None:
         """Create the table with the first record."""
-        self._table = self._db.create_table(self.TABLE_NAME, data=[record])
+        if self._db is not None:
+            self._table = self._db.create_table(self.TABLE_NAME, data=[record])
         logger.info(f"[ConversationEmbeddingStore] Created table '{self.TABLE_NAME}'")
 
     def _get_max_embedded_timestamp(self, session_id: Optional[str] = None) -> Optional[str]:
@@ -241,7 +242,7 @@ class ConversationEmbeddingStore:
 
                 # Single parameterized query with conditional WHERE clauses
                 conditions = ["LENGTH(content) >= ?"]
-                params = [min_content_length]
+                params: List[Any] = [min_content_length]
 
                 if session_id:
                     conditions.append("session_id = ?")
@@ -347,7 +348,7 @@ class ConversationEmbeddingStore:
         # Add to LanceDB
         if self._table is None:
             self._create_table_with_first_record(records[0])
-            if len(records) > 1:
+            if self._table is not None and len(records) > 1:
                 self._table.add(records[1:])
         else:
             self._table.add(records)
@@ -476,9 +477,9 @@ class ConversationEmbeddingStore:
             return 0
 
         try:
-            count_before = self._table.count_rows()
+            count_before = int(self._table.count_rows())
             self._table.delete(f"session_id = '{session_id}'")
-            count_after = self._table.count_rows()
+            count_after = int(self._table.count_rows())
             deleted = count_before - count_after
 
             logger.info(

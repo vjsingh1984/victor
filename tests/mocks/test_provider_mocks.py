@@ -264,7 +264,7 @@ class TestProviderTestHelpers:
         """Test response validation helper."""
         from victor.providers.base import CompletionResponse
 
-        response = CompletionResponse(
+        response = CompletionResponse(  # type: ignore[call-arg]
             content="Test",
             role="assistant",
             usage={"total_tokens": 10},

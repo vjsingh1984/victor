@@ -160,7 +160,7 @@ class ContextManager:
         if self._settings is not None:
             settings_max = getattr(self._settings, "max_context_chars", None)
             if settings_max and settings_max > 0:
-                return settings_max
+                return int(settings_max)
 
         # Check config override
         if self._config.max_context_chars is not None and self._config.max_context_chars > 0:

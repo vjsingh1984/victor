@@ -467,7 +467,8 @@ class KubernetesServiceProvider(BaseServiceProvider):
                 ),
             )
 
-            return logs
+            logs_str: str = logs
+            return logs_str
 
         except ApiException as e:
             return f"[Error getting logs: {e}]"
@@ -530,11 +531,16 @@ class KubernetesServiceProvider(BaseServiceProvider):
 
             for dep in deployments.items:
                 try:
+                    from kubernetes.client import V1Deployment
+
+                    def delete_deployment(d: V1Deployment = dep) -> None:
+                        self.apps_v1.delete_namespaced_deployment(
+                            name=d.metadata.name, namespace=ns
+                        )
+
                     await loop.run_in_executor(
                         None,
-                        lambda d=dep: self.apps_v1.delete_namespaced_deployment(
-                            name=d.metadata.name, namespace=ns
-                        ),
+                        delete_deployment,
                     )
                     count += 1
                 except ApiException:
@@ -551,11 +557,16 @@ class KubernetesServiceProvider(BaseServiceProvider):
 
             for svc in services.items:
                 try:
+                    from kubernetes.client import V1Service
+
+                    def delete_service(s: V1Service = svc) -> None:
+                        self.core_v1.delete_namespaced_service(
+                            name=s.metadata.name, namespace=ns
+                        )
+
                     await loop.run_in_executor(
                         None,
-                        lambda s=svc: self.core_v1.delete_namespaced_service(
-                            name=s.metadata.name, namespace=ns
-                        ),
+                        delete_service,
                     )
                 except ApiException:
                     pass

@@ -66,7 +66,6 @@ class MultiplierCalculator(IMultiplierCalculator):
 
     def calculate_effective_max(
         self,
-        budget_type: BudgetType,
         base_max: int,
     ) -> int:
         """Calculate effective maximum with all multipliers applied.
@@ -74,7 +73,6 @@ class MultiplierCalculator(IMultiplierCalculator):
         Formula: effective_max = base × model × mode × productivity
 
         Args:
-            budget_type: Type of budget (for future extensions)
             base_max: Base maximum before multipliers
 
         Returns:

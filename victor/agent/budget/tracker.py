@@ -119,7 +119,7 @@ class BudgetTracker(IBudgetTracker):
         # Get effective maximum from multiplier calculator
         if self._multiplier_calculator:
             effective_max = self._multiplier_calculator.calculate_effective_max(
-                budget_type, state.base_maximum
+                state.base_maximum
             )
             model_multiplier = self._multiplier_calculator.model_multiplier
             mode_multiplier = self._multiplier_calculator.mode_multiplier
@@ -162,7 +162,7 @@ class BudgetTracker(IBudgetTracker):
         # Get effective maximum from multiplier calculator
         if self._multiplier_calculator:
             effective_max = self._multiplier_calculator.calculate_effective_max(
-                budget_type, state.base_maximum
+                state.base_maximum
             )
         else:
             effective_max = state.base_maximum

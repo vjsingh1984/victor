@@ -69,8 +69,14 @@ class TestAdapterCapabilityRegistryRequired:
         # Create orchestrator mock without capability support
         mock_orchestrator = Mock(spec=[])
         # Explicitly ensure no capability methods exist
-        for method in ['has_capability', 'get_capability', 'set_capability',
-                       '_has_capability', '_get_capability_value', '_set_capability_value']:
+        for method in [
+            "has_capability",
+            "get_capability",
+            "set_capability",
+            "_has_capability",
+            "_get_capability_value",
+            "_set_capability_value",
+        ]:
             if hasattr(mock_orchestrator, method):
                 delattr(mock_orchestrator, method)
 
@@ -123,17 +129,18 @@ class TestAdapterCapabilityRegistryRequired:
         private_writes = []
 
         def track_setattr(obj, name, value):
-            if name == '_vertical_middleware':
+            if name == "_vertical_middleware":
                 private_writes.append((name, value))
             return original_setattr(obj, name, value)
 
-        with patch.object(type(mock_orchestrator), '__setattr__', track_setattr):
+        with patch.object(type(mock_orchestrator), "__setattr__", track_setattr):
             adapter = VerticalIntegrationAdapter(mock_orchestrator)
             adapter.apply_middleware([MockMiddleware()])
 
         # Should have NO private field writes
-        assert len(private_writes) == 0, \
-            f"Adapter should not write _vertical_middleware, but got: {private_writes}"
+        assert (
+            len(private_writes) == 0
+        ), f"Adapter should not write _vertical_middleware, but got: {private_writes}"
 
     def test_adapter_no_private_field_write_for_middleware_chain(self):
         """Adapter should NOT write to _middleware_chain private field."""
@@ -147,17 +154,18 @@ class TestAdapterCapabilityRegistryRequired:
         private_writes = []
 
         def track_setattr(obj, name, value):
-            if name == '_middleware_chain':
+            if name == "_middleware_chain":
                 private_writes.append((name, value))
             return original_setattr(obj, name, value)
 
-        with patch.object(type(mock_orchestrator), '__setattr__', track_setattr):
+        with patch.object(type(mock_orchestrator), "__setattr__", track_setattr):
             adapter = VerticalIntegrationAdapter(mock_orchestrator)
             adapter.apply_middleware([MockMiddleware()])
 
         # Should have NO private field writes to _middleware_chain
-        assert len(private_writes) == 0, \
-            f"Adapter should not write _middleware_chain, but got: {private_writes}"
+        assert (
+            len(private_writes) == 0
+        ), f"Adapter should not write _middleware_chain, but got: {private_writes}"
 
     def test_adapter_no_private_field_write_for_safety_patterns(self):
         """Adapter should NOT write to _vertical_safety_patterns private field."""
@@ -171,18 +179,19 @@ class TestAdapterCapabilityRegistryRequired:
         private_writes = []
 
         def track_setattr(obj, name, value):
-            if name == '_vertical_safety_patterns':
+            if name == "_vertical_safety_patterns":
                 private_writes.append((name, value))
             return original_setattr(obj, name, value)
 
-        with patch.object(type(mock_orchestrator), '__setattr__', track_setattr):
+        with patch.object(type(mock_orchestrator), "__setattr__", track_setattr):
             adapter = VerticalIntegrationAdapter(mock_orchestrator)
             patterns = [SafetyPattern(pattern="test", description="Test pattern")]
             adapter.apply_safety_patterns(patterns)
 
         # Should have NO private field writes to _vertical_safety_patterns
-        assert len(private_writes) == 0, \
-            f"Adapter should not write _vertical_safety_patterns, but got: {private_writes}"
+        assert (
+            len(private_writes) == 0
+        ), f"Adapter should not write _vertical_safety_patterns, but got: {private_writes}"
 
 
 class TestAdapterCapabilityRegistryIntegration:

@@ -124,6 +124,8 @@ class MemoryManager:
             return self._get_in_memory_context()
 
         try:
+            if self._conversation_store is None:
+                return self._get_in_memory_context()
             return self._conversation_store.get_context_messages(
                 session_id=self._session_id,
                 max_tokens=max_tokens,

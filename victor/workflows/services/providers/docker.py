@@ -32,7 +32,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from victor.workflows.services.definition import (
     PortMapping,
@@ -44,18 +44,22 @@ from victor.workflows.services.definition import (
 )
 from victor.workflows.services.providers.base import BaseServiceProvider
 
+if TYPE_CHECKING:
+    import docker
+    from docker.models.containers import Container
+
 logger = logging.getLogger(__name__)
 
 # Optional Docker SDK import
 try:
-    import docker
+    import docker as docker_mod
     from docker.errors import APIError, ContainerError, ImageNotFound, NotFound
     from docker.models.containers import Container
 
     DOCKER_AVAILABLE = True
 except ImportError:
     DOCKER_AVAILABLE = False
-    docker = None
+    docker_mod = None  # type: ignore
 
 
 class DockerServiceProvider(BaseServiceProvider):
@@ -89,16 +93,16 @@ class DockerServiceProvider(BaseServiceProvider):
         self._docker_host = docker_host
         self._network_name = network_name
         self._label_prefix = label_prefix
-        self._client: Optional[docker.DockerClient] = None
+        self._client: Optional[Any] = None
 
     @property
-    def client(self) -> docker.DockerClient:
+    def client(self) -> Any:
         """Get or create Docker client."""
         if self._client is None:
             if self._docker_host:
-                self._client = docker.DockerClient(base_url=self._docker_host)
+                self._client = docker_mod.DockerClient(base_url=self._docker_host)  # type: ignore
             else:
-                self._client = docker.from_env()
+                self._client = docker_mod.from_env()
         return self._client
 
     def _ensure_network(self) -> None:
@@ -134,7 +138,7 @@ class DockerServiceProvider(BaseServiceProvider):
 
         # Port mappings
         if config.ports:
-            ports = {}
+            ports: Dict[str, Optional[Tuple[str, int]]] = {}
             for pm in config.ports:
                 port_key = f"{pm.container_port}/{pm.protocol}"
                 if pm.host_port == 0:
@@ -326,7 +330,8 @@ class DockerServiceProvider(BaseServiceProvider):
                 lambda: container.logs(tail=tail, timestamps=True),
             )
 
-            return logs.decode("utf-8", errors="replace")
+            logs_str: str = logs.decode("utf-8", errors="replace")
+            return logs_str
 
         except NotFound:
             return "[Container not found]"
@@ -378,7 +383,7 @@ class DockerServiceProvider(BaseServiceProvider):
         """
         loop = asyncio.get_event_loop()
 
-        filters = {"label": f"{self._label_prefix}.managed=true"}
+        filters: Dict[str, Any] = {"label": f"{self._label_prefix}.managed=true"}
         if label_filter:
             filters["label"] = [filters["label"], label_filter]
 
@@ -391,9 +396,14 @@ class DockerServiceProvider(BaseServiceProvider):
             count = 0
             for container in containers:
                 try:
+                    from docker.models.containers import Container
+
+                    def remove_container(c: Container = container) -> None:
+                        c.remove(force=True)
+
                     await loop.run_in_executor(
                         None,
-                        lambda c=container: c.remove(force=True),
+                        remove_container,
                     )
                     count += 1
                 except Exception as e:

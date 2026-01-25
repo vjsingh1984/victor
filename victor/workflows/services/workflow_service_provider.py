@@ -128,13 +128,13 @@ class WorkflowServiceProvider:
         from victor.workflows.compiler_protocols import (
             NodeExecutorFactoryProtocol,
         )
-        from victor.workflows.executor import get_compute_handler
+        from victor.workflows.executors.factory import NodeExecutorFactory
         from victor.workflows.orchestrator_pool import OrchestratorPool
         from victor.workflows.validator import WorkflowValidator
 
-        # NodeExecutorFactory - creates executor functions for nodes
+        # NodeExecutorFactory - creates executor functions for nodes (concrete class)
         container.register(
-            NodeExecutorFactoryProtocol,
+            NodeExecutorFactory,
             lambda c: self._create_node_executor_factory(),
             ServiceLifetime.SINGLETON,
         )
@@ -192,18 +192,10 @@ class WorkflowServiceProvider:
         # Import concrete implementations for registration
         from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
         from victor.workflows.compiled_executor import WorkflowExecutor
-        from victor.workflows.compiler_protocols import WorkflowCompilerProtocol
 
         # WorkflowCompilerImpl - concrete implementation for DI container
         container.register(
             WorkflowCompilerImpl,
-            lambda c: self._create_workflow_compiler_impl(),
-            ServiceLifetime.TRANSIENT,
-        )
-
-        # WorkflowCompilerProtocol - protocol alias for the compiler implementation
-        container.register(
-            WorkflowCompilerProtocol,
             lambda c: self._create_workflow_compiler_impl(),
             ServiceLifetime.TRANSIENT,
         )
@@ -296,28 +288,6 @@ class WorkflowServiceProvider:
 
         return factory
 
-    def _create_compute_handler_registry(self) -> Any:
-        """Create ComputeHandlerRegistry instance.
-
-        The ComputeHandlerRegistry is responsible for:
-        - Registering compute node handlers from verticals
-        - Resolving handler names to handler instances
-        - Providing handler metadata (input schema, output schema)
-        - Validating handler registrations
-
-        Returns:
-            ComputeHandlerRegistry instance
-        """
-        from victor.workflows.handlers import ComputeHandlerRegistry
-
-        registry = ComputeHandlerRegistry()
-
-        # Auto-discover and register handlers from all verticals
-        # This will be called after vertical initialization
-        logger.debug("Created ComputeHandlerRegistry (handlers will be registered by verticals)")
-
-        return registry
-
     # =========================================================================
     # Factory methods for scoped services
     # =========================================================================
@@ -379,15 +349,22 @@ class WorkflowServiceProvider:
             WorkflowCompiler instance
         """
         from victor.workflows.compiler.unified_compiler import WorkflowCompiler
+        from victor.workflows.yaml_loader import YAMLWorkflowLoader
+        from victor.workflows.executors.factory import NodeExecutorFactory
 
         # Get dependencies from DI container
-        yaml_loader = self.container.get("YAMLWorkflowLoader")
-        validator = self.container.get("WorkflowValidator")
-        factory = self.container.get("NodeExecutorFactoryProtocol")
+        factory: Any = self.container.get(NodeExecutorFactory)
+
+        # Create YAML loader directly (not registered in container)
+        cache_enabled = getattr(self._settings, "enable_workflow_cache", True)
+        cache_ttl = getattr(self._settings, "workflow_cache_ttl", 3600)
+        yaml_loader = YAMLWorkflowLoader(
+            enable_cache=cache_enabled,
+            cache_ttl=cache_ttl,
+        )
 
         compiler = WorkflowCompiler(
             yaml_loader=yaml_loader,
-            validator=validator,
             node_executor_factory=factory,
         )
 

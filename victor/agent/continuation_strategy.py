@@ -56,14 +56,14 @@ _OUTPUT_REQUIREMENT_PATTERNS_RAW = {
 }
 
 # Pre-compile all patterns at module load (30-40% speedup on pattern matching)
-OUTPUT_REQUIREMENT_PATTERNS: Dict[str, List[Pattern[str]]] = {
+OUTPUT_REQUIREMENT_PATTERNS: Dict[str, List[Pattern[Any]]] = {
     key: [re.compile(pattern) for pattern in patterns]
     for key, patterns in _OUTPUT_REQUIREMENT_PATTERNS_RAW.items()
 }
 
 # Cache for tool mention patterns (avoid recompiling per-tool patterns)
 # Key: tool_name, Value: list of compiled patterns
-_TOOL_MENTION_PATTERN_CACHE: Dict[str, List[Pattern[str]]] = {}
+_TOOL_MENTION_PATTERN_CACHE: Dict[str, List[Pattern[Any]]] = {}
 
 # Common tool mention pattern templates (compiled once, tool name inserted)
 _TOOL_MENTION_TEMPLATES = [
@@ -73,7 +73,7 @@ _TOOL_MENTION_TEMPLATES = [
 ]
 
 
-def _get_tool_mention_patterns(tool_name: str) -> List[Pattern[str]]:
+def _get_tool_mention_patterns(tool_name: str) -> List[Pattern[Any]]:
     """Get or create compiled patterns for detecting tool mentions.
 
     Caches compiled patterns per tool name to avoid recompilation.

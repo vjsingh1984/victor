@@ -41,8 +41,9 @@ class TestPromptSectionCentralization:
         instead of inline prompt in get_system_prompt().
         """
         # Should have get_prompt_builder() method
-        assert hasattr(CodingAssistant, 'get_prompt_builder'), \
-            "CodingAssistant should have get_prompt_builder() method"
+        assert hasattr(
+            CodingAssistant, "get_prompt_builder"
+        ), "CodingAssistant should have get_prompt_builder() method"
 
         # Should return a PromptBuilder instance
         builder = CodingAssistant.get_prompt_builder()
@@ -60,8 +61,9 @@ class TestPromptSectionCentralization:
         instead of inline prompt in _get_system_prompt().
         """
         # Should have get_prompt_builder() method
-        assert hasattr(DevOpsAssistant, 'get_prompt_builder'), \
-            "DevOpsAssistant should have get_prompt_builder() method"
+        assert hasattr(
+            DevOpsAssistant, "get_prompt_builder"
+        ), "DevOpsAssistant should have get_prompt_builder() method"
 
         # Should return a PromptBuilder instance
         builder = DevOpsAssistant.get_prompt_builder()
@@ -79,8 +81,9 @@ class TestPromptSectionCentralization:
         instead of inline prompt in get_system_prompt().
         """
         # Should have get_prompt_builder() method
-        assert hasattr(RAGAssistant, 'get_prompt_builder'), \
-            "RAGAssistant should have get_prompt_builder() method"
+        assert hasattr(
+            RAGAssistant, "get_prompt_builder"
+        ), "RAGAssistant should have get_prompt_builder() method"
 
         # Should return a PromptBuilder instance
         builder = RAGAssistant.get_prompt_builder()
@@ -107,8 +110,10 @@ class TestPromptSectionCentralization:
 
         # Builder prompt should contain core concepts from system prompt
         # (We don't require exact match, but semantic overlap)
-        assert "developer" in coding_builder_prompt.lower() or "software" in coding_builder_prompt.lower(), \
-            "Builder prompt should mention development"
+        assert (
+            "developer" in coding_builder_prompt.lower()
+            or "software" in coding_builder_prompt.lower()
+        ), "Builder prompt should mention development"
 
     def test_coding_prompt_content_quality(self, reset_singletons):
         """CodingAssistant prompt should have quality content.
@@ -118,8 +123,9 @@ class TestPromptSectionCentralization:
         prompt = CodingAssistant.get_system_prompt()
 
         # Should mention key concepts
-        assert "code" in prompt.lower() or "software" in prompt.lower(), \
-            "Prompt should mention code/software"
+        assert (
+            "code" in prompt.lower() or "software" in prompt.lower()
+        ), "Prompt should mention code/software"
         assert len(prompt) > 200, "Prompt should have substantial content"
 
     def test_devops_prompt_content_quality(self, reset_singletons):
@@ -133,8 +139,7 @@ class TestPromptSectionCentralization:
         devops_keywords = ["docker", "infrastructure", "deploy", "container"]
         prompt_lower = prompt.lower()
         has_any_keyword = any(keyword in prompt_lower for keyword in devops_keywords)
-        assert has_any_keyword, \
-            f"Prompt should mention DevOps concepts (one of {devops_keywords})"
+        assert has_any_keyword, f"Prompt should mention DevOps concepts (one of {devops_keywords})"
         assert len(prompt) > 200, "Prompt should have substantial content"
 
     def test_rag_prompt_content_quality(self, reset_singletons):
@@ -148,8 +153,7 @@ class TestPromptSectionCentralization:
         rag_keywords = ["retrieval", "document", "search", "ingest", "knowledge"]
         prompt_lower = prompt.lower()
         has_any_keyword = any(keyword in prompt_lower for keyword in rag_keywords)
-        assert has_any_keyword, \
-            f"Prompt should mention RAG concepts (one of {rag_keywords})"
+        assert has_any_keyword, f"Prompt should mention RAG concepts (one of {rag_keywords})"
         assert len(prompt) > 200, "Prompt should have substantial content"
 
 

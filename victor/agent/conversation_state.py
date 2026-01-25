@@ -103,7 +103,9 @@ logger = logging.getLogger(__name__)
 
 # Import canonical ConversationStage from victor.core.state (single source of truth)
 # This import enforces layer boundaries - Framework should not depend on Agent
-from victor.core.state import ConversationStage
+from victor.core.state import ConversationStage  # noqa: F401
+
+__all__ = ["ConversationStage"]
 
 
 # Stage ordering for adjacency calculations (since values are strings, not ints)
@@ -294,6 +296,7 @@ class ConversationStateMachine:
 
         # Initialize StageTransitionEngine for validated transitions and tool priorities
         self._use_transition_engine = use_transition_engine
+        self._transition_engine: Optional[Any] = None  # Will be set below if needed
         if use_transition_engine:
             from victor.agent.stage_transition_engine import StageTransitionEngine
 

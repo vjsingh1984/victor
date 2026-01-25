@@ -646,9 +646,10 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
         Supported formats:
         - {"name": "tool_name", "arguments": {...}}  (qwen format)
         - {"name": "tool_name", "parameters": {...}}  (llama format)
+        - ```json\n{"name": "...", "arguments": {...}}\n``` (markdown code blocks)
 
         Args:
-            content: Message content that might contain JSON tool call
+            content: Message content that might contain JSON tool calls
 
         Returns:
             List of tool calls if detected, None otherwise
@@ -656,7 +657,30 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
         if not content or not content.strip():
             return None
 
-        # Try to parse as JSON
+        # First, try to extract JSON from markdown code blocks
+        import re
+
+        # Match markdown code blocks: ```json\n{...}\n```
+        json_block_pattern = r'```(?:json)?\s*\n?(.*?)\n?```'
+        matches = re.findall(json_block_pattern, content, re.DOTALL)
+
+        if matches:
+            # Try to parse each matched block
+            all_tool_calls = []
+            for match in matches:
+                try:
+                    data = json.loads(match)
+                    if isinstance(data, dict) and "name" in data:
+                        arguments = data.get("arguments") or data.get("parameters", {})
+                        all_tool_calls.append({"name": data.get("name"), "arguments": arguments})
+                except (json.JSONDecodeError, ValueError):
+                    continue
+
+            if all_tool_calls:
+                logger.debug(f"Parsed {len(all_tool_calls)} tool calls from markdown blocks")
+                return all_tool_calls
+
+        # Fallback: Try to parse entire content as JSON
         try:
             data = json.loads(content.strip())
 

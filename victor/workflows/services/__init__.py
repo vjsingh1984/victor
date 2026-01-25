@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
+from typing import Any
+
 """ServiceNode infrastructure for workflow lifecycle management.
 
 Provides infrastructure services (databases, caches, message queues) that
@@ -149,35 +153,35 @@ from victor.workflows.services.credentials import (
 
 
 # Providers (lazy import to avoid heavy dependencies)
-def get_docker_provider(**kwargs):
+def get_docker_provider(**kwargs: Any) -> Any:
     """Get Docker service provider."""
     from victor.workflows.services.providers.docker import DockerServiceProvider
 
     return DockerServiceProvider(**kwargs)
 
 
-def get_kubernetes_provider(**kwargs):
+def get_kubernetes_provider(**kwargs: Any) -> Any:
     """Get Kubernetes service provider."""
     from victor.workflows.services.providers.kubernetes import KubernetesServiceProvider
 
     return KubernetesServiceProvider(**kwargs)
 
 
-def get_local_provider(**kwargs):
+def get_local_provider(**kwargs: Any) -> Any:
     """Get local process provider."""
     from victor.workflows.services.providers.local import LocalProcessProvider
 
     return LocalProcessProvider(**kwargs)
 
 
-def get_external_provider(**kwargs):
+def get_external_provider(**kwargs: Any) -> Any:
     """Get external service provider."""
     from victor.workflows.services.providers.external import ExternalServiceProvider
 
     return ExternalServiceProvider(**kwargs)
 
 
-def get_aws_provider(**kwargs):
+def get_aws_provider(**kwargs: Any) -> Any:
     """Get AWS service provider."""
     from victor.workflows.services.providers.aws import AWSServiceProvider
 

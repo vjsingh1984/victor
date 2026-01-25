@@ -171,7 +171,7 @@ class MockBaseProvider(BaseProvider):
         else:
             usage = self._token_usage
 
-        return CompletionResponse(
+        return CompletionResponse(  # type: ignore[call-arg]
             content=self._response_text,
             role="assistant",
             tool_calls=self._tool_calls,
@@ -336,7 +336,7 @@ class FailingProvider(BaseProvider):
             raise error
 
         # Return success response
-        return CompletionResponse(
+        return CompletionResponse(  # type: ignore[call-arg]
             content=f"Success call {self._call_count}",
             role="assistant",
             model=model,
@@ -455,7 +455,7 @@ class StreamingTestProvider(BaseProvider):
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send a chat completion request (non-streaming)."""
-        return CompletionResponse(
+        return CompletionResponse(  # type: ignore[call-arg]
             content="".join(self._chunks),
             role="assistant",
             model=model,
@@ -596,7 +596,7 @@ class ToolCallMockProvider(BaseProvider):
             content = self._response_text
             tool_calls = self._default_tool_calls
 
-        return CompletionResponse(
+        return CompletionResponse(  # type: ignore[call-arg]
             content=content,
             role="assistant",
             tool_calls=tool_calls if tool_calls else None,
@@ -914,7 +914,7 @@ class LatencySimulationProvider(BaseProvider):
         # Simulate network delay
         await sleep(latency)
 
-        return CompletionResponse(
+        return CompletionResponse(  # type: ignore[call-arg]
             content=self._response_text,
             role="assistant",
             model=model,

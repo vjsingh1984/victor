@@ -45,15 +45,32 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Protocol, runtime_checkable
+from typing import Any, Dict, List, Protocol, runtime_checkable
 
-if TYPE_CHECKING:
-    # Forward reference - ConversationContext is defined in victor/framework/conversations/
-    # This avoids circular imports
-    class ConversationContext:
-        """Placeholder for type checking."""
 
-        token_count: int
+# Dict-based models for context-related types (instantiable for tests).
+class CompactionContext(dict[str, Any]):
+    """Context for context compaction operations.
+
+    This is distinct from ConversationContext in victor/framework/conversations/
+    which is used for multi-agent conversations. This type is specifically
+    for context compaction strategies.
+
+    Common keys:
+        - messages: List[Dict[str, str]] - Conversation messages
+        - token_count: int - Total token count
+        - metadata: Dict[str, Any] - Additional context metadata
+    """
+
+
+class ContextBudget(dict[str, Any]):
+    """Context budget with token limits.
+
+    Common keys:
+        - max_tokens: int - Maximum token limit
+        - reserve_tokens: int - Tokens to reserve for response
+        - min_messages: int - Minimum messages to keep
+    """
 
 
 @dataclass
@@ -68,7 +85,7 @@ class CompactionResult:
         metadata: Additional metadata about the compaction
     """
 
-    compacted_context: "ConversationContext"
+    compacted_context: CompactionContext
     tokens_saved: int
     messages_removed: int
     strategy_used: str
@@ -95,8 +112,8 @@ class ICompactionStrategy(Protocol):
 
     async def can_apply(
         self,
-        context: "ConversationContext",
-        budget: "ContextBudget",
+        context: CompactionContext,
+        budget: ContextBudget,
     ) -> bool:
         """Check if this strategy can be applied to the context.
 
@@ -110,14 +127,14 @@ class ICompactionStrategy(Protocol):
         Example:
             async def can_apply(self, context, budget) -> bool:
                 # Only apply if context exceeds budget by > 20%
-                return context.token_count > budget.max_tokens * 1.2
+                return context.get("token_count", 0) > budget.get("max_tokens", 4096) * 1.2
         """
         ...
 
     async def compact(
         self,
-        context: "ConversationContext",
-        budget: "ContextBudget",
+        context: CompactionContext,
+        budget: ContextBudget,
     ) -> CompactionResult:
         """Apply compaction strategy to reduce context size.
 
@@ -132,11 +149,11 @@ class ICompactionStrategy(Protocol):
             async def compact(self, context, budget) -> CompactionResult:
                 # Remove oldest messages until within budget
                 compacted = self._remove_oldest(context, budget)
-                tokens_saved = context.token_count - compacted.token_count
+                tokens_saved = context.get("token_count", 0) - compacted.get("token_count", 0)
                 return CompactionResult(
                     compacted_context=compacted,
                     tokens_saved=tokens_saved,
-                    messages_removed=len(context.messages) - len(compacted.messages),
+                    messages_removed=len(context.get("messages", [])) - len(compacted.get("messages", [])),
                     strategy_used="truncation",
                 )
         """

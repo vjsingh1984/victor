@@ -106,7 +106,7 @@ class LazyInvalidationCache:
             cleanup_interval: Seconds between periodic cleanups (default: 60s)
             dependency_extractor: Dependency extractor for auto-detecting files
         """
-        self._cache: OrderedDict = OrderedDict()
+        self._cache: OrderedDict[str, Any] = OrderedDict()
         self._timestamps: Dict[str, float] = {}
         self._stale_keys: Set[str] = set()
         self._file_index: Dict[str, Set[str]] = {}

@@ -146,7 +146,8 @@ class MessageStore(IMessageStore):
         Returns:
             List of messages
         """
-        return self._controller.messages[:limit] if limit else self._controller.messages
+        result = self._controller.messages[:limit] if limit else self._controller.messages
+        return cast(List["Message"], result)
 
     def get_last_user_message(self) -> Optional[str]:
         """Get the last user message content.
@@ -156,7 +157,7 @@ class MessageStore(IMessageStore):
         """
         for message in reversed(self._controller.messages):
             if message.role == "user":
-                return cast(str, message.content)
+                return cast(Optional[str], message.content)
         return None
 
     def get_last_assistant_message(self) -> Optional[str]:
@@ -167,7 +168,7 @@ class MessageStore(IMessageStore):
         """
         for message in reversed(self._controller.messages):
             if message.role == "assistant":
-                return message.content
+                return cast(Optional[str], message.content)
         return None
 
     @property

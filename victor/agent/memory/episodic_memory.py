@@ -177,7 +177,7 @@ class Episode:
         age_hours = (current_time - self.timestamp).total_seconds() / 3600
 
         # Decay factor reduces by 1% per hour (configurable)
-        decayed_importance = self.importance * self.decay_factor**age_hours
+        decayed_importance = self.importance * (self.decay_factor ** age_hours)
 
         # Boost based on rewards (positive rewards increase importance)
         reward_boost = min(abs(self.rewards) / 100.0, 0.3)  # Max 30% boost
@@ -186,7 +186,7 @@ class Episode:
         access_boost = min(self.access_count * 0.05, 0.2)  # Max 20% boost
 
         effective = min(decayed_importance + reward_boost + access_boost, 1.0)
-        return max(effective, 0.0)
+        return float(max(effective, 0.0))
 
     def __repr__(self) -> str:
         """String representation of episode."""
@@ -306,7 +306,7 @@ class MemoryIndex:
     """
 
     embeddings: Dict[str, np.ndarray] = field(default_factory=dict)
-    metadata_index: Dict[str, Dict[str, List[str]]] = field(
+    metadata_index: Dict[str, Any] = field(
         default_factory=lambda: {"by_key": {}}
     )  # key -> value -> [episode_ids]
     action_index: Dict[str, List[str]] = field(default_factory=dict)  # action -> [episode_ids]
@@ -936,7 +936,7 @@ class EpisodicMemory:
 
         return semantic_memory
 
-    def _default_consolidation(self, episodes: List[Episode]) -> Dict[str, Dict[str, Any]]:
+    def _default_consolidation(self, episodes: List[Episode]) -> Dict[str, Any]:
         """Default consolidation function.
 
         Extracts common patterns from episodes:
@@ -951,7 +951,7 @@ class EpisodicMemory:
         Returns:
             Dictionary of {fact: metadata}
         """
-        knowledge = {}
+        knowledge: Dict[str, Any] = {}
 
         if not episodes:
             return knowledge

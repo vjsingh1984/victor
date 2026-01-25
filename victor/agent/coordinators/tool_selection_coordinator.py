@@ -480,3 +480,9 @@ class ToolSelectionCoordinator(IToolSelectionCoordinator):
             outputs.update(matches)
 
         return outputs
+
+
+__all__ = [
+    "ToolSelectionCoordinator",
+    "IToolSelectionCoordinator",
+]

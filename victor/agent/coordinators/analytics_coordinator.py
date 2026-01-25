@@ -732,7 +732,7 @@ class FileAnalyticsExporter(BaseAnalyticsExporter):
                 error_message=str(e),
             )
 
-    def _export_json(self, data: Dict[str, Any], file_path) -> None:
+    def _export_json(self, data: Dict[str, Any], file_path: Path) -> None:
         """Export data to JSON format.
 
         Args:
@@ -761,7 +761,7 @@ class FileAnalyticsExporter(BaseAnalyticsExporter):
         with open(file_path, "w") as f:
             json.dump(existing_data, f, indent=2)
 
-    def _export_csv(self, data: Dict[str, Any], file_path) -> None:
+    def _export_csv(self, data: Dict[str, Any], file_path: Path) -> None:
         """Export data to CSV format.
 
         Args:

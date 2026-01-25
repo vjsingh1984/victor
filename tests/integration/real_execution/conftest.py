@@ -73,9 +73,11 @@ def ollama_available() -> bool:
 @pytest.fixture(scope="session")
 def ollama_model_available() -> bool:
     """Check if Ollama model is available for testing."""
-    return is_ollama_model_available("qwen2.5-coder:14b") or is_ollama_model_available(
-        "gpt-oss-tools:20b-64K"
-    ) or is_ollama_model_available("qwen2.5-coder:7b")
+    return (
+        is_ollama_model_available("qwen2.5-coder:14b")
+        or is_ollama_model_available("gpt-oss-tools:20b-64K")
+        or is_ollama_model_available("qwen2.5-coder:7b")
+    )
 
 
 @pytest.fixture(scope="session")
@@ -108,9 +110,7 @@ async def ollama_provider() -> AsyncGenerator[OllamaProvider, None]:
             break
 
     if not model:
-        pytest.skip(
-            "No suitable Ollama model found. Run: ollama pull qwen2.5-coder:14b"
-        )
+        pytest.skip("No suitable Ollama model found. Run: ollama pull qwen2.5-coder:14b")
 
     provider = OllamaProvider(
         base_url="http://localhost:11434",
@@ -223,15 +223,9 @@ TIMEOUT_XLONG = 180  # Complex workflows, file operations
 
 def pytest_configure(config):
     """Configure pytest markers."""
-    config.addinivalue_line(
-        "markers", "real_execution: Mark test as real execution (no mocks)"
-    )
-    config.addinivalue_line(
-        "markers", "cloud_provider: Mark test as cloud provider test"
-    )
-    config.addinivalue_line(
-        "markers", "benchmark: Mark test as performance benchmark"
-    )
+    config.addinivalue_line("markers", "real_execution: Mark test as real execution (no mocks)")
+    config.addinivalue_line("markers", "cloud_provider: Mark test as cloud provider test")
+    config.addinivalue_line("markers", "benchmark: Mark test as performance benchmark")
 
 
 def pytest_collection_modifyitems(items, config):
@@ -247,15 +241,18 @@ def pytest_collection_modifyitems(items, config):
             if not is_ollama_running():
                 item.add_marker(
                     pytest.mark.skip(
-                        reason=f"Ollama not available at localhost:11434. "
-                        f"Install: brew install ollama && ollama serve && ollama pull qwen2.5-coder:14b"
+                        reason="Ollama not available at localhost:11434. "
+                        "Install: brew install ollama && ollama serve && ollama pull qwen2.5-coder:14b"
                     )
                 )
-            elif not is_ollama_model_available("qwen2.5-coder:14b") and not is_ollama_model_available("gpt-oss-tools:20b-64K") and not is_ollama_model_available("qwen2.5-coder:7b"):
+            elif (
+                not is_ollama_model_available("qwen2.5-coder:14b")
+                and not is_ollama_model_available("gpt-oss-tools:20b-64K")
+                and not is_ollama_model_available("qwen2.5-coder:7b")
+            ):
                 item.add_marker(
                     pytest.mark.skip(
-                        reason=f"Ollama model not available. "
-                        f"Run: ollama pull qwen2.5-coder:14b"
+                        reason="Ollama model not available. " "Run: ollama pull qwen2.5-coder:14b"
                     )
                 )
 
@@ -264,7 +261,7 @@ def pytest_collection_modifyitems(items, config):
             if not has_zai_api_key():
                 item.add_marker(
                     pytest.mark.skip(
-                        reason=f"ZAI_API_KEY not set. "
-                        f"Set environment variable to run cloud provider tests."
+                        reason="ZAI_API_KEY not set. "
+                        "Set environment variable to run cloud provider tests."
                     )
                 )

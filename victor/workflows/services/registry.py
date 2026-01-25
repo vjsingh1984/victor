@@ -83,7 +83,7 @@ class ServiceRegistry:
     For multi-workflow scenarios, create separate registry instances.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._providers: Dict[ServiceProviderType, ServiceProvider] = {}
         self._services: Dict[str, ServiceRegistryEntry] = {}
         self._startup_order: List[str] = []
@@ -162,6 +162,24 @@ class ServiceRegistry:
             entry.handle and entry.handle.state == ServiceState.HEALTHY
             for entry in self._services.values()
         )
+
+    async def _check_service_health(self, name: str) -> bool:
+        """Check if a service is healthy by running provider's health check.
+
+        Args:
+            name: Service name
+
+        Returns:
+            True if healthy, False otherwise
+        """
+        entry = self._services.get(name)
+        if not entry or not entry.handle or not entry.provider:
+            return False
+
+        try:
+            return await entry.provider.health_check(entry.handle)
+        except Exception:
+            return False
 
     async def start_all(
         self,
@@ -409,7 +427,12 @@ class ServiceContext:
         self._started = True
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[Any],
+    ) -> bool:
         if self._started:
             if exc_type and self.cleanup_on_failure:
                 await self.registry.cleanup_all()
@@ -478,7 +501,7 @@ class RestartPolicyEnforcer:
         self._restart_counts: Dict[str, int] = {}
         self._restart_history: Dict[str, List[RestartAttempt]] = defaultdict(list)
         self._monitoring = False
-        self._monitor_task: Optional[asyncio.Task] = None
+        self._monitor_task: Optional[asyncio.Task[None]] = None
         self._manually_stopped: Set[str] = set()
 
     def should_restart(
@@ -557,13 +580,10 @@ class RestartPolicyEnforcer:
 
             # Stop if still running
             if entry.handle and entry.handle.state == ServiceState.HEALTHY:
-                await self.registry.stop_service(service_name)
+                await self.registry._stop_service(service_name, grace_period=entry.config.lifecycle.shutdown_grace)
 
             # Start again
-            await self.registry.start_service(
-                entry.config,
-                timeout=entry.config.lifecycle.startup_timeout,
-            )
+            await self.registry._start_service(service_name, timeout=entry.config.lifecycle.startup_timeout)
 
             # Record success
             self._restart_history[service_name].append(
@@ -599,10 +619,10 @@ class RestartPolicyEnforcer:
         Returns:
             Delay in seconds before next restart
         """
-        count = self._restart_counts.get(service_name, 0)
+        count: int = self._restart_counts.get(service_name, 0)
         base_delay = 1.0
         max_delay = 60.0
-        delay = min(base_delay * (2**count), max_delay)
+        delay: float = min(base_delay * (2**count), max_delay)
         return delay
 
     def reset_count(self, service_name: str) -> None:

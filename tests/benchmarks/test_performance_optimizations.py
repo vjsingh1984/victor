@@ -251,9 +251,7 @@ class TestJSONSerializationBenchmarks:
                         "id": i,
                         "values": list(range(100)),
                         "nested": {
-                            "level1": {
-                                "level2": {"level3": [f"data_{i}_{j}" for j in range(100)]}
-                            }
+                            "level1": {"level2": {"level3": [f"data_{i}_{j}" for j in range(100)]}}
                         },
                     }
                     for i in range(1000)

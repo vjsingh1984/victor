@@ -531,7 +531,7 @@ class ConversationController:
 
         return scored
 
-    def _compute_semantic_similarity(self, text1: str, text2: str) -> float:
+    async def _compute_semantic_similarity(self, text1: str, text2: str) -> float:
         """Compute semantic similarity between two texts using embeddings.
 
         Args:
@@ -549,7 +549,7 @@ class ConversationController:
             t1 = text1[:2000] if len(text1) > 2000 else text1
             t2 = text2[:2000] if len(text2) > 2000 else text2
 
-            embeddings = self._embedding_service.embed_batch([t1, t2])
+            embeddings = await self._embedding_service.embed_batch([t1, t2])
             if len(embeddings) == 2:
                 from victor.processing.native import cosine_similarity
 

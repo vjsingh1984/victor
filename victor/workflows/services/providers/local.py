@@ -254,8 +254,12 @@ class PostgresLocalProvider(LocalProcessProvider):
             await process.wait()
 
             if process.returncode != 0:
-                stderr = await process.stderr.read()
-                raise ServiceStartError(config.name, f"pg_ctl failed: {stderr.decode()}")
+                if process.stderr:
+                    stderr = await process.stderr.read()
+                    error_msg = stderr.decode()
+                else:
+                    error_msg = "Unknown error"
+                raise ServiceStartError(config.name, f"pg_ctl failed: {error_msg}")
 
             handle.state = ServiceState.STARTING
             handle.ports[5432] = port

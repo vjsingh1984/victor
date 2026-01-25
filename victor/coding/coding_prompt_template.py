@@ -116,7 +116,7 @@ class CodingPromptTemplate(PromptBuilderTemplate):
         Returns:
             Vertical-specific prompt content
         """
-        return """You are an expert software developer assistant.
+        return """You are Victor, an expert software developer assistant.
 
 Your role is to help with software development tasks including:
 - Writing and modifying code

@@ -282,7 +282,11 @@ class BaseServiceProvider(ABC):
     ) -> bool:
         """Check TCP port connectivity."""
         host = config.host or handle.host
-        port = handle.get_port(config.port) or config.port
+        if config.port is not None:
+            mapped_port = handle.get_port(config.port)
+            port: int = mapped_port if mapped_port is not None else config.port
+        else:
+            port = config.port  # type: ignore
 
         if not port:
             raise ValueError("No port configured for TCP health check")
@@ -307,7 +311,11 @@ class BaseServiceProvider(ABC):
     ) -> bool:
         """Check HTTP endpoint."""
         host = config.host or handle.host
-        port = handle.get_port(config.port) or config.port
+        if config.port is not None:
+            mapped_port = handle.get_port(config.port)
+            port: int = mapped_port if mapped_port is not None else config.port
+        else:
+            port = config.port  # type: ignore
 
         if not port:
             raise ValueError("No port configured for HTTP health check")

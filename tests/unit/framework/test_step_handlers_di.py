@@ -132,7 +132,9 @@ class TestStepHandlerDIInjection:
         handler.apply_team_specs(mock_orchestrator, vertical, context, result)
 
         # Verify injected registry was used instead of import
-        mock_registry.register_from_vertical.assert_called_once_with("test_vertical", {"team1": mock_team_spec}, replace=True)
+        mock_registry.register_from_vertical.assert_called_once_with(
+            "test_vertical", {"team1": mock_team_spec}, replace=True
+        )
 
     def test_step_handler_uses_injected_chain_registry(self):
         """Handler should use injected chain registry instead of importing."""
@@ -282,8 +284,9 @@ class TestStepHandlerOCPCompliance:
 
         # Verify handler is registered (use get_ordered_handlers())
         handlers = registry.get_ordered_handlers()
-        assert any(h.name == "custom" for h in handlers), \
-            f"Custom handler not found in handlers: {[h.name for h in handlers]}"
+        assert any(
+            h.name == "custom" for h in handlers
+        ), f"Custom handler not found in handlers: {[h.name for h in handlers]}"
 
     def test_framework_handler_does_not_hardcode_integration_order(self):
         """FrameworkStepHandler should not hard-code integration order.

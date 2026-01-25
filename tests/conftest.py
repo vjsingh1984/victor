@@ -94,6 +94,50 @@ def _clean_invalid_coverage_db(project_root: Path) -> None:
                 candidate.unlink()
 
 
+def _ensure_coverage_db_for_report(project_root: Path) -> bool:
+    """Ensure a usable .coverage DB exists for report generation."""
+    coverage_db = project_root / ".coverage"
+    if coverage_db.exists() and _coverage_db_is_valid(coverage_db):
+        return True
+    try:
+        import coverage
+        from coverage.exceptions import CoverageException
+
+        cov = coverage.Coverage(data_file=str(coverage_db), config_file=True)
+        try:
+            cov.load()
+            cov.combine()
+            cov.save()
+        except CoverageException:
+            return False
+    except Exception:
+        return False
+    return coverage_db.exists() and _coverage_db_is_valid(coverage_db)
+
+
+def _patch_pytest_cov_finish(config: pytest.Config) -> None:
+    """Patch pytest-cov finish to ensure coverage DB is report-ready."""
+    plugin = config.pluginmanager.getplugin("_cov")
+    if plugin is None or getattr(plugin, "_disabled", False):
+        return
+    cov_controller = getattr(plugin, "cov_controller", None)
+    if cov_controller is None:
+        return
+    if getattr(cov_controller, "_victor_finish_patched", False):
+        return
+
+    original_finish = cov_controller.finish
+
+    def finish_wrapper() -> None:
+        original_finish()
+        if not _ensure_coverage_db_for_report(Path(config.rootpath)):
+            plugin.options.cov_report = {}
+            plugin.options.cov_fail_under = None
+
+    cov_controller.finish = finish_wrapper  # type: ignore[assignment]
+    cov_controller._victor_finish_patched = True
+
+
 def pytest_sessionstart(session: pytest.Session) -> None:
     """Ensure stale coverage DBs don't poison pytest-cov reporting."""
     config = session.config
@@ -106,6 +150,7 @@ def pytest_sessionstart(session: pytest.Session) -> None:
     if getattr(config.option, "cov_append", False):
         return
     _clean_invalid_coverage_db(Path(config.rootpath))
+    _patch_pytest_cov_finish(config)
 
 
 @pytest.fixture

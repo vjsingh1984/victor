@@ -100,18 +100,23 @@ class ContextOverflowHandler(IContextOverflowHandler):
             )
 
             # Delegate to controller for compaction
-            metrics = self._controller.compact_context(
-                strategy=strategy,
-                target_ratio=target_ratio,
-                preserve_system_prompt=preserve_system_prompt,
-            )
+            if hasattr(self._controller, 'compact_context'):
+                metrics = self._controller.compact_context(
+                    strategy=strategy,
+                    target_ratio=target_ratio,
+                    preserve_system_prompt=preserve_system_prompt,
+                )
 
-            logger.info(
-                f"Compaction complete: {metrics.total_chars} chars, "
-                f"{metrics.message_count} messages"
-            )
+                logger.info(
+                    f"Compaction complete: {metrics.total_chars} chars, "
+                    f"{metrics.message_count} messages"
+                )
 
-            return metrics
+                return metrics
+            else:
+                # Fallback if compact_context not available
+                logger.warning("compact_context not available on controller")
+                return None
 
         except Exception as e:
             logger.error(f"Compaction failed: {e}")
@@ -149,7 +154,7 @@ class ContextOverflowHandler(IContextOverflowHandler):
 
         # Build context within character limit
         # Prioritize recent messages by iterating in reverse
-        context = []
+        context: List[Dict[str, Any]] = []
         total_chars = 0
 
         for message in reversed(messages):

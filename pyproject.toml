@@ -500,65 +500,6 @@ enrichment_strategy = "victor.agent.capabilities.builtin:EnrichmentStrategyCapab
 include = ["victor*"]
 exclude = ["tests*", "docs*"]
 
-# NOTE: Pytest configuration has been moved to pytest.ini to avoid duplication warnings
-# pytest.ini takes precedence over [tool.pytest.ini_options] in pyproject.toml
-# See pytest.ini for all pytest settings
-
-# Pytest configuration (for IDE integration - pytest.ini takes precedence)
-# This section provides IDE autocomplete and type hints for pytest options
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py", "*_test.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-addopts = [
-    "-v",
-    "--strict-markers",
-    "--strict-config",
-    "--tb=short",
-    "--disable-warnings",
-    "--cov=victor",
-    "--cov-report=term-missing:skip-covered",
-    "--cov-report=html",
-    "--cov-report=xml",
-    "-m",
-    "not load_test and not slow",
-]
-markers = [
-    # Test type markers
-    "unit: Unit tests (fast, isolated)",
-    "integration: Integration tests (require external services)",
-    "smoke: Smoke tests (quick sanity checks)",
-    "regression: Regression tests",
-    # Test characteristic markers
-    "slow: Slow tests (deselect with '-m \"not slow\"')",
-    "requires_network: Tests requiring network access",
-    "requires_ollama: Tests requiring Ollama server",
-    "requires_docker: Tests requiring Docker daemon",
-    # Feature-specific markers
-    "workflows: Workflow-related tests",
-    "agents: Multi-agent tests",
-    "hitl: Human-in-the-loop tests",
-    "benchmark: Performance benchmarks",
-    "summary: Summary/report generation tests",
-    "load_test: Load and scalability tests (require load testing infrastructure)",
-    # Provider-specific markers
-    "requires_anthropic: Tests requiring Anthropic API",
-    "requires_openai: Tests requiring OpenAI API",
-    "requires_google: Tests requiring Google API",
-    # Database markers
-    "requires_database: Tests requiring database connection",
-    "requires_cache: Tests requiring cache backend",
-]
-asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "function"
-timeout = 300
-timeout_method = "thread"
-filterwarnings = [
-    "ignore::DeprecationWarning",
-    "ignore::ResourceWarning",
-    "ignore::UserWarning",
-]
 
 [tool.ruff]
 line-length = 100

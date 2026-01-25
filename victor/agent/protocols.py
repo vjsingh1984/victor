@@ -3892,16 +3892,17 @@ class IEmbeddingManager(Protocol):
     Separated because not all conversations need embeddings.
     """
 
-    def initialize_embeddings(self) -> None:
+    async def initialize_embeddings(self) -> None:
         """Initialize embedding store."""
         ...
 
-    def semantic_search(self, query: str, k: int = 5) -> List[Any]:
+    async def semantic_search(self, query: str, k: int = 5, filters: Optional[Dict[str, Any]] = None) -> List[Any]:
         """Perform semantic search.
 
         Args:
             query: Search query
             k: Number of results to return
+            filters: Optional filters for search
 
         Returns:
             List of search results

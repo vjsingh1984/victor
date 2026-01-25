@@ -85,7 +85,7 @@ def _make_settings() -> Settings:
 
 def _make_orchestrator(provider: FakeProvider) -> AgentOrchestrator:
     settings = _make_settings()
-    settings.load_profiles = lambda: {
+    settings.load_profiles = lambda: {  # type: ignore[method-assign]
         "default": ProfileConfig(
             provider="fake",
             model="fake",
@@ -99,7 +99,7 @@ def _make_orchestrator(provider: FakeProvider) -> AgentOrchestrator:
     settings.analytics_enabled = False
     settings.tool_call_budget = 300
     settings.airgapped_mode = False
-    settings.load_tool_config = lambda: {}
+    settings.load_tool_config = lambda: {}  # type: ignore[method-assign]
 
     return AgentOrchestrator(settings=settings, provider=provider, model="fake")
 
@@ -154,7 +154,7 @@ async def test_non_streaming_path_uses_chat_when_streaming_not_supported():
     the stream completes without error.
     """
     provider = FakeProvider(stream_chunks=[], supports_tools=False)
-    provider.supports_streaming = lambda: False
+    provider.supports_streaming = lambda: False  # type: ignore[method-assign]
     orchestrator = _make_orchestrator(provider)
 
     # The stream should complete without raising an exception

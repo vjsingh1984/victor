@@ -47,14 +47,14 @@ logger = logging.getLogger(__name__)
 
 # Try to import native extensions for faster pattern detection
 _NATIVE_AVAILABLE = False
-_native = None
+_native_module = None
 
 try:
-    import victor_native as _native
+    import victor_native as _native_module
 
     _NATIVE_AVAILABLE = True
-    if _native:
-        logger.debug(f"Native thinking detector loaded (v{_native.__version__})")
+    if _native_module:
+        logger.debug(f"Native thinking detector loaded (v{_native_module.__version__})")
 except ImportError:
     logger.debug("Native extensions not available, using Python thinking detector")
 
@@ -83,7 +83,7 @@ class PatternAnalysis:
 
 
 # Common filler words to exclude from keyword extraction
-STOPWORDS: frozenset = frozenset(
+STOPWORDS: frozenset[str] = frozenset(
     {
         "let",
         "me",
@@ -176,7 +176,7 @@ STOPWORDS: frozenset = frozenset(
 )
 
 # Patterns indicating circular thinking
-CIRCULAR_PATTERNS: List[re.Pattern] = [
+CIRCULAR_PATTERNS: List[re.Pattern[str]] = [
     re.compile(r"let me (read|check|look at|examine|see) (the|this) (file|code)", re.I),
     re.compile(r"i need to (read|check|look at|examine|see)", re.I),
     re.compile(r"(first|now) let me", re.I),
@@ -191,7 +191,7 @@ CIRCULAR_PATTERNS: List[re.Pattern] = [
 ]
 
 # Stalling patterns - thinking without action (common in DeepSeek)
-STALLING_PATTERNS: List[re.Pattern] = [
+STALLING_PATTERNS: List[re.Pattern[str]] = [
     re.compile(r"^let me\b", re.I),  # Starts with "let me"
     re.compile(r"^i('ll| will| need to| should)\b", re.I),  # Starts with intent
     re.compile(r"^now\b", re.I),  # Starts with "now"
@@ -334,8 +334,8 @@ class ThinkingPatternDetector:
             True if circular phrases detected
         """
         # Use native implementation when available (6x faster)
-        if _NATIVE_AVAILABLE and _native:
-            result = _native.detect_circular_phrases(text)  # type: ignore[attr-defined]
+        if _NATIVE_AVAILABLE and _native_module:
+            result = _native_module.detect_circular_phrases(text)
             assert isinstance(result, bool)
             return result
 

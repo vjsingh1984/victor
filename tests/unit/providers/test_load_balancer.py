@@ -75,7 +75,7 @@ class TestProviderInstance:
 
     def test_initial_state(self, provider_instance) -> None:
         """Test initial instance state."""
-        assert provider_instance.provider_id == "test-1"
+        assert provider_instance.provider_id == "test-1"  # type: ignore[union-attr]
         assert provider_instance.active_connections == 0
         assert provider_instance.is_healthy
         assert provider_instance.can_accept_traffic
@@ -127,10 +127,10 @@ class TestRoundRobinLoadBalancer:
         selected_4 = await balancer.select_provider(multiple_instances)
 
         # Should cycle through instances
-        assert selected_1.provider_id == "test-0"
-        assert selected_2.provider_id == "test-1"
-        assert selected_3.provider_id == "test-2"
-        assert selected_4.provider_id == "test-0"  # Back to start
+        assert selected_1.provider_id == "test-0"  # type: ignore[union-attr]
+        assert selected_2.provider_id == "test-1"  # type: ignore[union-attr]
+        assert selected_3.provider_id == "test-2"  # type: ignore[union-attr]
+        assert selected_4.provider_id == "test-0"  # Back to start  # type: ignore[union-attr]
 
     @pytest.mark.asyncio
     async def test_filters_unhealthy(self, multiple_instances) -> None:
@@ -141,7 +141,7 @@ class TestRoundRobinLoadBalancer:
         multiple_instances[1].health_monitor.set_status(HealthStatus.UNHEALTHY)
 
         selected = await balancer.select_provider(multiple_instances)
-        assert selected.provider_id != "test-1"
+        assert selected.provider_id != "test-1"  # type: ignore[union-attr]
 
     @pytest.mark.asyncio
     async def test_no_healthy_instances(self, multiple_instances) -> None:
@@ -170,7 +170,7 @@ class TestLeastConnectionsLoadBalancer:
         multiple_instances[1].acquire_connection()
 
         selected = await balancer.select_provider(multiple_instances)
-        assert selected.provider_id == "test-2"  # No connections
+        assert selected.provider_id == "test-2"  # No connections  # type: ignore[union-attr]
 
     @pytest.mark.asyncio
     async def test_respects_weight(self, multiple_instances) -> None:
@@ -188,7 +188,7 @@ class TestLeastConnectionsLoadBalancer:
 
         selected = await balancer.select_provider(multiple_instances)
         # First should be selected due to higher weight (connections/weight is lower)
-        assert selected.provider_id == "test-0"
+        assert selected.provider_id == "test-0"  # type: ignore[union-attr]
 
     @pytest.mark.asyncio
     async def test_filters_unhealthy(self, multiple_instances) -> None:
@@ -202,7 +202,7 @@ class TestLeastConnectionsLoadBalancer:
         multiple_instances[0].acquire_connection()
 
         selected = await balancer.select_provider(multiple_instances)
-        assert selected.provider_id == "test-2"
+        assert selected.provider_id == "test-2"  # type: ignore[union-attr]
 
 
 class TestAdaptiveLoadBalancer:
@@ -219,7 +219,7 @@ class TestAdaptiveLoadBalancer:
         multiple_instances[2].health_monitor.record_success(500.0)
 
         selected = await balancer.select_provider(multiple_instances)
-        assert selected.provider_id == "test-0"  # Lowest latency
+        assert selected.provider_id == "test-0"  # Lowest latency  # type: ignore[union-attr]
 
     @pytest.mark.asyncio
     async def test_prefers_low_error_rate(self, multiple_instances) -> None:
@@ -238,7 +238,7 @@ class TestAdaptiveLoadBalancer:
 
         selected = await balancer.select_provider(multiple_instances)
         # Should prefer instances with no errors
-        assert selected.provider_id in ["test-1", "test-2"]
+        assert selected.provider_id in ["test-1", "test-2"]  # type: ignore[union-attr]
 
     @pytest.mark.asyncio
     async def test_considers_active_connections(self, multiple_instances) -> None:
@@ -256,7 +256,7 @@ class TestAdaptiveLoadBalancer:
 
         selected = await balancer.select_provider(multiple_instances)
         # Should prefer instance with fewest connections
-        assert selected.provider_id == "test-2"
+        assert selected.provider_id == "test-2"  # type: ignore[union-attr]
 
     @pytest.mark.asyncio
     async def test_custom_weights(self, multiple_instances) -> None:
@@ -283,7 +283,7 @@ class TestAdaptiveLoadBalancer:
 
         # With high latency weight, should prefer moderate latency and no errors
         selected = await balancer.select_provider(multiple_instances)
-        assert selected.provider_id == "test-2"
+        assert selected.provider_id == "test-2"  # type: ignore[union-attr]
 
 
 class TestRandomLoadBalancer:
@@ -296,7 +296,7 @@ class TestRandomLoadBalancer:
 
         selected = await balancer.select_provider(multiple_instances)
         assert selected is not None
-        assert selected.provider_id in ["test-0", "test-1", "test-2"]
+        assert selected.provider_id in ["test-0", "test-1", "test-2"]  # type: ignore[union-attr]
 
     @pytest.mark.asyncio
     async def test_distribution(self, multiple_instances) -> None:
@@ -306,7 +306,7 @@ class TestRandomLoadBalancer:
         selections = {}
         for _ in range(100):
             selected = await balancer.select_provider(multiple_instances)
-            selections[selected.provider_id] = selections.get(selected.provider_id, 0) + 1
+            selections[selected.provider_id] = selections.get(selected.provider_id, 0) + 1  # type: ignore[union-attr]
 
         # All instances should be selected
         assert len(selections) == 3

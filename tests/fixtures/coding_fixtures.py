@@ -246,7 +246,7 @@ def create_mock_function_node(name: str, start_line: int = 1) -> Dict[str, Any]:
 
 def create_mock_class_node(
     name: str,
-    bases: List[str] = None,
+    bases: List[str] | None = None,
     start_line: int = 1,
 ) -> Dict[str, Any]:
     """Create a mock class AST node."""
@@ -264,7 +264,7 @@ def create_mock_class_node(
 
 def create_mock_import_node(
     module: str,
-    names: List[str] = None,
+    names: List[str] | None = None,
     start_line: int = 1,
 ) -> Dict[str, Any]:
     """Create a mock import AST node."""
@@ -293,7 +293,7 @@ def create_mock_variable_node(
 
 def create_mock_call_node(
     func: str,
-    args: List[str] = None,
+    args: List[str] | None = None,
     start_line: int = 1,
 ) -> Dict[str, Any]:
     """Create a mock function call AST node."""
@@ -361,7 +361,7 @@ def create_mock_completion(
     kind: CompletionItemKind,
     detail: str = "",
     documentation: str = "",
-    insert_text: str = None,
+    insert_text: str | None = None,
 ) -> CompletionItem:
     """Create a mock completion item."""
     return CompletionItem(
@@ -532,7 +532,7 @@ class CodeReviewScenario:
         code: str,
         file_path: str,
         expected_findings: int,
-        categories: List[str] = None,
+        categories: List[str] | None = None,
     ):
         self.name = name
         self.code = code
@@ -598,7 +598,7 @@ def create_sample_file(
 
 def create_sample_project(
     tmp_path: Path,
-    files: Dict[str, str] = None,
+    files: Dict[str, str] | None = None,
 ) -> Path:
     """Create a sample project structure with multiple files."""
     if files is None:
@@ -796,7 +796,7 @@ interface DatabaseConnection {
 
 def create_mock_hover(
     contents: str,
-    range: Range = None,
+    range: Range | None = None,
     kind: str = "markdown",
 ) -> Dict[str, Any]:
     """Create a mock hover response."""
@@ -814,8 +814,8 @@ def create_mock_hover(
 def create_mock_code_action(
     title: str,
     kind: str,
-    edit: Dict[str, Any] = None,
-    command: Dict[str, Any] = None,
+    edit: Dict[str, Any] | None = None,
+    command: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     """Create a mock code action."""
     return {
@@ -828,7 +828,7 @@ def create_mock_code_action(
 
 def create_mock_code_lens(
     range: Range,
-    command: Dict[str, Any] = None,
+    command: Dict[str, Any] | None = None,
     data: Any = None,
 ) -> Dict[str, Any]:
     """Create a mock code lens."""
@@ -913,7 +913,7 @@ def create_mock_tree_sitter_node(
     text: str,
     start_point: tuple = (0, 0),
     end_point: tuple = (0, 10),
-    children: List[Dict[str, Any]] = None,
+    children: List[Dict[str, Any]] | None = None,
 ) -> Dict[str, Any]:
     """Create a mock tree-sitter node for testing.
 

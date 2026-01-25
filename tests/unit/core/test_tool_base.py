@@ -374,7 +374,8 @@ class TestToolRegistry:
         registry = ToolRegistry()
 
         class FailingTool(ConcreteTool):
-            async def execute(self, context, **kwargs):
+            async def execute(self, context, **kwargs):  # type: ignore[override]
+
                 raise ValueError("Test error")
 
         tool = FailingTool()

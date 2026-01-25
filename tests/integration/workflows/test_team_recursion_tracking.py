@@ -50,7 +50,7 @@ class MockTeamMember:
             sender_id=self.id,
             recipient_id=message.sender_id,
             content=f"Received: {message.content}",
-            message_type="response",
+            message_type="response",  # type: ignore[arg-type]
         )
 
 

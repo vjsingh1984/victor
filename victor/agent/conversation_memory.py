@@ -1347,7 +1347,7 @@ class ConversationStore:
 
         return session.messages[-count:]
 
-    def clear_session(self, session_id: str):
+    def clear_session(self, session_id: str) -> None:
         """Clear all messages from a session.
 
         Args:
@@ -1366,7 +1366,7 @@ class ConversationStore:
 
             logger.info(f"Cleared session {session_id}")
 
-    def delete_session(self, session_id: str):
+    def delete_session(self, session_id: str) -> None:
         """Delete a session and all its messages.
 
         Args:
@@ -1452,7 +1452,7 @@ class ConversationStore:
         if not session:
             return {}
 
-        role_counts = {}
+        role_counts: Dict[str, int] = {}
         for msg in session.messages:
             role_counts[msg.role.value] = role_counts.get(msg.role.value, 0) + 1
 
@@ -1719,7 +1719,7 @@ class ConversationStore:
 
         return scored
 
-    def _prune_context(self, session: ConversationSession):
+    def _prune_context(self, session: ConversationSession) -> None:
         """Prune conversation context to fit within token limits.
 
         Strategy:
@@ -1762,7 +1762,7 @@ class ConversationStore:
             f"Remaining: {len(session.messages)}, Tokens: {current_tokens}"
         )
 
-    def _persist_session(self, session: ConversationSession):
+    def _persist_session(self, session: ConversationSession) -> None:
         """Persist session to database using normalized FK columns."""
         with sqlite3.connect(self.db_path) as conn:
             # Get or create provider ID
@@ -1811,7 +1811,7 @@ class ConversationStore:
                 ),
             )
 
-    def _persist_message(self, session_id: str, message: ConversationMessage):
+    def _persist_message(self, session_id: str, message: ConversationMessage) -> None:
         """Persist message to database."""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
@@ -1835,7 +1835,7 @@ class ConversationStore:
                 ),
             )
 
-    def _update_session_activity(self, session_id: str):
+    def _update_session_activity(self, session_id: str) -> None:
         """Update session last activity timestamp."""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
@@ -2064,7 +2064,7 @@ class ConversationStore:
                 exclude_ids = [row["id"] for row in recent_rows]
 
         # Run async search
-        async def _search():
+        async def _search() -> List[Any]:
             return await self._embedding_store.search_similar(
                 query=query,
                 session_id=session_id,
@@ -2222,7 +2222,7 @@ class ConversationStore:
             if not rows:
                 return []
 
-            query_embedding = self._embedding_service.embed(query[:2000])
+            query_embedding = await self._embedding_service.embed_text(query[:2000])
             scored_summaries: List[Tuple[str, float]] = []
 
             for row in rows:
@@ -2230,7 +2230,7 @@ class ConversationStore:
                 if len(summary) < 10:
                     continue
 
-                summary_embedding = self._embedding_service.embed(summary[:2000])
+                summary_embedding = await self._embedding_service.embed_text(summary[:2000])
                 similarity = self._cosine_similarity(query_embedding, summary_embedding)
 
                 if similarity >= min_similarity:
@@ -2416,10 +2416,10 @@ class ConversationStore:
         if roles:
             role_placeholders = ",".join("?" * len(roles))
             where_clause = f"session_id = ? AND role IN ({role_placeholders})"
-            params = [session_id, *roles]
+            params: List[Any] = [session_id, *roles]
         else:
             where_clause = "session_id = ?"
-            params = [session_id]
+            params: List[Any] = [session_id]
 
         # Build AND conditions for each term
         for pattern in like_patterns:
@@ -2491,7 +2491,7 @@ class ConversationStore:
     # Efficient queries using normalized FK columns for training data extraction
     # =========================================================================
 
-    def get_provider_stats(self) -> List[Dict[str, Any]]:
+    def get_provider_stats_list(self) -> List[Dict[str, Any]]:
         """Get session statistics grouped by provider.
 
         Returns aggregated stats for ML/RL analysis of provider performance.
@@ -2522,7 +2522,7 @@ class ConversationStore:
 
             return [dict(row) for row in rows]
 
-    def get_model_family_stats(self) -> List[Dict[str, Any]]:
+    def get_model_family_stats_list(self) -> List[Dict[str, Any]]:
         """Get session statistics grouped by model family.
 
         Returns aggregated stats for ML/RL analysis of model architecture performance.
@@ -2555,7 +2555,7 @@ class ConversationStore:
 
             return [dict(row) for row in rows]
 
-    def get_model_size_stats(self) -> List[Dict[str, Any]]:
+    def get_model_size_stats_list(self) -> List[Dict[str, Any]]:
         """Get session statistics grouped by model size category.
 
         Returns aggregated stats for ML/RL analysis of model size impact.
@@ -2594,7 +2594,7 @@ class ConversationStore:
 
             return [dict(row) for row in rows]
 
-    def get_rl_training_data(
+    def get_rl_training_data_list(
         self,
         limit: int = 1000,
         min_messages: int = 2,

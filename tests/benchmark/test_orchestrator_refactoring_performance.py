@@ -83,7 +83,7 @@ def mock_provider():
     async def mock_chat(messages, **kwargs):
         from victor.providers.base import CompletionResponse, Message
 
-        return CompletionResponse(
+        return CompletionResponse(  # type: ignore[call-arg]
             content="Test response",
             role="assistant",
             finish_reason="stop",

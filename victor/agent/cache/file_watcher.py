@@ -101,8 +101,11 @@ class FileChangeHandler(FileSystemEventHandler):
         if event.is_directory:
             return  # Skip directory events
 
+        # Convert bytes to str if necessary
+        file_path = event.src_path if isinstance(event.src_path, str) else event.src_path.decode('utf-8')
+
         change_event = FileChangeEvent(
-            file_path=event.src_path,
+            file_path=str(file_path),
             change_type=FileChangeType.CREATED,
             timestamp=datetime.now().isoformat(),
         )
@@ -117,8 +120,11 @@ class FileChangeHandler(FileSystemEventHandler):
         if event.is_directory:
             return  # Skip directory events
 
+        # Convert bytes to str if necessary
+        file_path = event.src_path if isinstance(event.src_path, str) else event.src_path.decode('utf-8')
+
         change_event = FileChangeEvent(
-            file_path=event.src_path,
+            file_path=str(file_path),
             change_type=FileChangeType.MODIFIED,
             timestamp=datetime.now().isoformat(),
         )
@@ -133,8 +139,11 @@ class FileChangeHandler(FileSystemEventHandler):
         if event.is_directory:
             return  # Skip directory events
 
+        # Convert bytes to str if necessary
+        file_path = event.src_path if isinstance(event.src_path, str) else event.src_path.decode('utf-8')
+
         change_event = FileChangeEvent(
-            file_path=event.src_path,
+            file_path=str(file_path),
             change_type=FileChangeType.DELETED,
             timestamp=datetime.now().isoformat(),
         )
@@ -149,11 +158,15 @@ class FileChangeHandler(FileSystemEventHandler):
         if event.is_directory:
             return  # Skip directory events
 
+        # Convert bytes to str if necessary
+        dest_path = event.dest_path if isinstance(event.dest_path, str) else event.dest_path.decode('utf-8')
+        src_path = event.src_path if isinstance(event.src_path, str) else event.src_path.decode('utf-8')
+
         change_event = FileChangeEvent(
-            file_path=event.dest_path,
+            file_path=str(dest_path),
             change_type=FileChangeType.MOVED,
             timestamp=datetime.now().isoformat(),
-            source_path=event.src_path,
+            source_path=str(src_path) if src_path else None,
         )
         self._emit_event(change_event)
 

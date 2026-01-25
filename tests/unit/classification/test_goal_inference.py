@@ -21,7 +21,7 @@ class _DummyProvider(BaseProvider):
         return False
 
     async def chat(self, *args, **kwargs) -> CompletionResponse:
-        return CompletionResponse(content="", role="assistant", model="dummy")
+        return CompletionResponse(content="", role="assistant", model="dummy")  # type: ignore[call-arg]
 
     async def stream(self, *args, **kwargs):
         if False:

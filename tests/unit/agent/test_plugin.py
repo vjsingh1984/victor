@@ -41,7 +41,7 @@ class MockTool(BaseTool):
             "required": ["input"],
         }
 
-    async def execute(self, **kwargs) -> ToolResult:
+    async def execute(self, **kwargs) -> ToolResult:  # type: ignore[override]
         return ToolResult(success=True, output="Mock result")
 
 

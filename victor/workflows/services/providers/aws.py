@@ -286,7 +286,8 @@ class AWSServiceProvider(BaseServiceProvider):
             None,
             lambda: rds.describe_db_instances(DBInstanceIdentifier=instance_id),
         )
-        return response["DBInstances"][0]
+        result: Dict[str, Any] = response["DBInstances"][0]
+        return result
 
     async def _wait_for_rds_available(
         self,
@@ -440,7 +441,8 @@ class AWSServiceProvider(BaseServiceProvider):
                 ShowCacheNodeInfo=True,
             ),
         )
-        return response["CacheClusters"][0]
+        result: Dict[str, Any] = response["CacheClusters"][0]
+        return result
 
     async def _wait_for_elasticache_available(
         self,
