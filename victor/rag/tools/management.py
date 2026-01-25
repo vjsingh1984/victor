@@ -164,16 +164,17 @@ class RAGDeleteTool(BaseTool):
     def cost_tier(self) -> CostTier:
         return CostTier.LOW
 
-    async def execute(self, arguments: Dict[str, Any]) -> ToolResult:
+    async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
         """Delete a document.
 
         Args:
-            arguments: Tool arguments containing doc_id
+            _exec_ctx: Framework execution context
+            **kwargs: Tool arguments (doc_id)
 
         Returns:
             ToolResult with deletion status
         """
-        doc_id = arguments.get("doc_id", "")
+        doc_id = kwargs.get("doc_id", "")
         from victor.rag.document_store import DocumentStore
 
         try:

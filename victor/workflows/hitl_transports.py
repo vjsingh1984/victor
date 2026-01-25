@@ -631,7 +631,7 @@ class SlackTransport(BaseTransport):
         # Add action buttons
         approve_url = urls.get("approve_url")
         reject_url = urls.get("reject_url")
-        elements: list[dict[str, Any]] = [
+        button_elements: list[dict[str, Any]] = [
             {
                 "type": "button",
                 "text": {"type": "plain_text", "text": "✓ Approve"},
@@ -649,27 +649,26 @@ class SlackTransport(BaseTransport):
                 "url": reject_url if reject_url else "",
             },
         ]
-        blocks.append(
-            {
-                "type": "actions",
-                "block_id": f"hitl_{request.request_id}",
-                "elements": elements,
-            }
-        )
+        actions_block: Dict[str, Any] = {
+            "type": "actions",
+            "block_id": f"hitl_{request.request_id}",
+            "elements": button_elements,  # type: ignore[dict-item]
+        }
+        blocks.append(actions_block)
 
         # Add timeout notice
         req_id_short = request.request_id[:12]
-        blocks.append(
+        context_elements: list[dict[str, Any]] = [
             {
-                "type": "context",
-                "elements": [  # type: ignore[list-item]
-                    {
-                        "type": "mrkdwn",
-                        "text": f"⏱️ Timeout: {request.timeout}s | Request ID: `{req_id_short}...`",
-                    }
-                ],
+                "type": "mrkdwn",
+                "text": f"⏱️ Timeout: {request.timeout}s | Request ID: `{req_id_short}...`",
             }
-        )
+        ]
+        context_block: Dict[str, Any] = {
+            "type": "context",
+            "elements": context_elements,  # type: ignore[dict-item]
+        }
+        blocks.append(context_block)
 
         return blocks
 

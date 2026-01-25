@@ -131,8 +131,8 @@ class SqliteLanceDBStore:
 
         graph_db_path = self.persist_directory / "project.db"
         self._graph_store = SqliteGraphStore(project_path=graph_db_path)
-        assert isinstance(self._graph_store, GraphStoreProtocol)
-        await self._graph_store.initialize()
+        # Note: SqliteGraphStore doesn't have an initialize method
+        # It's ready to use after construction
 
         # Initialize embedding model
         from victor.coding.codebase.embeddings.models import (
@@ -180,7 +180,9 @@ class SqliteLanceDBStore:
         if self._graph_store:
             # GraphStoreProtocol doesn't define close(), but SqliteGraphStore has it
             if hasattr(self._graph_store, "close"):
-                await self._graph_store.close()  # type: ignore[attr-defined]
+                close_method = getattr(self._graph_store, "close", None)
+                if close_method and callable(close_method):
+                    await close_method()
             self._graph_store = None
         self._vector_store = None
         self._vector_table = None
@@ -298,7 +300,7 @@ class SqliteLanceDBStore:
 
         # Prepare graph nodes
         nodes = []
-        embedding_items = []
+        embedding_items: list[dict[str, Any]] = []
 
         for symbol, embedding_text in symbols:
             nodes.append(
@@ -350,11 +352,12 @@ class SqliteLanceDBStore:
                 # Prepare LanceDB documents (no content, just vector + metadata)
                 lance_docs = []
                 for item, vector in zip(batch, vectors, strict=False):
+                    metadata = cast(dict[str, Any], item.get("metadata", {}))
                     lance_docs.append(
                         {
                             "id": item["id"],
                             "vector": vector,
-                            **item["metadata"],
+                            **metadata,
                         }
                     )
 

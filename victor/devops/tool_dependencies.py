@@ -51,11 +51,14 @@ Example:
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
 
 from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
 from victor.framework.tool_naming import ToolNames
 from victor.tools.tool_graph import ToolExecutionGraph
+
+if TYPE_CHECKING:
+    from victor.core.tool_dependency_loader import YAMLToolDependencyProvider
 
 
 # =============================================================================
@@ -176,9 +179,24 @@ def get_devops_tool_graph() -> ToolExecutionGraph:
     if _devops_tool_graph is not None:
         return _devops_tool_graph
 
-    # Get base graph from provider
-    provider = DevOpsToolDependencyProvider
-    graph = provider.get_graph()
+    # Create graph from provider data
+    provider = cast("YAMLToolDependencyProvider", DevOpsToolDependencyProvider)
+
+    # Create new graph
+    graph = ToolExecutionGraph(name="devops")
+
+    # Add nodes and dependencies from provider
+    for dep in provider.get_dependencies():
+        graph.add_node(
+            name=dep.tool_name,
+            depends_on=dep.depends_on,
+            enables=dep.enables,
+            weight=dep.weight,
+        )
+
+    # Add sequences from provider
+    for sequence in provider.get_tool_sequences():
+        graph.add_sequence(sequence)
 
     # Add composed patterns as sequences with higher weights
     for pattern_name, pattern_data in DEVOPS_COMPOSED_PATTERNS.items():

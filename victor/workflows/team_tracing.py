@@ -399,13 +399,19 @@ class TeamTracer:
         if self._otel_available and self._otel_tracer:
             try:
                 from opentelemetry import trace
+                from opentelemetry.trace import Status, StatusCode
 
                 # Start OpenTelemetry span
-                otel_span = self._otel_tracer.start_span(name)
+                if parent_span and hasattr(parent_span, "_otel_span"):
+                    # Use parent's OpenTelemetry span as context
+                    otel_span = self._otel_tracer.start_span(
+                        name,
+                        links=[trace.Link(parent_span._otel_span.context)]  # type: ignore
+                    )
+                else:
+                    otel_span = self._otel_tracer.start_span(name)
+
                 otel_span.set_attribute("trace_id", trace_id)
-                if parent_span:
-                    # Use set_parent API instead of direct attribute assignment
-                    otel_span.set_parent(parent_span.span_id)  # type: ignore[attr-defined]
                 if attributes:
                     for key, value in attributes.items():
                         otel_span.set_attribute(key, str(value))

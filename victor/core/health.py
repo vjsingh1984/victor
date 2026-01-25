@@ -278,9 +278,9 @@ class CallableHealthCheck(BaseHealthCheck):
         """Execute the callable."""
         result = self._check_fn()
         if asyncio.iscoroutine(result):
-            coro_result = await result
+            coro_result = cast(ComponentHealth, await result)
             return coro_result
-        return result
+        return cast(ComponentHealth, result)
 
 
 class ProviderHealthCheck(BaseHealthCheck):

@@ -45,7 +45,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional, Set, TypedDict, cast
 
 from victor.workflows.definition import (
     WorkflowDefinition,
@@ -207,10 +207,10 @@ class WorkflowToGraphAdapter:
 
         def create_handler(
             n: WorkflowNode,
-        ) -> Callable[[WorkflowState], WorkflowState]:
+        ) -> Callable[[Dict[str, Any]], Dict[str, Any]]:
             """Create a state-updating handler for the node."""
 
-            def handler(state: WorkflowState) -> WorkflowState:
+            def handler(state: Dict[str, Any]) -> Dict[str, Any]:
                 # Update state with node execution
                 new_state = dict(state)
                 new_state["current_node"] = n.name
@@ -289,7 +289,7 @@ class WorkflowToGraphAdapter:
         self,
         node: WorkflowNode,
         executor: "WorkflowExecutor",
-    ) -> Callable[[WorkflowState], WorkflowState]:
+    ) -> Callable[[Dict[str, Any]], Dict[str, Any] | Awaitable[Dict[str, Any]]]:
         """Create an execution handler that uses the workflow executor.
 
         Args:
@@ -302,7 +302,7 @@ class WorkflowToGraphAdapter:
         # Import here to avoid circular imports
         from victor.workflows.executor import WorkflowExecutor
 
-        async def async_handler(state: WorkflowState) -> WorkflowState:
+        async def async_handler(state: Dict[str, Any]) -> Dict[str, Any]:
             """Execute the node using the workflow executor."""
             new_state = dict(state)
             new_state["current_node"] = node.name

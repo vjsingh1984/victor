@@ -22,10 +22,11 @@ import functools
 import inspect
 import logging
 import warnings
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, Optional, TypeVar, cast
 
 # Type variables for generic decorator support
 F = TypeVar("F", bound=Callable[..., Any])
+P = TypeVar("P")
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +131,7 @@ def deprecated_property(
     replacement: Optional[str] = None,
     remove_version: Optional[str] = None,
     reason: Optional[str] = None,
-) -> Callable[[F], F]:
+) -> Callable[[F], property]:
     """Decorator to mark properties as deprecated.
 
     Similar to @deprecated but specifically designed for properties,
@@ -158,7 +159,7 @@ def deprecated_property(
         ```
     """
 
-    def decorator(func: F) -> F:
+    def decorator(func: F) -> property:
         @functools.wraps(func)
         def wrapper(self: Any, owner: object, *args: Any, **kwargs: Any) -> Any:
             # Build deprecation message
@@ -190,7 +191,7 @@ def deprecated_property(
             return func(self)
 
         # Convert to property
-        return property(wrapper)  # type: ignore[return-value]
+        return property(wrapper)
 
     return decorator
 

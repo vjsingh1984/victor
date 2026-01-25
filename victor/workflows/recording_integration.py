@@ -187,7 +187,7 @@ async def save_workflow_recording(
         recording_id = await storage.save(recorder)
         metadata = await storage.get_metadata(recording_id)
         if metadata is not None:
-            return metadata.to_dict()
+            return metadata
         return {}
 
     if filepath:

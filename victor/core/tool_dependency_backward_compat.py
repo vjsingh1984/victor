@@ -36,10 +36,13 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Union
 
 if TYPE_CHECKING:
-    from victor.core.tool_dependency_loader import YAMLToolDependencyProvider
+    from victor.core.tool_dependency_loader import (
+        YAMLToolDependencyProvider,
+        EmptyToolDependencyProvider,
+    )
 
 from victor.core.tool_dependency_loader import (
     YAMLToolDependencyProvider,
@@ -67,7 +70,7 @@ class DeprecatedToolDependencyProvider(YAMLToolDependencyProvider):
             canonicalize: Whether to canonicalize tool IDs
         """
         self._vertical = vertical
-        self._yaml_path = yaml_path
+        self._yaml_path: Optional[Path] = yaml_path
         self._canonicalize = canonicalize
 
         warnings.warn(
@@ -83,12 +86,12 @@ class DeprecatedToolDependencyProvider(YAMLToolDependencyProvider):
 
         super().__init__(yaml_path=yaml_path, canonicalize=canonicalize)
 
-    def __class_getitem__(cls, item: Any) -> type:  # type: ignore[misc]
+    def __class_getitem__(cls, item: Any) -> type:
         """Support type hints like DeprecatedToolDependencyProvider[SomeType]."""
         return cls  # pragma: no cover
 
 
-def create_deprecated_provider(vertical: str) -> "YAMLToolDependencyProvider":
+def create_deprecated_provider(vertical: str) -> Union["YAMLToolDependencyProvider", "EmptyToolDependencyProvider"]:
     """Create a deprecated provider instance for backward compatibility.
 
     This function is used internally to maintain backward compatibility while

@@ -47,7 +47,7 @@ if TYPE_CHECKING:
     from victor.framework.workflow_engine import WorkflowExecutionResult, WorkflowEvent
     from victor.workflows.cache import WorkflowDefinitionCache
     from victor.workflows.definition import WorkflowDefinition
-    from victor.workflows.executor import WorkflowExecutor
+    from victor.workflows.executor import WorkflowExecutor, WorkflowResult
     from victor.workflows.streaming_executor import StreamingWorkflowExecutor
     from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
@@ -111,7 +111,7 @@ class YAMLWorkflowCoordinator:
                 pass
 
             orchestrator = MockOrchestrator()
-            self._executor = WorkflowExecutor(orchestrator)  # type: ignore[arg-type, call-arg]
+            self._executor = WorkflowExecutor(orchestrator)
         return self._executor
 
     def _get_streaming_executor(self) -> "StreamingWorkflowExecutor":
@@ -125,7 +125,7 @@ class YAMLWorkflowCoordinator:
                 pass
 
             orchestrator = MockOrchestrator()
-            self._streaming_executor = StreamingWorkflowExecutor(orchestrator)  # type: ignore[arg-type, call-arg]
+            self._streaming_executor = StreamingWorkflowExecutor(orchestrator)
         return self._streaming_executor
 
     def _get_definition_cache(self) -> "WorkflowDefinitionCache":
@@ -233,7 +233,7 @@ class YAMLWorkflowCoordinator:
 
         # Cache the definition
         if hasattr(cache, "store"):
-            cache.store(path, name, config_hash, workflow_def)  # type: ignore[attr-defined]
+            cache.store(path, name, config_hash, workflow_def)
         logger.debug(f"Cached workflow definition: {name} from {path}")
 
         return workflow_def
@@ -334,17 +334,17 @@ class YAMLWorkflowCoordinator:
                 executor = self._get_executor()
 
                 # Execute
-                exec_result = await executor.execute(workflow_def, initial_state or {})
+                result = await executor.execute(workflow_def, initial_state or {})
 
                 duration = time.time() - start_time
 
                 # Convert WorkflowResult to WorkflowExecutionResult
                 return WorkflowExecutionResult(
-                    success=exec_result.success,
-                    final_state=exec_result.context.to_dict() if hasattr(exec_result.context, "to_dict") else {},
+                    success=result.success,
+                    final_state=result.context.get_outputs() if hasattr(result.context, "get_outputs") else {},
                     nodes_executed=[],
                     duration_seconds=duration,
-                    error=exec_result.error if not exec_result.success else None,
+                    error=result.error if not result.success else None,
                 )
 
         except Exception as e:

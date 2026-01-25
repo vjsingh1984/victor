@@ -434,8 +434,8 @@ class WorkflowGenerationPipeline:
         result = validator.validate(schema)
         # Handle both sync and async validators
         if isinstance(result, asyncio.Future) or hasattr(result, '__await__'):
-            return await result
-        return result
+            return await result  # type: ignore[no-any-return]
+        return result  # type: ignore[no-any-return]
 
     async def _refine_schema(
         self, schema: Dict[str, Any], validation: WorkflowGenerationValidationResult
@@ -461,8 +461,13 @@ class WorkflowGenerationPipeline:
         result = self._refiner.refine(schema, validation)
         # Handle both sync and async refiners
         if isinstance(result, asyncio.Future) or hasattr(result, '__await__'):
-            return await result
-        return result
+            refined_result = await result
+            return refined_result  # type: ignore[no-any-return]
+        # If result is a tuple, return it directly
+        if isinstance(result, tuple):
+            return result  # type: ignore[return-value]
+        # Otherwise, it should be a RefinementResult, wrap it
+        return schema, result  # type: ignore[no-any-return]
 
     async def _compile_to_graph(self, schema: Dict[str, Any]) -> StateGraph[Any]:
         """Compile schema to executable StateGraph.

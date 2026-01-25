@@ -274,6 +274,8 @@ class DocumentStore:
                 ]
             )
 
+            # _db is guaranteed to be initialized here
+            assert self._db is not None, "Database connection not initialized"
             self._table = await asyncio.to_thread(
                 self._db.create_table, self.config.table_name, schema=schema
             )
@@ -649,7 +651,8 @@ class DocumentStore:
         Uses the embedding service if provided, otherwise uses a fallback.
         """
         if self._embedding_service:
-            return await self._embedding_service.embed(text)
+            result = await self._embedding_service.embed(text)
+            return cast(List[float], result)
 
         # Try to use sentence-transformers with core BGE model
         try:

@@ -128,20 +128,20 @@ class GraphExecutionCoordinator:
             # CompiledGraph.invoke() returns GraphExecutionResult with .state attribute
             # Some graphs may return state dict directly for backward compatibility
             if hasattr(result, "state"):
-                final_state2 = result.state
+                final_state_dict: dict[str, Any] = result.state
                 nodes_executed = getattr(result, "node_history", [])
                 success = getattr(result, "success", True)
                 error = getattr(result, "error", None)
             else:
                 # Backward compatibility: result is the final state dict
-                final_state2: dict[str, Any] = result
+                final_state_dict = result
                 nodes_executed = []
                 success = True
                 error = None
 
             return WorkflowExecutionResult(
                 success=success,
-                final_state=final_state2,
+                final_state=final_state_dict,
                 nodes_executed=(
                     nodes_executed
                     if nodes_executed
@@ -198,15 +198,15 @@ class GraphExecutionCoordinator:
 
                 # Handle polymorphic return type
                 if hasattr(result, "state"):
-                    final_state3: dict[str, Any] = result.state
+                    final_stream_state: dict[str, Any] = result.state
                 else:
-                    final_state3: dict[str, Any] = result
+                    final_stream_state = result
 
                 yield WorkflowEvent(
                     event_type="complete",
                     node_id="",
                     timestamp=time.time(),
-                    state_snapshot=final_state3,
+                    state_snapshot=final_stream_state,
                 )
 
         except Exception as e:
@@ -257,7 +257,9 @@ class GraphExecutionCoordinator:
             )
 
             # Compile WorkflowGraph to CompiledGraph
-            compiler = WorkflowGraphCompiler(compiler_config)
+            from victor.workflows.graph_compiler import WorkflowGraphCompiler
+
+            compiler: WorkflowGraphCompiler = WorkflowGraphCompiler(compiler_config)
             compiled = compiler.compile(graph)
 
             # Execute via CompiledGraph.invoke()
@@ -267,20 +269,20 @@ class GraphExecutionCoordinator:
 
             # Extract execution info from result (LSP compliance)
             if hasattr(result, "state"):
-                final_state4 = result.state
+                final_compiled_state: dict[str, Any] = result.state
                 nodes_executed = getattr(result, "node_history", [])
                 success = getattr(result, "success", True)
                 error = getattr(result, "error", None)
             else:
                 # Result is the final state dict
-                final_state4: dict[str, Any] = result
+                final_compiled_state = result
                 nodes_executed = []
                 success = True
                 error = None
 
             return WorkflowExecutionResult(
                 success=success,
-                final_state=final_state4,
+                final_state=final_compiled_state,
                 nodes_executed=nodes_executed,
                 duration_seconds=duration,
                 error=error,

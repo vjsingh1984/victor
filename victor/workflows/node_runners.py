@@ -68,7 +68,6 @@ from victor.workflows.context import ExecutionContext
 
 if TYPE_CHECKING:
     from victor.agent.subagents import SubAgentOrchestrator
-    from victor.agent.subagents import SubAgentManager
     from victor.tools.registry import ToolRegistry
     from victor.workflows.hitl import HITLExecutor, HITLNode
     from victor.agent.orchestrator import AgentOrchestrator
@@ -367,6 +366,8 @@ class ComputeNodeRunner(BaseNodeRunner):
                 # Call handler with expected signature (node, context, tool_registry)
                 # Note: Using inputs as node dict for compatibility
                 # TODO: Create proper ComputeNode and WorkflowContext objects
+                if self._tool_registry is None:
+                    raise ValueError("ToolRegistry is required but not set")
                 result = await handler(  # type: ignore[call-arg, arg-type]
                     inputs,  # type: ignore[arg-type]
                     context,  # type: ignore[arg-type]

@@ -66,15 +66,13 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 # Python 3.11+ has typing.Self, 3.10 needs typing_extensions
 if sys.version_info >= (3, 11):
-    from typing import Self as SelfType
+    from typing import Self
 else:
     try:
-        from typing_extensions import Self as SelfType
+        from typing_extensions import Self
     except ImportError:
-        from typing import Self as SelfType  # type: ignore[attr-defined]
-
-# Re-export as Self for consistency
-Self = SelfType
+        # Fallback for older Python versions - use string annotation
+        Self = Any  # type: ignore
 
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import PromptContributorProtocol

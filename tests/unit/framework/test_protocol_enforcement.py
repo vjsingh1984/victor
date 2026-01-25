@@ -38,6 +38,8 @@ class MockProtocolImplementor(CapabilityRegistryMixin):
 
     def __init__(self):
         super().__init__()
+        # Initialize the capability registry (required for mixin)
+        self.__init_capability_registry__()
         # Register a test capability using OrchestratorCapability
         self._register_capability(
             OrchestratorCapability(

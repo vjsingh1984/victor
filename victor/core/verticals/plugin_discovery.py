@@ -61,15 +61,20 @@ from pathlib import Path
 from typing import Dict, Type, Optional, Any, TYPE_CHECKING, cast, List
 
 try:
-    from importlib.metadata import EntryPoint, entry_points
+    from importlib.metadata import EntryPoint as ImportedEntryPoint
+    from importlib.metadata import entry_points as imported_entry_points
+    EntryPoint = ImportedEntryPoint
+    entry_points = imported_entry_points
 except ImportError:
-    from importlib_metadata import EntryPoint  # type: ignore[misc]
-    from importlib_metadata import entry_points
+    from importlib_metadata import EntryPoint as ImportedEntryPoint
+    from importlib_metadata import entry_points as imported_entry_points
+    EntryPoint = ImportedEntryPoint
+    entry_points = imported_entry_points
 
 try:
     import yaml
 except ImportError:
-    yaml = None
+    yaml = None  # type: ignore[assignment]
 
 if TYPE_CHECKING:
     from victor.core.verticals.base import VerticalBase

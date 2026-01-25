@@ -580,10 +580,13 @@ def _build_extended_corpus() -> List[CorpusEntry]:
         corpus_data = build_complete_corpus()
         entries = []
         for prompt, category, source in corpus_data:
+            # Convert string category to PromptCategory enum
+            from typing import cast
+            category_enum = cast(PromptCategory, PromptCategory(category))
             entries.append(
                 CorpusEntry(
                     prompt=prompt,
-                    category=category,
+                    category=category_enum,
                     source=source,
                 )
             )

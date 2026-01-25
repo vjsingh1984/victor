@@ -20,7 +20,7 @@ Executes agent nodes by spawning sub-agents with role-specific configurations.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Match
+from typing import TYPE_CHECKING, Any, Dict, Match, cast
 
 if TYPE_CHECKING:
     from victor.agent.subagents.base import SubAgentRole
@@ -115,17 +115,26 @@ class AgentNodeExecutor:
             logger.error(f"Agent node {node.id} execution failed: {e}")
             # Store error in state and return
             if node.output_key:
-                state[node.output_key] = {"error": str(e), "success": False}
+                # Use dict update for dynamic key assignment
+                state_dict = dict(state)
+                state_dict[node.output_key] = {"error": str(e), "success": False}
+                # Update state with modified dict
+                state.clear()
+                state.update(state_dict)  # type: ignore[arg-type]
             return state
 
         # Step 6: Store result in state
         if node.output_key:
-            # Store the entire result object
-            state[node.output_key] = result  # type: ignore[literal-required]
+            # Use dict conversion for dynamic key assignment to avoid TypedDict errors
+            state_dict = dict(state)
+            state_dict[node.output_key] = result
+            # Update state with modified dict
+            state.clear()
+            state.update(state_dict)  # type: ignore[arg-type]
 
         # Track node result for observability
-        # Use cast to handle dynamic TypedDict key
-        state_dict = dict(state)  # Convert to regular dict for dynamic access
+        # Convert to regular dict for dynamic access to avoid TypedDict issues
+        state_dict = dict(state)
         if "_node_results" not in state_dict:
             state_dict["_node_results"] = {}
 
@@ -201,7 +210,9 @@ class AgentNodeExecutor:
         if role not in role_map:
             raise ValueError(f"Unknown agent role: {role}. Must be one of {list(role_map.keys())}")
 
-        from typing import cast
+        # Import SubAgentRole for typing
+        from victor.agent.subagents.base import SubAgentRole
+
         return cast(SubAgentRole, role_map[role])
 
     def _substitute_context(self, template: str, context: Dict[str, Any]) -> str:
@@ -227,11 +238,11 @@ class AgentNodeExecutor:
                 if isinstance(value, dict):
                     import json
 
-                    return cast(str, json.dumps(value))
+                    return json.dumps(value)
                 # Handle primitive values
-                return cast(str, str(value))
+                return str(value)
             # Keep original if not found
-            return cast(str, match.group(0))
+            return match.group(0)
 
         return re.sub(pattern, replace_var, template)
 

@@ -609,7 +609,7 @@ class ParallelExecutor:
             ProgressEvent for each task completion
         """
         context = context or {}
-        task_futures = []
+        task_futures: List[Any] = []
 
         for i, task in enumerate(tasks):
             coro: Coroutine[Any, Any, Any] = self._prepare_task(task, i, context)
@@ -624,11 +624,11 @@ class ParallelExecutor:
                 return_when=asyncio.FIRST_COMPLETED,
             )
 
-            for task in done:
-                task_idx = task_futures.index(task)
+            for future in done:
+                task_idx = task_futures.index(future)
                 task_id = f"task_{task_idx}"
                 try:
-                    result = await task
+                    result = await future
                     yield ProgressEvent(
                         task_id=task_id,
                         status="completed",
@@ -770,7 +770,8 @@ class ParallelExecutorHandler:
 
         # If node has handler tasks, use those
         elif hasattr(node, "tasks") and node.tasks:
-            tasks = node.tasks  # type: ignore[assignment]
+            from typing import cast
+            tasks = cast(List[TaskInput[Any]], node.tasks)
 
         return tasks
 

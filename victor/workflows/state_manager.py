@@ -782,19 +782,23 @@ class WorkflowStateManager:
         Returns:
             New snapshot ID
         """
+        data_dict: Dict[str, Any]
         if isinstance(data, str):
-            data = json.loads(data)
+            data_dict = json.loads(data)
+        else:
+            data_dict = data
 
-        state_data = data["state"]
+        # Now data_dict is a Dict[str, Any]
+        state_data = data_dict.get("state")
+        if state_data is None:
+            raise ValueError("Import data must contain 'state' field")
+
         # Ensure state_data is a dict
         if isinstance(state_data, str):
             state_data = json.loads(state_data)
 
-        node_id = None
-        metadata = {}
-        if isinstance(data, dict):
-            node_id = data.get("node_id")
-            metadata = data.get("metadata", {})
+        node_id = data_dict.get("node_id")
+        metadata = data_dict.get("metadata", {})
 
         snapshot_id = self.capture_state(
             state_data,

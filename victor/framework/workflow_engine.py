@@ -76,6 +76,7 @@ from typing import (
     Protocol,
     TypeVar,
     Union,
+    cast,
     runtime_checkable,
 )
 
@@ -710,7 +711,8 @@ class WorkflowEngine:
                 transform_registry=transform_registry,
                 **kwargs,
             ):
-                # Ensure event is a WorkflowEvent
+                # Event should be WorkflowEvent from coordinator.stream()
+                # Type: Union[WorkflowEvent, tuple[str, Dict[str, Any]]] for backward compat
                 if isinstance(event, WorkflowEvent):
                     yield event
                 else:
@@ -955,7 +957,7 @@ class WorkflowEngine:
             from victor.workflows.executor import WorkflowExecutor
 
             # TODO: Provide orchestrator parameter
-            self._executor = WorkflowExecutor(orchestrator=None)  # type: ignore[call-arg]
+            self._executor = WorkflowExecutor(orchestrator=None)
         return self._executor
 
     def _get_streaming_executor(self) -> "StreamingWorkflowExecutor":
@@ -964,7 +966,7 @@ class WorkflowEngine:
             from victor.workflows.streaming_executor import StreamingWorkflowExecutor
 
             # TODO: Provide orchestrator parameter
-            self._streaming_executor = StreamingWorkflowExecutor(orchestrator=None)  # type: ignore[call-arg]
+            self._streaming_executor = StreamingWorkflowExecutor(orchestrator=None)
         return self._streaming_executor
 
 

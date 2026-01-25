@@ -32,16 +32,16 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union, cast
 
 from victor.agent.capabilities.base import CapabilitySpec
 
 # Import entry_points function (avoid name conflicts)
 try:
-    import importlib.metadata as ilmd
+    import importlib.metadata as importlib_metadata
 except ImportError:
     # Python < 3.8
-    import importlib_metadata as ilmd
+    import importlib_metadata as importlib_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -107,13 +107,13 @@ class DynamicCapabilityRegistry:
             This ensures the registry remains functional even if some plugins fail.
         """
         try:
-            eps = ilmd.entry_points()
+            eps = importlib_metadata.entry_points()
             # Python 3.10+ uses select() method, older versions have different API
             if hasattr(eps, "select"):
                 capability_eps = eps.select(group="victor.capabilities")
             else:
                 # Python 3.9 and earlier
-                capability_eps = eps.get("victor.capabilities", [])
+                capability_eps = cast(Any, eps).get("victor.capabilities", [])
 
             for ep in capability_eps:
                 try:

@@ -814,14 +814,15 @@ class WorkflowVisualizer:
         else:
             # Try in order
             from typing import Callable
-            for method in [
+            svg_methods: list[Callable[[Optional[str]], str]] = [
                 self._to_svg_d2,
                 self._to_svg_kroki,
                 self._to_svg_graphviz,
                 self._to_svg_matplotlib,
-            ]:
+            ]
+            for method in svg_methods:
                 try:
-                    return cast(str, method(output_path))
+                    return method(output_path)
                 except (ImportError, FileNotFoundError, RuntimeError):
                     continue
             raise ImportError("No SVG rendering backend available")

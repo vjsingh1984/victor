@@ -75,7 +75,7 @@ class ConditionNodeExecutor:
         if "_node_results" not in state_dict:
             state_dict["_node_results"] = {}
 
-        state_dict["_node_results"][node.id] = {  # type: ignore[typeddict-unknown-key, typeddict-item]
+        state_dict["_node_results"][node.id] = {
             "node_id": node.id,
             "status": "completed",
             "result": {"passthrough": True, "condition": True},

@@ -20,7 +20,7 @@ Executes compute nodes by calling registered handler functions.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from victor.workflows.definition import ComputeNode
@@ -178,8 +178,8 @@ class ComputeNodeExecutor:
         state[output_key] = output  # type: ignore[literal-required]
 
         # Step 6: Update node results for observability
-        # Use cast to handle dynamic TypedDict key
-        state_dict = dict(state)  # Convert to regular dict for dynamic access
+        # Convert to regular dict for dynamic access to avoid TypedDict issues
+        state_dict = dict(state)
         if "_node_results" not in state_dict:
             state_dict["_node_results"] = {}
 
@@ -195,12 +195,9 @@ class ComputeNodeExecutor:
             },
         }
 
-        # Update state with modified dict
-        state.clear()
-        state.update(state_dict)  # type: ignore[arg-type]
-
+        # Return the modified dict directly instead of mutating TypedDict
         logger.info(f"Compute node {node.id} completed successfully")
-        return state
+        return cast("WorkflowState", state_dict)
 
     def _get_compute_handler(self, handler_name: str) -> Any:
         """Get compute handler by name.

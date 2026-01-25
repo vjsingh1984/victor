@@ -163,7 +163,7 @@ class FrameworkShim:
 
         return vertical
 
-    async def create_orchestrator(self) -> "AgentOrchestrator":
+    async def create_orchestrator(self) -> "OrchestratorProtocol":
         """Create orchestrator with framework features wired.
 
         This is the main entry point. It:
@@ -174,13 +174,15 @@ class FrameworkShim:
         5. Returns the enhanced orchestrator
 
         Returns:
-            Configured AgentOrchestrator instance.
+            Configured orchestrator instance.
 
         Raises:
             RuntimeError: If orchestrator creation fails.
         """
         from victor.agent.orchestrator import AgentOrchestrator
         from victor.core.bootstrap import ensure_bootstrapped
+        from victor.core.protocols import OrchestratorProtocol
+        from typing import cast
 
         logger.debug(
             f"FrameworkShim creating orchestrator: profile={self._profile_name}, "
@@ -211,7 +213,8 @@ class FrameworkShim:
 
         logger.debug(f"FrameworkShim created orchestrator: session_id={self._session_id}")
 
-        return self._orchestrator
+        # Cast to protocol for type safety
+        return cast(OrchestratorProtocol, self._orchestrator)
 
     def _apply_vertical(self, vertical: Type["VerticalBase"]) -> None:
         """Apply vertical configuration to orchestrator.

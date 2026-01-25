@@ -28,7 +28,7 @@ The CodingAssistant provides:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Type
 
 if TYPE_CHECKING:
     from victor.framework.prompt_builder import PromptBuilder
@@ -130,9 +130,9 @@ class CodingAssistant(VerticalBase):
     """
 
     # Override class variables from base
-    name: str = "coding"
-    description: str = "Software development assistant for code exploration, writing, and refactoring"
-    version: str = "2.0.0"  # Extension support
+    name: ClassVar[str] = "coding"
+    description: ClassVar[str] = "Software development assistant for code exploration, writing, and refactoring"
+    version: ClassVar[str] = "2.0.0"  # Extension support
 
     # =========================================================================
     # Phase 3: Framework Capabilities

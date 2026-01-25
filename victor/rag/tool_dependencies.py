@@ -150,9 +150,8 @@ def get_rag_tool_graph() -> ToolExecutionGraph:
     if _rag_tool_graph is not None:
         return _rag_tool_graph
 
-    # Load data from YAML via provider
-    provider = RAGToolDependencyProvider()
-    config = provider.get_config()
+    # Load data from YAML via provider (RAGToolDependencyProvider is already an instance)
+    config = RAGToolDependencyProvider.get_config()
 
     # Extract components from config
     transitions = getattr(config, 'transitions', {})

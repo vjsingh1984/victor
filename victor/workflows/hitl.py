@@ -794,11 +794,11 @@ class HITLExecutor:
         logger.info(f"HITL request {request.request_id} sent via {self.mode.value}: {external_ref}")
 
         # Wait for response with polling
-        response = await transport.wait_for_response(
+        response: Optional[HITLResponse] = await transport.wait_for_response(
             request.request_id,
             external_ref,
             timeout=node.timeout,
-        )  # type: ignore[no-any-return]
+        )
 
         if response is not None:
             return response

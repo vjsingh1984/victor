@@ -513,7 +513,7 @@ def _get_provider() -> DataAnalysisCapabilityProvider:
     """Get or create provider instance."""
     global _provider_instance
     if _provider_instance is None:
-        _provider_instance = DataAnalysisCapabilityProvider()  # type: ignore[no-untyped-call]
+        _provider_instance = DataAnalysisCapabilityProvider()
     return _provider_instance
 
 

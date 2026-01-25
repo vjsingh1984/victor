@@ -95,7 +95,8 @@ logger = logging.getLogger(__name__)
 # Use the State-bound TypeVar from graph_dsl or define our own
 if TYPE_CHECKING:
     from victor.workflows.graph_dsl import State as GraphState
-    S = TypeVar("S", bound=GraphState)
+    # State is a Protocol/ABC, not a concrete type, so use Dict[str, Any] as bound
+    S = TypeVar("S", bound="Dict[str, Any]")
 else:
     # For runtime, use unbounded TypeVar
     S = TypeVar("S")
@@ -223,8 +224,9 @@ class NodeRunnerWrapper:
             # Return updated state
             if "_workflow_id" not in state:
                 # Return just the data for simple state
-                return cast(Dict[str, Any], updated_context.get("data", state))
-            return cast(Dict[str, Any], updated_context)
+                result = updated_context.get("data", state)
+                return cast(Dict[str, Any], result)
+            return updated_context
 
         except Exception as e:
             duration = time.time() - start_time
@@ -343,7 +345,7 @@ class WorkflowGraphCompiler(Generic[S]):
                 def wrapped_router(state: Dict[str, Any]) -> str:
                     # Convert dict state to typed state for router
                     if hasattr(st, "from_dict"):
-                        typed_state = st.from_dict(state)  # type: ignore[attr-defined]
+                        typed_state = st.from_dict(state)
                     else:
                         typed_state = st(**state) if isinstance(state, dict) else state
                     return r(typed_state)
@@ -408,14 +410,14 @@ class WorkflowGraphCompiler(Generic[S]):
         async def state_converting_wrapper(state: Dict[str, Any]) -> Dict[str, Any]:
             # Convert dict to typed state
             if hasattr(state_type, "from_dict"):
-                typed_state = state_type.from_dict(state)  # type: ignore[attr-defined]
+                typed_state = state_type.from_dict(state)
             else:
                 # Try direct construction
                 try:
                     typed_state = state_type(**state)
                 except TypeError:
                     # If that fails, pass dict directly
-                    typed_state = state
+                    typed_state = state  # type: ignore[assignment]
 
             # Call original function
             if asyncio.iscoroutinefunction(original_func):
@@ -432,10 +434,10 @@ class WorkflowGraphCompiler(Generic[S]):
 
                 return asdict(result)  # type: ignore[no-any-return]
             elif isinstance(result, dict):
-                return result  # type: ignore[return-value]
+                return result
             else:
                 # Unknown type, return as-is
-                return result  # type: ignore[no-any-return]
+                return cast(Dict[str, Any], result)  # type: ignore[no-any-return]
 
         return state_converting_wrapper
 
@@ -731,8 +733,8 @@ def compile_workflow_graph(
     Returns:
         CompiledGraph ready for execution.
     """
-    compiler: "WorkflowGraphCompiler[Any]" = WorkflowGraphCompiler(config)
-    return compiler.compile(graph)  # type: ignore[type-var]
+    compiler: "WorkflowGraphCompiler[Dict[str, Any]]" = WorkflowGraphCompiler[Dict[str, Any]](config)
+    return compiler.compile(graph)
 
 
 def compile_workflow_definition(

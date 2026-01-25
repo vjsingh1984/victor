@@ -39,7 +39,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 import yaml
 
@@ -290,10 +290,10 @@ class VerticalConfigLoader:
                 return ""
 
             # Resolve relative to base_path
-            file_path = base_path / file_path
+            file_path = base_path / cast(str, file_path)
 
             if file_path.exists():
-                return file_path.read_text()
+                return cast(str, file_path.read_text())
             else:
                 logger.warning(f"Prompt file not found: {file_path}")
                 return ""

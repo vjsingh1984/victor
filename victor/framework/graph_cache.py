@@ -52,7 +52,7 @@ from typing import (
     cast,
 )
 
-from cachetools import TTLCache  # type: ignore[import-untyped]
+from cachetools import TTLCache
 
 if TYPE_CHECKING:
     from victor.framework.graph import (

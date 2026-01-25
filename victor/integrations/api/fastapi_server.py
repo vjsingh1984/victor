@@ -1917,7 +1917,11 @@ Respond with just the command to run."""
                     if provider != recommendation.value:
                         q_val = learner_ms._get_q_value(provider, task_type)
                         alternatives.append({"provider": provider, "q_value": round(q_val, 3)})
-                alternatives.sort(key=lambda x: (x["q_value"] or 0) if x["q_value"] is not None else 0, reverse=True)
+                # Sort by q_value, handling None values as 0
+                def sort_key(item: dict[str, object]) -> float:
+                    val = item.get("q_value")
+                    return float(val) if val is not None else 0.0
+                alternatives.sort(key=sort_key, reverse=True)
 
                 return JSONResponse(
                     {
@@ -3265,7 +3269,7 @@ Respond with just the command to run."""
                 else:
                     logger.info("HITL using SQLite store")
             else:
-                self._hitl_store = HITLStore()  # type: ignore[call-arg]
+                self._hitl_store = HITLStore()
                 logger.info("HITL using in-memory store")
 
             # Create and include the HITL router

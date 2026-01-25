@@ -101,10 +101,8 @@ class RAGAssistant(VerticalBase):
         )
     """
 
-    # Override class variables from base
-    name = "rag"
-    description = "Retrieval-Augmented Generation assistant for document Q&A"
-    version = "0.5.0"
+    # NOTE: Metadata (name, description, version) is loaded from YAML config
+    # See victor/rag/config/vertical.yaml for the canonical definition
 
     @classmethod
     def get_tools(cls) -> List[str]:

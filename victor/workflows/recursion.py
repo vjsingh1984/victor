@@ -231,13 +231,12 @@ class RecursionContext:
         from typing import cast
         # Avoid infinite recursion
         if id(self) in memo:
-            return memo[id(self)]
+            return cast(RecursionContext, memo[id(self)])
 
         # Create a new instance with the same class
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result
-        return cast(RecursionContext, result)
 
         # Copy non-lock fields (need lock for thread-safe access)
         with self._lock:

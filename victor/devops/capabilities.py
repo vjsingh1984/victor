@@ -473,7 +473,7 @@ def _get_provider() -> DevOpsCapabilityProvider:
     """Get or create provider instance."""
     global _provider_instance
     if _provider_instance is None:
-        _provider_instance = DevOpsCapabilityProvider()  # type: ignore[no-untyped-call]
+        _provider_instance = DevOpsCapabilityProvider()
     return _provider_instance
 
 

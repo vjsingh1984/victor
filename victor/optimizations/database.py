@@ -536,7 +536,7 @@ def cached_query(
             # Cache result
             _cache[key] = (result, time.time())
 
-            return result
+            return cast(T, result)
 
         return wrapper
 

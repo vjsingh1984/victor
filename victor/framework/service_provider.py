@@ -208,8 +208,17 @@ def _create_agent_bridge(container: ServiceContainer) -> "AgentBridge":
         @property
         def provider_name(self) -> str:
             return "minimal"
+        @property
+        def tool_budget(self) -> Optional[int]:
+            return None
         def reset_conversation(self) -> None:
             pass
+
+    # Create a minimal agent for the bridge
+    # Note: AgentBridge requires an Agent instance, not just orchestrator
+    # For now, return None and let caller handle the bridge creation
+    # when they have an actual Agent instance
+    return None  # type: ignore[return-value]
 
 
 # =============================================================================
@@ -394,7 +403,9 @@ class FrameworkScope:
         from typing import cast
 
         # Get the service implementation (concrete class)
-        service_impl = self._scope._container._create_tool_configurator(self._scope._container)
+        # Access parent container through scope's _parent attribute
+        parent_container = self._scope._parent
+        service_impl = parent_container._create_tool_configurator(parent_container)
         # Cast to protocol
         return cast(ToolConfiguratorService, service_impl)
 
@@ -403,7 +414,9 @@ class FrameworkScope:
         from typing import cast
 
         # Get the service implementation (concrete class)
-        service_impl = self._scope._container._create_event_registry(self._scope._container)
+        # Access parent container through scope's _parent attribute
+        parent_container = self._scope._parent
+        service_impl = parent_container._create_event_registry(parent_container)
         # Cast to protocol
         return cast(EventRegistryService, service_impl)
 
@@ -415,7 +428,9 @@ class FrameworkScope:
         from typing import cast
 
         # Get the service implementation (concrete class)
-        service_impl = self._scope._container._create_agent_builder(self._scope._container)
+        # Access parent container through scope's _parent attribute
+        parent_container = self._scope._parent
+        service_impl = parent_container._create_agent_builder(parent_container)
         # Cast to protocol
         return cast(AgentBuilderService, service_impl)
 

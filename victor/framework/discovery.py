@@ -250,12 +250,12 @@ class VerticalDiscovery:
                 eps = entry_points()
                 if hasattr(eps, "select"):
                     # Python 3.10+
-                    external_eps = eps.select(group="victor.verticals")
+                    discovered_eps = eps.select(group="victor.verticals")
                 else:
                     # Python 3.9
-                    external_eps: Union[Any, List[Any]] = list(eps.get("victor.verticals", []))
+                    discovered_eps: Union[Any, List[Any]] = list(eps.get("victor.verticals", []))
 
-                for ep in external_eps:
+                for ep in discovered_eps:
                     try:
                         vertical_class = ep.load()
                         if hasattr(vertical_class, "name"):

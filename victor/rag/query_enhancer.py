@@ -232,10 +232,10 @@ class QueryEnhancer:
             )
 
             if hasattr(response, "content"):
-                return response.content.strip()  # type: ignore[no-any-return]
+                return response.content.strip()
             elif hasattr(response, "message"):
-                return response.message.get("content", "").strip()  # type: ignore[no-any-return]
-            return str(response).strip()  # type: ignore[no-any-return]
+                return response.message.get("content", "").strip()
+            return str(response).strip()
 
         except Exception as e:
             logger.warning(f"LLM call failed: {e}")

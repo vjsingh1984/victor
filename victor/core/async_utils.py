@@ -196,7 +196,7 @@ class SyncAsyncBridge:
         """
 
         @functools.wraps(async_method)
-        def wrapper(self, *args: Any, **kwargs: Any) -> Any:
+        def wrapper(self, *args: Any, **kwargs: Any) -> T:
             from typing import cast
             coro = async_method(self, *args, **kwargs)
             result = cast(T, self._run_sync(coro))

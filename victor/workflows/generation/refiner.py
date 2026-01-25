@@ -343,6 +343,7 @@ class SchemaRefiner:
 
         elif field_name == "timeout":
             clamped_timeout: int = int(max(0, float(current_value)))
+            clamped_value = clamped_timeout
             if isinstance(node, dict):
                 node[field_name] = clamped_timeout
 

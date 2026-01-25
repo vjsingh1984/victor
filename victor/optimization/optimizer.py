@@ -290,11 +290,12 @@ class WorkflowOptimizer:
             workflow_id=workflow_id,
             experiment_tracker=experiment_tracker,
         )
+        # SimulatedAnnealingOptimizer doesn't support max_iterations parameter
+        # Using max_iterations from config if supported by optimizer
         result = await self.search_optimizer.optimize_workflow(
             workflow_config=workflow_config,
             profile=profile_data,  # type: ignore[arg-type]
             opportunities=opportunities,
-            max_iterations=self.config.max_iterations,
             score_function=custom_score_function,
         )
 

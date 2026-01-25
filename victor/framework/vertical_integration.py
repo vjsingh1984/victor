@@ -259,212 +259,10 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-@dataclass
-class ExtensionHandlerInfo:
-    """Information about an extension handler.
-
-    Attributes:
-        name: Name of the extension type
-        attr_name: Attribute name on VerticalExtensions object
-        handler: Handler function to call
-        order: Execution order (lower = earlier)
-    """
-
-    name: str
-    attr_name: str
-    handler: Callable[
-        ["VerticalIntegrationPipeline", Any, Any, VerticalContext, "IntegrationResult"], None
-    ]
-    order: int = 100
-
-
-class ExtensionHandlerRegistry:
-    """Registry for extension handlers (OCP compliance).
-
-    .. deprecated::
-        This registry is kept for architectural reference but is NOT actively used.
-        The active implementation lives in `victor.framework.step_handlers.ExtensionsStepHandler`
-        which uses its own `ExtensionHandlerRegistry` instance-based approach.
-
-        This legacy registry represents the original OCP-compliant design for the
-        `VerticalIntegrationPipeline`. The codebase has evolved to use step handlers
-        with SOLID principles, and the extension handling is now managed by
-        `ExtensionsStepHandler` in `step_handlers.py`.
-
-        Keeping this registry serves as documentation of the architectural evolution
-        from OCP to SOLID principles. It may be repurposed in future iterations for
-        higher-level extension types that operate outside the step handler system.
-
-    This registry allows new extension types to be added without modifying
-    the _apply_extensions method. Each extension type registers a handler
-    that will be called when that extension is present.
-
-    Example:
-        registry = ExtensionHandlerRegistry.default()
-
-        # Register a new extension type
-        registry.register(
-            name="chain_factory",
-            attr_name="chain_factory_provider",
-            handler=lambda pipeline, orch, ext, ctx, res: pipeline._apply_chain_factory(orch, ext, ctx, res),
-            order=70,
-        )
-
-    Note:
-        For new extension types, use `victor.framework.step_handlers.ExtensionsStepHandler`
-        and its `ExtensionHandlerRegistry` instead.
-    """
-
-    def __init__(self) -> None:
-        self._handlers: Dict[str, ExtensionHandlerInfo] = {}
-
-    def register(
-        self,
-        name: str,
-        attr_name: str,
-        handler: Callable[..., Any],
-        order: int = 100,
-    ) -> None:
-        """Register an extension handler.
-
-        Args:
-            name: Name of the extension type
-            attr_name: Attribute name on VerticalExtensions object
-            handler: Handler function (pipeline, orch, ext_value, context, result) -> None
-            order: Execution order (lower = earlier)
-        """
-        self._handlers[name] = ExtensionHandlerInfo(
-            name=name,
-            attr_name=attr_name,
-            handler=handler,
-            order=order,
-        )
-        logger.debug(f"Registered extension handler: {name} (order={order})")
-
-    def unregister(self, name: str) -> bool:
-        """Unregister an extension handler.
-
-        Args:
-            name: Name of the extension type
-
-        Returns:
-            True if handler was removed, False if not found
-        """
-        if name in self._handlers:
-            del self._handlers[name]
-            return True
-        return False
-
-    def get_ordered_handlers(self) -> List[ExtensionHandlerInfo]:
-        """Get handlers sorted by execution order.
-
-        Returns:
-            List of handler info sorted by order
-        """
-        return sorted(self._handlers.values(), key=lambda h: h.order)
-
-    def get_handler(self, name: str) -> Optional[ExtensionHandlerInfo]:
-        """Get a specific handler by name.
-
-        Args:
-            name: Name of the extension type
-
-        Returns:
-            Handler info or None if not found
-        """
-        return self._handlers.get(name)
-
-    @classmethod
-    def default(cls) -> "ExtensionHandlerRegistry":
-        """Create registry with default extension handlers.
-
-        Returns:
-            Registry with built-in extension handlers
-        """
-        registry = cls()
-
-        # Register default handlers in order
-        registry.register(
-            name="middleware",
-            attr_name="middleware",
-            handler=lambda p, o, e, c, r: p._apply_middleware(o, e, c, r),
-            order=10,
-        )
-        registry.register(
-            name="safety",
-            attr_name="safety_extensions",
-            handler=lambda p, o, e, c, r: p._apply_safety(o, e, c, r),
-            order=20,
-        )
-        registry.register(
-            name="prompts",
-            attr_name="prompt_contributors",
-            handler=lambda p, o, e, c, r: p._apply_prompts(o, e, c, r),
-            order=30,
-        )
-        registry.register(
-            name="mode_config",
-            attr_name="mode_config_provider",
-            handler=lambda p, o, e, c, r: p._apply_mode_config(o, e, c, r),
-            order=40,
-        )
-        registry.register(
-            name="tool_deps",
-            attr_name="tool_dependency_provider",
-            handler=lambda p, o, e, c, r: p._apply_tool_deps(o, e, c, r),
-            order=50,
-        )
-
-        return registry
-
-
-# Module-level default registry (lazy initialization)
-_default_extension_registry: Optional[ExtensionHandlerRegistry] = None
-
-
-def get_extension_handler_registry() -> ExtensionHandlerRegistry:
-    """Get the default extension handler registry.
-
-    Returns:
-        The default extension handler registry
-    """
-    global _default_extension_registry
-    if _default_extension_registry is None:
-        _default_extension_registry = ExtensionHandlerRegistry.default()
-    return _default_extension_registry
-
-
-def register_extension_handler(
-    name: str,
-    attr_name: str,
-    handler: Callable[..., Any],
-    order: int = 100,
-) -> None:
-    """Register a new extension handler (OCP extension point).
-
-    This allows adding new extension types without modifying the
-    _apply_extensions method.
-
-    Args:
-        name: Name of the extension type
-        attr_name: Attribute name on VerticalExtensions object
-        handler: Handler function (pipeline, orch, ext_value, context, result) -> None
-        order: Execution order (lower = earlier)
-
-    Example:
-        def apply_chain_factory(pipeline, orch, chain_factory, ctx, result):
-            chains = chain_factory.create_chains()
-            # Apply chains...
-
-        register_extension_handler(
-            name="chain_factory",
-            attr_name="chain_factory_provider",
-            handler=apply_chain_factory,
-            order=60,
-        )
-    """
-    registry = get_extension_handler_registry()
-    registry.register(name, attr_name, handler, order)
+# NOTE: ExtensionHandlerInfo and ExtensionHandlerRegistry were removed in v0.6.0.
+# The active implementation lives in victor.framework.step_handlers.ExtensionsStepHandler
+# which uses its own ExtensionHandlerRegistry instance-based approach.
+# See docs/reference/internals/EXTENSION_HANDLER_REGISTRY.md for historical context.
 
 
 # =============================================================================
@@ -970,7 +768,6 @@ class VerticalIntegrationPipeline:
         post_hooks: Optional[List[Callable[[Any, IntegrationResult], None]]] = None,
         step_registry: Optional["StepHandlerRegistry"] = None,
         use_step_handlers: bool = True,
-        extension_registry: Optional[ExtensionHandlerRegistry] = None,
         enable_cache: bool = True,
         cache_ttl: int = 3600,
         parallel_enabled: bool = False,
@@ -983,14 +780,13 @@ class VerticalIntegrationPipeline:
             post_hooks: Callables to run after integration
             step_registry: Custom step handler registry (uses default if None)
             use_step_handlers: If True, use step handlers; if False, use legacy methods
-            extension_registry: Custom extension handler registry (OCP compliance)
             enable_cache: If True, enable configuration caching (default: True)
             cache_ttl: Cache time-to-live in seconds (default: 3600 = 1 hour)
             parallel_enabled: If True, enable parallel execution (Phase 2.2, default: False)
         """
         self._strict_mode: bool = strict_mode
-        self._pre_hooks: List[Callable[[Any, type[Any]], None]] = pre_hooks or []
-        self._post_hooks: List[Callable[[Any, IntegrationResult], None]] = post_hooks or []
+        self._pre_hooks: List[Callable[[Any, type[Any]], None]] = list(pre_hooks) if pre_hooks else []
+        self._post_hooks: List[Callable[[Any, IntegrationResult], None]] = list(post_hooks) if post_hooks else []
         self._use_step_handlers: bool = use_step_handlers
         self._enable_cache = enable_cache
         self._cache_ttl = cache_ttl
@@ -1001,9 +797,6 @@ class VerticalIntegrationPipeline:
 
         # Initialize step handler registry
         self._step_registry: Optional["StepHandlerRegistry"] = None
-
-        # Initialize extension handler registry (OCP compliance)
-        self._extension_registry = extension_registry or get_extension_handler_registry()
 
         # Initialize step handler registry
         if step_registry is not None:
@@ -1967,11 +1760,6 @@ __all__ = [
     "ValidationStatus",
     "VerticalIntegrationPipeline",
     "OrchestratorVerticalProtocol",
-    # Extension handler registry (OCP compliance)
-    "ExtensionHandlerInfo",
-    "ExtensionHandlerRegistry",
-    "get_extension_handler_registry",
-    "register_extension_handler",
     # Factory functions
     "create_integration_pipeline",
     "create_integration_pipeline_with_handlers",
