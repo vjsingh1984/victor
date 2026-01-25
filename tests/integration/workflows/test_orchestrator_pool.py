@@ -11,8 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any
 
+from __future__ import annotations
+
+from typing import Any
 
 """Integration tests for OrchestratorPool.
 
@@ -23,8 +25,6 @@ Tests multi-provider workflow functionality including:
 - Multiple profiles management
 - Error handling
 """
-
-from __future__ import annotations
 
 import pytest
 from unittest.mock import Mock, patch, MagicMock

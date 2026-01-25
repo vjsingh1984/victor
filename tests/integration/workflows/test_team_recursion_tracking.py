@@ -11,16 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any
 
+from __future__ import annotations
+
+from typing import Any
 
 """Integration tests for team coordinator recursion tracking.
 
 Tests the integration between UnifiedTeamCoordinator and RecursionContext
 to ensure proper tracking of nested team and workflow execution.
 """
-
-from __future__ import annotations
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock
