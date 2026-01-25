@@ -280,7 +280,7 @@ class PromptCoordinator:
             return
 
         # Get prompt extensions from vertical
-        prompt_ext = self._vertical_context.get_prompt_extensions()
+        prompt_ext = getattr(self._vertical_context, "get_prompt_extensions", lambda: None)()
         if not prompt_ext:
             return
 
@@ -323,7 +323,7 @@ class PromptCoordinator:
 
         # Fall back to vertical hints
         if self._vertical_context:
-            prompt_ext = self._vertical_context.get_prompt_extensions()
+            prompt_ext = getattr(self._vertical_context, "get_prompt_extensions", lambda: None)()
             if prompt_ext:
                 hint = prompt_ext.get_hint_for_task(task_type)
                 if hint:

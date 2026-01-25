@@ -27,7 +27,7 @@ import logging
 import threading
 from dataclasses import dataclass, field
 from time import time
-from typing import Any, Dict, Optional, Protocol, runtime_checkable
+from typing import Any, Callable, Dict, Optional, Protocol, runtime_checkable
 
 logger = logging.getLogger(__name__)
 
@@ -316,7 +316,7 @@ class ReadResultCache:
 
             return stats
 
-    def get_cached_paths(self) -> list:
+    def get_cached_paths(self) -> list[str]:
         """Get list of currently cached paths.
 
         Returns:
@@ -386,7 +386,7 @@ class ReadCacheMiddleware:
         """
         self._cache = cache or ReadResultCache()
 
-    def wrap_read(self, read_func):
+    def wrap_read(self, read_func: Callable[[str], Any]) -> Callable[[str], Any]:
         """Wrap a read function with caching.
 
         Args:
@@ -396,7 +396,7 @@ class ReadCacheMiddleware:
             Wrapped function with caching
         """
 
-        def cached_read(path: str, **kwargs: Any):
+        def cached_read(path: str, **kwargs: Any) -> Any:
             # Try cache first
             offset = kwargs.get("offset", 0)
             limit = kwargs.get("limit")

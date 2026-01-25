@@ -267,20 +267,21 @@ class HierarchicalPlanner:
                         {"role": "user", "content": user_message},
                     ]
                 )
-                return response.content
+                return str(response.content)
             except Exception as e:
                 logger.warning(f"Orchestrator LLM call failed: {e}")
 
         # Fall back to provider manager
         if self._provider_manager:
             try:
-                response = await self._provider_manager.chat(
+                provider = self._provider_manager.get_provider()  # type: ignore[attr-defined]
+                response = await provider.chat(
                     messages=[
                         {"role": "system", "content": self._decomposition_prompt},
                         {"role": "user", "content": user_message},
                     ]
                 )
-                return response.content
+                return str(response.content)
             except Exception as e:
                 logger.error(f"Provider manager LLM call failed: {e}")
                 raise RuntimeError(f"Failed to decompose task: {e}") from e

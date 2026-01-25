@@ -223,7 +223,8 @@ class AutonomousPlanner:
 
         try:
             # Use planning system prompt
-            self.orchestrator.set_system_prompt(PLANNING_SYSTEM_PROMPT)
+            if hasattr(self.orchestrator, "set_system_prompt"):
+                self.orchestrator.set_system_prompt(PLANNING_SYSTEM_PROMPT)  # type: ignore[attr-defined]
 
             # Call the orchestrator
             response = await self.orchestrator.chat(prompt)
@@ -231,8 +232,8 @@ class AutonomousPlanner:
 
         finally:
             # Restore original prompt
-            if original_prompt:
-                self.orchestrator.set_system_prompt(original_prompt)
+            if original_prompt and hasattr(self.orchestrator, "set_system_prompt"):
+                self.orchestrator.set_system_prompt(original_prompt)  # type: ignore[attr-defined]
 
     def _parse_plan_json(self, goal: str, json_str: str) -> ExecutionPlan:
         """Parse plan JSON into ExecutionPlan."""
@@ -409,7 +410,9 @@ class AutonomousPlanner:
         progress_callback: Optional[Callable[[PlanStep, StepStatus], None]],
     ) -> None:
         """Execute plan steps in parallel using sub-agents."""
-        from victor.agent.subagents import SubAgentTask, SubAgentRole
+        from victor.agent.subagents import SubAgentRole  # type: ignore[attr-defined]
+
+        SubAgentTask = getattr(__import__("victor.agent.subagents", fromlist=["SubAgentTask"]), "SubAgentTask", None)  # type: ignore[attr-defined]
 
         while not plan.is_complete() and not plan.is_failed():
             ready_steps = plan.get_ready_steps()

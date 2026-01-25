@@ -66,7 +66,7 @@ class ProviderHealthMonitor(IProviderHealthMonitor):
         """
         self._settings = settings
         self._health_checker: Optional[Any] = None
-        self._health_check_task: Optional[asyncio.Task] = None
+        self._health_check_task: Optional[asyncio.Task[None]] = None
         self._enable_health_checks = enable_health_checks
         self._health_check_interval = health_check_interval
 
@@ -130,7 +130,7 @@ class ProviderHealthMonitor(IProviderHealthMonitor):
 
         check_interval = interval or self._health_check_interval
 
-        async def monitor_loop():
+        async def monitor_loop() -> None:
             """Background health check loop."""
             while True:
                 try:
@@ -173,4 +173,4 @@ class ProviderHealthMonitor(IProviderHealthMonitor):
         if not self._health_checker:
             return []
 
-        return self._health_checker.get_healthy_providers()
+        return list(self._health_checker.get_healthy_providers())  # type: ignore[no-any-return]

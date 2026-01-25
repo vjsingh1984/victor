@@ -168,7 +168,7 @@ class ProviderLifecycleManager:
         settings_budget = getattr(settings, "tool_call_budget", None)
         if settings_budget is not None:
             logger.debug(f"Using settings override tool budget: {settings_budget}")
-            return settings_budget
+            return int(settings_budget)
 
         # Use recommended budget with minimum of 50
         recommended = getattr(capabilities, "recommended_tool_budget", 50)

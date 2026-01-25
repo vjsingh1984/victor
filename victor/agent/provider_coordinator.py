@@ -141,7 +141,7 @@ class ProviderCoordinator:
         self._post_switch_hooks: List[Callable[[ProviderState], None]] = []
 
         # Health monitoring state
-        self._health_task: Optional[asyncio.Task] = None
+        self._health_task: Optional[asyncio.Task[None]] = None
         self._is_monitoring: bool = False
 
         # Rate limit tracking
@@ -231,10 +231,14 @@ class ProviderCoordinator:
             # No event loop, create one
             result = asyncio.run(self._manager.switch_provider(provider_name, model, **kwargs))
 
-        if result:
+        if isinstance(result, bool):
+            if result:
+                self._notify_post_switch_hooks()
+            return result
+        else:
+            # Handle SwitchResult case
             self._notify_post_switch_hooks()
-
-        return result
+            return bool(result)
 
     def switch_model(self, model: str) -> bool:
         """Switch to a different model synchronously.

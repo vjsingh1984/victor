@@ -948,7 +948,7 @@ class TaskDecomposition:
 
                 dot_str = nx.nx_agraph.to_agraph(self._graph).to_string()
                 plt.close()
-                return dot_str
+                return str(dot_str)
             except ImportError:
                 plt.close()
                 return str(self._graph)
@@ -1071,7 +1071,7 @@ class TaskDecomposition:
             if all_deps_completed:
                 ready_tasks_new.append(node.task)
 
-        return ready_tasks_new  # type: ignore
+        return ready_tasks_new
 
     def validate_plan(self, task_graph: Optional["TaskGraph"] = None) -> "ValidationResult":
         """Validate a task graph for correctness.

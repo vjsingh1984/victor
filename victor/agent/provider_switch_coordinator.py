@@ -528,9 +528,9 @@ class ProviderSwitchCoordinator:
         # Execute new protocol-based hooks in priority order
         for registered in self._registered_hooks:
             try:
-                result = registered.hook.execute(context)
-                # Support async hooks via duck typing
-                if inspect.isawaitable(result):
+                result = registered.hook.execute(context)  # type: ignore[func-returns-value]
+                # Hook may return None, don't try to await it
+                if result is not None and inspect.isawaitable(result):
                     await result
                 logger.debug(f"Executed hook '{registered.hook.name}'")
             except Exception as e:

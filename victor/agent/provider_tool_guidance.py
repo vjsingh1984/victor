@@ -233,11 +233,12 @@ Focus on depth over breadth when exploring.
         # Check for same tool called 3+ times
         if len(tool_history) >= 3:
             recent_tools = [h.get("tool") for h in tool_history[-5:]]
-            tool_counts = {}
+            tool_counts: dict[str, int] = {}
             for tool in recent_tools:
-                tool_counts[tool] = tool_counts.get(tool, 0) + 1
-                if tool_counts[tool] >= 3:
-                    return True
+                if tool is not None:
+                    tool_counts[tool] = tool_counts.get(tool, 0) + 1
+                    if tool_counts[tool] >= 3:
+                        return True
 
         # Check for excessive ls/listing calls
         ls_count = sum(1 for h in tool_history if h.get("tool") in ("ls", "list_directory"))

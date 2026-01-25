@@ -53,7 +53,7 @@ Usage:
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, cast
 
 from victor.agent.model_switcher import ModelSwitcher, SwitchReason, ModelSwitchEvent
 from victor.agent.tool_calling import ToolCallingAdapterRegistry, ToolCallingCapabilities
@@ -70,6 +70,7 @@ from victor.core.errors import (
     ConfigurationError,
 )
 from victor.protocols.provider_manager import SwitchResult, HealthStatus
+from victor.protocols.agent_providers import IProviderSwitcher, IProviderEventEmitter
 from victor.providers.base import BaseProvider
 from victor.providers.registry import ProviderRegistry
 from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
@@ -175,14 +176,14 @@ class ProviderManager:
 
         # Initialize tool adapter coordinator
         self._adapter_coordinator = ToolAdapterCoordinator(
-            provider_switcher=None,  # Will set after creating switcher
+            provider_switcher=cast(IProviderSwitcher, None),  # Will set after creating switcher
             settings=settings,
         )
 
         # Initialize provider switcher (depends on coordinator)
         self._provider_switcher = ProviderSwitcher(
             classification_strategy=self._classification_strategy,
-            event_emitter=self,  # ProviderManager implements event emission
+            event_emitter=cast(IProviderEventEmitter, self),  # type: ignore[arg-type]
             health_monitor=self._health_monitor,
             adapter_coordinator=self._adapter_coordinator,
         )
@@ -196,7 +197,7 @@ class ProviderManager:
         # Initialize with provided values
         if initial_provider and initial_model:
             name = provider_name or getattr(initial_provider, "name", "unknown")
-            provider_name_lower = name.lower()
+            provider_name_lower = str(name).lower() if name else ""
 
             # Set state in switcher
             self._provider_switcher.set_initial_state(
@@ -311,7 +312,7 @@ class ProviderManager:
 
         # Try to initialize the provider
         try:
-            provider = ProviderRegistry.create(provider_name, self.settings)
+            provider = ProviderRegistry.create(provider_name)
             logger.debug(f"Created new provider instance: {provider_name}")
             return provider
         except ProviderNotFoundError:
@@ -377,7 +378,8 @@ class ProviderManager:
         if self.provider and hasattr(self.provider, "get_context_window"):
             try:
                 # This allows providers like Ollama to dynamically determine the window
-                return self.provider.get_context_window(self.model)
+                window = self.provider.get_context_window(self.model)
+                return int(window) if isinstance(window, (int, float)) else 200000
             except Exception:
                 logger.warning(
                     f"Provider {self.provider_name} failed to dynamically get context window."
@@ -480,7 +482,7 @@ class ProviderManager:
         from_provider = self.provider_name
         new_model = model or self.model
         error_message = None
-        metadata = {}
+        metadata: dict[str, Any] = {}
 
         try:
             # Convert SwitchReason enum to string for ProviderSwitcher
@@ -810,7 +812,9 @@ class ProviderManager:
         Returns:
             List of switch events
         """
-        return self._model_switcher.get_switch_history()
+        history = self._model_switcher.get_switch_history()
+        # Convert dict items to ModelSwitchEvent objects if needed
+        return [ModelSwitchEvent(**item) if isinstance(item, dict) else item for item in history]  # type: ignore[misc]
 
     def add_switch_callback(self, callback: Callable[[ProviderState], None]) -> None:
         """Add callback for provider/model switches.
@@ -819,7 +823,8 @@ class ProviderManager:
             callback: Function called with new ProviderState after switch
         """
         # Register with ProviderSwitcher for automatic notification
-        self._provider_switcher.on_switch(callback)
+        # Type ignore: ProviderSwitcher expects ProviderSwitcherState, but we provide ProviderState
+        self._provider_switcher.on_switch(callback)  # type: ignore[arg-type]
 
     # IProviderEventEmitter implementation
     def emit_switch_event(self, event: Dict[str, Any]) -> None:

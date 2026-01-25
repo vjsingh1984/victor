@@ -55,7 +55,7 @@ from typing import (
 if TYPE_CHECKING:
     from victor.agent.conversation_state import ConversationStage
     from victor.agent.tool_pipeline import ToolCallResult
-    from victor.tools.base import CostTier
+    from victor.tools.enums import CostTier
 
 
 # =============================================================================
@@ -2098,7 +2098,7 @@ class TaskCoordinatorProtocol(Protocol):
         ...
 
     @property
-    def observed_files(self) -> list:
+    def observed_files(self) -> list[str]:
         """Get the list of observed files."""
         ...
 

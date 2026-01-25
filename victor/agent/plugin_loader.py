@@ -42,7 +42,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
-from victor.tools.base import ToolRegistry
+from victor.tools.base import ToolRegistry  # type: ignore[attr-defined]
 
 logger = logging.getLogger(__name__)
 
@@ -161,7 +161,7 @@ class PluginLoader:
             from victor.config.settings import get_project_paths
 
             # Use centralized path for plugins directory
-            plugin_dirs = [get_project_paths().global_plugins_dir]
+            plugin_dirs: List[object] = [get_project_paths().global_plugins_dir]
             plugin_dirs.extend(self._config.plugin_dirs)
 
             plugin_config = getattr(self._settings, "plugin_config", {})

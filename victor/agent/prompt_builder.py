@@ -149,7 +149,7 @@ DO NOT assume content is missing - use offset/search to access additional sectio
 #
 # Migration: Use get_task_type_hint(task_type, prompt_contributors=[...])
 # with the appropriate vertical contributor for full task hint support.
-_DEPRECATED_TASK_TYPE_HINTS = {
+_DEPRECATED_TASK_TYPE_HINTS: dict[str, str] = {
     # Framework-level defaults (not vertical-specific)
     # These are minimal fallbacks when no vertical contributor is available
 }
@@ -189,7 +189,7 @@ def get_task_type_hint(task_type: str, prompt_contributors: Optional[list[Any]] 
                     task_type,
                     contributor_name,
                 )
-                return hint_text
+                return str(hint_text)
 
     # Fallback to deprecated hints (should be empty, but kept for safety)
     hint = _DEPRECATED_TASK_TYPE_HINTS.get(task_type.lower(), "")
@@ -203,11 +203,11 @@ def get_task_type_hint(task_type: str, prompt_contributors: Optional[list[Any]] 
             stacklevel=2,
         )
         logger.debug("Applied deprecated task hint for task_type=%s", task_type)
-    return hint
+    return str(hint)
 
 
 # Backward compatibility alias - deprecated
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """Provide backward compatibility for TASK_TYPE_HINTS access."""
     if name == "TASK_TYPE_HINTS":
         import warnings
@@ -323,7 +323,7 @@ class SystemPromptBuilder:
         """Check if the model has known native tool calling support."""
         return any(pattern in self.model_lower for pattern in NATIVE_TOOL_MODELS)
 
-    def get_merged_task_hints(self) -> dict:
+    def get_merged_task_hints(self) -> dict[str, str]:
         """Get merged task hints from vertical contributors.
 
         Returns:
@@ -344,7 +344,7 @@ class SystemPromptBuilder:
                 else:
                     merged[task_type] = str(task_hint)
 
-        self._merged_task_hints = merged
+        self._merged_task_hints = merged  # type: dict[str, str]
         return merged
 
     def get_vertical_grounding_rules(self) -> str:

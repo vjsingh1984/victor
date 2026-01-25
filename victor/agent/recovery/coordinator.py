@@ -55,7 +55,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING, cast
 
 from victor.agent.recovery.protocols import (
     FailureType,
@@ -70,6 +70,8 @@ from victor.agent.recovery.prompts import ModelSpecificPromptRegistry
 # Import existing framework components
 if TYPE_CHECKING:
     from victor.agent.adaptive_mode_controller import QLearningStore
+
+    from victor.agent.recovery.protocols import QLearningStoreProtocol
     from victor.agent.usage_analytics import UsageAnalytics
     from victor.agent.context_compactor import ContextCompactor
     from victor.providers.circuit_breaker import CircuitBreaker, CircuitBreakerRegistry
@@ -162,12 +164,12 @@ class RecoveryCoordinator:
         self._circuit_registry = circuit_breaker_registry
 
         # Initialize recovery-specific components (these extend framework)
-        self._strategy = CompositeRecoveryStrategy(q_store=q_store)
-        self._temperature = ProgressiveTemperatureAdjuster(q_store=q_store)
+        self._strategy = CompositeRecoveryStrategy(q_store=cast("QLearningStoreProtocol | None", q_store))
+        self._temperature = ProgressiveTemperatureAdjuster(q_store=cast("QLearningStoreProtocol | None", q_store))
 
         # Prompt registry can use separate persistence
         prompts_db = data_dir / "prompt_templates.db" if data_dir else None
-        self._prompts = ModelSpecificPromptRegistry(q_store=q_store, db_path=prompts_db)
+        self._prompts = ModelSpecificPromptRegistry(q_store=cast("QLearningStoreProtocol | None", q_store), db_path=prompts_db)
 
         # Current recovery context for learning
         self._current_context: Optional[RecoveryContext] = None
