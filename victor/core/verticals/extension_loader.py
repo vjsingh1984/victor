@@ -834,7 +834,7 @@ class VerticalExtensionLoader(ABC):
 
             # Create lazy wrapper that defers loading
             return create_lazy_extensions(
-                vertical_name=cls.name,
+                vertical_name=cls.name if hasattr(cls, "name") else cls.__name__,
                 loader=lambda: cls._load_extensions_eager(use_cache=use_cache, strict=strict),
                 trigger=trigger,
             )
@@ -909,7 +909,7 @@ class VerticalExtensionLoader(ABC):
                 return result
             except Exception as e:
                 is_required = extension_type in cls.required_extensions
-                vertical_name = cls.name
+                vertical_name = cls.name if hasattr(cls, "name") else cls.__name__
                 error = ExtensionLoadError(
                     message=f"Failed to load '{extension_type}' extension for vertical '{vertical_name}': {e}",
                     extension_type=extension_type,
@@ -965,11 +965,11 @@ class VerticalExtensionLoader(ABC):
 
                 logger.debug(
                     f"Loaded {len(dynamic_extensions)} dynamic extension type(s) "
-                    f"for vertical '{cls.name}'"
+                    f"for vertical '{cls.name if hasattr(cls, 'name') else cls.__name__}'"
                 )
         except Exception as e:
             # Dynamic extensions are optional - don't fail if registry not available
-            logger.debug(f"Could not load dynamic extensions for vertical '{cls.name}': {e}")
+            logger.debug(f"Could not load dynamic extensions for vertical '{cls.name if hasattr(cls, 'name') else cls.__name__}': {e}")
 
         # Check for critical failures (strict mode or required extensions)
         critical_errors = [e for e in errors if is_strict or e.is_required]
@@ -979,7 +979,7 @@ class VerticalExtensionLoader(ABC):
 
         # Log summary if there were non-critical errors
         if errors:
-            vertical_name = cls.name
+            vertical_name = cls.name if hasattr(cls, "name") else cls.__name__
             logger.warning(
                 f"Vertical '{vertical_name}' loaded with {len(errors)} extension error(s). "
                 f"Affected extensions: {', '.join(e.extension_type for e in errors)}"
