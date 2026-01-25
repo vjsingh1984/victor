@@ -146,6 +146,16 @@ from victor.core.verticals.protocols.providers import (
 from victor.core.tool_types import ToolDependency, ToolDependencyProviderProtocol
 from victor.core.vertical_types import StageDefinition, TieredToolConfig
 
+# Protocol utilities (Phase 11.1)
+from victor.core.verticals.protocols.utils import (
+    check_protocol,
+    check_protocol_optional,
+    is_protocol_conformant,
+    get_protocol_methods,
+    protocol_error_message,
+    require_protocol,
+)
+
 # =============================================================================
 # Composite Vertical Extension
 # =============================================================================
@@ -309,4 +319,11 @@ __all__ = [
     "ToolDependencyProvider",
     "TieredToolConfigProvider",
     "ServiceProvider",
+    # Protocol utilities (Phase 11.1)
+    "check_protocol",
+    "check_protocol_optional",
+    "is_protocol_conformant",
+    "get_protocol_methods",
+    "protocol_error_message",
+    "require_protocol",
 ]

@@ -2661,6 +2661,96 @@ class StreamingHandlerProtocol(Protocol):
         ...
 
 
+# =============================================================================
+# Accessor Protocols (Phase 11.2)
+# =============================================================================
+# These protocols replace direct private attribute access (e.g., _capability_loader)
+# with protocol-based accessor methods for better encapsulation and testability.
+
+
+@runtime_checkable
+class CapabilityLoaderAccessProtocol(Protocol):
+    """Protocol for accessing capability loader.
+
+    Replaces direct access to orchestrator._capability_loader
+    with protocol-based accessor methods.
+
+    Example:
+        from victor.core.verticals.protocols.utils import check_protocol
+
+        accessor = check_protocol(orchestrator, CapabilityLoaderAccessProtocol)
+        if accessor:
+            loader = accessor.get_capability_loader()
+            accessor.set_capability_loader(new_loader)
+    """
+
+    def get_capability_loader(self) -> Any:
+        """Get the capability loader.
+
+        Returns:
+            CapabilityLoader instance or None
+        """
+        ...
+
+    def set_capability_loader(self, loader: Any) -> None:
+        """Set the capability loader.
+
+        Args:
+            loader: CapabilityLoader instance to set
+        """
+        ...
+
+
+@runtime_checkable
+class MiddlewareChainAccessProtocol(Protocol):
+    """Protocol for accessing middleware chain.
+
+    Replaces direct access to orchestrator._middleware_chain
+    with protocol-based accessor methods.
+    """
+
+    def get_middleware_chain(self) -> Any:
+        """Get the middleware chain.
+
+        Returns:
+            MiddlewareChain instance or None
+        """
+        ...
+
+    def set_middleware_chain(self, chain: Any) -> None:
+        """Set the middleware chain.
+
+        Args:
+            chain: MiddlewareChain instance to set
+        """
+        ...
+
+
+@runtime_checkable
+class RLHooksAccessProtocol(Protocol):
+    """Protocol for accessing RL hooks.
+
+    Replaces direct access to orchestrator._rl_hooks
+    with protocol-based accessor methods.
+    """
+
+    def get_rl_hooks(self) -> Any:
+        """Get the RL hooks.
+
+        Returns:
+            RLHooks instance or None
+        """
+        ...
+
+    def set_rl_hooks(self, hooks: Any) -> None:
+        """Set the RL hooks.
+
+        Args:
+            hooks: RLHooks instance to set
+        """
+        ...
+
+
 __all__ = [
     # Factory protocols
     "IAgentFactory",
@@ -2763,6 +2853,10 @@ __all__ = [
     "PromptCoordinatorProtocol",
     # Vertical storage protocol (DIP compliance)
     "VerticalStorageProtocol",
+    # Accessor protocols (Phase 11.2)
+    "CapabilityLoaderAccessProtocol",
+    "MiddlewareChainAccessProtocol",
+    "RLHooksAccessProtocol",
 ]
 
 
