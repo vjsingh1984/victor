@@ -278,8 +278,7 @@ class CallableHealthCheck(BaseHealthCheck):
         """Execute the callable."""
         result = self._check_fn()
         if asyncio.iscoroutine(result):
-            coro_result = await result
-            return coro_result
+            return cast(ComponentHealth, await result)
         return result
 
 
@@ -496,7 +495,7 @@ class MemoryHealthCheck(BaseHealthCheck):
     async def _do_check(self) -> ComponentHealth:
         """Check memory usage."""
         try:
-            import psutil  # type: ignore[import-untyped]
+            import psutil
 
             process = psutil.Process()
             memory_info = process.memory_info()
