@@ -72,10 +72,16 @@ import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Tuple
 
 if TYPE_CHECKING:
     from victor.providers.base import BaseProvider
+    from victor.providers.types import Message
+    from victor.agent.intelligent_prompt_builder import IntelligentPromptBuilder
+    from victor.agent.adaptive_mode_controller import AdaptiveModeController
+    from victor.agent.response_quality import ResponseQualityScorer
+    from victor.agent.grounding_verifier import GroundingVerifier
+    from victor.agent.resilience import ResilientExecutor
 
 from victor.agent.output_deduplicator import OutputDeduplicator
 from victor.protocols.provider_adapter import get_provider_adapter
@@ -168,11 +174,11 @@ class IntelligentAgentPipeline:
         self.project_root = project_root
 
         # Components (initialized lazily)
-        self._prompt_builder = None
-        self._mode_controller = None
-        self._quality_scorer = None
-        self._grounding_verifier = None
-        self._resilient_executor = None
+        self._prompt_builder: Optional["IntelligentPromptBuilder"] = None
+        self._mode_controller: Optional["AdaptiveModeController"] = None
+        self._quality_scorer: Optional["ResponseQualityScorer"] = None
+        self._grounding_verifier: Optional["GroundingVerifier"] = None
+        self._resilient_executor: Optional["ResilientExecutor"] = None
         self._output_deduplicator: Optional[OutputDeduplicator] = None
 
         # State tracking
@@ -222,7 +228,7 @@ class IntelligentAgentPipeline:
         # Skip eager initialization - use lazy loading instead
         return pipeline
 
-    async def _get_prompt_builder(self):
+    async def _get_prompt_builder(self) -> Optional["IntelligentPromptBuilder"]:
         """Lazy initialize prompt builder."""
         if self._prompt_builder is None:
             try:
@@ -246,7 +252,7 @@ class IntelligentAgentPipeline:
                 )
         return self._prompt_builder
 
-    def _get_mode_controller(self):
+    def _get_mode_controller(self) -> Optional["AdaptiveModeController"]:
         """Lazy initialize mode controller (sync)."""
         if self._mode_controller is None:
             try:
@@ -275,7 +281,7 @@ class IntelligentAgentPipeline:
                 logger.warning(f"[IntelligentPipeline] Mode controller init failed: {e}")
         return self._mode_controller
 
-    def get_provider_quality_thresholds(self) -> dict:
+    def get_provider_quality_thresholds(self) -> Dict[str, Any]:
         """Get provider-specific quality thresholds.
 
         Returns:
@@ -297,7 +303,7 @@ class IntelligentAgentPipeline:
         # Default fallback
         return {"min_quality": 0.70, "grounding_threshold": 0.65}
 
-    async def _get_quality_scorer(self):
+    async def _get_quality_scorer(self) -> Optional["ResponseQualityScorer"]:
         """Lazy initialize quality scorer."""
         if self._quality_scorer is None:
             try:
@@ -308,7 +314,7 @@ class IntelligentAgentPipeline:
                 logger.warning(f"[IntelligentPipeline] Quality scorer init failed: {e}")
         return self._quality_scorer
 
-    async def _get_grounding_verifier(self):
+    async def _get_grounding_verifier(self) -> Optional["GroundingVerifier"]:
         """Lazy initialize grounding verifier."""
         if self._grounding_verifier is None and self.project_root:
             try:
@@ -376,7 +382,7 @@ class IntelligentAgentPipeline:
         except Exception as e:
             logger.debug(f"[IntelligentPipeline] Grounding event emission failed: {e}")
 
-    async def _get_resilient_executor(self):
+    async def _get_resilient_executor(self) -> Optional["ResilientExecutor"]:
         """Lazy initialize resilient executor."""
         if self._resilient_executor is None:
             try:
@@ -405,7 +411,7 @@ class IntelligentAgentPipeline:
         provider_lower = self.provider_name.lower()
         return provider_lower in PROVIDERS_WITH_REPETITION_ISSUES
 
-    def deduplicate_response(self, response: str) -> tuple[str, dict]:
+    def deduplicate_response(self, response: str) -> Tuple[str, Dict[str, Any]]:
         """Apply deduplication to response if enabled for provider.
 
         This method follows the Strategy Pattern - the deduplication strategy
@@ -476,8 +482,9 @@ class IntelligentAgentPipeline:
 
         # Build intelligent prompt (lazy init)
         system_prompt = ""
-        if await self._get_prompt_builder():
-            system_prompt = await self._prompt_builder.build(
+        prompt_builder = await self._get_prompt_builder()
+        if prompt_builder is not None:
+            system_prompt = await prompt_builder.build(
                 task=task,
                 task_type=task_type,
                 current_mode=current_mode,
@@ -493,8 +500,9 @@ class IntelligentAgentPipeline:
         should_continue = True
         recommended_budget = tool_budget
 
-        if self._get_mode_controller():
-            action = self._mode_controller.get_recommended_action(
+        mode_controller = self._get_mode_controller()
+        if mode_controller is not None:
+            action = mode_controller.get_recommended_action(
                 current_mode=current_mode,
                 task_type=task_type,
                 tool_calls_made=tool_calls_made,
@@ -517,7 +525,7 @@ class IntelligentAgentPipeline:
             # We use learned budget to potentially INCREASE the recommendation (if
             # history shows this task type needs more), but NEVER decrease below
             # the user's original tool_budget.
-            learned_budget = self._mode_controller.get_optimal_tool_budget(task_type)
+            learned_budget = mode_controller.get_optimal_tool_budget(task_type)
 
             # If learned budget suggests we need MORE than user specified, recommend
             # a slight increase (bounded). This helps tasks that historically need more.
@@ -535,9 +543,10 @@ class IntelligentAgentPipeline:
             recommended_budget = max(recommended_budget, min_budget)
 
         # Get profile stats
-        profile_stats = {}
-        if await self._get_prompt_builder():
-            profile_stats = self._prompt_builder.get_profile_stats()
+        profile_stats: Dict[str, Any] = {}
+        prompt_builder = await self._get_prompt_builder()
+        if prompt_builder is not None:
+            profile_stats = prompt_builder.get_profile_stats()
 
         context = RequestContext(
             system_prompt=system_prompt,
@@ -600,11 +609,12 @@ class IntelligentAgentPipeline:
 
         # Score quality (lazy init)
         quality_score = 0.5
-        quality_details = {}
-        improvement_suggestions = []
+        quality_details: Dict[str, float] = {}
+        improvement_suggestions: List[str] = []
 
-        if await self._get_quality_scorer() and query:
-            quality_result = await self._quality_scorer.score(
+        quality_scorer = await self._get_quality_scorer()
+        if quality_scorer is not None and query:
+            quality_result = await quality_scorer.score(
                 query=query,
                 response=response,
                 context=context,
@@ -618,11 +628,12 @@ class IntelligentAgentPipeline:
         # Verify grounding (lazy init)
         grounding_score = 1.0
         is_grounded = True
-        grounding_issues = []
+        grounding_issues: List[str] = []
         grounding_result = None  # Store full result for feedback generation
 
-        if await self._get_grounding_verifier():
-            grounding_result = await self._grounding_verifier.verify(
+        grounding_verifier = await self._get_grounding_verifier()
+        if grounding_verifier is not None:
+            grounding_result = await grounding_verifier.verify(
                 response=response,
                 context=context,
             )
@@ -685,8 +696,9 @@ class IntelligentAgentPipeline:
         learning_reward = 0.0
         response_time_ms = (time.perf_counter() - start_time) * 1000
 
-        if await self._get_prompt_builder():
-            self._prompt_builder.record_feedback(
+        prompt_builder = await self._get_prompt_builder()
+        if prompt_builder is not None:
+            prompt_builder.record_feedback(
                 task_type=task_type,
                 success=success,
                 quality_score=quality_score,
@@ -696,8 +708,9 @@ class IntelligentAgentPipeline:
                 grounded=is_grounded,
             )
 
-        if self._get_mode_controller():
-            learning_reward = self._mode_controller.record_outcome(
+        mode_controller = self._get_mode_controller()
+        if mode_controller is not None:
+            learning_reward = mode_controller.record_outcome(
                 success=success,
                 quality_score=quality_score,
                 user_satisfied=quality_score > 0.6,
@@ -753,10 +766,10 @@ class IntelligentAgentPipeline:
     async def execute_with_resilience(
         self,
         provider: "BaseProvider",
-        messages: List[Dict[str, Any]],
+        messages: List["Message"],
         circuit_name: Optional[str] = None,
-        fallback: Optional[Callable[..., Any]] = None,
-        **kwargs,
+        fallback: Optional[Callable[[], Any]] = None,
+        **kwargs: Any,
     ) -> Any:
         """Execute a provider call with resilience (circuit breaker, retry).
 
@@ -774,22 +787,23 @@ class IntelligentAgentPipeline:
             CircuitOpenError: If circuit is open and no fallback
             Exception: If retries exhausted and no fallback
         """
-        if not await self._get_resilient_executor():
+        resilient_executor = await self._get_resilient_executor()
+        if resilient_executor is None:
             # No resilience - direct call
             return await provider.chat(messages=messages, **kwargs)
 
         circuit = circuit_name or f"{self.provider_name}:{self.model}"
 
-        async def call_provider():
+        async def call_provider() -> Any:
             return await provider.chat(messages=messages, **kwargs)
 
-        async def fallback_func():
+        async def fallback_func() -> Any:
             if fallback:
                 return await fallback()
             raise RuntimeError("No fallback provided")
 
         try:
-            result = await self._resilient_executor.execute(
+            result = await resilient_executor.execute(
                 circuit,  # name (positional)
                 call_provider,  # func (positional)
                 fallback=fallback_func if fallback else None,
@@ -806,7 +820,7 @@ class IntelligentAgentPipeline:
         quality_score: float,
         iteration_count: int,
         iteration_budget: int,
-    ) -> tuple[bool, str]:
+    ) -> Tuple[bool, str]:
         """Determine if processing should continue.
 
         Args:
@@ -819,8 +833,9 @@ class IntelligentAgentPipeline:
         Returns:
             Tuple of (should_continue, reason)
         """
-        if self._get_mode_controller():
-            return self._mode_controller.should_continue(
+        mode_controller = self._get_mode_controller()
+        if mode_controller is not None:
+            return mode_controller.should_continue(
                 tool_calls_made=tool_calls_made,
                 tool_budget=tool_budget,
                 quality_score=quality_score,
@@ -885,7 +900,7 @@ class IntelligentAgentPipeline:
 
 
 # Module-level convenience functions
-_pipeline_cache: Dict[tuple, IntelligentAgentPipeline] = {}
+_pipeline_cache: Dict[Tuple[str, str, str, Optional[str]], IntelligentAgentPipeline] = {}
 
 
 async def get_pipeline(
