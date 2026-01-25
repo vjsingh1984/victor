@@ -39,7 +39,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from victor.tools.base import BaseTool, CostTier, ToolResult
+from victor.tools.base import BaseTool, ToolResult
+from victor.tools.enums import CostTier
 from victor.agent.delegation.protocol import DelegationRequest
 
 if TYPE_CHECKING:
@@ -157,26 +158,25 @@ Returns the result from the delegated agent. By default, waits for completion.""
 
     async def execute(
         self,
-        task: str,
-        role: str = "executor",
-        tool_budget: int = 10,
-        await_result: bool = True,
-        context: Optional[Dict[str, Any]] = None,
-        **kwargs,
+        _exec_ctx: Dict[str, Any],
+        **kwargs: Any,
     ) -> ToolResult:
         """Execute the delegation.
 
         Args:
-            task: Task for the delegate to accomplish
-            role: Delegate role (researcher, planner, executor, reviewer, tester)
-            tool_budget: Maximum tool calls for delegate
-            await_result: Whether to wait for completion
-            context: Additional context for the delegate
-            **kwargs: Additional arguments (ignored)
+            _exec_ctx: Framework execution context (unused)
+            **kwargs: Tool parameters (task, role, tool_budget, await_result, context)
 
         Returns:
             ToolResult with delegation outcome
         """
+        # Extract parameters from kwargs
+        task: str = kwargs.get("task", "")
+        role: str = kwargs.get("role", "executor")
+        tool_budget: int = kwargs.get("tool_budget", 10)
+        await_result: bool = kwargs.get("await_result", True)
+        context: Optional[Dict[str, Any]] = kwargs.get("context")
+
         logger.info(f"Delegating to {role}: {task[:50]}...")
 
         # Create delegation request

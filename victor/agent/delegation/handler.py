@@ -89,7 +89,7 @@ class ActiveDelegation:
         self.request = request
         self.delegate_id = delegate_id
         self.start_time = time.time()
-        self.task: Optional[asyncio.Task] = None
+        self.task: Optional[asyncio.Task[DelegationResponse]] = None
         self.result: Optional[DelegationResponse] = None
 
 
