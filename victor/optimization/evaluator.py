@@ -70,7 +70,7 @@ class EvaluationResult:
     quality_score: float
     overall_score: float
     confidence: float
-    metrics: Dict[str, float] = None
+    metrics: Dict[str, float] = field(default_factory=dict)
     recommendation: bool = False
 
     def __post_init__(self) -> None:
@@ -344,7 +344,7 @@ class VariantEvaluator:
             metrics={
                 "expected_improvement": expected_improvement,
                 "num_changes": len(variant.changes),
-                "risk_level": variant.risk_level,
+                "risk_level": float(variant.risk_level),
             },
         )
 

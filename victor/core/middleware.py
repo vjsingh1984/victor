@@ -604,7 +604,7 @@ class RetryMiddleware(Middleware[TRequest, TResponse]):
         if last_error:
             raise last_error
         # Should never reach here, but mypy needs a return
-        raise RuntimeError("Max retries exceeded without error")  # type: ignore[unreachable]
+        raise RuntimeError("Max retries exceeded without error")
 
 
 class TimeoutMiddleware(Middleware[TRequest, TResponse]):

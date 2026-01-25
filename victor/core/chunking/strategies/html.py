@@ -87,7 +87,7 @@ class HTMLChunkingStrategy(ChunkingStrategy):
         # Convert to chunks respecting size limits
         return self._build_chunks(semantic_elements)
 
-    def _extract_semantic_elements(self, soup: Any) -> List[tuple]:
+    def _extract_semantic_elements(self, soup: Any) -> List[Tuple[str, str]]:
         """Extract semantic elements from parsed HTML.
 
         Args:
@@ -136,7 +136,7 @@ class HTMLChunkingStrategy(ChunkingStrategy):
 
         return elements
 
-    def _build_chunks(self, elements: List[tuple]) -> List[Chunk]:
+    def _build_chunks(self, elements: List[Tuple[str, str]]) -> List[Chunk]:
         """Build chunks from semantic elements respecting size limits.
 
         Args:
@@ -148,8 +148,8 @@ class HTMLChunkingStrategy(ChunkingStrategy):
         from victor.core.chunking.strategies.text import TextChunkingStrategy
 
         text_strategy = TextChunkingStrategy(self.config)
-        chunks = []
-        current_parts = []
+        chunks: List[Chunk] = []
+        current_parts: List[str] = []
         current_size = 0
         pos = 0
 

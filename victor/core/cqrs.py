@@ -184,7 +184,7 @@ class QueryHandler(ABC, Generic[TResult]):
 # =============================================================================
 
 CommandHandlerFunc: TypeAlias = Callable[[Command], Awaitable[Any]]
-QueryHandlerFunc: TypeAlias = Callable[[Query[TResult]], Awaitable[TResult]]  # type: ignore[misc]
+QueryHandlerFunc: TypeAlias = Callable[[Query[TResult]], Awaitable[TResult]]
 
 
 # =============================================================================

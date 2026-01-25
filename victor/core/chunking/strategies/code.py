@@ -57,7 +57,7 @@ class CodeChunkingStrategy(ChunkingStrategy):
         r"^(pub\s+)?impl\s+",  # Rust
     ]
 
-    def __init__(self, config=None):
+    def __init__(self, config: Any = None) -> None:
         super().__init__(config)
         # Compile patterns
         self._function_re = re.compile(

@@ -154,7 +154,7 @@ class WorkflowVariantGenerator:
         variant_config = deepcopy(workflow_config)
 
         # Apply optimization based on strategy type
-        changes = []
+        changes: list[Any] = []
         success = False
 
         if opportunity.strategy_type == OptimizationStrategyType.PRUNING:
@@ -229,7 +229,7 @@ class WorkflowVariantGenerator:
         Returns:
             Tuple of (success, changes)
         """
-        changes = []
+        changes: list[Any] = []
 
         # Parse target node IDs
         target_nodes = opportunity.target.split(",")
@@ -283,7 +283,7 @@ class WorkflowVariantGenerator:
         Returns:
             Tuple of (success, changes)
         """
-        changes = []
+        changes: list[Any] = []
 
         # Parse target node IDs
         target_nodes = [n.strip() for n in opportunity.target.split(",")]
@@ -529,7 +529,7 @@ class WorkflowVariantGenerator:
             return False
 
         # Build adjacency list
-        adj = {node_id: [] for node_id in config["nodes"].keys()}
+        adj: Dict[str, List[str]] = {node_id: [] for node_id in config["nodes"].keys()}
 
         for edge in config["edges"]:
             source = edge.get("source")
@@ -541,7 +541,7 @@ class WorkflowVariantGenerator:
         visited = set()
         rec_stack = set()
 
-        def dfs(node):
+        def dfs(node: str) -> bool:
             visited.add(node)
             rec_stack.add(node)
 

@@ -137,8 +137,8 @@ class JSONChunkingStrategy(ChunkingStrategy):
         from victor.core.chunking.strategies.text import TextChunkingStrategy
 
         text_strategy = TextChunkingStrategy(self.config)
-        chunks = []
-        current_batch = []
+        chunks: List[Chunk] = []
+        current_batch: List[Dict[str, Any]] = []
         current_size = 0
         pos = 0
 

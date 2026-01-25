@@ -344,11 +344,11 @@ class ExecutionTrace:
         Returns:
             Summary dictionary
         """
-        event_counts = {}
+        event_counts: Dict[str, int] = {}
         for event in self.events:
             event_counts[event.event_type.value] = event_counts.get(event.event_type.value, 0) + 1
 
-        node_counts = {}
+        node_counts: Dict[str, int] = {}
         error_count = 0
         total_duration = 0.0
 
@@ -455,7 +455,7 @@ class StateManager:
         Returns:
             Dictionary of differences
         """
-        diff = {
+        diff: Dict[str, Any] = {
             "added": {},
             "removed": {},
             "changed": {},
@@ -475,7 +475,7 @@ class StateManager:
                     "to": state2[key],
                 }
             else:
-                diff["unchanged"].append(key)
+                diff["unchanged"].append(key)  # type: ignore[arg-type]
 
         return diff
 
