@@ -780,7 +780,7 @@ class SecurityTestSuite:
                             description=f"Agent may be susceptible to prompt injection: {payload[:50]}...",
                             severity=SeverityLevel.HIGH,
                             remediation="Implement strict input validation and sanitization. Use system prompt hardening techniques.",
-                            evidence=response[:200],
+                            evidence=response.content[:200],
                             attack_payload=payload,
                             cvss_score=7.5,
                             references=[
@@ -879,7 +879,7 @@ class SecurityTestSuite:
                             description=f"Authorization bypass possible: {payload[:50]}...",
                             severity=SeverityLevel.CRITICAL,
                             remediation="Implement proper role-based access control (RBAC). Verify permissions on every privileged operation.",
-                            evidence=response[:200],
+                            evidence=response.content[:200],
                             attack_payload=payload,
                             cvss_score=9.0,
                             references=[
@@ -969,7 +969,7 @@ class SecurityTestSuite:
                             description=f"Data exfiltration possible: {payload[:50]}...",
                             severity=SeverityLevel.CRITICAL,
                             remediation="Implement data loss prevention (DLP). Block external network calls to untrusted domains. Sanitize output for sensitive data.",
-                            evidence=response[:200],
+                            evidence=response.content[:200],
                             attack_payload=payload,
                             cvss_score=8.5,
                             references=[
@@ -1236,7 +1236,7 @@ class SecurityTestSuite:
                             description=f"Code injection vulnerability: {payload[:50]}...",
                             severity=SeverityLevel.CRITICAL,
                             remediation="Use parameterized queries. Sanitize all user input. Implement strict input validation.",
-                            evidence=response[:200],
+                            evidence=response.content[:200],
                             attack_payload=payload,
                             cvss_score=9.5,
                             references=[
@@ -1327,7 +1327,7 @@ class SecurityTestSuite:
                             description=f"Session hijacking vulnerability: {payload[:50]}...",
                             severity=SeverityLevel.HIGH,
                             remediation="Implement secure session management. Use httpOnly cookies. Regenerate session IDs after authentication.",
-                            evidence=response[:200],
+                            evidence=response.content[:200],
                             attack_payload=payload,
                             cvss_score=7.5,
                             references=[

@@ -27,6 +27,8 @@ Example:
     entities = await extractor.extract(text, source="conversation")
 """
 
+from typing import List, cast
+
 from victor.storage.memory.extractors.base import (
     EntityExtractor,
     ExtractionResult,
@@ -81,18 +83,18 @@ def create_extractor(
     Returns:
         Configured CompositeExtractor
     """
-    extractors = []
+    extractors: List[EntityExtractor] = []
 
     # Add Tree-sitter extractor if available and requested
     if use_tree_sitter and _HAS_TREE_SITTER:
-        extractors.append(TreeSitterEntityExtractor())
+        extractors.append(cast(EntityExtractor, TreeSitterEntityExtractor()))
     elif include_code:
         # Fallback to regex-based code extraction
-        extractors.append(CodeEntityExtractor())
+        extractors.append(cast(EntityExtractor, CodeEntityExtractor()))
 
     # Add text extractor
     if include_text:
-        extractors.append(TextEntityExtractor())
+        extractors.append(cast(EntityExtractor, TextEntityExtractor()))
 
     return CompositeExtractor(
         extractors=extractors,

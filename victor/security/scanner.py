@@ -218,7 +218,7 @@ class PythonDependencyParser(BaseDependencyParser):
 
     def _parse_pyproject(self, file_path: Path) -> list[Dependency]:
         """Parse pyproject.toml for dependencies."""
-        deps = []
+        deps: list[Dependency] = []
         try:
             import tomllib
         except ImportError:
