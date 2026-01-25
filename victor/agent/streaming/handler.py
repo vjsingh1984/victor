@@ -1416,6 +1416,11 @@ def create_streaming_handler(
         Configured StreamingChatHandler
     """
     limit = session_idle_timeout or getattr(settings, "session_idle_timeout", 180.0)
+    # Ensure limit is a float
+    if limit is not None:
+        limit = float(limit)
+    else:
+        limit = 180.0
     # Get presentation adapter from orchestrator if available
     presentation = getattr(orchestrator, "_presentation", None)
     return StreamingChatHandler(

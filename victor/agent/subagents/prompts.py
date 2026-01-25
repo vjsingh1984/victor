@@ -161,7 +161,7 @@ def get_role_prompt(role: SubAgentRole) -> str:
     return prompt
 
 
-def get_all_role_prompts() -> dict:
+def get_all_role_prompts() -> dict[SubAgentRole, str]:
     """Get all role prompts for inspection or testing.
 
     Returns:

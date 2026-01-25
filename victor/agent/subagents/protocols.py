@@ -232,7 +232,8 @@ class SubAgentContextAdapter:
         Returns:
             Temperature value from the wrapped orchestrator
         """
-        return self._orchestrator.temperature
+        temp = self._orchestrator.temperature
+        return float(temp) if temp is not None else 0.7
 
 
 @runtime_checkable

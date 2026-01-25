@@ -166,7 +166,8 @@ class StreamingCoordinator:
         """
         # Delegate to controller if available
         if self._controller and hasattr(self._controller, "aggregate_chunks"):
-            return self._controller.aggregate_chunks(chunks)
+            result = self._controller.aggregate_chunks(chunks)
+            return str(result) if result is not None else ""
 
         # Default aggregation
         if not chunks:
@@ -229,7 +230,8 @@ class StreamingCoordinator:
         """
         # Delegate to controller if available
         if self._controller and hasattr(self._controller, "format_output"):
-            return self._controller.format_output(data)
+            result = self._controller.format_output(data)
+            return str(result) if result is not None else ""
 
         # Default formatting
         if "data" in data:

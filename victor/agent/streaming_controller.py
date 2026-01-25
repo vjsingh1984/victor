@@ -336,7 +336,9 @@ class StreamingController:
                 provider=session.provider,
             )
             if self.metrics_collector:
-                self.metrics_collector.record_metrics(analytics_metrics)
+                # Use sync version if available, otherwise skip (can't await in non-async context)
+                if hasattr(self.metrics_collector, "record_metrics_sync"):
+                    self.metrics_collector.record_metrics_sync(analytics_metrics)
 
             # Log whether we used actual or estimated tokens
             if session.metrics.has_actual_usage:
@@ -370,9 +372,11 @@ class StreamingController:
 
         try:
             summary = self.metrics_collector.get_summary()
+            if hasattr(summary, "to_dict"):
+                return summary.to_dict()
             if hasattr(summary, "__dict__"):
-                return dict(vars(summary))
-            return dict(summary) if summary else None
+                return vars(summary)
+            return summary  # type: ignore[return-value]
         except Exception as e:
             logger.warning(f"Failed to get metrics summary: {e}")
             return None

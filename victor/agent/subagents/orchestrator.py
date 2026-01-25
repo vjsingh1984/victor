@@ -390,10 +390,10 @@ class SubAgentOrchestrator:
                     )
                 )
             else:
-                processed_results.append(result)
-                total_tool_calls += result.tool_calls_used
-                if not result.success and result.error:
-                    errors.append(f"Task {i} ({tasks[i].role.value}): {result.error}")
+                processed_results.append(result)  # type: ignore[arg-type]
+                total_tool_calls += result.tool_calls_used  # type: ignore[union-attr]
+                if not result.success and result.error:  # type: ignore[union-attr]
+                    errors.append(f"Task {i} ({tasks[i].role.value}): {result.error}")  # type: ignore[union-attr]
 
         total_duration = time.time() - start_time
         all_success = all(r.success for r in processed_results)

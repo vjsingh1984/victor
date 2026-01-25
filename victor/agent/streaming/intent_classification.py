@@ -469,11 +469,14 @@ def create_intent_classification_handler(
     Returns:
         Configured IntentClassificationHandler.
     """
+    chunk_gen = orchestrator._chunk_generator or getattr(orchestrator, "chunk_generator", None)
+    if chunk_gen is None:
+        raise ValueError("orchestrator must have a chunk_generator")
     return IntentClassificationHandler(
         intent_classifier=orchestrator.intent_classifier,
-        unified_tracker=orchestrator.unified_tracker,
+        unified_tracker=orchestrator.unified_tracker,  # type: ignore[arg-type]
         sanitizer=orchestrator.sanitizer,
-        chunk_generator=orchestrator._chunk_generator,
+        chunk_generator=chunk_gen,
         settings=orchestrator.settings,
         rl_coordinator=orchestrator._rl_coordinator,
         conversation_state=getattr(orchestrator, "conversation_state", None),

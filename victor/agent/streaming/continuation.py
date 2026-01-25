@@ -608,7 +608,7 @@ class ContinuationHandler:
         max_tokens: int = 4096,
         messages_getter: Optional[Callable[[], List[Any]]] = None,
         unified_tracker: Optional[Any] = None,
-        finalize_metrics: Optional[Callable[[Dict], Any]] = None,
+        finalize_metrics: Optional[Callable[[Dict[str, Any]], Any]] = None,
         record_outcome: Optional[Callable[..., None]] = None,
         execute_extracted_tool: Optional[Callable[..., AsyncIterator[StreamChunk]]] = None,
         progress_metrics: Optional[ProgressMetrics] = None,
@@ -849,7 +849,7 @@ class ContinuationHandler:
 
         try:
             # Import Message here to avoid circular dependency
-            from victor.core.types import Message
+            from victor.providers.base import Message
 
             messages = self._messages_getter() + [
                 Message(
@@ -1049,9 +1049,12 @@ def create_continuation_handler(
     Returns:
         Configured ContinuationHandler.
     """
+    chunk_gen = orchestrator._chunk_generator or getattr(orchestrator, "chunk_generator", None)
+    if chunk_gen is None:
+        raise ValueError("orchestrator must have a chunk_generator")
     return ContinuationHandler(
         message_adder=orchestrator,
-        chunk_generator=orchestrator._chunk_generator,
+        chunk_generator=chunk_gen,
         sanitizer=orchestrator.sanitizer,
         settings=orchestrator.settings,
         provider=orchestrator.provider,
@@ -1061,7 +1064,7 @@ def create_continuation_handler(
         messages_getter=lambda: orchestrator.messages,
         unified_tracker=orchestrator.unified_tracker,
         finalize_metrics=orchestrator._finalize_stream_metrics,
-        record_outcome=orchestrator._record_intelligent_outcome,
+        record_outcome=orchestrator._record_intelligent_outcome if not asyncio.iscoroutinefunction(orchestrator._record_intelligent_outcome) else None,  # type: ignore[arg-type]
         execute_extracted_tool=orchestrator._execute_extracted_tool_call,
         progress_metrics=getattr(orchestrator, "_progress_metrics", None),
     )

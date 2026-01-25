@@ -33,8 +33,14 @@ from victor.agent.unified_classifier import (
 )
 
 if TYPE_CHECKING:
-    from victor.storage.embeddings.task_classifier import TaskType
-    from victor.storage.embeddings.intent_classifier import IntentType
+    try:
+        from victor.storage.embeddings.task_classifier import TaskType  # type: ignore[attr-defined]
+    except (ImportError, AttributeError):
+        TaskType = None  # type: ignore
+    try:
+        from victor.storage.embeddings.intent_classifier import IntentType
+    except (ImportError, AttributeError):
+        IntentType = None  # type: ignore
     from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
     from victor.protocols.coordination import CoordinationSuggestion
 
@@ -119,13 +125,13 @@ class TaskAnalyzer:
         Args:
             coordinator: Optional ModeWorkflowTeamCoordinator for team/workflow suggestions
         """
-        self._complexity_classifier = None
-        self._action_authorizer = None
-        self._unified_classifier = None
-        self._task_classifier = None
-        self._intent_classifier = None
+        self._complexity_classifier: Optional[ComplexityClassifier] = None
+        self._action_authorizer: Optional[ActionAuthorizer] = None
+        self._unified_classifier: Optional[UnifiedTaskClassifier] = None
+        self._task_classifier: Optional[TaskClassifierProtocol] = None
+        self._intent_classifier: Optional[IntentClassifierProtocol] = None
         self._coordinator = coordinator
-        self._last_complexity = None  # Track last analyzed complexity for continuation strategy
+        self._last_complexity: Optional[TaskComplexity] = None  # Track last analyzed complexity for continuation strategy
 
     def set_coordinator(self, coordinator: "ModeWorkflowTeamCoordinator") -> None:
         """Set the coordinator for team/workflow suggestions.
@@ -167,7 +173,7 @@ class TaskAnalyzer:
             try:
                 from victor.storage.embeddings.task_classifier import TaskTypeClassifier
 
-                self._task_classifier = TaskTypeClassifier.get_instance()
+                self._task_classifier = TaskTypeClassifier.get_instance()  # type: ignore[assignment]
             except ImportError:
                 logger.warning("TaskTypeClassifier not available")
         return self._task_classifier
@@ -178,7 +184,7 @@ class TaskAnalyzer:
             try:
                 from victor.storage.embeddings.intent_classifier import IntentClassifier
 
-                self._intent_classifier = IntentClassifier.get_instance()
+                self._intent_classifier = IntentClassifier.get_instance()  # type: ignore[assignment]
             except ImportError:
                 logger.warning("IntentClassifier not available")
         return self._intent_classifier
@@ -240,10 +246,12 @@ class TaskAnalyzer:
 
         if include_intent and self.intent_classifier:
             try:
-                intent_result = self.intent_classifier.classify_intent_sync(message)
-                analysis.intent_type = intent_result.intent_type
-                analysis.continuation_needed = intent_result.needs_continuation
-                analysis.analysis_details["intent_confidence"] = intent_result.confidence
+                # Use sync method if available
+                if hasattr(self.intent_classifier, "classify_intent_sync"):
+                    intent_result = self.intent_classifier.classify_intent_sync(message)
+                    analysis.intent_type = intent_result.intent_type
+                    analysis.continuation_needed = intent_result.needs_continuation
+                    analysis.analysis_details["intent_confidence"] = intent_result.confidence
             except Exception as e:
                 logger.warning(f"Intent classification failed: {e}")
 
@@ -309,7 +317,14 @@ class TaskAnalyzer:
             try:
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
-                    asyncio.create_task(bus.emit(event.to_messaging_event()))
+                    # Emit the event directly as MessagingEvent
+                    msg_event = event.to_messaging_event()
+                    asyncio.create_task(bus.emit(
+                        msg_event.topic,
+                        msg_event.data,
+                        source=msg_event.source,
+                        correlation_id=msg_event.correlation_id
+                    ))
                 else:
                     # Sync context, emit synchronously
                     pass  # Event bus requires async context
@@ -599,11 +614,11 @@ def get_task_analyzer() -> TaskAnalyzer:
     # Try DI container first
     try:
         from victor.core.container import get_container
-        from victor.agent.protocols import TaskAnalyzerProtocol
 
         container = get_container()
-        if container.is_registered(TaskAnalyzerProtocol):
-            return container.get(TaskAnalyzerProtocol)
+        analyzer = container.get(TaskAnalyzer)
+        if isinstance(analyzer, TaskAnalyzer):
+            return analyzer
     except Exception:
         pass  # Fall back to legacy singleton
 

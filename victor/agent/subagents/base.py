@@ -238,12 +238,12 @@ class SubAgent(IAgent):
         return self._id
 
     @property
-    def role(self):
+    def role(self) -> "SubAgentRole":
         """Role of this agent (SubAgentRole)."""
         return self.config.role
 
     @property
-    def persona(self):
+    def persona(self) -> None:
         """Persona of this agent (None for SubAgent)."""
         return None
 
@@ -406,6 +406,8 @@ class SubAgent(IAgent):
                     logger.debug(f"   {refresh_icon} Retry attempt {attempt}/{max_attempts}...")
 
                 # Try to execute the chat
+                if self.orchestrator is None:
+                    raise RuntimeError("Orchestrator not initialized")
                 response = await self.orchestrator.chat(self.config.task)
 
                 if attempt > 1:
@@ -453,6 +455,8 @@ class SubAgent(IAgent):
 
         # All retries exhausted
         logger.error(f"   {error_icon} All retry attempts exhausted for {self.config.role.value}")
+        if last_exception is None:
+            raise RuntimeError("All retry attempts exhausted")
         raise last_exception
 
     async def execute(self) -> SubAgentResult:

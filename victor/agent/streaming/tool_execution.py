@@ -220,7 +220,7 @@ class ToolExecutionHandler:
         handle_budget_exhausted: Callable[[StreamingChatContext], AsyncIterator[StreamChunk]],
         handle_force_final_response: Callable[[StreamingChatContext], AsyncIterator[StreamChunk]],
         handle_tool_calls: Callable[[List[Dict[str, Any]]], Any],
-        get_tool_status_message: Callable[[str, Dict], str],
+        get_tool_status_message: Callable[[str, Dict[str, Any]], str],
         observed_files: Optional[Set[str]] = None,
     ):
         """Initialize the tool execution handler.
@@ -466,12 +466,15 @@ def create_tool_execution_handler(
     """
     from victor.agent.orchestrator_utils import get_tool_status_message
 
+    chunk_gen = orchestrator._chunk_generator or getattr(orchestrator, "chunk_generator", None)
+    if chunk_gen is None:
+        raise ValueError("orchestrator must have a chunk_generator")
     return ToolExecutionHandler(
-        recovery_coordinator=orchestrator._recovery_coordinator,
-        chunk_generator=orchestrator._chunk_generator,
+        recovery_coordinator=orchestrator._recovery_coordinator,  # type: ignore[arg-type]
+        chunk_generator=chunk_gen,
         message_adder=orchestrator,
         reminder_manager=orchestrator.reminder_manager,
-        unified_tracker=orchestrator.unified_tracker,
+        unified_tracker=orchestrator.unified_tracker,  # type: ignore[arg-type]
         settings=orchestrator.settings,
         create_recovery_context=orchestrator._create_recovery_context,
         check_progress_with_handler=orchestrator._check_progress_with_handler,
