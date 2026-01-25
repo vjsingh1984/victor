@@ -208,7 +208,7 @@ class ModelCapabilityLoader:
         provider_lower = provider.lower()
 
         # Start building resolved config
-        resolved = {}
+        resolved: Dict[str, Any] = {}
 
         # 1. Apply global defaults
         defaults = config_dict.get("defaults")
@@ -289,7 +289,7 @@ class ModelCapabilityLoader:
         if "thinking_disable_prefix" in training:
             resolved["thinking_disable_prefix"] = training["thinking_disable_prefix"]
 
-    def _find_matching_model(self, models: Dict[str, Any], model_lower: str) -> List[tuple]:
+    def _find_matching_model(self, models: Dict[str, Any], model_lower: str) -> List[Tuple[int, str, Dict[str, Any]]]:
         """Find matching model patterns, sorted by specificity."""
         matching = []
 
@@ -369,7 +369,11 @@ class ModelCapabilityLoader:
             Dict with training, providers, settings sections, or None if not found
         """
         config_dict = self._config or {}
-        return config_dict.get("models", {}).get(model_pattern)
+        models = config_dict.get("models", {})
+        if not isinstance(models, dict):
+            return None
+        result = models.get(model_pattern)
+        return result if isinstance(result, dict) else None
 
     def get_all_model_patterns(self) -> List[str]:
         """Get all configured model patterns."""
@@ -408,7 +412,9 @@ class ModelCapabilityLoader:
         model_config = self.get_model_config(model_pattern)
         if model_config:
             providers = model_config.get("providers", {})
-            return providers.get(provider.lower())
+            if isinstance(providers, dict):
+                result = providers.get(provider.lower())
+                return result if isinstance(result, dict) else None
         return None
 
     def debug_resolution(self, provider: str, model: str) -> Dict[str, Any]:
@@ -436,7 +442,7 @@ class ModelCapabilityLoader:
             "final_capabilities": {},
         }
 
-        resolved = {}
+        resolved: Dict[str, Any] = {}
 
         # 1. Global defaults
         defaults = config_dict.get("defaults", {})

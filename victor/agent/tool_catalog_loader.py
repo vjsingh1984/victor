@@ -39,7 +39,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from victor.tools.base import ToolRegistry
+from victor.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 

@@ -205,7 +205,7 @@ class ToolResultCache:
         self._entries: OrderedDict[str, ToolResultCacheEntry] = OrderedDict()
         self._embeddings: List[np.ndarray] = []
         self._hash_to_idx: Dict[str, int] = {}
-        self._faiss_index = None
+        self._faiss_index: Optional[Any] = None
         self._embedding_dim: Optional[int] = None
 
         # Thread safety
@@ -232,7 +232,7 @@ class ToolResultCache:
         """Normalize vector for cosine similarity."""
         norm = np.linalg.norm(vec)
         if norm > 0:
-            return vec / norm
+            return vec / norm  # type: ignore[no-any-return]
         return vec
 
     def _hash_args(self, tool_name: str, arguments: Dict[str, Any]) -> str:
@@ -362,7 +362,7 @@ class ToolResultCache:
             try:
                 # Generate query embedding
                 query_text = self._create_query_text(tool_name, arguments)
-                embedding = await self.embedding_service.embed_async(query_text)
+                embedding = await self.embedding_service.embed_text(query_text)
 
                 if embedding is None:
                     self.stats.misses += 1
@@ -458,7 +458,7 @@ class ToolResultCache:
         try:
             # Generate embedding
             query_text = self._create_query_text(tool_name, arguments)
-            embedding = await self.embedding_service.embed_async(query_text)
+            embedding = await self.embedding_service.embed_text(query_text)
 
             if embedding is None:
                 return False

@@ -1331,7 +1331,7 @@ class SkillChainer:
             errors: List[str]
 
         # Create graph
-        graph = StateGraph(ChainState)
+        graph = StateGraph[ChainState](ChainState)  # type: ignore[type-var]
 
         # Add nodes for each step
         for step in chain.steps:
@@ -1389,7 +1389,7 @@ class SkillChainer:
             "errors": [],
         }
 
-        graph_result: GraphExecutionResult = await compiled_graph.invoke(initial_state)
+        graph_result: GraphExecutionResult[Any] = await compiled_graph.invoke(initial_state)
 
         # Convert graph result to chain result
         result = ChainResult(
@@ -1476,6 +1476,8 @@ class SkillChainer:
                         )
                         result.step_results[step_id] = error_result
                     else:
+                        # step_result is StepResult here
+                        assert isinstance(step_result, StepResult)
                         result.step_results[step_result.step_id] = step_result
                         result.intermediate_results[step_result.step_id] = step_result.output
         else:
@@ -1775,7 +1777,7 @@ class SkillChainer:
 
         # Find step with longest path
         max_length = 0
-        critical_end = None
+        critical_end: str | None = None
 
         for step in chain.steps:
             path_length = get_path_length(step.id, set())
@@ -1787,12 +1789,12 @@ class SkillChainer:
         if not critical_end:
             return []
 
-        path = []
-        current = critical_end
+        path: list[str] = []
+        current: str | None = critical_end
         while current:
             path.append(current)
-            step = step_map.get(current)
-            if not step or not step.dependencies:
+            step: ChainStep | None = step_map.get(current)
+            if step is None or not step.dependencies:
                 break
             current = step.dependencies[0]  # Take first dependency
 

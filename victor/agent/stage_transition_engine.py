@@ -418,7 +418,11 @@ class StageTransitionEngine(StageTransitionProtocol):
             return
 
         try:
-            self._event_bus.emit(
+            # Import helper for sync event emission
+            from victor.core.events.emit_helper import emit_event_sync
+
+            emit_event_sync(
+                event_bus=self._event_bus,
                 topic="state.stage_changed",
                 data={
                     "old_stage": old_stage.name,

@@ -52,8 +52,8 @@ from victor.core.vertical_types import TieredToolConfigProtocol
 from victor.protocols.mode_aware import ModeAwareMixin
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_state import ConversationStage
-    from victor.tools.base import ToolRegistry
+    from victor.core.state import ConversationStage
+    from victor.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +131,7 @@ class SafetyLayer(AccessLayer):
     NAME = "safety"
 
     # Tools that are always blocked for safety
-    BLOCKED_TOOLS: Set[str] = frozenset(
+    BLOCKED_TOOLS: frozenset[str] = frozenset(
         {
             # No tools are unconditionally blocked for now
             # Add dangerous tools here if needed
@@ -139,7 +139,7 @@ class SafetyLayer(AccessLayer):
     )
 
     # Dangerous operations that require extra caution
-    DANGEROUS_TOOLS: Set[str] = frozenset(
+    DANGEROUS_TOOLS: frozenset[str] = frozenset(
         {
             "shell",
             "bash",
@@ -401,10 +401,10 @@ class StageLayer(AccessLayer, ModeAwareMixin):
     NAME = "stage"
 
     # Stages where write tools should be filtered
-    EXPLORATION_STAGES: Set[str] = frozenset({"INITIAL", "PLANNING", "READING", "ANALYSIS"})
+    EXPLORATION_STAGES: frozenset[str] = frozenset({"INITIAL", "PLANNING", "READING", "ANALYSIS"})
 
     # Write/execute tools to filter during exploration
-    WRITE_TOOLS: Set[str] = frozenset(
+    WRITE_TOOLS: frozenset[str] = frozenset(
         {
             "write_file",
             "write",
@@ -420,7 +420,7 @@ class StageLayer(AccessLayer, ModeAwareMixin):
     )
 
     # Core tools never filtered (basic operation)
-    CORE_TOOLS: Set[str] = frozenset(
+    CORE_TOOLS: frozenset[str] = frozenset(
         {"read", "read_file", "ls", "list_directory", "search", "code_search"}
     )
 
@@ -490,10 +490,10 @@ class IntentLayer(AccessLayer):
     NAME = "intent"
 
     # Intents that block write tools
-    READ_ONLY_INTENTS: Set[str] = frozenset({"DISPLAY_ONLY", "READ_ONLY", "EXPLAIN"})
+    READ_ONLY_INTENTS: frozenset[str] = frozenset({"DISPLAY_ONLY", "READ_ONLY", "EXPLAIN"})
 
     # Write tools blocked for read-only intents
-    WRITE_TOOLS: Set[str] = frozenset(
+    WRITE_TOOLS: frozenset[str] = frozenset(
         {
             "write_file",
             "write",

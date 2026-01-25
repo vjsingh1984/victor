@@ -49,21 +49,15 @@ from victor.core.retry import (
     RetryExecutor,
     tool_retry_strategy,
 )
-from victor.tools.base import (
-    AccessMode,
-    BaseTool,
-    Hook,
-    HookError,
-    ToolRegistry,
-    ToolResult,
-    ToolValidationResult,
-)
+from victor.tools.base import BaseTool, ToolResult, ToolValidationResult
+from victor.tools.enums import AccessMode
+from victor.tools.registry import Hook, HookError, ToolRegistry
 
 # RL hook integration (lazy import to avoid circular dependencies)
 _rl_hooks = None
 
 
-def _get_rl_hooks():
+def _get_rl_hooks() -> Any:
     """Get RL hooks registry (lazy initialization)."""
     global _rl_hooks
     if _rl_hooks is None:
@@ -1178,6 +1172,8 @@ class ToolExecutor:
                     )
                     all_results.append(error_result)
                 else:
+                    # result is ToolExecutionResult here (not Exception)
+                    assert isinstance(result, ToolExecutionResult)
                     all_results.append(result)
 
         return all_results

@@ -182,7 +182,7 @@ class SQLiteSessionPersistence:
             },
             "conversation": conversation_data,
             "conversation_state": (
-                conversation_state.to_dict()
+                conversation_state.to_dict()  # type: ignore[union-attr]
                 if hasattr(conversation_state, "to_dict")
                 else conversation_state
             ),
@@ -255,7 +255,7 @@ class SQLiteSessionPersistence:
                 return None
 
             row = rows[0]
-            session_data = json.loads(
+            session_data: dict[str, Any] = json.loads(  # type: ignore[no-any-return]
                 row[5]
             )  # data column (0-indexed: id=0, name=1, provider=2, model=3, profile=4, data=5)
 

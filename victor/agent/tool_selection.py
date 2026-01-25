@@ -31,10 +31,10 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tupl
 
 import yaml
 
-from victor.agent.conversation_state import ConversationStage
+from victor.agent.conversation_state import ConversationStage  # noqa: TC002
 from victor.tools.enums import SchemaLevel
 from victor.protocols.mode_aware import ModeAwareMixin
-from victor.tools.base import AccessMode, ExecutionCategory
+from victor.tools.base import AccessMode, ExecutionCategory  # noqa: TC002
 
 # Rust-accelerated pattern matching (with Python fallback)
 _RUST_PATTERN_MATCHING = False
@@ -56,7 +56,7 @@ if TYPE_CHECKING:
         ToolSelectionStrategyProtocol,
     )
     from victor.providers.base import ToolDefinition
-    from victor.tools.base import ToolRegistry
+    from victor.tools.base import ToolRegistry  # noqa: TC002
     from victor.tools.semantic_selector import SemanticToolSelector
 
 logger = logging.getLogger(__name__)
@@ -1107,7 +1107,7 @@ class ToolSelector(ModeAwareMixin):
             ConversationStage.VERIFICATION: STAGE_TOOL_LIMITS.verification_max,
             ConversationStage.COMPLETION: STAGE_TOOL_LIMITS.completion_max,
         }
-        max_tools = stage_limits.get(stage, STAGE_TOOL_LIMITS.executing_max)
+        max_tools = stage_limits.get(stage, STAGE_TOOL_LIMITS.executing_max) if stage is not None else STAGE_TOOL_LIMITS.executing_max
 
         if len(tools) <= max_tools:
             return tools
@@ -1248,7 +1248,7 @@ class ToolSelector(ModeAwareMixin):
             # Get conversation stage if available
             stage = "exploration"
             if self.conversation_state:
-                stage = self.conversation_state.current_stage.name.lower()
+                stage = self.conversation_state.get_current_stage().name.lower()
 
             # Build context for strategy
             context = ToolSelectionContext(

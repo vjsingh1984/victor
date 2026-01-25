@@ -120,20 +120,20 @@ class StreamingContentFilter:
     MAX_THINKING_CONTENT: int = 50000
 
     # Thinking token patterns (compiled for efficiency) - class-level constants
-    THINKING_START_PATTERNS: List[re.Pattern] = [
+    THINKING_START_PATTERNS: List[re.Pattern[str]] = [
         re.compile(r"<｜begin▁of▁thinking｜>"),  # DeepSeek
         re.compile(r"<\|begin_of_thinking\|>"),  # ASCII variant
         re.compile(r"<think>"),  # Qwen3
     ]
 
-    THINKING_END_PATTERNS: List[re.Pattern] = [
+    THINKING_END_PATTERNS: List[re.Pattern[str]] = [
         re.compile(r"<｜end▁of▁thinking｜>"),  # DeepSeek
         re.compile(r"<\|end_of_thinking\|>"),  # ASCII variant
         re.compile(r"</think>"),  # Qwen3
     ]
 
     # Individual token patterns to strip (single markers without blocks)
-    INLINE_TOKEN_PATTERNS: List[re.Pattern] = [
+    INLINE_TOKEN_PATTERNS: List[re.Pattern[str]] = [
         re.compile(r"<｜end▁of▁thinking｜>"),
         re.compile(r"<｜begin▁of▁thinking｜>"),
         re.compile(r"<\|end_of_thinking\|>"),
@@ -382,7 +382,7 @@ def create_streaming_filter(
         StreamingContentFilter (native or Python implementation)
     """
     if _NATIVE_AVAILABLE and _native:
-        return _native.StreamingFilter(suppress_thinking, max_thinking_content)  # type: ignore[attr-defined]
+        return _native.StreamingFilter(suppress_thinking, max_thinking_content)
     return StreamingContentFilter(suppress_thinking)
 
 
@@ -398,7 +398,7 @@ def strip_thinking_tokens_fast(content: str) -> str:
         Content with thinking tokens removed
     """
     if _NATIVE_AVAILABLE and _native:
-        return _native.strip_thinking_tokens(content)  # type: ignore[attr-defined]
+        return _native.strip_thinking_tokens(content)
 
     # Fallback to simple string replacement
     patterns = [
@@ -729,7 +729,7 @@ class ResponseSanitizer:
 
     def _extract_code_from_markdown(self, code: str) -> str:
         """Extract code from markdown code blocks."""
-        matches = self.MARKDOWN_CODE_BLOCK.findall(code)
+        matches: list[str] = self.MARKDOWN_CODE_BLOCK.findall(code)
         if matches:
             # Use the longest code block
             return max(matches, key=len).strip()
@@ -817,7 +817,7 @@ class ResponseSanitizer:
 
     def _ensure_valid_python(self, code: str) -> Tuple[str, List[str]]:
         """Ensure code is valid Python, trying to extract function if needed."""
-        fixes = []
+        fixes: list[str] = []
 
         # First, try to parse as-is
         try:
@@ -906,7 +906,7 @@ class ResponseSanitizer:
 
     def _validate_python_syntax(self, code: str) -> Tuple[bool, List[str]]:
         """Validate Python syntax."""
-        errors = []
+        errors: list[str] = []
         try:
             ast.parse(code)
             return True, errors

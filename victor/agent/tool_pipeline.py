@@ -90,12 +90,13 @@ except ImportError:
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.tools.base import ToolRegistry
+    from victor.tools.base import ToolRegistry  # noqa: TC002
     from victor.storage.cache.tool_cache import ToolCache
     from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
     from victor.agent.signature_store import SignatureStore
     from victor.agent.middleware_chain import MiddlewareChain
     from victor.agent.tool_result_cache import ToolResultCache
+    from victor.native.accelerators.signature import SignatureAccelerator
 
 logger = logging.getLogger(__name__)
 
@@ -374,7 +375,7 @@ class ToolPipelineConfig:
     # This prevents re-reading same files during a session (helps DeepSeek, Ollama)
     enable_idempotent_caching: bool = True
     idempotent_cache_max_size: int = ToolPipelineDefaults.IDEMPOTENT_CACHE_MAX_SIZE
-    idempotent_cache_ttl: int = ToolPipelineDefaults.IDEMPOTENT_CACHE_TTL
+    idempotent_cache_ttl: float = ToolPipelineDefaults.IDEMPOTENT_CACHE_TTL
 
     # Batch-level deduplication for providers that send duplicate tool calls
     # (helps DeepSeek, Ollama which sometimes issue identical calls in same batch)
@@ -506,7 +507,7 @@ class LRUToolCache:
             max_size: Maximum number of entries to cache
             ttl_seconds: Time-to-live in seconds
         """
-        self._cache: OrderedDict = OrderedDict()
+        self._cache: OrderedDict[str, Any] = OrderedDict()
         self._timestamps: Dict[str, float] = {}
         self._max_size = max_size
         self._ttl_seconds = ttl_seconds
@@ -612,7 +613,7 @@ class LRUToolCache:
         with self._lock:
             return len(self._cache)
 
-    def items(self):
+    def items(self) -> list[tuple[str, Any]]:
         """Return all non-expired items in the cache.
 
         Thread-safe: Returns snapshot of current items.
@@ -793,7 +794,7 @@ class ToolPipeline:
         self._calls_used = 0
         # In-memory failed signatures for session-only tracking (backward compatible)
         # When signature_store is provided, it's used for persistent cross-session tracking
-        self._failed_signatures: Set[tuple] = set()
+        self._failed_signatures: Set[str] = set()
         self._executed_tools: List[str] = []
 
         # Analytics
@@ -824,14 +825,13 @@ class ToolPipeline:
         self._read_file_timestamps: Dict[str, float] = {}
 
         # Initialize signature accelerator for 10x faster deduplication
+        self._signature_accelerator: Optional["SignatureAccelerator"] = None
         if _SIGNATURE_ACCELERATOR_AVAILABLE and get_signature_accelerator is not None:
             self._signature_accelerator = get_signature_accelerator()
             if self._signature_accelerator.rust_available:
                 logger.info(
                     "Tool pipeline: Using Rust signature accelerator " "(10x faster deduplication)"
                 )
-        else:
-            self._signature_accelerator = None
 
         # Hot path optimization cache for tool execution decisions
         # Caches validation, normalization, and signature computation
@@ -1228,7 +1228,7 @@ class ToolPipeline:
         Returns:
             Dict with idempotent cache stats, semantic cache stats, and decision cache stats
         """
-        stats = {
+        stats: Dict[str, Any] = {
             "cache_hits": self._cache_hits,
             "cache_misses": self._cache_misses,
             "cache_size": len(self._idempotent_cache),
@@ -1277,7 +1277,7 @@ class ToolPipeline:
     def deduplicate_tool_calls(
         self,
         tool_calls: List[Dict[str, Any]],
-    ) -> tuple[List[Dict[str, Any]], List[tuple[int, tuple]]]:
+    ) -> Tuple[List[Dict[str, Any]], List[Tuple[int, str]]]:
         """Deduplicate identical tool calls within a batch.
 
         Some providers (DeepSeek, Ollama) sometimes issue duplicate tool calls
@@ -1295,9 +1295,9 @@ class ToolPipeline:
         if not self.config.enable_batch_deduplication:
             return tool_calls, []
 
-        seen_signatures: Dict[tuple, int] = {}  # signature -> index in unique_calls
+        seen_signatures: Dict[str, int] = {}  # signature -> index in unique_calls
         unique_calls: List[Dict[str, Any]] = []
-        duplicate_indices: List[tuple[int, tuple]] = []  # (original_index, signature)
+        duplicate_indices: List[Tuple[int, str]] = []  # (original_index, signature)
 
         for i, tc in enumerate(tool_calls):
             # Skip invalid structures - let execute_tool_calls handle them
@@ -1413,7 +1413,7 @@ class ToolPipeline:
         unique_calls, duplicate_info = self.deduplicate_tool_calls(tool_calls)
 
         # Track results by signature for duplicate resolution
-        results_by_signature: Dict[tuple, ToolCallResult] = {}
+        results_by_signature: Dict[str, ToolCallResult] = {}
 
         # Build tool history for synthesis checkpoint
         tool_history: List[Dict[str, Any]] = []

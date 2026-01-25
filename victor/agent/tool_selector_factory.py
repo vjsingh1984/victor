@@ -219,11 +219,12 @@ def _create_semantic_selector(
     # Using different embedding models per provider would break parity and cause inconsistent behavior
     embedding_provider = "sentence-transformers"
 
-    return SemanticToolSelector(
+    selector = SemanticToolSelector(
         embedding_model=embedding_model,
         embedding_provider=embedding_provider,
         cache_embeddings=True,  # Enable caching for performance
     )
+    return selector  # type: ignore[return-value]
 
 
 def _create_keyword_selector(
@@ -247,13 +248,14 @@ def _create_keyword_selector(
     """
     from victor.tools.keyword_tool_selector import KeywordToolSelector
 
-    return KeywordToolSelector(
+    selector = KeywordToolSelector(
         tools=tools,
         conversation_state=conversation_state,
         model=model,
         provider_name=provider_name,
         enabled_tools=enabled_tools,
     )
+    return selector  # type: ignore[return-value]
 
 
 def _create_hybrid_selector(

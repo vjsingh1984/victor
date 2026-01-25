@@ -299,12 +299,13 @@ class SharedToolRegistry:
                     for member_name, obj in inspect.getmembers(module):
                         # Handle @tool decorated functions
                         if inspect.isfunction(obj) and getattr(obj, "_is_tool", False):
-                            tool_instance = obj.Tool
-                            tool_name = tool_instance.name
-                            # Store the class, not the instance
-                            self._tool_classes[tool_name] = type(tool_instance)
-                            self._decorated_tools[tool_name] = obj
-                            discovered_decorated += 1
+                            if hasattr(obj, "Tool"):
+                                tool_instance = obj.Tool  # type: ignore[attr-defined]
+                                tool_name = tool_instance.name
+                                # Store the class, not the instance
+                                self._tool_classes[tool_name] = type(tool_instance)
+                                self._decorated_tools[tool_name] = obj
+                                discovered_decorated += 1
 
                         # Handle BaseTool class instances
                         elif (
@@ -358,7 +359,7 @@ class SharedToolRegistry:
             self._tool_instances_cache = {}
 
         if cache_key not in self._tool_instances_cache:
-            result: List[Any] = []
+            result: list[Any] = []
 
             # Add decorated tools (functions with @tool decorator)
             for name, func in self.get_decorated_tools(airgapped_mode=airgapped_mode).items():

@@ -61,8 +61,8 @@ from typing import (
 
 from victor.agent.conversation_state import (
     ConversationStage,
-    ConversationState,
-    STAGE_ORDER,
+    ConversationState,  # type: ignore[attr-defined]
+    STAGE_ORDER,  # type: ignore[attr-defined]
 )
 
 if TYPE_CHECKING:
@@ -270,11 +270,12 @@ class StateCoordinator:
         """
         try:
             if self._state_machine:
-                self._state_machine.set_stage(stage)
+                # Use the transition_to method to properly transition stages
+                self._state_machine._transition_to(stage, confidence=0.8)
             else:
                 # Direct update on controller state
                 if hasattr(self._controller, "_state_machine"):
-                    self._controller._state_machine.set_stage(stage)
+                    self._controller._state_machine._transition_to(stage, confidence=0.8)
             return True
         except Exception as e:
             logger.warning(f"Failed to transition to {stage.value}: {e}")

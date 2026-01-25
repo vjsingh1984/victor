@@ -159,7 +159,7 @@ class ToolCallingAdapterRegistry:
         )
 
     @classmethod
-    def list_providers(cls) -> list:
+    def list_providers(cls) -> List[str]:
         """List registered provider names."""
         # Ensure defaults are loaded
         cls.get_adapter("ollama")  # Triggers default registration

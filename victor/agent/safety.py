@@ -290,7 +290,7 @@ class SafetyChecker:
         ]
 
         # Custom patterns from vertical extensions
-        self._custom_patterns: List[tuple[re.Pattern, str, OperationalRiskLevel]] = []
+        self._custom_patterns: List[tuple[re.Pattern[str], str, OperationalRiskLevel]] = []
 
     def add_custom_pattern(
         self,

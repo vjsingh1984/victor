@@ -272,7 +272,7 @@ class SearchRouter:
     def _score_patterns(
         self,
         query: str,
-        patterns: List[Tuple[re.Pattern, float, str]],
+        patterns: List[Tuple[re.Pattern[str], float, str]],
     ) -> Tuple[float, List[str]]:
         """Score patterns against query."""
         total_score = 0.0

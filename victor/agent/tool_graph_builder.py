@@ -42,7 +42,8 @@ from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
 from victor.providers.base import ToolDefinition
-from victor.tools.base import ToolRegistry, CostTier
+from victor.tools.enums import CostTier
+from victor.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -231,6 +232,8 @@ class ToolGraphBuilder:
         Returns:
             1 if successful, 0 if failed
         """
+        if not self._tool_graph:
+            return 0
         try:
             if self._config.include_cost_tiers:
                 self._tool_graph.add_tool(

@@ -661,7 +661,7 @@ class BaseToolCallingAdapter(ABC):
     # LLMs often hallucinate alternate names for common parameters.
     # Key: (tool_name, alias_name), Value: canonical_name
     # Use None as tool_name for global aliases that apply to all tools.
-    ARGUMENT_ALIASES: Dict[tuple, str] = {
+    ARGUMENT_ALIASES: Dict[Tuple[Optional[str], str], str] = {
         # Shell tool: LLMs often use 'command' instead of 'cmd'
         ("shell", "command"): "cmd",
         ("execute_bash", "command"): "cmd",
@@ -709,7 +709,7 @@ class BaseToolCallingAdapter(ABC):
     # Tool-specific valid arguments that should NOT be filtered even if they appear
     # in HALLUCINATED_ARGUMENTS. Some tools legitimately support pagination params.
     # Key: tool_name (canonical or legacy), Value: set of valid argument names
-    TOOL_VALID_ARGUMENTS: Dict[str, set] = {
+    TOOL_VALID_ARGUMENTS: Dict[str, Set[str]] = {
         # read/read_file support offset/limit for pagination of large files
         "read": {"offset", "limit", "line_start", "line_end"},
         "read_file": {"offset", "limit", "line_start", "line_end"},
@@ -724,7 +724,7 @@ class BaseToolCallingAdapter(ABC):
     # These are filtered out silently to prevent tool execution failures.
     # Models like gpt-oss:20b and smaller models frequently hallucinate these.
     # NOTE: Check TOOL_VALID_ARGUMENTS first - some tools legitimately use these.
-    HALLUCINATED_ARGUMENTS: set = {
+    HALLUCINATED_ARGUMENTS: Set[str] = {
         # Common pagination/limit params (but some tools DO support these - see above)
         "max_results",
         "limit",
@@ -787,8 +787,8 @@ class BaseToolCallingAdapter(ABC):
         logger = logging.getLogger(__name__)
 
         # Step 1: Apply argument aliases (e.g., 'command' -> 'cmd' for shell)
-        aliased = {}
-        aliased_keys = []
+        aliased: Dict[str, Any] = {}
+        aliased_keys: List[str] = []
         for key, value in arguments.items():
             # Check for tool-specific alias
             alias_key = (tool_name, key)

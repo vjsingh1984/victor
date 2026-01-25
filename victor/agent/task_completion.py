@@ -174,7 +174,7 @@ class TaskCompletionDetector:
     # Priority 1: Active signals - deterministic, instructed in system prompt
     # These are checked first and if detected, immediately signal completion
     # Using underscore-prefixed signals to avoid confusion with natural language
-    ACTIVE_SIGNALS: frozenset = frozenset(
+    ACTIVE_SIGNALS: frozenset[str] = frozenset(
         {
             "_task_done_",
             "_done_",
@@ -189,7 +189,7 @@ class TaskCompletionDetector:
     )
 
     # Priority 3: Passive phrases indicating task completion (fallback)
-    COMPLETION_PHRASES: frozenset = frozenset(
+    COMPLETION_PHRASES: frozenset[str] = frozenset(
         {
             # File operations
             "successfully created",
@@ -255,7 +255,7 @@ class TaskCompletionDetector:
     )
 
     # Phrases indicating continuation loop (agent asking to continue)
-    CONTINUATION_PHRASES: frozenset = frozenset(
+    CONTINUATION_PHRASES: frozenset[str] = frozenset(
         {
             "continue with the implementation",
             "what would you like me to",
@@ -281,7 +281,7 @@ class TaskCompletionDetector:
     )
 
     # Tools that produce file deliverables
-    WRITE_TOOLS: frozenset = frozenset(
+    WRITE_TOOLS: frozenset[str] = frozenset(
         {
             "write",
             "edit",
@@ -296,7 +296,7 @@ class TaskCompletionDetector:
     )
 
     # Tools that execute code
-    EXECUTE_TOOLS: frozenset = frozenset(
+    EXECUTE_TOOLS: frozenset[str] = frozenset(
         {
             "execute_bash",
             "bash",

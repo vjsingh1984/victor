@@ -98,8 +98,8 @@ class ConfigurableProviderClassificationStrategy(IProviderClassificationStrategy
 
     def __init__(
         self,
-        cloud_providers: Set[str] = None,
-        local_providers: Set[str] = None,
+        cloud_providers: Set[str] | None = None,
+        local_providers: Set[str] | None = None,
     ) -> None:
         """Initialize with optional provider sets.
 

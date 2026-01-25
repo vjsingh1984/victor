@@ -479,7 +479,7 @@ class TeamCompositionLearner:
         weights = role_weights.get(category, {"executor": 0.4, "researcher": 0.3})
 
         # Generate random role distribution
-        role_distribution: Dict[str, int] = {}
+        role_distribution: dict[str, int] = {}
         total_members = random.randint(2, 4)
 
         for _ in range(total_members):

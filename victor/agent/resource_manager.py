@@ -29,7 +29,7 @@ import weakref
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Callable, Dict, Generator, List, Optional, Protocol, runtime_checkable
 
 logger = logging.getLogger(__name__)
 
@@ -359,7 +359,7 @@ class ResourceManager:
         resource: Any,
         name: str,
         cleanup_method: str = "close",
-    ):
+    ) -> Generator[Any, None, None]:
         """Context manager for automatic resource cleanup.
 
         Args:
@@ -416,7 +416,7 @@ def register_for_cleanup(
 
 
 @contextmanager
-def managed(resource: Any, name: str, cleanup_method: str = "close"):
+def managed(resource: Any, name: str, cleanup_method: str = "close") -> Generator[Any, None, None]:
     """Convenience context manager for resource management.
 
     Args:

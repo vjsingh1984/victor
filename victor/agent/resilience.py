@@ -56,7 +56,7 @@ import logging
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, TypeVar, TYPE_CHECKING, cast
+from typing import Any, Awaitable, Callable, Dict, List, Optional, TypeVar, TYPE_CHECKING, cast
 
 # Import canonical types from circuit_breaker.py to avoid duplication
 from victor.providers.circuit_breaker import (
@@ -114,7 +114,7 @@ class MultiCircuitBreakerConfig:
     recovery_timeout: float = 30.0  # Keep legacy name for backward compatibility
     half_open_max_calls: int = 3
     success_threshold: int = 2
-    exclude_exceptions: tuple = (asyncio.CancelledError,)
+    exclude_exceptions: tuple[type[BaseException], ...] = (asyncio.CancelledError,)
 
     @property
     def timeout_seconds(self) -> float:
@@ -319,12 +319,12 @@ class AgentRetryConfig:
     max_delay: float = 60.0
     exponential_base: float = 2.0
     jitter: bool = True
-    retryable_exceptions: tuple = (
+    retryable_exceptions: tuple[type[Exception], ...] = (
         ConnectionError,
         TimeoutError,
         asyncio.TimeoutError,
     )
-    retryable_status_codes: tuple = (429, 500, 502, 503, 504)
+    retryable_status_codes: tuple[int, ...] = (429, 500, 502, 503, 504)
 
 
 class RetryHandler:
@@ -391,7 +391,7 @@ class RetryHandler:
 
     async def execute_with_retry(
         self,
-        func: Callable[..., T],
+        func: Callable[..., Awaitable[T]],
         *args: Any,
         on_retry: Optional[Callable[[int, Exception], None]] = None,
         **kwargs: Any,
@@ -415,7 +415,7 @@ class RetryHandler:
         for attempt in range(self.config.max_retries + 1):
             try:
                 result = await func(*args, **kwargs)
-                return cast(T, result)
+                return result
             except self.config.retryable_exceptions as e:
                 last_error = e
 
@@ -589,9 +589,9 @@ class ResilientExecutor:
     async def execute(
         self,
         name: str,
-        func: Callable[..., T],
+        func: Callable[..., Awaitable[T]],
         *args: Any,
-        fallback: Optional[Callable[..., T]] = None,
+        fallback: Optional[Callable[..., Awaitable[T]]] = None,
         **kwargs: Any,
     ) -> T:
         """Execute a function with full resilience patterns.
@@ -617,26 +617,26 @@ class ResilientExecutor:
             if fallback:
                 logger.info(f"Circuit '{name}' open, using fallback")
                 fallback_result = await fallback(*args, **kwargs)
-                return cast(T, fallback_result)
+                return fallback_result
             raise CircuitOpenError(f"Circuit '{name}' is open")
 
         # 3. Execute with retry
         try:
-            result = await self.retry_handler.execute_with_retry(
+            result: T = await self.retry_handler.execute_with_retry(
                 func,
                 *args,
                 on_retry=lambda attempt, e: self.circuit_breaker.record_failure(name, e),
                 **kwargs,
             )
             self.circuit_breaker.record_success(name)
-            return cast(T, result)
+            return result
 
         except Exception as e:
             self.circuit_breaker.record_failure(name, e)
             if fallback:
                 logger.warning(f"Primary failed for '{name}', using fallback: {e}")
                 fallback_result = await fallback(*args, **kwargs)
-                return cast(T, fallback_result)
+                return fallback_result
             raise
 
     def get_health_report(self) -> Dict[str, Any]:

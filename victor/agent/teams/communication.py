@@ -443,7 +443,7 @@ class TeamSharedMemory:
         files = memory.get("files_analyzed")
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize empty shared memory."""
         self._data: Dict[str, Any] = {}
         self._contributors: Dict[str, Set[str]] = {}

@@ -788,7 +788,7 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
         """
         function_declarations = []
         for tool in tools:
-            func_decl = {
+            func_decl: Dict[str, Any] = {
                 "name": tool.name,
                 "description": tool.description,
             }
@@ -1811,7 +1811,7 @@ class BedrockToolCallingAdapter(BaseToolCallingAdapter):
             remaining_content=content,
             parse_method="native",
             confidence=1.0,
-            warnings=warnings if warnings else None,
+            warnings=warnings or [],
         )
 
     def get_system_prompt_hints(self) -> str:
@@ -1975,11 +1975,11 @@ class AzureOpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter
                     remaining_content=result.remaining_content,
                     parse_method=result.parse_method,
                     confidence=result.confidence,
-                    warnings=all_warnings if all_warnings else None,
+                    warnings=all_warnings if all_warnings else [],
                 )
 
         return ToolCallParseResult(
-            remaining_content=content, warnings=warnings if warnings else None
+            remaining_content=content, warnings=warnings if warnings else []
         )
 
     def get_system_prompt_hints(self) -> str:

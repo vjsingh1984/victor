@@ -111,9 +111,9 @@ class BaseRecoveryStrategy:
         if self._q_store:
             state_key = context.to_state_key()
             # Get all actions and find the best one
-            all_actions = getattr(self._q_store, "get_all_actions", lambda x: {})(state_key)  # type: ignore[attr-defined]
+            all_actions: dict[str, float] = getattr(self._q_store, "get_all_actions", lambda x: {})(state_key)
             if all_actions:
-                best_action_key = max(all_actions, key=all_actions.get)
+                best_action_key = max(all_actions.keys(), key=lambda k: all_actions[k])
                 q_value = all_actions[best_action_key]
                 # Boost priority if Q-learning suggests our action type
                 if self._matches_action_key(best_action_key):

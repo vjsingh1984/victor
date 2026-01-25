@@ -28,7 +28,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from victor.agent.tool_registrar import ToolRegistrar
     from victor.agent.action_authorizer import ActionIntent
-    from victor.tools.base import ToolDefinition
+    from victor.tools.base import ToolDefinition  # noqa: TC002
     from victor.config.settings import Settings
 
 from victor.core.events import ObservabilityBus
@@ -182,7 +182,8 @@ class ToolPlanner:
                 Tool name string or empty string if not found
             """
             if hasattr(tool, "name"):
-                return tool.name
+                name = tool.name
+                return str(name) if name is not None else ""
             elif isinstance(tool, dict):
                 return tool.get("name", "")
             return ""
@@ -224,7 +225,8 @@ class ToolPlanner:
             # Verify event loop is running
             asyncio.get_running_loop()
             # Fire and forget - don't await the coroutine
-            asyncio.create_task(self._event_bus.emit(topic, data, source="ToolPlanner"))
+            if self._event_bus is not None:
+                asyncio.create_task(self._event_bus.emit(topic, data, source="ToolPlanner"))
         except RuntimeError:
             # No running event loop - skip event emission
             # This is acceptable in synchronous contexts

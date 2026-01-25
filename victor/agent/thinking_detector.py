@@ -47,12 +47,13 @@ logger = logging.getLogger(__name__)
 
 # Try to import native extensions for faster pattern detection
 _NATIVE_AVAILABLE = False
-_native_module = None
+_native_module: Any = None
 
 try:
-    import victor_native as _native_module
+    import victor_native
 
     _NATIVE_AVAILABLE = True
+    _native_module = victor_native
     if _native_module:
         logger.debug(f"Native thinking detector loaded (v{_native_module.__version__})")
 except ImportError:
@@ -176,7 +177,7 @@ STOPWORDS: frozenset[str] = frozenset(
 )
 
 # Patterns indicating circular thinking
-CIRCULAR_PATTERNS: List[re.Pattern[str]] = [
+CIRCULAR_PATTERNS: List[re.Pattern] = [
     re.compile(r"let me (read|check|look at|examine|see) (the|this) (file|code)", re.I),
     re.compile(r"i need to (read|check|look at|examine|see)", re.I),
     re.compile(r"(first|now) let me", re.I),
@@ -191,7 +192,7 @@ CIRCULAR_PATTERNS: List[re.Pattern[str]] = [
 ]
 
 # Stalling patterns - thinking without action (common in DeepSeek)
-STALLING_PATTERNS: List[re.Pattern[str]] = [
+STALLING_PATTERNS: List[re.Pattern] = [
     re.compile(r"^let me\b", re.I),  # Starts with "let me"
     re.compile(r"^i('ll| will| need to| should)\b", re.I),  # Starts with intent
     re.compile(r"^now\b", re.I),  # Starts with "now"

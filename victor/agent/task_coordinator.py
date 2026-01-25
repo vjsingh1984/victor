@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from victor.agent.conversation_controller import ConversationController
     from victor.agent.prompt_builder import SystemPromptBuilder
     from victor.config.settings import Settings
-    from victor.agent.task_analyzer import TaskType
+    from victor.framework.task import TaskType
 
 logger = logging.getLogger(__name__)
 
@@ -341,7 +341,7 @@ class TaskCoordinator:
     # =====================================================================
 
     @property
-    def current_intent(self):
+    def current_intent(self) -> Any:
         """Get the current detected intent."""
         return self._current_intent
 
@@ -351,7 +351,7 @@ class TaskCoordinator:
         return self._temperature
 
     @temperature.setter
-    def temperature(self, value: float):
+    def temperature(self, value: float) -> None:
         """Set the temperature setting."""
         self._temperature = value
 
@@ -361,21 +361,21 @@ class TaskCoordinator:
         return self._tool_budget
 
     @tool_budget.setter
-    def tool_budget(self, value: int):
+    def tool_budget(self, value: int) -> None:
         """Set the tool budget."""
         self._tool_budget = value
 
     @property
-    def observed_files(self) -> list:
+    def observed_files(self) -> list[Any]:
         """Get the list of observed files."""
         return self._observed_files
 
     @observed_files.setter
-    def observed_files(self, value: list[Any]):
+    def observed_files(self, value: list[Any]) -> None:
         """Set the list of observed files."""
         self._observed_files = value
 
-    def set_reminder_manager(self, reminder_manager: Any):
+    def set_reminder_manager(self, reminder_manager: Any) -> None:
         """Set the reminder manager reference.
 
         Args:

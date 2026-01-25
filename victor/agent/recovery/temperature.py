@@ -280,7 +280,7 @@ class ProgressiveTemperatureAdjuster:
 
         self._q_store.update_q_value(
             state_key,
-            RecoveryAction.ADJUST_TEMPERATURE,
+            RecoveryAction.ADJUST_TEMPERATURE.name,
             reward,
         )
 

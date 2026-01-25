@@ -54,7 +54,7 @@ class ToolExecutionCompiler:
         self._tool_registry = tool_registry
         self._idempotent_tools = self._load_idempotent_tools()
 
-    def _load_idempotent_tools(self) -> frozenset:
+    def _load_idempotent_tools(self) -> frozenset[str]:
         """Load idempotent tool names from config.
 
         Returns:
@@ -130,7 +130,7 @@ class ToolExecutionCompiler:
         Returns:
             List of validation rules
         """
-        rules = []
+        rules: List[ValidationRule] = []
         tool = self._tool_registry.get_tool(tool_name)
 
         if not tool:

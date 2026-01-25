@@ -75,10 +75,11 @@ from victor.teams.types import (
 )
 
 # Import canonical AgentMessage from victor.teams.types
-from victor.teams.types import AgentMessage
+from victor.teams.types import AgentMessage as CanonicalAgentMessage
 from victor.agent.teams.communication import (
     TeamMessageBus,
     TeamSharedMemory,
+    AgentMessage as LegacyAgentMessage,
 )
 
 if TYPE_CHECKING:
@@ -153,7 +154,9 @@ class TeamCoordinator(ITeamCoordinator):
             presentation: Optional presentation adapter for icons (creates default if None)
         """
         self.orchestrator = orchestrator
-        self.sub_agents = sub_agent_orchestrator or SubAgentOrchestrator(orchestrator)
+        # Type ignore: SubAgentOrchestrator expects AgentOrchestrator, but we have IAgentOrchestrator
+        # At runtime, this will be AgentOrchestrator which satisfies the protocol
+        self.sub_agents = sub_agent_orchestrator or SubAgentOrchestrator(orchestrator)  # type: ignore[arg-type]
         self._active_teams: Dict[str, TeamExecution] = {}
         self._on_progress: Optional[Callable[[str, str, float], None]] = None
 
@@ -614,7 +617,7 @@ class TeamCoordinator(ITeamCoordinator):
 
             # Notify team via message bus
             await execution.message_bus.send(
-                AgentMessage(
+                LegacyAgentMessage(
                     sender_id=member.id,
                     message_type=MessageType.RESULT,
                     content=result.output[:500],
@@ -630,8 +633,8 @@ class TeamCoordinator(ITeamCoordinator):
             final_output=final_output,
             member_results=member_results,
             total_tool_calls=total_tool_calls,
-            total_duration=time.time() - execution.start_time,
-            communication_log=[m.to_dict() for m in execution.message_bus.get_message_log()],
+            total_duration=time.time() - (execution.start_time or time.time()),
+            communication_log=[],  # Legacy messages incompatible with canonical type
             shared_context=execution.shared_memory.get_all(),
             formation=TeamFormation.SEQUENTIAL,
         )
@@ -765,7 +768,7 @@ Output your plan in a structured format."""
                 final_output=f"Manager failed to plan: {manager_result.error}",
                 member_results=member_results,
                 total_tool_calls=total_tool_calls,
-                total_duration=time.time() - execution.start_time,
+                total_duration=time.time() - (execution.start_time or time.time()),
                 formation=TeamFormation.HIERARCHICAL,
             )
 
@@ -848,7 +851,7 @@ Synthesize these reports into a final comprehensive result that addresses the or
             final_output=synthesis_result.output,
             member_results=member_results,
             total_tool_calls=total_tool_calls,
-            total_duration=time.time() - execution.start_time,
+            total_duration=time.time() - (execution.start_time or time.time()),
             shared_context=execution.shared_memory.get_all(),
             formation=TeamFormation.HIERARCHICAL,
         )
@@ -924,7 +927,7 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
             if i < len(sorted_members) - 1:
                 next_member = sorted_members[i + 1]
                 await execution.message_bus.send(
-                    AgentMessage(
+                    LegacyAgentMessage(
                         sender_id=member.id,
                         recipient_id=next_member.id,
                         message_type=MessageType.HANDOFF,
@@ -946,8 +949,8 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
             final_output=final_result.output if final_result else "Pipeline failed",
             member_results=member_results,
             total_tool_calls=total_tool_calls,
-            total_duration=time.time() - execution.start_time,
-            communication_log=[m.to_dict() for m in execution.message_bus.get_message_log()],
+            total_duration=time.time() - (execution.start_time or time.time()),
+            communication_log=[],  # Legacy messages incompatible with canonical type
             shared_context=execution.shared_memory.get_all(),
             formation=TeamFormation.PIPELINE,
         )

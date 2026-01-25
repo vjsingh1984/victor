@@ -70,7 +70,7 @@ class ExecutionBudget:
     total_seconds: float
     start_time: float
     checkpoints: List[ExecutionCheckpoint] = field(default_factory=list)
-    phase_transitions: List[tuple[float, TimePhase, TimePhase]] = field(default_factory=list)
+    phase_transitions: List[tuple[float, TimePhase, TimePhase]] = field(default_factory=list)  # type: ignore[call-arg]
     _last_phase: TimePhase = field(default=TimePhase.NORMAL)
 
     @property
@@ -422,7 +422,7 @@ class TimeAwareContext:
 
     def __exit__(
         self,
-        exc_type: Optional[type],
+        exc_type: Optional[type[BaseException]],
         exc_val: Optional[BaseException],
         exc_tb: Optional[Any],
     ) -> bool:
