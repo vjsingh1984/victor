@@ -269,7 +269,7 @@ class VerticalConfigLoader:
             text = prompt_config.get("text", "")
             if not text:
                 raise ValueError("Inline prompt requires 'text' field")
-            return str(text)  # type: ignore[return-value]
+            return str(text)
 
         elif source == "file":
             # Load prompt from file

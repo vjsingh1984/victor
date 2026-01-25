@@ -1147,7 +1147,7 @@ class ServiceManager:
         Args:
             registry: Service registry to use (creates new if None)
         """
-        self._registry = registry or ServiceRegistry()  # type: ignore[call-arg]
+        self._registry = registry or ServiceRegistry()
 
     @classmethod
     def register_handler(cls, service_type: str, handler: Type[ServiceTypeHandler]) -> None:

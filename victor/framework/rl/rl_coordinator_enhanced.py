@@ -76,6 +76,7 @@ from typing import (
     Tuple,
     TypeVar,
     Union,
+    cast,
 )
 
 import numpy as np
@@ -232,7 +233,7 @@ class ExperienceReplayBuffer:
             beta: Importance sampling exponent
         """
         self.capacity = capacity
-        self.buffer: deque["Experience[Any]"] = deque(maxlen=capacity)
+        self.buffer: deque["Experience[S, A]"] = deque(maxlen=capacity)
         self.use_prioritization = use_prioritization
         self.priorities: Optional[np.ndarray] = None
         self.alpha = alpha
@@ -242,7 +243,7 @@ class ExperienceReplayBuffer:
         if use_prioritization:
             self.priorities = np.zeros(capacity, dtype=np.float32)
 
-    def add(self, experience: "Experience[Any]") -> None:
+    def add(self, experience: "Experience[S, A]") -> None:
         """Add experience to buffer.
 
         Args:
@@ -255,7 +256,7 @@ class ExperienceReplayBuffer:
             idx = len(self.buffer) - 1
             self.priorities[idx] = self.max_priority
 
-    def sample(self, batch_size: int) -> List["Experience[Any]"]:
+    def sample(self, batch_size: int) -> List["Experience[S, A]"]:
         """Sample a batch of experiences.
 
         Uses uniform sampling if prioritization is disabled,
@@ -1109,7 +1110,7 @@ class EnhancedRLCoordinator:
         if state not in self.q_table and state not in self.policy:
             self.stats.state_count += 1
 
-        return cast("A", action)
+        return cast(A, action)
 
     def compute_reward(self, outcome: TaskResult) -> float:
         """Compute reward signal from task outcome.

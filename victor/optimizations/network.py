@@ -427,7 +427,7 @@ class NetworkOptimizer:
             )
             if cached_response is not None:
                 self._stats.cache_hits += 1
-                return cached_response
+                return cached_response  # type: ignore[no-any-return]
             self._stats.cache_misses += 1
 
         start_time = time.perf_counter()

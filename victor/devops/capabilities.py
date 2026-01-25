@@ -38,7 +38,7 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING, cast
 
 from victor.framework.capabilities.base_vertical_capability_provider import (
     BaseVerticalCapabilityProvider,
@@ -132,7 +132,7 @@ def get_container_settings(orchestrator: Any) -> Dict[str, Any]:
     """
     # SOLID DIP: Read from VerticalContext instead of direct attribute access
     context = orchestrator.vertical_context
-    return context.get_capability_config(
+    config = context.get_capability_config(
         "container_settings",
         {
             "runtime": "docker",
@@ -141,6 +141,7 @@ def get_container_settings(orchestrator: Any) -> Dict[str, Any]:
             "max_image_size_mb": 2000,
         },
     )
+    return cast(Dict[str, Any], config)
 
 
 def configure_infrastructure_settings(
@@ -258,7 +259,7 @@ class DevOpsCapabilityProvider(BaseVerticalCapabilityProvider):
         config = provider.get_capability_config(orchestrator, "deployment_safety")
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the DevOps capability provider."""
         super().__init__("devops")
 
@@ -381,7 +382,11 @@ class DevOpsCapabilityProvider(BaseVerticalCapabilityProvider):
 
             capability = OrchestratorCapability(
                 capability_type=definition.type,
-                **cap_metadata
+                name=cap_metadata["name"],
+                version=cap_metadata["version"],
+                setter=cap_metadata["setter"],
+                description=cap_metadata["description"],
+                getter=cap_metadata.get("getter"),
             )
 
             # Get handler functions
@@ -468,7 +473,7 @@ def _get_provider() -> DevOpsCapabilityProvider:
     """Get or create provider instance."""
     global _provider_instance
     if _provider_instance is None:
-        _provider_instance = DevOpsCapabilityProvider()
+        _provider_instance = DevOpsCapabilityProvider()  # type: ignore[no-untyped-call]
     return _provider_instance
 
 

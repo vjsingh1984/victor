@@ -354,7 +354,7 @@ def migrate_vertical_to_template(
 # =============================================================================
 
 
-def main_extract(args) -> int:
+def main_extract(args: Any) -> int:
     """CLI entry point for extraction.
 
     Args:

@@ -275,7 +275,7 @@ class DocumentStore:
             )
 
             self._table = await asyncio.to_thread(
-                self._db.create_table, self.config.table_name, schema=schema  # type: ignore[arg-type]
+                self._db.create_table, self.config.table_name, schema=schema
             )
             logger.info(f"Created new table: {self.config.table_name}")
 
@@ -297,7 +297,7 @@ class DocumentStore:
             # Get all unique doc_ids and their metadata from chunks
             # We query chunk_index=0 to get one chunk per document
             assert self._table is not None
-            all_data = await asyncio.to_thread(lambda: self._table.to_pandas())
+            all_data = await asyncio.to_thread(self._table.to_pandas)
 
             if all_data.empty:
                 logger.info("No existing documents found")
@@ -492,7 +492,7 @@ class DocumentStore:
                 search_query = self._table.search(query_embedding).limit(fetch_limit)
                 if where_clause:
                     search_query = search_query.where(where_clause)
-                return search_query.to_list()
+                return cast(List[Any], search_query.to_list())
 
             results = await asyncio.to_thread(do_hybrid_search)
         else:
@@ -502,7 +502,7 @@ class DocumentStore:
                 search_query = self._table.search(query_embedding).limit(fetch_limit)
                 if where_clause:
                     search_query = search_query.where(where_clause)
-                return search_query.to_list()
+                return cast(List[Any], search_query.to_list())
 
             results = await asyncio.to_thread(do_vector_search)
 
@@ -668,7 +668,8 @@ class DocumentStore:
 
             h = hashlib.sha256(text.encode()).digest()
             # Convert to list of floats
-            return [b / 255.0 for b in h[: self.config.embedding_dim]]
+            result: List[float] = [b / 255.0 for b in h[: self.config.embedding_dim]]
+            return result
 
     async def delete_document(self, doc_id: str) -> int:
         """Delete a document and its chunks.
@@ -696,7 +697,7 @@ class DocumentStore:
 
         # Delete from LanceDB
         assert self._table is not None
-        await asyncio.to_thread(lambda: self._table.delete(f"doc_id = '{doc_id}'"))
+        await asyncio.to_thread(self._table.delete, f"doc_id = '{doc_id}'")
 
         return 1  # LanceDB doesn't return count
 
@@ -729,7 +730,7 @@ class DocumentStore:
         """
         await self.initialize()
         stats = dict(self._stats)
-        stats["store_path"] = str(self.config.path)
+        stats["store_path"] = str(self.config.path)  # type: ignore[assignment]
         return stats
 
     async def close(self) -> None:

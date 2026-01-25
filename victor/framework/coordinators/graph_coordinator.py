@@ -128,20 +128,20 @@ class GraphExecutionCoordinator:
             # CompiledGraph.invoke() returns GraphExecutionResult with .state attribute
             # Some graphs may return state dict directly for backward compatibility
             if hasattr(result, "state"):
-                final_state = result.state
+                final_state2 = result.state
                 nodes_executed = getattr(result, "node_history", [])
                 success = getattr(result, "success", True)
                 error = getattr(result, "error", None)
             else:
                 # Backward compatibility: result is the final state dict
-                final_state: dict[str, Any] = result
+                final_state2: dict[str, Any] = result
                 nodes_executed = []
                 success = True
                 error = None
 
             return WorkflowExecutionResult(
                 success=success,
-                final_state=final_state,
+                final_state=final_state2,
                 nodes_executed=(
                     nodes_executed
                     if nodes_executed
@@ -198,15 +198,15 @@ class GraphExecutionCoordinator:
 
                 # Handle polymorphic return type
                 if hasattr(result, "state"):
-                    final_state: dict[str, Any] = result.state
+                    final_state3: dict[str, Any] = result.state
                 else:
-                    final_state: dict[str, Any] = result
+                    final_state3: dict[str, Any] = result
 
                 yield WorkflowEvent(
                     event_type="complete",
                     node_id="",
                     timestamp=time.time(),
-                    state_snapshot=final_state,
+                    state_snapshot=final_state3,
                 )
 
         except Exception as e:
@@ -267,13 +267,13 @@ class GraphExecutionCoordinator:
 
             # Extract execution info from result (LSP compliance)
             if hasattr(result, "state"):
-                final_state = result.state
+                final_state4 = result.state
                 nodes_executed = getattr(result, "node_history", [])
                 success = getattr(result, "success", True)
                 error = getattr(result, "error", None)
             else:
                 # Result is the final state dict
-                final_state: dict[str, Any] = result
+                final_state4: dict[str, Any] = result
                 nodes_executed = []
                 success = True
                 error = None

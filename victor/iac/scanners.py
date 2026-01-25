@@ -706,13 +706,14 @@ class DockerComposeScanner(IaCScannerProtocol):
             if isinstance(environment, dict):
                 env_items = list(environment.items())
             elif isinstance(environment, list):
-                env_items: list[tuple[str, str]] = []
+                env_items_list: list[tuple[str, str]] = []
                 for item in environment:
                     if "=" in item:
                         k, v = item.split("=", 1)
-                        env_items.append((k, v))
+                        env_items_list.append((k, v))
+                env_items = env_items_list
             else:
-                env_items: list[tuple[str, str]] = []
+                env_items = []
 
             for key, value in env_items:
                 key_upper = key.upper()

@@ -34,13 +34,13 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Optional
 
+from victor.agent.capabilities.base import CapabilitySpec
+
 try:
-    from importlib.metadata import entry_points
+    from importlib.metadata import entry_points as import_entry_points
 except ImportError:
     # Python < 3.8
-    from importlib_metadata import entry_points
-
-from victor.agent.capabilities.base import CapabilitySpec
+    from importlib_metadata import entry_points as import_entry_points
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +112,7 @@ class DynamicCapabilityRegistry:
                 capability_eps = eps.select(group="victor.capabilities")
             else:
                 # Python 3.9 and earlier
-                capability_eps = eps.get("victor.capabilities", [])  # type: ignore[arg-type]
+                capability_eps = eps.get("victor.capabilities", [])  # type: ignore[attr-defined]
 
             for ep in capability_eps:
                 try:

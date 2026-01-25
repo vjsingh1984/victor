@@ -188,19 +188,28 @@ def _create_agent_bridge(container: ServiceContainer) -> "AgentBridge":
     # Create a minimal orchestrator wrapper for the bridge
     class MinimalOrchestrator(OrchestratorProtocol):
         """Minimal orchestrator for service container compatibility."""
-        def chat(self, *args: Any, **kwargs: Any) -> Any: ...
-        def stream_chat(self, *args: Any, **kwargs: Any) -> Any: ...
-        def supports_tools(self) -> bool: ...
-        def name(self) -> str: ...
+        def chat(self, *args: Any, **kwargs: Any) -> Any:
+            return None
+        def stream_chat(self, *args: Any, **kwargs: Any) -> Any:
+            return None
+        def supports_tools(self) -> bool:
+            return True
+        def name(self) -> str:
+            return "minimal"
         @property
-        def messages(self) -> list[Any]: ...
+        def messages(self) -> list[Any]:
+            return []
         @property
-        def tool_calls_used(self) -> int: ...
-
-    orchestrator = MinimalOrchestrator()
-    config = AgentConfig()
-    agent = Agent(orchestrator)  # Agent doesn't accept config parameter
-    return AgentBridge(agent, BridgeConfiguration(enable_cqrs=False, enable_observability=False))
+        def tool_calls_used(self) -> int:
+            return 0
+        @property
+        def model(self) -> str:
+            return "minimal"
+        @property
+        def provider_name(self) -> str:
+            return "minimal"
+        def reset_conversation(self) -> None:
+            pass
 
 
 # =============================================================================
@@ -383,14 +392,20 @@ class FrameworkScope:
         """Get tool configurator service."""
         from victor.framework.tool_config import ToolConfigurator
         from typing import cast
-        service = self._scope.get(ToolConfiguratorService)
-        # Cast to ToolConfigurator protocol since the service implements it
-        return cast(ToolConfigurator, service)
+
+        # Get the service implementation (concrete class)
+        service_impl = self._scope._container._create_tool_configurator(self._scope._container)
+        # Cast to protocol
+        return cast(ToolConfiguratorService, service_impl)
 
     def get_registry(self) -> Any:
         """Get event registry service."""
         from typing import cast
-        return cast(EventRegistryService, self._scope.get(EventRegistryService))
+
+        # Get the service implementation (concrete class)
+        service_impl = self._scope._container._create_event_registry(self._scope._container)
+        # Cast to protocol
+        return cast(EventRegistryService, service_impl)
 
     def get_builder(self) -> Any:
         """Get agent builder service.
@@ -398,7 +413,11 @@ class FrameworkScope:
         Returns a new builder instance (transient).
         """
         from typing import cast
-        return cast(AgentBuilderService, self._scope.get(AgentBuilderService))
+
+        # Get the service implementation (concrete class)
+        service_impl = self._scope._container._create_agent_builder(self._scope._container)
+        # Cast to protocol
+        return cast(AgentBuilderService, service_impl)
 
     async def __aenter__(self) -> "FrameworkScope":
         """Enter async context."""
@@ -468,7 +487,10 @@ def get_tool_configurator(container: Optional[ServiceContainer] = None) -> Any:
     from typing import cast
     if container is None:
         container = get_container()
-    return cast(ToolConfiguratorService, container.get(ToolConfiguratorService))
+    # Get the service implementation directly via factory
+    service_impl = _create_tool_configurator(container)
+    # Cast to protocol
+    return cast(ToolConfiguratorService, service_impl)
 
 
 def get_event_registry(container: Optional[ServiceContainer] = None) -> Any:
@@ -483,7 +505,10 @@ def get_event_registry(container: Optional[ServiceContainer] = None) -> Any:
     from typing import cast
     if container is None:
         container = get_container()
-    return cast(EventRegistryService, container.get(EventRegistryService))
+    # Get the service implementation directly via factory
+    service_impl = _create_event_registry(container)
+    # Cast to protocol
+    return cast(EventRegistryService, service_impl)
 
 
 def create_builder(container: Optional[ServiceContainer] = None) -> Any:
@@ -498,7 +523,10 @@ def create_builder(container: Optional[ServiceContainer] = None) -> Any:
     from typing import cast
     if container is None:
         container = get_container()
-    return cast(AgentBuilderService, container.get(AgentBuilderService))
+    # Get the service implementation directly via factory
+    service_impl = _create_agent_builder(container)
+    # Cast to protocol
+    return cast(AgentBuilderService, service_impl)
 
 
 def create_framework_scope(container: Optional[ServiceContainer] = None) -> FrameworkScope:

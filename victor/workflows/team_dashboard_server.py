@@ -312,7 +312,7 @@ class ConnectionManager:
 
     def __init__(self) -> None:
         """Initialize connection manager."""
-        self._active_connections: Dict[str, Set[WebSocket]] = defaultdict(set)  # type: ignore[arg-type]
+        self._active_connections: Dict[str, Set[WebSocket]] = defaultdict(set)
         self._connection_metadata: Dict[WebSocket, Dict[str, Any]] = {}
         self._lock = asyncio.Lock()
 
@@ -679,7 +679,7 @@ class TeamDashboardServer:
                 "recursion_depth": recursion_depth,
                 "start_time": (
                     self._execution_states[execution_id].start_time.isoformat()
-                    if self._execution_states[execution_id].start_time
+                    if self._execution_states[execution_id].start_time is not None
                     else None
                 ),
             },

@@ -209,11 +209,11 @@ class MetricsAggregator:
         """
         if metric_names is None:
             # Get all unique metric names across runs
-            metric_names = set()
+            metric_names_set: set[str] = set()
             for run_id in run_ids:
                 metrics = self._storage.get_metrics(run_id)
-                metric_names.update(m.key for m in metrics)
-            metric_names_list = list(metric_names)
+                metric_names_set.update(m.key for m in metrics)
+            metric_names_list = list(metric_names_set)
         else:
             metric_names_list = metric_names
 

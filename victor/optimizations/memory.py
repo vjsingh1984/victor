@@ -544,7 +544,7 @@ def memory_efficient(maxsize: int = 128) -> Callable[..., Any]:
             if pool is None:
                 pool = ObjectPool(lambda: func(*args, **kwargs), max_size=maxsize)
             result = pool.acquire()
-            return cast(T, result)
+            return result
 
         return wrapper
 

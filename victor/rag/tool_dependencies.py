@@ -82,7 +82,7 @@ class RAGToolDependencyProvider(YAMLToolDependencyProvider):
     hand-coded Python implementation.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the provider with RAG-specific config from YAML.
 
         .. deprecated::

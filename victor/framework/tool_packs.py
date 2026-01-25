@@ -42,7 +42,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set, Union, cast
 
 logger = logging.getLogger(__name__)
 
@@ -451,7 +451,11 @@ def resolve_tool_pack(
     if registry is None:
         registry = get_tool_pack_registry()
 
-    return registry.resolve(name)
+    result = registry.resolve(name)
+    if isinstance(result, list):
+        return result
+    # If it's a ToolPack, return the tools list
+    return cast("list[str]", result.tools if hasattr(result, "tools") else result)
 
 
 def create_custom_pack(
@@ -491,7 +495,7 @@ def create_custom_pack(
         description=description or f"Custom pack extending {extends}",
     )
     # Return tools list as expected by the signature
-    return cast("list[str]", pack.tools)
+    return pack.tools
 
 
 # Auto-register default packs on import

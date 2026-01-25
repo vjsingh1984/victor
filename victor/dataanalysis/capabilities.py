@@ -38,7 +38,7 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING, cast
 
 from victor.framework.capabilities.base_vertical_capability_provider import (
     BaseVerticalCapabilityProvider,
@@ -105,7 +105,7 @@ def get_data_quality(orchestrator: Any) -> Dict[str, Any]:
     """
     # SOLID DIP: Read from VerticalContext instead of direct attribute access
     context = orchestrator.vertical_context
-    return context.get_capability_config(
+    config = context.get_capability_config(
         "data_quality",
         {
             "min_completeness": 0.9,
@@ -114,6 +114,7 @@ def get_data_quality(orchestrator: Any) -> Dict[str, Any]:
             "handle_missing": "impute",
         },
     )
+    return cast(Dict[str, Any], config)
 
 
 def configure_visualization_style(
@@ -160,7 +161,7 @@ def get_visualization_style(orchestrator: Any) -> Dict[str, Any]:
     """
     # SOLID DIP: Read from VerticalContext instead of direct attribute access
     context = orchestrator.vertical_context
-    return context.get_capability_config(
+    config = context.get_capability_config(
         "visualization_style",
         {
             "backend": "matplotlib",
@@ -170,6 +171,7 @@ def get_visualization_style(orchestrator: Any) -> Dict[str, Any]:
             "save_format": "png",
         },
     )
+    return cast(Dict[str, Any], config)
 
 
 def configure_statistical_analysis(
@@ -215,7 +217,7 @@ def get_statistical_config(orchestrator: Any) -> Dict[str, Any]:
     """
     # SOLID DIP: Read from VerticalContext instead of direct attribute access
     context = orchestrator.vertical_context
-    return context.get_capability_config(
+    config = context.get_capability_config(
         "statistical_analysis",
         {
             "significance_level": 0.05,
@@ -224,6 +226,7 @@ def get_statistical_config(orchestrator: Any) -> Dict[str, Any]:
             "effect_size_threshold": 0.2,
         },
     )
+    return cast(Dict[str, Any], config)
 
 
 def configure_ml_pipeline(
@@ -276,7 +279,7 @@ def get_ml_config(orchestrator: Any) -> Dict[str, Any]:
     """
     # SOLID DIP: Read from VerticalContext instead of direct attribute access
     context = orchestrator.vertical_context
-    return context.get_capability_config(
+    config = context.get_capability_config(
         "ml_pipeline",
         {
             "framework": "sklearn",
@@ -287,6 +290,7 @@ def get_ml_config(orchestrator: Any) -> Dict[str, Any]:
             "tuning_method": "grid",
         },
     )
+    return cast(Dict[str, Any], config)
 
 
 def configure_data_privacy(
@@ -362,7 +366,7 @@ class DataAnalysisCapabilityProvider(BaseVerticalCapabilityProvider):
         config = provider.get_capability_config(orchestrator, "data_quality")
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the data analysis capability provider."""
         super().__init__("dataanalysis")
 
@@ -509,7 +513,7 @@ def _get_provider() -> DataAnalysisCapabilityProvider:
     """Get or create provider instance."""
     global _provider_instance
     if _provider_instance is None:
-        _provider_instance = DataAnalysisCapabilityProvider()
+        _provider_instance = DataAnalysisCapabilityProvider()  # type: ignore[no-untyped-call]
     return _provider_instance
 
 

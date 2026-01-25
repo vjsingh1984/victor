@@ -215,7 +215,7 @@ class TemplateLibrary:
                 best_score = score
                 best_template = template
 
-        if best_score >= min_score:
+        if best_score >= min_score and best_template is not None:
             logger.info(f"Template '{best_template.name}' matched with score {best_score:.2f}")
             return best_template
 

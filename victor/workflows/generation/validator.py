@@ -613,7 +613,9 @@ class GraphStructureValidator:
         self, nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]
     ) -> Dict[str, List[str]]:
         """Build adjacency list representation."""
-        graph: Dict[str, List[str]] = {node.get("id"): [] for node in nodes if "id" in node}
+        graph: Dict[str, List[str]] = {
+            node.get("id"): [] for node in nodes if "id" in node and node.get("id") is not None
+        }
 
         for edge in edges:
             source = edge.get("source")
@@ -1463,7 +1465,7 @@ class RequirementValidator:
             score=score,
         )
 
-    def _check_completeness(self, requirements: Any) -> List:
+    def _check_completeness(self, requirements: Any) -> List[str]:
         """Check for missing required information."""
         from victor.workflows.generation.requirements import RequirementValidationError
 
@@ -1566,7 +1568,7 @@ class RequirementValidator:
 
         return errors
 
-    def _check_consistency(self, requirements: Any) -> tuple:
+    def _check_consistency(self, requirements: Any) -> tuple[List[str], List[str]]:
         """Check for contradictions.
 
         Returns:
@@ -1659,7 +1661,7 @@ class RequirementValidator:
 
         return errors, warnings
 
-    def _check_feasibility(self, requirements: Any) -> tuple:
+    def _check_feasibility(self, requirements: Any) -> tuple[List[str], List[str]]:
         """Check if requirements can be implemented.
 
         Returns:
@@ -1738,7 +1740,7 @@ class RequirementValidator:
 
         return errors, warnings
 
-    def _check_specificity(self, requirements: Any) -> List:
+    def _check_specificity(self, requirements: Any) -> List[str]:
         """Check if requirements are specific enough.
 
         Args:
@@ -1871,7 +1873,7 @@ class RequirementValidator:
         # Clamp to [0, 1]
         return max(0.0, min(1.0, score))
 
-    def _detect_cycles(self, dependencies: Any) -> List:
+    def _detect_cycles(self, dependencies: Any) -> List[str]:
         """Detect cycles in dependency graph using DFS.
 
         Args:

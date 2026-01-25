@@ -970,6 +970,54 @@ class VerticalIntegrationPipeline:
 
     This pipeline encapsulates all vertical integration logic that was
     previously spread across FrameworkShim._apply_vertical() and
+
+    **PRIMARY EXTENSION MECHANISM**: StepHandlerRegistry
+
+    This pipeline uses StepHandlerRegistry as its primary extension mechanism.
+    Custom integration logic should be implemented as step handlers, not by
+    modifying this class or its methods. See examples below.
+
+    **Why Step Handlers?**
+    - Testable: Each handler can be unit tested independently
+    - Reusable: Share handlers across verticals
+    - Maintainable: Clear separation of concerns
+    - Extensible: Add handlers without modifying existing code
+    - Observable: Per-step status tracking
+
+    **Creating Custom Handlers:**
+    ```python
+    from victor.framework.step_handlers import BaseStepHandler, StepHandlerRegistry
+
+    class CustomToolsHandler(BaseStepHandler):
+        @property
+        def name(self) -> str:
+            return "custom_tools"
+
+        @property
+        def order(self) -> int:
+            return 15  # After default tools (10)
+
+        def _do_apply(self, orchestrator, vertical, context, result):
+            # Your custom logic here
+            tools = vertical.get_tools()
+            context.apply_enabled_tools(tools)
+            result.add_info(f"Applied {len(tools)} tools")
+
+    # Register and use
+    registry = StepHandlerRegistry.default()
+    registry.add_handler(CustomToolsHandler())
+    pipeline = VerticalIntegrationPipeline(step_registry=registry)
+    ```
+
+    See docs/extensions/step_handler_guide.md for complete guide.
+
+    **Legacy Patterns Deprecated:**
+    - Direct vertical method overrides (use step handlers instead)
+    - Private attribute access (use capability registry)
+    - Monolithic apply_to_orchestrator() (use focused handlers)
+
+    This pipeline encapsulates all vertical integration logic that was
+    previously spread across FrameworkShim._apply_vertical() and
     related methods. It provides:
 
     1. **Unified Integration**: Same logic for CLI and SDK paths
@@ -1040,10 +1088,10 @@ class VerticalIntegrationPipeline:
             cache_ttl: Cache time-to-live in seconds (default: 3600 = 1 hour)
             parallel_enabled: If True, enable parallel execution (Phase 2.2, default: False)
         """
-        self._strict_mode = strict_mode
-        self._pre_hooks = pre_hooks or []
-        self._post_hooks = post_hooks or []
-        self._use_step_handlers = use_step_handlers
+        self._strict_mode: bool = strict_mode
+        self._pre_hooks: List[Callable[[Any, type[Any]], None]] = pre_hooks or []
+        self._post_hooks: List[Callable[[Any, IntegrationResult], None]] = post_hooks or []
+        self._use_step_handlers: bool = use_step_handlers
         self._enable_cache = enable_cache
         self._cache_ttl = cache_ttl
         self._parallel_enabled = parallel_enabled

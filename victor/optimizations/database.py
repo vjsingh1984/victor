@@ -528,7 +528,7 @@ def cached_query(
             if key in _cache:
                 cached_result, timestamp = _cache[key]
                 if time.time() - timestamp < cache_ttl:
-                    return cast(T, cached_result)
+                    return cached_result
 
             # Execute function
             result = await func(*args, **kwargs)
@@ -536,7 +536,7 @@ def cached_query(
             # Cache result
             _cache[key] = (result, time.time())
 
-            return cast(T, result)
+            return result
 
         return wrapper
 

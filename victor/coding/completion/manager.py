@@ -375,15 +375,15 @@ class CompletionManager:
                 stream_result = provider.stream_inline_completion(params)
                 # Check if it's a coroutine or an async iterator
                 import inspect
-                from typing import AsyncIterator
+                from typing import AsyncIterator, cast
                 if inspect.iscoroutine(stream_result):
                     # It's a coroutine returning an iterator
-                    async_iter: AsyncIterator[str] = await stream_result  # type: ignore[misc]
+                    async_iter = cast(AsyncIterator[str], await stream_result)
                     async for token in async_iter:
                         yield token
                 else:
                     # It's already an async iterator
-                    async for token in stream_result:  # type: ignore[misc]
+                    async for token in stream_result:
                         yield token
                 return
             except Exception as e:

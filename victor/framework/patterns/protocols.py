@@ -123,7 +123,10 @@ class CollaborationPattern:
 
         # Use existing team coordinator factory - create_coordinator signature
         # accepts orchestrator as optional first positional argument
-        return create_coordinator(orchestrator)
+        from victor.agent.orchestrator import AgentOrchestrator
+        return create_coordinator(
+            cast(AgentOrchestrator, orchestrator)
+        )
 
 
 class TaskContext:

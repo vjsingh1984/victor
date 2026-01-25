@@ -1240,7 +1240,7 @@ GENERAL_CODING_PROMPTS: List[Tuple[str, str]] = [
 # =============================================================================
 
 
-def build_complete_corpus() -> list[tuple[str, "PromptCategory", str]]:
+def build_complete_corpus() -> list[tuple[str, str, str]]:
     """Build the complete corpus with all categories.
 
     Returns:
@@ -1252,34 +1252,35 @@ def build_complete_corpus() -> list[tuple[str, "PromptCategory", str]]:
 
     # Function completion (25%)
     for prompt, source in FUNCTION_COMPLETION_PROMPTS:
-        corpus.append((prompt, PromptCategory.FUNCTION_COMPLETION, source))
+        corpus.append((prompt, str(PromptCategory.FUNCTION_COMPLETION.value), source))
 
     # Code debugging (20%)
     for prompt, source in CODE_DEBUGGING_PROMPTS:
-        corpus.append((prompt, PromptCategory.CODE_DEBUGGING, source))
+        corpus.append((prompt, str(PromptCategory.CODE_DEBUGGING.value), source))
 
     # Code explanation (12%)
     for prompt, source in CODE_EXPLANATION_PROMPTS:
-        corpus.append((prompt, PromptCategory.CODE_EXPLANATION, source))
+        corpus.append((prompt, str(PromptCategory.CODE_EXPLANATION.value), source))
 
     # Code refactoring (10%)
     for prompt, source in CODE_REFACTORING_PROMPTS:
-        corpus.append((prompt, PromptCategory.CODE_REFACTORING, source))
+        corpus.append((prompt, str(PromptCategory.CODE_REFACTORING.value), source))
 
     # Testing (8%)
     for prompt, source in TESTING_PROMPTS:
-        corpus.append((prompt, PromptCategory.TESTING, source))
+        corpus.append((prompt, str(PromptCategory.TESTING.value), source))
 
     # Algorithm implementation (7%)
     for prompt, source in ALGORITHM_IMPLEMENTATION_PROMPTS:
-        corpus.append((prompt, PromptCategory.ALGORITHM_IMPLEMENTATION, source))
+        corpus.append((prompt, str(PromptCategory.ALGORITHM_IMPLEMENTATION.value), source))
 
     # API integration (6%)
     for prompt, source in API_INTEGRATION_PROMPTS:
-        corpus.append((prompt, PromptCategory.API_INTEGRATION, source))
+        corpus.append((prompt, str(PromptCategory.API_INTEGRATION.value), source))
 
     # Data structure (5%)
     for prompt, source in DATA_STRUCTURE_PROMPTS:
+        corpus.append((prompt, str(PromptCategory.DATA_STRUCTURE.value), source))
         corpus.append((prompt, PromptCategory.DATA_STRUCTURE, source))
 
     # File I/O (3%)

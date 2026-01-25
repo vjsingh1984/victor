@@ -43,7 +43,7 @@ from __future__ import annotations
 import logging
 import threading
 from dataclasses import dataclass, field
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from victor.core.errors import RecursionDepthError
 
@@ -228,6 +228,7 @@ class RecursionContext:
         Returns:
             New RecursionContext with copied state and fresh lock
         """
+        from typing import cast
         # Avoid infinite recursion
         if id(self) in memo:
             return memo[id(self)]
@@ -236,6 +237,7 @@ class RecursionContext:
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result
+        return cast(RecursionContext, result)
 
         # Copy non-lock fields (need lock for thread-safe access)
         with self._lock:
@@ -277,11 +279,10 @@ class RecursionGuard:
         self._ctx.enter(self._operation_type, self._identifier)
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Exit the recursion guard.
 
         Returns:
-            False to indicate exceptions should not be suppressed
+            None to indicate exceptions should not be suppressed
         """
         self._ctx.exit()
-        return False  # Don't suppress exceptions

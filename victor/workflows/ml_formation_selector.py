@@ -709,9 +709,9 @@ class FeatureExtractor:
             Task ID
         """
         if hasattr(task, "id"):
-            return str(task.id)  # type: ignore[no-any-return]
+            return str(task.id)
         elif hasattr(task, "message_id"):
-            return str(task.message_id)  # type: ignore[no-any-return]
+            return str(task.message_id)
         else:
             # Generate hash-based ID (non-cryptographic, for identification only)
             content = self._get_task_content(task)
@@ -803,12 +803,14 @@ class ModelTrainer:
         scaler = StandardScaler()
         X_train_scaled = scaler.fit_transform(X_train)
         X_test_scaled = scaler.transform(X_test)
-        self.scaler = scaler  # type: ignore[assignment]
+        self.scaler = scaler
 
         # Train model
         start_time = time.time()
-        self.model = self._create_model()
-        self.model.fit(X_train_scaled, y_train)
+        model = self._create_model()
+        if model is not None:
+            model.fit(X_train_scaled, y_train)
+            self.model = model
         training_time = time.time() - start_time
 
         # Evaluate model
@@ -914,7 +916,10 @@ class ModelTrainer:
 
         # Measure inference time
         start_time = time.time()
-        y_pred = self.model.predict(X_test)
+        model = self.model
+        if model is None:
+            raise ValueError("Model not trained. Call train_model() first.")
+        y_pred = model.predict(X_test)
         inference_time = time.time() - start_time
 
         # Calculate metrics
@@ -1222,7 +1227,7 @@ class AdaptiveFormationML:
         scores["consensus"] -= features.urgency * 0.4
 
         # Select best
-        formation = max(scores.keys(), key=lambda k: scores[k])  # type: ignore[arg-type]
+        formation = max(scores.keys(), key=lambda k: scores[k])
 
         if return_scores:
             return formation, scores

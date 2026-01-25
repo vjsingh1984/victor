@@ -280,11 +280,11 @@ class WorkflowEngine:
         self._hitl_executor: Optional["HITLExecutor"] = None
 
         # Lazy-loaded compilers
-        self._graph_compiler: Optional["WorkflowGraphCompiler"] = None
+        self._graph_compiler: Optional["WorkflowGraphCompiler[Any]"] = None
         self._definition_compiler: Optional["WorkflowDefinitionCompiler"] = None
 
         # Lazy-loaded unified compiler for consistent compilation and caching
-        self._unified_compiler: Optional["UnifiedWorkflowCompiler[Any]"] = None
+        self._unified_compiler: Optional["UnifiedWorkflowCompiler"] = None
 
     async def _emit_workflow_event(
         self,
@@ -432,7 +432,7 @@ class WorkflowEngine:
 
     async def execute_graph(
         self,
-        graph: "CompiledGraph",
+        graph: "CompiledGraph[Any]",
         initial_state: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> WorkflowExecutionResult:
@@ -510,8 +510,8 @@ class WorkflowEngine:
 
             return WorkflowExecutionResult(
                 success=result.success,
-                final_state=result.context.to_dict(),
-                nodes_executed=0,  # Not tracked in WorkflowResult
+                final_state=result.context.to_dict() if hasattr(result.context, "to_dict") else {},
+                nodes_executed=[],  # Not tracked in WorkflowResult
                 duration_seconds=duration,
                 error=result.error if not result.success else None,
             )
@@ -715,7 +715,7 @@ class WorkflowEngine:
                     yield event
                 else:
                     # Handle tuple format for backward compatibility
-                    event_type, data = event  # type: ignore
+                    event_type, data = cast("tuple[str, Dict[str, Any]]", event)
                     yield WorkflowEvent(
                         event_type=event_type,
                         node_id=data.get("node_id", ""),
@@ -725,7 +725,7 @@ class WorkflowEngine:
 
     async def stream_graph(
         self,
-        graph: "CompiledGraph",
+        graph: "CompiledGraph[Any]",
         initial_state: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[WorkflowEvent]:
@@ -949,7 +949,7 @@ class WorkflowEngine:
     # Helpers (for backward compatibility)
     # =========================================================================
 
-    def _get_executor(self) -> "WorkflowExecutor":  # type: ignore[no-untyped-call]
+    def _get_executor(self) -> "WorkflowExecutor":
         """Get or create workflow executor."""
         if self._executor is None:
             from victor.workflows.executor import WorkflowExecutor
@@ -958,7 +958,7 @@ class WorkflowEngine:
             self._executor = WorkflowExecutor(orchestrator=None)  # type: ignore[call-arg]
         return self._executor
 
-    def _get_streaming_executor(self) -> "StreamingWorkflowExecutor":  # type: ignore[no-untyped-call]
+    def _get_streaming_executor(self) -> "StreamingWorkflowExecutor":
         """Get or create streaming executor."""
         if self._streaming_executor is None:
             from victor.workflows.streaming_executor import StreamingWorkflowExecutor

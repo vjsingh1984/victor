@@ -467,7 +467,7 @@ class ValidatorFactory:
     ) -> ValidatorProtocol:
         """Create a custom validator."""
         validator_class = self._custom_validators[config.type]
-        result = validator_class.from_config(config)
+        result = validator_class.from_config(config)  # type: ignore[attr-defined]
         return cast(ValidatorProtocol, result)
 
 

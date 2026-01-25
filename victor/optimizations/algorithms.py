@@ -443,7 +443,7 @@ class AlgorithmOptimizer:
         lazy_value = optimizer.lazy(lambda: expensive_computation())
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize algorithm optimizer."""
         self._caches: Dict[str, LRUCache[Any, Any]] = {}
         self._timed_caches: Dict[str, TimedCache[Any, Any]] = {}
@@ -515,7 +515,7 @@ class AlgorithmOptimizer:
         """
         return BloomFilter(expected_items, false_positive_rate)
 
-    def lazy(self, func: Callable[[], T]) -> Lazy:
+    def lazy(self, func: Callable[[], T]) -> Lazy[T]:
         """Create lazy value.
 
         Args:

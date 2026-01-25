@@ -203,11 +203,12 @@ class ParallelToolExecutor:
                 else:
                     # res is ToolExecutionResult
                     exec_result = res
-                    if res.success:
+                    # Check if res has success attribute (it should be ToolExecutionResult)
+                    if hasattr(res, "success") and res.success:
                         result.completed_count += 1
                     else:
                         result.failed_count += 1
-                        if res.error:
+                        if hasattr(res, "error") and res.error:
                             result.errors.append(res.error)
 
                 results_by_index[idx] = exec_result

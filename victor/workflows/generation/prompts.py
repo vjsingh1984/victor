@@ -69,7 +69,7 @@ class RefinementPromptBuilder:
         )
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize prompt builder."""
         self.error_reporter = ErrorReporter()
 

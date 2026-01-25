@@ -802,8 +802,8 @@ class SqliteLanceDBStore:
 
         await self._graph_store.delete_by_repo()  # type: ignore[union-attr]
 
-        if self._vector_store and "symbols" in self._vector_store.list_tables().tables:  # type: ignore[union-attr]
-            self._vector_store.drop_table("symbols")  # type: ignore[union-attr]
+        if self._vector_store and "symbols" in self._vector_store.list_tables().tables:
+            self._vector_store.drop_table("symbols")
             self._vector_table = None
 
     async def stats(self) -> Dict[str, Any]:
@@ -816,7 +816,8 @@ class SqliteLanceDBStore:
         vector_count = 0
         if self._vector_table:
             try:
-                vector_count = self._vector_table.count_rows()  # type: ignore[union-attr]
+                if self._vector_table is not None:
+                    vector_count = self._vector_table.count_rows()
             except Exception:
                 pass
 

@@ -804,7 +804,7 @@ def lazy_load(component_key: str) -> Callable[[F], F]:
 
     def decorator(func: F) -> F:
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             # Get loader from first argument if it's self
             loader = None
             if args and hasattr(args[0], "_lazy_loader"):

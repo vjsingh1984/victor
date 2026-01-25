@@ -1062,10 +1062,10 @@ class WorkflowExecutor:
                         result = await compiled.invoke(inputs or {})
                     else:
                         # Graph doesn't support invoke, return inputs as result
-                        result = inputs or {}
+                        result = cast("GraphExecutionResult[Any]", inputs or {})
                 else:
                     # Already compiled graph
-                    result = await workflow.invoke(inputs or {})
+                    result = await workflow.invoke(inputs or {})  # type: ignore[attr-defined]
 
                 if hasattr(result, "state"):
                     final_state = cast("Dict[str, Any]", result.state)

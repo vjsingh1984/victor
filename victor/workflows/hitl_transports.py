@@ -629,28 +629,31 @@ class SlackTransport(BaseTransport):
             blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": context_text}})
 
         # Add action buttons
+        approve_url = urls.get("approve_url")
+        reject_url = urls.get("reject_url")
+        elements: list[dict[str, Any]] = [
+            {
+                "type": "button",
+                "text": {"type": "plain_text", "text": "✓ Approve"},
+                "style": "primary",
+                "action_id": "approve",
+                "value": request.request_id,
+                "url": approve_url if approve_url else "",
+            },
+            {
+                "type": "button",
+                "text": {"type": "plain_text", "text": "✗ Reject"},
+                "style": "danger",
+                "action_id": "reject",
+                "value": request.request_id,
+                "url": reject_url if reject_url else "",
+            },
+        ]
         blocks.append(
             {
                 "type": "actions",
                 "block_id": f"hitl_{request.request_id}",
-                "elements": [
-                    {
-                        "type": "button",
-                        "text": {"type": "plain_text", "text": "✓ Approve"},
-                        "style": "primary",
-                        "action_id": "approve",
-                        "value": request.request_id,
-                        "url": urls.get("approve_url"),
-                    },
-                    {
-                        "type": "button",
-                        "text": {"type": "plain_text", "text": "✗ Reject"},
-                        "style": "danger",
-                        "action_id": "reject",
-                        "value": request.request_id,
-                        "url": urls.get("reject_url"),
-                    },
-                ],  # type: ignore[list-item]
+                "elements": elements,
             }
         )
 
@@ -659,7 +662,7 @@ class SlackTransport(BaseTransport):
         blocks.append(
             {
                 "type": "context",
-                "elements": [  # type: ignore[dict-item]
+                "elements": [
                     {
                         "type": "mrkdwn",
                         "text": f"⏱️ Timeout: {request.timeout}s | Request ID: `{req_id_short}...`",

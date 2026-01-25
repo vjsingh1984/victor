@@ -21,7 +21,7 @@ except Exception:
 if TYPE_CHECKING:
     DuckDBGraphStore = _DuckDBGraphStore
 else:
-    DuckDBGraphStore = _duckdb_available  # type: ignore[assignment]
+    DuckDBGraphStore: Optional[Type[_DuckDBGraphStore]] = _duckdb_available
 
 
 def create_graph_store(

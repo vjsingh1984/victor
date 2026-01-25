@@ -1125,8 +1125,9 @@ class NodeExecutorFactory:
                 if orchestrator is None:
                     raise ValueError(f"Orchestrator is required for team node '{node.id}'")
 
+                from victor.agent.orchestrator import AgentOrchestrator
                 runner = TeamNodeRunner(
-                    orchestrator=orchestrator,
+                    orchestrator=cast(AgentOrchestrator, orchestrator),
                     tool_registry=tool_registry,
                     enable_observability=bool(emitter),
                 )
@@ -1542,8 +1543,8 @@ class UnifiedWorkflowCompiler:
         )
 
         # Lazy-loaded compilers
-        self._graph_compiler: Optional["WorkflowGraphCompiler[Dict[str, Any]]"] = None
-        self._definition_compiler: Optional["WorkflowDefinitionCompiler[Dict[str, Any]]"] = None
+        self._graph_compiler: Optional["WorkflowGraphCompiler"] = None
+        self._definition_compiler: Optional["WorkflowDefinitionCompiler"] = None
 
         # Compilation stats
         self._compile_stats = {
@@ -1561,7 +1562,11 @@ class UnifiedWorkflowCompiler:
             from victor.core.container import ServiceContainer
 
             container = ServiceContainer()
-            return container.get(ToolRegistry) if container.has(ToolRegistry) else None
+            # Check if ToolRegistry is registered by attempting to get it
+            try:
+                return container.get(ToolRegistry)
+            except Exception:
+                return None
         except Exception:
             return None
 
@@ -1581,7 +1586,7 @@ class UnifiedWorkflowCompiler:
             self._execution_cache = get_workflow_cache_manager()
         return self._execution_cache
 
-    def _get_graph_compiler(self) -> "WorkflowGraphCompiler":
+    def _get_graph_compiler(self) -> "WorkflowGraphCompiler[Any]":
         """Get or create WorkflowGraph compiler."""
         if self._graph_compiler is None:
             from victor.workflows.graph_compiler import (
@@ -1871,7 +1876,7 @@ class UnifiedWorkflowCompiler:
 
     def compile_graph(
         self,
-        graph: "WorkflowGraph[Dict[str, Any]]",
+        graph: "WorkflowGraph[Any]",
         name: Optional[str] = None,
         cache_key: Optional[str] = None,
         **kwargs: Any,
@@ -2036,7 +2041,7 @@ class UnifiedWorkflowCompiler:
 
     def _generate_graph_cache_key(
         self,
-        graph: "WorkflowGraph[Dict[str, Any]]",
+        graph: "WorkflowGraph[Any]",
         name: Optional[str],
     ) -> str:
         """Generate cache key for WorkflowGraph compilation."""

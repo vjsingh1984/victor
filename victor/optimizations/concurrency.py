@@ -230,8 +230,7 @@ class LockFreeQueue(Generic[T]):
 
     def get(self, block: bool = True, timeout: Optional[float] = None) -> T:
         """Get item from queue."""
-        result = self._queue.get(block=block, timeout=timeout)
-        return cast(T, result)
+        return self._queue.get(block=block, timeout=timeout)
 
     def put_nowait(self, item: T) -> None:
         """Put item without blocking."""
@@ -239,8 +238,7 @@ class LockFreeQueue(Generic[T]):
 
     def get_nowait(self) -> T:
         """Get item without blocking."""
-        result = self._queue.get_nowait()
-        return cast(T, result)
+        return self._queue.get_nowait()
 
     def qsize(self) -> int:
         """Get approximate queue size."""

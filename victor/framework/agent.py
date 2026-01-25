@@ -670,8 +670,9 @@ class Agent:
             event_bus = getattr(observability, "event_bus", None)
             if event_bus:
                 from victor.observability.event_bus import ObservabilityBus
+                from typing import cast
                 if isinstance(event_bus, ObservabilityBus):
-                    return event_bus
+                    return cast("ObservabilityBus", event_bus)
         return None
 
     @property

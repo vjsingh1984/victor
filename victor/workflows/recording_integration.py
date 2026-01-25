@@ -40,7 +40,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
-from typing import Any, Dict, Optional, Union, cast
+from typing import Any, Dict, Iterator, Optional, Union, cast
 
 from victor.workflows.execution_recorder import ExecutionRecorder, RecordingEventType
 from victor.workflows.recording_storage import FileRecordingStorage
@@ -186,11 +186,13 @@ async def save_workflow_recording(
     if storage:
         recording_id = await storage.save(recorder)
         metadata = await storage.get_metadata(recording_id)
-        return metadata.to_dict() if metadata else {}  # type: ignore[union-attr]
+        if metadata is not None:
+            return metadata.to_dict()
+        return {}
 
     if filepath:
-        metadata: RecordingMetadata = await recorder.save(str(filepath))  # type: ignore[arg-type]
-        return metadata.to_dict()
+        result = await recorder.save(str(filepath))
+        return result.to_dict() if result else {}
 
     raise ValueError("Must provide either filepath or storage")
 

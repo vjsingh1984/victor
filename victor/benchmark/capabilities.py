@@ -450,7 +450,7 @@ def code_quality_capability(
             **kwargs,
         )
 
-    return handler  # type: ignore[return-value]
+    return handler
 
 
 @capability(
@@ -474,7 +474,7 @@ def performance_capability(
             **kwargs,
         )
 
-    return handler  # type: ignore[return-value]
+    return handler
 
 
 # =============================================================================

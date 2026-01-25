@@ -296,7 +296,7 @@ class WorkflowProfiler:
         Returns:
             List of detected bottlenecks
         """
-        bottlenecks: List[Dict[str, Any]] = []
+        bottlenecks: List[Bottleneck] = []
 
         if not node_stats:
             return bottlenecks
@@ -309,89 +309,84 @@ class WorkflowProfiler:
         # Detect slow nodes
         for node_id, stats in node_stats.items():
             if stats.avg_duration > self.slow_threshold_multiplier * median_duration:
-                bottlenecks.append(
-                    Bottleneck(
-                        type=BottleneckType.SLOW_NODE,
-                        severity=BottleneckSeverity.HIGH,
-                        node_id=node_id,
-                        metric="duration",
-                        value=stats.avg_duration,
-                        threshold=self.slow_threshold_multiplier * median_duration,
-                        suggestion=f"Node '{node_id}' is {stats.avg_duration / median_duration:.1f}x slower than median. "
-                        f"Consider parallelization or breaking into smaller nodes.",
-                        confidence=0.9,
-                    )
+                bottleneck = Bottleneck(
+                    type=BottleneckType.SLOW_NODE,
+                    severity=BottleneckSeverity.HIGH,
+                    node_id=node_id,
+                    metric="duration",
+                    value=stats.avg_duration,
+                    threshold=self.slow_threshold_multiplier * median_duration,
+                    suggestion=f"Node '{node_id}' is {stats.avg_duration / median_duration:.1f}x slower than median. "
+                    f"Consider parallelization or breaking into smaller nodes.",
+                    confidence=0.9,
                 )
+                bottlenecks.append(bottleneck)
 
             # Check for dominant nodes
             if median_duration > 0:
                 contribution = stats.avg_duration / sum(s.avg_duration for s in node_stats.values())
                 if contribution > 0.20:
-                    bottlenecks.append(
-                        Bottleneck(
-                            type=BottleneckType.DOMINANT_NODE,
-                            severity=BottleneckSeverity.MEDIUM,
-                            node_id=node_id,
-                            metric="time_contribution",
-                            value=contribution * 100,
-                            threshold=20.0,
-                            suggestion=f"Node '{node_id}' consumes {contribution*100:.1f}% of workflow time. "
-                            f"Consider optimization or parallelization.",
-                            confidence=0.8,
-                        )
+                    bottleneck = Bottleneck(
+                        type=BottleneckType.DOMINANT_NODE,
+                        severity=BottleneckSeverity.MEDIUM,
+                        node_id=node_id,
+                        metric="time_contribution",
+                        value=contribution * 100,
+                        threshold=20.0,
+                        suggestion=f"Node '{node_id}' consumes {contribution*100:.1f}% of workflow time. "
+                        f"Consider optimization or parallelization.",
+                        confidence=0.8,
                     )
+                    bottlenecks.append(bottleneck)
 
             # Detect failing nodes
             if stats.success_rate < self.success_rate_threshold:
-                bottlenecks.append(
-                    Bottleneck(
-                        type=BottleneckType.UNRELIABLE_NODE,
-                        severity=BottleneckSeverity.HIGH,
-                        node_id=node_id,
-                        metric="success_rate",
-                        value=stats.success_rate * 100,
-                        threshold=self.success_rate_threshold * 100,
-                        suggestion=f"Node '{node_id}' success rate {stats.success_rate*100:.1f}% is below threshold. "
-                        f"Review error handling or consider pruning.",
-                        confidence=0.95,
-                    )
+                bottleneck = Bottleneck(
+                    type=BottleneckType.UNRELIABLE_NODE,
+                    severity=BottleneckSeverity.HIGH,
+                    node_id=node_id,
+                    metric="success_rate",
+                    value=stats.success_rate * 100,
+                    threshold=self.success_rate_threshold * 100,
+                    suggestion=f"Node '{node_id}' success rate {stats.success_rate*100:.1f}% is below threshold. "
+                    f"Review error handling or consider pruning.",
+                    confidence=0.95,
                 )
+                bottlenecks.append(bottleneck)
 
             # Detect expensive tools
             for tool_id, tool_data in stats.tool_calls.items():
                 tool_cost = tool_data.get("cost", 0)
                 if total_cost > 0 and tool_cost / total_cost > self.expensive_tool_threshold:
-                    bottlenecks.append(
-                        Bottleneck(
-                            type=BottleneckType.EXPENSIVE_TOOL,
-                            severity=BottleneckSeverity.MEDIUM,
-                            tool_id=tool_id,
-                            metric="cost_contribution",
-                            value=tool_cost / total_cost * 100,
-                            threshold=self.expensive_tool_threshold * 100,
-                            suggestion=f"Tool '{tool_id}' in node '{node_id}' consumes {tool_cost/total_cost*100:.1f}% of cost. "
-                            f"Consider cheaper alternative or caching.",
-                            confidence=0.85,
-                        )
+                    bottleneck = Bottleneck(
+                        type=BottleneckType.EXPENSIVE_TOOL,
+                        severity=BottleneckSeverity.MEDIUM,
+                        tool_id=tool_id,
+                        metric="cost_contribution",
+                        value=tool_cost / total_cost * 100,
+                        threshold=self.expensive_tool_threshold * 100,
+                        suggestion=f"Tool '{tool_id}' in node '{node_id}' consumes {tool_cost/total_cost*100:.1f}% of cost. "
+                        f"Consider cheaper alternative or caching.",
+                        confidence=0.85,
                     )
+                    bottlenecks.append(bottleneck)
 
             # Detect missing caching
             if stats.token_efficiency > 0.8:  # High consistency suggests deterministic
                 # Check if caching is not enabled (simplified check)
                 if not any("cache" in str(k).lower() for k in stats.tool_calls.keys()):
-                    bottlenecks.append(
-                        Bottleneck(
-                            type=BottleneckType.MISSING_CACHING,
-                            severity=BottleneckSeverity.LOW,
-                            node_id=node_id,
-                            metric="determinism",
-                            value=stats.token_efficiency * 100,
-                            threshold=80.0,
-                            suggestion=f"Node '{node_id}' shows high token efficiency ({stats.token_efficiency:.2f}), "
-                            f"suggesting deterministic operations. Consider enabling caching.",
-                            confidence=0.7,
-                        )
+                    bottleneck = Bottleneck(
+                        type=BottleneckType.MISSING_CACHING,
+                        severity=BottleneckSeverity.LOW,
+                        node_id=node_id,
+                        metric="determinism",
+                        value=stats.token_efficiency * 100,
+                        threshold=80.0,
+                        suggestion=f"Node '{node_id}' shows high token efficiency ({stats.token_efficiency:.2f}), "
+                        f"suggesting deterministic operations. Consider enabling caching.",
+                        confidence=0.7,
                     )
+                    bottlenecks.append(bottleneck)
 
         return bottlenecks
 

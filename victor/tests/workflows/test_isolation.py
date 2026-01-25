@@ -163,8 +163,11 @@ class TestIsolationMapper:
         """Test unknown vertical falls back to process isolation."""
         try:
             from victor.workflows.isolation import IsolationMapper
+            from victor.workflows.definition import TaskConstraints
 
-            config = IsolationMapper.from_constraints(None, vertical="unknown_vertical")
+            # Use TaskConstraints() instead of None
+            constraints = TaskConstraints()
+            config = IsolationMapper.from_constraints(constraints, vertical="unknown_vertical")
 
             assert config is not None
             assert config.sandbox_type == "process"

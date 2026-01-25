@@ -63,13 +63,13 @@ async def example_individual_tests() -> None:
     suite = SecurityTestSuite()
 
     # Test specific vulnerabilities
-    prompt_injection_report = await suite.test_prompt_injection(agent)  # type: ignore
+    prompt_injection_report = await suite.test_prompt_injection(agent)
     print(f"Prompt Injection Tests: {prompt_injection_report.passed}")
 
-    auth_bypass_report = await suite.test_authorization_bypass(agent)  # type: ignore
+    auth_bypass_report = await suite.test_authorization_bypass(agent)
     print(f"Authorization Bypass Tests: {auth_bypass_report.passed}")
 
-    code_injection_report = await suite.test_code_injection(agent)  # type: ignore
+    code_injection_report = await suite.test_code_injection(agent)
     print(f"Code Injection Tests: {code_injection_report.passed}")
 
 

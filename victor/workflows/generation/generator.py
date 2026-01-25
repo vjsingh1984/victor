@@ -47,7 +47,7 @@ import json
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union, cast
 from enum import Enum
 
 from victor.workflows.generation.requirements import WorkflowRequirements
@@ -198,7 +198,7 @@ class WorkflowGenerator:
     async def generate_from_requirements(
         self,
         requirements: WorkflowRequirements,
-        validation_callback: Optional[callable] = None,
+        validation_callback: Optional[Callable[[Dict[str, Any]], Any]] = None,
     ) -> tuple[Dict[str, Any], GenerationMetadata]:
         """Generate workflow schema from structured requirements.
 
@@ -702,7 +702,8 @@ Fixed schema:
 
         # Parse JSON
         try:
-            return json.loads(response)
+            result = json.loads(response)
+            return cast(Dict[str, Any], result)
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON: {e}")
             logger.debug(f"Response content: {response[:500]}")

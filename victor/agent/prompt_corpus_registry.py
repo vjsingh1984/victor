@@ -583,7 +583,7 @@ def _build_extended_corpus() -> List[CorpusEntry]:
             entries.append(
                 CorpusEntry(
                     prompt=prompt,
-                    category=category,  # type: ignore[arg-type]
+                    category=category,
                     source=source,
                 )
             )

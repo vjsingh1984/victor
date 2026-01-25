@@ -790,10 +790,16 @@ class WorkflowStateManager:
         if isinstance(state_data, str):
             state_data = json.loads(state_data)
 
+        node_id = None
+        metadata = {}
+        if isinstance(data, dict):
+            node_id = data.get("node_id")
+            metadata = data.get("metadata", {})
+
         snapshot_id = self.capture_state(
             state_data,
-            node_id=data.get("node_id"),
-            metadata=data.get("metadata", {}),
+            node_id=node_id,
+            metadata=metadata,
         )
 
         logger.info(f"State imported as snapshot '{snapshot_id}'")

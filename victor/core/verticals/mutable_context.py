@@ -112,9 +112,9 @@ class MutableVerticalContext(VerticalContext):
             name: Vertical name
             config: Vertical configuration dict or VerticalConfig object
         """
-        # Handle dict config by converting to empty dict (VerticalConfig is complex)
-        # For now, we pass None if config is a plain dict to avoid type errors
-        actual_config: Optional["VerticalConfig"] = config if isinstance(config, dict) or config is None else None  # type: ignore[arg-type]
+        # Handle dict config by converting to None for type safety
+        # VerticalConfig is a complex type that we can't construct from dict here
+        actual_config: Optional["VerticalConfig"] = None if isinstance(config, dict) else config
         super().__init__(name=name, config=actual_config)
         self._mutations: List[CapabilityMutation] = []
         self._capability_values: Dict[str, Any] = {}

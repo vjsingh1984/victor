@@ -84,7 +84,7 @@ class AgentNodeExecutor:
         if node.input_mapping:
             for key, source_key in node.input_mapping.items():
                 if source_key in state:
-                    input_context[key] = state[source_key]
+                    input_context[key] = state[source_key]  # type: ignore[literal-required]
 
         # Step 2: Substitute context variables in goal
         goal = node.goal
@@ -121,23 +121,29 @@ class AgentNodeExecutor:
         # Step 6: Store result in state
         if node.output_key:
             # Store the entire result object
-            state[node.output_key] = result
+            state[node.output_key] = result  # type: ignore[literal-required]
 
         # Track node result for observability
-        if "_node_results" not in state:
-            state["_node_results"] = {}
+        # Use cast to handle dynamic TypedDict key
+        state_dict = dict(state)  # Convert to regular dict for dynamic access
+        if "_node_results" not in state_dict:
+            state_dict["_node_results"] = {}
 
-        from victor.framework.graph import GraphNodeResult
-        state["_node_results"][node.id] = GraphNodeResult(
-            node_id=node.id,
-            status="completed",
-            result=result,
-            metadata={
+        # Create a simple dict for node result instead of using GraphNodeResult
+        state_dict["_node_results"][node.id] = {
+            "node_id": node.id,
+            "status": "completed",
+            "result": result,
+            "metadata": {
                 "role": node.role,
                 "tool_budget": node.tool_budget,
                 "profile": node.profile,
             },
-        )
+        }
+
+        # Update state with modified dict
+        state.clear()
+        state.update(state_dict)  # type: ignore[arg-type]
 
         logger.info(f"Agent node {node.id} completed successfully")
         return state
@@ -195,7 +201,8 @@ class AgentNodeExecutor:
         if role not in role_map:
             raise ValueError(f"Unknown agent role: {role}. Must be one of {list(role_map.keys())}")
 
-        return role_map[role]
+        from typing import cast
+        return cast(SubAgentRole, role_map[role])
 
     def _substitute_context(self, template: str, context: Dict[str, Any]) -> str:
         """Substitute context variables in template string.
@@ -212,6 +219,7 @@ class AgentNodeExecutor:
         pattern = r"\{\{(\w+)\}\}"
 
         def replace_var(match: Any) -> str:
+            from typing import cast
             var_name = match.group(1)
             if var_name in context:
                 value = context[var_name]
@@ -219,11 +227,11 @@ class AgentNodeExecutor:
                 if isinstance(value, dict):
                     import json
 
-                    return json.dumps(value)
+                    return cast(str, json.dumps(value))
                 # Handle primitive values
-                return str(value)
+                return cast(str, str(value))
             # Keep original if not found
-            return match.group(0)
+            return cast(str, match.group(0))
 
         return re.sub(pattern, replace_var, template)
 

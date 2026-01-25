@@ -339,11 +339,11 @@ class WorkflowGraphCompiler(Generic[S]):
             # Create state-aware router
             state_type = graph.state_type
 
-            def make_router(r: Callable[[S], str], st: Type[S]) -> Callable[[Dict[str, Any]], str]:
+            def make_router(r: Callable[[S], str], st: Type[Any]) -> Callable[[Dict[str, Any]], str]:
                 def wrapped_router(state: Dict[str, Any]) -> str:
                     # Convert dict state to typed state for router
                     if hasattr(st, "from_dict"):
-                        typed_state: S = st.from_dict(state)  # type: ignore[attr-defined]
+                        typed_state = st.from_dict(state)  # type: ignore[attr-defined]
                     else:
                         typed_state = st(**state) if isinstance(state, dict) else state
                     return r(typed_state)
@@ -369,7 +369,7 @@ class WorkflowGraphCompiler(Generic[S]):
             edges=edges,
             entry_point=entry_point,
             state_schema=graph.state_type if self._config.preserve_state_type else None,
-        )
+        )  # type: ignore[type-var]
 
     def _create_node_function(
         self,
@@ -408,7 +408,7 @@ class WorkflowGraphCompiler(Generic[S]):
         async def state_converting_wrapper(state: Dict[str, Any]) -> Dict[str, Any]:
             # Convert dict to typed state
             if hasattr(state_type, "from_dict"):
-                typed_state: S = state_type.from_dict(state)  # type: ignore[attr-defined]
+                typed_state = state_type.from_dict(state)  # type: ignore[attr-defined]
             else:
                 # Try direct construction
                 try:
@@ -717,9 +717,9 @@ class WorkflowDefinitionCompiler:
 
 
 def compile_workflow_graph(
-    graph: "WorkflowGraph[S]",
+    graph: "WorkflowGraph[Any]",
     config: Optional[CompilerConfig] = None,
-) -> "CompiledGraph[S]":
+) -> "CompiledGraph[Any]":
     """Compile a WorkflowGraph to CompiledGraph.
 
     Convenience function for one-off compilation.
@@ -731,8 +731,8 @@ def compile_workflow_graph(
     Returns:
         CompiledGraph ready for execution.
     """
-    compiler: "WorkflowGraphCompiler[S]" = WorkflowGraphCompiler(config)
-    return compiler.compile(graph)
+    compiler: "WorkflowGraphCompiler[Any]" = WorkflowGraphCompiler(config)
+    return compiler.compile(graph)  # type: ignore[type-var]
 
 
 def compile_workflow_definition(

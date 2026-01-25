@@ -292,7 +292,8 @@ class RAGEnrichmentStrategy:
         if should_use_llm and self._query_enhancer:
             from victor.rag.query_enhancer import EnhancementTechnique
 
-            techniques = [EnhancementTechnique(t) for t in self.config.enhancement_techniques]
+            enhancement_techniques = self.config.enhancement_techniques or []
+            techniques = [EnhancementTechnique(t) for t in enhancement_techniques]
 
             enhanced = await self._query_enhancer.enhance(
                 query=query,

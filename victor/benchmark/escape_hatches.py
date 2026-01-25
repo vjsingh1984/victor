@@ -992,10 +992,10 @@ HANDLERS = {
 
 def register_handlers() -> None:
     """Register Benchmark handlers with the workflow executor."""
-    from victor.workflows.executor import register_compute_handler
+    from victor.workflows.executor import register_compute_handler, ComputeHandler
 
     for name, handler in HANDLERS.items():
-        register_compute_handler(name, handler)
+        register_compute_handler(name, cast(ComputeHandler, handler))
         logger.debug(f"Registered Benchmark handler: {name}")
 
 

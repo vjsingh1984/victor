@@ -52,7 +52,7 @@ import os
 import re
 import warnings
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import aiohttp
 
@@ -316,7 +316,6 @@ class SECFilingFetcher:
                 data = await response.json()
 
         # Parse recent filings
-        filings: List[Dict[str, Any]] = []
         recent = data.get("filings", {}).get("recent", {})
 
         forms = recent.get("form", [])
@@ -324,19 +323,19 @@ class SECFilingFetcher:
         accessions = recent.get("accessionNumber", [])
         primary_docs = recent.get("primaryDocument", [])
 
+        filings: List[Filing] = []
         for i, form in enumerate(forms):
             if form == filing_type and len(filings) < count:
                 accession = accessions[i].replace("-", "")
-                filings.append(
-                    Filing(
-                        company=data.get("name", "Unknown"),
-                        cik=cik,
-                        filing_type=form,
-                        filing_date=dates[i],
-                        accession_number=accessions[i],
-                        primary_doc_url=f"{self.BASE_URL}/Archives/edgar/data/{cik_no_zeros}/{accession}/{primary_docs[i]}",
-                    )
-                )
+                filing_dict = {
+                    "company": data.get("name", "Unknown"),
+                    "cik": cik,
+                    "filing_type": form,
+                    "filing_date": dates[i],
+                    "accession_number": accessions[i],
+                    "primary_doc_url": f"{self.BASE_URL}/Archives/edgar/data/{cik_no_zeros}/{accession}/{primary_docs[i]}",
+                }
+                filings.append(Filing(**filing_dict))
 
         return filings
 
@@ -567,7 +566,11 @@ async def query_filings(
     if filter_symbol:
         metadata_filter["symbol"] = filter_symbol.upper()
 
+    from victor.agent.tool_calling.execution_context import ExecutionContext
+    exec_ctx = ExecutionContext()
+
     result = await tool.execute(
+        _exec_ctx=exec_ctx,
         question=query,
         k=top_k,
         synthesize=synthesize,
@@ -787,7 +790,7 @@ def main() -> None:
                 provider=args.provider,
                 model=args.model,
                 filter_sector=args.sector,
-                filter_symbol=args.company[0] if args.company else None,  # type: ignore[arg-type]
+                filter_symbol=args.company[0] if args.company else None,
             )
         )
         return

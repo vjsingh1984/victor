@@ -110,8 +110,8 @@ class DataAnalysisToolDependencyProvider(YAMLToolDependencyProvider):
 def _get_deprecated_config() -> "DataAnalysisToolDependencyProvider":
     """Lazily load provider for deprecated constant access."""
     if not hasattr(_get_deprecated_config, "_provider"):
-        _get_deprecated_config._provider = DataAnalysisToolDependencyProvider()
-    return _get_deprecated_config._provider
+        _get_deprecated_config._provider = DataAnalysisToolDependencyProvider()  # type: ignore[attr-defined]
+    return _get_deprecated_config._provider  # type: ignore[no-any-return, attr-defined]
 
 
 def _warn_deprecated(name: str) -> None:
@@ -133,7 +133,7 @@ class _DeprecatedTransitions:
         result = config.get_tool_transitions().get(key, [])
         # Ensure the return type matches List[Tuple[str, float]]
         if isinstance(result, list):
-            return result  # type: ignore[return-value]
+            return result
         return []
 
     def __iter__(self) -> Any:

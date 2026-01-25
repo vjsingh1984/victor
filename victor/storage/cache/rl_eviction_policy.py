@@ -230,7 +230,7 @@ class RLEvictionPolicy:
         self._external_learner = cache_eviction_learner
 
         # Local Q-table if no external learner
-        self._q_table: Dict[tuple, Dict[EvictionAction, float]] = {}
+        self._q_table: Dict[Tuple[Any, ...], Dict[EvictionAction, float]] = {}
 
         # Track recent decisions for feedback
         self._recent_decisions: Dict[str, Tuple[CacheEntryState, EvictionAction, float]] = {}

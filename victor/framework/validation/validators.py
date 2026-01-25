@@ -65,14 +65,14 @@ logger = __import__("logging").getLogger(__name__)
 # =============================================================================
 
 
-def _get_validation_result() -> type[Any]:  # type: ignore[name-defined]
+def _get_validation_result() -> type[Any]:
     """Get ValidationResult at runtime to avoid circular import."""
     from victor.framework.validation.pipeline import ValidationResult
 
     return ValidationResult
 
 
-def _get_validation_context() -> type[Any]:  # type: ignore[name-defined]
+def _get_validation_context() -> type[Any]:
     """Get ValidationContext at runtime to avoid circular import."""
     from victor.framework.validation.pipeline import ValidationContext
 
@@ -185,8 +185,8 @@ class BaseValidator(ABC):
         Returns:
             ValidationResult
         """
-        ValidationResult = _get_validation_result()
-        return cast("ValidationResult", ValidationResult(is_valid=is_valid))
+        from victor.framework.validation.pipeline import ValidationResult
+        return ValidationResult(is_valid=is_valid)
 
     def _add_error(
         self,
@@ -1080,7 +1080,7 @@ class CompositeValidator(BaseValidator):
 
     def _all_logic(self, results: List[ValidationResult]) -> ValidationResult:
         """ALL logic: All validators must pass."""
-        ValidationResult = _get_validation_result()
+        from victor.framework.validation.pipeline import ValidationResult
         combined = ValidationResult()
         for result in results:
             combined.merge(result)
@@ -1096,7 +1096,7 @@ class CompositeValidator(BaseValidator):
                     return result
 
         # All failed, combine all errors
-        ValidationResult = _get_validation_result()
+        from victor.framework.validation.pipeline import ValidationResult
         combined = ValidationResult()
         for result in results:
             combined.merge(result)
@@ -1104,7 +1104,7 @@ class CompositeValidator(BaseValidator):
 
     def _none_logic(self, results: List[ValidationResult]) -> ValidationResult:
         """NONE logic: No validators should pass."""
-        ValidationResult = _get_validation_result()
+        from victor.framework.validation.pipeline import ValidationResult
         passed = [r for r in results if r.is_valid]
 
         if passed:
@@ -1119,7 +1119,7 @@ class CompositeValidator(BaseValidator):
 
     def _one_logic(self, results: List[ValidationResult]) -> ValidationResult:
         """ONE logic: Exactly one validator must pass."""
-        ValidationResult = _get_validation_result()
+        from victor.framework.validation.pipeline import ValidationResult
         passed = [r for r in results if r.is_valid]
 
         if len(passed) == 1:
@@ -1194,7 +1194,7 @@ class ConditionalValidator(BaseValidator):
             ValidationResult
         """
         if not self._condition(data):
-            ValidationResult = _get_validation_result()
+            from victor.framework.validation.pipeline import ValidationResult
             return ValidationResult(is_valid=True)
 
         return self._validator.validate(data, context)
@@ -1262,12 +1262,14 @@ class TransformingValidator(BaseValidator):
         path, value = self._get_value(data)
 
         if value is None:
+            from victor.framework.validation.pipeline import ValidationResult
             return ValidationResult(is_valid=True)
 
         # Transform the value
         try:
             transformed = self._transform(value)
         except Exception as e:
+            from victor.framework.validation.pipeline import ValidationResult
             result = ValidationResult()
             self._add_error(
                 result,

@@ -143,7 +143,8 @@ class FrameworkStrategy(AgentCreationStrategy):
         )
 
         # Apply overrides
-        self._apply_overrides(agent, context)
+        from victor.agent.orchestrator import AgentOrchestrator
+        self._apply_overrides(cast(AgentOrchestrator, agent), context)
 
         return agent  # type: ignore[return-value]
 

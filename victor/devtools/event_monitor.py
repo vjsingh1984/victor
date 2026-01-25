@@ -201,9 +201,11 @@ class EventMonitor:
 
             # Subscribe to all events
             import asyncio
+            from typing import Any, Awaitable
+            from victor.observability.events import MessagingEvent
 
-            async def _subscribe_wrapper():
-                await bus.subscribe("*", self._on_observability_event)
+            async def _subscribe_wrapper() -> None:
+                await bus.subscribe("*", cast(Callable[[MessagingEvent], Awaitable[None]], self._on_observability_event))
 
             asyncio.create_task(_subscribe_wrapper())
             logger.info("Subscribed to ObservabilityBus")

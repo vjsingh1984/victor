@@ -784,6 +784,8 @@ class HITLExecutor:
             HITLResponse from external system
         """
         transport = self._get_transport()
+        if transport is None:
+            raise RuntimeError("No transport available for HITL")
 
         # Send to external system
         external_ref = await transport.send(request, workflow_id)
@@ -792,7 +794,7 @@ class HITLExecutor:
         logger.info(f"HITL request {request.request_id} sent via {self.mode.value}: {external_ref}")
 
         # Wait for response with polling
-        response: HITLResponse = await transport.wait_for_response(  # type: ignore[no-any-return]
+        response = await transport.wait_for_response(
             request.request_id,
             external_ref,
             timeout=node.timeout,

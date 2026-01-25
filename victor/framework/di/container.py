@@ -585,7 +585,7 @@ class DIScope:
             with self._lock:
                 if service_type not in self._scoped_instances:
                     instance = descriptor.create_instance(self._parent)
-                    self._scoped_instances[service_type] = cast(T, instance)
+                    self._scoped_instances[service_type] = instance
                 return self._scoped_instances[service_type]
 
         # Transient - always create new

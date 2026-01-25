@@ -550,7 +550,7 @@ class RuleBasedExtractor:
 
         # Return vertical with highest score
         if scores:
-            best_vertical = max(scores, key=scores.get)
+            best_vertical = max(scores, key=scores.get)  # type: ignore[arg-type]
             if scores[best_vertical] > 0:
                 return best_vertical
 

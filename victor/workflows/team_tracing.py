@@ -404,7 +404,8 @@ class TeamTracer:
                 otel_span = self._otel_tracer.start_span(name)
                 otel_span.set_attribute("trace_id", trace_id)
                 if parent_span:
-                    otel_span.parent = parent_span.span_id
+                    # Use set_parent API instead of direct attribute assignment
+                    otel_span.set_parent(parent_span.span_id)  # type: ignore[attr-defined]
                 if attributes:
                     for key, value in attributes.items():
                         otel_span.set_attribute(key, str(value))

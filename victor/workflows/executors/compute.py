@@ -73,14 +73,14 @@ class ComputeNodeExecutor:
         if hasattr(node, 'inputs') and node.inputs:
             for param_name, source in node.inputs.items():
                 # Handle $ctx. prefix (from state)
-                if source.startswith("$ctx."):
+                if isinstance(source, str) and source.startswith("$ctx."):
                     context_key = source[5:]
                     if context_key in state:
                         params[param_name] = state[context_key]
                     else:
                         params[param_name] = context_key
                 # Handle $state. prefix (also from state)
-                elif source.startswith("$state."):
+                elif isinstance(source, str) and source.startswith("$state."):
                     context_key = source[7:]
                     if context_key in state:
                         params[param_name] = state[context_key]
@@ -111,7 +111,7 @@ class ComputeNodeExecutor:
                 # Transfer context changes back to state
                 for key, value in context.data.items():
                     if not key.startswith("_"):
-                        state[key] = value
+                        state[key] = value  # type: ignore[literal-required]
 
                 output = result.output if result else None
                 tool_calls_used = result.tool_calls_used if result else 0
@@ -175,14 +175,16 @@ class ComputeNodeExecutor:
 
         # Step 5: Store output in state
         output_key = node.output_key or node.id
-        state[output_key] = output
+        state[output_key] = output  # type: ignore[literal-required]
 
         # Step 6: Update node results for observability
-        if "_node_results" not in state:
-            state["_node_results"] = {}
+        # Use cast to handle dynamic TypedDict key
+        state_dict = dict(state)  # Convert to regular dict for dynamic access
+        if "_node_results" not in state_dict:
+            state_dict["_node_results"] = {}
 
         # Store node result as dict for observability
-        state["_node_results"][node.id] = {
+        state_dict["_node_results"][node.id] = {
             "node_id": node.id,
             "status": "completed",
             "result": output,
@@ -192,6 +194,10 @@ class ComputeNodeExecutor:
                 "tool_calls_used": tool_calls_used,
             },
         }
+
+        # Update state with modified dict
+        state.clear()
+        state.update(state_dict)  # type: ignore[arg-type]
 
         logger.info(f"Compute node {node.id} completed successfully")
         return state

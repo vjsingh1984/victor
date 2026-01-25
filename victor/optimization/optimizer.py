@@ -147,9 +147,10 @@ class WorkflowOptimizer:
                 variant_generator=self.variant_generator,
             )
         elif self.config.search_algorithm == "simulated_annealing":
-            self.search_optimizer: HillClimbingOptimizer = SimulatedAnnealingOptimizer(  # type: ignore[assignment]
+            search_optimizer = SimulatedAnnealingOptimizer(
                 variant_generator=self.variant_generator,
             )
+            self.search_optimizer = search_optimizer
         else:
             raise ValueError(f"Unsupported search algorithm: {self.config.search_algorithm}")
 
