@@ -481,7 +481,7 @@ class TestMCPProtocolHandling:
     async def test_server_initialize_message(self):
         """Test server handles initialize message correctly."""
         from victor.integrations.mcp.server import MCPServer
-        from victor.tools.base import ToolRegistry
+        from victor.tools.registry import ToolRegistry
 
         server = MCPServer(name="test", version="0.5.0", tool_registry=ToolRegistry())
 
@@ -502,7 +502,8 @@ class TestMCPProtocolHandling:
     async def test_server_list_tools_message(self):
         """Test server handles list tools message correctly."""
         from victor.integrations.mcp.server import MCPServer
-        from victor.tools.base import ToolRegistry, BaseTool, CostTier
+        from victor.tools.base import BaseTool, CostTier
+        from victor.tools.registry import ToolRegistry
 
         # Create a test tool
         class TestTool(BaseTool):
@@ -534,7 +535,7 @@ class TestMCPProtocolHandling:
     async def test_server_ping_message(self):
         """Test server handles ping message correctly."""
         from victor.integrations.mcp.server import MCPServer
-        from victor.tools.base import ToolRegistry
+        from victor.tools.registry import ToolRegistry
 
         server = MCPServer(tool_registry=ToolRegistry())
         server.initialized = True
@@ -550,7 +551,7 @@ class TestMCPProtocolHandling:
     async def test_server_error_on_uninitialized(self):
         """Test server returns error when not initialized."""
         from victor.integrations.mcp.server import MCPServer
-        from victor.tools.base import ToolRegistry
+        from victor.tools.registry import ToolRegistry
 
         server = MCPServer(tool_registry=ToolRegistry())
         # Don't initialize

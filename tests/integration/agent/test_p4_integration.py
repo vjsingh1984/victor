@@ -19,7 +19,7 @@ from victor.framework.search import HybridSearchEngine, create_hybrid_search_eng
 from victor.framework.rl.learners.semantic_threshold import SemanticThresholdLearner
 from victor.agent.tool_deduplication import ToolDeduplicationTracker
 from victor.agent.tool_pipeline import ToolPipeline, ToolPipelineConfig
-from victor.tools.base import ToolRegistry
+from victor.tools.registry import ToolRegistry
 from victor.agent.tool_executor import ToolExecutor
 
 

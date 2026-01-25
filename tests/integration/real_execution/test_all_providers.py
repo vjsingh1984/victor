@@ -24,6 +24,7 @@ This tests against:
 - Enterprise providers: Vertex AI, Azure OpenAI, AWS Bedrock, HuggingFace, Replicate
 """
 
+import os
 import time
 from pathlib import Path
 from typing import List, Tuple
@@ -402,6 +403,7 @@ async def test_provider_multi_tool(
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
+@pytest.mark.parametrize("provider_name", ALL_PROVIDERS)
 @pytest.mark.timeout(60)
 async def test_provider_simple_query(
     provider_name: str,
@@ -469,6 +471,8 @@ def test_provider_summary():
 
     This test always runs and shows which providers are available.
     """
+    from tests.integration.real_execution.conftest_all_providers import PROVIDER_CONFIG
+
     print("\n" + "="*70)
     print("PROVIDER AVAILABILITY SUMMARY")
     print("="*70)

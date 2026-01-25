@@ -24,7 +24,7 @@ from unittest.mock import Mock
 from victor.agent.tool_pipeline import ToolPipeline, ToolPipelineConfig
 from victor.agent.argument_normalizer import ArgumentNormalizer
 from victor.agent.tool_executor import ToolExecutor
-from victor.tools.base import ToolRegistry
+from victor.tools.registry import ToolRegistry
 
 
 class MockToolExecutor(ToolExecutor):

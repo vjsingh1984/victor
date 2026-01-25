@@ -33,7 +33,8 @@ from typing import Dict, Any, List
 
 from victor.agent.tool_pipeline import ToolPipeline, ToolPipelineConfig
 from victor.agent.tool_executor import ToolExecutor
-from victor.tools.base import ToolRegistry, BaseTool
+from victor.tools.base import BaseTool
+from victor.tools.registry import ToolRegistry
 
 
 # =============================================================================
@@ -44,7 +45,7 @@ from victor.tools.base import ToolRegistry, BaseTool
 @pytest.fixture
 async def tool_registry():
     """Create registry with real tools for testing."""
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
     from victor.tools.bash import shell, shell_readonly
     from victor.tools import filesystem
 
