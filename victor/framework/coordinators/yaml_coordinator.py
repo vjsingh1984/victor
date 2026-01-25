@@ -334,17 +334,17 @@ class YAMLWorkflowCoordinator:
                 executor = self._get_executor()
 
                 # Execute
-                result = await executor.execute(workflow_def, initial_state or {})
+                workflow_result = await executor.execute(workflow_def, initial_state or {})
 
                 duration = time.time() - start_time
 
                 # Convert WorkflowResult to WorkflowExecutionResult
                 return WorkflowExecutionResult(
-                    success=result.success,
-                    final_state=result.context.get_outputs() if hasattr(result.context, "get_outputs") else {},
+                    success=workflow_result.success,
+                    final_state=workflow_result.context.get_outputs() if hasattr(workflow_result.context, "get_outputs") else {},
                     nodes_executed=[],
                     duration_seconds=duration,
-                    error=result.error if not result.success else None,
+                    error=workflow_result.error if not workflow_result.success else None,
                 )
 
         except Exception as e:

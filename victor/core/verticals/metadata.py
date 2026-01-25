@@ -45,10 +45,10 @@ class VerticalMetadataProvider(ABC):
     This is a mix-in class that can be used with VerticalBase or standalone.
     """
 
-    # Subclasses must define these
-    name: str = ""
-    description: str = ""
-    version: str = "0.5.0"
+    # Subclasses must define these as ClassVar to avoid MyPy errors
+    name: ClassVar[str] = ""
+    description: ClassVar[str] = ""
+    version: ClassVar[str] = "0.5.0"
 
     @classmethod
     def get_provider_hints(cls) -> Dict[str, Any]:

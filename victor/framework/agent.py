@@ -665,13 +665,14 @@ class Agent:
             # Subscribe to all tool events
             agent.event_bus.backend.subscribe("tool.*", on_tool_event)
         """
+        from typing import cast
+        from victor.observability.event_bus import ObservabilityBus
+
         observability = getattr(self._orchestrator, "observability", None)
         if observability:
             event_bus = getattr(observability, "event_bus", None)
-            if event_bus:
-                from victor.observability.event_bus import ObservabilityBus
-                if isinstance(event_bus, ObservabilityBus):
-                    return event_bus
+            if event_bus and isinstance(event_bus, ObservabilityBus):
+                return cast(ObservabilityBus, event_bus)
         return None
 
     @property

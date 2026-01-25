@@ -58,18 +58,23 @@ from enum import Enum
 from functools import lru_cache
 from importlib import import_module
 from pathlib import Path
-from typing import Dict, Type, Optional, Any, TYPE_CHECKING, cast, List
+from typing import Dict, Type, Optional, Any, TYPE_CHECKING, cast, List, Union
 
-try:
-    from importlib.metadata import EntryPoint as ImportedEntryPoint
-    from importlib.metadata import entry_points as imported_entry_points
-    EntryPoint = ImportedEntryPoint
-    entry_points = imported_entry_points
-except ImportError:
-    from importlib_metadata import EntryPoint as ImportedEntryPoint
-    from importlib_metadata import entry_points as imported_entry_points
-    EntryPoint = ImportedEntryPoint
-    entry_points = imported_entry_points
+if TYPE_CHECKING:
+    from importlib.metadata import EntryPoint
+else:
+    try:
+        from importlib.metadata import EntryPoint
+    except ImportError:
+        from importlib_metadata import EntryPoint
+
+if TYPE_CHECKING:
+    from importlib.metadata import entry_points
+else:
+    try:
+        from importlib.metadata import entry_points
+    except ImportError:
+        from importlib_metadata import entry_points
 
 try:
     import yaml
@@ -252,7 +257,7 @@ class PluginDiscovery:
                 # Old API: eps_result is already the iterable
                 eps = eps_result
 
-            for ep in cast(List[EntryPoint], eps):
+            for ep in cast(List[Union[Any, "EntryPoint"]], eps):
                 try:
                     # Load the vertical class
                     vertical_class = ep.load()
@@ -302,7 +307,9 @@ class PluginDiscovery:
             return result
 
         # Check if yaml is available
-        if yaml is None:
+        # Note: yaml is None when not installed, but MyPy sees it as always available
+        # This check is kept for runtime safety even if MyPy thinks it's unreachable
+        if yaml is None:  # type: ignore[unreachable]
             self.logger.warning("YAML library not available, skipping YAML discovery")
             return result
 

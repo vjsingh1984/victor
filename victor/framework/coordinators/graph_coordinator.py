@@ -134,7 +134,7 @@ class GraphExecutionCoordinator:
                 error = getattr(result, "error", None)
             else:
                 # Backward compatibility: result is the final state dict
-                final_state_dict = result
+                final_state_dict = result  # type: ignore[assignment]
                 nodes_executed = []
                 success = True
                 error = None
@@ -200,7 +200,7 @@ class GraphExecutionCoordinator:
                 if hasattr(result, "state"):
                     final_stream_state: dict[str, Any] = result.state
                 else:
-                    final_stream_state = result
+                    final_stream_state = result  # type: ignore[assignment]
 
                 yield WorkflowEvent(
                     event_type="complete",
@@ -259,7 +259,7 @@ class GraphExecutionCoordinator:
             # Compile WorkflowGraph to CompiledGraph
             from victor.workflows.graph_compiler import WorkflowGraphCompiler
 
-            compiler: WorkflowGraphCompiler = WorkflowGraphCompiler(compiler_config)
+            compiler: Any = WorkflowGraphCompiler(compiler_config)
             compiled = compiler.compile(graph)
 
             # Execute via CompiledGraph.invoke()

@@ -51,6 +51,7 @@ import logging
 import uuid
 from typing import TYPE_CHECKING, Any, Optional, Type, Union, cast
 
+from victor.core.protocols import OrchestratorProtocol
 from victor.framework.vertical_integration import (
     VerticalIntegrationPipeline,
     IntegrationResult,
@@ -59,7 +60,6 @@ from victor.framework.vertical_integration import (
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator as ConcreteAgentOrchestrator
     from victor.config.settings import Settings
-    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
     from victor.core.verticals.base import VerticalBase, VerticalConfig
     from victor.observability.integration import ObservabilityIntegration
 
@@ -181,7 +181,6 @@ class FrameworkShim:
         """
         from victor.agent.orchestrator import AgentOrchestrator
         from victor.core.bootstrap import ensure_bootstrapped
-        from victor.core.protocols import OrchestratorProtocol
 
         logger.debug(
             f"FrameworkShim creating orchestrator: profile={self._profile_name}, "
@@ -292,14 +291,14 @@ class FrameworkShim:
     # =========================================================================
 
     @property
-    def orchestrator(self) -> Optional["AgentOrchestrator"]:
+    def orchestrator(self) -> Optional["OrchestratorProtocol"]:
         """Get the created orchestrator.
 
         Returns:
             Orchestrator instance, or None if not yet created.
         """
         from typing import cast
-        return cast("AgentOrchestrator", self._orchestrator)
+        return cast("OrchestratorProtocol", self._orchestrator)
 
     @property
     def observability(self) -> Optional["ObservabilityIntegration"]:
