@@ -225,14 +225,14 @@ class ConversationExporter:
         include_tool_calls: bool,
     ) -> str:
         """Export to JSON format."""
-        data = {
+        data: Dict[str, Any] = {
             "version": "1.0",
             "exported_at": datetime.now().isoformat(),
             "messages": [],
         }
 
         if include_metadata:
-            data["metadata"] = {
+            metadata_dict: Dict[str, Any] = {
                 "title": conversation.title,
                 "created_at": (
                     conversation.created_at.isoformat() if conversation.created_at else None
@@ -242,10 +242,11 @@ class ConversationExporter:
                 "session_id": conversation.session_id,
             }
             if conversation.metadata:
-                data["metadata"].update(conversation.metadata)
+                metadata_dict.update(conversation.metadata)
+            data["metadata"] = metadata_dict
 
         for msg in conversation.messages:
-            msg_data = {
+            msg_data: Dict[str, Any] = {
                 "role": msg.role,
                 "content": msg.content,
             }

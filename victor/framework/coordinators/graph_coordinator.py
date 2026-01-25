@@ -97,7 +97,7 @@ class GraphExecutionCoordinator:
 
     async def execute(
         self,
-        graph: "CompiledGraph",
+        graph: "CompiledGraph[Dict[str, Any]]",
         initial_state: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> "WorkflowExecutionResult":
@@ -163,7 +163,7 @@ class GraphExecutionCoordinator:
 
     async def stream(
         self,
-        graph: "CompiledGraph",
+        graph: "CompiledGraph[Dict[str, Any]]",
         initial_state: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> AsyncIterator["WorkflowEvent"]:
@@ -220,7 +220,7 @@ class GraphExecutionCoordinator:
 
     async def execute_workflow_graph(
         self,
-        graph: "WorkflowGraph",
+        graph: "WorkflowGraph[Dict[str, Any]]",
         initial_state: Optional[Dict[str, Any]] = None,
         use_node_runners: bool = False,
         **kwargs: Any,
@@ -257,7 +257,7 @@ class GraphExecutionCoordinator:
             )
 
             # Compile WorkflowGraph to CompiledGraph
-            compiler = WorkflowGraphCompiler(compiler_config)
+            compiler: WorkflowGraphCompiler[Dict[str, Any]] = WorkflowGraphCompiler(compiler_config)
             compiled = compiler.compile(graph)
 
             # Execute via CompiledGraph.invoke()

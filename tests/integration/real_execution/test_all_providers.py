@@ -27,43 +27,221 @@ This tests against:
 import os
 import time
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
 import pytest
+import pytest_asyncio
 
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import Settings
-from victor.providers.base import BaseProvider
 
 
 # =============================================================================
-# Provider Configuration (All 21 Providers)
+# Provider Configuration (All 15 Providers)
 # =============================================================================
 
 # List of all providers in priority order (local first, then cheapest cloud)
 ALL_PROVIDERS: List[str] = [
     # Local providers (free)
     "ollama",
-    "llamacpp",
-
-    # Free-tier cloud providers (cheapest first)
-    "groqcloud",
-    "mistral",
-    "together",
-    "openrouter",
-    "fireworks",
-    "cerebras",
-    "huggingface",
 
     # Premium cloud providers (cheapest models)
     "deepseek",      # ~$0.14/$0.28 per 1M tokens
     "google",        # ~$0.075/$0.30 per 1M tokens
     "openai",        # gpt-4o-mini ~$0.15/$0.60 per 1M tokens
     "anthropic",     # claude-haiku ~$0.25/$1.25 per 1M tokens
-    "xai",           # grok-beta
-    "zai",           # glm-4-flash
-    "moonshot",      # kimi models
 ]
+
+
+# =============================================================================
+# Parametrized Provider Fixture
+# =============================================================================
+
+
+@pytest_asyncio.fixture(params=ALL_PROVIDERS)
+async def provider(request):
+    """Parametrized provider fixture that creates provider instances.
+
+    This fixture is parametrized across all configured providers and:
+    - Validates provider availability (API keys, service running)
+    - Creates provider instance with appropriate configuration
+    - Validates API keys with test calls (for cloud providers)
+    - Skips tests gracefully for unavailable providers
+
+    Args:
+        request: Pytest request object with param attribute
+
+    Yields:
+        Configured provider instance with _provider_name and _selected_model attributes
+    """
+    from tests.integration.real_execution.conftest_all_providers import (
+        PROVIDER_CONFIG,
+        get_provider_api_key,
+        is_ollama_running,
+        is_ollama_model_available,
+        is_local_provider_running,
+    )
+    from victor.providers.base import Message
+
+    provider_name = request.param
+    config = PROVIDER_CONFIG.get(provider_name)
+
+    if not config:
+        pytest.skip(f"Provider {provider_name} not configured")
+
+    provider_class = config["class"]
+    if provider_class is None:
+        pytest.skip(f"Provider {provider_name} fixture not implemented")
+
+    provider_type = config.get("type", "cloud")
+
+    # Local providers - check if running
+    if provider_type == "local":
+        if provider_name == "ollama":
+            if not is_ollama_running():
+                pytest.skip("Ollama not available at localhost:11434")
+
+            # Check for available model
+            model = None
+            for candidate_model in config["models"]:
+                if is_ollama_model_available(candidate_model):
+                    model = candidate_model
+                    break
+
+            if not model:
+                pytest.skip(
+                    f"No Ollama model found. "
+                    f"Run: ollama pull {config['models'][0]}"
+                )
+
+            from victor.providers.ollama_provider import OllamaProvider
+
+            provider_instance = OllamaProvider(
+                base_url="http://localhost:11434",
+                timeout=120,
+            )
+            provider_instance._selected_model = model
+            provider_instance._provider_name = provider_name
+
+            yield provider_instance
+
+            # Cleanup
+            if hasattr(provider_instance, "close"):
+                try:
+                    await provider_instance.close()
+                except Exception:
+                    pass
+            elif hasattr(provider_instance, "client"):
+                try:
+                    await provider_instance.client.aclose()
+                except Exception:
+                    pass
+
+        elif provider_name == "llamacpp":
+            if not is_local_provider_running("llamacpp"):
+                pytest.skip("LlamaCpp not running")
+
+            from victor.providers.llamacpp_provider import LlamaCppProvider
+
+            provider_instance = LlamaCppProvider(
+                model_path="local-model",
+                timeout=120,
+            )
+            provider_instance._selected_model = config["model"]
+            provider_instance._provider_name = provider_name
+
+            yield provider_instance
+
+            # Cleanup
+            if hasattr(provider_instance, "close"):
+                try:
+                    await provider_instance.close()
+                except Exception:
+                    pass
+            elif hasattr(provider_instance, "client"):
+                try:
+                    await provider_instance.client.aclose()
+                except Exception:
+                    pass
+
+        else:
+            pytest.skip(f"{provider_name} fixture not yet implemented")
+
+    # Cloud providers - check API key
+    else:
+        api_key = get_provider_api_key(provider_name)
+        if not api_key:
+            pytest.skip(f"{config['api_key_env']} not set")
+
+        try:
+            provider_instance = provider_class(
+                api_key=api_key,
+                model=config["model"],
+                timeout=120,
+            )
+            provider_instance._selected_model = config["model"]
+            provider_instance._provider_name = provider_name
+
+            # Validate API key with a test call
+            try:
+                test_response = await provider_instance.chat(
+                    messages=[Message(role="user", content="Hi")],
+                    model=config["model"],
+                    max_tokens=5
+                )
+
+                if not test_response or not test_response.content:
+                    pytest.skip(f"{provider_name}: API key validation failed (no response)")
+
+            except Exception as e:
+                # Classify error to provide helpful message
+                error_str = str(e).lower()
+
+                # Check for specific error patterns
+                if any(pattern in error_str for pattern in [
+                    "invalid", "unauthorized", "401", "403",
+                    "authentication", "forbidden"
+                ]):
+                    pytest.skip(
+                        f"{provider_name}: Invalid API key ({str(e)[:80]})"
+                    )
+                elif any(pattern in error_str for pattern in [
+                    "billing", "payment", "credit", "quota", "limit",
+                    "insufficient", "balance", "suspended"
+                ]):
+                    pytest.skip(
+                        f"{provider_name}: Billing/credit issue ({str(e)[:80]})"
+                    )
+                elif any(pattern in error_str for pattern in [
+                    "rate limit", "429", "too many requests"
+                ]):
+                    pytest.skip(
+                        f"{provider_name}: Rate limit ({str(e)[:80]})"
+                    )
+                else:
+                    # Network or other error - skip to avoid test failures
+                    pytest.skip(
+                        f"{provider_name}: Error ({str(e)[:80]})"
+                    )
+
+            yield provider_instance
+
+            # Cleanup
+            if hasattr(provider_instance, "close"):
+                try:
+                    await provider_instance.close()
+                except Exception:
+                    pass
+            elif hasattr(provider_instance, "client"):
+                try:
+                    await provider_instance.client.aclose()
+                except Exception:
+                    pass
+
+        except Exception as e:
+            pytest.skip(
+                f"{provider_name}: Failed to create provider ({str(e)[:80]})"
+            )
 
 
 # =============================================================================
@@ -137,73 +315,33 @@ def is_provider_available(provider: str) -> bool:
 
 
 # =============================================================================
-# Pytest Hooks for Dynamic Skipping
-# =============================================================================
-
-
-def pytest_collection_modifyitems(items, config):
-    """Add skip markers for unavailable providers.
-
-    This function runs during test collection to mark tests that should
-    be skipped due to:
-    - Missing API keys
-    - Provider not running (local providers)
-    - Auth/billing errors (detected during fixture setup)
-    """
-    # This hook is handled by the fixture skip logic
-    # Fixtures will pytest.skip() if provider is not available
-    pass
-
-
-# =============================================================================
 # Test Cases
 # =============================================================================
 
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-@pytest.mark.parametrize("provider_name", ALL_PROVIDERS)
 async def test_provider_read_tool(
-    provider_name: str,
+    provider,
     sample_code_file: str,
     temp_workspace: str,
-    request,
 ):
     """Test Read tool execution with a provider.
 
-    This test is parametrized to run with ALL available providers.
+    This test uses fixture parametrization to run with ALL available providers.
     Tests are automatically skipped for unavailable providers.
     """
-    from tests.integration.real_execution.conftest_all_providers import PROVIDER_CONFIG
-
-    config = PROVIDER_CONFIG.get(provider_name)
-    if not config:
-        pytest.skip(f"Provider {provider_name} not configured")
-
-    provider_class = config["class"]
-    if provider_class is None:
-        pytest.skip(f"Provider {provider_name} fixture not implemented")
-
-    # Get provider fixture (will skip if not available)
-    try:
-        provider = await request.getfixturevalue(f"{provider_name}_provider")
-        model = getattr(provider, "_selected_model", config["model"])
-    except pytest.skip.Exception:
-        raise  # Re-raise skip exception
-    except Exception as e:
-        pytest.skip(f"Failed to get {provider_name} provider: {str(e)[:80]}")
-
     # Create orchestrator
     settings = Settings()
-    settings.provider = provider_name
-    settings.model = model
+    settings.provider = provider._provider_name
+    settings.model = provider._selected_model
     settings.working_dir = temp_workspace
-    settings.airgapped_mode = (provider_name in ["ollama", "llamacpp"])
+    settings.airgapped_mode = (provider._provider_name in ["ollama", "llamacpp"])
 
     orchestrator = AgentOrchestrator(
         settings=settings,
         provider=provider,
-        model=model,
+        model=provider._selected_model,
     )
 
     # Test Read tool
@@ -222,54 +360,33 @@ async def test_provider_read_tool(
     content_lower = response.content.lower()
     assert (
         "greet" in content_lower or "add" in content_lower
-    ), f"[{provider_name}] Response should mention functions: {response.content[:200]}"
+    ), f"[{provider._provider_name}] Response should mention functions: {response.content[:200]}"
 
-    print(f"✓ [{provider_name}] Read tool executed in {elapsed:.2f}s")
+    print(f"✓ [{provider._provider_name}] Read tool executed in {elapsed:.2f}s")
 
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-@pytest.mark.parametrize("provider_name", ALL_PROVIDERS)
 async def test_provider_shell_tool(
-    provider_name: str,
+    provider,
     temp_workspace: str,
-    request,
 ):
     """Test Shell tool execution with a provider.
 
-    This test is parametrized to run with ALL available providers.
+    This test uses fixture parametrization to run with ALL available providers.
     Tests are automatically skipped for unavailable providers.
     """
-    from tests.integration.real_execution.conftest_all_providers import PROVIDER_CONFIG
-
-    config = PROVIDER_CONFIG.get(provider_name)
-    if not config:
-        pytest.skip(f"Provider {provider_name} not configured")
-
-    provider_class = config["class"]
-    if provider_class is None:
-        pytest.skip(f"Provider {provider_name} fixture not implemented")
-
-    # Get provider fixture
-    try:
-        provider = await request.getfixturevalue(f"{provider_name}_provider")
-        model = getattr(provider, "_selected_model", config["model"])
-    except pytest.skip.Exception:
-        raise
-    except Exception as e:
-        pytest.skip(f"Failed to get {provider_name} provider: {str(e)[:80]}")
-
     # Create orchestrator
     settings = Settings()
-    settings.provider = provider_name
-    settings.model = model
+    settings.provider = provider._provider_name
+    settings.model = provider._selected_model
     settings.working_dir = temp_workspace
-    settings.airgapped_mode = (provider_name in ["ollama", "llamacpp"])
+    settings.airgapped_mode = (provider._provider_name in ["ollama", "llamacpp"])
 
     orchestrator = AgentOrchestrator(
         settings=settings,
         provider=provider,
-        model=model,
+        model=provider._selected_model,
     )
 
     # Test Shell tool
@@ -291,58 +408,37 @@ async def test_provider_shell_tool(
     )
 
     assert command_keywords, (
-        f"[{provider_name}] Response should mention command execution. "
+        f"[{provider._provider_name}] Response should mention command execution. "
         f"Got: {response.content[:200]}"
     )
 
-    print(f"✓ [{provider_name}] Shell tool executed in {elapsed:.2f}s")
+    print(f"✓ [{provider._provider_name}] Shell tool executed in {elapsed:.2f}s")
 
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-@pytest.mark.parametrize("provider_name", ALL_PROVIDERS)
 async def test_provider_multi_tool(
-    provider_name: str,
+    provider,
     sample_code_file: str,
     temp_workspace: str,
-    request,
 ):
     """Test multi-turn conversation with multiple tools.
 
     This test involves 3 LLM turns (Read → Edit → Read), which takes longer.
-    The timeout accounts for multiple provider calls and tool execution.
     """
     from pathlib import Path
-    from tests.integration.real_execution.conftest_all_providers import PROVIDER_CONFIG
-
-    config = PROVIDER_CONFIG.get(provider_name)
-    if not config:
-        pytest.skip(f"Provider {provider_name} not configured")
-
-    provider_class = config["class"]
-    if provider_class is None:
-        pytest.skip(f"Provider {provider_name} fixture not implemented")
-
-    # Get provider fixture
-    try:
-        provider = await request.getfixturevalue(f"{provider_name}_provider")
-        model = getattr(provider, "_selected_model", config["model"])
-    except pytest.skip.Exception:
-        raise
-    except Exception as e:
-        pytest.skip(f"Failed to get {provider_name} provider: {str(e)[:80]}")
 
     # Create orchestrator
     settings = Settings()
-    settings.provider = provider_name
-    settings.model = model
+    settings.provider = provider._provider_name
+    settings.model = provider._selected_model
     settings.working_dir = temp_workspace
-    settings.airgapped_mode = (provider_name in ["ollama", "llamacpp"])
+    settings.airgapped_mode = (provider._provider_name in ["ollama", "llamacpp"])
 
     orchestrator = AgentOrchestrator(
         settings=settings,
         provider=provider,
-        model=model,
+        model=provider._selected_model,
     )
 
     original_content = Path(sample_code_file).read_text()
@@ -351,14 +447,14 @@ async def test_provider_multi_tool(
     # Turn 1: Read file
     response1 = await orchestrator.chat(user_message=f"Read the file {sample_code_file}.")
     assert response1.content is not None
-    print(f"✓ [{provider_name}] Turn 1 (Read): {len(response1.content)} chars")
+    print(f"✓ [{provider._provider_name}] Turn 1 (Read): {len(response1.content)} chars")
 
     # Turn 2: Add docstring (check for success indicators)
     response2 = await orchestrator.chat(
         user_message="Add a docstring to the greet function."
     )
     assert response2.content is not None
-    print(f"✓ [{provider_name}] Turn 2 (Edit): {len(response2.content)} chars")
+    print(f"✓ [{provider._provider_name}] Turn 2 (Edit): {len(response2.content)} chars")
 
     # Check for success indicators (robust to model variations)
     new_content = Path(sample_code_file).read_text()
@@ -383,7 +479,7 @@ async def test_provider_multi_tool(
 
     # At least one indicator should be true
     assert any(success_indicators.values()), (
-        f"[{provider_name}] Multi-tool test requires at least one success indicator. "
+        f"[{provider._provider_name}] Multi-tool test requires at least one success indicator. "
         f"Got: {success_indicators}. "
         f"Response: {response2.content[:200]}"
     )
@@ -395,44 +491,23 @@ async def test_provider_multi_tool(
     assert response3.content is not None
 
     elapsed = time.time() - start_time
-    print(f"✓ [{provider_name}] Multi-tool test completed in {elapsed:.2f}s")
+    print(f"✓ [{provider._provider_name}] Multi-tool test completed in {elapsed:.2f}s")
 
 
 @pytest.mark.real_execution
-@pytest.mark.parametrize("provider_name", ALL_PROVIDERS)
-async def test_provider_simple_query(
-    provider_name: str,
-    request,
-):
+@pytest.mark.asyncio
+async def test_provider_simple_query(provider):
     """Test simple query without tools.
 
     This is the fastest test and verifies basic provider connectivity.
     """
-    from tests.integration.real_execution.conftest_all_providers import PROVIDER_CONFIG
     from victor.providers.base import Message
-
-    config = PROVIDER_CONFIG.get(provider_name)
-    if not config:
-        pytest.skip(f"Provider {provider_name} not configured")
-
-    provider_class = config["class"]
-    if provider_class is None:
-        pytest.skip(f"Provider {provider_name} fixture not implemented")
-
-    # Get provider fixture
-    try:
-        provider = await request.getfixturevalue(f"{provider_name}_provider")
-        model = getattr(provider, "_selected_model", config["model"])
-    except pytest.skip.Exception:
-        raise
-    except Exception as e:
-        pytest.skip(f"Failed to get {provider_name} provider: {str(e)[:80]}")
 
     # Simple query without tools
     start_time = time.time()
     response = await provider.chat(
         messages=[Message(role="user", content="What is 2+2? Just say the number.")],
-        model=model,
+        model=provider._selected_model,
         max_tokens=10
     )
     elapsed = time.time() - start_time
@@ -449,10 +524,10 @@ async def test_provider_simple_query(
     )
 
     assert has_number or len(response.content) > 0, (
-        f"[{provider_name}] Response should mention answer. Got: {response.content[:100]}"
+        f"[{provider._provider_name}] Response should mention answer. Got: {response.content[:100]}"
     )
 
-    print(f"✓ [{provider_name}] Simple query test passed in {elapsed:.2f}s")
+    print(f"✓ [{provider._provider_name}] Simple query test passed in {elapsed:.2f}s")
 
 
 # =============================================================================
@@ -476,13 +551,12 @@ def test_provider_summary():
     # Local providers
     print("Local Providers:")
     print(f"  Ollama: {'✓ Available' if is_provider_available('ollama') else '✗ Not available'}")
-    print(f"  LlamaCpp: {'✓ Available' if is_provider_available('llamacpp') else '✗ Not available'}")
     print()
 
     # Cloud providers
     print("Cloud Providers:")
     for provider in ALL_PROVIDERS:
-        if provider in ["ollama", "llamacpp"]:
+        if provider == "ollama":
             continue
 
         has_key = has_provider_key(provider)

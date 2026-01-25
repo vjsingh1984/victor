@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING, Any, Optional
 if TYPE_CHECKING:
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.protocols.agent import IAgentOrchestrator
+    from victor.agent.protocols import OrchestratorProtocol
     from victor.config.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -53,9 +53,9 @@ class AgentCreationContext:
     max_iterations: Optional[int] = None
     mode: Optional[str] = None
     # Additional metadata
-    metadata: dict = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "profile": self.profile,
@@ -146,7 +146,7 @@ class FrameworkStrategy(AgentCreationStrategy):
         # Apply overrides
         self._apply_overrides(agent, context)
 
-        return agent
+        return agent  # type: ignore[return-value]
 
     def supports_observability(self) -> bool:
         return True
@@ -154,12 +154,12 @@ class FrameworkStrategy(AgentCreationStrategy):
     def supports_verticals(self) -> bool:
         return True
 
-    def _apply_overrides(self, agent: "AgentOrchestrator", context: AgentCreationContext) -> None:
+    def _apply_overrides(self, agent: OrchestratorProtocol, context: AgentCreationContext) -> None:
         """Apply budget, iteration, and mode overrides to agent."""
-        if context.tool_budget is not None:
+        if context.tool_budget is not None and hasattr(agent, 'unified_tracker') and agent.unified_tracker is not None:
             agent.unified_tracker.set_tool_budget(context.tool_budget, user_override=True)
 
-        if context.max_iterations is not None:
+        if context.max_iterations is not None and hasattr(agent, 'unified_tracker') and agent.unified_tracker is not None:
             agent.unified_tracker.set_max_iterations(context.max_iterations, user_override=True)
 
         if context.mode:
@@ -286,7 +286,7 @@ class AgentCreationFactory:
         vertical: Optional[str] = None,
         enable_observability: bool = True,
         session_id: Optional[str] = None,
-        **metadata,
+        **metadata: Any,
     ) -> AgentCreationContext:
         """Create AgentCreationContext from CLI arguments.
 

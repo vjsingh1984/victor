@@ -175,7 +175,7 @@ def setup_analytics_with_di(settings: Any) -> AnalyticsServiceV2:
 # =============================================================================
 
 
-def example_before_migration():
+def example_before_migration() -> None:
     """Example usage BEFORE migration."""
     from victor.config.settings import Settings
 
@@ -189,7 +189,7 @@ def example_before_migration():
     analytics.track_event("user_login", {"user_id": "123"})
 
 
-def example_after_migration():
+def example_after_migration() -> None:
     """Example usage AFTER migration."""
     from victor.config.settings import Settings
 

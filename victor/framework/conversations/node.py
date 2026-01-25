@@ -221,7 +221,7 @@ class ConversationalNode:
                 conversation_id=conversation_id,
                 status=ConversationStatus.TIMED_OUT,
                 outcome="Conversation timed out",
-                total_turns=self._context.current_turn,
+                total_turns=self._ctx.current_turn,
                 duration_seconds=time.time() - start_time,
             )
         except Exception as e:
@@ -230,14 +230,14 @@ class ConversationalNode:
                 conversation_id=conversation_id,
                 status=ConversationStatus.FAILED,
                 outcome=str(e),
-                total_turns=self._context.current_turn,
+                total_turns=self._ctx.current_turn,
                 duration_seconds=time.time() - start_time,
             )
 
         # Update state
         state[self.output_key] = result.to_dict()
         state[f"{self.output_key}_history"] = (
-            await self._history.get_history(self._context) if self._history else []
+            await self._history.get_history(self._ctx) if self._history else []
         )
 
         logger.info(
@@ -262,7 +262,7 @@ class ConversationalNode:
         assert self._context is not None, "Context must be initialized before conversation loop"
         start_time = time.time()
 
-        while self._context.current_turn < self.config.max_turns:
+        while self._ctx.current_turn < self.config.max_turns:
             # Check timeout
             elapsed = time.time() - start_time
             if elapsed > self.config.timeout_seconds:
@@ -274,41 +274,41 @@ class ConversationalNode:
                 logger.debug("No more speakers, ending conversation")
                 break
 
-            self._context.current_speaker = speaker
-            self._context.current_turn += 1
+            self._ctx.current_speaker = speaker
+            self._ctx.current_turn += 1
 
-            logger.debug(f"Turn {self._context.current_turn}: speaker={speaker}")
+            logger.debug(f"Turn {self._ctx.current_turn}: speaker={speaker}")
 
             # Execute turn
             turn = await self._execute_turn(speaker, orchestrator)
 
             # Record in history
             if self._history:
-                await self._history.add_turn(self._context, turn)
+                await self._history.add_turn(self._ctx, turn)
 
             # Update shared state for next speaker
-            self._context.shared_state["last_speaker"] = speaker
-            self._context.shared_state["last_message"] = turn.message.content
+            self._ctx.shared_state["last_speaker"] = speaker
+            self._ctx.shared_state["last_message"] = turn.message.content
 
             # Check if conversation should continue
             should_continue, reason = await self._should_continue()
             if not should_continue:
-                self._context.terminate(reason or "Conversation complete")
+                self._ctx.terminate(reason or "Conversation complete")
                 break
 
         # Build result
         return ConversationResult(
-            conversation_id=self._context.conversation_id,
+            conversation_id=self._ctx.conversation_id,
             status=(
                 ConversationStatus.COMPLETED
-                if not self._context.is_terminated
-                or "complete" in (self._context.termination_reason or "").lower()
+                if not self._ctx.is_terminated
+                or "complete" in (self._ctx.termination_reason or "").lower()
                 else ConversationStatus.TERMINATED
             ),
-            outcome=self._context.termination_reason or "Conversation completed",
+            outcome=self._ctx.termination_reason or "Conversation completed",
             summary=await self._generate_summary(),
-            final_speaker=self._context.current_speaker,
-            total_turns=self._context.current_turn,
+            final_speaker=self._ctx.current_speaker,
+            total_turns=self._ctx.current_turn,
             duration_seconds=time.time() - start_time,
             metadata={"topic": self.topic},
         )
@@ -320,15 +320,15 @@ class ConversationalNode:
             Next speaker ID or None if no more speakers
         """
         if self.protocol:
-            return await self.protocol.get_next_speaker(self._context)
+            return await self.protocol.get_next_speaker(self._ctx)
 
         # Default: round-robin through participants
-        participant_ids = list(self._context.participants.keys())
+        participant_ids = list(self._ctx.participants.keys())
         if not participant_ids:
             return None
 
         # Start with first participant, then rotate
-        idx = self._context.current_turn % len(participant_ids)
+        idx = self._ctx.current_turn % len(participant_ids)
         return participant_ids[idx]
 
     async def _execute_turn(
@@ -345,7 +345,7 @@ class ConversationalNode:
         Returns:
             Completed turn
         """
-        participant = self._context.participants.get(speaker)
+        participant = self._ctx.participants.get(speaker)
         if not participant:
             raise ValueError(f"Unknown speaker: {speaker}")
 
@@ -357,28 +357,28 @@ class ConversationalNode:
             response_text = await orchestrator.chat(prompt)
         else:
             # Fallback for testing
-            response_text = f"[{speaker}] Response to turn {self._context.current_turn}"
+            response_text = f"[{speaker}] Response to turn {self._ctx.current_turn}"
 
         # Create message
         message = ConversationalMessage(
             sender=speaker,
             content=response_text,
             message_type=MessageType.CONVERSATION,
-            conversation_id=self._context.conversation_id,
-            turn_number=self._context.current_turn,
+            conversation_id=self._ctx.conversation_id,
+            turn_number=self._ctx.current_turn,
         )
 
         # Route message and get responses
         responses = []
         if self._router:
-            recipients = await self._router.route_message(message, self.participants, self._context)
+            recipients = await self._router.route_message(message, self.participants, self._ctx)
 
             # Collect responses (optional, depending on protocol)
             for recipient_id in recipients:
-                should_reply = await self._router.should_reply(recipient_id, message, self._context)
+                should_reply = await self._router.should_reply(recipient_id, message, self._ctx)
                 if should_reply and orchestrator:
                     # Get response from recipient
-                    recipient = self._context.participants.get(recipient_id)
+                    recipient = self._ctx.participants.get(recipient_id)
                     if recipient:
                         reply_prompt = self._build_reply_prompt(recipient, message)
                         if hasattr(orchestrator, "chat"):
@@ -392,14 +392,14 @@ class ConversationalNode:
                                 content=reply_text,
                                 message_type=MessageType.ANSWER,
                                 recipients=[speaker],
-                                conversation_id=self._context.conversation_id,
-                                turn_number=self._context.current_turn,
+                                conversation_id=self._ctx.conversation_id,
+                                turn_number=self._ctx.current_turn,
                                 reply_to=message.id,
                             )
                         )
 
         return ConversationalTurn(
-            turn_number=self._context.current_turn,
+            turn_number=self._ctx.current_turn,
             speaker=speaker,
             message=message,
             responses=responses,
@@ -412,15 +412,15 @@ class ConversationalNode:
             Tuple of (should_continue, reason)
         """
         if self.protocol:
-            return await self.protocol.should_continue(self._context)
+            return await self.protocol.should_continue(self._ctx)
 
         # Default: continue until max turns
-        if self._context.current_turn >= self.config.max_turns:
+        if self._ctx.current_turn >= self.config.max_turns:
             return False, "Maximum turns reached"
 
         # Check for termination signals in shared state
-        if self._context.shared_state.get("terminate"):
-            return False, self._context.shared_state.get(
+        if self._ctx.shared_state.get("terminate"):
+            return False, self._ctx.shared_state.get(
                 "termination_reason", "Terminated by participant"
             )
 
@@ -453,7 +453,7 @@ class ConversationalNode:
 {f'**Your Persona:** {participant.persona}' if participant.persona else ''}
 
 **Conversation Topic:** {self.topic}
-**Current Turn:** {self._context.current_turn}/{self.config.max_turns}
+**Current Turn:** {self._ctx.current_turn}/{self.config.max_turns}
 
 {('**Recent History:**' + chr(10) + history_context) if history_context else ''}
 

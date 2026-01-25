@@ -172,7 +172,7 @@ class ServiceDescriptor(Generic[T]):
 class ResolutionContext:
     """Tracks state during dependency resolution."""
 
-    resolving: set[Type] = field(default_factory=set)
+    resolving: set[Type[Any]] = field(default_factory=set)
     depth: int = 0
     max_depth: int = 50
 
@@ -345,7 +345,7 @@ class DIContainer:
             container_ref = self
 
             @wraps(factory)
-            def wrapped_factory():
+            def wrapped_factory() -> Any:
                 return factory(container_ref)
 
             self._descriptors[service_type] = ServiceDescriptor(
@@ -453,11 +453,11 @@ class DIContainer:
         try:
             # Inspect factory signature
             sig = inspect.signature(factory)
-            parameters: Mapping[str, Parameter] = sig.parameters  # type: ignore[assignment]
+            parameters: Mapping[str, Parameter] = sig.parameters
 
             # Skip 'self' parameter for methods
             if list(parameters.keys()) and list(parameters.keys())[0] == "self":
-                parameters = {k: v for k, v in parameters.items() if k != "self"}  # type: ignore[assignment]
+                parameters = dict[str, Parameter]({k: v for k, v in parameters.items() if k != "self"})
 
             # Build kwargs with resolved dependencies
             kwargs = {}
@@ -515,7 +515,7 @@ class DIContainer:
         """
         return DIScope(self)
 
-    def get_registered_types(self) -> list[Type]:
+    def get_registered_types(self) -> list[Type[Any]]:
         """Get list of all registered service types.
 
         Returns:
@@ -555,7 +555,7 @@ class DIScope:
             parent: Parent container to inherit singleton services from
         """
         self._parent = parent
-        self._scoped_instances: Dict[Type, Any] = {}
+        self._scoped_instances: Dict[Type[Any], Any] = {}
         self._disposed = False
         self._lock = threading.Lock()
 
@@ -585,10 +585,10 @@ class DIScope:
             with self._lock:
                 if service_type not in self._scoped_instances:
                     self._scoped_instances[service_type] = descriptor.create_instance(self._parent)
-                return cast(T, self._scoped_instances[service_type])
+                return self._scoped_instances[service_type]
 
         # Transient - always create new
-        return cast(T, descriptor.create_instance(self._parent))
+        return descriptor.create_instance(self._parent)
 
     def dispose(self) -> None:
         """Dispose all scoped services."""

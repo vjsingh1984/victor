@@ -164,20 +164,24 @@ class EntityExtractor:
 
         # Extract file references
         if self._config.extract_file_references:
+            from victor.storage.memory.entity_types import Entity
             files = self._file_pattern.findall(content)
             for file_path in set(files):
                 if entities_found >= self._config.max_entities_per_message:
                     break
 
-                await self._memory.store(
+                entity = Entity.create(
                     name=file_path,
                     entity_type=EntityType.FILE,
+                    description=f"File: {file_path}",
                     attributes={"source": "code_reference", "context": "mentioned_in_message"},
                 )
+                await self._memory.store(entity)
                 entities_found += 1
 
         # Extract function references
         if self._config.extract_function_references:
+            from victor.storage.memory.entity_types import Entity
             # Find function calls and definitions
             functions = self._function_pattern.findall(content)
             for func_name in set(functions):
@@ -187,15 +191,18 @@ class EntityExtractor:
                 # Clean up the function name
                 func_name = func_name.replace("(", "").strip()
                 if len(func_name) >= self._config.min_entity_length:
-                    await self._memory.store(
+                    entity = Entity.create(
                         name=func_name,
                         entity_type=EntityType.FUNCTION,
+                        description=f"Function: {func_name}",
                         attributes={"source": "code_reference"},
                     )
+                    await self._memory.store(entity)
                     entities_found += 1
 
         # Extract class references
         if self._config.extract_class_references:
+            from victor.storage.memory.entity_types import Entity
             # Find class names (PascalCase)
             classes = self._class_pattern.findall(content)
             for class_name in set(classes):
@@ -204,11 +211,13 @@ class EntityExtractor:
 
                 # Filter out common non-class words
                 if class_name.lower() not in {"the", "this", "that", "when", "then", "with"}:
-                    await self._memory.store(
+                    entity = Entity.create(
                         name=class_name,
                         entity_type=EntityType.CLASS,
+                        description=f"Class: {class_name}",
                         attributes={"source": "code_reference"},
                     )
+                    await self._memory.store(entity)
                     entities_found += 1
 
         # Extract module references
@@ -257,11 +266,14 @@ class EntityExtractor:
                 continue
 
             # Store as CONCEPT entity (could be refined with LLM)
-            await self._memory.store(
+            from victor.storage.memory.entity_types import Entity
+            entity = Entity.create(
                 name=quote,
                 entity_type=EntityType.CONCEPT,
+                description=f"Concept: {quote}",
                 attributes={"source": "quoted_text"},
             )
+            await self._memory.store(entity)
             entities_found += 1
 
     async def extract_relations(
@@ -280,15 +292,25 @@ class EntityExtractor:
         if not self._config.enable_relation_extraction:
             return
 
-        from victor.storage.memory.entity_types import RelationType
+        from victor.storage.memory.entity_types import EntityRelation, RelationType
 
         try:
             relation_enum = RelationType[relation_type.upper()]
-            await self._memory.store_relation(
-                source_entity_name=source_entity_name,
-                target_entity_name=target_entity_name,
-                relation_type=relation_enum,
-            )
+            # Search for entities to get their IDs
+            source_entities = self._memory.search(source_entity_name, limit=1)
+            target_entities = self._memory.search(target_entity_name, limit=1)
+
+            # Await the results
+            source_list = await source_entities if hasattr(source_entities, '__await__') else source_entities  # type: ignore[arg-type]
+            target_list = await target_entities if hasattr(target_entities, '__await__') else target_entities  # type: ignore[arg-type]
+
+            if source_list and target_list:
+                relation = EntityRelation.create(
+                    source=source_list[0].id,
+                    target=target_list[0].id,
+                    relation_type=relation_enum,
+                )
+                await self._memory.store_relation(relation)
         except KeyError:
             logger.warning(f"Unknown relation type: {relation_type}")
 
@@ -314,7 +336,8 @@ class EntityExtractor:
         Returns:
             List of relevant entity descriptions
         """
-        entities = self._memory.search(query, limit=limit)
+        search_result = self._memory.search(query, limit=limit)
+        entities = await search_result if hasattr(search_result, '__await__') else search_result  # type: ignore[arg-type]
 
         return [f"{e.name} ({e.entity_type.value})" for e in entities]
 
