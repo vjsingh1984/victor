@@ -1825,7 +1825,7 @@ Respond with just the command to run."""
                     )
 
                 # Cast to proper type for mypy
-                learner_ms: ModelSelectorLearner = learner  # type: ignore[assignment]
+                learner_ms: ModelSelectorLearner = learner  # type: ignore[misc]
 
                 # Get rankings
                 rankings = learner_ms.get_provider_rankings()
@@ -1889,7 +1889,7 @@ Respond with just the command to run."""
                     )
 
                 # Cast to proper type for mypy
-                learner_ms: ModelSelectorLearner = learner  # type: ignore[assignment]
+                learner_ms: ModelSelectorLearner = learner  # type: ignore[misc]
 
                 available = list(learner_ms._q_table.keys()) if learner_ms._q_table else ["ollama"]
 
@@ -1958,7 +1958,7 @@ Respond with just the command to run."""
                     )
 
                 # Cast to proper type for mypy
-                learner_ms: ModelSelectorLearner = learner  # type: ignore[assignment]
+                learner_ms: ModelSelectorLearner = learner  # type: ignore[misc]
 
                 old_rate = learner_ms.epsilon
                 learner_ms.epsilon = request.rate
@@ -1990,6 +1990,17 @@ Respond with just the command to run."""
                         {"error": "Model selector learner not available"}, status_code=503
                     )
 
+                # Import and check learner type
+                from victor.framework.rl.learners.model_selector import ModelSelectorLearner
+
+                if not isinstance(learner, ModelSelectorLearner):
+                    return JSONResponse(
+                        {"error": "Model selector learner has unexpected type"}, status_code=500
+                    )
+
+                # Cast to proper type for mypy
+                learner_ms: ModelSelectorLearner = learner  # type: ignore[misc]
+
                 try:
                     strategy = SelectionStrategy(request.strategy.lower())
                 except ValueError:
@@ -1999,8 +2010,8 @@ Respond with just the command to run."""
                         detail=f"Unknown strategy: {request.strategy}. Available: {available}",
                     )
 
-                old_strategy = learner.strategy.value
-                learner.strategy = strategy
+                old_strategy = learner_ms.strategy.value
+                learner_ms.strategy = strategy
 
                 return JSONResponse(
                     {
@@ -2344,7 +2355,7 @@ Respond with just the command to run."""
 
             import asyncio
 
-            execute_steps_task: asyncio.Task[None] = asyncio.create_task(execute_steps())  # type: ignore[assignment]
+            execute_steps_task: asyncio.Task[None] = asyncio.create_task(execute_steps())  # type: ignore[misc]
 
             return JSONResponse(
                 {
@@ -2585,7 +2596,7 @@ Respond with just the command to run."""
                             }
                         )
 
-            execute_team_task: asyncio.Task[None] = asyncio.create_task(execute_team())  # type: ignore[assignment]
+            execute_team_task: asyncio.Task[None] = asyncio.create_task(execute_team())  # type: ignore[misc]
 
             return JSONResponse(
                 {
@@ -2779,7 +2790,7 @@ Respond with just the command to run."""
                         {
                             "id": node.id,
                             "name": node.name or node.id,
-                            "type": node.type.value,
+                            "type": node.node_type.value,
                             "status": "pending",
                         }
                         for node in workflow_def.nodes.values()
@@ -2799,7 +2810,7 @@ Respond with just the command to run."""
                 )
 
                 # Execute in background
-                async def run_workflow() -> None:  # type: ignore[no-untyped-def]
+                async def run_workflow() -> None:
                     try:
                         orchestrator = await self._get_orchestrator()
                         executor = WorkflowExecutor(orchestrator)
@@ -2826,8 +2837,8 @@ Respond with just the command to run."""
                                         "completed" if node_result.success else "failed"
                                     )
                                     step["duration"] = (
-                                        node_result.duration_ms / 1000
-                                        if node_result.duration_ms
+                                        node_result.duration_seconds
+                                        if node_result.duration_seconds
                                         else None
                                     )
 

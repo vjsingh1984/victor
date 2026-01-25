@@ -40,7 +40,8 @@ from victor.integrations.mcp.protocol import (
     MCPTool,
     MCPToolCallResult,
 )
-from victor.tools.base import BaseTool, ToolRegistry
+from victor.tools.base import BaseTool
+from victor.tools.registry import ToolRegistry
 
 
 class MCPServer:
@@ -535,13 +536,13 @@ class MCPServer:
             except json.JSONDecodeError as e:
                 error_response = self._create_error(None, -32700, f"Parse error: {str(e)}")
                 await loop.run_in_executor(
-                    None, lambda r=error_response: print(json.dumps(r), flush=True)
+                    None, lambda r=error_response: print(json.dumps(r), flush=True)  # type: ignore[misc]
                 )
 
             except Exception as e:
                 error_response = self._create_error(None, -32603, f"Internal error: {str(e)}")
                 await loop.run_in_executor(
-                    None, lambda r=error_response: print(json.dumps(r), flush=True)
+                    None, lambda r=error_response: print(json.dumps(r), flush=True)  # type: ignore[misc]
                 )
 
     def _cleanup_stdio(self) -> None:
@@ -641,7 +642,8 @@ async def run_mcp_server_stdio() -> None:
     import sys
 
     from victor.config.settings import Settings
-    from victor.tools.base import BaseTool, ToolRegistry
+    from victor.tools.base import BaseTool
+    from victor.tools.registry import ToolRegistry
 
     # Initialize settings
     Settings()

@@ -231,7 +231,7 @@ class EventBroadcaster:
             if client.is_subscribed(event.type.value):
                 try:
                     # Call send if it's a coroutine function
-                    send_result = client.send(event_json)
+                    send_result = client.send(event_json)  # type: ignore[func-returns-value]
                     if asyncio.iscoroutine(send_result):
                         await asyncio.wait_for(send_result, timeout=5.0)
                     client.last_activity = time.time()
@@ -300,7 +300,7 @@ class WebSocketEventHandler:
 
             elif msg_type == "ping":
                 # Respond with pong
-                send_result = self._broadcaster._clients[client_id].send(
+                send_result = self._broadcaster._clients[client_id].send(  # type: ignore[func-returns-value]
                     json.dumps({"type": "pong", "timestamp": time.time()})
                 )
                 if asyncio.iscoroutine(send_result):
@@ -367,7 +367,8 @@ class EventBusAdapter:
                             logger.debug(f"Skipping async subscribe to {internal_type}")
                         else:
                             # Old sync API
-                            event_bus.subscribe(internal_type, self._on_event)  # type: ignore[arg-type]
+                            _sub_result = event_bus.subscribe(internal_type, self._on_event)  # type: ignore[arg-type]
+                            del _sub_result  # Mark as intentionally unused
                             self._subscriptions.append(internal_type)
                 except Exception as e:
                     logger.debug(f"Failed to subscribe to {internal_type}: {e}")
