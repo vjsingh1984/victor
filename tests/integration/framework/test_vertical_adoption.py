@@ -121,15 +121,22 @@ class TestResearchCapabilityProviderAdoption:
 
         provider = ResearchCapabilityProvider()
 
-        # Create mock orchestrator
+        # Create mock orchestrator with vertical_context that has set_capability_config
         mock_orchestrator = MagicMock()
+        capability_configs = {}
+        mock_orchestrator.vertical_context = MagicMock()
+        mock_orchestrator.vertical_context.set_capability_config = MagicMock(
+            side_effect=lambda name, config: capability_configs.update({name: config})
+        )
 
         # Configure a capability
         provider.configure_source_verification(mock_orchestrator, min_credibility=0.8)
 
-        # Verify orchestrator was configured
-        assert hasattr(mock_orchestrator, "source_verification_config")
-        assert mock_orchestrator.source_verification_config["min_credibility"] == 0.8
+        # Verify orchestrator was configured via vertical_context
+        assert "source_verification" in capability_configs
+        config = capability_configs["source_verification"]
+        assert isinstance(config, dict)
+        assert config.get("min_credibility") == 0.8
 
     def test_research_capability_provider_applied_tracking(self):
         """ResearchCapabilityProvider tracks which capabilities have been configured."""

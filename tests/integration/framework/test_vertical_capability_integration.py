@@ -32,7 +32,7 @@ For each vertical, tests verify:
 - Capabilities can be applied to orchestrator
 """
 
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 from unittest.mock import MagicMock
 
 import pytest
@@ -46,6 +46,62 @@ from victor.rag.workflows import RAGWorkflowProvider
 from victor.benchmark.workflows import BenchmarkWorkflowProvider
 
 
+class MockVerticalContext:
+    """Mock vertical context for testing."""
+
+    def __init__(self, orchestrator: Any = None):
+        """Initialize mock vertical context."""
+        self.team_specs: Dict = {}
+        self.tools: list = []
+        self.capabilities: list = []
+        self._capability_configs: Dict = {}
+        self._orchestrator = orchestrator
+
+    def set_capability_config(self, name: str, config: Dict) -> None:
+        """Set capability configuration.
+
+        Also sets legacy attributes on orchestrator for backward compatibility.
+        """
+        self._capability_configs[name] = config
+        # Map capability names to orchestrator attributes for backward compatibility
+        if self._orchestrator is not None:
+            # Simple attribute mappings
+            attr_map = {
+                "source_verification": "source_verification_config",
+                "citation_management": "citation_config",
+                "research_quality": "research_quality_config",
+                "literature_analysis": "literature_config",
+                "fact_checking": "fact_checking_config",
+                "code_style": "code_style",
+                "test_requirements": "test_config",
+                "lsp_integration": "lsp_config",
+                "refactoring": "refactor_config",
+                "container_settings": "container_config",
+                "infrastructure_settings": "infra_config",
+                "cicd_settings": "cicd_config",
+                "monitoring_settings": "monitoring_config",
+                "data_quality": "data_quality_config",
+                "visualization_style": "visualization_config",
+                "statistical_analysis": "statistics_config",
+                "ml_pipeline": "ml_config",
+                "data_privacy": "privacy_config",
+            }
+            if name in attr_map:
+                setattr(self._orchestrator, attr_map[name], config)
+            # Handle nested configs (safety_config, rag_config)
+            elif name == "deployment_safety":
+                self._orchestrator.safety_config["deployment"] = config
+            elif name.startswith("rag_"):
+                # RAG capabilities use rag_indexing, rag_retrieval etc.
+                # Store without the "rag_" prefix in rag_config dict
+                key = name[4:]  # Remove "rag_" prefix
+                self._orchestrator.rag_config[key] = config
+
+    def get_capability_config(self, name: str, default: Any = None) -> Optional[Dict]:
+        """Get capability configuration."""
+        return self._capability_configs.get(name, default)
+
+
 class MockOrchestrator:
     """Mock orchestrator for testing capability application.
 
@@ -55,6 +111,8 @@ class MockOrchestrator:
 
     def __init__(self):
         """Initialize mock orchestrator with config storage."""
+        self.vertical_context = MockVerticalContext(orchestrator=self)
+
         self.source_verification_config: Optional[Dict] = None
         self.citation_config: Optional[Dict] = None
         self.research_quality_config: Optional[Dict] = None
@@ -206,13 +264,13 @@ class TestResearchVerticalCapabilities:
 
         orchestrator = MockOrchestrator()
 
-        # Set some config
-        orchestrator.source_verification_config = {
+        # Set some config via vertical_context (the proper way)
+        orchestrator.vertical_context.set_capability_config("source_verification", {
             "min_credibility": 0.9,
             "min_source_count": 5,
             "require_diverse_sources": True,
             "validate_urls": False,
-        }
+        })
 
         # Get it back
         config = get_source_verification(orchestrator)
@@ -220,11 +278,11 @@ class TestResearchVerticalCapabilities:
         assert config["min_credibility"] == 0.9
         assert config["min_source_count"] == 5
 
-        # Test getter with config set
-        orchestrator.citation_config = {
+        # Test getter with config set via vertical_context
+        orchestrator.vertical_context.set_capability_config("citation_management", {
             "default_style": "chicago",
             "require_urls": False,
-        }
+        })
         citation_cfg = get_citation_config(orchestrator)
         assert citation_cfg["default_style"] == "chicago"
         assert citation_cfg["require_urls"] is False
@@ -320,12 +378,13 @@ class TestDevOpsVerticalCapabilities:
         from victor.devops.capabilities import get_container_settings
 
         orchestrator = MockOrchestrator()
-        orchestrator.container_config = {
+        # Set config via vertical_context (the proper way)
+        orchestrator.vertical_context.set_capability_config("container_settings", {
             "runtime": "docker",
             "default_registry": "ghcr.io",
             "security_scan_enabled": False,
             "max_image_size_mb": 5000,
-        }
+        })
 
         config = get_container_settings(orchestrator)
 

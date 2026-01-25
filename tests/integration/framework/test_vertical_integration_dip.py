@@ -189,14 +189,15 @@ class TestVerticalIntegrationDIP:
         assert context.get_mutation_count() == 2
 
     def test_config_contains_applied_capabilities(self):
-        """Test that config contains applied capabilities."""
-        context = MutableVerticalContext("test", {})
+        """Test that applied capabilities are tracked via get_all_applied_capabilities()."""
+        context = MutableVerticalContext("test", None)
 
         context.apply_capability("cap1", value=1)
 
-        # Check config
-        assert "_applied_capabilities" in context.config
-        assert context.config["_applied_capabilities"]["cap1"] == {"value": 1}
+        # Check applied capabilities via the proper API (not direct config access)
+        applied = context.get_all_applied_capabilities()
+        assert "cap1" in applied
+        assert applied["cap1"] == {"value": 1}
 
     def test_clear_mutations(self):
         """Test clearing mutations."""
