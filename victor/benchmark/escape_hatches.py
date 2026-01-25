@@ -33,7 +33,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, cast
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry

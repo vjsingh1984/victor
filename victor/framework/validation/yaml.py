@@ -55,6 +55,7 @@ from victor.framework.validation.pipeline import (
     ValidationPipeline,
 )
 from victor.framework.validation.validators import (
+    BaseValidator,
     CompositeLogic,
     CompositeValidator,
     ConditionalValidator,
@@ -441,11 +442,11 @@ class ValidatorFactory:
             transform = _title_transform
         elif transform_type == "trim":
 
-            def _trim_transform(x: Any) -> Any:
+            def _trim_transform2(x: Any) -> Any:
                 """Strip whitespace from strings, pass through other types."""
                 return x.strip() if isinstance(x, str) else x
 
-            transform = _trim_transform
+            transform = _trim_transform2
         else:
 
             def _strip_transform(x: Any) -> Any:

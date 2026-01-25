@@ -20,7 +20,7 @@ Executes condition nodes by evaluating branching logic.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Dict
 
 if TYPE_CHECKING:
     from victor.workflows.definition import ConditionNode
@@ -69,13 +69,13 @@ class ConditionNodeExecutor:
         logger.debug(f"Condition node {node.id} is passthrough (routing handled by StateGraph)")
 
         # Make mutable copy of state
-        state = dict(state)
+        state_dict: Dict[str, Any] = dict(state)
 
         # Track that we passed through this condition node
-        if "_node_results" not in state:
-            state["_node_results"] = {}
+        if "_node_results" not in state_dict:
+            state_dict["_node_results"] = {}
 
-        state["_node_results"][node.id] = {
+        state_dict["_node_results"][node.id] = {  # type: ignore[typeddict-unknown-key, typeddict-item]
             "node_id": node.id,
             "status": "completed",
             "result": {"passthrough": True, "condition": True},
@@ -84,7 +84,7 @@ class ConditionNodeExecutor:
             },
         }
 
-        return state
+        return state_dict
 
     def supports_node_type(self, node_type: str) -> bool:
         """Check if this executor supports the given node type."""

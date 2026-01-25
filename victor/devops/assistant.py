@@ -3,12 +3,16 @@
 Competitive positioning: Docker Desktop AI, Terraform Assistant, Pulumi AI, K8s GPT.
 """
 
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from victor.framework.prompt_builder import PromptBuilder
 
-from victor.core.verticals.base import StageDefinition, VerticalBase
+from victor.core.verticals.base import VerticalBase
+try:
+    from victor.core.verticals.base import StageDefinition
+except ImportError:
+    StageDefinition = None  # type: ignore[misc,assignment]
 from victor.core.verticals.defaults.tool_defaults import (
     COMMON_REQUIRED_TOOLS,
     merge_required_tools,
@@ -61,9 +65,10 @@ class DevOpsAssistant(VerticalBase):
         - TieredToolConfigProvider: Provides tiered tool configuration
     """
 
-    name = "devops"
-    description = "Infrastructure automation, container management, CI/CD, and deployment"
-    version = "0.5.0"
+    # Note: These class variables override base class instance variables (MyPy limitation)
+    name: str = "devops"  # type: ignore[misc]
+    description: str = "Infrastructure automation, container management, CI/CD, and deployment"  # type: ignore[misc]
+    version: str = "0.5.0"  # type: ignore[misc]
 
     @classmethod
     def get_tools(cls) -> List[str]:
@@ -268,10 +273,11 @@ class DevOpsAssistant(VerticalBase):
             Tool dependency provider or None
         """
 
-        def _create() -> ToolDependencyProviderProtocol:
+        def _create() -> "ToolDependencyProviderProtocol | None":
             from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
 
-            return create_vertical_tool_dependency_provider("devops")
+            provider = create_vertical_tool_dependency_provider("devops")
+            return cast("ToolDependencyProviderProtocol", provider)
 
         return cls._get_cached_extension("tool_dependency_provider", _create)
 

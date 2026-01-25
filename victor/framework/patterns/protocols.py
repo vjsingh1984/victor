@@ -27,7 +27,7 @@ Following the refinement plan, these protocols extend existing Victor
 infrastructure (experiment tracking, team formations, template library).
 """
 
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Dict, List, Optional, Protocol, cast, runtime_checkable
 
 from victor.framework.protocols import OrchestratorProtocol
 from victor.teams import TeamFormation

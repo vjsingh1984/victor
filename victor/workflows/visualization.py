@@ -295,9 +295,11 @@ class WorkflowVisualizer:
             elif isinstance(node, ParallelNode):
                 metadata["parallel_nodes"] = node.parallel_nodes
                 metadata["join_strategy"] = node.join_strategy
-            elif has_hitl and isinstance(node, HITLNode):
-                metadata["hitl_type"] = node.hitl_type.value
-                metadata["timeout"] = node.timeout
+            elif has_hitl and HITLNode is not None and isinstance(node, HITLNode):
+                if hasattr(node, "hitl_type"):
+                    metadata["hitl_type"] = node.hitl_type.value
+                if hasattr(node, "timeout"):
+                    metadata["timeout"] = node.timeout
             elif hasattr(node, "description"):
                 desc = getattr(node, "description", None)
                 if desc:
@@ -704,6 +706,7 @@ class WorkflowVisualizer:
             """Escape string for DOT label."""
             if not isinstance(s, str):
                 s = str(s)
+            assert isinstance(s, str)  # Help type narrowing
             return s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
         lines = ["digraph workflow {"]
@@ -810,6 +813,7 @@ class WorkflowVisualizer:
             return self._to_svg_matplotlib(output_path)
         else:
             # Try in order
+            from typing import Callable
             for method in [
                 self._to_svg_d2,
                 self._to_svg_kroki,
@@ -817,7 +821,6 @@ class WorkflowVisualizer:
                 self._to_svg_matplotlib,
             ]:
                 try:
-                    from typing import cast
                     return cast(str, method(output_path))
                 except (ImportError, FileNotFoundError, RuntimeError):
                     continue

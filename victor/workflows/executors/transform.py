@@ -64,6 +64,7 @@ class TransformNodeExecutor:
         Raises:
             Exception: If transform function fails
         """
+        import dataclasses
         import time
         from dataclasses import dataclass, field
         from typing import Any, Dict, Optional
@@ -81,22 +82,22 @@ class TransformNodeExecutor:
         start_time = time.time()
 
         # Make mutable copy of state
-        state: "WorkflowState" = dict(state)  # type: ignore[assignment]
+        state_dict: Dict[str, Any] = dict(state)
 
         try:
             # Step 1: Execute transform function
-            transformed = node.transform(state)
+            transformed = node.transform(state_dict)
 
             # Step 2: Merge transformed data back into state
             for key, value in transformed.items():
-                state[key] = value  # type: ignore[typeddict-unknown-key]
+                state_dict[key] = value
 
             # Step 3: Update node results for observability
-            if "_node_results" not in state:
-                state["_node_results"] = {}
+            if "_node_results" not in state_dict:
+                state_dict["_node_results"] = {}
 
             # Store result as dict instead of GraphNodeResult
-            state["_node_results"][node.id] = {
+            state_dict["_node_results"][node.id] = {
                 "node_id": node.id,
                 "status": "completed",
                 "result": {"transformed_keys": list(transformed.keys())},
@@ -106,23 +107,23 @@ class TransformNodeExecutor:
             }
 
             logger.info(f"Transform node {node.id} completed successfully")
-            return state
+            return state_dict
 
         except Exception as e:
             logger.error(f"Transform node '{node.id}' failed: {e}", exc_info=True)
-            state["_error"] = f"Transform node '{node.id}' failed: {e}"
+            state_dict["_error"] = f"Transform node '{node.id}' failed: {e}"
 
-            if "_node_results" not in state:
-                state["_node_results"] = {}
+            if "_node_results" not in state_dict:
+                state_dict["_node_results"] = {}
 
-            state["_node_results"][node.id] = GraphNodeResult(
+            state_dict["_node_results"][node.id] = dataclasses.asdict(GraphNodeResult(
                 node_id=node.id,
                 status="failed",
                 error=str(e),
                 metadata={
                     "duration_seconds": time.time() - start_time,
                 },
-            )
+            ))
 
             raise
 

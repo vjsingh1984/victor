@@ -110,7 +110,7 @@ class TaskManager:
         logger.debug(f"Created tracked task: {name or task.get_name()}")
         return task
 
-    def _task_done_callback(self, task: asyncio.Task) -> None:
+    def _task_done_callback(self, task: asyncio.Task[Any]) -> None:
         """Callback invoked when a tracked task completes.
 
         Removes the task from the tracking set and logs any exceptions

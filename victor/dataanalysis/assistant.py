@@ -3,7 +3,7 @@
 Competitive positioning: ChatGPT Data Analysis, Claude Artifacts, Jupyter AI.
 """
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast, ClassVar
 
 if TYPE_CHECKING:
     from victor.framework.prompt_builder import PromptBuilder
@@ -48,9 +48,9 @@ class DataAnalysisAssistant(VerticalBase):
         and do not require explicit registration.
     """
 
-    name = "data_analysis"
-    description = "Data exploration, statistical analysis, visualization, and ML insights"
-    version = "0.5.0"
+    name: ClassVar[str] = "data_analysis"
+    description: ClassVar[str] = "Data exploration, statistical analysis, visualization, and ML insights"
+    version: ClassVar[str] = "0.5.0"
 
     @classmethod
     def get_tools(cls) -> list[str]:
@@ -85,7 +85,7 @@ class DataAnalysisAssistant(VerticalBase):
             ]
         )
 
-        return tools
+        return cast(List[str], tools)
 
     @classmethod
     def get_system_prompt(cls) -> str:
@@ -205,7 +205,10 @@ class DataAnalysisAssistant(VerticalBase):
         def _create() -> ToolDependencyProviderProtocol:
             from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
 
-            return create_vertical_tool_dependency_provider(cls.name)  # type: ignore[no-any-return]
+            return cast(
+                ToolDependencyProviderProtocol,
+                create_vertical_tool_dependency_provider(cls.name)
+            )
 
         return cls._get_cached_extension("tool_dependency_provider", _create)
 

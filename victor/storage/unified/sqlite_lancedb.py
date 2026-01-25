@@ -127,10 +127,12 @@ class SqliteLanceDBStore:
 
         # Initialize SQLite graph store
         from victor.storage.graph.sqlite_store import SqliteGraphStore
+        from victor.storage.graph.protocol import GraphStoreProtocol
 
         graph_db_path = self.persist_directory / "project.db"
-        self._graph_store = SqliteGraphStore(project_path=graph_db_path)  # type: ignore[assignment]
-        await self._graph_store.initialize()  # type: ignore[union-attr]
+        self._graph_store = SqliteGraphStore(project_path=graph_db_path)
+        assert isinstance(self._graph_store, GraphStoreProtocol)
+        await self._graph_store.initialize()
 
         # Initialize embedding model
         from victor.coding.codebase.embeddings.models import (
@@ -139,11 +141,11 @@ class SqliteLanceDBStore:
         )
 
         model_config = EmbeddingModelConfig(
-            model_type=self.embedding_model_type,
-            model_name=self.embedding_model,
+            embedding_type=self.embedding_model_type,
+            embedding_model=self.embedding_model,
         )
-        self._embedding_model = create_embedding_model(model_config)  # type: ignore[assignment]
-        await self._embedding_model.initialize()  # type: ignore[union-attr]
+        self._embedding_model = create_embedding_model(model_config)
+        await self._embedding_model.initialize()
 
         # Initialize LanceDB vector store (vectors only, no content)
         await self._init_vector_store()
@@ -161,11 +163,11 @@ class SqliteLanceDBStore:
 
             embeddings_dir = self.persist_directory / "embeddings"
             embeddings_dir.mkdir(parents=True, exist_ok=True)
-            self._vector_store = lancedb.connect(str(embeddings_dir))  # type: ignore[assignment]
+            self._vector_store = lancedb.connect(str(embeddings_dir))
 
             # Check if table exists
-            if self._vector_store is not None and "symbols" in self._vector_store.list_tables().tables:  # type: ignore[union-attr]
-                self._vector_table = self._vector_store.open_table("symbols")  # type: ignore[union-attr]
+            if self._vector_store is not None and "symbols" in self._vector_store.list_tables().tables:
+                self._vector_table = self._vector_store.open_table("symbols")
         except ImportError:
             logger.warning("LanceDB not available. Semantic search disabled.")
             self._vector_store = None
@@ -173,10 +175,12 @@ class SqliteLanceDBStore:
     async def close(self) -> None:
         """Clean up resources."""
         if self._embedding_model:
-            await self._embedding_model.close()  # type: ignore[union-attr]
+            await self._embedding_model.close()
             self._embedding_model = None
         if self._graph_store:
-            await self._graph_store.close()  # type: ignore[union-attr]
+            # GraphStoreProtocol doesn't define close(), but SqliteGraphStore has it
+            if hasattr(self._graph_store, "close"):
+                await self._graph_store.close()  # type: ignore[attr-defined]
             self._graph_store = None
         self._vector_store = None
         self._vector_table = None
@@ -191,7 +195,7 @@ class SqliteLanceDBStore:
         if not self._initialized:
             raise RuntimeError("SqliteLanceDBStore not initialized. Call await initialize() first.")
 
-    def _get_graph_store(self) -> GraphStoreProtocol:
+    def _get_graph_store(self) -> Any:
         """Get graph store, ensuring it's initialized."""
         self._ensure_initialized()
         assert self._graph_store is not None, "Graph store not initialized"
@@ -328,7 +332,8 @@ class SqliteLanceDBStore:
                 )
 
         # Batch upsert to graph
-        await self._graph_store.upsert_nodes(nodes)  # type: ignore[union-attr]
+        assert self._graph_store is not None
+        await self._graph_store.upsert_nodes(nodes)
 
         # Batch upsert to vector store
         if self._vector_store and embedding_items:
@@ -339,7 +344,8 @@ class SqliteLanceDBStore:
                 texts = [item["text"] for item in batch]
 
                 # Batch embed
-                vectors = await self._embedding_model.embed_batch(texts)  # type: ignore[union-attr]
+                assert self._embedding_model is not None
+                vectors = await self._embedding_model.embed_batch(texts)
 
                 # Prepare LanceDB documents (no content, just vector + metadata)
                 lance_docs = []
@@ -354,9 +360,9 @@ class SqliteLanceDBStore:
 
                 # Upsert to LanceDB
                 if self._vector_table is None:
-                    self._vector_table = self._vector_store.create_table("symbols", data=lance_docs)  # type: ignore[union-attr]
+                    self._vector_table = self._vector_store.create_table("symbols", data=lance_docs)
                 else:
-                    self._vector_table.add(lance_docs)  # type: ignore[union-attr]
+                    self._vector_table.add(lance_docs)
 
                 indexed += len(batch)
                 if indexed % 5000 == 0:
@@ -378,7 +384,8 @@ class SqliteLanceDBStore:
             weight=edge.weight,
             metadata=edge.metadata,
         )
-        await self._graph_store.upsert_edges([graph_edge])  # type: ignore[union-attr]
+        assert self._graph_store is not None
+        await self._graph_store.upsert_edges([graph_edge])
 
     async def index_edges_batch(self, edges: List[UnifiedEdge]) -> int:
         """Batch index edges. Returns count indexed."""
@@ -398,7 +405,8 @@ class SqliteLanceDBStore:
             )
             for e in edges
         ]
-        await self._graph_store.upsert_edges(graph_edges)  # type: ignore[union-attr]
+        assert self._graph_store is not None
+        await self._graph_store.upsert_edges(graph_edges)
         return len(graph_edges)
 
     async def _upsert_vector(
@@ -418,9 +426,10 @@ class SqliteLanceDBStore:
         }
 
         if self._vector_table is None:
-            self._vector_table = self._vector_store.create_table("symbols", data=[doc])  # type: ignore[union-attr]
+            assert self._vector_store is not None
+            self._vector_table = self._vector_store.create_table("symbols", data=[doc])
         else:
-            self._vector_table.add([doc])  # type: ignore[union-attr]
+            self._vector_table.add([doc])
 
     # =========================================================================
     # Unified Search
@@ -522,10 +531,12 @@ class SqliteLanceDBStore:
             return []
 
         # Embed query
-        query_vector = await self._embedding_model.embed_text(query)  # type: ignore[union-attr]
+        assert self._embedding_model is not None
+        query_vector = await self._embedding_model.embed_text(query)
 
         # Search LanceDB
-        results = self._vector_table.search(query_vector).limit(limit).to_list()  # type: ignore[union-attr]
+        assert self._vector_table is not None
+        results = self._vector_table.search(query_vector).limit(limit).to_list()
 
         search_results = []
         for r in results:
@@ -563,7 +574,8 @@ class SqliteLanceDBStore:
         if not self._graph_store:
             return []
 
-        nodes = await self._graph_store.search_symbols(  # type: ignore[union-attr]
+        assert self._graph_store is not None
+        nodes = await self._graph_store.search_symbols(
             query=query,
             limit=limit,
             symbol_types=symbol_types,
@@ -619,7 +631,8 @@ class SqliteLanceDBStore:
         if not self._initialized:
             await self.initialize()
 
-        node = await self._graph_store.get_node_by_id(unified_id)  # type: ignore[union-attr]
+        assert self._graph_store is not None
+        node = await self._graph_store.get_node_by_id(unified_id)
         if not node:
             return None
 
@@ -630,7 +643,8 @@ class SqliteLanceDBStore:
         if not self._initialized:
             await self.initialize()
 
-        nodes = await self._graph_store.get_nodes_by_file(rel_path)  # type: ignore[union-attr]
+        assert self._graph_store is not None
+        nodes = await self._graph_store.get_nodes_by_file(rel_path)
         return [self._node_to_symbol(n) for n in nodes]
 
     async def get_callers(
@@ -642,7 +656,8 @@ class SqliteLanceDBStore:
         if not self._initialized:
             await self.initialize()
 
-        edges = await self._graph_store.get_neighbors(  # type: ignore[union-attr]
+        assert self._graph_store is not None
+        edges = await self._graph_store.get_neighbors(
             unified_id,
             edge_types=["CALLS"],
             max_depth=max_depth,
@@ -667,7 +682,8 @@ class SqliteLanceDBStore:
         if not self._initialized:
             await self.initialize()
 
-        edges = await self._graph_store.get_neighbors(  # type: ignore[union-attr]
+        assert self._graph_store is not None
+        edges = await self._graph_store.get_neighbors(
             unified_id,
             edge_types=["CALLS"],
             max_depth=max_depth,
@@ -692,7 +708,8 @@ class SqliteLanceDBStore:
         if not self._initialized:
             await self.initialize()
 
-        edges = await self._graph_store.get_neighbors(  # type: ignore[union-attr]
+        assert self._graph_store is not None
+        edges = await self._graph_store.get_neighbors(
             unified_id,
             edge_types=edge_types,
         )
@@ -788,19 +805,21 @@ class SqliteLanceDBStore:
             await self.initialize()
 
         # Delete from graph
-        await self._graph_store.delete_by_file(rel_path)  # type: ignore[union-attr]
+        assert self._graph_store is not None
+        await self._graph_store.delete_by_file(rel_path)
 
         # Delete from vector store (by file_path prefix)
         if self._vector_table:
             # LanceDB delete by predicate
-            self._vector_table.delete(f"file_path = '{rel_path}'")  # type: ignore[union-attr]
+            self._vector_table.delete(f"file_path = '{rel_path}'")
 
     async def delete_all(self) -> None:
         """Clear entire store."""
         if not self._initialized:
             await self.initialize()
 
-        await self._graph_store.delete_by_repo()  # type: ignore[union-attr]
+        assert self._graph_store is not None
+        await self._graph_store.delete_by_repo()
 
         if self._vector_store and "symbols" in self._vector_store.list_tables().tables:
             self._vector_store.drop_table("symbols")
@@ -811,13 +830,13 @@ class SqliteLanceDBStore:
         if not self._initialized:
             await self.initialize()
 
-        graph_stats = await self._graph_store.stats()  # type: ignore[union-attr]
+        assert self._graph_store is not None
+        graph_stats = await self._graph_store.stats()
 
         vector_count = 0
         if self._vector_table:
             try:
-                if self._vector_table is not None:
-                    vector_count = self._vector_table.count_rows()
+                vector_count = self._vector_table.count_rows()
             except Exception:
                 pass
 

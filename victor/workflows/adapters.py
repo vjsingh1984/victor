@@ -101,7 +101,7 @@ class AdaptedNode:
 
     name: str
     node_type: WorkflowNodeType
-    handler: Callable[[WorkflowState], WorkflowState]
+    handler: Callable[[Dict[str, Any]], Dict[str, Any] | Awaitable[Dict[str, Any]]]
     next_nodes: List[str] = field(default_factory=list)
     conditional_edges: Dict[str, str] = field(default_factory=dict)
     tool_budget: int = 10
@@ -246,7 +246,7 @@ class WorkflowToGraphAdapter:
         self,
         workflow: WorkflowDefinition,
         executor: "WorkflowExecutor",
-    ) -> "StateGraph":
+    ) -> "StateGraph[Dict[str, Any]]":
         """Adapt with real execution handlers.
 
         This version connects the adapted graph to the actual

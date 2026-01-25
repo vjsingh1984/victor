@@ -257,7 +257,7 @@ class GraphExecutionCoordinator:
             )
 
             # Compile WorkflowGraph to CompiledGraph
-            compiler: WorkflowGraphCompiler[Dict[str, Any]] = WorkflowGraphCompiler(compiler_config)
+            compiler = WorkflowGraphCompiler(compiler_config)
             compiled = compiler.compile(graph)
 
             # Execute via CompiledGraph.invoke()
@@ -280,7 +280,7 @@ class GraphExecutionCoordinator:
 
             return WorkflowExecutionResult(
                 success=success,
-                final_state=final_state,
+                final_state=final_state4,
                 nodes_executed=nodes_executed,
                 duration_seconds=duration,
                 error=error,

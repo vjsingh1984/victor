@@ -460,7 +460,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
         self._metrics = PerformanceMetrics()
         self._task_durations.clear()
 
-    def _should_parallelize(self, tasks: List[TaskInput]) -> bool:
+    def _should_parallelize(self, tasks: List["TaskInput[Any]"]) -> bool:
         """Decide whether to execute tasks in parallel.
 
         Args:
@@ -768,9 +768,9 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     def _create_batches(
         self,
-        tasks: List[TaskInput[Any]],
+        tasks: List["TaskInput[Any]"],
         batch_size: int,
-    ) -> List[List[TaskInput]]:
+    ) -> List[List["TaskInput[Any]"]]:
         """Divide tasks into batches.
 
         Args:
@@ -787,7 +787,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     async def _execute_batches(
         self,
-        batches: List[List[TaskInput]],
+        batches: List[List["TaskInput[Any]"]],
         context: Dict[str, Any],
     ) -> List[ParallelExecutionResult]:
         """Execute batches in parallel.
@@ -1518,7 +1518,7 @@ def create_adaptive_executor(
 
 
 async def execute_parallel_optimized(
-    tasks: List[TaskInput],
+    tasks: List["TaskInput[Any]"],
     context: Optional[Dict[str, Any]] = None,
     strategy: Union[OptimizationStrategy, str] = OptimizationStrategy.AUTO,
     max_workers: Optional[int] = None,

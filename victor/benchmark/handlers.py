@@ -206,7 +206,13 @@ class EnvironmentSetupHandler(BaseHandler):
         """Execute environment setup."""
         language = node.input_mapping.get("language", "python")
         deps_input = node.input_mapping.get("dependencies", [])
-        dependencies: List[str] = deps_input if isinstance(deps_input, list) else [deps_input] if deps_input else []
+        dependencies: List[str] = (
+            deps_input
+            if isinstance(deps_input, list)
+            else [deps_input]
+            if deps_input
+            else []
+        )
         workspace = node.input_mapping.get("workspace", "")
 
         # Resolve context variables
@@ -367,7 +373,13 @@ class LanguageDetectorHandler(BaseHandler):
     ) -> Tuple[Any, int]:
         """Execute language detection."""
         files_input = node.input_mapping.get("files", [])
-        files: List[str] = files_input if isinstance(files_input, list) else [files_input] if isinstance(files_input, str) else []
+        files: List[str] = (
+            files_input
+            if isinstance(files_input, list)
+            else [files_input]
+            if isinstance(files_input, str)
+            else []
+        )
 
         # Resolve context variables
         if isinstance(files, str) and files.startswith("$ctx."):
@@ -496,9 +508,21 @@ class MultiSolutionValidatorHandler(BaseHandler):
     ) -> Tuple[Any, int]:
         """Execute multi-solution validation."""
         solutions_input = node.input_mapping.get("solutions", [])
-        solutions: List[str] = solutions_input if isinstance(solutions_input, list) else [solutions_input] if isinstance(solutions_input, str) else []
+        solutions: List[str] = (
+            solutions_input
+            if isinstance(solutions_input, list)
+            else [solutions_input]
+            if isinstance(solutions_input, str)
+            else []
+        )
         test_cases_input = node.input_mapping.get("test_cases", [])
-        test_cases: List[str] = test_cases_input if isinstance(test_cases_input, list) else [test_cases_input] if isinstance(test_cases_input, str) else []
+        test_cases: List[str] = (
+            test_cases_input
+            if isinstance(test_cases_input, list)
+            else [test_cases_input]
+            if isinstance(test_cases_input, str)
+            else []
+        )
         timeout_per = node.input_mapping.get("timeout_per_solution", 30)
 
         # Resolve context variables
@@ -599,7 +623,13 @@ class CodeTesterHandler(BaseHandler):
         """Execute code testing."""
         code = node.input_mapping.get("code", "")
         test_cases_input = node.input_mapping.get("test_cases", [])
-        test_cases: List[str] = test_cases_input if isinstance(test_cases_input, list) else [test_cases_input] if isinstance(test_cases_input, str) else []
+        test_cases: List[str] = (
+            test_cases_input
+            if isinstance(test_cases_input, list)
+            else [test_cases_input]
+            if isinstance(test_cases_input, str)
+            else []
+        )
 
         # Resolve context variables
         if isinstance(code, str) and code.startswith("$ctx."):

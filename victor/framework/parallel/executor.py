@@ -263,15 +263,15 @@ class ParallelExecutor:
             )
 
         # Prepare task coroutines
-        coroutines: List[Coroutine[Any, Any, Any]] = []
+        awaitables: List[Awaitable[Any]] = []
         for i, task in enumerate(tasks):
-            coroutines.append(self._prepare_task(task, i, context))
+            awaitables.append(self._prepare_task(task, i, context))
 
         # Execute with appropriate strategy
         if self.config.error_strategy == ErrorStrategy.FAIL_FAST:
-            result = await self._execute_fail_fast(coroutines, start_time)
+            result = await self._execute_fail_fast(awaitables, start_time)
         else:
-            result = await self._execute_continue_all(coroutines, start_time)
+            result = await self._execute_continue_all(awaitables, start_time)
 
         return result
 
@@ -625,7 +625,8 @@ class ParallelExecutor:
             )
 
             for task in done:
-                task_id = f"task_{task_futures.index(task)}"
+                task_idx = task_futures.index(task)
+                task_id = f"task_{task_idx}"
                 try:
                     result = await task
                     yield ProgressEvent(
@@ -749,7 +750,7 @@ class ParallelExecutorHandler:
         node: Any,
         context: Any,
         tool_registry: Any,
-    ) -> List[Callable[[], Awaitable[Any]]]:
+    ) -> List[TaskInput[Any]]:
         """Extract task functions from workflow node.
 
         Args:
@@ -760,7 +761,7 @@ class ParallelExecutorHandler:
         Returns:
             List of async task functions
         """
-        tasks = []
+        tasks: List[TaskInput[Any]] = []
 
         # If node has tools, create tool execution tasks
         if hasattr(node, "tools") and node.tools:
@@ -769,7 +770,7 @@ class ParallelExecutorHandler:
 
         # If node has handler tasks, use those
         elif hasattr(node, "tasks") and node.tasks:
-            tasks = node.tasks
+            tasks = node.tasks  # type: ignore[assignment]
 
         return tasks
 

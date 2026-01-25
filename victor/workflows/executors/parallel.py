@@ -65,6 +65,7 @@ class ParallelNodeExecutor:
             Parallel results should already be populated by child nodes.
             This node serves as a join point and applies the join strategy.
         """
+        import dataclasses
         import time
         from dataclasses import dataclass, field
         from typing import Any, Dict, Optional
@@ -82,11 +83,11 @@ class ParallelNodeExecutor:
         start_time = time.time()
 
         # Make mutable copy of state
-        state: "WorkflowState" = dict(state)  # type: ignore[assignment]
+        state_dict: Dict[str, Any] = dict(state)
 
         try:
             # Step 1: Get parallel results (populated by child nodes)
-            parallel_results = state.get("_parallel_results", {})
+            parallel_results = state_dict.get("_parallel_results", {})
 
             # Step 2: Apply join strategy
             join_strategy = getattr(node, "join_strategy", "all")
@@ -98,7 +99,7 @@ class ParallelNodeExecutor:
                     for r in parallel_results.values()
                 )
                 if not all_success:
-                    state["_error"] = "Not all parallel nodes succeeded"
+                    state_dict["_error"] = "Not all parallel nodes succeeded"
 
             elif join_strategy == "any":
                 # At least one must succeed
@@ -107,7 +108,7 @@ class ParallelNodeExecutor:
                     for r in parallel_results.values()
                 )
                 if not any_success:
-                    state["_error"] = "No parallel nodes succeeded"
+                    state_dict["_error"] = "No parallel nodes succeeded"
 
             elif join_strategy == "first":
                 # First success wins (results should be ordered)
@@ -117,19 +118,19 @@ class ParallelNodeExecutor:
                         first_success = result
                         break
                 if first_success:
-                    state["_parallel_first"] = first_success  # type: ignore[typeddict-unknown-key]
+                    state_dict["_parallel_first"] = first_success
                 else:
-                    state["_error"] = "No parallel node succeeded"
+                    state_dict["_error"] = "No parallel node succeeded"
 
             # "merge" strategy just combines all results (no validation)
 
             # Step 3: Update node results for observability
-            if "_node_results" not in state:
-                state["_node_results"] = {}
+            if "_node_results" not in state_dict:
+                state_dict["_node_results"] = {}
 
-            state["_node_results"][node.id] = GraphNodeResult(
+            state_dict["_node_results"][node.id] = dataclasses.asdict(GraphNodeResult(
                 node_id=node.id,
-                status="completed" if "_error" not in state else "failed",
+                status="completed" if "_error" not in state_dict else "failed",
                 result={
                     "parallel_nodes": getattr(node, "parallel_nodes", []),
                     "join_strategy": join_strategy,
@@ -139,26 +140,26 @@ class ParallelNodeExecutor:
                     "duration_seconds": time.time() - start_time,
                     "join_strategy": join_strategy,
                 },
-            )
+            ))
 
             logger.info(f"Parallel node {node.id} completed with strategy: {join_strategy}")
-            return state
+            return state_dict
 
         except Exception as e:
             logger.error(f"Parallel node '{node.id}' failed: {e}", exc_info=True)
-            state["_error"] = f"Parallel node '{node.id}' failed: {e}"
+            state_dict["_error"] = f"Parallel node '{node.id}' failed: {e}"
 
-            if "_node_results" not in state:
-                state["_node_results"] = {}
+            if "_node_results" not in state_dict:
+                state_dict["_node_results"] = {}
 
-            state["_node_results"][node.id] = GraphNodeResult(
+            state_dict["_node_results"][node.id] = dataclasses.asdict(GraphNodeResult(
                 node_id=node.id,
                 status="failed",
                 error=str(e),
                 metadata={
                     "duration_seconds": time.time() - start_time,
                 },
-            )
+            ))
 
             raise
 

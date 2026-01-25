@@ -73,9 +73,9 @@ class BenchmarkVertical(VerticalBase):
 
     # Metadata (inherited from VerticalMetadataProvider)
     # Note: These class variables override base class instance variables (MyPy limitation)
-    name: str = "benchmark"
-    description: str = "AI coding benchmark evaluation and performance testing"
-    version: str = "0.5.0"
+    name: str = "benchmark"  # type: ignore[misc]
+    description: str = "AI coding benchmark evaluation and performance testing"  # type: ignore[misc]
+    version: str = "0.5.0"  # type: ignore[misc]
 
     # Benchmark-specific stages
     STAGE_UNDERSTANDING = "UNDERSTANDING"

@@ -1917,7 +1917,7 @@ Respond with just the command to run."""
                     if provider != recommendation.value:
                         q_val = learner_ms._get_q_value(provider, task_type)
                         alternatives.append({"provider": provider, "q_value": round(q_val, 3)})
-                alternatives.sort(key=lambda x: x["q_value"] or 0, reverse=True)  # type: ignore[arg-type]
+                alternatives.sort(key=lambda x: (x["q_value"] or 0) if x["q_value"] is not None else 0, reverse=True)
 
                 return JSONResponse(
                     {
@@ -3259,7 +3259,7 @@ Respond with just the command to run."""
 
             # Create HITL store - SQLite for persistence, in-memory otherwise
             if self.hitl_persistent:
-                self._hitl_store = SQLiteHITLStore()  # type: ignore[assignment]
+                self._hitl_store = SQLiteHITLStore()
                 if hasattr(self._hitl_store, "db_path"):
                     logger.info(f"HITL using SQLite store: {self._hitl_store.db_path}")
                 else:

@@ -204,10 +204,11 @@ class CacheBackendFactory:
         default_ttl = options.get("default_ttl_seconds", 3600)
         enable_stats = options.get("enable_stats", True)
 
-        return MemoryCacheBackend(
+        backend: ICacheBackend = MemoryCacheBackend(
             default_ttl_seconds=default_ttl,
             enable_stats=enable_stats,
         )
+        return backend
 
     @staticmethod
     def _create_redis_backend(options: Dict[str, Any]) -> RedisCacheBackend:

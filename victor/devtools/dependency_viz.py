@@ -125,7 +125,7 @@ class DependencyGraph:
             module_name = self._get_module_name(file_path)
 
             # Create module info
-            if module_name not in self.modules:
+            if module_name not in self.modules and module_name is not None:
                 self.modules[module_name] = ModuleInfo(
                     name=module_name,
                     file_path=str(file_path.relative_to(self.victor_root)),
@@ -136,20 +136,21 @@ class DependencyGraph:
             imports = self._extract_imports(tree, file_path)
 
             # Update graph
-            for imp in imports:
-                self.adj_list[module_name].add(imp)
-                self.reverse_adj_list[imp].add(module_name)
+            if module_name is not None:
+                for imp in imports:
+                    self.adj_list[module_name].add(imp)
+                    self.reverse_adj_list[imp].add(module_name)
 
-                # Create module for imported module if it doesn't exist
-                if imp not in self.modules:
-                    self.modules[imp] = ModuleInfo(
-                        name=imp,
-                        file_path="<external>",
-                        is_internal=False,
-                    )
+                    # Create module for imported module if it doesn't exist
+                    if imp not in self.modules:
+                        self.modules[imp] = ModuleInfo(
+                            name=imp,
+                            file_path="<external>",
+                            is_internal=False,
+                        )
 
-                self.modules[module_name].imports.add(imp)
-                self.modules[imp].imported_by.add(module_name)
+                    self.modules[module_name].imports.add(imp)
+                    self.modules[imp].imported_by.add(module_name)
 
         except SyntaxError as e:
             logger.warning(f"Syntax error in {file_path}: {e}")

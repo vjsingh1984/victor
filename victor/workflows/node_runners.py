@@ -68,6 +68,7 @@ from victor.workflows.context import ExecutionContext
 
 if TYPE_CHECKING:
     from victor.agent.subagents import SubAgentOrchestrator
+    from victor.agent.subagents import SubAgentManager
     from victor.tools.registry import ToolRegistry
     from victor.workflows.hitl import HITLExecutor, HITLNode
     from victor.agent.orchestrator import AgentOrchestrator
@@ -365,10 +366,11 @@ class ComputeNodeRunner(BaseNodeRunner):
                 inputs = self._resolve_inputs(node_config.get("inputs", {}), context)
                 # Call handler with expected signature (node, context, tool_registry)
                 # Note: Using inputs as node dict for compatibility
-                result = await handler(  # type: ignore[call-arg]
-                    inputs,
-                    context,
-                    self._tool_registry,  # type: ignore[arg-type]
+                # TODO: Create proper ComputeNode and WorkflowContext objects
+                result = await handler(  # type: ignore[call-arg, arg-type]
+                    inputs,  # type: ignore[arg-type]
+                    context,  # type: ignore[arg-type]
+                    self._tool_registry,
                 )
 
                 # Store output
@@ -774,7 +776,7 @@ class NodeRunnerRegistry:
             context, result = await runner.execute(...)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize an empty registry."""
         self._runners: List[NodeRunner] = []
 

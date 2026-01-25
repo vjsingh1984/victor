@@ -28,7 +28,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from victor.providers.base import Message
     from victor.storage.memory.entity_memory import EntityMemory
-    from victor.storage.memory.entity_types import EntityType
+    from victor.storage.memory.entity_types import Entity, EntityType
 
 logger = logging.getLogger(__name__)
 
@@ -305,12 +305,12 @@ class EntityExtractor:
             if hasattr(source_entities, '__await__'):
                 source_list = await source_entities
             else:
-                source_list: List[Entity] = source_entities  # type: ignore[assignment]
+                source_list = source_entities
 
             if hasattr(target_entities, '__await__'):
                 target_list = await target_entities
             else:
-                target_list: List[Entity] = target_entities  # type: ignore[assignment]
+                target_list = target_entities
 
             if source_list and target_list:
                 relation = EntityRelation(
@@ -349,7 +349,7 @@ class EntityExtractor:
         if hasattr(search_result, '__await__'):
             entities = await search_result
         else:
-            entities: List[Entity] = search_result  # type: ignore[assignment]
+            entities = search_result
 
         return [f"{e.name} ({e.entity_type.value})" for e in entities]
 
@@ -368,7 +368,7 @@ class EntityExtractor:
         if hasattr(all_entities, '__await__'):
             entities_list = await all_entities
         else:
-            entities_list: List[Entity] = all_entities  # type: ignore[assignment]
+            entities_list = all_entities
 
         if not entities_list:
             return "No entities tracked in this conversation."

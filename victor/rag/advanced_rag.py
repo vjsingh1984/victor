@@ -475,7 +475,7 @@ class AdvancedRAG:
         # Combine top results into answer
         answer = " ".join(r.content for r in results[:3])
 
-        response = {"answer": answer, "query": query}
+        response: Dict[str, Any] = {"answer": answer, "query": query}
 
         if include_sources:
             sources_list: List[Dict[str, Any]] = [

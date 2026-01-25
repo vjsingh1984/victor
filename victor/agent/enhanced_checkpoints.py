@@ -199,7 +199,7 @@ class StateSerializer:
             JSON-serializable dictionary
         """
         # Convert datetime objects to ISO format
-        serialized = {}
+        serialized: Dict[str, Any] = {}
         for key, value in context.items():
             if isinstance(value, datetime):
                 serialized[key] = value.isoformat()

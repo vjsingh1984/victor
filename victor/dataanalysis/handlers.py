@@ -187,7 +187,7 @@ class MLTrainingHandler(BaseHandler):
         _target_key = node.input_mapping.get("target")  # noqa: F841
 
         train_cmd = f"python -m victor.ml.train --model {model_type}"
-        result = await tool_registry.execute("shell", command=train_cmd)
+        result = await tool_registry.execute("shell", command=train_cmd, _exec_ctx={})
 
         # Build output structure
         output = {

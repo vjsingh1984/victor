@@ -268,10 +268,7 @@ class FeatureFlagManager:
         # Get old value for audit log
         old_value = None
         try:
-            if isinstance(self._resolver, ChainedFlagResolver):
-                old_value = self._resolver.get(flag_name)
-            else:
-                old_value = self._resolver.get(flag_name)
+            old_value = self._resolver.resolve(flag_name)
         except Exception:
             pass
 

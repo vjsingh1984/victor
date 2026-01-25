@@ -563,9 +563,9 @@ class ServiceConfigYAML:
 
         return ServiceConfig(
             name=self.name,
-            provider=self.provider,  # type: ignore[arg-type]
+            provider=self.provider if self.provider else "default",
             image=self.image,
-            command=[self.command] if self.command else None,  # type: ignore[arg-type]
+            command=[self.command] if self.command else None,
             ports=port_mappings,
             environment=self.environment,
             volumes=volume_mounts,
@@ -729,10 +729,10 @@ def _resolve_ref(
         raise YAMLWorkflowError(f"Node '{node_id}' not found in {full_path}")
     else:
         # Return first node from file
-        nodes: List[Dict[str, Any]] = file_data.get("nodes", [])
-        if not nodes:
+        all_nodes: List[Dict[str, Any]] = file_data.get("nodes", [])
+        if not all_nodes:
             raise YAMLWorkflowError(f"No nodes found in {full_path}")
-        return nodes[0]
+        return all_nodes[0]
 
 
 def _expand_refs(
@@ -1118,8 +1118,9 @@ def _parse_condition_node(
     condition_expr = node_data.get("condition", "default")
 
     # Check for registered condition
-    if condition_expr in config.condition_registry:
-        condition_fn = config.condition_registry[condition_expr]
+    condition_registry = config.condition_registry or {}
+    if condition_expr in condition_registry:
+        condition_fn = condition_registry[condition_expr]
     else:
         condition_fn = _create_simple_condition(condition_expr)
 
@@ -1153,8 +1154,9 @@ def _parse_transform_node(
     transform_expr = node_data.get("transform", "")
 
     # Check for registered transform
-    if transform_expr in config.transform_registry:
-        transform_fn = config.transform_registry[transform_expr]
+    transform_registry = config.transform_registry or {}
+    if transform_expr in transform_registry:
+        transform_fn = transform_registry[transform_expr]
     else:
         transform_fn = _create_transform(transform_expr)
 
@@ -2077,7 +2079,7 @@ class WorkflowArgument:
         }
         converter = type_map.get(self.type, str)
         try:
-            converted = converter(value)  # type: ignore[arg-type]
+            converted = converter(value)  # type: ignore[arg-type, no-any-return]
         except (ValueError, TypeError) as e:
             raise YAMLWorkflowError(f"Invalid value for argument '{self.name}': {e}")
 

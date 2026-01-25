@@ -73,7 +73,7 @@ class RAGListTool(BaseTool):
                 output_parts.append(f"{'='*50}")
 
                 # Group by ticker
-                by_ticker: Dict[str, list] = {}
+                by_ticker: Dict[str, List[Any]] = {}
                 for doc in sec_docs:
                     symbol = doc.metadata.get("symbol", "UNKNOWN")
                     if symbol not in by_ticker:
@@ -164,15 +164,16 @@ class RAGDeleteTool(BaseTool):
     def cost_tier(self) -> CostTier:
         return CostTier.LOW
 
-    async def execute(self, doc_id: str, **kwargs: Any) -> ToolResult:
+    async def execute(self, arguments: Dict[str, Any]) -> ToolResult:
         """Delete a document.
 
         Args:
-            doc_id: Document ID to delete
+            arguments: Tool arguments containing doc_id
 
         Returns:
             ToolResult with deletion status
         """
+        doc_id = arguments.get("doc_id", "")
         from victor.rag.document_store import DocumentStore
 
         try:

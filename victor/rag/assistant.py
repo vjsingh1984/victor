@@ -27,7 +27,10 @@ Features:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Type, cast
+
+if TYPE_CHECKING:
+    from victor.framework.stages import StageDefinition
 
 if TYPE_CHECKING:
     from victor.framework.prompt_builder import PromptBuilder
@@ -98,10 +101,10 @@ class RAGAssistant(VerticalBase):
         )
     """
 
-    # Override class variables from base
-    name: str = "rag"
-    description: str = "Retrieval-Augmented Generation assistant for document Q&A"
-    version: str = "0.5.0"
+    # Override class variables from base (must be class vars, not instance vars)
+    name: ClassVar[str] = "rag"
+    description: ClassVar[str] = "Retrieval-Augmented Generation assistant for document Q&A"
+    version: ClassVar[str] = "0.5.0"
 
     @classmethod
     def get_tools(cls) -> List[str]:

@@ -1291,8 +1291,15 @@ class VictorAPIServer:
                         except Exception:
                             pass
 
-            # Get largest files
-            file_sizes.sort(key=lambda x: x.get("lines", 0) or 0, reverse=True)  # type: ignore[arg-type]
+            # Get largest files - use numeric key for sorting
+            file_sizes.sort(
+                key=lambda x: (
+                    x.get("lines", 0) or 0
+                    if isinstance(x.get("lines", 0), (int, float))
+                    else 0
+                ),
+                reverse=True
+            )
             metrics["largest_files"] = file_sizes[:10]
 
             return web.json_response(metrics)

@@ -28,7 +28,7 @@ Example: Query[Any, Any]: "What is Apple's revenue?"
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from victor.integrations.protocols.query_enhancement import (
     EnhancedQuery,

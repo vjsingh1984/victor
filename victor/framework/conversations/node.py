@@ -195,16 +195,14 @@ class ConversationalNode:
                 )
                 for p in self.participants
             ]
-            # Convert context
+            # Convert context - use protocol's ConversationContext
+            from victor.framework.conversations.protocols import ConversationContext as ProtocolContext
             ctx = self._ctx
             protocol_context = ProtocolContext(
                 conversation_id=ctx.conversation_id,
-                participants={},  # Will be populated by protocol
-                shared_state=ctx.shared_state,
-                current_turn=ctx.current_turn,
-                current_speaker=ctx.current_speaker,
-                is_terminated=ctx.is_terminated,
-                termination_reason=ctx.termination_reason,
+                topic=ctx.topic,
+                protocol=ctx.protocol,
+                metadata=ctx.metadata,
             )
             await self.protocol.initialize(protocol_participants, protocol_context)
 
@@ -234,7 +232,7 @@ class ConversationalNode:
         # Update state
         state[self.output_key] = result.to_dict()
         state[f"{self.output_key}_history"] = (
-            self._history.to_dict() if self._history else []
+            self._history.to_dict() if self._history else {}  # type: ignore[attr-defined]
         )
 
         logger.info(
@@ -324,7 +322,15 @@ class ConversationalNode:
             Next speaker ID or None if no more speakers
         """
         if self.protocol:
-            return await self.protocol.get_next_speaker(self._ctx)
+            from victor.framework.conversations.protocols import ConversationContext as ProtocolContext
+            ctx = self._ctx
+            protocol_ctx = ProtocolContext(
+                conversation_id=ctx.conversation_id,
+                topic=ctx.topic,
+                protocol=ctx.protocol,
+                metadata=ctx.metadata,
+            )
+            return await self.protocol.get_next_speaker(protocol_ctx)
 
         # Default: round-robin through participants
         participant_ids = list(self._ctx.participants.keys())
@@ -416,7 +422,15 @@ class ConversationalNode:
             Tuple of (should_continue, reason)
         """
         if self.protocol:
-            return await self.protocol.should_continue(self._ctx)
+            from victor.framework.conversations.protocols import ConversationContext as ProtocolContext
+            ctx = self._ctx
+            protocol_ctx = ProtocolContext(
+                conversation_id=ctx.conversation_id,
+                topic=ctx.topic,
+                protocol=ctx.protocol,
+                metadata=ctx.metadata,
+            )
+            return await self.protocol.should_continue(protocol_ctx)
 
         # Default: continue until max turns
         if self._ctx.current_turn >= self.config.max_turns:

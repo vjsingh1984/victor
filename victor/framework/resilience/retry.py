@@ -213,13 +213,22 @@ class RetryHandler:
         if strategy_type not in self._strategy_cache:
             retry_cfg = self._config.retry_config
             if strategy_type == "exponential":
+                # Convert tuple to set of Exception types
+                non_retryable: Optional[Set[Type[Exception]]] = None
+                if retry_cfg.non_retryable_exceptions:
+                    # Filter to only Exception types (not BaseException)
+                    non_retryable = set(
+                        exc for exc in retry_cfg.non_retryable_exceptions
+                        if issubclass(exc, Exception)
+                    )
+
                 self._strategy_cache[strategy_type] = ExponentialBackoffStrategy(
                     max_attempts=retry_cfg.max_retries + 1,
                     base_delay=retry_cfg.base_delay,
                     max_delay=retry_cfg.max_delay,
                     multiplier=retry_cfg.exponential_base,
                     jitter=retry_cfg.jitter_factor,
-                    non_retryable_exceptions=set(retry_cfg.non_retryable_exceptions) if retry_cfg.non_retryable_exceptions else None,
+                    non_retryable_exceptions=non_retryable,
                 )
             elif strategy_type == "linear":
                 self._strategy_cache[strategy_type] = LinearBackoffStrategy(

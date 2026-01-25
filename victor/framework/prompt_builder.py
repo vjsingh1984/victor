@@ -65,10 +65,13 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 # Python 3.11+ has typing.Self, 3.10 needs typing_extensions
-try:
+if sys.version_info >= (3, 11):
     from typing import Self
-except ImportError:
-    from typing_extensions import Self
+else:
+    try:
+        from typing_extensions import Self
+    except ImportError:
+        from typing import Self  # type: ignore[attr-defined]
 
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import PromptContributorProtocol

@@ -190,7 +190,7 @@ def deprecated_property(
             return func(self)
 
         # Convert to property
-        return property(wrapper)  # type: ignore [arg-type]
+        return property(wrapper)  # type: ignore[return-value]
 
     return decorator
 

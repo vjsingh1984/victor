@@ -85,7 +85,7 @@ class VectorSearchHandler(BaseHandler):
 
         result = await tool_registry.execute(
             "vector_search",
-            _exec_ctx=None,  # No execution context in workflow handler
+            _exec_ctx={},  # Empty dict for workflow handler
             query=query,
             top_k=top_k,
             collection=collection,

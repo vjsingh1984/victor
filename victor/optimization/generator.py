@@ -375,7 +375,7 @@ class WorkflowVariantGenerator:
         Returns:
             Tuple of (success, changes)
         """
-        changes: List[Dict[str, Any]] = []
+        changes: List[WorkflowChange] = []
 
         # Parse tool mapping (e.g., "tool_a -> tool_b")
         if " -> " not in opportunity.target:
@@ -396,18 +396,17 @@ class WorkflowVariantGenerator:
                         old_tool = node_config.get("tool")
                         node_config["tool"] = new_tool
 
-                        changes.append(
-                            WorkflowChange(
-                                change_type="substitute_tool",
-                                target=node_id,
-                                description=f"Substituted tool '{old_tool}' with '{new_tool}' in node '{node_id}'",
-                                metadata={
-                                    "old_tool": old_tool,
-                                    "new_tool": new_tool,
-                                    "node_id": node_id,
-                                },
-                            )
+                        change = WorkflowChange(
+                            change_type="substitute_tool",
+                            target=node_id,
+                            description=f"Substituted tool '{old_tool}' with '{new_tool}' in node '{node_id}'",
+                            metadata={
+                                "old_tool": old_tool,
+                                "new_tool": new_tool,
+                                "node_id": node_id,
+                            },
                         )
+                        changes.append(change)
 
                         logger.info(f"Substituted tool in node {node_id}: {old_tool} -> {new_tool}")
 

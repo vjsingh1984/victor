@@ -91,7 +91,7 @@ workflows:
             workflows = workflows_result
         else:
             workflows = {workflows_result.name: workflows_result}
-        wf = workflows["compute_test"]  # type: ignore[index]
+        wf = workflows["compute_test"]
 
         assert len(wf.nodes) == 1
         node = wf.nodes["compute_step"]
@@ -142,7 +142,7 @@ workflows:
             workflows = workflows_result
         else:
             workflows = {workflows_result.name: workflows_result}
-        wf = workflows["parallel_test"]  # type: ignore[index]
+        wf = workflows["parallel_test"]
 
         parallel_node = wf.nodes["parallel_step"]
         assert isinstance(parallel_node, ParallelNode)

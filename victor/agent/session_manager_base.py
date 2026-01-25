@@ -17,7 +17,7 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional, cast
 
 if TYPE_CHECKING:
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
@@ -341,7 +341,7 @@ class TUISessionHandler(BaseSessionHandler):
             from victor.ui.tui import VictorTUI
 
             tui_app = VictorTUI(
-                agent=agent,
+                agent=cast("UIAgentProtocol | None", agent),
                 provider=config.provider,
                 model=config.model,
                 stream=True,

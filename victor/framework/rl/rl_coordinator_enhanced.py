@@ -198,7 +198,7 @@ class Experience(Generic[S, A]):
         return (self.state, self.action, self.reward, self.next_state, self.done)
 
 
-class ExperienceReplayBuffer:
+class ExperienceReplayBuffer(Generic[S, A]):
     """Experience replay buffer for sample-efficient learning.
 
     Implements uniform sampling and prioritized experience replay (PER).
@@ -556,8 +556,8 @@ class ExplorationStrategyImpl:
         elif self.strategy == ExplorationStrategy.ENTROPY_BONUS:
             return self._entropy_bonus(q_values, available_actions)
         else:
-            logger.warning(f"Unknown strategy: {self.strategy}, using epsilon-greedy")
-            return self._epsilon_greedy(q_values, available_actions)
+            # Fallback for unknown strategies
+            return self._epsilon_greedy(q_values, available_actions)  # type: ignore[unreachable]
 
     def _epsilon_greedy(self, q_values: Dict[Any, float], available_actions: List[Any]) -> Any:
         """Epsilon-greedy action selection."""
@@ -884,7 +884,7 @@ class EnhancedRLCoordinator:
         self.policy_grad_returns: List[float] = []  # For Monte Carlo returns
 
         # Experience replay buffer
-        self.replay_buffer = ExperienceReplayBuffer(capacity=replay_buffer_size)
+        self.replay_buffer: ExperienceReplayBuffer[S, A] = ExperienceReplayBuffer(capacity=replay_buffer_size)
 
         # Target network for stable learning
         self.target_network = TargetNetwork(update_frequency=target_network_update_freq)
@@ -985,7 +985,7 @@ class EnhancedRLCoordinator:
 
         # Sample mini-batch from replay buffer
         if len(self.replay_buffer) >= 32:  # Minimum batch size
-            batch = self.replay_buffer.sample(batch_size=32)
+            batch: List["Experience[S, A]"] = self.replay_buffer.sample(batch_size=32)
 
             for exp in batch:
                 s, a, r, ns, d = exp.to_tuple()

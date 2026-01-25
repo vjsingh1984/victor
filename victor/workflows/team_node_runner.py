@@ -314,6 +314,9 @@ class TeamNodeRunner:
                 logger.error(f"Team node '{node.id}' execution failed: {e}", exc_info=True)
                 raise YAMLWorkflowError(f"Team execution failed: {e}") from e
 
+        # This should never be reached, but satisfies MyPy
+        raise RuntimeError("Unexpected control flow in team node execution")
+
     def _add_member_to_coordinator(
         self,
         coordinator: Any,

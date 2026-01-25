@@ -1107,13 +1107,13 @@ Summary:"""
         for audio_path in audio_paths:
             try:
                 if operation == "transcribe":
-                    result: TranscriptionResult | AudioAnalysis | str | List[SpeakerSegment] | None = await self.transcribe_audio(audio_path, **kwargs)
+                    result = await self.transcribe_audio(audio_path, **kwargs)
                 elif operation == "analyze":
-                    result: TranscriptionResult | AudioAnalysis | str | List[SpeakerSegment] | None = await self.analyze_audio(audio_path)
+                    result = await self.analyze_audio(audio_path)
                 elif operation == "detect_language":
-                    result: TranscriptionResult | AudioAnalysis | str | List[SpeakerSegment] | None = await self.detect_language(audio_path)
+                    result = await self.detect_language(audio_path)
                 elif operation == "diarize":
-                    result: TranscriptionResult | AudioAnalysis | str | List[SpeakerSegment] | None = await self.extract_speaker_diarization(audio_path, **kwargs)
+                    result = await self.extract_speaker_diarization(audio_path, **kwargs)
                 else:
                     result = None
 

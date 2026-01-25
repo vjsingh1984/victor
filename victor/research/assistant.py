@@ -220,7 +220,7 @@ class ResearchAssistant(VerticalBase):
 
         from typing import cast
 
-        def _create():
+        def _create() -> ToolDependencyProviderProtocol:
             from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
             from victor.core.verticals.protocols import ToolDependencyProviderProtocol
 

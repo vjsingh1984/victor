@@ -388,11 +388,7 @@ if TEXTUAL_AVAILABLE:
 
             store = DocumentStore()
             await store.initialize()
-            stats_coro = store.get_stats()
-            if hasattr(stats_coro, "__await__"):
-                stats = await stats_coro
-            else:
-                stats = stats_coro
+            stats = await store.get_stats()
 
             self.doc_count = stats.get("total_documents", 0) if stats else 0
             self.chunk_count = stats.get("total_chunks", 0) if stats else 0

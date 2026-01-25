@@ -236,9 +236,10 @@ class CachingCompletionProvider(BaseCompletionProvider):
 
         key = self._cache_key(params)
         if key in self._cache:
-            timestamp, completion_list = self._cache[key]  # type: ignore[assignment]
+            entry = self._cache[key]
+            timestamp, completion_list = entry
             if time.time() - timestamp < self._cache_ttl:
-                return completion_list  # type: ignore[no-any-return]
+                return completion_list
             del self._cache[key]
         return None
 

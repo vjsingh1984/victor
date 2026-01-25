@@ -1281,23 +1281,22 @@ def build_complete_corpus() -> list[tuple[str, str, str]]:
     # Data structure (5%)
     for prompt, source in DATA_STRUCTURE_PROMPTS:
         corpus.append((prompt, str(PromptCategory.DATA_STRUCTURE.value), source))
-        corpus.append((prompt, PromptCategory.DATA_STRUCTURE, source))
 
     # File I/O (3%)
     for prompt, source in FILE_IO_PROMPTS:
-        corpus.append((prompt, PromptCategory.FILE_IO, source))
+        corpus.append((prompt, str(PromptCategory.FILE_IO.value), source))
 
     # String manipulation (2%)
     for prompt, source in STRING_MANIPULATION_PROMPTS:
-        corpus.append((prompt, PromptCategory.STRING_MANIPULATION, source))
+        corpus.append((prompt, str(PromptCategory.STRING_MANIPULATION.value), source))
 
     # Mathematical (1%)
     for prompt, source in MATHEMATICAL_PROMPTS:
-        corpus.append((prompt, PromptCategory.MATHEMATICAL, source))
+        corpus.append((prompt, str(PromptCategory.MATHEMATICAL.value), source))
 
     # General coding (1%)
     for prompt, source in GENERAL_CODING_PROMPTS:
-        corpus.append((prompt, PromptCategory.GENERAL_CODING, source))
+        corpus.append((prompt, str(PromptCategory.GENERAL_CODING.value), source))
 
     return corpus
 

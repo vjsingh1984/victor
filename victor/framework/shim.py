@@ -211,8 +211,7 @@ class FrameworkShim:
 
         logger.debug(f"FrameworkShim created orchestrator: session_id={self._session_id}")
 
-        from typing import cast
-        return cast("AgentOrchestrator", self._orchestrator)
+        return self._orchestrator
 
     def _apply_vertical(self, vertical: Type["VerticalBase"]) -> None:
         """Apply vertical configuration to orchestrator.

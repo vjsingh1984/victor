@@ -520,7 +520,7 @@ class ResearchCapabilityProvider(BaseVerticalCapabilityProvider):
 _provider_instance: Optional[ResearchCapabilityProvider] = None
 
 
-def _get_provider() -> ResearchCapabilityProvider:  # type: ignore
+def _get_provider() -> ResearchCapabilityProvider:
     """Get or create provider instance."""
     global _provider_instance
     if _provider_instance is None:

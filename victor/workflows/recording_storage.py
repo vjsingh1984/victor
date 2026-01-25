@@ -41,6 +41,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     Dict,
     List,
@@ -49,6 +50,9 @@ from typing import (
     Union,
     cast,
 )
+
+if TYPE_CHECKING:
+    from victor.workflows.execution_recorder import ExecutionReplayer
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -599,7 +603,7 @@ class FileRecordingStorage(RecordingStorage):
 class InMemoryRecordingStorage(RecordingStorage):
     """In-memory storage for recordings (useful for testing)."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize in-memory storage."""
         self._recordings: Dict[str, Tuple[bytes, Dict[str, Any]]] = {}
         logger.debug("Initialized InMemoryRecordingStorage")
