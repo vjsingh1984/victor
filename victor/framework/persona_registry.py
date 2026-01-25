@@ -273,7 +273,7 @@ class PersonaRegistry:
 
         with self._lock:
             if key in self._factories:
-                factory: Callable[[], PersonaSpec] = self._factories[key]  # type: ignore[assignment]
+                factory: Callable[[], PersonaSpec] | None = self._factories[key]
             elif vertical:
                 factory = self._factories.get(name)
             else:
@@ -636,9 +636,12 @@ def persona(
 
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> PersonaSpec:
-            return func(*args, **kwargs)
+            result = func(*args, **kwargs)
+            # Cast to PersonaSpec since we're decorating functions that return it
+            from typing import cast
+            return cast(PersonaSpec, result)
 
-        return wrapper  # type: ignore[return-value]
+        return wrapper
 
     return decorator
 

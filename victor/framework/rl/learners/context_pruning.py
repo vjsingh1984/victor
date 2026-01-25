@@ -427,7 +427,8 @@ class ContextPruningLearner(BaseLearner):
         reward = 0.4 * normalized_savings + 0.6 * success_bonus
 
         # Scale to -1.0 to 1.0 range
-        return max(-1.0, min(1.0, reward * 2))
+        result: float = max(-1.0, min(1.0, reward * 2))
+        return result
 
     def get_stats(self, provider_type: Optional[str] = None) -> Dict[str, Any]:
         """Get learner statistics.

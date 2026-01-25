@@ -224,7 +224,7 @@ class RLHookRegistry:
         self._event_counts: Dict[RLEventType, int] = {}
         self._exploration_counts: Dict[str, int] = {}  # learner -> exploration count
         self._exploitation_counts: Dict[str, int] = {}  # learner -> exploitation count
-        self._epsilon_history: List[Tuple[str, str, float]] = []  # (timestamp, learner, epsilon)
+        self._epsilon_history: List[Tuple[datetime, str, float]] = []  # (timestamp, learner, epsilon)
 
         # Track whether we've warned about missing coordinator (only warn once)
         self._warned_no_coordinator = False
@@ -417,7 +417,7 @@ class RLHookRegistry:
             },
         }
 
-    def get_epsilon_trend(self, learner_name: str, limit: int = 100) -> List[Tuple[str, float]]:
+    def get_epsilon_trend(self, learner_name: str, limit: int = 100) -> List[Tuple[datetime, float]]:
         """Get epsilon value trend for a learner.
 
         Args:

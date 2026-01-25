@@ -611,7 +611,8 @@ class ModeTransitionLearner(BaseLearner):
         """
         if task_type in self._task_stats:
             stats = self._task_stats[task_type].copy()
-            stats["task_type"] = task_type
+            # Cast task_type to str for the dict since task_type might not be str
+            stats["task_type"] = str(task_type)
             return stats
 
         return {

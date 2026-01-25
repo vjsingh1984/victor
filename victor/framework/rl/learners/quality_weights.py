@@ -477,7 +477,8 @@ class QualityWeightLearner(BaseLearner):
 
         # Map error [0, 1] to reward [-1, 1]
         # error=0 -> reward=1, error=1 -> reward=-1
-        return 1.0 - 2.0 * error
+        reward: float = 1.0 - 2.0 * error
+        return reward
 
     def get_correlation_analysis(self, task_type: str) -> Dict[str, float]:
         """Analyze correlation between dimensions and success.

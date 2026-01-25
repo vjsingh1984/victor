@@ -914,10 +914,14 @@ class RLCoordinator:
         for name, learner in self._learners.items():
             try:
                 if learner is not None:
-                    metrics["coordinator"]["learners"][name] = learner.export_metrics()
+                    learners_dict = metrics.get("coordinator", {}).get("learners", {})
+                    if isinstance(learners_dict, dict):
+                        learners_dict[name] = learner.export_metrics()
             except Exception as e:
                 logger.error(f"RL: Failed to export metrics for {name}: {e}")
-                metrics["coordinator"]["learners"][name] = {"error": str(e)}
+                learners_dict = metrics.get("coordinator", {}).get("learners", {})
+                if isinstance(learners_dict, dict):
+                    learners_dict[name] = {"error": str(e)}
 
         # Add global stats
         cursor = self.db.cursor()

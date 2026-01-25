@@ -484,7 +484,7 @@ class PromptTemplateLearner(BaseLearner):
             element_posterior.update(success)
 
         # Update sample count
-        context_key = self._get_context_key(task_type, provider)
+        context_key = self._get_context_key(provider, model, task_type)
         self._sample_counts[context_key] = self._sample_counts.get(context_key, 0) + 1
 
         # Save to database
@@ -527,7 +527,7 @@ class PromptTemplateLearner(BaseLearner):
         """Save posteriors and history to database."""
         cursor = self.db.cursor()
         timestamp = datetime.now().isoformat()
-        context_key = self._get_context_key(task_type, provider)
+        context_key = self._get_context_key(provider, model or "", task_type)
         sample_count = self._sample_counts.get(context_key, 0)
 
         # Save style posterior
@@ -608,7 +608,7 @@ class PromptTemplateLearner(BaseLearner):
         Returns:
             Recommendation with PromptTemplate dictionary
         """
-        context_key = self._get_context_key(task_type, provider)
+        context_key = self._get_context_key(provider, model or "", task_type)
         sample_count = self._sample_counts.get(context_key, 0)
 
         # Check for pure exploration

@@ -53,7 +53,9 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from watchdog.observers import Observer
+    from watchdog.observers.api import BaseObserver
+else:
+    BaseObserver = object  # type: ignore[misc,assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +204,7 @@ class DynamicModuleLoader:
         self._debounce_timer = DebouncedReloadTimer(delay=debounce_delay)
 
         # File watcher state
-        self._observer: Optional["Observer"] = None
+        self._observer: Optional[BaseObserver] = None  # type: ignore[valid-type]
         self._file_handler: Optional[Any] = None
 
         # Module tracking
@@ -354,7 +356,7 @@ class DynamicModuleLoader:
         class ModuleFileHandler(FileSystemEventHandler):
             """Handler for module file changes."""
 
-            def __init__(handler_self):
+            def __init__(handler_self) -> None:
                 super().__init__()
 
             def _handle_change(
@@ -373,7 +375,7 @@ class DynamicModuleLoader:
 
                 if module_name:
                     # Schedule debounced reload
-                    def do_reload():
+                    def do_reload() -> None:
                         try:
                             loader._on_module_changed(
                                 module_name,
@@ -399,8 +401,8 @@ class DynamicModuleLoader:
                 if not event.is_directory:
                     handler_self._handle_change(event.src_path, "deleted")
 
-        self._observer = Observer()
-        self._file_handler = ModuleFileHandler()
+        self._observer = Observer()  # type: ignore[call-arg]
+        self._file_handler = ModuleFileHandler()  # type: ignore[call-arg]
 
         # Watch all directories
         watched_count = 0
@@ -770,8 +772,9 @@ class EntryPointCache:
             # Build sorted list of package:version pairs
             packages = []
             for dist in distributions():
-                name = dist.metadata.get("Name", "unknown")
-                version = dist.metadata.get("Version", "0.0.0")
+                # PackageMetadata doesn't have get() method, use getattr with default
+                name = getattr(dist.metadata, "get", lambda x, y=None: x)("Name", "unknown")  # type: ignore[attr-defined]
+                version = getattr(dist.metadata, "get", lambda x, y=None: x)("Version", "0.0.0")  # type: ignore[attr-defined]
                 packages.append(f"{name}=={version}")
 
             packages.sort()
@@ -998,7 +1001,7 @@ class EntryPointCache:
         import time
 
         with self._cache_lock:
-            stats = {
+            stats: Dict[str, Any] = {
                 "groups_cached": len(self._memory_cache),
                 "env_hash": self._env_hash,
                 "cache_file": str(self._cache_file),
@@ -1007,12 +1010,14 @@ class EntryPointCache:
 
             now = time.time()
             for group, cached in self._memory_cache.items():
-                stats["groups"][group] = {
-                    "entries": len(cached.entries),
-                    "age_seconds": now - cached.timestamp,
-                    "ttl_remaining": max(0, cached.ttl - (now - cached.timestamp)),
-                    "expired": cached.is_expired(now),
-                }
+                groups_dict = stats.get("groups")
+                if isinstance(groups_dict, dict):
+                    groups_dict[group] = {
+                        "entries": len(cached.entries),
+                        "age_seconds": now - cached.timestamp,
+                        "ttl_remaining": max(0, cached.ttl - (now - cached.timestamp)),
+                        "expired": cached.is_expired(now),
+                    }
 
             return stats
 

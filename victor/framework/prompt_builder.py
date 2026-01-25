@@ -66,9 +66,9 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 # Python 3.11+ has typing.Self, 3.10 needs typing_extensions
 try:
-    from typing import Self
+    from typing import Self  # type: ignore[attr-defined]
 except ImportError:
-    from typing_extensions import Self
+    from typing_extensions import Self  # type: ignore[no-redef]
 
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import PromptContributorProtocol
@@ -771,12 +771,13 @@ def create_coding_prompt_builder() -> PromptBuilder:
         CODING_TOOL_USAGE,
     )
 
-    return (
+    builder: PromptBuilder = (
         PromptBuilder()
         .add_section("identity", CODING_IDENTITY, priority=PromptBuilder.PRIORITY_IDENTITY)
         .add_section("guidelines", CODING_GUIDELINES, priority=PromptBuilder.PRIORITY_GUIDELINES)
         .add_section("tool_usage", CODING_TOOL_USAGE, priority=PromptBuilder.PRIORITY_TOOL_GUIDANCE)
     )
+    return builder
 
 
 def create_devops_prompt_builder() -> PromptBuilder:
@@ -791,12 +792,13 @@ def create_devops_prompt_builder() -> PromptBuilder:
         DEVOPS_COMMON_PITFALLS,
     )
 
-    return (
+    builder: PromptBuilder = (
         PromptBuilder()
         .add_section("identity", DEVOPS_IDENTITY, priority=PromptBuilder.PRIORITY_IDENTITY)
         .add_section("security", DEVOPS_SECURITY_CHECKLIST, priority=PromptBuilder.PRIORITY_SAFETY)
         .add_section("pitfalls", DEVOPS_COMMON_PITFALLS, priority=PromptBuilder.PRIORITY_GUIDELINES)
     )
+    return builder
 
 
 def create_research_prompt_builder() -> PromptBuilder:
@@ -811,16 +813,17 @@ def create_research_prompt_builder() -> PromptBuilder:
         RESEARCH_SOURCE_HIERARCHY,
     )
 
-    return (
+    builder: PromptBuilder = (
         PromptBuilder()
         .add_section("identity", RESEARCH_IDENTITY, priority=PromptBuilder.PRIORITY_IDENTITY)
         .add_section(
             "quality", RESEARCH_QUALITY_CHECKLIST, priority=PromptBuilder.PRIORITY_GUIDELINES
         )
         .add_section(
-            "sources", RESEARCH_SOURCE_HIERARCHY, priority=PromptBuilder.PRIORITY_GUIDELINES + 5
+            "sources", RESEARCH_SOURCE_HIERARCHY, priority=PromptBuilder.PRIORITY_CAPABILITIES
         )
     )
+    return builder
 
 
 def create_data_analysis_prompt_builder() -> PromptBuilder:
@@ -835,7 +838,7 @@ def create_data_analysis_prompt_builder() -> PromptBuilder:
         DATA_ANALYSIS_OPERATIONS,
     )
 
-    return (
+    builder: PromptBuilder = (
         PromptBuilder()
         .add_section("identity", DATA_ANALYSIS_IDENTITY, priority=PromptBuilder.PRIORITY_IDENTITY)
         .add_section(
@@ -845,6 +848,7 @@ def create_data_analysis_prompt_builder() -> PromptBuilder:
             "operations", DATA_ANALYSIS_OPERATIONS, priority=PromptBuilder.PRIORITY_GUIDELINES
         )
     )
+    return builder
 
 
 __all__ = [
