@@ -140,12 +140,14 @@ class RAGQueryTool(BaseTool):
 
     async def execute(
         self,
-        params: Dict[str, Any],
+        _exec_ctx: Dict[str, Any],
+        **kwargs: Any,
     ) -> ToolResult:
         """Execute RAG query with optional LLM synthesis.
 
         Args:
-            params: Parameters dictionary with keys:
+            _exec_ctx: Framework execution context
+            **kwargs: Parameters dictionary with keys:
                 - question: Question to answer
                 - k: Number of context chunks
                 - synthesize: Whether to use LLM to synthesize answer
@@ -158,12 +160,12 @@ class RAGQueryTool(BaseTool):
         """
         from victor.rag.document_store import DocumentStore
 
-        question = params.get("question", "")
-        k = params.get("k", 5)
-        synthesize = params.get("synthesize", True)
-        provider = params.get("provider")
-        model = params.get("model")
-        max_context_chars = params.get("max_context_chars", 10240)
+        question = kwargs.get("question", "")
+        k = kwargs.get("k", 5)
+        synthesize = kwargs.get("synthesize", True)
+        provider = kwargs.get("provider")
+        model = kwargs.get("model")
+        max_context_chars = kwargs.get("max_context_chars", 10240)
 
         try:
             store = self._get_document_store()

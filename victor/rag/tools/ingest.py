@@ -105,12 +105,14 @@ class RAGIngestTool(BaseTool):
 
     async def execute(
         self,
-        params: Dict[str, Any],
+        _exec_ctx: Dict[str, Any],
+        **kwargs: Any,
     ) -> ToolResult:
         """Execute document ingestion.
 
         Args:
-            params: Parameters dictionary with keys:
+            _exec_ctx: Framework execution context
+            **kwargs: Parameters with keys:
                 - path: Path to document file or directory
                 - url: URL to fetch and ingest
                 - content: Direct content to ingest
@@ -125,14 +127,14 @@ class RAGIngestTool(BaseTool):
         """
         from victor.rag.document_store import Document, DocumentStore
 
-        path = params.get("path")
-        url = params.get("url")
-        content = params.get("content")
-        doc_type = params.get("doc_type", "text")
-        doc_id = params.get("doc_id")
-        recursive = params.get("recursive", False)
-        pattern = params.get("pattern", "*")
-        metadata = params.get("metadata")
+        path = kwargs.get("path")
+        url = kwargs.get("url")
+        content = kwargs.get("content")
+        doc_type = kwargs.get("doc_type", "text")
+        doc_id = kwargs.get("doc_id")
+        recursive = kwargs.get("recursive", False)
+        pattern = kwargs.get("pattern", "*")
+        metadata = kwargs.get("metadata")
 
         try:
             # Get or create document store

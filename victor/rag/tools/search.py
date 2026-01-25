@@ -71,12 +71,14 @@ class RAGSearchTool(BaseTool):
 
     async def execute(
         self,
-        params: Dict[str, Any],
+        _exec_ctx: Dict[str, Any],
+        **kwargs: Any,
     ) -> ToolResult:
         """Execute search query.
 
         Args:
-            params: Parameters dictionary with keys:
+            _exec_ctx: Framework execution context
+            **kwargs: Parameters dictionary with keys:
                 - query: Search query
                 - k: Number of results
                 - doc_ids: Optional document filter
@@ -87,10 +89,10 @@ class RAGSearchTool(BaseTool):
         """
         from victor.rag.document_store import DocumentStore
 
-        query = params.get("query", "")
-        k = params.get("k", 10)
-        doc_ids = params.get("doc_ids")
-        use_hybrid = params.get("use_hybrid", True)
+        query = kwargs.get("query", "")
+        k = kwargs.get("k", 10)
+        doc_ids = kwargs.get("doc_ids")
+        use_hybrid = kwargs.get("use_hybrid", True)
 
         try:
             store = self._get_document_store()

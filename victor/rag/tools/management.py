@@ -40,7 +40,7 @@ class RAGListTool(BaseTool):
     def cost_tier(self) -> CostTier:
         return CostTier.FREE
 
-    async def execute(self, params: Dict[str, Any]) -> ToolResult:
+    async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
         """List all documents.
 
         Returns:
@@ -227,7 +227,7 @@ class RAGStatsTool(BaseTool):
     def cost_tier(self) -> CostTier:
         return CostTier.FREE
 
-    async def execute(self, params: Dict[str, Any]) -> ToolResult:
+    async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
         """Get store statistics.
 
         Returns:
