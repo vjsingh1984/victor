@@ -151,7 +151,7 @@ class LRUCache(Generic[K, V]):
         """Get cache values."""
         return self._cache.values()
 
-    def items(self) -> ItemsView[tuple[K, V]]:
+    def items(self) -> ItemsView[tuple[K, V]]:  # type: ignore[type-arg]
         """Get cache items."""
         return self._cache.items()
 
@@ -374,7 +374,7 @@ class TimedCache(Generic[K, V]):
         return self._hits / total if total > 0 else 0.0
 
 
-class Lazy:
+class Lazy(Generic[T]):
     """Lazy evaluation wrapper.
 
     Delays computation until value is actually needed.
@@ -391,7 +391,7 @@ class Lazy:
         value = lazy_value.get()  # No recomputation
     """
 
-    def __init__(self, func: Callable[[], T]):
+    def __init__(self, func: Callable[[], T]) -> None:
         """Initialize lazy value.
 
         Args:
@@ -411,7 +411,8 @@ class Lazy:
             self._value = self._func()
             self._computed = True
 
-        return self._value  # type: ignore
+        assert self._value is not None, "Value should be computed after get()"
+        return self._value
 
     def is_computed(self) -> bool:
         """Check if value has been computed."""
@@ -451,7 +452,7 @@ class AlgorithmOptimizer:
         self,
         name: str,
         max_size: int = 128,
-    ) -> LRUCache:
+    ) -> LRUCache[Any, Any]:
         """Create or get LRU cache.
 
         Args:
@@ -474,7 +475,7 @@ class AlgorithmOptimizer:
         self,
         name: str,
         ttl_seconds: int = 300,
-    ) -> TimedCache:
+    ) -> TimedCache[Any, Any]:
         """Create or get timed cache.
 
         Args:
@@ -532,7 +533,7 @@ class AlgorithmOptimizer:
     def memoize(
         self,
         max_size: int = 128,
-    ) -> Callable:
+    ) -> Callable[..., Any]:
         """Decorator for memoizing function results.
 
         Args:
@@ -546,9 +547,9 @@ class AlgorithmOptimizer:
             def expensive_function(x, y):
                 return x * y
         """
-        cache = LRUCache(max_size=max_size)
+        cache: LRUCache[Any, Any] = LRUCache(max_size=max_size)
 
-        def decorator(func: Callable[..., Any]) -> Callable:
+        def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             @functools.wraps(func)
             def wrapper(*args: Any, **kwargs: Any) -> Any:
                 # Create cache key from args
@@ -584,7 +585,7 @@ class AlgorithmOptimizer:
         for name, cache in self._caches.items():
             stats[name] = cache.get_stats()
 
-        for name, cache in self._timed_caches.items():
+        for name, cache in self._timed_caches.items():  # type: ignore[assignment]
             stats[name] = {
                 "size": len(cache),
                 "hit_rate": cache.hit_rate,
@@ -602,7 +603,7 @@ class AlgorithmOptimizer:
         for cache in self._caches.values():
             cache.clear()
 
-        for cache in self._timed_caches.values():
+        for cache in self._timed_caches.values():  # type: ignore[assignment]
             cache.clear()
 
 
@@ -621,7 +622,7 @@ def lru_cache(max_size: int = 128) -> Callable[..., Any]:
                 return n
             return fibonacci(n - 1) + fibonacci(n - 2)
     """
-    cache: TimedCache[Any, Any] = TimedCache(max_age=max_size)
+    cache: LRUCache[Any, Any] = LRUCache(max_size=max_size)
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(func)

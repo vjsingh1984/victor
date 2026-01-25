@@ -186,7 +186,7 @@ class ParallelizationStrategy(BaseOptimizationStrategy):
     - Nodes that can be grouped for parallel execution
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize parallelization strategy."""
         self._dependency_cache: Dict[str, Set[str]] = {}
 
@@ -255,7 +255,7 @@ class ParallelizationStrategy(BaseOptimizationStrategy):
         deps = self._build_dependency_graph(profile)
 
         parallel_groups = []
-        visited = set()
+        visited: Set[str] = set()
 
         # For each node, find independent nodes
         for node_id in profile.node_stats.keys():
@@ -267,7 +267,7 @@ class ParallelizationStrategy(BaseOptimizationStrategy):
                 node_id,
                 deps,
                 visited,
-                profile.node_stats.keys(),
+                list(profile.node_stats.keys()),
             )
 
             if len(independent_nodes) > 1:
@@ -453,4 +453,5 @@ def create_strategy(
     if not strategy_class:
         raise ValueError(f"Unsupported strategy type: {strategy_type}")
 
-    return strategy_class()
+    # Create instance (concrete strategies are not abstract)
+    return strategy_class()  # type: ignore[abstract]
