@@ -60,7 +60,7 @@ import yaml
 
 from victor.core.tool_dependency_base import BaseToolDependencyProvider, ToolDependencyConfig
 from victor.core.tool_dependency_schema import ToolDependencySpec
-from victor.core.tool_types import ToolDependency
+from victor.core.tool_types import EmptyToolDependencyProvider, ToolDependency
 
 logger = logging.getLogger(__name__)
 
@@ -641,7 +641,7 @@ _VERTICAL_CANONICALIZE_SETTINGS: Dict[str, bool] = {
 def create_vertical_tool_dependency_provider(
     vertical: str,
     canonicalize: Optional[bool] = None,
-) -> Union["YAMLToolDependencyProvider", "EmptyToolDependencyProvider"]:
+) -> Union["YAMLToolDependencyProvider", EmptyToolDependencyProvider]:
     """Factory function to create tool dependency providers for verticals.
 
     Consolidates vertical-specific tool dependency provider creation into

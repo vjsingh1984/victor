@@ -300,7 +300,7 @@ config = AgentConfig(
 agent = await Agent.create(config=config)
 ```
 
-[Full Configuration Documentation ->](configuration/)
+[Full Configuration Documentation ->](configuration/index.md)
 
 ---
 
@@ -334,10 +334,10 @@ except ToolExecutionError as e:
 
 ## See Also
 
-- [Provider Reference](providers/) - Current provider list
-- [Tool Reference](tools/) - Current tool list
+- [Provider Reference](providers/index.md) - Current provider list
+- [Tool Reference](tools/catalog.md) - Current tool list
 - [Workflow Reference](internals/workflows-api.md) - YAML workflows
-- [Configuration](configuration/) - Complete configuration guide
+- [Configuration](configuration/index.md) - Complete configuration guide
 
 ---
 

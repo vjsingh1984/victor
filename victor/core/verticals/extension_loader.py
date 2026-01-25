@@ -903,10 +903,11 @@ class VerticalExtensionLoader(ABC):
                 return result
             except Exception as e:
                 is_required = extension_type in cls.required_extensions
+                vertical_name = cls.name if hasattr(cls, "name") else cls.__name__
                 error = ExtensionLoadError(
-                    message=f"Failed to load '{extension_type}' extension for vertical '{cls.name}': {e}",
+                    message=f"Failed to load '{extension_type}' extension for vertical '{vertical_name}': {e}",
                     extension_type=extension_type,
-                    vertical_name=cls.name,
+                    vertical_name=vertical_name,
                     original_error=e,
                     is_required=is_required,
                 )
@@ -916,23 +917,23 @@ class VerticalExtensionLoader(ABC):
                 if is_strict or is_required:
                     logger.error(
                         f"[{error.correlation_id}] {extension_type} extension failed to load "
-                        f"for vertical '{cls.name}': {e}",
+                        f"for vertical '{vertical_name}': {e}",
                         exc_info=True,
                     )
                 else:
                     logger.warning(
                         f"[{error.correlation_id}] {extension_type} extension failed to load "
-                        f"for vertical '{cls.name}': {e}"
+                        f"for vertical '{vertical_name}': {e}"
                     )
 
                 # Return default value
                 return [] if is_list else None
 
         # Load each extension with error handling
-        middleware = _load_extension("middleware", cls.get_middleware, is_list=True)
-        safety = _load_extension("safety", cls.get_safety_extension)
-        prompt = _load_extension("prompt", cls.get_prompt_contributor)
-        mode_config = _load_extension("mode_config", cls.get_mode_config_provider)
+        middleware = _load_extension("middleware", cls.get_middleware if hasattr(cls, "get_middleware") else (lambda: []), is_list=True)
+        safety = _load_extension("safety", cls.get_safety_extension if hasattr(cls, "get_safety_extension") else (lambda: None))
+        prompt = _load_extension("prompt", cls.get_prompt_contributor if hasattr(cls, "get_prompt_contributor") else (lambda: None))
+        mode_config = _load_extension("mode_config", cls.get_mode_config_provider if hasattr(cls, "get_mode_config_provider") else (lambda: None))
         tool_deps = _load_extension("tool_deps", cls.get_tool_dependency_provider)
         workflow = _load_extension("workflow", cls.get_workflow_provider)
         service = _load_extension("service", cls.get_service_provider)
@@ -958,11 +959,11 @@ class VerticalExtensionLoader(ABC):
 
                 logger.debug(
                     f"Loaded {len(dynamic_extensions)} dynamic extension type(s) "
-                    f"for vertical '{cls.name}'"
+                    f"for vertical '{cls.name if hasattr(cls, 'name') else cls.__name__}'"
                 )
         except Exception as e:
             # Dynamic extensions are optional - don't fail if registry not available
-            logger.debug(f"Could not load dynamic extensions for vertical '{cls.name}': {e}")
+            logger.debug(f"Could not load dynamic extensions for vertical '{cls.name if hasattr(cls, 'name') else cls.__name__}': {e}")
 
         # Check for critical failures (strict mode or required extensions)
         critical_errors = [e for e in errors if is_strict or e.is_required]
@@ -972,8 +973,9 @@ class VerticalExtensionLoader(ABC):
 
         # Log summary if there were non-critical errors
         if errors:
+            vertical_name = cls.name if hasattr(cls, "name") else cls.__name__
             logger.warning(
-                f"Vertical '{cls.name}' loaded with {len(errors)} extension error(s). "
+                f"Vertical '{vertical_name}' loaded with {len(errors)} extension error(s). "
                 f"Affected extensions: {', '.join(e.extension_type for e in errors)}"
             )
 

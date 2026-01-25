@@ -195,7 +195,7 @@ victor config show            # Show configuration
 - [First Run](../getting-started/first-run.md)
 - [Local Models](../getting-started/local-models.md)
 - [Cloud Models](../getting-started/cloud-models.md)
-- [Configuration](configuration/)
+- [Configuration](configuration/index.md)
 - [API Reference](api.md)
 
 ---

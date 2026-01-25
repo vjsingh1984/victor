@@ -213,13 +213,13 @@ victor workflow schedule code-review --cron "0 9 * * 1"
 - **Troubleshooting**: [Troubleshooting Guide ->](../user-guide/troubleshooting.md)
 - **Development**: [Development Guide ->](../development/)
 - **Architecture**: [Architecture Deep Dive ->](../development/architecture/deep-dive.md)
-- **Community**: [Support ->](../README.md#community--support)
+- **Community**: [Support ->](../operations/index.md#related)
 
 ---
 
 <div align="center">
 
-**[<- Back to Documentation](../README.md)**
+**[<- Back to Documentation](../index.md)**
 
 **Reference Documentation**
 

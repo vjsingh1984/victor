@@ -533,7 +533,7 @@ class TieredToolConfig:
         all_tools = registry.get_all_tool_names()
         # Semantic pool = all tools - base tools (mandatory + vertical_core)
         base = self.get_base_tools()
-        return all_tools - base
+        return cast(set[str], all_tools - base)
 
     def get_effective_semantic_pool(self) -> Set[str]:
         """Get effective semantic pool, preferring registry over static.
