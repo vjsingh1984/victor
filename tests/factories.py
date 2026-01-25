@@ -1137,7 +1137,8 @@ class TestFixtureFactory:
         Returns:
             Mock tool registry
         """
-        from victor.tools.base import Tool, ToolRegistry
+        from victor.tools.base import Tool
+        from victor.tools.registry import ToolRegistry
 
         # Create real registry
         real_registry = ToolRegistry()

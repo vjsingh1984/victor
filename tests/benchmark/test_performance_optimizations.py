@@ -33,7 +33,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from victor.agent.tool_executor import ToolExecutor, ToolExecutionResult
-from victor.tools.base import BaseTool, ToolRegistry, ToolResult
+from victor.tools.base import BaseTool, ToolResult
+from victor.tools.registry import ToolRegistry
 from victor.tools.decorators import tool
 from victor.storage.cache.tool_cache import ToolCache
 from victor.storage.cache.config import CacheConfig

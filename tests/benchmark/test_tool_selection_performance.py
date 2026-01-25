@@ -38,7 +38,7 @@ import sys
 
 # Import directly from modules to avoid framework import issues
 from victor.tools.semantic_selector import SemanticToolSelector
-from victor.tools.base import ToolRegistry
+from victor.tools.registry import ToolRegistry
 from victor.providers.base import ToolDefinition
 
 

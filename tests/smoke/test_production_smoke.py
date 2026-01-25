@@ -94,7 +94,7 @@ class TestCoreInfrastructureSmokeTests:
     def test_tool_pipeline_creation(self):
         """Test ToolPipeline class exists and can be instantiated."""
         from victor.agent.tool_pipeline import ToolPipeline, ToolPipelineConfig
-        from victor.tools.base import ToolRegistry
+        from victor.tools.registry import ToolRegistry
         from victor.agent.tool_executor import ToolExecutor
 
         # Verify class exists
@@ -260,7 +260,7 @@ class TestIntegrationSmokeTests:
 
     def test_tool_registry_accessible(self):
         """Test tool registry is accessible."""
-        from victor.tools.base import ToolRegistry
+        from victor.tools.registry import ToolRegistry
 
         registry = ToolRegistry()
         assert registry is not None
@@ -294,7 +294,7 @@ class TestPerformanceSmokeTests:
 
         # Initialize core components
         from victor.agent.tool_pipeline import ToolPipeline, ToolPipelineConfig
-        from victor.tools.base import ToolRegistry
+        from victor.tools.registry import ToolRegistry
         from victor.agent.tool_executor import ToolExecutor
 
         registry = ToolRegistry()
@@ -384,7 +384,7 @@ class TestSecuritySmokeTests:
 
     def test_file_access_controls(self):
         """Test file access controls exist."""
-        from victor.tools.base import ToolRegistry
+        from victor.tools.registry import ToolRegistry
 
         # File tools should be registered in the tool registry
         registry = ToolRegistry()
@@ -588,7 +588,7 @@ class TestSmokeTestSummary:
         assert provider is not None
 
         # 4. Tool system works
-        from victor.tools.base import ToolRegistry
+        from victor.tools.registry import ToolRegistry
 
         registry = ToolRegistry()
         assert registry is not None

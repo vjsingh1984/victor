@@ -42,7 +42,8 @@ import pytest
 from victor.core.container import ServiceContainer
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import Settings
-from victor.tools.base import BaseTool, ToolResult, ToolRegistry
+from victor.tools.base import BaseTool, ToolResult
+from victor.tools.registry import ToolRegistry
 from victor.agent.tool_executor import ToolExecutor
 from victor.agent.context_compactor import ContextCompactor
 from victor.agent.coordinators.compaction_strategies import (
