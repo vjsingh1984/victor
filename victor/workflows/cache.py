@@ -54,7 +54,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING, Union, cast
 
-from cachetools import TTLCache  # type: ignore[import]
+from cachetools import TTLCache  # type: ignore[import-untyped]
 
 if TYPE_CHECKING:
     from victor.workflows.definition import (
