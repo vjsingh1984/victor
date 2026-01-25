@@ -33,33 +33,49 @@ from victor.config.settings import Settings, ProfileConfig
 from victor.providers.registry import ProviderRegistry
 
 
-def get_ollama_provider() -> str:
-    """Check if Ollama is available."""
+def get_ollama_models() -> list[str]:
+    """Get list of available Ollama models."""
     try:
         import subprocess
 
         result = subprocess.run(
-            ["ollama", "list"], capture_output=True, timeout=5
+            ["ollama", "list"], capture_output=True, text=True, timeout=5
         )
-        return result.returncode == 0
+        if result.returncode == 0:
+            models = []
+            for line in result.stdout.strip().split("\n"):
+                if "NAME" not in line and line.strip():
+                    # Extract model name (first column)
+                    model_name = line.strip().split()[0]
+                    models.append(model_name)
+            return models
     except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
+        pass
+    return []
 
 
-def get_lmstudio_provider() -> str:
-    """Check if LMStudio is available."""
+def get_lmstudio_models() -> list[str]:
+    """Get list of available LMStudio models."""
     try:
         import subprocess
 
+        # LMStudio exposes OpenAI-compatible API on port 1234
         result = subprocess.run(
-            ["curl", "http://localhost:1234/v1/models"],
+            ["curl", "-s", "--connect-timeout", "5", "http://localhost:1234/v1/models"],
             capture_output=True,
-            timeout=5,
+            text=True,
+            timeout=10,
         )
-        # LMStudio typically runs on localhost:1234
-        return result.returncode == 0
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
+        if result.returncode == 0 and result.stdout.strip():
+            import json
+
+            data = json.loads(result.stdout)
+            if "data" in data:
+                return [model["id"] for model in data["data"]]
+    except (FileNotFoundError, subprocess.TimeoutExpired, json.JSONDecodeError) as e:
+        # Silently fail - provider might not be available
+        pass
+    return []
 
 
 @pytest.fixture
@@ -73,43 +89,75 @@ def settings():
 
 
 @pytest.fixture
-def provider_name():
-    """Get an available provider for testing."""
-    # Try Ollama first, then LMStudio
-    if get_ollama_provider():
-        return "ollama"
-    elif get_lmstudio_provider():
-        return "lmstudio"
-    else:
-        pytest.skip("No local provider available (Ollama or LMStudio required)")
+def available_providers():
+    """Get dictionary of available providers and their models."""
+    providers = {}
+
+    ollama_models = get_ollama_models()
+    if ollama_models:
+        providers["ollama"] = ollama_models
+
+    lmstudio_models = get_lmstudio_models()
+    if lmstudio_models:
+        providers["lmstudio"] = lmstudio_models
+
+    if not providers:
+        pytest.skip("No local providers available (Ollama or LMStudio required)")
+
+    return providers
 
 
 @pytest.fixture
-def model_name():
-    """Get a model name for the available provider."""
-    # Ollama models
-    if get_ollama_provider():
-        # Try to get a model list
-        import subprocess
+def provider_name(available_providers):
+    """Get first available provider for testing."""
+    # Return first available provider
+    return next(iter(available_providers.keys()))
 
-        result = subprocess.run(
-            ["ollama", "list"], capture_output=True, text=True, timeout=5
-        )
-        if result.returncode == 0:
-            # Parse model list
-            for line in result.stdout.strip().split("\n"):
-                if "NAME" not in line and line.strip():
-                    return line.strip().split()[0]
-        # Fallback to common models
-        return "llama3.2"
 
-    # LMStudio models
-    elif get_lmstudio_provider():
-        # LMStudio typically exposes models through OpenAI-compatible API
-        # Common default models
-        return "llama-3.2-3b-instruct"
+@pytest.fixture
+def model_name(available_providers, provider_name):
+    """Get first model for the provider."""
+    models = available_providers[provider_name]
+    if models:
+        return models[0]
+    pytest.skip(f"No models available for provider {provider_name}")
 
-    pytest.skip("No model available for testing")
+
+@pytest.fixture
+def second_provider_name(available_providers, provider_name):
+    """Get second provider for switching tests."""
+    providers_list = list(available_providers.keys())
+
+    if len(providers_list) >= 2:
+        # Get the other provider
+        if provider_name == providers_list[0]:
+            return providers_list[1]
+        else:
+            return providers_list[0]
+    else:
+        # Only one provider available
+        pytest.skip("Provider switching tests require at least 2 different providers (Ollama and LMStudio)")
+
+
+@pytest.fixture
+def second_model_name(available_providers, second_provider_name):
+    """Get first model for the second provider."""
+    models = available_providers.get(second_provider_name, [])
+    if models:
+        return models[0]
+    pytest.skip(f"No models available for provider {second_provider_name}")
+
+
+@pytest.fixture
+def alternative_model(available_providers, provider_name):
+    """Get an alternative model on the same provider for testing model switching."""
+    models = available_providers.get(provider_name, [])
+    if len(models) >= 2:
+        return models[1]
+    # If only one model, use the same model (switch will be to same model)
+    elif models:
+        return models[0]
+    pytest.skip(f"No models available for provider {provider_name}")
 
 
 @pytest.fixture
@@ -129,95 +177,67 @@ def orchestrator(settings, provider_name, model_name):
     return orc
 
 
-@pytest.fixture
-def second_provider_name(provider_name):
-    """Get a second provider for switching tests.
-
-    For model switching on same provider, returns the same provider.
-    For actual provider switching, requires two different providers to be available.
-    """
-    # Check if we have both Ollama and LMStudio available
-    has_ollama = get_ollama_provider()
-    has_lmstudio = get_lmstudio_provider()
-
-    if has_ollama and has_lmstudio:
-        # Both available - return the other one
-        if provider_name == "ollama":
-            return "lmstudio"
-        else:
-            return "ollama"
-    else:
-        # Only one provider available - use same for model switching tests
-        pytest.skip("Provider switching tests require at least 2 different providers (Ollama and LMStudio)")
-
-
 class TestModelSwitchingIntegration:
     """Integration tests for model switching on the same provider."""
 
-    def test_switch_model_same_provider(self, orchestrator):
+    def test_switch_model_same_provider(self, orchestrator, alternative_model):
         """Test switching model on the same provider."""
         initial_provider = orchestrator.provider_name
         initial_model = orchestrator.model
 
         # Use the orchestrator's sync switch_model method
         # This internally handles the async coordinator call
-        # Note: This may fail if the model doesn't exist on the provider
-        success = orchestrator.switch_model("different-model")
+        success = orchestrator.switch_model(alternative_model)
 
-        # With real providers, model switching may fail if model doesn't exist
-        # We test the mechanism, not the actual model availability
-        assert orchestrator.provider_name == initial_provider  # Provider unchanged
+        # Provider should remain unchanged
+        assert orchestrator.provider_name == initial_provider
+
+        # Model should be updated (if switch was successful)
+        # Note: If alternative_model == initial_model, model stays the same
+        if success:
+            assert orchestrator.model == alternative_model
 
     def test_switch_model_to_nonexistent_provider(self, orchestrator):
         """Test that switching to a non-existent model is handled gracefully."""
         initial_provider = orchestrator.provider_name
         initial_model = orchestrator.model
 
-        # Try to switch to a model that likely doesn't exist
-        # This should either fail or succeed with the same provider
+        # Try to switch to a model that doesn't exist
         success = orchestrator.switch_model("definitely-nonexistent-model-12345")
 
         # Provider should remain unchanged
         assert orchestrator.provider_name == initial_provider
 
-    def test_model_switch_updates_provider_manager(self, orchestrator):
+    def test_model_switch_updates_provider_manager(self, orchestrator, alternative_model):
         """Test that model switch updates ProviderManager state."""
-        # Get a list of available models for this provider
-        initial_model = orchestrator.model
-
         # Switch model using orchestrator's sync method
-        # Use the initial model to test state change (even if it fails)
-        orchestrator.switch_model("new-model")
+        orchestrator.switch_model(alternative_model)
 
         # ProviderManager should exist and have a model attribute
         assert hasattr(orchestrator._provider_manager, "model")
-        # Model might be the old one or new one depending on whether switch succeeded
         assert orchestrator._provider_manager.model is not None
 
-    def test_multiple_model_switches(self, orchestrator):
+    def test_multiple_model_switches(self, orchestrator, alternative_model):
         """Test multiple consecutive model switches."""
-        # Test that the orchestrator can handle multiple switch attempts
-        # Without failing or crashing, even if models don't exist
-        models = ["model1", "model2", "model3"]
+        # Switch between models multiple times
+        models_to_test = [alternative_model, orchestrator.model, alternative_model]
 
-        for model in models:
-            # Try to switch - may succeed or fail, but shouldn't crash
+        for model in models_to_test:
+            # Try to switch - should not crash
             success = orchestrator.switch_model(model)
-            # We don't assert on success since models may not exist
 
         # Provider should still be intact
         assert orchestrator.provider_name is not None
 
-    def test_model_switch_updates_tool_adapter(self, orchestrator):
+    def test_model_switch_updates_tool_adapter(self, orchestrator, alternative_model):
         """Test that model switch updates tool adapter."""
         original_adapter = orchestrator.tool_adapter
 
         # Switch model using orchestrator's sync method
-        orchestrator.switch_model("new-model")
+        orchestrator.switch_model(alternative_model)
 
         # Tool adapter should exist
         assert orchestrator.tool_adapter is not None
-        # Adapter should have been re-initialized after switch attempt
 
 
 class TestProviderSwitchingIntegration:
