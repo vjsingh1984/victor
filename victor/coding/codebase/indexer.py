@@ -1933,13 +1933,13 @@ class CodebaseIndex:
                                     base_unparsed: Any = py_ast.unparse(base)  # type: ignore[arg-type]
                                     base_name_result: str | None = str(base_unparsed) if base_unparsed else None
                                 else:
-                                    base_attr: Any = getattr(base, "id", None)
-                                    base_name_result = str(base_attr) if base_attr else None
+                                    base_id_attr: Any = getattr(base, "id", None)
+                                    base_name_result = str(base_id_attr) if base_id_attr else None
                                     if base_name_result is None:
                                         base_name_result = str(base)
                             except Exception:
-                                base_attr: Any = getattr(base, "id", str(base))
-                                base_name_result = str(base_attr) if base_attr else None
+                                base_fallback: Any = getattr(base, "id", str(base))
+                                base_name_result = str(base_fallback) if base_fallback else None
                             if base_name_result:
                                 edges.append((class_name, base_name_result))
             except Exception:
