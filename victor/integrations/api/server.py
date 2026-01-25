@@ -518,14 +518,13 @@ class VictorAPIServer:
     async def _list_providers(self, request: Request) -> Response:
         """List available LLM providers with their configuration status."""
         try:
-            from victor.providers.registry import get_provider_registry
+            from victor.providers.registry import ProviderRegistry
 
-            registry = get_provider_registry()
             providers_info = []
 
-            for provider_name in registry.list_providers():
+            for provider_name in ProviderRegistry.list_providers():
                 try:
-                    provider = registry.get(provider_name)
+                    provider = ProviderRegistry.get(provider_name)
                     if provider is None:
                         continue
                     providers_info.append(
@@ -1187,11 +1186,15 @@ class VictorAPIServer:
                             result["children"].append(scan_dir(entry, depth + 1))
                         else:
                             ext = entry.suffix.lower()
-                            overview["file_counts"][ext] = overview["file_counts"].get(ext, 0) + 1  # type: ignore[index]
+                            file_counts_dict = overview["file_counts"]
+                            assert isinstance(file_counts_dict, dict)
+                            file_counts_dict[ext] = file_counts_dict.get(ext, 0) + 1  # type: ignore[index]
                             total_files_val = overview.get("total_files", 0)
+                            assert isinstance(total_files_val, int)
                             overview["total_files"] = total_files_val + 1  # type: ignore[index]
                             try:
                                 total_size_val = overview.get("total_size", 0)
+                                assert isinstance(total_size_val, int)
                                 overview["total_size"] = total_size_val + entry.stat().st_size  # type: ignore[index]
                             except OSError:
                                 pass
@@ -1282,7 +1285,7 @@ class VictorAPIServer:
                             pass
 
             # Get largest files
-            file_sizes.sort(key=lambda x: int(x.get("lines", 0)), reverse=True)
+            file_sizes.sort(key=lambda x: int(x.get("lines", 0) if isinstance(x.get("lines"), int) else 0), reverse=True)  # type: ignore[arg-type]
             metrics["largest_files"] = file_sizes[:10]
 
             return web.json_response(metrics)
@@ -1380,7 +1383,7 @@ class VictorAPIServer:
             import json
 
             root = Path(self.workspace_root)
-            dependencies = {
+            dependencies: Dict[str, Any] = {
                 "python": None,
                 "node": None,
                 "rust": None,
@@ -1757,15 +1760,18 @@ class VictorAPIServer:
             servers = []
 
             for name in registry.list_servers():
-                server_info = registry.get_server_info(name)
-                servers.append(
-                    {
-                        "name": name,
-                        "connected": server_info.get("connected", False),
-                        "tools": server_info.get("tools", []),
-                        "endpoint": server_info.get("endpoint"),
-                    }
-                )
+                # Get server entry directly from registry
+                server_entry = registry._servers.get(name)  # type: ignore[attr-defined]
+                if server_entry:
+                    server_info = server_entry.instance.get_server_info() if server_entry.instance else {}
+                    servers.append(
+                        {
+                            "name": name,
+                            "connected": getattr(server_entry.instance, "is_connected", False) if server_entry.instance else False,
+                            "tools": server_info.get("tools", []),
+                            "endpoint": server_info.get("endpoint"),
+                        }
+                    )
 
             return web.json_response({"servers": servers})
 
@@ -1782,13 +1788,12 @@ class VictorAPIServer:
 
             data = await request.json()
             server_name = data.get("server")
-            endpoint = data.get("endpoint")
 
             if not server_name:
                 return web.json_response({"error": "server name required"}, status=400)
 
             registry = get_mcp_registry()
-            success = await registry.connect(server_name, endpoint=endpoint)
+            success = await registry.connect(server_name)
 
             return web.json_response(
                 {
@@ -1928,8 +1933,19 @@ class VictorAPIServer:
             if recommendation is None:
                 return web.json_response({"error": "No recommendation available"}, status=500)
 
-            # Get rankings for alternatives
-            rankings = learner.get_provider_rankings()
+            # Get rankings for alternatives - duplicate logic from _rl_stats
+            rankings = []
+            if hasattr(learner, "_q_table"):
+                q_table = getattr(learner, "_q_table", None)
+                if isinstance(q_table, dict):
+                    for provider, q_value in q_table.items():  # type: ignore[attr-defined]
+                        rankings.append(
+                            {
+                                "provider": provider,
+                                "q_value": q_value,
+                            }
+                        )
+
             alternatives = [
                 {"provider": r["provider"], "q_value": round(r["q_value"], 3)}
                 for r in rankings
@@ -1941,10 +1957,9 @@ class VictorAPIServer:
             return web.json_response(
                 {
                     "provider": recommendation.value,
-                    "model": recommendation.model or "default",
                     "q_value": round(recommendation.confidence, 3),
                     "confidence": round(recommendation.confidence, 3),
-                    "reason": recommendation.reasoning,
+                    "reason": recommendation.reason,
                     "task_type": task_type,
                     "alternatives": alternatives,
                 }

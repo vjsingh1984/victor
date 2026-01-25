@@ -238,10 +238,10 @@ class VerticalExtensionLoader(ABC):
             # Only add if not already defined in the class
             if method_name not in cls.__dict__:
 
-                def _make_getter(ext_type: str, mod_suffix: str, cls_suffix: str) -> Any:
+                def _make_getter(ext_type: str, mod_suffix: str, cls_suffix: str) -> classmethod:
                     """Factory to create getter methods with proper closure."""
 
-                    def _getter(subcls: type) -> Any:
+                    def _getter(subcls: type) -> Any:  # type: ignore[no-untyped-def]
                         """Auto-generated getter method."""
                         # Build import path from vertical name
                         from victor.core.verticals.naming import get_vertical_module_name
@@ -276,7 +276,7 @@ class VerticalExtensionLoader(ABC):
                 def _make_cached_getter(ext_type: str) -> classmethod:
                     """Factory to create cached getter methods with proper closure."""
 
-                    def _getter(subcls: type) -> Any:
+                    def _getter(subcls: type) -> Any:  # type: ignore[no-untyped-def]
                         """Auto-generated cached getter method."""
                         # Skip if vertical name is empty (abstract base class)
                         from victor.core.verticals.naming import get_vertical_module_name
@@ -463,7 +463,7 @@ class VerticalExtensionLoader(ABC):
                 )
         """
 
-        def _create():
+        def _create() -> Any:  # type: ignore[no-untyped-def]
             # Skip loading if import_path is invalid (empty vertical name)
             # This handles the case where VerticalBase has name="" (abstract base class)
             # which would create invalid paths like "victor..safety" (double dots)
@@ -827,7 +827,7 @@ class VerticalExtensionLoader(ABC):
             )
 
             # Create lazy wrapper that defers loading
-            return create_lazy_extensions(
+            return create_lazy_extensions(  # type: ignore[return-value]
                 vertical_name=cls.name,
                 loader=lambda: cls._load_extensions_eager(use_cache=use_cache, strict=strict),
                 trigger=trigger,

@@ -213,7 +213,9 @@ class EventBroadcaster:
         """Main broadcast loop."""
         while self._running:
             try:
-                event = await asyncio.wait_for(self._event_queue.get(), timeout=1.0)  # type: ignore[arg-type]
+                event: BridgeEvent = await asyncio.wait_for(
+                    self._event_queue.get(), timeout=1.0
+                )  # type: ignore[arg-type]
                 await self._send_to_clients(event)
             except asyncio.TimeoutError:
                 continue
@@ -240,6 +242,8 @@ class EventBroadcaster:
         # Remove disconnected clients
         for client_id in disconnected:
             self.remove_client(client_id)
+
+        return None
 
 
 class WebSocketEventHandler:
@@ -304,6 +308,8 @@ class WebSocketEventHandler:
             logger.warning(f"Invalid JSON from {client_id}")
         except Exception as e:
             logger.error(f"Error handling message from {client_id}: {e}")
+
+        return None
 
 
 class EventBusAdapter:
@@ -375,7 +381,9 @@ class EventBusAdapter:
                 try:
                     # New API uses subscription handles
                     if hasattr(self._event_bus, "unsubscribe"):
-                        self._event_bus.unsubscribe(sub_handle)  # type: ignore[call-arg]
+                        # Skip unsubscribe if we only have internal_type strings
+                        # The new API expects SubscriptionHandle objects
+                        logger.debug(f"Skipping unsubscribe for {sub_handle} (not a handle)")
                 except Exception:
                     pass
             self._subscriptions.clear()

@@ -341,7 +341,7 @@ class VerticalRegistryManager:
                             InstalledVertical(
                                 name=ep.name,
                                 version=dist.version,
-                                location=Path(dist.locate_file("")),
+                                location=Path(str(dist.locate_file(""))),
                                 metadata=metadata,
                                 is_builtin=False,
                             )
@@ -697,7 +697,8 @@ class VerticalRegistryManager:
         """
         if package_spec.source == PackageSourceType.LOCAL:
             # Load from local path
-            metadata_file = Path(package_spec.url) / "victor-vertical.toml"
+            url_str = str(package_spec.url) if package_spec.url else ""
+            metadata_file = Path(url_str) / "victor-vertical.toml"
             if metadata_file.exists():
                 return VerticalPackageMetadata.from_toml(metadata_file)
 

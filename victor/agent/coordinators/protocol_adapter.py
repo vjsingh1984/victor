@@ -65,10 +65,8 @@ if TYPE_CHECKING:
     from victor.agent.tool_selector import ToolSelector
     from victor.agent.protocols import ToolAccessContext
     from victor.agent.prompts.system import SystemPromptBuilder
-    try:
-        from victor.agent.conversation import Conversation
-    except ImportError:
-        Conversation = Any  # type: ignore
+    # Conversation is not in the conversation module, use Any as fallback
+    Conversation: Any = Any
 
 logger = logging.getLogger(__name__)
 

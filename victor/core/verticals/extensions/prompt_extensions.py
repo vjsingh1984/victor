@@ -146,7 +146,7 @@ class PromptExtensions:
             if hasattr(contributor, "get_grounding_rules"):
                 rules = contributor.get_grounding_rules()
                 if rules:
-                    return rules  # type: ignore[return-value]
+                    return str(rules)
         return ""
 
     def has_enrichment(self) -> bool:
@@ -175,7 +175,8 @@ class PromptExtensions:
             return []
 
         if hasattr(self.enrichment_strategy, "get_enrichments"):
-            return await self.enrichment_strategy.get_enrichments(prompt, context)  # type: ignore[return-value]
+            result = await self.enrichment_strategy.get_enrichments(prompt, context)
+            return result if isinstance(result, list) else []
         return []
 
     def get_enrichment_priority(self) -> int:
@@ -185,7 +186,8 @@ class PromptExtensions:
             Priority value (default 50) or 100 if no strategy
         """
         if self.enrichment_strategy and hasattr(self.enrichment_strategy, "get_priority"):
-            return self.enrichment_strategy.get_priority()  # type: ignore[return-value]
+            priority = self.enrichment_strategy.get_priority()
+            return priority if isinstance(priority, int) else 100
         return 100  # Low priority if not configured
 
     def get_enrichment_token_allocation(self) -> float:
@@ -195,7 +197,8 @@ class PromptExtensions:
             Float between 0.0 and 1.0 (default 0.0 if no strategy)
         """
         if self.enrichment_strategy and hasattr(self.enrichment_strategy, "get_token_allocation"):
-            return self.enrichment_strategy.get_token_allocation()  # type: ignore[return-value]
+            allocation = self.enrichment_strategy.get_token_allocation()
+            return allocation if isinstance(allocation, (int, float)) else 0.0
         return 0.0
 
     def merge(self, other: "PromptExtensions") -> "PromptExtensions":

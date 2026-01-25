@@ -94,7 +94,8 @@ class ConfigExtensions:
             Dict mapping mode names to ModeConfig instances
         """
         if self.mode_config and hasattr(self.mode_config, "get_mode_configs"):
-            return self.mode_config.get_mode_configs()  # type: ignore[return-value]
+            result = self.mode_config.get_mode_configs()
+            return result if isinstance(result, dict) else {}
         return {}
 
     def get_mode(self, mode_name: str) -> Optional[ModeConfig]:
@@ -115,7 +116,8 @@ class ConfigExtensions:
             Default mode name or "default" if not configured
         """
         if self.mode_config and hasattr(self.mode_config, "get_default_mode"):
-            return self.mode_config.get_default_mode()  # type: ignore[return-value]
+            mode = self.mode_config.get_default_mode()
+            return mode if isinstance(mode, str) else "default"
         return "default"
 
     def get_default_tool_budget(self) -> int:
@@ -125,7 +127,8 @@ class ConfigExtensions:
             Default tool budget or 10 if not configured
         """
         if self.mode_config and hasattr(self.mode_config, "get_default_tool_budget"):
-            return self.mode_config.get_default_tool_budget()  # type: ignore[return-value]
+            budget = self.mode_config.get_default_tool_budget()
+            return budget if isinstance(budget, int) else 10
         return 10
 
     def get_rl_settings(self) -> Dict[str, Any]:
@@ -135,7 +138,8 @@ class ConfigExtensions:
             RL config dict with learners, thresholds, etc.
         """
         if self.rl_config and hasattr(self.rl_config, "get_rl_config"):
-            return self.rl_config.get_rl_config()  # type: ignore[return-value]
+            config = self.rl_config.get_rl_config()
+            return config if isinstance(config, dict) else {}
         return {}
 
     def get_active_learners(self) -> List[str]:

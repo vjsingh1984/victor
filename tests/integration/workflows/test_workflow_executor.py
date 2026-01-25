@@ -235,7 +235,7 @@ def error_workflow():
 class TestWorkflowExecutorE2E:
     """End-to-end tests for WorkflowExecutor."""
 
-    async def test_execute_simple_linear_workflow(self, mock_orchestrator, simple_workflow):
+    async def test_execute_simple_linear_workflow(self, mock_orchestrator, simple_workflow) -> None:
         """Test executing a simple linear workflow from start to finish."""
         # Given an executor with mock orchestrator
         executor = WorkflowExecutor(mock_orchestrator)
@@ -257,7 +257,7 @@ class TestWorkflowExecutorE2E:
         assert final_data.get("counter") == 111  # 0 + 1 + 10 + 100
         assert final_data.get("steps") == ["a", "b", "c"]
 
-    async def test_execute_with_initial_context(self, mock_orchestrator, simple_workflow):
+    async def test_execute_with_initial_context(self, mock_orchestrator, simple_workflow) -> None:
         """Test that initial context is properly passed to workflow."""
         executor = WorkflowExecutor(mock_orchestrator)
 
@@ -273,7 +273,7 @@ class TestWorkflowExecutorE2E:
         assert final_data.get("counter") == 1111  # 1000 + 1 + 10 + 100
         assert final_data.get("custom_key") == "custom_value"
 
-    async def test_execute_workflow_timeout(self, mock_orchestrator):
+    async def test_execute_workflow_timeout(self, mock_orchestrator) -> None:
         """Test workflow execution timeout handling.
 
         Note: This tests the timeout parameter configuration. The actual
@@ -303,7 +303,7 @@ class TestWorkflowExecutorE2E:
         assert result.success is True
         assert result.context.data.get("completed") is True
 
-    async def test_execute_tracks_node_results(self, mock_orchestrator, simple_workflow):
+    async def test_execute_tracks_node_results(self, mock_orchestrator, simple_workflow) -> None:
         """Test that individual node results are tracked."""
         executor = WorkflowExecutor(mock_orchestrator)
 
@@ -321,7 +321,7 @@ class TestWorkflowExecutorE2E:
                 ExecutorNodeStatus.SKIPPED,
             ]
 
-    async def test_execute_tracks_duration(self, mock_orchestrator, simple_workflow):
+    async def test_execute_tracks_duration(self, mock_orchestrator, simple_workflow) -> None:
         """Test that execution duration is tracked."""
         executor = WorkflowExecutor(mock_orchestrator)
 
@@ -337,7 +337,7 @@ class TestWorkflowExecutorE2E:
 class TestCheckpointFunctionality:
     """Tests for checkpoint save/resume functionality."""
 
-    async def test_checkpoint_saved_after_each_node(self, mock_orchestrator, simple_workflow):
+    async def test_checkpoint_saved_after_each_node(self, mock_orchestrator, simple_workflow) -> None:
         """Test that checkpoints are saved after each node execution."""
         # Create a mock checkpointer
         mock_checkpointer = MagicMock()
@@ -356,7 +356,7 @@ class TestCheckpointFunctionality:
         # Checkpoints should have been created (one per node)
         assert mock_checkpointer.create_checkpoint.call_count >= 1
 
-    async def test_resume_from_checkpoint(self, mock_orchestrator):
+    async def test_resume_from_checkpoint(self, mock_orchestrator) -> None:
         """Test resuming workflow execution from a checkpoint."""
 
         def step_a(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -400,7 +400,7 @@ class TestCheckpointFunctionality:
         # Step B should have been executed
         assert result.context.data.get("b_executed") is True
 
-    async def test_checkpoint_contains_workflow_state(self, mock_orchestrator):
+    async def test_checkpoint_contains_workflow_state(self, mock_orchestrator) -> None:
         """Test that checkpoint contains complete workflow state."""
         captured_checkpoints = []
 
@@ -437,7 +437,7 @@ class TestCheckpointFunctionality:
 class TestErrorHandlingAndRetry:
     """Tests for error handling and retry policies."""
 
-    async def test_error_stops_workflow_by_default(self, mock_orchestrator, error_workflow):
+    async def test_error_stops_workflow_by_default(self, mock_orchestrator, error_workflow) -> None:
         """Test that errors stop workflow execution by default."""
         executor = WorkflowExecutor(mock_orchestrator)
 
@@ -453,7 +453,7 @@ class TestErrorHandlingAndRetry:
         # Cleanup should NOT have run (workflow stopped on failure)
         assert result.context.data.get("cleaned_up") is not True
 
-    async def test_continue_on_failure_option(self, mock_orchestrator):
+    async def test_continue_on_failure_option(self, mock_orchestrator) -> None:
         """Test workflow continues on failure when configured."""
 
         def failing_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -477,7 +477,7 @@ class TestErrorHandlingAndRetry:
         # Workflow should have failures
         assert result.context.has_failures() is True
 
-    async def test_error_message_captured(self, mock_orchestrator, error_workflow):
+    async def test_error_message_captured(self, mock_orchestrator, error_workflow) -> None:
         """Test that error messages are captured in node results."""
         executor = WorkflowExecutor(mock_orchestrator)
 
@@ -497,7 +497,7 @@ class TestErrorHandlingAndRetry:
         assert failed_result.error is not None
         assert "Intentional failure" in failed_result.error
 
-    async def test_successful_workflow_no_error(self, mock_orchestrator, error_workflow):
+    async def test_successful_workflow_no_error(self, mock_orchestrator, error_workflow) -> None:
         """Test that successful workflow has no errors."""
         executor = WorkflowExecutor(mock_orchestrator)
 
@@ -518,7 +518,7 @@ class TestErrorHandlingAndRetry:
 class TestConditionalEdgeRouting:
     """Tests for conditional edge routing in workflows."""
 
-    async def test_route_to_high_path(self, mock_orchestrator, conditional_workflow):
+    async def test_route_to_high_path(self, mock_orchestrator, conditional_workflow) -> None:
         """Test routing to high value path."""
         executor = WorkflowExecutor(mock_orchestrator)
 
@@ -532,7 +532,7 @@ class TestConditionalEdgeRouting:
         assert result.context.data.get("result") == "Processed high value"
         assert result.context.data.get("finalized") is True
 
-    async def test_route_to_medium_path(self, mock_orchestrator, conditional_workflow):
+    async def test_route_to_medium_path(self, mock_orchestrator, conditional_workflow) -> None:
         """Test routing to medium value path."""
         executor = WorkflowExecutor(mock_orchestrator)
 
@@ -545,7 +545,7 @@ class TestConditionalEdgeRouting:
         assert result.context.data.get("path_taken") == "medium"
         assert result.context.data.get("result") == "Processed medium value"
 
-    async def test_route_to_low_path(self, mock_orchestrator, conditional_workflow):
+    async def test_route_to_low_path(self, mock_orchestrator, conditional_workflow) -> None:
         """Test routing to low value path."""
         executor = WorkflowExecutor(mock_orchestrator)
 
@@ -558,7 +558,7 @@ class TestConditionalEdgeRouting:
         assert result.context.data.get("path_taken") == "low"
         assert result.context.data.get("result") == "Processed low value"
 
-    async def test_condition_based_on_complex_state(self, mock_orchestrator):
+    async def test_condition_based_on_complex_state(self, mock_orchestrator) -> None:
         """Test conditional routing based on complex state evaluation.
 
         This test verifies that the condition function correctly evaluates
@@ -662,11 +662,11 @@ class TestConditionalEdgeRouting:
 class TestParallelNodeExecution:
     """Tests for parallel node execution."""
 
-    async def test_parallel_nodes_execute_concurrently(self, mock_orchestrator):
+    async def test_parallel_nodes_execute_concurrently(self, mock_orchestrator) -> None:
         """Test that parallel nodes execute concurrently."""
         execution_times = {}
 
-        def create_timed_transform(name: str, delay: float = 0.1):
+        def create_timed_transform(name: str, delay: float = 0.1) -> Any:
             def transform(ctx: Dict[str, Any]) -> Dict[str, Any]:
                 import time
 
@@ -713,7 +713,7 @@ class TestParallelNodeExecution:
         # (allowing some buffer for test overhead)
         assert total_time < 0.5  # Should be around 0.1s + overhead
 
-    async def test_parallel_join_strategy_all(self, mock_orchestrator):
+    async def test_parallel_join_strategy_all(self, mock_orchestrator) -> None:
         """Test parallel execution with 'all' join strategy."""
 
         def success_task(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -746,7 +746,7 @@ class TestParallelNodeExecution:
 class TestWorkflowCancellation:
     """Tests for workflow cancellation."""
 
-    async def test_timeout_parameter_accepted(self, mock_orchestrator):
+    async def test_timeout_parameter_accepted(self, mock_orchestrator) -> None:
         """Test that timeout parameter is accepted and workflow completes within timeout.
 
         Note: asyncio timeout with synchronous blocking code (time.sleep) cannot
@@ -774,7 +774,7 @@ class TestWorkflowCancellation:
         assert result.success is True
         assert result.context.data.get("quick_completed") is True
 
-    async def test_cancellation_cleanup(self, mock_orchestrator):
+    async def test_cancellation_cleanup(self, mock_orchestrator) -> None:
         """Test that cancellation properly cleans up resources."""
         cleanup_called = {"value": False}
 
@@ -804,7 +804,7 @@ class TestWorkflowCancellation:
 class TestWorkflowContextManagement:
     """Tests for workflow context management during execution."""
 
-    async def test_context_shared_across_nodes(self, mock_orchestrator):
+    async def test_context_shared_across_nodes(self, mock_orchestrator) -> None:
         """Test that context is properly shared across all nodes."""
 
         def add_key_a(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -835,7 +835,7 @@ class TestWorkflowContextManagement:
         assert result.context.data.get("saw_key_a") is True
         assert result.context.data.get("saw_both") is True
 
-    async def test_context_modifications_persist(self, mock_orchestrator):
+    async def test_context_modifications_persist(self, mock_orchestrator) -> None:
         """Test that context modifications from each node persist."""
 
         def accumulate(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -867,7 +867,7 @@ class TestWorkflowContextManagement:
 class TestWorkflowExecutionMetrics:
     """Tests for workflow execution metrics and reporting."""
 
-    async def test_total_duration_tracked(self, mock_orchestrator, simple_workflow):
+    async def test_total_duration_tracked(self, mock_orchestrator, simple_workflow) -> None:
         """Test that total execution duration is tracked."""
         executor = WorkflowExecutor(mock_orchestrator)
         result = await executor.execute(simple_workflow)
@@ -875,7 +875,7 @@ class TestWorkflowExecutionMetrics:
         assert result.total_duration > 0
         assert result.total_duration < 60  # Should complete quickly
 
-    async def test_node_durations_tracked(self, mock_orchestrator, simple_workflow):
+    async def test_node_durations_tracked(self, mock_orchestrator, simple_workflow) -> None:
         """Test that individual node durations are tracked."""
         executor = WorkflowExecutor(mock_orchestrator)
         result = await executor.execute(simple_workflow)
@@ -883,7 +883,7 @@ class TestWorkflowExecutionMetrics:
         for node_result in result.context.node_results.values():
             assert node_result.duration_seconds >= 0
 
-    async def test_workflow_result_serialization(self, mock_orchestrator, simple_workflow):
+    async def test_workflow_result_serialization(self, mock_orchestrator, simple_workflow) -> None:
         """Test that workflow result can be serialized to dict."""
         executor = WorkflowExecutor(mock_orchestrator)
         result = await executor.execute(simple_workflow)
@@ -903,17 +903,17 @@ class TestWorkflowExecutionMetrics:
 class TestWorkflowExecutorConfiguration:
     """Tests for WorkflowExecutor configuration options."""
 
-    async def test_max_parallel_configuration(self, mock_orchestrator):
+    async def test_max_parallel_configuration(self, mock_orchestrator) -> None:
         """Test that max_parallel limits concurrent executions."""
         executor = WorkflowExecutor(mock_orchestrator, max_parallel=2)
         assert executor.max_parallel == 2
 
-    async def test_default_timeout_configuration(self, mock_orchestrator):
+    async def test_default_timeout_configuration(self, mock_orchestrator) -> None:
         """Test default timeout configuration."""
         executor = WorkflowExecutor(mock_orchestrator, default_timeout=600.0)
         assert executor.default_timeout == 600.0
 
-    async def test_cache_configuration(self, mock_orchestrator):
+    async def test_cache_configuration(self, mock_orchestrator) -> None:
         """Test workflow cache configuration."""
         from victor.workflows.cache import WorkflowCacheConfig
 
@@ -922,7 +922,7 @@ class TestWorkflowExecutorConfiguration:
 
         assert executor.cache is not None
 
-    async def test_cache_disabled_by_default(self, mock_orchestrator):
+    async def test_cache_disabled_by_default(self, mock_orchestrator) -> None:
         """Test that cache is disabled by default."""
         executor = WorkflowExecutor(mock_orchestrator)
         assert executor.cache is None

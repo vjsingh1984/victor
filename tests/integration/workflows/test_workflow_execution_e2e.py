@@ -1,6 +1,8 @@
 # Copyright 2025 Vijaykumar Singh
 #
 # Licensed under the Apache License, Version 2.0
+from typing import Any
+
 
 """End-to-end workflow execution tests.
 
@@ -14,7 +16,7 @@ from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 class TestWorkflowExecutionE2E:
     """End-to-end workflow execution tests."""
 
-    def test_simple_linear_workflow_execution(self):
+    def test_simple_linear_workflow_execution(self) -> None:
         """Test execution of simple linear workflow."""
         yaml_content = """
 workflows:
@@ -43,7 +45,7 @@ workflows:
         # Note: Actual execution would require orchestrator
         assert compiled is not None
 
-    def test_parallel_workflow_execution(self):
+    def test_parallel_workflow_execution(self) -> None:
         """Test execution of parallel workflow."""
         yaml_content = """
 workflows:
@@ -80,7 +82,7 @@ workflows:
         compiled = compiler.compile_yaml_content(yaml_content, "parallel_test", handlers=handlers)
         assert compiled is not None
 
-    def test_conditional_workflow_execution(self):
+    def test_conditional_workflow_execution(self) -> None:
         """Test execution of conditional workflow."""
         yaml_content = """
 workflows:
@@ -106,7 +108,7 @@ workflows:
           status: "improving"
 """
 
-        def check_score(inputs):
+        def check_score(inputs: Any) -> Any:
             return "high_quality" if inputs["score"] >= 70 else "low_quality"
 
         handlers = {"identity": lambda inputs: inputs, "check_score": check_score}
@@ -121,7 +123,7 @@ workflows:
 class TestWorkflowCaching:
     """Tests for workflow caching behavior."""
 
-    def test_workflow_cache_invalidation(self):
+    def test_workflow_cache_invalidation(self) -> None:
         """Test that changing workflow invalidates cache."""
         yaml_content_v1 = """
 workflows:
@@ -163,7 +165,7 @@ workflows:
 class TestWorkflowErrorHandling:
     """Tests for workflow error handling."""
 
-    def test_handler_failure_propagates(self):
+    def test_handler_failure_propagates(self) -> None:
         """Test that handler failures propagate properly."""
         yaml_content = """
 workflows:
@@ -179,7 +181,7 @@ workflows:
         handler: identity
 """
 
-        def failing_handler(inputs):
+        def failing_handler(inputs: Any) -> Any:
             raise ValueError("Handler failed!")
 
         handlers = {"failing_handler": failing_handler, "identity": lambda inputs: inputs}

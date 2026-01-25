@@ -40,10 +40,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 from victor.agent.protocols import IToolSelectionCoordinator, AgentToolSelectionContext
 
 if TYPE_CHECKING:
-    try:
-        from victor.tools.base import ToolRegistry
-    except ImportError:
-        ToolRegistry = Any  # type: ignore
+    from victor.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 

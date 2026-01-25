@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Any
+
 
 """Integration tests for recursion context flow through workflow execution.
 
@@ -44,7 +46,7 @@ def mock_orchestrator():
 
 
 @pytest.fixture
-def compiler(mock_orchestrator):
+def compiler(mock_orchestrator: Any) -> Any:
     """Create a compiler with mock orchestrator."""
     return UnifiedWorkflowCompiler(
         orchestrator=mock_orchestrator,
@@ -56,7 +58,7 @@ class TestRecursionContextFlow:
     """Test recursion context propagation through workflow execution."""
 
     @pytest.mark.asyncio
-    async def test_recursion_context_in_workflow_state(self, compiler):
+    async def test_recursion_context_in_workflow_state(self, compiler) -> None:
         """Test that recursion context is added to workflow state."""
         # Create simple workflow
         workflow_def = WorkflowDefinition(
@@ -83,7 +85,7 @@ class TestRecursionContextFlow:
         assert isinstance(result.state["_recursion_context"], RecursionContext)
 
     @pytest.mark.asyncio
-    async def test_max_recursion_depth_from_metadata(self, compiler):
+    async def test_max_recursion_depth_from_metadata(self, compiler) -> None:
         """Test that max_recursion_depth from workflow metadata is used."""
         # Create workflow with custom max_recursion_depth in metadata
         workflow_def = WorkflowDefinition(
@@ -107,7 +109,7 @@ class TestRecursionContextFlow:
         assert compiled.max_recursion_depth == 5
 
     @pytest.mark.asyncio
-    async def test_max_recursion_depth_runtime_override(self, compiler):
+    async def test_max_recursion_depth_runtime_override(self, compiler) -> None:
         """Test that runtime parameter overrides metadata value."""
         # Create workflow with metadata max_recursion_depth
         workflow_def = WorkflowDefinition(
@@ -137,7 +139,7 @@ class TestRecursionContextFlow:
         assert result.state["_recursion_context"].max_depth == 10
 
     @pytest.mark.asyncio
-    async def test_recursion_context_shared_in_parallel(self, compiler):
+    async def test_recursion_context_shared_in_parallel(self, compiler) -> None:
         """Test that recursion context is shared across parallel branches."""
         from victor.workflows.definition import ParallelNode
 
@@ -179,7 +181,7 @@ class TestRecursionContextFlow:
         assert isinstance(recursion_ctx, RecursionContext)
 
     @pytest.mark.asyncio
-    async def test_yaml_metadata_max_recursion_depth(self):
+    async def test_yaml_metadata_max_recursion_depth(self) -> None:
         """Test that max_recursion_depth is parsed from YAML metadata."""
         yaml_content = """
 workflows:
@@ -201,7 +203,7 @@ workflows:
         assert workflow_def.metadata.get("max_recursion_depth") == 8
 
     @pytest.mark.asyncio
-    async def test_yaml_execution_max_recursion_depth(self):
+    async def test_yaml_execution_max_recursion_depth(self) -> None:
         """Test that max_recursion_depth is parsed from YAML execution settings."""
         yaml_content = """
 workflows:
@@ -223,7 +225,7 @@ workflows:
         assert workflow_def.metadata.get("max_recursion_depth") == 12
 
     @pytest.mark.asyncio
-    async def test_yaml_precedence_execution_over_metadata(self):
+    async def test_yaml_precedence_execution_over_metadata(self) -> None:
         """Test that execution settings take precedence over metadata."""
         yaml_content = """
 workflows:
@@ -247,7 +249,7 @@ workflows:
         assert workflow_def.metadata.get("max_recursion_depth") == 15
 
     @pytest.mark.asyncio
-    async def test_recursion_context_cleanup_on_error(self, compiler):
+    async def test_recursion_context_cleanup_on_error(self, compiler) -> None:
         """Test that recursion context exists and is properly managed."""
         # Create workflow
         workflow_def = WorkflowDefinition(
@@ -277,7 +279,7 @@ workflows:
         # The exit() happens in finally block after execution completes
         assert recursion_ctx.current_depth >= 0
 
-    def test_recursion_context_default_depth(self, compiler):
+    def test_recursion_context_default_depth(self, compiler) -> None:
         """Test that default max_recursion_depth is 3 when not specified."""
         # Create workflow without max_recursion_depth
         workflow_def = WorkflowDefinition(
@@ -304,7 +306,7 @@ class TestRecursionContextTeamNodes:
     """Test recursion context with team nodes."""
 
     @pytest.mark.asyncio
-    async def test_team_node_receives_recursion_context(self, compiler):
+    async def test_team_node_receives_recursion_context(self, compiler) -> None:
         """Test that recursion context is properly initialized for team nodes."""
         # Create workflow with team node
         workflow_def = WorkflowDefinition(

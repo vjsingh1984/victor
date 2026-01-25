@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Any
+
 
 """Integration tests for pure compiler and executor (Phase 3).
 
@@ -54,19 +56,19 @@ SAMPLE_WORKFLOW_YAML = """workflows:
 class TestCompilerExecutorIntegration:
     """Integration tests for compiler and executor separation."""
 
-    def test_workflow_compiler_imports(self):
+    def test_workflow_compiler_imports(self) -> None:
         """Test that WorkflowCompiler can be imported."""
         from victor.workflows.compiler.unified_compiler import WorkflowCompiler
 
         assert WorkflowCompiler is not None
 
-    def test_state_graph_executor_imports(self):
+    def test_state_graph_executor_imports(self) -> None:
         """Test that StateGraphExecutor can be imported."""
         from victor.workflows.executors import StateGraphExecutor
 
         assert StateGraphExecutor is not None
 
-    def test_compiler_initialization(self):
+    def test_compiler_initialization(self) -> None:
         """Test that WorkflowCompiler can be initialized."""
         from victor.workflows.compiler.unified_compiler import WorkflowCompiler
 
@@ -86,7 +88,7 @@ class TestCompilerExecutorIntegration:
         assert hasattr(compiler, "compile")
         assert hasattr(compiler, "_yaml_config")
 
-    def test_executor_initialization(self):
+    def test_executor_initialization(self) -> None:
         """Test that StateGraphExecutor can be initialized with a mock graph."""
         from victor.workflows.executors import StateGraphExecutor
         from unittest.mock import MagicMock
@@ -101,7 +103,7 @@ class TestCompilerExecutorIntegration:
         assert hasattr(executor, "invoke")
         assert hasattr(executor, "stream")
 
-    def test_compiler_executor_protocol_compliance(self):
+    def test_compiler_executor_protocol_compliance(self) -> None:
         """Test that compiler and executor comply with protocols."""
         from victor.workflows.compiler_protocols import (
             WorkflowCompilerProtocol,
@@ -112,7 +114,7 @@ class TestCompilerExecutorIntegration:
         assert hasattr(WorkflowCompilerProtocol, "compile")
         assert hasattr(CompiledGraphProtocol, "invoke")
 
-    def test_sample_workflow_structure(self):
+    def test_sample_workflow_structure(self) -> None:
         """Test that sample workflow YAML is valid structure."""
         import yaml
 
@@ -132,7 +134,7 @@ class TestCompilerExecutorIntegration:
         assert "transform" in node_types
 
     @pytest.mark.skip("Requires actual YAML loader and validator setup")
-    def test_compile_simple_workflow(self):
+    def test_compile_simple_workflow(self) -> None:
         """Test compiling a simple workflow from YAML."""
         from victor.workflows.compiler.unified_compiler import WorkflowCompiler
         from victor.workflows.yaml_loader import YAMLWorkflowConfig
@@ -159,7 +161,7 @@ class TestCompilerExecutorIntegration:
 class TestSeparationOfConcerns:
     """Tests for SRP compliance - compiler only compiles, executor only executes."""
 
-    def test_compiler_has_no_execution_logic(self):
+    def test_compiler_has_no_execution_logic(self) -> None:
         """Verify compiler doesn't have execution methods."""
         from victor.workflows.compiler.unified_compiler import WorkflowCompiler
 
@@ -179,7 +181,7 @@ class TestSeparationOfConcerns:
         assert not hasattr(compiler, "execute")
         assert not hasattr(compiler, "run_workflow")
 
-    def test_executor_has_no_compilation_logic(self):
+    def test_executor_has_no_compilation_logic(self) -> None:
         """Verify executor doesn't have compilation methods."""
         from victor.workflows.executors import StateGraphExecutor
         from unittest.mock import MagicMock

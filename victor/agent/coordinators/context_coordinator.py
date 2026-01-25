@@ -481,8 +481,8 @@ class SummarizationCompactionStrategy(BaseCompactionStrategy):
         Returns:
             True if summarization should be applied
         """
-        token_count = context.get("token_count", 0)
-        max_tokens = budget.get("max_tokens", 4096)
+        token_count: int = context.get("token_count", 0)
+        max_tokens: int = budget.get("max_tokens", 4096)
 
         # Only apply if significantly over budget (by at least threshold)
         return token_count > max_tokens + self._summarize_threshold
@@ -602,8 +602,8 @@ class SemanticCompactionStrategy(BaseCompactionStrategy):
         Returns:
             True if semantic compaction should be applied
         """
-        token_count = context.get("token_count", 0)
-        max_tokens = budget.get("max_tokens", 4096)
+        token_count: int = context.get("token_count", 0)
+        max_tokens: int = budget.get("max_tokens", 4096)
 
         # Apply if context exceeds budget
         return token_count > max_tokens
@@ -739,8 +739,8 @@ class HybridCompactionStrategy(BaseCompactionStrategy):
         Returns:
             True if hybrid compaction should be applied
         """
-        token_count = context.get("token_count", 0)
-        max_tokens = budget.get("max_tokens", 4096)
+        token_count: int = context.get("token_count", 0)
+        max_tokens: int = budget.get("max_tokens", 4096)
 
         # Apply if context exceeds budget
         return token_count > max_tokens

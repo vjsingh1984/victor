@@ -490,6 +490,25 @@ class HybridCompactionStrategy(CompactionStrategy):
         self.large_context_threshold = large_context_threshold
         self.complexity_threshold = complexity_threshold
 
+    def compact(
+        self,
+        messages: List[Dict[str, Any]],
+        target_tokens: int,
+        current_query: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Synchronous compact - delegates to async version.
+
+        Args:
+            messages: List of messages to compact
+            target_tokens: Target token count
+            current_query: Optional current query
+
+        Returns:
+            Compacted list of messages
+        """
+        # For sync version, use truncation strategy (fast, no async needed)
+        return self.truncation_strategy.compact(messages, target_tokens, current_query)
+
     async def compact_async(
         self,
         messages: List[Dict[str, Any]],
@@ -582,7 +601,7 @@ class HybridCompactionStrategy(CompactionStrategy):
 
 def create_compaction_strategy(
     strategy_type: str = "hybrid",
-    **kwargs,
+    **kwargs: Any,
 ) -> CompactionStrategy:
     """Factory function to create compaction strategies.
 

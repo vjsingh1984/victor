@@ -126,28 +126,31 @@ class LanceDBProvider(BaseEmbeddingProvider):
         print(f"🤖 Embedding Model: {model_name} ({model_type})")
 
         # Setup LanceDB
+        persist_dir_path: Path
         persist_dir = self.config.persist_directory
         if persist_dir:
-            persist_dir = Path(persist_dir).expanduser()
-            persist_dir.mkdir(parents=True, exist_ok=True)
-            print(f"📁 Using persistent storage: {persist_dir}")
+            persist_dir_path = Path(persist_dir).expanduser()
+            persist_dir_path.mkdir(parents=True, exist_ok=True)
+            print(f"📁 Using persistent storage: {persist_dir_path}")
         else:
             # LanceDB requires a directory, use centralized path
             from victor.config.settings import get_project_paths
 
-            persist_dir = get_project_paths().global_embeddings_dir / "lancedb"
-            persist_dir.mkdir(parents=True, exist_ok=True)
-            print(f"📁 Using default storage: {persist_dir}")
+            persist_dir_path = get_project_paths().global_embeddings_dir / "lancedb"
+            persist_dir_path.mkdir(parents=True, exist_ok=True)
+            print(f"📁 Using default storage: {persist_dir_path}")
 
         # Check for database corruption and handle it
         table_name = self.config.extra_config.get("table_name", "embeddings")
-        db_path = persist_dir / f"{table_name}.lance"
+        db_path = persist_dir_path / f"{table_name}.lance"
 
         # If rebuild requested or DB is corrupted, clean up
         if should_rebuild or db_path.exists():
             try:
                 # Try to connect first to check if DB is valid
-                self.db = lancedb.connect(str(persist_dir))
+                self.db = lancedb.connect(str(persist_dir_path))
+                if self.db is None:
+                    raise RuntimeError("Failed to connect to LanceDB")
                 existing_tables = self.db.list_tables().tables
 
                 # Try to open the table to verify it's not corrupted
@@ -164,8 +167,10 @@ class LanceDBProvider(BaseEmbeddingProvider):
                             print(f"⚠️  Database corrupted: {e}")
                             if should_rebuild:
                                 print("🔧 Rebuilding corrupted database...")
-                                self._corrupted_db_cleanup(persist_dir, table_name)
-                                self.db = lancedb.connect(str(persist_dir))
+                                self._corrupted_db_cleanup(persist_dir_path, table_name)
+                                self.db = lancedb.connect(str(persist_dir_path))
+                                if self.db is None:
+                                    raise RuntimeError("Failed to reconnect to LanceDB")
                                 existing_tables = self.db.list_tables().tables
                             else:
                                 raise RuntimeError(
@@ -183,8 +188,10 @@ class LanceDBProvider(BaseEmbeddingProvider):
                     if should_rebuild:
                         print(f"⚠️  Database corrupted during connection: {e}")
                         print("🔧 Rebuilding corrupted database...")
-                        self._corrupted_db_cleanup(persist_dir, table_name)
-                        self.db = lancedb.connect(str(persist_dir))
+                        self._corrupted_db_cleanup(persist_dir_path, table_name)
+                        self.db = lancedb.connect(str(persist_dir_path))
+                        if self.db is None:
+                            raise RuntimeError("Failed to reconnect to LanceDB")
                         existing_tables = self.db.list_tables().tables
                     else:
                         raise RuntimeError(
@@ -195,7 +202,9 @@ class LanceDBProvider(BaseEmbeddingProvider):
                     raise
         else:
             # Fresh database
-            self.db = lancedb.connect(str(persist_dir))
+            self.db = lancedb.connect(str(persist_dir_path))
+            if self.db is None:
+                raise RuntimeError("Failed to connect to LanceDB")
             existing_tables = self.db.list_tables().tables
             print(f"📝 Creating new table: {table_name}")
 
@@ -260,6 +269,9 @@ class LanceDBProvider(BaseEmbeddingProvider):
         if not self._initialized:
             await self.initialize()
 
+        if self.embedding_model is None:
+            raise RuntimeError("Embedding model not initialized")
+
         return await self.embedding_model.embed_text(text)
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
@@ -273,6 +285,9 @@ class LanceDBProvider(BaseEmbeddingProvider):
         """
         if not self._initialized:
             await self.initialize()
+
+        if self.embedding_model is None:
+            raise RuntimeError("Embedding model not initialized")
 
         return await self.embedding_model.embed_batch(texts)
 
@@ -310,6 +325,8 @@ class LanceDBProvider(BaseEmbeddingProvider):
         # Add to table (create if doesn't exist)
         table_name = self.config.extra_config.get("table_name", "embeddings")
         if self.table is None:
+            if self.db is None:
+                raise RuntimeError("Database not initialized")
             self.table = self.db.create_table(table_name, data=[document])
         else:
             self.table.add([document])
@@ -347,6 +364,8 @@ class LanceDBProvider(BaseEmbeddingProvider):
         # Add to table (create if doesn't exist)
         table_name = self.config.extra_config.get("table_name", "embeddings")
         if self.table is None:
+            if self.db is None:
+                raise RuntimeError("Database not initialized")
             self.table = self.db.create_table(table_name, data=lance_docs)
         else:
             self.table.add(lance_docs)
@@ -472,6 +491,8 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
         # Drop and recreate table
         table_name = self.config.extra_config.get("table_name", "embeddings")
+        if self.db is None:
+            return
         if table_name in self.db.list_tables().tables:
             self.db.drop_table(table_name)
 

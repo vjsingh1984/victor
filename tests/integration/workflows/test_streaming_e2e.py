@@ -158,7 +158,7 @@ def long_running_workflow():
 class TestStreamingWorkflowE2E:
     """End-to-end streaming workflow tests."""
 
-    async def test_stream_simple_transform_workflow(self, mock_orchestrator, three_node_workflow):
+    async def test_stream_simple_transform_workflow(self, mock_orchestrator, three_node_workflow) -> None:
         """Test streaming a simple transform workflow.
 
         Verifies event sequence: START -> NODE_START -> NODE_COMPLETE (x3) -> COMPLETE
@@ -193,7 +193,7 @@ class TestStreamingWorkflowE2E:
         node_ids = [e.node_id for e in node_starts]
         assert node_ids == ["step_a", "step_b", "step_c"]
 
-    async def test_stream_progress_increases(self, mock_orchestrator, three_node_workflow):
+    async def test_stream_progress_increases(self, mock_orchestrator, three_node_workflow) -> None:
         """Test that progress increases during streaming.
 
         Verifies progress: 0 -> 33 -> 66 -> 100
@@ -224,7 +224,7 @@ class TestStreamingWorkflowE2E:
         assert 0.0 in unique_progress
         assert 100.0 in unique_progress
 
-    async def test_stream_multi_node_sequence(self, mock_orchestrator, three_node_workflow):
+    async def test_stream_multi_node_sequence(self, mock_orchestrator, three_node_workflow) -> None:
         """Test streaming maintains node order in sequence.
 
         Verifies nodes execute in dependency order.
@@ -241,7 +241,7 @@ class TestStreamingWorkflowE2E:
         # Nodes should execute in sequence: a -> b -> c
         assert execution_order == ["step_a", "step_b", "step_c"]
 
-    async def test_stream_error_propagation(self, mock_orchestrator, failing_workflow):
+    async def test_stream_error_propagation(self, mock_orchestrator, failing_workflow) -> None:
         """Test error events are properly streamed.
 
         Verifies WORKFLOW_ERROR or NODE_ERROR events are emitted on failure.
@@ -283,7 +283,7 @@ class TestStreamingWorkflowE2E:
         else:
             assert final_event.event_type == WorkflowEventType.WORKFLOW_ERROR
 
-    async def test_subscription_receives_events(self, mock_orchestrator, three_node_workflow):
+    async def test_subscription_receives_events(self, mock_orchestrator, three_node_workflow) -> None:
         """Test subscription callback receives matching events.
 
         Subscribes to NODE_COMPLETE events and verifies callback invocation.
@@ -317,7 +317,7 @@ class TestStreamingWorkflowE2E:
         node_ids = {e.node_id for e in subscribed_events}
         assert node_ids == {"step_a", "step_b", "step_c"}
 
-    async def test_subscription_unsubscribe_works(self, mock_orchestrator, three_node_workflow):
+    async def test_subscription_unsubscribe_works(self, mock_orchestrator, three_node_workflow) -> None:
         """Test that unsubscribe stops callback invocation."""
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
@@ -339,7 +339,7 @@ class TestStreamingWorkflowE2E:
         # Should not have received any events via callback
         assert call_count["value"] == 0
 
-    async def test_cancellation_stops_workflow(self, mock_orchestrator, long_running_workflow):
+    async def test_cancellation_stops_workflow(self, mock_orchestrator, long_running_workflow) -> None:
         """Test cancellation properly stops streaming.
 
         Starts a long workflow and cancels mid-execution.
@@ -375,14 +375,14 @@ class TestStreamingWorkflowE2E:
         # We cancel after first NODE_COMPLETE, so we might get 1-2 completes
         assert len(node_completes) < 3
 
-    async def test_cancel_nonexistent_workflow(self, mock_orchestrator):
+    async def test_cancel_nonexistent_workflow(self, mock_orchestrator) -> None:
         """Test cancelling a workflow that doesn't exist returns False."""
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
         result = executor.cancel_workflow("nonexistent_workflow_id")
         assert result is False
 
-    async def test_backward_compatibility_execute(self, mock_orchestrator, three_node_workflow):
+    async def test_backward_compatibility_execute(self, mock_orchestrator, three_node_workflow) -> None:
         """Test execute() still works on StreamingWorkflowExecutor.
 
         Verifies that the base class execute() method returns
@@ -402,7 +402,7 @@ class TestStreamingWorkflowE2E:
         assert result.context.data.get("counter") == 111  # 0 + 1 + 10 + 100
         assert result.context.data.get("steps") == ["a", "b", "c"]
 
-    async def test_get_active_workflows(self, mock_orchestrator, long_running_workflow):
+    async def test_get_active_workflows(self, mock_orchestrator, long_running_workflow) -> None:
         """Test get_active_workflows returns active workflow IDs."""
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
@@ -430,7 +430,7 @@ class TestStreamingWorkflowE2E:
         # After fully completing the iteration, should be empty
         assert executor.get_active_workflows() == []
 
-    async def test_get_workflow_progress(self, mock_orchestrator, long_running_workflow):
+    async def test_get_workflow_progress(self, mock_orchestrator, long_running_workflow) -> None:
         """Test get_workflow_progress returns current progress."""
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
@@ -455,7 +455,7 @@ class TestStreamingWorkflowE2E:
         # After completion, should return None
         assert executor.get_workflow_progress(workflow_id) is None
 
-    async def test_workflow_metadata_in_chunks(self, mock_orchestrator, three_node_workflow):
+    async def test_workflow_metadata_in_chunks(self, mock_orchestrator, three_node_workflow) -> None:
         """Test that workflow metadata is included in chunks."""
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
@@ -472,7 +472,7 @@ class TestStreamingWorkflowE2E:
         assert "total_nodes" in first_chunk.metadata
         assert first_chunk.metadata["total_nodes"] == 3
 
-    async def test_node_metadata_in_chunks(self, mock_orchestrator, three_node_workflow):
+    async def test_node_metadata_in_chunks(self, mock_orchestrator, three_node_workflow) -> None:
         """Test that node metadata is included in node event chunks."""
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
@@ -508,7 +508,7 @@ class TestStreamingWorkflowE2E:
 class TestStreamingWorkflowEdgeCases:
     """Edge case tests for streaming workflow execution."""
 
-    async def test_empty_workflow_context(self, mock_orchestrator):
+    async def test_empty_workflow_context(self, mock_orchestrator) -> None:
         """Test streaming with empty initial context."""
 
         def identity_transform(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -531,7 +531,7 @@ class TestStreamingWorkflowEdgeCases:
         assert events[-1].event_type == WorkflowEventType.WORKFLOW_COMPLETE
         assert events[-1].metadata.get("success") is True
 
-    async def test_single_node_workflow(self, mock_orchestrator):
+    async def test_single_node_workflow(self, mock_orchestrator) -> None:
         """Test streaming a workflow with only one node."""
 
         def single_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -559,7 +559,7 @@ class TestStreamingWorkflowEdgeCases:
         assert events[0].progress == 0.0
         assert events[-1].progress == 100.0
 
-    async def test_multiple_subscriptions(self, mock_orchestrator, three_node_workflow):
+    async def test_multiple_subscriptions(self, mock_orchestrator, three_node_workflow) -> None:
         """Test multiple simultaneous subscriptions."""
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
@@ -586,7 +586,7 @@ class TestStreamingWorkflowEdgeCases:
         assert len(starts_received) == 3
         assert len(completes_received) == 3
 
-    async def test_workflow_with_custom_timeout(self, mock_orchestrator):
+    async def test_workflow_with_custom_timeout(self, mock_orchestrator) -> None:
         """Test streaming with custom timeout parameter."""
 
         def quick_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -604,7 +604,7 @@ class TestStreamingWorkflowEdgeCases:
         # Should complete successfully within timeout
         assert events[-1].is_final is True
 
-    async def test_workflow_id_consistency(self, mock_orchestrator, three_node_workflow):
+    async def test_workflow_id_consistency(self, mock_orchestrator, three_node_workflow) -> None:
         """Test that workflow_id is consistent across all events."""
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
@@ -615,7 +615,7 @@ class TestStreamingWorkflowEdgeCases:
         # All events should have the same workflow_id
         assert len(workflow_ids) == 1
 
-    async def test_thread_id_parameter(self, mock_orchestrator, three_node_workflow):
+    async def test_thread_id_parameter(self, mock_orchestrator, three_node_workflow) -> None:
         """Test that thread_id is properly handled."""
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 

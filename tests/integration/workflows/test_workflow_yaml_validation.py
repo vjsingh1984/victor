@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 
 from victor.workflows.generation.validator import WorkflowValidator
 
@@ -160,7 +160,7 @@ class TestProductionWorkflows:
     """Test all production workflows for successful compilation."""
 
     @pytest.mark.parametrize("workflow_path", get_all_workflow_files())
-    def test_workflow_loads_and_compiles(self, workflow_path: str):
+    def test_workflow_loads_and_compiles(self, workflow_path: str) -> None:
         """Test that workflow file loads and compiles successfully.
 
         This is a regression test to catch:
@@ -179,7 +179,7 @@ class TestProductionWorkflows:
         assert len(compiled_graphs) == len(workflows), "All workflows should compile"
 
     @pytest.mark.parametrize("vertical,files", PRODUCTION_WORKFLOWS.items())
-    def test_vertical_all_workflows_valid(self, vertical: str, files: List[str]):
+    def test_vertical_all_workflows_valid(self, vertical: str, files: List[str]) -> None:
         """Test that all workflows in a vertical are valid."""
         for workflow_path in files:
             try:
@@ -187,7 +187,7 @@ class TestProductionWorkflows:
             except Exception as e:
                 pytest.fail(f"Workflow {workflow_path} failed to compile: {e}")
 
-    def test_all_coding_workflows(self):
+    def test_all_coding_workflows(self) -> None:
         """Test all coding workflows compile successfully."""
         for workflow_path in PRODUCTION_WORKFLOWS["coding"]:
             workflow_name, workflows, compiled_graphs = load_and_compile_workflow(workflow_path)
@@ -195,31 +195,31 @@ class TestProductionWorkflows:
                 len(workflows) >= 1
             ), f"Coding workflow {workflow_name} should have at least 1 workflow"
 
-    def test_all_devops_workflows(self):
+    def test_all_devops_workflows(self) -> None:
         """Test all DevOps workflows compile successfully."""
         for workflow_path in PRODUCTION_WORKFLOWS["devops"]:
             workflow_name, workflows, compiled_graphs = load_and_compile_workflow(workflow_path)
             assert len(workflows) >= 1
 
-    def test_all_rag_workflows(self):
+    def test_all_rag_workflows(self) -> None:
         """Test all RAG workflows compile successfully."""
         for workflow_path in PRODUCTION_WORKFLOWS["rag"]:
             workflow_name, workflows, compiled_graphs = load_and_compile_workflow(workflow_path)
             assert len(workflows) >= 1
 
-    def test_all_dataanalysis_workflows(self):
+    def test_all_dataanalysis_workflows(self) -> None:
         """Test all data analysis workflows compile successfully."""
         for workflow_path in PRODUCTION_WORKFLOWS["dataanalysis"]:
             workflow_name, workflows, compiled_graphs = load_and_compile_workflow(workflow_path)
             assert len(workflows) >= 1
 
-    def test_all_research_workflows(self):
+    def test_all_research_workflows(self) -> None:
         """Test all research workflows compile successfully."""
         for workflow_path in PRODUCTION_WORKFLOWS["research"]:
             workflow_name, workflows, compiled_graphs = load_and_compile_workflow(workflow_path)
             assert len(workflows) >= 1
 
-    def test_all_benchmark_workflows(self):
+    def test_all_benchmark_workflows(self) -> None:
         """Test all benchmark workflows compile successfully."""
         for workflow_path in PRODUCTION_WORKFLOWS["benchmark"]:
             workflow_name, workflows, compiled_graphs = load_and_compile_workflow(workflow_path)
@@ -242,7 +242,7 @@ class TestKnownWorkflowIssues:
     """
 
     @pytest.mark.parametrize("workflow_path,issue_info", KNOWN_ISSUES.items())
-    def test_known_issue_documentation(self, workflow_path: str, issue_info: Dict):
+    def test_known_issue_documentation(self, workflow_path: str, issue_info: Dict) -> None:
         """Document and track known workflow issues.
 
         This test will always fail (xfail) but provides documentation
@@ -273,7 +273,7 @@ class TestExampleWorkflows:
     """
 
     @pytest.mark.parametrize("vertical,files", EXAMPLE_WORKFLOWS.items())
-    def test_example_workflow_status(self, vertical: str, files: List[str]):
+    def test_example_workflow_status(self, vertical: str, files: List[str]) -> None:
         """Test example workflows and document their status.
 
         Example workflows may fail validation, but we should at least
@@ -308,7 +308,7 @@ class TestWorkflowRegressions:
     These tests prevent specific bugs from reoccurring.
     """
 
-    def test_unknown_node_type_detection(self):
+    def test_unknown_node_type_detection(self) -> None:
         """Test that team node type is now supported.
 
         Success test for: team_node_example.yaml using 'team' node type
@@ -327,7 +327,7 @@ class TestWorkflowRegressions:
         assert len(workflows) > 0
         assert len(compiled_graphs) == len(workflows)
 
-    def test_missing_node_reference_detection(self):
+    def test_missing_node_reference_detection(self) -> None:
         """Test that missing node references are properly detected.
 
         Regression test for: migrated_example.yaml files that reference
@@ -344,7 +344,7 @@ class TestWorkflowRegressions:
             or "validation failed" in error_message.lower()
         )
 
-    def test_invalid_yaml_syntax_detection(self):
+    def test_invalid_yaml_syntax_detection(self) -> None:
         """Test that invalid YAML syntax is properly detected."""
         # Test truly malformed YAML
         import tempfile
@@ -382,18 +382,18 @@ workflows:
 class TestWorkflowStatistics:
     """Test workflow statistics and coverage."""
 
-    def test_production_workflow_count(self):
+    def test_production_workflow_count(self) -> None:
         """Verify we have the expected number of production workflows."""
         total_count = sum(len(files) for files in PRODUCTION_WORKFLOWS.values())
         # We expect at least 25 production workflows
         assert total_count >= 25, f"Expected at least 25 production workflows, found {total_count}"
 
-    def test_all_verticals_have_workflows(self):
+    def test_all_verticals_have_workflows(self) -> None:
         """Verify all verticals have at least one workflow."""
         for vertical, files in PRODUCTION_WORKFLOWS.items():
             assert len(files) > 0, f"Vertical '{vertical}' should have at least one workflow"
 
-    def test_workflow_compilation_success_rate(self):
+    def test_workflow_compilation_success_rate(self) -> None:
         """Test that most workflows compile successfully.
 
         This is a health check metric - should be > 90% success rate.
@@ -431,7 +431,7 @@ class TestNodeTypes:
 
     VALID_NODE_TYPES = {"agent", "compute", "condition", "parallel", "transform", "hitl", "team"}
 
-    def test_all_nodes_use_valid_types(self):
+    def test_all_nodes_use_valid_types(self) -> None:
         """Test that all workflow nodes use valid node types.
 
         Regression test to prevent invalid node types from being added.

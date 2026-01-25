@@ -309,8 +309,13 @@ class MemoryCoordinator:
             return []
 
         try:
-            messages_list = self._conversation_store.get_recent_messages(1000)
-            return [msg.model_dump() if hasattr(msg, 'model_dump') else msg for msg in messages_list]
+            messages_list = self._conversation_store.get_recent_messages(
+                session_id=self._session_id or "default", count=1000
+            )
+            return [
+                msg.model_dump() if hasattr(msg, 'model_dump') else msg  # type: ignore[misc]
+                for msg in messages_list
+            ]
         except Exception as e:
             logger.warning(f"Failed to get in-memory messages: {e}")
             return []

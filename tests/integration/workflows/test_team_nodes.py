@@ -32,13 +32,13 @@ from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 class TestTeamNodeLoading:
     """Test loading YAML workflows with team nodes."""
 
-    def test_load_team_node_example(self):
+    def test_load_team_node_example(self) -> None:
         """Test that team_node_example.yaml can be loaded."""
         workflows = load_workflow_from_file("victor/coding/workflows/team_node_example.yaml")
         assert isinstance(workflows, dict)
         assert "team_node_demo" in workflows
 
-    def test_compile_team_workflow(self):
+    def test_compile_team_workflow(self) -> None:
         """Test compiling workflow with team nodes."""
         compiler = UnifiedWorkflowCompiler()
         workflows = load_workflow_from_file("victor/coding/workflows/team_node_example.yaml")
@@ -47,7 +47,7 @@ class TestTeamNodeLoading:
             compiled = compiler.compile_definition(workflow_def)
             assert compiled is not None
 
-    def test_team_node_has_required_fields(self):
+    def test_team_node_has_required_fields(self) -> None:
         """Test that team nodes have all required fields."""
         from victor.workflows.yaml_loader import _parse_team_node
 
@@ -77,7 +77,7 @@ class TestTeamNodeExecution:
     """Test team node execution with recursion tracking."""
 
     @pytest.mark.asyncio
-    async def test_team_node_within_depth_limit(self):
+    async def test_team_node_within_depth_limit(self) -> None:
         """Test that team nodes execute within depth limit."""
         # Create a simple team node
         team_node = TeamNodeWorkflow(
@@ -105,7 +105,7 @@ class TestTeamNodeExecution:
         recursion_ctx.exit()
 
     @pytest.mark.asyncio
-    async def test_team_node_exceeds_depth_limit(self):
+    async def test_team_node_exceeds_depth_limit(self) -> None:
         """Test that team nodes fail when exceeding depth limit."""
         # Create recursion context with limit of 2
         recursion_ctx = RecursionContext(max_depth=2)
@@ -128,7 +128,7 @@ class TestTeamNodeExecution:
         assert len(error.execution_stack) == 2
 
     @pytest.mark.asyncio
-    async def test_recursion_guard_context_manager(self):
+    async def test_recursion_guard_context_manager(self) -> None:
         """Test RecursionGuard context manager for team execution."""
         recursion_ctx = RecursionContext(max_depth=3)
 
@@ -150,7 +150,7 @@ class TestTeamNodeExecution:
 class TestWorkflowRecursion:
     """Test recursion tracking across workflow execution."""
 
-    def test_workflow_yaml_with_custom_depth(self):
+    def test_workflow_yaml_with_custom_depth(self) -> None:
         """Test loading workflow with custom max_recursion_depth."""
         yaml_content = """
 workflows:
@@ -181,7 +181,7 @@ workflows:
         finally:
             Path(temp_file).unlink()
 
-    def test_runtime_depth_override(self):
+    def test_runtime_depth_override(self) -> None:
         """Test runtime override of max_recursion_depth."""
         # Create a workflow definition
         yaml_content = """
@@ -216,7 +216,7 @@ workflows:
         finally:
             Path(temp_file).unlink()
 
-    def test_depth_info_reporting(self):
+    def test_depth_info_reporting(self) -> None:
         """Test recursion context depth information reporting."""
         recursion_ctx = RecursionContext(max_depth=5)
 
@@ -246,7 +246,7 @@ workflows:
 class TestTeamFormations:
     """Test different team formation types in YAML."""
 
-    def test_sequential_formation(self):
+    def test_sequential_formation(self) -> None:
         """Test sequential team formation parsing."""
         from victor.workflows.yaml_loader import _parse_team_node
 
@@ -267,7 +267,7 @@ class TestTeamFormations:
         node = _parse_team_node(node_data)
         assert node.team_formation == "sequential"
 
-    def test_parallel_formation(self):
+    def test_parallel_formation(self) -> None:
         """Test parallel team formation parsing."""
         from victor.workflows.yaml_loader import _parse_team_node
 
@@ -288,7 +288,7 @@ class TestTeamFormations:
         node = _parse_team_node(node_data)
         assert node.team_formation == "parallel"
 
-    def test_pipeline_formation(self):
+    def test_pipeline_formation(self) -> None:
         """Test pipeline team formation parsing."""
         from victor.workflows.yaml_loader import _parse_team_node
 
@@ -309,7 +309,7 @@ class TestTeamFormations:
         node = _parse_team_node(node_data)
         assert node.team_formation == "pipeline"
 
-    def test_hierarchical_formation(self):
+    def test_hierarchical_formation(self) -> None:
         """Test hierarchical team formation parsing."""
         from victor.workflows.yaml_loader import _parse_team_node
 
@@ -330,7 +330,7 @@ class TestTeamFormations:
         node = _parse_team_node(node_data)
         assert node.team_formation == "hierarchical"
 
-    def test_consensus_formation(self):
+    def test_consensus_formation(self) -> None:
         """Test consensus team formation parsing."""
         from victor.workflows.yaml_loader import _parse_team_node
 
@@ -355,7 +355,7 @@ class TestTeamFormations:
 class TestTeamNodeMembers:
     """Test team member configuration in YAML."""
 
-    def test_member_configuration_parsing(self):
+    def test_member_configuration_parsing(self) -> None:
         """Test parsing team member configuration."""
         from victor.workflows.yaml_loader import _parse_team_node
 
@@ -408,7 +408,7 @@ class TestTeamNodeMembers:
         assert member2["tool_budget"] == 25
         assert "write" in member2["tools"]
 
-    def test_team_node_optional_fields(self):
+    def test_team_node_optional_fields(self) -> None:
         """Test team node with optional fields."""
         from victor.workflows.yaml_loader import _parse_team_node
 
@@ -447,7 +447,7 @@ class TestTeamNodeMembers:
 class TestTeamNodeInRealWorkflow:
     """Test team nodes within actual workflow definitions."""
 
-    def test_team_node_in_workflow_graph(self):
+    def test_team_node_in_workflow_graph(self) -> None:
         """Test that team nodes integrate into workflow graphs."""
         yaml_content = """
 workflows:
@@ -516,7 +516,7 @@ workflows:
         finally:
             Path(temp_file).unlink()
 
-    def test_multiple_team_nodes_in_workflow(self):
+    def test_multiple_team_nodes_in_workflow(self) -> None:
         """Test workflow with multiple team nodes."""
         yaml_content = """
 workflows:
@@ -616,7 +616,7 @@ workflows:
 class TestTeamNodeErrorHandling:
     """Test error handling in team node execution."""
 
-    def test_team_node_missing_required_fields(self):
+    def test_team_node_missing_required_fields(self) -> None:
         """Test that team node requires id field."""
         from victor.workflows.yaml_loader import _parse_team_node, YAMLWorkflowError
 
@@ -637,7 +637,7 @@ class TestTeamNodeErrorHandling:
         with pytest.raises(YAMLWorkflowError, match="missing required 'id' field"):
             _parse_team_node(node_data)
 
-    def test_team_node_default_values(self):
+    def test_team_node_default_values(self) -> None:
         """Test that team node has sensible default values."""
         from victor.workflows.yaml_loader import _parse_team_node
 

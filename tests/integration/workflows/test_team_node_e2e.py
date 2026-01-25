@@ -101,7 +101,7 @@ class TestSimpleTeamNodeExecution:
     """Test simple team node execution within recursion depth limit."""
 
     @pytest.mark.asyncio
-    async def test_team_node_at_depth_zero(self):
+    async def test_team_node_at_depth_zero(self) -> None:
         """Test team node execution at top level (depth 0 -> 1)."""
         # Create recursion context with max_depth=3
         recursion_ctx = RecursionContext(max_depth=3)
@@ -119,7 +119,7 @@ class TestSimpleTeamNodeExecution:
         assert recursion_ctx.current_depth == 0
 
     @pytest.mark.asyncio
-    async def test_team_node_within_workflow(self):
+    async def test_team_node_within_workflow(self) -> None:
         """Test team node execution within a workflow (depth 1 -> 2)."""
         recursion_ctx = RecursionContext(max_depth=3)
 
@@ -140,7 +140,7 @@ class TestSimpleTeamNodeExecution:
         assert recursion_ctx.current_depth == 0
 
     @pytest.mark.asyncio
-    async def test_team_node_with_coordinator(self):
+    async def test_team_node_with_coordinator(self) -> None:
         """Test team node execution via UnifiedTeamCoordinator."""
         # Create lightweight coordinator
         coordinator = create_coordinator(lightweight=True)
@@ -177,7 +177,7 @@ class TestNestedTeamNodes:
     """Test nested team node execution with proper recursion tracking."""
 
     @pytest.mark.asyncio
-    async def test_workflow_team_team_nesting(self):
+    async def test_workflow_team_team_nesting(self) -> None:
         """Test workflow -> team -> team nesting (depth 0 -> 1 -> 2 -> 3)."""
         recursion_ctx = RecursionContext(max_depth=3)
 
@@ -206,7 +206,7 @@ class TestNestedTeamNodes:
         assert recursion_ctx.current_depth == 0
 
     @pytest.mark.asyncio
-    async def test_nested_team_coordinators(self):
+    async def test_nested_team_coordinators(self) -> None:
         """Test nested team coordinators share recursion context."""
         # Create shared recursion context
         shared_ctx = RecursionContext(max_depth=3)
@@ -244,7 +244,7 @@ class TestNestedTeamNodes:
         assert shared_ctx.current_depth == 0
 
     @pytest.mark.asyncio
-    async def test_team_spawning_workflow_spawning_team(self):
+    async def test_team_spawning_workflow_spawning_team(self) -> None:
         """Test team -> workflow -> team nesting pattern."""
         recursion_ctx = RecursionContext(max_depth=4)
 
@@ -284,7 +284,7 @@ class TestRecursionLimitEnforcement:
     """Test recursion limit enforcement for team nodes."""
 
     @pytest.mark.asyncio
-    async def test_team_exceeds_max_depth(self):
+    async def test_team_exceeds_max_depth(self) -> None:
         """Test that team node fails when exceeding max_depth."""
         recursion_ctx = RecursionContext(max_depth=2)
 
@@ -308,7 +308,7 @@ class TestRecursionLimitEnforcement:
         assert "team:middle" in error.execution_stack
 
     @pytest.mark.asyncio
-    async def test_team_node_prevents_infinite_recursion(self):
+    async def test_team_node_prevents_infinite_recursion(self) -> None:
         """Test that team nodes prevent infinite recursion chains."""
         recursion_ctx = RecursionContext(max_depth=3)
 
@@ -335,7 +335,7 @@ class TestRecursionLimitEnforcement:
             recursion_ctx.enter("team", "team_1")
 
     @pytest.mark.asyncio
-    async def test_coordinator_respects_recursion_limit(self):
+    async def test_coordinator_respects_recursion_limit(self) -> None:
         """Test that coordinator respects recursion context limits."""
         # Create context with low limit
         recursion_ctx = RecursionContext(max_depth=1)
@@ -366,7 +366,7 @@ class TestTeamFormationTypes:
     """Test all team formation types with recursion tracking."""
 
     @pytest.mark.asyncio
-    async def test_sequential_formation(self):
+    async def test_sequential_formation(self) -> None:
         """Test sequential formation with recursion tracking."""
         recursion_ctx = RecursionContext(max_depth=3)
         coordinator = create_coordinator(lightweight=True, recursion_context=recursion_ctx)
@@ -391,7 +391,7 @@ class TestTeamFormationTypes:
         assert member3.execute_count == 1
 
     @pytest.mark.asyncio
-    async def test_parallel_formation(self):
+    async def test_parallel_formation(self) -> None:
         """Test parallel formation with recursion tracking."""
         recursion_ctx = RecursionContext(max_depth=3)
         coordinator = create_coordinator(lightweight=True, recursion_context=recursion_ctx)
@@ -414,7 +414,7 @@ class TestTeamFormationTypes:
         assert member2.execute_count == 1
 
     @pytest.mark.asyncio
-    async def test_pipeline_formation(self):
+    async def test_pipeline_formation(self) -> None:
         """Test pipeline formation with recursion tracking."""
         recursion_ctx = RecursionContext(max_depth=3)
         coordinator = create_coordinator(lightweight=True, recursion_context=recursion_ctx)
@@ -438,7 +438,7 @@ class TestTeamFormationTypes:
         assert "Stage 3 output" in result["final_output"]
 
     @pytest.mark.asyncio
-    async def test_hierarchical_formation(self):
+    async def test_hierarchical_formation(self) -> None:
         """Test hierarchical formation with recursion tracking."""
         recursion_ctx = RecursionContext(max_depth=3)
         coordinator = create_coordinator(lightweight=True, recursion_context=recursion_ctx)
@@ -462,7 +462,7 @@ class TestTeamFormationTypes:
         assert result["formation"] == "hierarchical"
 
     @pytest.mark.asyncio
-    async def test_consensus_formation(self):
+    async def test_consensus_formation(self) -> None:
         """Test consensus formation with recursion tracking."""
         recursion_ctx = RecursionContext(max_depth=3)
         coordinator = create_coordinator(lightweight=True, recursion_context=recursion_ctx)
@@ -495,7 +495,7 @@ class TestCustomMaxRecursionDepth:
     """Test custom max_recursion_depth configuration via metadata."""
 
     @pytest.mark.asyncio
-    async def test_team_node_with_custom_depth_in_metadata(self):
+    async def test_team_node_with_custom_depth_in_metadata(self) -> None:
         """Test team node with custom max_recursion_depth in shared_context."""
         # Create team node with custom recursion depth
         team_node = TeamNodeWorkflow(
@@ -518,7 +518,7 @@ class TestCustomMaxRecursionDepth:
         assert custom_ctx.can_nest(5) is True
 
     @pytest.mark.asyncio
-    async def test_team_node_metadata_propagation(self):
+    async def test_team_node_metadata_propagation(self) -> None:
         """Test that team node shared_context propagates to execution context."""
         team_node = TeamNodeWorkflow(
             id="metadata_test",
@@ -546,7 +546,7 @@ class TestCustomMaxRecursionDepth:
         assert team_node.shared_context["custom_flag"] is True
 
     @pytest.mark.asyncio
-    async def test_coordinator_with_custom_context_from_metadata(self):
+    async def test_coordinator_with_custom_context_from_metadata(self) -> None:
         """Test coordinator created with custom context from metadata."""
         # Simulate extracting custom depth from node shared_context
         shared_context = {"max_recursion_depth": 10}
@@ -586,7 +586,7 @@ class TestRuntimeParameterOverride:
     """Test runtime parameter override for max_recursion_depth."""
 
     @pytest.mark.asyncio
-    async def test_runtime_override_max_depth(self):
+    async def test_runtime_override_max_depth(self) -> None:
         """Test overriding max_recursion_depth at runtime."""
         # Create context with default limit
         recursion_ctx = RecursionContext(max_depth=3)
@@ -604,7 +604,7 @@ class TestRuntimeParameterOverride:
         assert override_ctx.can_nest(7) is True
 
     @pytest.mark.asyncio
-    async def test_coordinator_runtime_depth_override(self):
+    async def test_coordinator_runtime_depth_override(self) -> None:
         """Test coordinator respecting runtime depth override."""
         # Create coordinator with default context
         default_ctx = RecursionContext(max_depth=3)
@@ -621,7 +621,7 @@ class TestRuntimeParameterOverride:
         assert override_coordinator.can_spawn_nested() is True
 
     @pytest.mark.asyncio
-    async def test_workflow_execution_with_runtime_params(self):
+    async def test_workflow_execution_with_runtime_params(self) -> None:
         """Test workflow execution passing runtime recursion params."""
         from victor.workflows.definition import WorkflowBuilder
 
@@ -663,7 +663,7 @@ class TestTeamNodeErrorHandling:
     """Test team node error handling and recovery scenarios."""
 
     @pytest.mark.asyncio
-    async def test_member_failure_with_continue_on_error(self):
+    async def test_member_failure_with_continue_on_error(self) -> None:
         """Test team continues when member fails with continue_on_error=True."""
         recursion_ctx = RecursionContext(max_depth=3)
         coordinator = create_coordinator(lightweight=True, recursion_context=recursion_ctx)
@@ -684,7 +684,7 @@ class TestTeamNodeErrorHandling:
         assert "member_results" in result
 
     @pytest.mark.asyncio
-    async def test_team_timeout_handling(self):
+    async def test_team_timeout_handling(self) -> None:
         """Test team node timeout handling."""
         recursion_ctx = RecursionContext(max_depth=3)
         coordinator = create_coordinator(lightweight=True, recursion_context=recursion_ctx)
@@ -711,7 +711,7 @@ class TestTeamNodeErrorHandling:
         assert "member_results" in result
 
     @pytest.mark.asyncio
-    async def test_recursion_error_recovery(self):
+    async def test_recursion_error_recovery(self) -> None:
         """Test recovery from RecursionDepthError."""
         recursion_ctx = RecursionContext(max_depth=2)
 
@@ -747,7 +747,7 @@ class TestTeamMemberConfiguration:
     """Test team node with various member configurations."""
 
     @pytest.mark.asyncio
-    async def test_team_with_role_configuration(self):
+    async def test_team_with_role_configuration(self) -> None:
         """Test team node with explicit role configuration."""
         # Create team with role-based members (using dict format)
         team_node = TeamNodeWorkflow(
@@ -781,7 +781,7 @@ class TestTeamMemberConfiguration:
         assert team_node.members[2]["role"] == "executor"
 
     @pytest.mark.asyncio
-    async def test_team_with_expertise_configuration(self):
+    async def test_team_with_expertise_configuration(self) -> None:
         """Test team node with expertise tags."""
         team_node = TeamNodeWorkflow(
             id="expertise_team",
@@ -817,7 +817,7 @@ class TestTeamMemberConfiguration:
         assert "optimization" in performance_member["expertise"]
 
     @pytest.mark.asyncio
-    async def test_team_with_personality_configuration(self):
+    async def test_team_with_personality_configuration(self) -> None:
         """Test team node with personality configuration."""
         team_node = TeamNodeWorkflow(
             id="personality_team",
@@ -857,7 +857,7 @@ class TestTeamMemberConfiguration:
         assert "objectively" in team_node.members[2]["backstory"].lower()
 
     @pytest.mark.asyncio
-    async def test_team_with_mixed_configuration(self):
+    async def test_team_with_mixed_configuration(self) -> None:
         """Test team node with mixed role, expertise, and personality."""
         team_node = TeamNodeWorkflow(
             id="mixed_config_team",
@@ -923,7 +923,7 @@ class TestWorkflowCompilerIntegration:
     """Test team node integration with UnifiedWorkflowCompiler."""
 
     @pytest.mark.asyncio
-    async def test_compile_workflow_with_team_node(self):
+    async def test_compile_workflow_with_team_node(self) -> None:
         """Test that team nodes can be created and serialized."""
         # Create team node
         team_node = TeamNodeWorkflow(
@@ -958,7 +958,7 @@ class TestWorkflowCompilerIntegration:
         assert team_dict["team_formation"] == "parallel"
 
     @pytest.mark.asyncio
-    async def test_team_node_in_yaml_workflow(self):
+    async def test_team_node_in_yaml_workflow(self) -> None:
         """Test loading team node from YAML workflow definition."""
         from victor.workflows import load_workflow_from_file
 
@@ -992,7 +992,7 @@ class TestRecursionContextStateManagement:
     """Test recursion context state management across team executions."""
 
     @pytest.mark.asyncio
-    async def test_context_isolation_between_teams(self):
+    async def test_context_isolation_between_teams(self) -> None:
         """Test that different teams have isolated recursion contexts."""
         # Create separate contexts for different teams
         ctx1 = RecursionContext(max_depth=3)
@@ -1021,7 +1021,7 @@ class TestRecursionContextStateManagement:
         assert ctx1.can_nest(2) is False  # Cannot go to 4
 
     @pytest.mark.asyncio
-    async def test_context_cleanup_after_team_execution(self):
+    async def test_context_cleanup_after_team_execution(self) -> None:
         """Test that recursion context is properly cleaned up after execution."""
         recursion_ctx = RecursionContext(max_depth=3)
 
@@ -1040,7 +1040,7 @@ class TestRecursionContextStateManagement:
         assert len(recursion_ctx.execution_stack) == 0
 
     @pytest.mark.asyncio
-    async def test_multiple_sequential_team_executions(self):
+    async def test_multiple_sequential_team_executions(self) -> None:
         """Test multiple team executions in sequence with same context."""
         recursion_ctx = RecursionContext(max_depth=3)
 
@@ -1074,7 +1074,7 @@ class TestTeamNodeEdgeCases:
     """Test edge cases and corner cases for team node execution."""
 
     @pytest.mark.asyncio
-    async def test_empty_team_execution(self):
+    async def test_empty_team_execution(self) -> None:
         """Test behavior when team has no members."""
         recursion_ctx = RecursionContext(max_depth=3)
         coordinator = create_coordinator(lightweight=True, recursion_context=recursion_ctx)
@@ -1089,7 +1089,7 @@ class TestTeamNodeEdgeCases:
         assert "error" in result
 
     @pytest.mark.asyncio
-    async def test_single_member_team(self):
+    async def test_single_member_team(self) -> None:
         """Test team with only one member."""
         recursion_ctx = RecursionContext(max_depth=3)
         coordinator = create_coordinator(lightweight=True, recursion_context=recursion_ctx)
@@ -1106,7 +1106,7 @@ class TestTeamNodeEdgeCases:
         assert member.execute_count == 1
 
     @pytest.mark.asyncio
-    async def test_team_formation_switching(self):
+    async def test_team_formation_switching(self) -> None:
         """Test switching formations between executions."""
         recursion_ctx = RecursionContext(max_depth=3)
         coordinator = create_coordinator(lightweight=True, recursion_context=recursion_ctx)
@@ -1131,7 +1131,7 @@ class TestTeamNodeEdgeCases:
         assert result3["formation"] == "pipeline"
 
     @pytest.mark.asyncio
-    async def test_max_recursion_depth_zero(self):
+    async def test_max_recursion_depth_zero(self) -> None:
         """Test behavior when max_recursion_depth is set to 0."""
         # Edge case: max_depth = 0 means no nesting allowed
         recursion_ctx = RecursionContext(max_depth=0)
@@ -1144,7 +1144,7 @@ class TestTeamNodeEdgeCases:
             recursion_ctx.enter("team", "test_team")
 
     @pytest.mark.asyncio
-    async def test_very_large_max_recursion_depth(self):
+    async def test_very_large_max_recursion_depth(self) -> None:
         """Test behavior with very large max_recursion_depth."""
         # Large limit for deep nesting scenarios
         recursion_ctx = RecursionContext(max_depth=1000)
@@ -1155,7 +1155,7 @@ class TestTeamNodeEdgeCases:
         assert recursion_ctx.can_nest(1001) is False
 
     @pytest.mark.asyncio
-    async def test_recursion_depth_info_reporting(self):
+    async def test_recursion_depth_info_reporting(self) -> None:
         """Test recursion depth information reporting."""
         recursion_ctx = RecursionContext(max_depth=5)
 

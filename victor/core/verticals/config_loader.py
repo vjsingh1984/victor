@@ -284,7 +284,7 @@ class VerticalConfigLoader:
                 raise ValueError(f"Prompt file not found: {file_path}")
 
             with open(path, "r") as f:
-                return f.read()
+                return f.read()  # type: ignore[return-value]
 
         else:
             raise ValueError(f"Unknown prompt source: {source}")

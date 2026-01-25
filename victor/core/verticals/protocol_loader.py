@@ -82,14 +82,26 @@ from typing import (
     Optional,
     Type,
     TYPE_CHECKING,
+    Protocol as TypingProtocol,
 )
-from typing import Protocol as TypingProtocol
 from typing import runtime_checkable
 
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import VerticalExtensions
 
 logger = logging.getLogger(__name__)
+
+
+# Re-export Protocol for convenience
+__all__ = [
+    "ProtocolBasedExtensionLoader",
+    "ProtocolImplementationEntry",
+    "register_protocol_implementation",
+    "implements_protocol",
+]
+
+# Use typing.Protocol for all annotations
+Protocol = TypingProtocol
 
 
 # =============================================================================
@@ -386,7 +398,7 @@ class ProtocolBasedExtensionLoader:
         return implemented
 
     @classmethod
-    def list_verticals(cls, protocol_type: Type[Protocol]) -> List[Type[Any]]:
+    def list_verticals(cls, protocol_type: Type[TypingProtocol]) -> List[Type[Any]]:
         """List all verticals implementing a protocol.
 
         Args:
@@ -437,7 +449,7 @@ class ProtocolBasedExtensionLoader:
     def clear_cache(
         cls,
         vertical_class: Optional[Type[Any]] = None,
-        protocol_type: Optional[Type[Protocol]] = None,
+        protocol_type: Optional[Type[TypingProtocol]] = None,
     ) -> None:
         """Clear protocol cache entries.
 

@@ -49,7 +49,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Dict, List, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union
 
 from victor.framework.module_loader import get_entry_point_cache
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
@@ -123,7 +123,7 @@ class VerticalLoader:
         else:
             logger.debug(f"Eager loading enabled for verticals (mode: {mode})")
 
-    def load(self, name: str, lazy: Optional[bool] = None) -> Union[Type[VerticalBase], any]:
+    def load(self, name: str, lazy: Optional[bool] = None) -> Union[Type[VerticalBase], Any]:
         """Load and activate a vertical by name.
 
         Searches for verticals in this order:
@@ -159,7 +159,7 @@ class VerticalLoader:
         if use_lazy:
             from victor.core.verticals.lazy_proxy import LazyProxy, LazyProxyType
 
-            def _load_vertical():
+            def _load_vertical() -> Type[VerticalBase]:
                 self._activate(vertical)
                 return vertical
 
@@ -286,7 +286,7 @@ class VerticalLoader:
             except Exception as e:
                 logger.warning("Failed to load vertical entry point '%s': %s", name, e)
 
-    def _load_entry_point(self, name: str, value: str) -> Type[Any]:
+    def _load_entry_point(self, name: str, value: str) -> Type[Any]:  # noqa: ANN401
         """Load an entry point by its value string.
 
         Args:
@@ -306,7 +306,6 @@ class VerticalLoader:
 
         module = importlib.import_module(module_name)
         result = getattr(module, attr_name)
-        # Type: ignore because getattr returns Any
         return result  # type: ignore[return-value]
 
     def discover_tools(
@@ -493,7 +492,7 @@ class VerticalLoader:
         except Exception as e:
             logger.error("Failed to register vertical services: %s", e)
 
-    def get_config(self):
+    def get_config(self) -> Optional[Any]:
         """Get configuration from active vertical.
 
         Returns:
@@ -546,7 +545,7 @@ def get_vertical_loader() -> VerticalLoader:
     return _loader
 
 
-def load_vertical(name: str, lazy: Optional[bool] = None) -> Union[Type[VerticalBase], any]:
+def load_vertical(name: str, lazy: Optional[bool] = None) -> Union[Type[VerticalBase], Any]:
     """Load a vertical by name (convenience function).
 
     Args:

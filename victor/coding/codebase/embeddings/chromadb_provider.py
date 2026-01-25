@@ -78,8 +78,8 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         if not CHROMADB_AVAILABLE:
             raise ImportError("ChromaDB not available. Install with: pip install chromadb")
 
-        self.client: Optional[chromadb.Client] = None
-        self.collection: Optional[chromadb.Collection] = None
+        self.client: Optional[Any] = None  # chromadb.Client
+        self.collection: Optional[Any] = None  # chromadb.Collection
         self.embedding_model: Optional[BaseEmbeddingModel] = None
 
     async def initialize(self) -> None:
@@ -154,6 +154,9 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         if not self._initialized:
             await self.initialize()
 
+        if self.embedding_model is None:
+            raise RuntimeError("Embedding model not initialized")
+
         return await self.embedding_model.embed_text(text)
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
@@ -167,6 +170,9 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         """
         if not self._initialized:
             await self.initialize()
+
+        if self.embedding_model is None:
+            raise RuntimeError("Embedding model not initialized")
 
         return await self.embedding_model.embed_batch(texts)
 
@@ -185,6 +191,9 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         embedding = await self.embed_text(content)
 
         # Add to ChromaDB
+        if self.collection is None:
+            raise RuntimeError("Collection not initialized")
+
         self.collection.add(
             ids=[doc_id],
             embeddings=[embedding],
@@ -216,6 +225,9 @@ class ChromaDBProvider(BaseEmbeddingProvider):
 
         # Batch add to ChromaDB
         batch_size = self.config.extra_config.get("batch_size", 100)
+
+        if self.collection is None:
+            raise RuntimeError("Collection not initialized")
 
         for i in range(0, len(documents), batch_size):
             batch_ids = ids[i : i + batch_size]
@@ -255,7 +267,10 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         query_embedding = await self.embed_text(query)
 
         # Search in ChromaDB
-        results = self.collection.query(
+        if self.collection is None:
+            raise RuntimeError("Collection not initialized")
+
+        results: Any = self.collection.query(
             query_embeddings=[query_embedding],
             n_results=limit,
             where=filter_metadata,
@@ -265,23 +280,28 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         # Convert to EmbeddingSearchResult objects
         search_results = []
         if results["ids"] and results["ids"][0]:
-            for i in range(len(results["ids"][0])):
-                content = results["documents"][0][i]
-                metadata = results["metadatas"][0][i]
-                distance = results["distances"][0][i]
+            ids_list = results["ids"][0]
+            docs_list = results.get("documents", [[]])
+            metas_list = results.get("metadatas", [[]])
+            dists_list = results.get("distances", [[]])
+
+            for i in range(len(ids_list)):
+                content = docs_list[0][i] if docs_list and docs_list[0] else ""
+                metadata = metas_list[0][i] if metas_list and metas_list[0] else {}
+                distance = dists_list[0][i] if dists_list and dists_list[0] else 0.0
 
                 # Convert distance to similarity score (0-1, higher is better)
                 # For cosine distance: similarity = 1 - distance
-                score = 1.0 - distance
+                score = 1.0 - distance if isinstance(distance, (int, float)) else 0.0
 
                 search_results.append(
                     EmbeddingSearchResult(
-                        file_path=metadata.get("file_path", ""),
-                        symbol_name=metadata.get("symbol_name"),
-                        content=content,
-                        score=score,
-                        line_number=metadata.get("line_number"),
-                        metadata=metadata,
+                        file_path=str(metadata.get("file_path", "")),
+                        symbol_name=str(metadata.get("symbol_name", "")) if metadata.get("symbol_name") else None,
+                        content=str(content),
+                        score=float(score),
+                        line_number=int(metadata["line_number"]) if metadata.get("line_number") else None,
+                        metadata=dict(metadata) if metadata else {},
                     )
                 )
 
@@ -295,6 +315,9 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         """
         if not self._initialized:
             await self.initialize()
+
+        if self.collection is None:
+            return
 
         self.collection.delete(ids=[doc_id])
 
@@ -313,6 +336,9 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         if not self._initialized:
             await self.initialize()
 
+        if self.collection is None:
+            return 0
+
         # Count documents before deletion
         count_before = self.collection.count()
 
@@ -328,6 +354,9 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         """Clear entire index."""
         if not self._initialized:
             await self.initialize()
+
+        if self.collection is None or self.client is None:
+            return
 
         # Delete collection and recreate
         collection_name = self.collection.name
@@ -349,7 +378,11 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         if not self._initialized:
             await self.initialize()
 
-        count = self.collection.count()
+        count = 0
+        collection_name = ""
+        if self.collection is not None:
+            count = self.collection.count()
+            collection_name = self.collection.name
 
         return {
             "provider": "chromadb",
@@ -358,7 +391,7 @@ class ChromaDBProvider(BaseEmbeddingProvider):
             "embedding_model": self.config.embedding_model,
             "dimension": self.embedding_model.get_dimension() if self.embedding_model else 4096,
             "distance_metric": self.config.distance_metric,
-            "collection_name": self.collection.name,
+            "collection_name": collection_name,
             "persist_directory": self.config.persist_directory,
         }
 

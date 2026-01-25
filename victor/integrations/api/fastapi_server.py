@@ -759,28 +759,28 @@ class VictorFastAPIServer:
 
                 for provider_name in ProviderRegistry.list_providers():
                     try:
-                        provider = ProviderRegistry.get(provider_name)
-                        if provider is not None:
+                        provider_class = ProviderRegistry.get(provider_name)
+                        if provider_class is not None:
+                            # Try to instantiate provider to check capabilities
+                            supports_tools = False
+                            supports_streaming = True
+                            configured = True
+                            try:
+                                provider_instance = provider_class()
+                                supports_tools = provider_instance.supports_tools() if hasattr(provider_instance, "supports_tools") else False
+                                supports_streaming = provider_instance.supports_streaming() if hasattr(provider_instance, "supports_streaming") else True
+                                configured = provider_instance.is_configured() if hasattr(provider_instance, "is_configured") else True
+                            except Exception:
+                                pass
+
                             providers_info.append(
                                 {
                                     "name": provider_name,
                                     "display_name": provider_name.replace("_", " ").title(),
                                     "is_local": provider_name in ("ollama", "lmstudio", "vllm"),
-                                    "configured": (
-                                        provider.is_configured()
-                                        if hasattr(provider, "is_configured")
-                                        else True
-                                    ),
-                                    "supports_tools": (
-                                        provider.supports_tools()
-                                        if hasattr(provider, "supports_tools")
-                                        else False
-                                    ),
-                                    "supports_streaming": (
-                                        provider.supports_streaming()
-                                        if hasattr(provider, "supports_streaming")
-                                        else True
-                                    ),
+                                    "configured": configured,
+                                    "supports_tools": supports_tools,
+                                    "supports_streaming": supports_streaming,
                                 }
                             )
                     except Exception as e:
@@ -818,14 +818,16 @@ class VictorFastAPIServer:
 
                 if vertical:
                     manifest = discovery.discover_by_vertical(vertical)
+                    # Convert to dict if it's a dataclass
+                    if hasattr(manifest, "__dict__"):
+                        return JSONResponse(manifest.__dict__)
                     return JSONResponse(manifest)
                 else:
                     manifest = discovery.discover_all()
-                    # Handle both dict and manifest object types
-                    if hasattr(manifest, "to_dict"):
-                        return JSONResponse(manifest.to_dict())
-                    else:
-                        return JSONResponse(manifest)
+                    # Convert to dict if it's a dataclass
+                    if hasattr(manifest, "__dict__"):
+                        return JSONResponse(manifest.__dict__)
+                    return JSONResponse(manifest)
 
             except Exception as e:
                 logger.exception("Capabilities discovery error")

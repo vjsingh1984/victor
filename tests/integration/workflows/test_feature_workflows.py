@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Any
+
 
 """Integration tests for feature workflows YAML.
 
@@ -33,13 +35,13 @@ from victor.workflows.yaml_loader import load_workflow_from_yaml
 class TestFeatureWorkflowYAML:
     """Integration tests for feature_workflows.yaml."""
 
-    def test_yaml_file_exists(self):
+    def test_yaml_file_exists(self) -> None:
         """Test that feature_workflows.yaml file exists."""
         yaml_path = Path("victor/workflows/feature_workflows.yaml")
         assert yaml_path.exists()
         assert yaml_path.is_file()
 
-    def test_yaml_loads_successfully(self):
+    def test_yaml_loads_successfully(self) -> None:
         """Test that YAML file can be loaded without errors."""
         yaml_path = Path("victor/workflows/feature_workflows.yaml")
 
@@ -53,7 +55,7 @@ class TestFeatureWorkflowYAML:
         except Exception as e:
             pytest.fail(f"Failed to load YAML: {e}")
 
-    def test_yaml_has_python_feature_workflow(self):
+    def test_yaml_has_python_feature_workflow(self) -> None:
         """Test that YAML contains python_feature workflow."""
         yaml_path = Path("victor/workflows/feature_workflows.yaml")
         yaml_content = yaml_path.read_text()
@@ -67,7 +69,7 @@ class TestFeatureWorkflowYAML:
         assert workflow.metadata
         assert workflow.nodes
 
-    def test_python_feature_workflow_structure(self):
+    def test_python_feature_workflow_structure(self) -> None:
         """Test that python_feature workflow has correct structure."""
         yaml_path = Path("victor/workflows/feature_workflows.yaml")
         yaml_content = yaml_path.read_text()
@@ -85,7 +87,7 @@ class TestFeatureWorkflowYAML:
         # WorkflowNode objects have different attributes than YAML dicts
         assert hasattr(first_node, "role") or hasattr(first_node, "type")
 
-    def test_python_feature_with_git_workflow_exists(self):
+    def test_python_feature_with_git_workflow_exists(self) -> None:
         """Test that YAML contains python_feature_with_git workflow."""
         yaml_path = Path("victor/workflows/feature_workflows.yaml")
         yaml_content = yaml_path.read_text()
@@ -102,17 +104,17 @@ class TestFeatureWorkflowYAML:
 class TestTextNormalizationInWorkflow:
     """Tests for text normalization functions used in workflow."""
 
-    def test_normalize_for_git_branch(self):
+    def test_normalize_for_git_branch(self) -> None:
         """Test git branch name normalization."""
         branch = normalize_for_git_branch("User Authentication", prefix="feature/")
         assert branch == "feature/user-authentication"
 
-    def test_normalize_for_filename(self):
+    def test_normalize_for_filename(self) -> None:
         """Test filename normalization."""
         filename = normalize_for_filename("User Authentication", extension=".py")
         assert filename == "user_authentication.py"
 
-    def test_normalize_for_test_filename(self):
+    def test_normalize_for_test_filename(self) -> None:
         """Test test filename normalization."""
         test_file = normalize_for_test_filename("User Authentication")
         assert test_file == "test_user_authentication.py"
@@ -122,7 +124,7 @@ class TestScaffoldFromTemplate:
     """Tests for scaffold from-template operation used in workflow."""
 
     @pytest.mark.asyncio
-    async def test_scaffold_python_feature_template(self):
+    async def test_scaffold_python_feature_template(self) -> None:
         """Test creating files from python_feature template."""
         import os
 
@@ -165,7 +167,7 @@ class TestWorkflowIntegration:
     """End-to-end integration tests for workflow components."""
 
     @pytest.mark.asyncio
-    async def test_complete_feature_creation_workflow(self):
+    async def test_complete_feature_creation_workflow(self) -> None:
         """Test complete workflow: normalize → create files."""
         import os
 
@@ -219,7 +221,7 @@ class TestWorkflowIntegration:
             finally:
                 os.chdir(old_cwd)
 
-    def test_workflow_yaml_valid_structure(self):
+    def test_workflow_yaml_valid_structure(self) -> None:
         """Test that workflow YAML follows expected structure."""
         yaml_path = Path("victor/workflows/feature_workflows.yaml")
         yaml_content = yaml_path.read_text()
@@ -246,7 +248,7 @@ class TestWorkflowIntegration:
 class TestWorkflowNodeDefinitions:
     """Tests for individual workflow node definitions."""
 
-    def test_create_feature_files_node(self):
+    def test_create_feature_files_node(self) -> None:
         """Test create_feature_files node definition."""
         yaml_path = Path("victor/workflows/feature_workflows.yaml")
         yaml_content = yaml_path.read_text()
@@ -264,7 +266,7 @@ class TestWorkflowNodeDefinitions:
         if hasattr(create_node, "allowed_tools") and create_node.allowed_tools:
             assert "scaffold" in create_node.allowed_tools
 
-    def test_workflow_with_git_node_order(self):
+    def test_workflow_with_git_node_order(self) -> None:
         """Test that python_feature_with_git has correct node order."""
         yaml_path = Path("victor/workflows/feature_workflows.yaml")
         yaml_content = yaml_path.read_text()

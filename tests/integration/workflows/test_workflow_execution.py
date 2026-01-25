@@ -63,7 +63,7 @@ class TestWorkflowExecution:
     """Integration tests for workflow execution."""
 
     @pytest.mark.asyncio
-    async def test_simple_linear_workflow(self, mock_orchestrator, mock_subagent_result):
+    async def test_simple_linear_workflow(self, mock_orchestrator, mock_subagent_result) -> None:
         """Test execution of a simple linear workflow."""
         from victor.workflows import NodeResult
 
@@ -98,7 +98,7 @@ class TestWorkflowExecution:
         )
 
     @pytest.mark.asyncio
-    async def test_workflow_with_condition(self, mock_orchestrator, mock_subagent_result):
+    async def test_workflow_with_condition(self, mock_orchestrator, mock_subagent_result) -> None:
         """Test workflow with conditional branching."""
         from victor.workflows import NodeResult
 
@@ -136,7 +136,7 @@ class TestWorkflowExecution:
         assert "report" in result.context.node_results
 
     @pytest.mark.asyncio
-    async def test_workflow_skip_branch(self, mock_orchestrator, mock_subagent_result):
+    async def test_workflow_skip_branch(self, mock_orchestrator, mock_subagent_result) -> None:
         """Test workflow takes skip branch when no issues."""
         from victor.workflows import NodeResult
 
@@ -173,7 +173,7 @@ class TestWorkflowExecution:
         assert "fix_step" not in result.context.node_results
 
     @pytest.mark.asyncio
-    async def test_workflow_with_transform(self, mock_orchestrator, mock_subagent_result):
+    async def test_workflow_with_transform(self, mock_orchestrator, mock_subagent_result) -> None:
         """Test workflow with transform node."""
         from victor.workflows import NodeResult
 
@@ -206,7 +206,7 @@ class TestWorkflowExecution:
         assert result.context.data.get("data") == "processed"
 
     @pytest.mark.asyncio
-    async def test_workflow_timeout(self, mock_orchestrator):
+    async def test_workflow_timeout(self, mock_orchestrator) -> None:
         """Test workflow timeout handling."""
         from victor.workflows import NodeResult
 
@@ -235,7 +235,7 @@ class TestWorkflowExecution:
         assert "timed out" in result.error.lower()
 
     @pytest.mark.asyncio
-    async def test_workflow_context_passing(self, mock_orchestrator):
+    async def test_workflow_context_passing(self, mock_orchestrator) -> None:
         """Test that context is passed between nodes."""
         from victor.workflows import NodeResult
 
@@ -278,7 +278,7 @@ class TestWorkflowExecution:
         assert call_count[0] == 2
 
     @pytest.mark.asyncio
-    async def test_workflow_from_yaml(self, mock_orchestrator, mock_subagent_result):
+    async def test_workflow_from_yaml(self, mock_orchestrator, mock_subagent_result) -> None:
         """Test executing a workflow loaded from YAML."""
         from victor.workflows import NodeResult
 
@@ -315,7 +315,7 @@ workflows:
         assert result.workflow_name == "yaml_test"
 
     @pytest.mark.asyncio
-    async def test_workflow_result_aggregation(self, mock_orchestrator):
+    async def test_workflow_result_aggregation(self, mock_orchestrator) -> None:
         """Test that workflow aggregates results from all nodes."""
         from victor.workflows import NodeResult
 
@@ -352,7 +352,7 @@ workflows:
 class TestVerticalWorkflowIntegration:
     """Integration tests for vertical workflow providers."""
 
-    def test_coding_workflow_provider(self):
+    def test_coding_workflow_provider(self) -> None:
         """Test Coding vertical workflow provider."""
         from victor.coding import CodingAssistant
 
@@ -363,7 +363,7 @@ class TestVerticalWorkflowIntegration:
         assert len(workflows) > 0
         assert "code_review" in workflows or "feature_implementation" in workflows
 
-    def test_data_analysis_workflow_provider(self):
+    def test_data_analysis_workflow_provider(self) -> None:
         """Test Data Analysis vertical workflow provider."""
         from victor.dataanalysis import DataAnalysisAssistant
 
@@ -373,7 +373,7 @@ class TestVerticalWorkflowIntegration:
         workflows = provider.get_workflows()
         assert len(workflows) > 0
 
-    def test_research_workflow_provider(self):
+    def test_research_workflow_provider(self) -> None:
         """Test Research vertical workflow provider."""
         from victor.research import ResearchAssistant
 
@@ -384,7 +384,7 @@ class TestVerticalWorkflowIntegration:
         assert len(workflows) > 0
         assert "deep_research" in workflows
 
-    def test_devops_workflow_provider(self):
+    def test_devops_workflow_provider(self) -> None:
         """Test DevOps vertical workflow provider."""
         from victor.devops import DevOpsAssistant
 
@@ -394,7 +394,7 @@ class TestVerticalWorkflowIntegration:
         workflows = provider.get_workflows()
         assert len(workflows) > 0
 
-    def test_workflow_definition_validity(self):
+    def test_workflow_definition_validity(self) -> None:
         """Test that all vertical workflows pass validation."""
         from victor.coding import CodingAssistant
         from victor.dataanalysis import DataAnalysisAssistant
@@ -422,10 +422,10 @@ class TestVerticalWorkflowIntegration:
 class TestWorkflowBuilderIntegration:
     """Integration tests for WorkflowBuilder."""
 
-    def test_complex_workflow_building(self):
+    def test_complex_workflow_building(self) -> None:
         """Test building a complex workflow with all node types."""
 
-        def categorize(ctx):
+        def categorize(ctx: Any) -> Any:
             score = ctx.get("score", 0)
             if score > 80:
                 return "excellent"
@@ -458,7 +458,7 @@ class TestWorkflowBuilderIntegration:
         errors = workflow.validate()
         assert not errors
 
-    def test_workflow_with_hitl_nodes(self):
+    def test_workflow_with_hitl_nodes(self) -> None:
         """Test building workflow with HITL nodes."""
         workflow = (
             WorkflowBuilder("hitl_test", "HITL workflow")
@@ -483,7 +483,7 @@ class TestWorkflowBuilderIntegration:
         assert isinstance(hitl_node, HITLNode)
         assert hitl_node.prompt == "Do you approve these changes?"
 
-    def test_auto_chaining(self):
+    def test_auto_chaining(self) -> None:
         """Test that nodes are auto-chained when no explicit next is provided."""
         workflow = (
             WorkflowBuilder("autochain_test")
@@ -502,7 +502,7 @@ class TestWorkflowBuilderIntegration:
 class TestYAMLWorkflowIntegration:
     """Integration tests for YAML workflow loading."""
 
-    def test_complex_yaml_workflow(self):
+    def test_complex_yaml_workflow(self) -> None:
         """Test loading and validating a complex YAML workflow."""
         yaml_content = """
 workflows:
@@ -565,7 +565,7 @@ workflows:
         errors = workflow.validate()
         assert not errors
 
-    def test_yaml_with_all_node_types(self):
+    def test_yaml_with_all_node_types(self) -> None:
         """Test YAML with agent, condition, parallel, and transform nodes."""
         yaml_content = """
 workflows:

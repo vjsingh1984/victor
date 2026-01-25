@@ -38,7 +38,7 @@ import pytest
 class ConcreteYAMLWorkflowProvider:
     """Concrete implementation of BaseYAMLWorkflowProvider for testing."""
 
-    def __init__(self, workflows_dir: Optional[Path] = None):
+    def __init__(self, workflows_dir: Optional[Path] = None) -> Any:
         self._workflows_dir = workflows_dir
         # Import here to avoid circular imports in fixture scope
         from victor.framework.workflows.base_yaml_provider import BaseYAMLWorkflowProvider
@@ -111,20 +111,20 @@ def mock_orchestrator() -> MagicMock:
 class TestGetCompiler:
     """Tests for the get_compiler() method."""
 
-    def test_get_compiler_returns_unified_compiler(self, test_provider):
+    def test_get_compiler_returns_unified_compiler(self, test_provider) -> None:
         """Test that get_compiler returns a UnifiedWorkflowCompiler."""
         from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
         compiler = test_provider.provider.get_compiler()
         assert isinstance(compiler, UnifiedWorkflowCompiler)
 
-    def test_get_compiler_is_cached(self, test_provider):
+    def test_get_compiler_is_cached(self, test_provider) -> None:
         """Test that get_compiler returns the same instance."""
         compiler1 = test_provider.provider.get_compiler()
         compiler2 = test_provider.provider.get_compiler()
         assert compiler1 is compiler2
 
-    def test_get_compiler_enables_caching(self, test_provider):
+    def test_get_compiler_enables_caching(self, test_provider) -> None:
         """Test that the compiler has caching enabled."""
         compiler = test_provider.provider.get_compiler()
         # Check that caching is enabled via the compiler's internal state
@@ -157,7 +157,7 @@ class TestCompileWorkflow:
                 compiled = test_provider.provider.compile_workflow("test_workflow")
                 assert isinstance(compiled, CachedCompiledGraph)
 
-    def test_compile_workflow_has_workflow_name(self, test_provider, yaml_workflow_file):
+    def test_compile_workflow_has_workflow_name(self, test_provider, yaml_workflow_file) -> None:
         """Test that compiled workflow has correct workflow_name."""
         with patch.object(
             test_provider.provider, "_get_workflow_path", return_value=yaml_workflow_file
@@ -168,7 +168,7 @@ class TestCompileWorkflow:
                 compiled = test_provider.provider.compile_workflow("test_workflow")
                 assert compiled.workflow_name == "test_workflow"
 
-    def test_compile_workflow_raises_for_unknown_workflow(self, test_provider, tmp_path):
+    def test_compile_workflow_raises_for_unknown_workflow(self, test_provider, tmp_path) -> None:
         """Test that compile_workflow raises ValueError for unknown workflow."""
         with pytest.raises(ValueError, match="Workflow not found"):
             test_provider.provider.compile_workflow("nonexistent_workflow")
@@ -182,7 +182,7 @@ class TestCompileWorkflow:
 class TestCachedCompiledGraph:
     """Tests for CachedCompiledGraph functionality."""
 
-    def test_cached_compiled_graph_has_metadata(self):
+    def test_cached_compiled_graph_has_metadata(self) -> None:
         """Test that CachedCompiledGraph has expected metadata attributes."""
         from victor.workflows.unified_compiler import CachedCompiledGraph
 
@@ -199,7 +199,7 @@ class TestCachedCompiledGraph:
         assert cached.source_mtime == 12345.0
         assert cached.compiled_at > 0
 
-    def test_cached_compiled_graph_age_seconds(self):
+    def test_cached_compiled_graph_age_seconds(self) -> None:
         """Test that age_seconds property works correctly."""
         import time
 
@@ -216,7 +216,7 @@ class TestCachedCompiledGraph:
         assert cached.age_seconds >= 0.01
 
     @pytest.mark.asyncio
-    async def test_cached_compiled_graph_invoke_delegates(self):
+    async def test_cached_compiled_graph_invoke_delegates(self) -> None:
         """Test that invoke() delegates to underlying compiled_graph."""
         from unittest.mock import AsyncMock
 
@@ -237,7 +237,7 @@ class TestCachedCompiledGraph:
         assert result is mock_result
 
     @pytest.mark.asyncio
-    async def test_cached_compiled_graph_stream_delegates(self):
+    async def test_cached_compiled_graph_stream_delegates(self) -> None:
         """Test that stream() delegates to underlying compiled_graph."""
         from unittest.mock import AsyncMock
 
@@ -264,7 +264,7 @@ class TestCachedCompiledGraph:
         assert results[0] == ("node1", {"state": 1})
         assert results[1] == ("node2", {"state": 2})
 
-    def test_cached_compiled_graph_get_graph_schema_delegates(self):
+    def test_cached_compiled_graph_get_graph_schema_delegates(self) -> None:
         """Test that get_graph_schema() delegates to underlying compiled_graph."""
         from victor.workflows.unified_compiler import CachedCompiledGraph
 
@@ -290,7 +290,7 @@ class TestCachedCompiledGraph:
 class TestVerticalProviderIntegration:
     """Tests verifying that vertical providers inherit new functionality."""
 
-    def test_research_provider_has_get_compiler(self):
+    def test_research_provider_has_get_compiler(self) -> None:
         """Test that ResearchWorkflowProvider has get_compiler method."""
         try:
             from victor.research.workflows import ResearchWorkflowProvider
@@ -301,7 +301,7 @@ class TestVerticalProviderIntegration:
         except ImportError:
             pytest.skip("ResearchWorkflowProvider not available")
 
-    def test_coding_provider_has_get_compiler(self):
+    def test_coding_provider_has_get_compiler(self) -> None:
         """Test that CodingWorkflowProvider has get_compiler method."""
         try:
             from victor.coding.workflows.provider import CodingWorkflowProvider
@@ -312,7 +312,7 @@ class TestVerticalProviderIntegration:
         except ImportError:
             pytest.skip("CodingWorkflowProvider not available")
 
-    def test_devops_provider_has_compile_workflow(self):
+    def test_devops_provider_has_compile_workflow(self) -> None:
         """Test that DevOpsWorkflowProvider has compile_workflow method."""
         try:
             from victor.devops.workflows import DevOpsWorkflowProvider
@@ -323,7 +323,7 @@ class TestVerticalProviderIntegration:
         except ImportError:
             pytest.skip("DevOpsWorkflowProvider not available")
 
-    def test_dataanalysis_provider_has_run_compiled_workflow(self):
+    def test_dataanalysis_provider_has_run_compiled_workflow(self) -> None:
         """Test that DataAnalysisWorkflowProvider has run_compiled_workflow method."""
         try:
             from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
@@ -343,13 +343,13 @@ class TestVerticalProviderIntegration:
 class TestModuleStructure:
     """Tests for module structure and exports."""
 
-    def test_cached_compiled_graph_exported(self):
+    def test_cached_compiled_graph_exported(self) -> None:
         """Test that CachedCompiledGraph is exported from unified_compiler."""
         from victor.workflows.unified_compiler import CachedCompiledGraph
 
         assert CachedCompiledGraph is not None
 
-    def test_base_yaml_provider_imports_without_error(self):
+    def test_base_yaml_provider_imports_without_error(self) -> None:
         """Test that BaseYAMLWorkflowProvider can be imported."""
         from victor.framework.workflows.base_yaml_provider import BaseYAMLWorkflowProvider
 

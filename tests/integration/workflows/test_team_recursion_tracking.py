@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Any
+
 
 """Integration tests for team coordinator recursion tracking.
 
@@ -33,7 +35,7 @@ from victor.workflows.recursion import RecursionContext, RecursionGuard
 class MockTeamMember:
     """Mock team member for testing."""
 
-    def __init__(self, member_id: str, response: str = "Task complete"):
+    def __init__(self, member_id: str, response: str = "Task complete") -> Any:
         self.id = member_id
         self.role = "test_role"
         self._response = response
@@ -57,7 +59,7 @@ class MockTeamMember:
 class TestTeamCoordinatorRecursionIntegration:
     """Test recursion tracking integration in UnifiedTeamCoordinator."""
 
-    def test_init_with_default_recursion_context(self):
+    def test_init_with_default_recursion_context(self) -> None:
         """Test that coordinator creates default RecursionContext if not provided."""
         coordinator = UnifiedTeamCoordinator(
             orchestrator=None,
@@ -70,7 +72,7 @@ class TestTeamCoordinatorRecursionIntegration:
         assert coordinator._recursion_ctx.max_depth == 3  # Default
         assert coordinator._recursion_ctx.current_depth == 0
 
-    def test_init_with_custom_recursion_context(self):
+    def test_init_with_custom_recursion_context(self) -> None:
         """Test that coordinator accepts custom RecursionContext."""
         custom_ctx = RecursionContext(max_depth=5)
         coordinator = UnifiedTeamCoordinator(
@@ -83,7 +85,7 @@ class TestTeamCoordinatorRecursionIntegration:
         assert coordinator._recursion_ctx is custom_ctx
         assert coordinator._recursion_ctx.max_depth == 5
 
-    def test_get_recursion_depth(self):
+    def test_get_recursion_depth(self) -> None:
         """Test get_recursion_depth returns current depth."""
         coordinator = UnifiedTeamCoordinator(
             orchestrator=None,
@@ -100,7 +102,7 @@ class TestTeamCoordinatorRecursionIntegration:
         # Clean up
         coordinator._recursion_ctx.exit()
 
-    def test_can_spawn_nested(self):
+    def test_can_spawn_nested(self) -> None:
         """Test can_spawn_nested checks recursion limits."""
         coordinator = UnifiedTeamCoordinator(
             orchestrator=None,
@@ -128,7 +130,7 @@ class TestTeamCoordinatorRecursionIntegration:
         coordinator._recursion_ctx.exit()
 
     @pytest.mark.asyncio
-    async def test_execute_task_tracks_recursion_depth(self):
+    async def test_execute_task_tracks_recursion_depth(self) -> None:
         """Test that execute_task properly tracks recursion depth."""
         coordinator = UnifiedTeamCoordinator(
             orchestrator=None,
@@ -149,7 +151,7 @@ class TestTeamCoordinatorRecursionIntegration:
         assert coordinator.get_recursion_depth() == 0
 
     @pytest.mark.asyncio
-    async def test_execute_task_with_nested_recursion(self):
+    async def test_execute_task_with_nested_recursion(self) -> None:
         """Test execute_task with pre-existing recursion depth."""
         custom_ctx = RecursionContext(max_depth=3)
         coordinator = UnifiedTeamCoordinator(
@@ -179,7 +181,7 @@ class TestTeamCoordinatorRecursionIntegration:
         custom_ctx.exit()
 
     @pytest.mark.asyncio
-    async def test_execute_task_respects_recursion_limit(self):
+    async def test_execute_task_respects_recursion_limit(self) -> None:
         """Test that execute_task respects recursion depth limits."""
         custom_ctx = RecursionContext(max_depth=2)
         coordinator = UnifiedTeamCoordinator(
@@ -212,7 +214,7 @@ class TestTeamCoordinatorRecursionIntegration:
         custom_ctx.exit()
 
     @pytest.mark.asyncio
-    async def test_execute_task_includes_recursion_in_events(self):
+    async def test_execute_task_includes_recursion_in_events(self) -> None:
         """Test that execute_task includes recursion depth in events."""
         # Create coordinator with observability
         coordinator = UnifiedTeamCoordinator(
@@ -229,7 +231,7 @@ class TestTeamCoordinatorRecursionIntegration:
         emitted_events = []
         original_emit = coordinator._emit_team_event
 
-        def capture_event(event_type, data):
+        def capture_event(event_type: Any, data: Any) -> Any:
             emitted_events.append((event_type, data))
             return original_emit(event_type, data)
 
@@ -249,7 +251,7 @@ class TestTeamCoordinatorRecursionIntegration:
             assert isinstance(data["recursion_depth"], int)
 
     @pytest.mark.asyncio
-    async def test_recursion_guard_cleanup_on_error(self):
+    async def test_recursion_guard_cleanup_on_error(self) -> None:
         """Test that RecursionGuard properly cleans up even on errors."""
         coordinator = UnifiedTeamCoordinator(
             orchestrator=None,
@@ -281,7 +283,7 @@ class TestTeamCoordinatorRecursionIntegration:
         assert len(custom_ctx.execution_stack) == 0
 
     @pytest.mark.asyncio
-    async def test_shared_recursion_context_across_coordinators(self):
+    async def test_shared_recursion_context_across_coordinators(self) -> None:
         """Test that multiple coordinators can share a recursion context."""
         shared_ctx = RecursionContext(max_depth=3)
 
@@ -326,7 +328,7 @@ class TestTeamCoordinatorRecursionIntegration:
 class TestRecursionContextMethods:
     """Test RecursionContext helper methods."""
 
-    def test_get_depth_info(self):
+    def test_get_depth_info(self) -> None:
         """Test get_depth_info returns complete information."""
         ctx = RecursionContext(max_depth=5)
 
@@ -347,7 +349,7 @@ class TestRecursionContextMethods:
         ctx.exit()
         ctx.exit()
 
-    def test_recursion_context_repr(self):
+    def test_recursion_context_repr(self) -> None:
         """Test RecursionContext string representation."""
         ctx = RecursionContext(max_depth=3)
         ctx.enter("workflow", "test")
@@ -359,7 +361,7 @@ class TestRecursionContextMethods:
 
         ctx.exit()
 
-    def test_recursion_context_context_manager(self):
+    def test_recursion_context_context_manager(self) -> None:
         """Test RecursionContext as context manager."""
         ctx = RecursionContext(max_depth=3)
 
@@ -373,7 +375,7 @@ class TestRecursionContextMethods:
         assert ctx.current_depth == 0
         assert len(ctx.execution_stack) == 0
 
-    def test_recursion_guard_context_manager(self):
+    def test_recursion_guard_context_manager(self) -> None:
         """Test RecursionGuard as context manager."""
         ctx = RecursionContext(max_depth=3)
 
@@ -385,7 +387,7 @@ class TestRecursionContextMethods:
         assert ctx.current_depth == 0
         assert len(ctx.execution_stack) == 0
 
-    def test_recursion_guard_with_exception(self):
+    def test_recursion_guard_with_exception(self) -> None:
         """Test RecursionGuard properly exits even with exceptions."""
         ctx = RecursionContext(max_depth=3)
 

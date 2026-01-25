@@ -269,7 +269,7 @@ def _process_file_parallel(
 
             # Call edge extraction
             call_query_src = CALL_QUERIES.get(language)
-            if call_query_src:
+            if call_query_src and parser.language:
                 try:
                     query = Query(parser.language, call_query_src)
                     cursor = QueryCursor(query)
@@ -287,7 +287,7 @@ def _process_file_parallel(
 
             # Reference extraction
             ref_query_src = REFERENCE_QUERIES.get(language)
-            if ref_query_src:
+            if ref_query_src and parser.language:
                 try:
                     query = Query(parser.language, ref_query_src)
                     cursor = QueryCursor(query)
@@ -691,11 +691,11 @@ try:
     from watchdog.observers import Observer as _Observer
 
     WATCHDOG_AVAILABLE = True
-    Observer: type[_Observer] = _Observer
+    Observer = _Observer
 except ImportError:
     WATCHDOG_AVAILABLE = False
-    Observer = None
-    FileSystemEventHandler = object
+    Observer = None  # type: ignore[assignment]
+    FileSystemEventHandler = object  # type: ignore[misc,assignment]
 
 
 # Module-level function for ProcessPoolExecutor (must be picklable)
@@ -790,8 +790,8 @@ class CodebaseFileHandler(FileSystemEventHandler):
     def __init__(
         self,
         on_change: Callable[[str], None],
-        file_patterns: List[str] = None,
-        ignore_patterns: List[str] = None,
+        file_patterns: Optional[List[str]] = None,
+        ignore_patterns: Optional[List[str]] = None,
     ):
         """Initialize file handler.
 
@@ -1079,7 +1079,7 @@ class CodebaseIndex:
 
         # File watcher
         self._watcher_enabled = enable_watcher and WATCHDOG_AVAILABLE
-        self._observer: Optional[Observer] = None
+        self._observer: Optional[Any] = None  # Observer
         self._file_handler: Optional[CodebaseFileHandler] = None
 
         # Callbacks for change notifications (e.g., SymbolStore)
@@ -1259,9 +1259,11 @@ class CodebaseIndex:
 
         # Flush graph buffers to store
         if self.graph_store and self._graph_nodes:
-            await self.graph_store.upsert_nodes(self._graph_nodes)
+            from typing import cast
+            await self.graph_store.upsert_nodes(cast(Any, self._graph_nodes))
         if self.graph_store and self._graph_edges:
-            await self.graph_store.upsert_edges(self._graph_edges)
+            from typing import cast
+            await self.graph_store.upsert_edges(cast(Any, self._graph_edges))
 
         # Build embeddings for all indexed symbols (batched for performance)
         if self.use_embeddings and self.embedding_provider:
@@ -1911,7 +1913,7 @@ class CodebaseIndex:
                             try:
                                 base_expr = base
                                 if hasattr(py_ast, "unparse"):
-                                    base_name = py_ast.unparse(base_expr)
+                                    base_name: str | None = py_ast.unparse(base_expr)
                                 else:
                                     base_name = getattr(base_expr, "id", None)
                                     if base_name is None:
@@ -1947,13 +1949,14 @@ class CodebaseIndex:
                 cursor = QueryCursor(query)
                 captures = cursor.captures(ts_tree.root_node)
                 child = None
-                for node, capture_name in captures:
-                    text = node.text.decode("utf-8", errors="ignore")
-                    if capture_name == "child":
-                        child = text
-                    elif capture_name == "base" and child:
-                        edges.append((child, text))
-                        child = None
+                for capture_name, nodes in captures.items():
+                    for node in nodes:
+                        text = node.text.decode("utf-8", errors="ignore") if node.text else ""
+                        if capture_name == "child":
+                            child = text
+                        elif capture_name == "base" and child:
+                            edges.append((child, text))
+                            child = None
             except Exception:
                 pass
 
@@ -1994,13 +1997,14 @@ class CodebaseIndex:
                 cursor = QueryCursor(query)
                 captures = cursor.captures(tree.root_node)
                 child = None
-                for node, capture_name in captures:
-                    text = node.text.decode("utf-8", errors="ignore")
-                    if capture_name == "child":
-                        child = text
-                    elif capture_name in {"interface", "base"} and child:
-                        edges.append((child, text))
-                        child = None
+                for capture_name, nodes in captures.items():
+                    for node in nodes:
+                        text = node.text.decode("utf-8", errors="ignore") if node.text else ""
+                        if capture_name == "child":
+                            child = text
+                        elif capture_name in {"interface", "base"} and child:
+                            edges.append((child, text))
+                            child = None
             except Exception:
                 pass
 
@@ -2052,15 +2056,16 @@ class CodebaseIndex:
                 cursor = QueryCursor(query)
                 captures = cursor.captures(tree.root_node)
                 owner = None
-                for node, capture_name in captures:
-                    node_text = node.text
-                    if node_text is None:
-                        continue
-                    text = node_text.decode("utf-8", errors="ignore")
-                    if capture_name == "owner":
-                        owner = text
-                    elif capture_name == "type" and owner:
-                        edges.append((owner, text))
+                for capture_name, nodes in captures.items():
+                    for node in nodes:
+                        node_text = node.text
+                        if node_text is None:
+                            continue
+                        text = node_text.decode("utf-8", errors="ignore")
+                        if capture_name == "owner":
+                            owner = text
+                        elif capture_name == "type" and owner:
+                            edges.append((owner, text))
                 # Do not clear owner on missing type; next owner will overwrite.
             except Exception:
                 pass
@@ -2166,14 +2171,15 @@ class CodebaseIndex:
             query_obj = Query(lang, query_src)
             cursor = QueryCursor(query_obj)
             captures = cursor.captures(tree.root_node)
-            for node, _ in captures:
-                node_text = node.text
-                if node_text is None:
-                    continue
-                callee = node_text.decode("utf-8", errors="ignore")
-                caller = self._find_enclosing_symbol_name(node, language)
-                if caller and callee:
-                    call_edges.append((caller, callee))
+            for capture_name, nodes in captures.items():
+                for node in nodes:
+                    node_text = node.text
+                    if node_text is None:
+                        continue
+                    callee = node_text.decode("utf-8", errors="ignore")
+                    caller = self._find_enclosing_symbol_name(node, language)
+                    if caller and callee:
+                        call_edges.append((caller, callee))
         except Exception:
             call_edges = []
 
@@ -2736,7 +2742,12 @@ class CodebaseIndex:
             )
 
             # Create embedding provider
-            self.embedding_provider = EmbeddingRegistry.create(embedding_config)
+            from typing import cast
+            from victor.storage.vector_stores.base import BaseEmbeddingProvider as StorageBaseEmbeddingProvider
+
+            created_provider = EmbeddingRegistry.create(embedding_config)
+            # Cast to match expected type (they're compatible)
+            self.embedding_provider = cast(StorageBaseEmbeddingProvider, created_provider)
             print(
                 f"✓ Embeddings enabled: {embedding_config.embedding_model} + "
                 f"{embedding_config.vector_store}"

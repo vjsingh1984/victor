@@ -29,7 +29,7 @@ import pytest
 class TestResearchWorkflowE2E:
     """E2E tests for Research vertical YAML workflows."""
 
-    def test_provider_loads_workflows(self):
+    def test_provider_loads_workflows(self) -> None:
         """Test ResearchWorkflowProvider loads all YAML workflows."""
         from victor.research.workflows import ResearchWorkflowProvider
 
@@ -43,7 +43,7 @@ class TestResearchWorkflowE2E:
         workflow_names = provider.get_workflow_names()
         assert any("research" in name.lower() for name in workflow_names)
 
-    def test_escape_hatches_registered(self):
+    def test_escape_hatches_registered(self) -> None:
         """Test escape hatches are available in config."""
         from victor.research.escape_hatches import CONDITIONS, TRANSFORMS
 
@@ -59,7 +59,7 @@ class TestResearchWorkflowE2E:
         assert "merge_search_results" in TRANSFORMS
         assert "format_bibliography" in TRANSFORMS
 
-    def test_workflow_definitions_valid(self):
+    def test_workflow_definitions_valid(self) -> None:
         """Test workflow definitions are structurally valid."""
         from victor.research.workflows import ResearchWorkflowProvider
 
@@ -77,7 +77,7 @@ class TestResearchWorkflowE2E:
                     # Node might be a string ID
                     assert isinstance(node, str), f"Invalid node type in {name}"
 
-    def test_provider_config_uses_escape_hatches(self):
+    def test_provider_config_uses_escape_hatches(self) -> None:
         """Test provider config includes escape hatches."""
         from victor.research.workflows import ResearchWorkflowProvider
 
@@ -92,7 +92,7 @@ class TestResearchWorkflowE2E:
         assert hasattr(config, "transform_registry")
         assert "merge_search_results" in config.transform_registry
 
-    def test_handlers_registered(self):
+    def test_handlers_registered(self) -> None:
         """Test research handlers are in HANDLERS dict."""
         from victor.research.handlers import HANDLERS
 
@@ -103,7 +103,7 @@ class TestResearchWorkflowE2E:
 class TestDevOpsWorkflowE2E:
     """E2E tests for DevOps vertical YAML workflows."""
 
-    def test_provider_loads_workflows(self):
+    def test_provider_loads_workflows(self) -> None:
         """Test DevOpsWorkflowProvider loads all YAML workflows."""
         from victor.devops.workflows import DevOpsWorkflowProvider
 
@@ -113,7 +113,7 @@ class TestDevOpsWorkflowE2E:
         # Should have loaded workflows
         assert len(workflows) > 0, "Should load at least one workflow"
 
-    def test_escape_hatches_registered(self):
+    def test_escape_hatches_registered(self) -> None:
         """Test escape hatches are available in config."""
         from victor.devops.escape_hatches import CONDITIONS, TRANSFORMS
 
@@ -130,7 +130,7 @@ class TestDevOpsWorkflowE2E:
         assert "merge_deployment_results" in TRANSFORMS
         assert "generate_deployment_summary" in TRANSFORMS
 
-    def test_workflow_definitions_valid(self):
+    def test_workflow_definitions_valid(self) -> None:
         """Test workflow definitions are structurally valid."""
         from victor.devops.workflows import DevOpsWorkflowProvider
 
@@ -152,7 +152,7 @@ class TestDevOpsWorkflowE2E:
                 else:
                     assert isinstance(node, str), f"Invalid node type in {name}"
 
-    def test_container_setup_workflow_exists(self):
+    def test_container_setup_workflow_exists(self) -> None:
         """Test container_setup workflow is loaded."""
         from victor.devops.workflows import DevOpsWorkflowProvider
 
@@ -167,7 +167,7 @@ class TestDevOpsWorkflowE2E:
         container_workflows = [n for n in workflow_names if "container" in n.lower()]
         assert len(container_workflows) > 0, "Should have container workflows"
 
-    def test_handlers_registered(self):
+    def test_handlers_registered(self) -> None:
         """Test devops handlers are in HANDLERS dict."""
         from victor.devops.handlers import HANDLERS
 
@@ -178,7 +178,7 @@ class TestDevOpsWorkflowE2E:
 class TestDataAnalysisWorkflowE2E:
     """E2E tests for DataAnalysis vertical YAML workflows."""
 
-    def test_provider_loads_workflows(self):
+    def test_provider_loads_workflows(self) -> None:
         """Test DataAnalysisWorkflowProvider loads all YAML workflows."""
         from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
 
@@ -188,7 +188,7 @@ class TestDataAnalysisWorkflowE2E:
         # Should have loaded workflows
         assert len(workflows) > 0, "Should load at least one workflow"
 
-    def test_escape_hatches_registered(self):
+    def test_escape_hatches_registered(self) -> None:
         """Test escape hatches are available in config."""
         from victor.dataanalysis.escape_hatches import CONDITIONS, TRANSFORMS
 
@@ -203,7 +203,7 @@ class TestDataAnalysisWorkflowE2E:
         assert "merge_parallel_stats" in TRANSFORMS
         assert "aggregate_model_results" in TRANSFORMS
 
-    def test_workflow_definitions_valid(self):
+    def test_workflow_definitions_valid(self) -> None:
         """Test workflow definitions are structurally valid."""
         from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
 
@@ -221,7 +221,7 @@ class TestDataAnalysisWorkflowE2E:
                 else:
                     assert isinstance(node, str), f"Invalid node type in {name}"
 
-    def test_handlers_registered(self):
+    def test_handlers_registered(self) -> None:
         """Test dataanalysis handlers are in HANDLERS dict."""
         from victor.dataanalysis.handlers import HANDLERS
 
@@ -232,7 +232,7 @@ class TestDataAnalysisWorkflowE2E:
 class TestCrossVerticalConsistency:
     """Tests for cross-vertical consistency."""
 
-    def test_all_providers_have_yaml_config(self):
+    def test_all_providers_have_yaml_config(self) -> None:
         """Test all providers use YAMLWorkflowConfig."""
         from victor.research.workflows import ResearchWorkflowProvider
         from victor.devops.workflows import DevOpsWorkflowProvider
@@ -249,7 +249,7 @@ class TestCrossVerticalConsistency:
             assert hasattr(config, "condition_registry"), f"{provider} missing condition_registry"
             assert hasattr(config, "transform_registry"), f"{provider} missing transform_registry"
 
-    def test_all_providers_have_canonical_streaming_methods(self):
+    def test_all_providers_have_canonical_streaming_methods(self) -> None:
         """Test all providers support streaming via canonical API."""
         from victor.research.workflows import ResearchWorkflowProvider
         from victor.devops.workflows import DevOpsWorkflowProvider
@@ -267,7 +267,7 @@ class TestCrossVerticalConsistency:
                 provider, "stream_compiled_workflow"
             ), f"{provider} missing stream_compiled_workflow"
 
-    def test_workflow_yaml_files_exist(self):
+    def test_workflow_yaml_files_exist(self) -> None:
         """Test YAML workflow files exist for each vertical."""
         base = Path(__file__).parent.parent.parent.parent / "victor"
 
@@ -280,7 +280,7 @@ class TestCrossVerticalConsistency:
             yaml_files = list(workflow_dir.glob("*.yaml"))
             assert len(yaml_files) > 0, f"{vertical} has no YAML workflow files"
 
-    def test_escape_hatch_files_exist(self):
+    def test_escape_hatch_files_exist(self) -> None:
         """Test escape_hatches.py exists for each vertical."""
         base = Path(__file__).parent.parent.parent.parent / "victor"
 
@@ -290,7 +290,7 @@ class TestCrossVerticalConsistency:
             escape_file = base / vertical / "escape_hatches.py"
             assert escape_file.exists(), f"{vertical}/escape_hatches.py missing"
 
-    def test_handler_files_exist(self):
+    def test_handler_files_exist(self) -> None:
         """Test handlers.py exists for each vertical."""
         base = Path(__file__).parent.parent.parent.parent / "victor"
 
@@ -304,7 +304,7 @@ class TestCrossVerticalConsistency:
 class TestWorkflowNodeTypes:
     """Tests for proper node type usage across workflows."""
 
-    def test_devops_has_hitl_nodes(self):
+    def test_devops_has_hitl_nodes(self) -> None:
         """Test DevOps workflows include HITL approval nodes."""
         from victor.devops.workflows import DevOpsWorkflowProvider
 
@@ -325,7 +325,7 @@ class TestWorkflowNodeTypes:
         # The test passes as long as workflows loaded successfully
         assert len(workflows) >= 0  # At least check workflows exist
 
-    def test_workflows_have_condition_nodes(self):
+    def test_workflows_have_condition_nodes(self) -> None:
         """Test workflows use condition nodes with escape hatches."""
         from victor.devops.workflows import DevOpsWorkflowProvider
 
@@ -349,7 +349,7 @@ class TestWorkflowNodeTypes:
 class TestAutoRegistration:
     """Tests for handler auto-registration on import."""
 
-    def test_research_handlers_auto_register(self):
+    def test_research_handlers_auto_register(self) -> None:
         """Test research handlers auto-register on vertical import."""
         # Import the vertical package
         from victor.research import workflows as research_workflows
@@ -360,7 +360,7 @@ class TestAutoRegistration:
         assert "web_scraper" in HANDLERS
         assert "citation_formatter" in HANDLERS
 
-    def test_devops_handlers_auto_register(self):
+    def test_devops_handlers_auto_register(self) -> None:
         """Test devops handlers auto-register on vertical import."""
         from victor.devops import workflows as devops_workflows
 
@@ -369,7 +369,7 @@ class TestAutoRegistration:
         assert "container_ops" in HANDLERS
         assert "terraform_apply" in HANDLERS
 
-    def test_dataanalysis_handlers_auto_register(self):
+    def test_dataanalysis_handlers_auto_register(self) -> None:
         """Test dataanalysis handlers auto-register on vertical import."""
         from victor.dataanalysis import workflows as dataanalysis_workflows
 

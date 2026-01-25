@@ -317,7 +317,7 @@ def create_auth_middleware(
         # Attach client_id to request for downstream use
         request["client_id"] = client_id  # type: ignore[index]
 
-        result = await handler(request)
+        result: Response = await handler(request)
         return result
 
     return auth_middleware
@@ -354,7 +354,7 @@ def create_rate_limit_middleware(
                 headers={"Retry-After": str(int(retry_after))},
             )
 
-        result = await handler(request)
+        result: Response = await handler(request)
         return result
 
     return rate_limit_middleware
@@ -375,7 +375,7 @@ def create_request_logging_middleware() -> (
         start_time = time.monotonic()
 
         try:
-            response = await handler(request)
+            response: Response = await handler(request)
             elapsed = (time.monotonic() - start_time) * 1000
 
             logger.info(
@@ -437,7 +437,7 @@ class APIMiddlewareStack:
                     }
                 )
 
-            result = await handler(request)
+            result: Response = await handler(request)
             result.headers["Access-Control-Allow-Origin"] = origins
             return result
 

@@ -196,7 +196,7 @@ class TestStatePersistenceAcrossNodes:
         assert metadata.get("last_step") == "step_2"
         assert metadata.get("counter_value") == 2
 
-    async def test_state_from_previous_node_available(self, mock_orchestrator):
+    async def test_state_from_previous_node_available(self, mock_orchestrator) -> None:
         """Test that each node can access state from all previous nodes."""
         state_snapshots = []
 
@@ -246,7 +246,7 @@ class TestStatePersistenceAcrossNodes:
         # Final result should have all values
         assert result.context.data.get("c_value") == 300  # 100 + 200
 
-    async def test_nested_state_persists(self, mock_orchestrator, nested_state_workflow):
+    async def test_nested_state_persists(self, mock_orchestrator, nested_state_workflow) -> None:
         """Test that deeply nested state modifications persist."""
         executor = WorkflowExecutor(mock_orchestrator)
 
@@ -272,7 +272,7 @@ class TestStatePersistenceAcrossNodes:
 class TestStateModificationPropagation:
     """Tests for state modification propagation."""
 
-    async def test_list_modifications_propagate(self, mock_orchestrator):
+    async def test_list_modifications_propagate(self, mock_orchestrator) -> None:
         """Test that list modifications are properly propagated."""
 
         def add_items(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -311,7 +311,7 @@ class TestStateModificationPropagation:
         items = result.context.data.get("items", [])
         assert all(item.get("processed") for item in items)
 
-    async def test_dict_modifications_propagate(self, mock_orchestrator):
+    async def test_dict_modifications_propagate(self, mock_orchestrator) -> None:
         """Test that dictionary modifications are properly propagated."""
 
         def set_config(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -346,7 +346,7 @@ class TestStateModificationPropagation:
         assert result.context.data.get("final_version") == "1.1"
         assert result.context.data.get("has_logging") is True
 
-    async def test_state_replacement_vs_modification(self, mock_orchestrator):
+    async def test_state_replacement_vs_modification(self, mock_orchestrator) -> None:
         """Test that both state replacement and modification work correctly."""
 
         def replace_state(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -387,7 +387,7 @@ class TestStateModificationPropagation:
 class TestLargeStateHandling:
     """Tests for handling large state data."""
 
-    async def test_large_list_state(self, mock_orchestrator):
+    async def test_large_list_state(self, mock_orchestrator) -> None:
         """Test handling state with large lists."""
 
         def create_large_list(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -415,7 +415,7 @@ class TestLargeStateHandling:
         assert result.context.data.get("processed_count") == 10000
         assert result.context.data.get("sum_ids") == sum(range(10000))
 
-    async def test_large_nested_state(self, mock_orchestrator):
+    async def test_large_nested_state(self, mock_orchestrator) -> None:
         """Test handling deeply nested state structures."""
 
         def create_nested_structure(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -458,7 +458,7 @@ class TestLargeStateHandling:
         assert result.success is True
         assert result.context.data.get("verified_depth") == 50
 
-    async def test_large_string_state(self, mock_orchestrator):
+    async def test_large_string_state(self, mock_orchestrator) -> None:
         """Test handling large string values in state."""
 
         def create_large_strings(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -486,7 +486,7 @@ class TestLargeStateHandling:
         assert result.context.data.get("large_string_len") == 1_000_000
         assert result.context.data.get("total_list_len") == 1_000_000  # 100 * 10000
 
-    async def test_state_with_many_keys(self, mock_orchestrator):
+    async def test_state_with_many_keys(self, mock_orchestrator) -> None:
         """Test handling state with many top-level keys."""
 
         def create_many_keys(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -519,7 +519,7 @@ class TestLargeStateHandling:
 class TestStateIsolation:
     """Tests for state isolation between workflow instances."""
 
-    async def test_concurrent_workflows_isolated(self, mock_orchestrator):
+    async def test_concurrent_workflows_isolated(self, mock_orchestrator) -> None:
         """Test that concurrent workflow executions have isolated state."""
 
         def set_instance_data(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -556,7 +556,7 @@ class TestStateIsolation:
             assert result.context.data.get("instance_id") == f"inst_{i + 1}"
             assert result.context.data.get("data") == f"data_from_inst_{i + 1}"
 
-    async def test_sequential_workflows_isolated(self, mock_orchestrator):
+    async def test_sequential_workflows_isolated(self, mock_orchestrator) -> None:
         """Test that sequential workflow executions don't leak state."""
 
         def append_to_list(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -590,7 +590,7 @@ class TestStateIsolation:
 class TestWorkflowContextClass:
     """Tests specifically for WorkflowContext functionality."""
 
-    async def test_context_get_set_operations(self, mock_orchestrator):
+    async def test_context_get_set_operations(self, mock_orchestrator) -> None:
         """Test WorkflowContext get/set operations during execution."""
         context_operations = []
 
@@ -617,7 +617,7 @@ class TestWorkflowContextClass:
         assert result.success is True
         assert result.context.data.get("test_key") == "test_value"
 
-    async def test_context_update_multiple_values(self, mock_orchestrator):
+    async def test_context_update_multiple_values(self, mock_orchestrator) -> None:
         """Test updating multiple context values at once."""
 
         def batch_update(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -646,7 +646,7 @@ class TestWorkflowContextClass:
         assert result.success is True
         assert result.context.data.get("all_present") is True
 
-    async def test_context_node_result_tracking(self, mock_orchestrator):
+    async def test_context_node_result_tracking(self, mock_orchestrator) -> None:
         """Test that context properly tracks node results."""
 
         def step(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -666,7 +666,7 @@ class TestWorkflowContextClass:
         # Node results should be tracked
         assert "step1" in result.context.node_results or "step2" in result.context.node_results
 
-    async def test_context_has_failures_detection(self, mock_orchestrator):
+    async def test_context_has_failures_detection(self, mock_orchestrator) -> None:
         """Test WorkflowContext.has_failures() detection."""
         context = WorkflowContext()
 
@@ -692,7 +692,7 @@ class TestWorkflowContextClass:
         )
         assert context.has_failures() is True
 
-    async def test_context_get_outputs(self, mock_orchestrator):
+    async def test_context_get_outputs(self, mock_orchestrator) -> None:
         """Test WorkflowContext.get_outputs() functionality."""
         context = WorkflowContext()
 
@@ -733,7 +733,7 @@ class TestWorkflowContextClass:
 class TestStateSerializationEdgeCases:
     """Tests for state serialization edge cases."""
 
-    async def test_state_with_none_values(self, mock_orchestrator):
+    async def test_state_with_none_values(self, mock_orchestrator) -> None:
         """Test handling state with None values."""
 
         def set_nones(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -761,7 +761,7 @@ class TestStateSerializationEdgeCases:
         assert result.context.data.get("none_preserved") is True
         assert result.context.data.get("list_nones_preserved") is True
 
-    async def test_state_with_boolean_values(self, mock_orchestrator):
+    async def test_state_with_boolean_values(self, mock_orchestrator) -> None:
         """Test handling state with boolean values."""
 
         def set_booleans(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -791,7 +791,7 @@ class TestStateSerializationEdgeCases:
         assert result.context.data.get("false_is_false") is True
         assert result.context.data.get("list_correct") is True
 
-    async def test_state_with_numeric_types(self, mock_orchestrator):
+    async def test_state_with_numeric_types(self, mock_orchestrator) -> None:
         """Test handling state with various numeric types."""
 
         def set_numbers(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -827,7 +827,7 @@ class TestStateSerializationEdgeCases:
         assert result.context.data.get("large_correct") is True
         assert result.context.data.get("zero_correct") is True
 
-    async def test_state_with_empty_collections(self, mock_orchestrator):
+    async def test_state_with_empty_collections(self, mock_orchestrator) -> None:
         """Test handling state with empty collections."""
 
         def set_empties(ctx: Dict[str, Any]) -> Dict[str, Any]:

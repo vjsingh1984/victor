@@ -165,6 +165,9 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             # Try to import proximadb embedded module
             from proximadb import EmbeddedProximaDB, EmbeddedConfig
 
+            if not isinstance(self._data_dir, Path):
+                raise ValueError("Data directory not initialized")
+
             config = EmbeddedConfig(
                 data_dir=str(self._data_dir),
                 rest_port=15678,
@@ -177,7 +180,8 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             self._db = EmbeddedProximaDB(config=config)
             await self._db.start()
             self._started = True
-            self._server_url = self._db.rest_url
+            if self._db is not None:
+                self._server_url = self._db.rest_url
             print(f"Started embedded ProximaDB: {self._server_url}")
 
         except ImportError:
@@ -210,6 +214,9 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         """Ensure collection exists."""
         self._collection_name = name
         self._dimension = dimension
+
+        if self._client is None:
+            raise RuntimeError("HTTP client not initialized")
 
         try:
             response = await self._client.post(
@@ -287,6 +294,9 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         if not self._initialized:
             await self.initialize()
 
+        if self.embedding_model is None:
+            raise RuntimeError("Embedding model not initialized")
+
         return await self.embedding_model.embed_text(text)
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
@@ -300,6 +310,9 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         """
         if not self._initialized:
             await self.initialize()
+
+        if self.embedding_model is None:
+            raise RuntimeError("Embedding model not initialized")
 
         return await self.embedding_model.embed_batch(texts)
 
@@ -333,6 +346,9 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         vector_data["metadata"] = self._convert_metadata(full_metadata)
 
         # Insert into collection
+        if self._client is None:
+            raise RuntimeError("HTTP client not initialized")
+
         response = await self._client.post(
             "/api/v1/vectors/batch",
             json={
@@ -376,6 +392,9 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             )
 
         # Batch insert
+        if self._client is None:
+            raise RuntimeError("HTTP client not initialized")
+
         response = await self._client.post(
             "/api/v1/vectors/batch",
             json={
@@ -411,11 +430,14 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         query_embedding = await self.embed_text(query)
 
         # Prepare search request
-        search_query = {"vector": query_embedding}
+        search_query: Dict[str, Any] = {"vector": query_embedding}
         if filter_metadata:
             search_query["filters"] = self._convert_metadata(filter_metadata)
 
         # Execute search
+        if self._client is None:
+            raise RuntimeError("HTTP client not initialized")
+
         response = await self._client.post(
             "/api/v1/search",
             json={
@@ -440,7 +462,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
 
             for result in raw_results:
                 # Extract metadata
-                metadata = {}
+                metadata: Dict[str, Any] = {}
                 if "metadata" in result:
                     metadata = self._extract_metadata(result["metadata"])
 
@@ -472,6 +494,9 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             await self.initialize()
 
         # ProximaDB delete endpoint (if available)
+        if self._client is None:
+            return
+
         try:
             await self._client.delete(
                 f"/api/v1/vectors/{self._collection_name}/{doc_id}",
@@ -503,6 +528,9 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             await self.initialize()
 
         # Delete and recreate collection
+        if self._client is None:
+            return
+
         try:
             await self._client.delete(
                 f"/api/v1/collections/{self._collection_name}",
@@ -524,6 +552,21 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             await self.initialize()
 
         count = 0
+        if self._client is None:
+            return {
+                "provider": "proximadb",
+                "engine": "SST",
+                "graph_engine": "ORION",
+                "total_documents": 0,
+                "embedding_model_type": self.config.embedding_model_type,
+                "embedding_model": self.config.embedding_model,
+                "dimension": 384,
+                "distance_metric": self.config.distance_metric,
+                "collection_name": self._collection_name,
+                "persist_directory": str(self._data_dir) if isinstance(self._data_dir, Path) else "",
+                "server_url": self._server_url,
+            }
+
         try:
             response = await self._client.get(
                 f"/api/v1/collections/{self._collection_name}",

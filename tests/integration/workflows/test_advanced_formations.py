@@ -77,7 +77,7 @@ def mock_agents():
 
 
 @pytest.fixture
-def team_context(mock_agents):
+def team_context(mock_agents: Any) -> Any:
     """Create a team context with mock agents."""
     shared_state = {f"agent_{i}": agent for i, agent in enumerate(mock_agents)}
     return TeamContext(
@@ -106,7 +106,7 @@ class TestDynamicFormation:
     """Test suite for DynamicFormation."""
 
     @pytest.mark.asyncio
-    async def test_dynamic_formation_initialization(self):
+    async def test_dynamic_formation_initialization(self) -> None:
         """Test DynamicFormation initialization with default parameters."""
         formation = DynamicFormation()
 
@@ -117,7 +117,7 @@ class TestDynamicFormation:
         assert formation._current_phase == FormationPhase.EXPLORATION
 
     @pytest.mark.asyncio
-    async def test_dynamic_formation_custom_initialization(self):
+    async def test_dynamic_formation_custom_initialization(self) -> None:
         """Test DynamicFormation initialization with custom parameters."""
         switching_rules = {
             "dependencies_emerge": "sequential",
@@ -137,7 +137,7 @@ class TestDynamicFormation:
         assert formation.enable_auto_detection is False
 
     @pytest.mark.asyncio
-    async def test_dynamic_formation_execution(self, mock_agents, team_context, sample_task):
+    async def test_dynamic_formation_execution(self, mock_agents, team_context, sample_task) -> None:
         """Test basic execution with dynamic formation."""
         formation = DynamicFormation(initial_formation="parallel", enable_auto_detection=False)
 
@@ -197,7 +197,7 @@ class TestDynamicFormation:
         assert metadata["switches_made"] <= formation.max_switches
 
     @pytest.mark.asyncio
-    async def test_dynamic_formation_error_recovery(self, mock_agents, team_context, sample_task):
+    async def test_dynamic_formation_error_recovery(self, mock_agents, team_context, sample_task) -> None:
         """Test error recovery by switching formations."""
         # Create agent that fails initially
         call_count = {"count": 0}
@@ -253,7 +253,7 @@ class TestAdaptiveFormation:
     """Test suite for AdaptiveFormation."""
 
     @pytest.mark.asyncio
-    async def test_adaptive_formation_initialization(self):
+    async def test_adaptive_formation_initialization(self) -> None:
         """Test AdaptiveFormation initialization with defaults."""
         formation = AdaptiveFormation()
 
@@ -263,7 +263,7 @@ class TestAdaptiveFormation:
         assert formation.use_ml is False
 
     @pytest.mark.asyncio
-    async def test_adaptive_formation_custom_initialization(self):
+    async def test_adaptive_formation_custom_initialization(self) -> None:
         """Test AdaptiveFormation with custom parameters."""
         criteria = ["complexity", "uncertainty", "collaboration_needed"]
 
@@ -280,7 +280,7 @@ class TestAdaptiveFormation:
         assert formation.use_ml is True
 
     @pytest.mark.asyncio
-    async def test_adaptive_formation_task_analysis(self, mock_agents, team_context, sample_task):
+    async def test_adaptive_formation_task_analysis(self, mock_agents, team_context, sample_task) -> None:
         """Test task characteristic analysis."""
         formation = AdaptiveFormation()
 
@@ -311,7 +311,7 @@ class TestAdaptiveFormation:
         assert characteristics.collaboration_needed > 0.5  # Should detect collaboration need
 
     @pytest.mark.asyncio
-    async def test_adaptive_formation_scoring(self, mock_agents, team_context, sample_task):
+    async def test_adaptive_formation_scoring(self, mock_agents, team_context, sample_task) -> None:
         """Test formation scoring based on characteristics."""
         formation = AdaptiveFormation()
 
@@ -337,7 +337,7 @@ class TestAdaptiveFormation:
         assert scores["sequential"] > 0.5 or scores["pipeline"] > 0.5
 
     @pytest.mark.asyncio
-    async def test_adaptive_formation_execution(self, mock_agents, team_context, sample_task):
+    async def test_adaptive_formation_execution(self, mock_agents, team_context, sample_task) -> None:
         """Test adaptive formation execution."""
         formation = AdaptiveFormation(
             criteria=["complexity", "deadline"],
@@ -368,7 +368,7 @@ class TestAdaptiveFormation:
         )
 
         # Mock _score_formations to return low scores, triggering default_formation usage
-        def mock_score(characteristics):
+        def mock_score(characteristics: Any) -> Any:
             # Return very low scores to trigger fallback to default_formation
             return {
                 "sequential": 0.1,
@@ -398,7 +398,7 @@ class TestHybridFormation:
     """Test suite for HybridFormation."""
 
     @pytest.mark.asyncio
-    async def test_hybrid_formation_initialization(self):
+    async def test_hybrid_formation_initialization(self) -> None:
         """Test HybridFormation initialization."""
         phases = [
             HybridPhase(formation="parallel", goal="Explore"),
@@ -412,7 +412,7 @@ class TestHybridFormation:
         assert formation.stop_on_first_failure is False
 
     @pytest.mark.asyncio
-    async def test_hybrid_formation_execution(self, mock_agents, team_context, sample_task):
+    async def test_hybrid_formation_execution(self, mock_agents, team_context, sample_task) -> None:
         """Test hybrid formation execution through multiple phases."""
         phases = [
             HybridPhase(formation="parallel", goal="Explore"),
@@ -432,7 +432,7 @@ class TestHybridFormation:
         assert "phase_results" in metadata
 
     @pytest.mark.asyncio
-    async def test_hybrid_formation_phase_results(self, mock_agents, team_context, sample_task):
+    async def test_hybrid_formation_phase_results(self, mock_agents, team_context, sample_task) -> None:
         """Test that each phase produces its own results."""
         phases = [
             HybridPhase(formation="parallel", goal="Phase 1"),
@@ -458,7 +458,7 @@ class TestHybridFormation:
             assert "results" in phase_result
 
     @pytest.mark.asyncio
-    async def test_hybrid_formation_stop_on_failure(self, mock_agents, team_context, sample_task):
+    async def test_hybrid_formation_stop_on_failure(self, mock_agents, team_context, sample_task) -> None:
         """Test stop_on_first_failure behavior."""
 
         # Create an agent that fails
@@ -488,7 +488,7 @@ class TestHybridFormation:
         assert metadata["phases_completed"] < 3
 
     @pytest.mark.asyncio
-    async def test_hybrid_formation_duration_budget(self, mock_agents, team_context, sample_task):
+    async def test_hybrid_formation_duration_budget(self, mock_agents, team_context, sample_task) -> None:
         """Test phase duration budget enforcement."""
 
         async def slow_execute(task: str, context: Dict[str, Any] = None) -> str:
@@ -535,7 +535,7 @@ class TestHybridFormation:
 class TestAdvancedFormationSchema:
     """Test suite for advanced formation schema validation."""
 
-    def test_dynamic_config_validation(self):
+    def test_dynamic_config_validation(self) -> None:
         """Test DynamicFormationConfig validation."""
         # Valid config
         config = DynamicFormationConfig(
@@ -551,7 +551,7 @@ class TestAdvancedFormationSchema:
         errors = validate_dynamic_config(config)
         assert len(errors) == 0
 
-    def test_dynamic_config_invalid_formation(self):
+    def test_dynamic_config_invalid_formation(self) -> None:
         """Test DynamicFormationConfig with invalid formation."""
         config = DynamicFormationConfig(
             initial_formation="invalid_formation",
@@ -563,7 +563,7 @@ class TestAdvancedFormationSchema:
         assert len(errors) > 0
         assert any("invalid_formation" in str(e) for e in errors)
 
-    def test_adaptive_config_validation(self):
+    def test_adaptive_config_validation(self) -> None:
         """Test AdaptiveFormationConfig validation."""
         config = AdaptiveFormationConfig(
             criteria=["complexity", "deadline"],
@@ -576,7 +576,7 @@ class TestAdvancedFormationSchema:
         errors = validate_adaptive_config(config)
         assert len(errors) == 0
 
-    def test_adaptive_config_invalid_criteria(self):
+    def test_adaptive_config_invalid_criteria(self) -> None:
         """Test AdaptiveFormationConfig with invalid criteria."""
         config = AdaptiveFormationConfig(
             criteria=["invalid_criterion"],
@@ -588,7 +588,7 @@ class TestAdvancedFormationSchema:
         assert len(errors) > 0
         assert any("invalid_criterion" in str(e) for e in errors)
 
-    def test_hybrid_config_validation(self):
+    def test_hybrid_config_validation(self) -> None:
         """Test HybridFormationConfig validation."""
         phases = [
             HybridPhaseConfig(formation="parallel", goal="Explore"),
@@ -602,7 +602,7 @@ class TestAdvancedFormationSchema:
         errors = validate_hybrid_config(config)
         assert len(errors) == 0
 
-    def test_hybrid_config_empty_phases(self):
+    def test_hybrid_config_empty_phases(self) -> None:
         """Test HybridFormationConfig with empty phases."""
         config = HybridFormationConfig(phases=[])
 
@@ -612,7 +612,7 @@ class TestAdvancedFormationSchema:
         assert len(errors) > 0
         assert any("at least one phase" in str(e) for e in errors)
 
-    def test_parse_dynamic_from_yaml(self):
+    def test_parse_dynamic_from_yaml(self) -> None:
         """Test parsing dynamic formation from YAML dict."""
         yaml_data = {
             "type": "dynamic",
@@ -632,7 +632,7 @@ class TestAdvancedFormationSchema:
         assert config.dynamic_config.initial_formation == "parallel"
         assert config.dynamic_config.max_switches == 3
 
-    def test_parse_adaptive_from_yaml(self):
+    def test_parse_adaptive_from_yaml(self) -> None:
         """Test parsing adaptive formation from YAML dict."""
         yaml_data = {
             "type": "adaptive",
@@ -649,7 +649,7 @@ class TestAdvancedFormationSchema:
         assert config.adaptive_config is not None
         assert config.adaptive_config.criteria == ["complexity", "deadline"]
 
-    def test_parse_hybrid_from_yaml(self):
+    def test_parse_hybrid_from_yaml(self) -> None:
         """Test parsing hybrid formation from YAML dict."""
         yaml_data = {
             "type": "hybrid",
@@ -667,7 +667,7 @@ class TestAdvancedFormationSchema:
         assert config.hybrid_config is not None
         assert len(config.hybrid_config.phases) == 2
 
-    def test_parse_invalid_type_raises_error(self):
+    def test_parse_invalid_type_raises_error(self) -> None:
         """Test that parsing invalid type raises ValidationError."""
         yaml_data = {
             "type": "invalid_type",
@@ -687,7 +687,7 @@ class TestAdvancedFormationBenchmarks:
 
     @pytest.mark.asyncio
     @pytest.mark.slow
-    async def test_benchmark_dynamic_vs_static(self, mock_agents, team_context, sample_task):
+    async def test_benchmark_dynamic_vs_static(self, mock_agents, team_context, sample_task) -> None:
         """Benchmark DynamicFormation vs static formations."""
         # This is a simplified benchmark - real benchmarks would use more complex tasks
 
@@ -719,7 +719,7 @@ class TestAdvancedFormationBenchmarks:
 
     @pytest.mark.asyncio
     @pytest.mark.slow
-    async def test_benchmark_adaptive_selection(self, mock_agents, team_context):
+    async def test_benchmark_adaptive_selection(self, mock_agents, team_context) -> None:
         """Benchmark AdaptiveFormation selection accuracy."""
         formation = AdaptiveFormation()
 
@@ -764,7 +764,7 @@ class TestAdvancedFormationIntegration:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
-    async def test_dynamic_formation_real_scenario(self, mock_agents, team_context):
+    async def test_dynamic_formation_real_scenario(self, mock_agents, team_context) -> None:
         """Test dynamic formation with realistic scenario."""
         # Scenario: Code review task that starts parallel but switches
         # to consensus when conflicts are found
@@ -802,7 +802,7 @@ class TestAdvancedFormationIntegration:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
-    async def test_hybrid_formation_research_workflow(self, mock_agents, team_context):
+    async def test_hybrid_formation_research_workflow(self, mock_agents, team_context) -> None:
         """Test hybrid formation for research workflow."""
         # Scenario: Research workflow with explore → analyze → synthesize phases
 

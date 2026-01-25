@@ -58,12 +58,12 @@ from enum import Enum
 from functools import lru_cache
 from importlib import import_module
 from pathlib import Path
-from typing import Dict, Type, Optional, Any, TYPE_CHECKING
+from typing import Dict, Type, Optional, Any, TYPE_CHECKING, cast
 
 try:
-    from importlib.metadata import entry_points as _entry_points
+    from importlib.metadata import EntryPoint, entry_points as _entry_points
 except ImportError:
-    from importlib_metadata import entry_points as _entry_points
+    from importlib_metadata import EntryPoint, entry_points as _entry_points
 
 try:
     import yaml
@@ -235,17 +235,17 @@ class PluginDiscovery:
             # Handle both old and new entry_points API
             # Python 3.10+: entry_points(group=...) returns iterable directly
             # Python <3.10: _entry_points().group(...) returns iterable
-            eps_result = entry_points(group=self.ENTRY_POINT_GROUP)
+            eps_result = _entry_points(group=self.ENTRY_POINT_GROUP)
 
-            # Check if eps_result has .group() method (old API)
-            if hasattr(eps_result, "group") and callable(eps_result.group):
-                # Old API: call .group() to get entry points
-                eps = eps_result.group(self.ENTRY_POINT_GROUP)
+            # Check if eps_result has .select() method (new API)
+            if hasattr(eps_result, "select"):
+                # New API: use .select() to get entry points
+                eps = eps_result.select(group=self.ENTRY_POINT_GROUP)
             else:
-                # New API: eps_result is already the iterable
+                # Old API: eps_result is already the iterable
                 eps = eps_result
 
-            for ep in eps:
+            for ep in cast(List[EntryPoint], eps):
                 try:
                     # Load the vertical class
                     vertical_class = ep.load()

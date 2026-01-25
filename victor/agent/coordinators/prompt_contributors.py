@@ -467,7 +467,8 @@ class DynamicPromptContributor(IPromptContributor):
             return result
         elif hasattr(result, "__await__"):
             # It's a coroutine
-            return await result
+            coro_result = await result
+            return coro_result if isinstance(coro_result, str) else ""
         else:
             return ""
 

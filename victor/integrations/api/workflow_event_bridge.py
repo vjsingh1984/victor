@@ -316,7 +316,7 @@ class WorkflowEventBridge:
         await self.subscribe_workflow(
             workflow_id,
             client_id,
-            websocket.send_text,  # type: ignore
+            websocket.send_text,
         )
 
         try:

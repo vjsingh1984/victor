@@ -148,7 +148,7 @@ class TeamCoordinator:
         # Fall back to vertical context if available
         vertical_context = getattr(self._orchestrator, "vertical_context", None)
         if vertical_context is not None:
-            context_specs = getattr(vertical_context, "team_specs", None)
+            context_specs: Dict[str, Any] = getattr(vertical_context, "team_specs", None) or {}
             if context_specs:
                 return context_specs
 
@@ -163,7 +163,7 @@ class TeamCoordinator:
             # Strip namespace prefix for compatibility with local team names
             if not isinstance(registry_specs, dict):
                 registry_specs = {}
-            normalized: Dict[str, Any] = cast("Dict[str, Any]", registry_specs)
+            normalized: Dict[str, Any] = registry_specs
             for name, spec in registry_specs.items():
                 short_name = name.split(":", 1)[-1] if ":" in name else name
                 normalized[short_name] = spec

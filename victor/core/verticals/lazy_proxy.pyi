@@ -25,13 +25,13 @@ T = TypeVar("T", bound=VerticalBase)
 class LazyProxyType(str, Enum):
     """When to load the vertical."""
 
-    LAZY: str = "lazy"
+    LAZY = "lazy"
     """Load on first attribute access (default)."""
 
-    ON_DEMAND: str = "on_demand"
+    ON_DEMAND = "on_demand"
     """Load immediately when proxy is created."""
 
-    EAGER: str = "eager"
+    EAGER = "eager"
     """Alias for ON_DEMAND."""
 
 # =============================================================================
@@ -101,7 +101,7 @@ class LazyProxy(VerticalBase, Generic[T]):
         ...
 
     @property
-    def description(self) -> str:
+    def description(self) -> str:  # type: ignore[override]
         """Get the description from the loaded vertical.
 
         Triggers lazy load if not already loaded.
@@ -138,7 +138,7 @@ class LazyProxy(VerticalBase, Generic[T]):
         """
         ...
 
-    def get_tools(self) -> List[Any]:
+    def get_tools(self) -> List[str]:  # type: ignore[override]
         """Get tools from the loaded vertical.
 
         Triggers lazy load if not already loaded.
@@ -148,7 +148,8 @@ class LazyProxy(VerticalBase, Generic[T]):
         """
         ...
 
-    def get_system_prompt(self) -> str:
+    @classmethod
+    def get_system_prompt(cls) -> str:  # type: ignore[override]
         """Get system prompt from the loaded vertical.
 
         Triggers lazy load if not already loaded.

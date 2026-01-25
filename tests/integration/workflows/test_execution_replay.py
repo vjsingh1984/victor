@@ -42,7 +42,7 @@ from victor.workflows.recording_integration import (
 
 
 @pytest.fixture
-def temp_storage_dir(tmp_path):
+def temp_storage_dir(tmp_path: Any) -> Any:
     """Create a temporary storage directory."""
     storage_dir = tmp_path / "recordings"
     storage_dir.mkdir()
@@ -78,7 +78,7 @@ def sample_recording_data():
 class TestExecutionRecorder:
     """Tests for ExecutionRecorder."""
 
-    def test_recorder_initialization(self):
+    def test_recorder_initialization(self) -> None:
         """Test recorder initialization."""
         recorder = ExecutionRecorder(
             workflow_name="test_workflow",
@@ -91,7 +91,7 @@ class TestExecutionRecorder:
         assert recorder.config["record_inputs"] is True
         assert recorder.config["record_outputs"] is True
 
-    def test_record_workflow_lifecycle(self):
+    def test_record_workflow_lifecycle(self) -> None:
         """Test recording workflow lifecycle."""
         recorder = ExecutionRecorder(workflow_name="test_workflow")
 
@@ -118,7 +118,7 @@ class TestExecutionRecorder:
         assert metadata.node_count == 2
         assert metadata.event_count == 6
 
-    def test_record_recursion(self):
+    def test_record_recursion(self) -> None:
         """Test recording recursion depth changes."""
         recorder = ExecutionRecorder(workflow_name="test_workflow")
 
@@ -134,7 +134,7 @@ class TestExecutionRecorder:
         recursion_events = [e for e in recorder.events if "recursion" in e.event_type.value]
         assert len(recursion_events) == 4
 
-    def test_record_team_execution(self):
+    def test_record_team_execution(self) -> None:
         """Test recording team execution."""
         recorder = ExecutionRecorder(workflow_name="test_workflow")
 
@@ -163,7 +163,7 @@ class TestExecutionRecorder:
         team_events = [e for e in recorder.events if "team" in e.event_type.value]
         assert len(team_events) == 3
 
-    def test_record_state_snapshots(self):
+    def test_record_state_snapshots(self) -> None:
         """Test recording state snapshots."""
         recorder = ExecutionRecorder(
             workflow_name="test_workflow",
@@ -189,7 +189,7 @@ class TestExecutionRecorder:
         assert recorder.snapshots[1].state == {"key": "value2"}
 
     @pytest.mark.asyncio
-    async def test_save_and_load_recording(self, tmp_path):
+    async def test_save_and_load_recording(self, tmp_path) -> None:
         """Test saving and loading recording."""
         recorder = ExecutionRecorder(workflow_name="test_workflow", compress=False)
 
@@ -214,7 +214,7 @@ class TestExecutionRecorder:
         assert replayer.metadata.success is True
 
     @pytest.mark.asyncio
-    async def test_compressed_recording(self, tmp_path):
+    async def test_compressed_recording(self, tmp_path) -> None:
         """Test saving compressed recording."""
         recorder = ExecutionRecorder(workflow_name="test_workflow", compress=True)
 
@@ -265,7 +265,7 @@ class TestExecutionReplayer:
 
         return filepath
 
-    def test_load_recording(self, sample_recording):
+    def test_load_recording(self, sample_recording) -> None:
         """Test loading a recording."""
         replayer = ExecutionReplayer.load(sample_recording)
 
@@ -275,7 +275,7 @@ class TestExecutionReplayer:
         )  # workflow_start, node_start, node_complete, state_snapshot, node_start, node_complete, workflow_complete
         assert len(replayer.snapshots) == 1
 
-    def test_step_forward(self, sample_recording):
+    def test_step_forward(self, sample_recording) -> None:
         """Test stepping forward through events."""
         replayer = ExecutionReplayer.load(sample_recording)
 
@@ -287,7 +287,7 @@ class TestExecutionReplayer:
         # Position should be at 2
         assert replayer.current_position == 2
 
-    def test_step_backward(self, sample_recording):
+    def test_step_backward(self, sample_recording) -> None:
         """Test stepping backward through events."""
         replayer = ExecutionReplayer.load(sample_recording)
         replayer.current_position = 4
@@ -298,7 +298,7 @@ class TestExecutionReplayer:
         # Position should be at 2
         assert replayer.current_position == 2
 
-    def test_get_event(self, sample_recording):
+    def test_get_event(self, sample_recording) -> None:
         """Test getting a specific event."""
         replayer = ExecutionReplayer.load(sample_recording)
 
@@ -309,7 +309,7 @@ class TestExecutionReplayer:
         assert event is not None
         assert event.event_type == RecordingEventType.WORKFLOW_START
 
-    def test_get_node_events(self, sample_recording):
+    def test_get_node_events(self, sample_recording) -> None:
         """Test getting events for a specific node."""
         replayer = ExecutionReplayer.load(sample_recording)
 
@@ -321,7 +321,7 @@ class TestExecutionReplayer:
         assert node1_events[1].event_type == RecordingEventType.NODE_COMPLETE
         assert node1_events[2].event_type == RecordingEventType.STATE_SNAPSHOT
 
-    def test_jump_to_event(self, sample_recording):
+    def test_jump_to_event(self, sample_recording) -> None:
         """Test jumping to a specific event."""
         replayer = ExecutionReplayer.load(sample_recording)
 
@@ -337,7 +337,7 @@ class TestExecutionReplayer:
         assert replayer.current_position == replayer.events.index(node2_complete)
 
     @pytest.mark.asyncio
-    async def test_compare_recordings(self, tmp_path, sample_recording):
+    async def test_compare_recordings(self, tmp_path, sample_recording) -> None:
         """Test comparing two recordings."""
         # Create second recording with different path
         recorder2 = ExecutionRecorder(workflow_name="sample_workflow", compress=False)
@@ -360,7 +360,7 @@ class TestExecutionReplayer:
         assert diff["node_diff"]["only_in_other"] == set()
         assert len(diff["node_diff"]["common"]) == 1  # node1
 
-    def test_visualize(self, sample_recording, tmp_path):
+    def test_visualize(self, sample_recording, tmp_path) -> None:
         """Test generating visualization."""
         replayer = ExecutionReplayer.load(sample_recording)
 
@@ -375,7 +375,7 @@ class TestFileRecordingStorage:
     """Tests for FileRecordingStorage."""
 
     @pytest.mark.asyncio
-    async def test_save_and_load(self, temp_storage_dir):
+    async def test_save_and_load(self, temp_storage_dir) -> None:
         """Test saving and loading recordings."""
         storage = FileRecordingStorage(base_path=temp_storage_dir)
 
@@ -394,7 +394,7 @@ class TestFileRecordingStorage:
         assert replayer.metadata.workflow_name == "test_workflow"
 
     @pytest.mark.asyncio
-    async def test_list_recordings(self, temp_storage_dir):
+    async def test_list_recordings(self, temp_storage_dir) -> None:
         """Test listing recordings."""
         storage = FileRecordingStorage(base_path=temp_storage_dir)
 
@@ -416,7 +416,7 @@ class TestFileRecordingStorage:
         assert filtered[0]["workflow_name"] == "workflow_1"
 
     @pytest.mark.asyncio
-    async def test_delete_recording(self, temp_storage_dir):
+    async def test_delete_recording(self, temp_storage_dir) -> None:
         """Test deleting a recording."""
         storage = FileRecordingStorage(base_path=temp_storage_dir)
 
@@ -435,7 +435,7 @@ class TestFileRecordingStorage:
         assert metadata is None
 
     @pytest.mark.asyncio
-    async def test_get_storage_stats(self, temp_storage_dir):
+    async def test_get_storage_stats(self, temp_storage_dir) -> None:
         """Test getting storage statistics."""
         storage = FileRecordingStorage(base_path=temp_storage_dir)
 
@@ -454,7 +454,7 @@ class TestFileRecordingStorage:
         assert "test_workflow" in stats["workflow_counts"]
 
     @pytest.mark.asyncio
-    async def test_retention_policy(self, temp_storage_dir):
+    async def test_retention_policy(self, temp_storage_dir) -> None:
         """Test applying retention policy."""
         from datetime import datetime, timedelta
 
@@ -483,7 +483,7 @@ class TestInMemoryRecordingStorage:
     """Tests for InMemoryRecordingStorage."""
 
     @pytest.mark.asyncio
-    async def test_save_and_load(self):
+    async def test_save_and_load(self) -> None:
         """Test saving and loading in memory."""
         storage = InMemoryRecordingStorage()
 
@@ -502,7 +502,7 @@ class TestInMemoryRecordingStorage:
         assert replayer.metadata.workflow_name == "test_workflow"
 
     @pytest.mark.asyncio
-    async def test_clear(self):
+    async def test_clear(self) -> None:
         """Test clearing all recordings."""
         storage = InMemoryRecordingStorage()
 
@@ -520,7 +520,7 @@ class TestInMemoryRecordingStorage:
 class TestRecordingIntegration:
     """Tests for recording integration utilities."""
 
-    def test_record_workflow_context_manager(self):
+    def test_record_workflow_context_manager(self) -> None:
         """Test using record_workflow context manager."""
         with record_workflow("test_workflow") as recorder:
             recorder.record_workflow_start({"input": "data"})
@@ -531,7 +531,7 @@ class TestRecordingIntegration:
         assert recorder.metadata.success is True
         assert recorder.metadata.node_count == 1
 
-    def test_enable_and_disable_recording(self):
+    def test_enable_and_disable_recording(self) -> None:
         """Test enabling and disabling recording."""
         from victor.workflows.recording_integration import (
             enable_workflow_recording,
@@ -554,7 +554,7 @@ class TestEndToEndRecording:
     """End-to-end integration tests for recording system."""
 
     @pytest.mark.asyncio
-    async def test_record_simple_workflow_execution(self, temp_storage_dir):
+    async def test_record_simple_workflow_execution(self, temp_storage_dir) -> None:
         """Test recording a simple workflow execution."""
         from victor.workflows.definition import WorkflowBuilder
 
@@ -588,7 +588,7 @@ class TestEndToEndRecording:
         assert replayer.metadata.node_count == 2
 
     @pytest.mark.asyncio
-    async def test_replay_with_state_inspection(self, temp_storage_dir):
+    async def test_replay_with_state_inspection(self, temp_storage_dir) -> None:
         """Test replaying with state inspection."""
         # Create recording with state snapshots
         recorder = ExecutionRecorder(

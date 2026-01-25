@@ -155,7 +155,7 @@ def register_protocols(
     *,
     protocols: Optional[List[Type[object]]] = None,
     auto_detect: bool = True,
-):
+) -> Any:
     """Class decorator for automatic protocol registration.
 
     This decorator auto-detects which protocols a vertical class

@@ -56,10 +56,15 @@ Usage:
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from victor.core.verticals.capability_mutation import CapabilityMutation, CapabilityRollback
 from victor.core.verticals.context import VerticalContext
+
+if TYPE_CHECKING:
+    from victor.core.verticals.base import VerticalConfig
+
+logger = __import__("logging").getLogger(__name__)
 
 
 class MutableVerticalContext(VerticalContext):
@@ -102,14 +107,14 @@ class MutableVerticalContext(VerticalContext):
             print(f"{mutation.capability}: {mutation.args}")
     """
 
-    def __init__(self, name: str, config: Dict[str, Any] | None):
+    def __init__(self, name: str, config: Optional[VerticalConfig]):
         """Initialize mutable context.
 
         Args:
             name: Vertical name
             config: Vertical configuration dict
         """
-        super().__init__(name=name, config=config if config is not None else {})
+        super().__init__(name=name, config=config if config is not None else {})  # type: ignore[arg-type]
         self._mutations: List[CapabilityMutation] = []
         self._capability_values: Dict[str, Any] = {}
         self._rollback_stack: List[CapabilityRollback] = []
@@ -157,11 +162,11 @@ class MutableVerticalContext(VerticalContext):
         # Update config (but don't mutate orchestrator directly)
         if self.config is not None:
             if "_applied_capabilities" not in self.config:
-                self.config["_applied_capabilities"] = {}
-            self.config["_applied_capabilities"][capability_name] = kwargs
+                (self.config)["_applied_capabilities"] = {}  # type: ignore[index]
+            (self.config)["_applied_capabilities"][capability_name] = kwargs  # type: ignore[index]
         else:
             # Initialize config if it's None
-            self.config = {"_applied_capabilities": {capability_name: kwargs}}
+            self.config = {"_applied_capabilities": {capability_name: kwargs}}  # type: ignore[assignment]
 
     def get_capability(self, capability_name: str) -> Optional[Any]:
         """Get applied capability value.
@@ -288,7 +293,7 @@ class MutableVerticalContext(VerticalContext):
         self._capability_values.clear()
         self._rollback_stack.clear()
         if self.config is not None and "_applied_capabilities" in self.config:
-            del self.config["_applied_capabilities"]
+            del self.config["_applied_capabilities"]  # type: ignore[attr-defined]
 
     def get_mutations_by_capability(self, capability_name: str) -> List[CapabilityMutation]:
         """Get all mutations for a specific capability.

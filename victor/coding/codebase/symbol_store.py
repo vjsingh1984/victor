@@ -825,7 +825,8 @@ class SymbolStore:
             ],
         }
 
-        queries: List[Tuple[str, Optional[str], str]] = SYMBOL_QUERIES.get(language, [])
+        # Symbol queries: (type, name_field|None, symbol_type)
+        queries: Any = SYMBOL_QUERIES.get(language, [])
 
         def walk_tree(node: Any) -> None:
             """Recursively walk tree and extract symbols."""

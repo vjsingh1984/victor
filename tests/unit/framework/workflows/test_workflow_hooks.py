@@ -20,7 +20,7 @@ method that enable automatic loading of vertical-specific capability providers.
 
 import importlib
 import pytest
-from typing import Optional
+from typing import Optional, Any
 from pathlib import Path
 
 from victor.framework.workflows.base_yaml_provider import BaseYAMLWorkflowProvider
@@ -97,35 +97,35 @@ class NoCapabilityClassWorkflowProvider(BaseYAMLWorkflowProvider):
 class TestGetCapabilityProviderModuleHook:
     """Tests for the _get_capability_provider_module() hook method."""
 
-    def test_default_returns_none(self):
+    def test_default_returns_none(self) -> None:
         """Default implementation should return None."""
         provider = MinimalWorkflowProvider()
         result = provider._get_capability_provider_module()
 
         assert result is None
 
-    def test_research_provider_returns_module_path(self):
+    def test_research_provider_returns_module_path(self) -> None:
         """ResearchWorkflowProvider should return correct module path."""
         provider = ResearchWorkflowProviderWithCapability()
         result = provider._get_capability_provider_module()
 
         assert result == "victor.research.capabilities"
 
-    def test_devops_provider_returns_module_path(self):
+    def test_devops_provider_returns_module_path(self) -> None:
         """DevOpsWorkflowProvider should return correct module path."""
         provider = DevOpsWorkflowProviderWithCapability()
         result = provider._get_capability_provider_module()
 
         assert result == "victor.devops.capabilities"
 
-    def test_dataanalysis_provider_returns_module_path(self):
+    def test_dataanalysis_provider_returns_module_path(self) -> None:
         """DataAnalysisWorkflowProvider should return correct module path."""
         provider = DataAnalysisWorkflowProviderWithCapability()
         result = provider._get_capability_provider_module()
 
         assert result == "victor.dataanalysis.capabilities"
 
-    def test_returns_optional_string(self):
+    def test_returns_optional_string(self) -> None:
         """Method should return Optional[str]."""
         provider = MinimalWorkflowProvider()
         result = provider._get_capability_provider_module()
@@ -142,14 +142,14 @@ class TestGetCapabilityProviderModuleHook:
 class TestGetCapabilityProviderMethod:
     """Tests for the get_capability_provider() method."""
 
-    def test_returns_none_when_hook_returns_none(self):
+    def test_returns_none_when_hook_returns_none(self) -> None:
         """get_capability_provider should return None when hook returns None."""
         provider = MinimalWorkflowProvider()
         result = provider.get_capability_provider()
 
         assert result is None
 
-    def test_returns_none_for_invalid_module(self):
+    def test_returns_none_for_invalid_module(self) -> None:
         """get_capability_provider should return None for invalid module path."""
         provider = InvalidModuleWorkflowProvider()
         result = provider.get_capability_provider()
@@ -157,14 +157,14 @@ class TestGetCapabilityProviderMethod:
         # Should handle ImportError gracefully and return None
         assert result is None
 
-    def test_returns_none_for_module_without_provider(self):
+    def test_returns_none_for_module_without_provider(self) -> None:
         """get_capability_provider should return None when module has no capability provider."""
         provider = NoCapabilityClassWorkflowProvider()
         result = provider.get_capability_provider()
 
         assert result is None
 
-    def test_returns_capability_provider_for_research(self):
+    def test_returns_capability_provider_for_research(self) -> None:
         """get_capability_provider should return ResearchCapabilityProvider."""
         provider = ResearchWorkflowProviderWithCapability()
         result = provider.get_capability_provider()
@@ -172,7 +172,7 @@ class TestGetCapabilityProviderMethod:
         assert result is not None
         assert isinstance(result, BaseCapabilityProvider)
 
-    def test_returns_capability_provider_for_devops(self):
+    def test_returns_capability_provider_for_devops(self) -> None:
         """get_capability_provider should return DevOpsCapabilityProvider."""
         provider = DevOpsWorkflowProviderWithCapability()
         result = provider.get_capability_provider()
@@ -180,7 +180,7 @@ class TestGetCapabilityProviderMethod:
         assert result is not None
         assert isinstance(result, BaseCapabilityProvider)
 
-    def test_returns_capability_provider_for_dataanalysis(self):
+    def test_returns_capability_provider_for_dataanalysis(self) -> None:
         """get_capability_provider should return DataAnalysisCapabilityProvider."""
         provider = DataAnalysisWorkflowProviderWithCapability()
         result = provider.get_capability_provider()
@@ -188,7 +188,7 @@ class TestGetCapabilityProviderMethod:
         assert result is not None
         assert isinstance(result, BaseCapabilityProvider)
 
-    def test_returned_provider_has_required_methods(self):
+    def test_returned_provider_has_required_methods(self) -> None:
         """Returned capability provider should have required methods."""
         provider = ResearchWorkflowProviderWithCapability()
         result = provider.get_capability_provider()
@@ -199,7 +199,7 @@ class TestGetCapabilityProviderMethod:
             assert callable(result.get_capabilities)
             assert callable(result.get_capabilities)
 
-    def test_returned_provider_has_metadata(self):
+    def test_returned_provider_has_metadata(self) -> None:
         """Returned capability provider should have metadata."""
         provider = ResearchWorkflowProviderWithCapability()
         result = provider.get_capability_provider()
@@ -213,7 +213,7 @@ class TestGetCapabilityProviderMethod:
             for meta in metadata.values():
                 assert isinstance(meta, CapabilityMetadata)
 
-    def test_returned_provider_has_capabilities(self):
+    def test_returned_provider_has_capabilities(self) -> None:
         """Returned capability provider should have capabilities."""
         provider = DevOpsWorkflowProviderWithCapability()
         result = provider.get_capability_provider()
@@ -223,7 +223,7 @@ class TestGetCapabilityProviderMethod:
             assert isinstance(capabilities, dict)
             assert len(capabilities) > 0
 
-    def test_research_provider_capabilities(self):
+    def test_research_provider_capabilities(self) -> None:
         """Research capability provider should have expected capabilities."""
         provider = ResearchWorkflowProviderWithCapability()
         result = provider.get_capability_provider()
@@ -243,7 +243,7 @@ class TestGetCapabilityProviderMethod:
             for expected in expected_capabilities:
                 assert expected in capabilities, f"Missing capability: {expected}"
 
-    def test_devops_provider_capabilities(self):
+    def test_devops_provider_capabilities(self) -> None:
         """DevOps capability provider should have expected capabilities."""
         provider = DevOpsWorkflowProviderWithCapability()
         result = provider.get_capability_provider()
@@ -263,7 +263,7 @@ class TestGetCapabilityProviderMethod:
             for expected in expected_capabilities:
                 assert expected in capabilities, f"Missing capability: {expected}"
 
-    def test_dataanalysis_provider_capabilities(self):
+    def test_dataanalysis_provider_capabilities(self) -> None:
         """DataAnalysis capability provider should have expected capabilities."""
         provider = DataAnalysisWorkflowProviderWithCapability()
         result = provider.get_capability_provider()
@@ -275,7 +275,7 @@ class TestGetCapabilityProviderMethod:
             # (checking that it has some capabilities)
             assert len(capabilities) > 0
 
-    def test_capability_provider_is_new_instance(self):
+    def test_capability_provider_is_new_instance(self) -> None:
         """Each call to get_capability_provider should return a new instance."""
         provider = ResearchWorkflowProviderWithCapability()
         result1 = provider.get_capability_provider()
@@ -285,7 +285,7 @@ class TestGetCapabilityProviderMethod:
             # Should be different instances
             assert result1 is not result2
 
-    def test_filters_abstract_base_class(self):
+    def test_filters_abstract_base_class(self) -> None:
         """get_capability_provider should filter out BaseCapabilityProvider abstract class."""
         provider = ResearchWorkflowProviderWithCapability()
         result = provider.get_capability_provider()
@@ -307,7 +307,7 @@ class TestGetCapabilityProviderMethod:
 class TestErrorHandling:
     """Tests for error handling in get_capability_provider()."""
 
-    def test_handles_import_error_gracefully(self):
+    def test_handles_import_error_gracefully(self) -> None:
         """Should handle ImportError gracefully and return None."""
         provider = InvalidModuleWorkflowProvider()
         result = provider.get_capability_provider()
@@ -315,7 +315,7 @@ class TestErrorHandling:
         # Should not raise exception
         assert result is None
 
-    def test_logs_warning_for_invalid_module(self, caplog):
+    def test_logs_warning_for_invalid_module(self, caplog) -> None:
         """Should log warning when module cannot be imported."""
         import logging
 
@@ -329,7 +329,7 @@ class TestErrorHandling:
         # Warning should mention the module path
         assert any("nonexistent" in record.message for record in caplog.records)
 
-    def test_logs_warning_for_missing_provider(self, caplog):
+    def test_logs_warning_for_missing_provider(self, caplog) -> None:
         """Should log warning when no capability provider found in module."""
         import logging
 
@@ -341,7 +341,7 @@ class TestErrorHandling:
         # Should have logged a warning
         assert result is None
 
-    def test_handles_attribute_error_gracefully(self):
+    def test_handles_attribute_error_gracefully(self) -> None:
         """Should handle AttributeError gracefully and return None."""
 
         # Create a provider that returns a module without expected attributes
@@ -358,7 +358,7 @@ class TestErrorHandling:
         # Should handle gracefully
         assert result is None
 
-    def test_handles_instantiation_error(self):
+    def test_handles_instantiation_error(self) -> None:
         """Should handle TypeError during instantiation gracefully."""
         # This tests the try/except block that catches abstract class instantiation
         provider = ResearchWorkflowProviderWithCapability()
@@ -378,7 +378,7 @@ class TestRealVerticalIntegration:
     """Integration tests with actual vertical workflow providers."""
 
     @pytest.mark.slow
-    def test_actual_research_workflow_provider(self):
+    def test_actual_research_workflow_provider(self) -> None:
         """Test with actual ResearchWorkflowProvider from victor.research.workflows."""
         try:
             from victor.research.workflows import ResearchWorkflowProvider
@@ -399,7 +399,7 @@ class TestRealVerticalIntegration:
             pytest.skip("victor.research.workflows not available")
 
     @pytest.mark.slow
-    def test_actual_devops_workflow_provider(self):
+    def test_actual_devops_workflow_provider(self) -> None:
         """Test with actual DevOpsWorkflowProvider from victor.devops.workflows."""
         try:
             from victor.devops.workflows import DevOpsWorkflowProvider
@@ -420,7 +420,7 @@ class TestRealVerticalIntegration:
             pytest.skip("victor.devops.workflows not available")
 
     @pytest.mark.slow
-    def test_actual_dataanalysis_workflow_provider(self):
+    def test_actual_dataanalysis_workflow_provider(self) -> None:
         """Test with actual DataAnalysisWorkflowProvider from victor.dataanalysis.workflows."""
         try:
             from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
@@ -448,7 +448,7 @@ class TestRealVerticalIntegration:
 class TestCapabilityProviderMetadata:
     """Tests for capability provider metadata."""
 
-    def test_research_provider_metadata(self):
+    def test_research_provider_metadata(self) -> None:
         """Research capability provider should have correct metadata."""
         provider = ResearchWorkflowProviderWithCapability()
         result = provider.get_capability_provider()
@@ -464,7 +464,7 @@ class TestCapabilityProviderMetadata:
                 assert isinstance(meta.version, str)
                 assert isinstance(meta.tags, list)
 
-    def test_devops_provider_metadata_dependencies(self):
+    def test_devops_provider_metadata_dependencies(self) -> None:
         """DevOps capability provider metadata should have dependencies."""
         provider = DevOpsWorkflowProviderWithCapability()
         result = provider.get_capability_provider()
@@ -477,7 +477,7 @@ class TestCapabilityProviderMetadata:
                 monitoring_meta = metadata["monitoring_settings"]
                 assert isinstance(monitoring_meta.dependencies, list)
 
-    def test_capability_tags_include_framework(self):
+    def test_capability_tags_include_framework(self) -> None:
         """Capability tags should be relevant to the vertical."""
         provider = ResearchWorkflowProviderWithCapability()
         result = provider.get_capability_provider()
@@ -502,7 +502,7 @@ class TestCapabilityProviderMetadata:
 class TestLazyLoading:
     """Tests for lazy loading behavior."""
 
-    def test_capability_provider_not_loaded_on_init(self):
+    def test_capability_provider_not_loaded_on_init(self) -> None:
         """Capability provider should not be loaded during workflow provider init."""
         # Creating a workflow provider should not load the capability provider
         provider = ResearchWorkflowProviderWithCapability()
@@ -513,7 +513,7 @@ class TestLazyLoading:
         if result:
             assert isinstance(result, BaseCapabilityProvider)
 
-    def test_multiple_calls_load_fresh_instances(self):
+    def test_multiple_calls_load_fresh_instances(self) -> None:
         """Each call should load a fresh instance."""
         provider = ResearchWorkflowProviderWithCapability()
 
@@ -538,7 +538,7 @@ class TestLazyLoading:
 class TestAbstractBaseClassFiltering:
     """Tests for filtering out abstract base classes."""
 
-    def test_skips_base_capability_provider(self):
+    def test_skips_base_capability_provider(self) -> None:
         """Should skip BaseCapabilityProvider abstract class."""
         provider = ResearchWorkflowProviderWithCapability()
         result = provider.get_capability_provider()
@@ -551,7 +551,7 @@ class TestAbstractBaseClassFiltering:
             capabilities = result.get_capabilities()
             assert capabilities is not None
 
-    def test_skips_classes_starting_with_base(self):
+    def test_skips_classes_starting_with_base(self) -> None:
         """Should skip classes starting with 'Base'."""
         provider = ResearchWorkflowProviderWithCapability()
         result = provider.get_capability_provider()
@@ -561,7 +561,7 @@ class TestAbstractBaseClassFiltering:
             class_name = type(result).__name__
             assert not class_name.startswith("Base")
 
-    def test_requires_get_capabilities_method(self):
+    def test_requires_get_capabilities_method(self) -> None:
         """Returned provider must have get_capabilities method."""
         provider = ResearchWorkflowProviderWithCapability()
         result = provider.get_capability_provider()
@@ -570,7 +570,7 @@ class TestAbstractBaseClassFiltering:
             assert hasattr(result, "get_capabilities")
             assert callable(result.get_capabilities)
 
-    def test_requires_get_capability_metadata_method(self):
+    def test_requires_get_capability_metadata_method(self) -> None:
         """Returned provider must have get_capability_metadata method."""
         provider = ResearchWorkflowProviderWithCapability()
         result = provider.get_capability_provider()

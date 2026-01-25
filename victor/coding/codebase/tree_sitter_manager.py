@@ -218,7 +218,9 @@ def parse_file_accelerated(
     # Use Rust accelerator if available
     if _ast_accelerator is not None and _ast_accelerator.rust_available:
         try:
-            tree = _ast_accelerator.parse_to_ast(source_code, language, file_path)
+            from typing import cast
+
+            tree = cast("Tree | None", _ast_accelerator.parse_to_ast(source_code, language, file_path))
             return tree
         except Exception as e:
             logger.debug(f"Rust parsing failed for {file_path}, falling back to Python: {e}")

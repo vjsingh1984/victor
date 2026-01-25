@@ -32,7 +32,7 @@ Quick reference guide with:
 - Viewing and maintenance instructions
 - Known issues and contributing guidelines
 
-**Location**: `/Users/vijaysingh/code/codingagent/docs/workflow-diagrams/README.md`
+**Location**: `docs/workflow-diagrams/index.md`
 
 ### 3. **REPORT.md** (14 KB)
 Detailed audit report with:
