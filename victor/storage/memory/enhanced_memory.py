@@ -479,7 +479,7 @@ class EnhancedMemory:
 
         if priority is not None:
             memory.priority = priority
-            memory.importance = self._calculate_importance(content, priority)
+            memory.importance = self._calculate_importance(content or "", priority)
 
         if tags is not None:
             memory.tags = tags
@@ -518,8 +518,8 @@ class EnhancedMemory:
         Returns:
             Statistics dict
         """
-        memories_by_type = {}
-        memories_by_priority = {}
+        memories_by_type: Dict[str, int] = {}
+        memories_by_priority: Dict[str, int] = {}
 
         for memory in self._memories.values():
             memories_by_type[memory.memory_type.value] = (

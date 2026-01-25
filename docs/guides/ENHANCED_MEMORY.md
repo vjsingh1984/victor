@@ -883,7 +883,7 @@ async def consolidation_workflow():
 ## Additional Resources
 
 - [API Reference](../api/NEW_CAPABILITIES_API.md)
-- [User Guide](../USER_GUIDE.md)
+- [User Guide](../user-guide/index.md)
 - [Hierarchical Planning Guide](HIERARCHICAL_PLANNING.md)
 - [Dynamic Skills Guide](DYNAMIC_SKILLS.md)
-- [Memory System Architecture](../architecture/memory_systems.md)
+- [Memory System Architecture](../architecture/overview.md)

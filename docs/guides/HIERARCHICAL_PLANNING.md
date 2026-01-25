@@ -745,7 +745,7 @@ async def multi_phase_project():
 ## Additional Resources
 
 - [API Reference](../api/NEW_CAPABILITIES_API.md)
-- [User Guide](../USER_GUIDE.md)
+- [User Guide](../user-guide/index.md)
 - [Enhanced Memory Guide](ENHANCED_MEMORY.md)
 - [Dynamic Skills Guide](DYNAMIC_SKILLS.md)
 - [Source Code](https://github.com/your-repo/tree/main/victor/agent/planning)

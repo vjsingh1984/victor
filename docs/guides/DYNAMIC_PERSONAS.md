@@ -694,6 +694,6 @@ pipeline = await orchestrator.chat(
 ## Additional Resources
 
 - [API Reference](../api/NEW_CAPABILITIES_API.md)
-- [User Guide](../USER_GUIDE.md)
-- [Persona Management](../personas/README.md)
-- [Persona Templates](../personas/templates.md)
+- [User Guide](../user-guide/index.md)
+- Persona Management (not yet published)
+- Persona Templates (not yet published)

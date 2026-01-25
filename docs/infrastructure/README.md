@@ -224,10 +224,10 @@ python scripts/benchmark_tool_selection.py run --group all
 
 ## 📝 Documentation
 
-- **[Complete Guide](../INFRASTRUCTURE.md)** - Full documentation
+- **[Complete Guide](quickstart.md)** - Full documentation
 - **[Quick Start](quickstart.md)** - Get started in 5 minutes
-- **[K8s Manifests](../config/k8s/README.md)** - Kubernetes documentation
-- **[Helm Chart](../config/helm/victor/README.md)** - Helm documentation
+- **K8s Manifests**: `config/k8s/` - Kubernetes documentation
+- **Helm Chart**: `config/helm/victor/` - Helm documentation
 
 ## 🎯 Checklist
 
@@ -259,14 +259,14 @@ python scripts/benchmark_tool_selection.py run --group all
 ## 🔗 Links
 
 - [Victor AI Repository](https://github.com/vijayksingh/victor)
-- [Documentation](../README.md)
+- [Documentation](../index.md)
 - [Issues](https://github.com/vijayksingh/victor/issues)
 - [Discussions](https://github.com/vijayksingh/victor/discussions)
 
 ## 📞 Support
 
 For help:
-1. Check [troubleshooting section](../INFRASTRUCTURE.md#troubleshooting)
+1. Check the troubleshooting section in [quickstart.md](quickstart.md)
 2. Search [existing issues](https://github.com/vijayksingh/victor/issues)
 3. Start a [discussion](https://github.com/vijayksingh/victor/discussions)
 4. Open a new [issue](https://github.com/vijayksingh/victor/issues/new)

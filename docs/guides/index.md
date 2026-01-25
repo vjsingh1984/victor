@@ -460,7 +460,7 @@ result = await orchestrator.run("Analyze this code")
 - **Reference**: [Providers →](../reference/providers/index.md)
 - **Reference**: [Tools →](../reference/tools/catalog.md)
 - **Reference**: [Configuration →](../reference/configuration/index.md)
-- **Development**: [Contributing →](../../CONTRIBUTING.md)
+- **Development**: [Contributing →](../contributing/index.md)
 - **Operations**: [Deployment →](../operations/deployment/enterprise.md)
 
 ---

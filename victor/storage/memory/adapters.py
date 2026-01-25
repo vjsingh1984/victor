@@ -537,7 +537,7 @@ class GraphMemoryAdapter:
         from victor.storage.memory.entity_types import EntityRelation, RelationType
 
         if isinstance(value, dict):
-            relation = EntityRelation.create(
+            relation = EntityRelation(
                 source_id=value["source_id"],
                 target_id=value["target_id"],
                 relation_type=RelationType(value.get("relation_type", "related_to")),

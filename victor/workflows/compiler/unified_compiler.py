@@ -236,7 +236,9 @@ class WorkflowCompiler:
             f"Compiled workflow '{workflow_def.name}' with " f"{len(workflow_def.nodes)} nodes"
         )
 
-        return compiled
+        # Cast to protocol for type safety - CompiledGraph implements CompiledGraphProtocol
+        from typing import cast
+        return cast("CompiledGraphProtocol", compiled)
 
 
 __all__ = [

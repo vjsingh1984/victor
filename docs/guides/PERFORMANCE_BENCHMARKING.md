@@ -163,5 +163,5 @@ alias bench='python scripts/benchmark_suite.py --profile quick'
 ## Resources
 
 - [pytest-benchmark Documentation](https://pytest-benchmark.readthedocs.io/)
-- [Phase 4 Performance Baselines](../PERFORMANCE_BASELINES.md)
-- [Architecture Documentation](../architecture/README.md)
+- [Phase 4 Performance Baselines](../performance/benchmark_results.md)
+- [Architecture Documentation](../architecture/overview.md)

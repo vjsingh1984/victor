@@ -637,7 +637,7 @@ graph.add_edge("final_node", END)
 
 **Related Documentation**:
 - [User Guide: Workflows](../../user-guide/index.md#4-workflows)
-- [Developer Guide](../../development/index.md)
+- [Developer Guide](../../contributing/index.md)
 - [Tool Catalog](../../reference/tools/catalog.md)
 
 *Last Updated: 2025-12-29*

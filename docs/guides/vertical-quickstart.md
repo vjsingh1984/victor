@@ -167,6 +167,6 @@ myvertical = "victor_myvertical:MyVertical"
 
 | Topic | Link |
 |-------|------|
-| Complete guide | [Vertical Development Guide](../development/extending/verticals.md) |
+| Complete guide | [Vertical Development Guide](../reference/internals/VERTICAL_DEVELOPMENT_GUIDE.md) |
 | Workflow DSL | [Workflow Development](workflow-development/dsl.md) |
 | Tool catalog | [Tool Reference](../reference/tools/catalog.md) |

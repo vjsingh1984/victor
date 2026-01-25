@@ -109,7 +109,7 @@ class CodeEntityExtractor(EntityExtractor):
 
         if use_treesitter:
             try:
-                from victor.coding.codebase.indexer import CodebaseIndexer
+                from victor.coding.codebase.indexer import CodebaseIndex
 
                 self._treesitter_available = True
             except ImportError:

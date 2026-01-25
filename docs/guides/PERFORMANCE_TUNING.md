@@ -698,7 +698,7 @@ Use this checklist to ensure optimal performance:
 ## Additional Resources
 
 - [API Reference](../api/NEW_CAPABILITIES_API.md)
-- [User Guide](../USER_GUIDE.md)
-- [Profiling Guide](../profiling/README.md)
-- [Production Deployment](../deployment/production.md)
-- [Performance Benchmarks](../benchmarks/results.md)
+- [User Guide](../user-guide/index.md)
+- [Profiling Guide](../observability/performance_monitoring.md)
+- [Production Deployment](../operations/deployment/enterprise.md)
+- [Performance Benchmarks](../performance/benchmark_results.md)

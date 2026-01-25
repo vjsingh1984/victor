@@ -2,16 +2,20 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from victor.storage.graph.protocol import GraphStoreProtocol
 from victor.storage.graph.sqlite_store import SqliteGraphStore
 from victor.storage.graph.memory_store import MemoryGraphStore
 
-try:
+if TYPE_CHECKING:
     from victor.storage.graph.duckdb_store import DuckDBGraphStore
+
+try:
+    from victor.storage.graph.duckdb_store import DuckDBGraphStore as _DuckDBGraphStore
+    DuckDBGraphStore = _DuckDBGraphStore
 except Exception:
-    DuckDBGraphStore = None
+    DuckDBGraphStore = None  # type: ignore[assignment]
 
 
 def create_graph_store(
@@ -35,5 +39,7 @@ def create_graph_store(
     if backend == "duckdb":
         if DuckDBGraphStore is None:
             raise ValueError("DuckDB graph backend requested but duckdb is not installed")
-        return DuckDBGraphStore(project_path)
+        if project_path is None:
+            raise ValueError("DuckDB graph backend requires a project_path")
+        return DuckDBGraphStore(project_path)  # type: ignore[arg-type]
     raise ValueError(f"Unsupported graph store backend: {name}")

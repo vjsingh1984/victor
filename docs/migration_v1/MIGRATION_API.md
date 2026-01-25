@@ -1047,7 +1047,7 @@ Use this checklist to ensure you've migrated all API usage:
 
 - [Main Migration Guide](./MIGRATION_GUIDE.md)
 - [Protocol Reference](../architecture/PROTOCOLS_REFERENCE.md)
-- [API Reference](../API_REFERENCE.md)
+- [API Reference](../reference/api/index.md)
 - [Best Practices](../architecture/BEST_PRACTICES.md)
 
 ---

@@ -135,6 +135,8 @@ class EntityGraph:
 
     async def _init_database(self) -> None:
         """Initialize SQLite database for persistence."""
+        if self._db_path is None:
+            return
         db_path = Path(self._db_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
 

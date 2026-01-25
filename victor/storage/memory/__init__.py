@@ -133,7 +133,7 @@ from victor.storage.memory.enhanced_memory import (
     Memory,
     MemoryConfig,
     MemoryPriority,
-    MemoryType,
+    MemoryType as EnhancedMemoryType,
     MemoryCluster,
 )
 
@@ -196,6 +196,6 @@ __all__ = [
     "Memory",
     "MemoryConfig",
     "MemoryPriority",
-    "MemoryType",
+    "EnhancedMemoryType",
     "MemoryCluster",
 ]

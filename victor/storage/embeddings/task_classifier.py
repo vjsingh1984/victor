@@ -1453,7 +1453,7 @@ class TaskTypeClassifier:
             "test",
         }
 
-        def replace_pascal(match):
+        def replace_pascal(match: re.Match[str]) -> str:
             word = match.group(0)
             if word.lower() in preserve_words:
                 return word

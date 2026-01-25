@@ -672,7 +672,7 @@ async def digitize_document(image_path):
 ## Additional Resources
 
 - [API Reference](../api/NEW_CAPABILITIES_API.md)
-- [User Guide](../USER_GUIDE.md)
-- [Provider Documentation](../providers/README.md)
-- [Vision Agent API](../api/multimodal/vision.md)
-- [Audio Agent API](../api/multimodal/audio.md)
+- [User Guide](../user-guide/index.md)
+- [Provider Documentation](../reference/providers/index.md)
+- [Vision Agent API](../reference/api/index.md)
+- [Audio Agent API](../reference/api/index.md)

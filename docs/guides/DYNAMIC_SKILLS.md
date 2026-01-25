@@ -789,7 +789,7 @@ async def adaptive_workflow(task):
 ## Additional Resources
 
 - [API Reference](../api/NEW_CAPABILITIES_API.md)
-- [User Guide](../USER_GUIDE.md)
+- [User Guide](../user-guide/index.md)
 - [Hierarchical Planning Guide](HIERARCHICAL_PLANNING.md)
 - [Enhanced Memory Guide](ENHANCED_MEMORY.md)
-- [Tool System Documentation](../tools/README.md)
+- [Tool System Documentation](../reference/tools/catalog.md)

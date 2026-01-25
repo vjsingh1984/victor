@@ -27,7 +27,7 @@ class DuckDBGraphStore(GraphStoreProtocol):
         self._lock = asyncio.Lock()
         self._ensure_schema()
 
-    def _connect(self):
+    def _connect(self) -> Any:
         return self.duckdb.connect(str(self.db_path))
 
     def _ensure_schema(self) -> None:

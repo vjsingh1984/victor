@@ -136,7 +136,10 @@ class WorkflowCompilerImpl:
             self._validator.validate(yaml_def)
 
         # Compile using legacy implementation
-        return legacy_compiler.compile(yaml_def)
+        result = legacy_compiler.compile(yaml_def)
+        # Cast to protocol for type safety
+        from typing import cast
+        return cast("CompiledGraphProtocol", result)
 
 
 __all__ = [

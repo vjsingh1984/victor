@@ -60,13 +60,13 @@ class TreeSitterEntityExtractor(EntityExtractor):
             EntityType.VARIABLE,
         }
 
-    def _get_extractor(self):
+    def _get_extractor(self) -> Any:
         """Lazily initialize Tree-sitter extractor."""
         if self._extractor is None:
             try:
                 from victor.coding.codebase.tree_sitter_extractor import TreeSitterExtractor
 
-                self._extractor = TreeSitterExtractor(auto_discover=self._auto_discover)
+                self._extractor = TreeSitterExtractor(auto_discover=self._auto_discover)  # type: ignore[assignment]
             except ImportError as e:
                 logger.warning(f"Tree-sitter not available: {e}")
                 raise

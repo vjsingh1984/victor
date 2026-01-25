@@ -119,7 +119,7 @@ class WorkflowNode(ABC):
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize node to dictionary."""
-        result = {
+        result: Dict[str, Any] = {
             "id": self.id,
             "name": self.name,
             "type": self.node_type.value,
@@ -446,7 +446,7 @@ class TaskConstraints(ConstraintsProtocol):
 class AirgappedConstraints(TaskConstraints):
     """Constraints for airgapped/offline execution."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(
             llm_allowed=False,
             network_allowed=False,
@@ -459,7 +459,7 @@ class AirgappedConstraints(TaskConstraints):
 class ComputeOnlyConstraints(TaskConstraints):
     """Constraints for pure computation (no LLM, no writes)."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(
             llm_allowed=False,
             network_allowed=True,
@@ -472,7 +472,7 @@ class ComputeOnlyConstraints(TaskConstraints):
 class FullAccessConstraints(TaskConstraints):
     """Constraints with full access (use carefully)."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(
             llm_allowed=True,
             network_allowed=True,

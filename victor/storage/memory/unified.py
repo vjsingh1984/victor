@@ -583,7 +583,7 @@ class UnifiedMemoryCoordinator:
             if isinstance(results, Exception):
                 self._error_count += 1
                 logger.warning(f"Provider {target_providers[i].memory_type.name} failed: {results}")
-            else:
+            elif isinstance(results, list):
                 all_results.extend(results)
 
         # Rank and deduplicate

@@ -136,7 +136,7 @@ class CompositeExtractor(EntityExtractor):
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 logger.warning(f"Extractor {self._extractors[i].name} failed: {result}")
-            else:
+            elif isinstance(result, ExtractionResult):
                 valid_results.append(result)
 
         return valid_results
@@ -176,14 +176,14 @@ class CompositeExtractor(EntityExtractor):
             # Merge attributes from duplicates
             from victor.storage.memory.entity_types import Entity
 
-            seen: Dict[str, Entity] = {}
+            merged: Dict[str, Entity] = {}
             for entity in result.entities:
-                if entity.id in seen:
-                    seen[entity.id] = seen[entity.id].merge_with(entity)
+                if entity.id in merged:
+                    merged[entity.id] = merged[entity.id].merge_with(entity)
                 else:
-                    seen[entity.id] = entity
+                    merged[entity.id] = entity
 
-            result.entities = list(seen.values())
+            result.entities = list(merged.values())
 
         # For "first" strategy, merge() already keeps first
 
@@ -210,4 +210,4 @@ def create_default_extractor() -> CompositeExtractor:
 
 
 # Add class method alias
-CompositeExtractor.create_default = staticmethod(create_default_extractor)
+CompositeExtractor.create_default = staticmethod(create_default_extractor)  # type: ignore[attr-defined]

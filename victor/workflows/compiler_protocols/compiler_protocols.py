@@ -45,7 +45,8 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Dict, List, Opti
 
 if TYPE_CHECKING:
     from victor.framework.graph import StateGraph
-    from victor.workflows.definition import WorkflowDefinition, WorkflowNode, WorkflowState
+    from victor.workflows.definition import WorkflowDefinition, WorkflowNode
+    from victor.workflows.adapters import WorkflowState
 
 
 class WorkflowCompilerProtocol(Protocol):
@@ -157,7 +158,7 @@ class CompiledGraphProtocol(Protocol):
         ...
 
     @property
-    def graph(self) -> "StateGraph":
+    def graph(self) -> "StateGraph[Any]":
         """Get the underlying StateGraph.
 
         Returns:
@@ -270,7 +271,7 @@ class NodeExecutorFactoryProtocol(Protocol):
     - Closed for modification: Don't modify factory to add node types
     """
 
-    def create_executor(self, node: "WorkflowNode") -> Callable:
+    def create_executor(self, node: "WorkflowNode") -> Callable[..., Any]:
         """Create an executor function for a workflow node.
 
         Args:
@@ -292,7 +293,7 @@ class NodeExecutorFactoryProtocol(Protocol):
     def register_executor_type(
         self,
         node_type: str,
-        executor_factory: Callable[["WorkflowNode"], Callable],
+        executor_factory: Callable[["WorkflowNode"], Callable[..., Any]],
         *,
         replace: bool = False,
     ) -> None:

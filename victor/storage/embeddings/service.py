@@ -639,12 +639,13 @@ class EmbeddingService:
         # Use Rust accelerator for top-k selection if available
         if self._embedding_accelerator.is_using_rust:
             similarities_list = similarities.tolist()
-            top_k_indices = self._embedding_accelerator.topk_indices(similarities_list, k)
-            top_k_similarities = np.array([similarities[i] for i in top_k_indices], dtype=np.float32)
+            top_k_indices_list = self._embedding_accelerator.topk_indices(similarities_list, k)
+            top_k_indices = np.array(top_k_indices_list, dtype=np.int64)
+            top_k_similarities = np.array([similarities[i] for i in top_k_indices_list], dtype=np.float32)
         else:
             # NumPy argpartition (O(n))
             if k >= len(similarities):
-                top_k_indices = np.arange(len(similarities))
+                top_k_indices = np.arange(len(similarities), dtype=np.int64)
                 top_k_similarities = similarities
             else:
                 top_k_unsorted = np.argpartition(-similarities, k)[:k]

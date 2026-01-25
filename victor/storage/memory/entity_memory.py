@@ -171,6 +171,8 @@ class EntityMemory:
 
     async def _init_database(self) -> None:
         """Initialize SQLite database."""
+        if self._db_path is None:
+            return
         db_path = Path(self._db_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -250,6 +252,8 @@ class EntityMemory:
         """Persist entity to SQLite."""
         import json
 
+        if self._conn is None:
+            return
         self._conn.execute(
             """
             INSERT OR REPLACE INTO entities
@@ -271,7 +275,8 @@ class EntityMemory:
                 self.session_id,
             ),
         )
-        self._conn.commit()
+        if self._conn is not None:
+            self._conn.commit()
 
     async def get(self, entity_id: str) -> Optional[Entity]:
         """Get entity by ID.
@@ -307,6 +312,8 @@ class EntityMemory:
         """Load entity from SQLite."""
         import json
 
+        if self._conn is None:
+            return None
         cursor = self._conn.execute("SELECT * FROM entities WHERE id = ?", (entity_id,))
         row = cursor.fetchone()
 
@@ -447,6 +454,8 @@ class EntityMemory:
         """Persist relation to SQLite."""
         import json
 
+        if self._conn is None:
+            return
         self._conn.execute(
             """
             INSERT OR REPLACE INTO relations
@@ -465,7 +474,8 @@ class EntityMemory:
                 relation.last_seen.isoformat(),
             ),
         )
-        self._conn.commit()
+        if self._conn is not None:
+            self._conn.commit()
 
     async def get_related(
         self,

@@ -524,7 +524,7 @@ def to_workflow_context(ctx: ExecutionContext) -> "WorkflowContext":
     if ctx.get("_as_of_date"):
         temporal = TemporalContext(
             as_of_date=ctx.get("_as_of_date"),
-            lookback_periods=ctx.get("_lookback_periods"),
+            lookback_periods=ctx.get("_lookback_periods", 1),
             include_end_date=ctx.get("_include_end_date", True),
         )
 

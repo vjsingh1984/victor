@@ -175,4 +175,4 @@ victor scheduler remove <id>
 
 - [Workflow DSL](workflow-development/dsl.md) - Complete DSL reference
 - [Workflow Scheduling](workflow-development/scheduling.md) - Cron scheduling
-- [Vertical Workflows](../development/extending/verticals.md) - Vertical-specific workflows
+- [Vertical Workflows](../reference/internals/VERTICAL_DEVELOPMENT_GUIDE.md) - Vertical-specific workflows
