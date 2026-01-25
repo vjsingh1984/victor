@@ -386,12 +386,12 @@ class WorkflowServiceProvider:
             WorkflowCompilerImpl instance
         """
         from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
-        from victor.workflows.compiler_protocols import NodeExecutorFactoryProtocol
+        from victor.workflows.executors.factory import NodeExecutorFactory
         from victor.workflows.validator import WorkflowValidator
         from victor.workflows.yaml_loader import YAMLWorkflowLoader
 
         # Get dependencies from DI container (use actual types, not strings)
-        factory = self.container.get(NodeExecutorFactoryProtocol)
+        factory = self.container.get(NodeExecutorFactory)
         validator = self.container.get(WorkflowValidator)
 
         # Create YAML loader directly (not registered in container)
