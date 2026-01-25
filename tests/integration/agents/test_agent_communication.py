@@ -116,8 +116,8 @@ class CommunicationTestAgent:
             sender_id=self.id,
             recipient_id=message.sender_id,
             content=content,
-            message_type=MessageType.RESULT,  # type: ignore[arg-type]
-            data={"original_message_type": message.message_type.value},  # type: ignore[union-attr]
+            message_type=MessageType.RESULT,
+            data={"original_message_type": message.message_type.value},
         )
         self.sent_responses.append(response)
         return response
@@ -180,7 +180,7 @@ class TestBroadcastMessaging:
             sender_id="coordinator",
             recipient_id="all",
             content="Status update required",
-            message_type=MessageType.QUERY,  # type: ignore[arg-type]
+            message_type=MessageType.QUERY,
         )
 
         await coordinator.broadcast(message)
@@ -203,7 +203,7 @@ class TestBroadcastMessaging:
             sender_id="coordinator",
             recipient_id="all",
             content="Report status",
-            message_type=MessageType.QUERY,  # type: ignore[arg-type]
+            message_type=MessageType.QUERY,
         )
 
         responses = await coordinator.broadcast(message)
@@ -225,7 +225,7 @@ class TestBroadcastMessaging:
             sender_id="coordinator",
             recipient_id="all",
             content="Identify yourselves",
-            message_type=MessageType.QUERY,  # type: ignore[arg-type]
+            message_type=MessageType.QUERY,
         )
 
         responses = await coordinator.broadcast(message)
@@ -248,13 +248,13 @@ class TestBroadcastMessaging:
             sender_id="coordinator",
             recipient_id="all",
             content="Task assignment",
-            message_type=MessageType.TASK,  # type: ignore[arg-type]
+            message_type=MessageType.TASK,
         )
 
         await coordinator.broadcast(message)
 
         for agent in three_comm_agents:
-            assert agent.received_messages[0].message_type == MessageType.TASK  # type: ignore[union-attr]
+            assert agent.received_messages[0].message_type == MessageType.TASK
 
     @pytest.mark.asyncio
     async def test_broadcast_preserves_metadata(
@@ -271,7 +271,7 @@ class TestBroadcastMessaging:
             sender_id="coordinator",
             recipient_id="all",
             content="Urgent task",
-            message_type=MessageType.TASK,  # type: ignore[arg-type]
+            message_type=MessageType.TASK,
             data=msg_data,
         )
 
@@ -307,7 +307,7 @@ class TestDirectMessaging:
             sender_id="coordinator",
             recipient_id="agent_2",
             content="Private instruction",
-            message_type=MessageType.TASK,  # type: ignore[arg-type]
+            message_type=MessageType.TASK,
         )
 
         await coordinator.send_message(message)
@@ -333,7 +333,7 @@ class TestDirectMessaging:
             sender_id="coordinator",
             recipient_id="responder",
             content="Confirm receipt",
-            message_type=MessageType.QUERY,  # type: ignore[arg-type]
+            message_type=MessageType.QUERY,
         )
 
         response = await coordinator.send_message(message)
@@ -355,7 +355,7 @@ class TestDirectMessaging:
             sender_id="coordinator",
             recipient_id="nonexistent_agent",
             content="Message to nobody",
-            message_type=MessageType.QUERY,  # type: ignore[arg-type]
+            message_type=MessageType.QUERY,
         )
 
         response = await coordinator.send_message(message)
@@ -375,7 +375,7 @@ class TestDirectMessaging:
             sender_id="coordinator",
             recipient_id="responder",
             content="Query",
-            message_type=MessageType.QUERY,  # type: ignore[arg-type]
+            message_type=MessageType.QUERY,
         )
 
         response = await coordinator.send_message(message)
@@ -416,7 +416,7 @@ class TestTeamMessageBus:
         message_bus.register_agent("receiver")
 
         message = TeamAgentMessage(
-            message_type=TeamMessageType.DISCOVERY,  # type: ignore[arg-type]
+            message_type=TeamMessageType.DISCOVERY,
             sender_id="sender",
             recipient_id="receiver",
             content="Found important code",
@@ -443,7 +443,7 @@ class TestTeamMessageBus:
             sender_id="sender",
             recipient_id=None,  # broadcast
             content="Status update",
-            message_type=TeamMessageType.STATUS,  # type: ignore[arg-type]
+            message_type=TeamMessageType.STATUS,
         )
 
         await message_bus.send(message)
@@ -469,7 +469,7 @@ class TestTeamMessageBus:
         for i in range(5):
             await message_bus.send(
                 TeamAgentMessage(
-                    message_type=TeamMessageType.DISCOVERY,  # type: ignore[arg-type]
+                    message_type=TeamMessageType.DISCOVERY,
                     sender_id="agent_1",
                     recipient_id="agent_2",
                     content=f"Message {i}",
@@ -493,7 +493,7 @@ class TestTeamMessageBus:
                 sender_id="agent",
                 recipient_id=None,  # broadcast
                 content="Discovery",
-                message_type=TeamMessageType.DISCOVERY,  # type: ignore[arg-type]
+                message_type=TeamMessageType.DISCOVERY,
             )
         )
         await message_bus.send(
@@ -501,7 +501,7 @@ class TestTeamMessageBus:
                 sender_id="agent",
                 recipient_id=None,  # broadcast
                 content="Status",
-                message_type=TeamMessageType.STATUS,  # type: ignore[arg-type]
+                message_type=TeamMessageType.STATUS,
             )
         )
         await message_bus.send(
@@ -509,11 +509,11 @@ class TestTeamMessageBus:
                 sender_id="agent",
                 recipient_id=None,  # broadcast
                 content="Another discovery",
-                message_type=TeamMessageType.DISCOVERY,  # type: ignore[arg-type]
+                message_type=TeamMessageType.DISCOVERY,
             )
         )
 
-        discoveries = message_bus.get_message_log(message_type=TeamMessageType.DISCOVERY)  # type: ignore[arg-type]
+        discoveries = message_bus.get_message_log(message_type=TeamMessageType.DISCOVERY)
         assert len(discoveries) == 2
 
     @pytest.mark.asyncio
@@ -547,7 +547,7 @@ class TestTeamMessageBus:
                 sender_id="agent",
                 recipient_id=None,  # broadcast
                 content="Important alert",
-                message_type=TeamMessageType.ALERT,  # type: ignore[arg-type]
+                message_type=TeamMessageType.ALERT,
             )
         )
 
@@ -568,7 +568,7 @@ class TestTeamMessageBus:
                 sender_id="researcher",
                 recipient_id=None,  # broadcast
                 content="Found authentication module",
-                message_type=TeamMessageType.DISCOVERY,  # type: ignore[arg-type]
+                message_type=TeamMessageType.DISCOVERY,
             )
         )
 
@@ -700,7 +700,7 @@ class TestMessageRouting:
         # Send to agent_b specifically
         await message_bus.send(
             TeamAgentMessage(
-                message_type=TeamMessageType.REQUEST,  # type: ignore[arg-type]
+                message_type=TeamMessageType.REQUEST,
                 sender_id="agent_a",
                 recipient_id="agent_b",
                 content="Only for B",
@@ -727,7 +727,7 @@ class TestMessageRouting:
         for i in range(5):
             await message_bus.send(
                 TeamAgentMessage(
-                    message_type=TeamMessageType.STATUS,  # type: ignore[arg-type]
+                    message_type=TeamMessageType.STATUS,
                     sender_id="sender",
                     recipient_id="receiver",
                     content=f"Message {i}",
@@ -748,7 +748,7 @@ class TestMessageRouting:
         message_bus.register_agent("responder")
 
         original = TeamAgentMessage(
-            message_type=TeamMessageType.REQUEST,  # type: ignore[arg-type]
+            message_type=TeamMessageType.REQUEST,
             sender_id="requester",
             recipient_id="responder",
             content="What is the status?",
@@ -757,7 +757,7 @@ class TestMessageRouting:
 
         # Simulate response
         response = TeamAgentMessage(
-            message_type=TeamMessageType.RESPONSE,  # type: ignore[arg-type]
+            message_type=TeamMessageType.RESPONSE,
             sender_id="responder",
             recipient_id="requester",
             content="All good",
@@ -800,7 +800,7 @@ class TestResponseAggregation:
             sender_id="coordinator",
             recipient_id="all",
             content="Status check",
-            message_type=MessageType.QUERY,  # type: ignore[arg-type]
+            message_type=MessageType.QUERY,
         )
 
         responses = await coordinator.broadcast(message)
@@ -831,7 +831,7 @@ class TestResponseAggregation:
             sender_id="coordinator",
             recipient_id="all",
             content="Response time test",
-            message_type=MessageType.QUERY,  # type: ignore[arg-type]
+            message_type=MessageType.QUERY,
         )
 
         responses = await coordinator.broadcast(message)
@@ -858,7 +858,7 @@ class TestResponseAggregation:
             sender_id="coordinator",
             recipient_id="all",
             content="Query",
-            message_type=MessageType.QUERY,  # type: ignore[arg-type]
+            message_type=MessageType.QUERY,
         )
 
         responses = await coordinator.broadcast(message)
@@ -899,7 +899,7 @@ class TestCommunicationWithTeamExecution:
             sender_id="coordinator",
             recipient_id="all",
             content="Post-execution message",
-            message_type=MessageType.FEEDBACK,  # type: ignore[arg-type]
+            message_type=MessageType.FEEDBACK,
         )
         responses = await coordinator.broadcast(message)
 
@@ -926,7 +926,7 @@ class TestCommunicationWithTeamExecution:
         # Communicate via bus
         await bus.send(
             TeamAgentMessage(
-                message_type=TeamMessageType.RESULT,  # type: ignore[arg-type]
+                message_type=TeamMessageType.RESULT,
                 sender_id="agent_1",
                 recipient_id="agent_2",
                 content="Execution complete",
@@ -959,7 +959,7 @@ class TestCommunicationErrorHandling:
         with pytest.raises(ValueError, match="not registered"):
             await message_bus.send(
                 TeamAgentMessage(
-                    message_type=TeamMessageType.STATUS,  # type: ignore[arg-type]
+                    message_type=TeamMessageType.STATUS,
                     sender_id="unregistered",
                     recipient_id="receiver",
                     content="Test",
@@ -977,7 +977,7 @@ class TestCommunicationErrorHandling:
         # Should not raise, just log warning
         await message_bus.send(
             TeamAgentMessage(
-                message_type=TeamMessageType.STATUS,  # type: ignore[arg-type]
+                message_type=TeamMessageType.STATUS,
                 sender_id="sender",
                 recipient_id="unregistered",
                 content="Test",

@@ -700,7 +700,7 @@ class TestTeamNodeErrorHandling:
         slow_member_obj = MockTeamMember("slow", "worker", "Complete")
         # Monkey patch execute_task to be slow
         original_execute = slow_member_obj.execute_task
-        slow_member_obj.execute_task = slow_member  # type: ignore
+        slow_member_obj.execute_task = slow_member
 
         coordinator.add_member(slow_member_obj)
 

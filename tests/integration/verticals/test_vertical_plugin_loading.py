@@ -89,7 +89,7 @@ class InvalidToolsReturnType(VerticalBase):
     description = "Invalid vertical"
 
     @classmethod
-    def get_tools(cls) -> str:  # type: ignore
+    def get_tools(cls) -> str:
         return "not a list"  # Should be a list
 
     @classmethod
@@ -108,7 +108,7 @@ class InvalidPromptReturnType(VerticalBase):
         return ["read"]
 
     @classmethod
-    def get_system_prompt(cls) -> int:  # type: ignore
+    def get_system_prompt(cls) -> int:
         return 123  # Should be a string
 
 

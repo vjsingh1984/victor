@@ -66,7 +66,7 @@ from victor.storage.checkpoints import ConversationCheckpointManager
 try:
     from victor.storage.checkpoints import SQLiteCheckpointBackend
 except ImportError:
-    SQLiteCheckpointBackend = None  # type: ignore
+    SQLiteCheckpointBackend = None
 
 
 class TestEntityMemoryWithExtraction:
