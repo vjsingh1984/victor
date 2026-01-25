@@ -22,7 +22,7 @@ Part of SOLID-based refactoring to eliminate god class anti-pattern.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from victor.agent.protocols import ISessionManager
 
@@ -71,7 +71,7 @@ class SessionManager(ISessionManager):
             return ""
 
         try:
-            session_id = self._store.create_session()
+            session_id = cast(str, self._store.create_session())
             logger.info(f"Created session: {session_id}")
             return session_id
         except Exception as e:
@@ -178,7 +178,7 @@ class SessionManager(ISessionManager):
             return None
 
         try:
-            return self._store.session_id
+            return cast(Optional[str], self._store.session_id)
         except Exception:
             return None
 

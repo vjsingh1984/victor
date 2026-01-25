@@ -35,7 +35,7 @@ import logging
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, List, Optional, Set, Tuple
+from typing import Callable, List, Optional, Pattern, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -375,10 +375,10 @@ class IntentDetector:
         self.custom_detectors = custom_detectors or []
 
         # Compile patterns
-        self._display_patterns: List[Tuple[re.Pattern, float, str]] = []
-        self._write_patterns: List[Tuple[re.Pattern, float, str]] = []
-        self._read_only_patterns: List[Tuple[re.Pattern, float, str]] = []
-        self._compound_write_patterns: List[Tuple[re.Pattern, float, str]] = []
+        self._display_patterns: List[Tuple[Pattern[str], float, str]] = []
+        self._write_patterns: List[Tuple[Pattern[str], float, str]] = []
+        self._read_only_patterns: List[Tuple[Pattern[str], float, str]] = []
+        self._compound_write_patterns: List[Tuple[Pattern[str], float, str]] = []
 
         self._compile_patterns(DISPLAY_SIGNALS, self._display_patterns)
         self._compile_patterns(WRITE_SIGNALS, self._write_patterns)
@@ -393,7 +393,7 @@ class IntentDetector:
     def _compile_patterns(
         self,
         signals: List[Tuple[str, float, str]],
-        target: List[Tuple[re.Pattern, float, str]],
+        target: List[Tuple[Pattern[str], float, str]],
     ) -> None:
         """Compile regex patterns."""
         for pattern_str, weight, name in signals:
@@ -469,7 +469,7 @@ class IntentDetector:
     def _score_patterns(
         self,
         message: str,
-        patterns: List[Tuple[re.Pattern, float, str]],
+        patterns: List[Tuple[Pattern[str], float, str]],
     ) -> Tuple[float, List[str]]:
         """Score patterns against message.
 

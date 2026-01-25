@@ -44,8 +44,11 @@ if TYPE_CHECKING:
 try:
     from victor.agent.coordinators.state_coordinator import StateScope
 except ImportError:
-    # Fallback for testing
-    StateScope = None
+    # Fallback for testing - create a simple enum
+    class StateScope:  # type: ignore[misc]
+        CHECKPOINT = "checkpoint"
+        ROLLBACK = "rollback"
+        SNAPSHOT = "snapshot"
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +122,16 @@ class CoordinatorAdapter:
             return
 
         try:
-            self._evaluation_coordinator.send_rl_reward_signal(session)
+            # Note: This must be awaited, but this is a sync method
+            # The caller should use an async context or the coordinator should handle this
+            import asyncio
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # We're in an async context, schedule the coroutine
+                asyncio.create_task(self._evaluation_coordinator.send_rl_reward_signal(session))
+            else:
+                # We're in a sync context, run the coroutine
+                loop.run_until_complete(self._evaluation_coordinator.send_rl_reward_signal(session))
             logger.debug("RL reward signal sent successfully")
         except Exception as e:
             logger.warning(f"Failed to send RL reward signal: {e}")
@@ -139,8 +151,7 @@ class CoordinatorAdapter:
 
         try:
             # Get base state from StateCoordinator
-            # Use string "CHECKPOINT" if StateScope is not available (testing)
-            scope = StateScope.CHECKPOINT if StateScope else "CHECKPOINT"
+            scope = StateScope.CHECKPOINT if hasattr(StateScope, 'CHECKPOINT') else "CHECKPOINT"
             base_state = self._state_coordinator.get_state(scope=scope, include_metadata=False)
 
             # Merge with orchestrator-specific state
@@ -151,7 +162,7 @@ class CoordinatorAdapter:
                 ),
                 "message_count": len(
                     self._conversation_controller.conversation.messages
-                    if self._conversation_controller
+                    if self._conversation_controller and hasattr(self._conversation_controller, 'conversation')
                     else []
                 ),
             }
@@ -193,7 +204,7 @@ class CoordinatorAdapter:
 
             # Delegate to StateCoordinator
             # Use string "CHECKPOINT" if StateScope is not available (testing)
-            scope = StateScope.CHECKPOINT if StateScope else "CHECKPOINT"
+            scope = StateScope.CHECKPOINT if StateScope is not None else "CHECKPOINT"
             self._state_coordinator.set_state({"checkpoint": checkpoint_state}, scope=scope)
 
             logger.debug(

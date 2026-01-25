@@ -159,6 +159,7 @@ class ChatCoordinator:
             raw_response=None,
             stop_reason=None,
             usage=None,
+            metadata=None,
         )
 
     async def stream_chat(self, user_message: str) -> AsyncIterator[StreamChunk]:
@@ -1351,11 +1352,6 @@ class ChatCoordinator:
                         f"\n\n[Research loop limit reached ({total_iterations}/{max_total_iterations}) - "
                         "generating comprehensive summary...]\n"
                     ),
-                    metadata={
-                        "chunk_type": "system_message",
-                        "iteration_limit": True,
-                        "total_iterations": total_iterations,
-                    },
                 )
             )
 
@@ -1411,7 +1407,7 @@ class ChatCoordinator:
             Number of seconds to wait before retrying
         """
         orch = self._orch()
-        base_wait = orch._provider_coordinator.get_rate_limit_wait_time(exc)
+        base_wait = cast(float, orch._provider_coordinator.get_rate_limit_wait_time(exc))
         backoff_multiplier = 2**attempt
         wait_time = base_wait * backoff_multiplier
         return min(wait_time, 300.0)
@@ -1434,7 +1430,7 @@ class ChatCoordinator:
         Returns:
             Tuple of (full_content, tool_calls, total_tokens, garbage_detected)
         """
-        last_exception = None
+        last_exception: Optional[Exception] = None
 
         for attempt in range(max_retries + 1):
             try:

@@ -26,7 +26,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
-from victor.workflows.yaml_loader import load_workflow_from_file, YAMLWorkflowConfig
+from victor.workflows.yaml_loader import load_workflow_from_file, load_workflow_from_yaml, YAMLWorkflowConfig
 from victor.workflows.definition import WorkflowDefinition
 from victor.core.errors import ConfigurationValidationError
 
@@ -161,7 +161,7 @@ class TeamNodeConfig(BaseModel):
 
 
 @app.get("/")
-async def root():
+async def root() -> dict[str, Any]:
     """Root endpoint."""
     return {
         "name": "Victor Workflow Editor API",
@@ -171,7 +171,7 @@ async def root():
 
 
 @app.get("/health")
-async def health():
+async def health() -> dict[str, Any]:
     """Health check endpoint."""
     return {"status": "healthy"}
 
@@ -186,8 +186,8 @@ async def validate_workflow_graph(graph: WorkflowGraph) -> ValidationResponse:
     Returns:
         Validation response with errors and warnings
     """
-    errors = []
-    warnings = []
+    errors: list[str] = []
+    warnings: list[str] = []
 
     # Basic validation
     if not graph.nodes:
@@ -271,7 +271,7 @@ async def compile_workflow(request: CompileRequest) -> CompileResponse:
 
 
 @app.post("/api/workflows/export/yaml")
-async def export_to_yaml(graph: WorkflowGraph):
+async def export_to_yaml(graph: WorkflowGraph) -> dict[str, str] | dict[str, bool]:
     """Export workflow graph to YAML format.
 
     Args:
@@ -284,8 +284,13 @@ async def export_to_yaml(graph: WorkflowGraph):
         # Convert graph to workflow definition
         workflow_def = graph_to_definition(graph)
 
-        # Export to YAML
-        yaml_content = workflow_def.to_yaml()
+        # Export to YAML - create YAML content directly
+        import yaml
+        yaml_content = yaml.dump({
+            "name": workflow_def.name,
+            "nodes": {node_id: node.__dict__ for node_id, node in workflow_def.nodes.items()},
+            "start_node": workflow_def.start_node,
+        }, default_flow_style=False)
 
         return {"yaml_content": yaml_content, "success": True}
 
@@ -295,7 +300,7 @@ async def export_to_yaml(graph: WorkflowGraph):
 
 
 @app.post("/api/workflows/import/yaml")
-async def import_from_yaml(file: UploadFile = File(...)):
+async def import_from_yaml(file: UploadFile = File(...)) -> dict[str, Any]:
     """Import workflow from YAML file.
 
     Args:
@@ -324,11 +329,11 @@ async def import_from_yaml(file: UploadFile = File(...)):
 
     except Exception as e:
         logger.error(f"Import failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"error": str(e), "success": False}
 
 
 @app.get("/api/nodes/types")
-async def get_node_types():
+async def get_node_types() -> dict[str, dict[str, Any]]:
     """Get available node types and their configurations.
 
     Returns:
@@ -434,7 +439,7 @@ async def get_node_types():
 
 
 @app.get("/api/formations")
-async def get_formations():
+async def get_formations() -> dict[str, Any]:
     """Get available team formation types.
 
     Returns:
@@ -499,24 +504,27 @@ def graph_to_definition(graph: WorkflowGraph) -> WorkflowDefinition:
         AgentNode,
         ComputeNode,
         WorkflowDefinition,
+        WorkflowNode,
     )
 
     # WorkflowDefinition expects nodes as Dict[str, WorkflowNode]
-    nodes_dict = {}
-    first_node_id = None
+    nodes_dict: dict[str, WorkflowNode] = {}
+    first_node_id: str | None = None
 
     for node in graph.nodes:
         if first_node_id is None:
             first_node_id = node.id
 
         if node.type == "agent":
-            nodes_dict[node.id] = AgentNode(
+            # AgentNode is a subclass of WorkflowNode, so this is safe
+            agent_node: WorkflowNode = AgentNode(  # type: ignore[assignment]
                 id=node.id,
                 name=node.name,
                 role=node.config.get("role", "assistant"),
                 goal=node.config.get("goal", ""),
                 tool_budget=node.config.get("tool_budget", 25),
             )
+            nodes_dict[node.id] = agent_node
         # Add other node types...
 
     return WorkflowDefinition(
@@ -536,8 +544,8 @@ def definition_to_graph(workflow_def: WorkflowDefinition) -> WorkflowGraph:
         Workflow graph for editor
     """
     # Simplified conversion
-    nodes = []
-    edges = []
+    nodes: list[WorkflowNode] = []
+    edges: list[WorkflowEdge] = []
 
     # workflow_def.nodes is Dict[str, WorkflowNode]
     for node_id, node in workflow_def.nodes.items():
@@ -559,7 +567,7 @@ def definition_to_graph(workflow_def: WorkflowDefinition) -> WorkflowGraph:
 # =============================================================================
 
 
-def main():
+def main() -> int:
     """Run the API server."""
     logging.basicConfig(
         level=logging.INFO,

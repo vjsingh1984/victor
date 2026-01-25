@@ -25,7 +25,7 @@ Extracted from CRITICAL-001 Phase 2E.
 
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Pattern
 
 from victor.core.events import ObservabilityBus
 from victor.agent.tool_call_extractor import extract_tool_call_from_text, ExtractedToolCall
@@ -56,14 +56,14 @@ _OUTPUT_REQUIREMENT_PATTERNS_RAW = {
 }
 
 # Pre-compile all patterns at module load (30-40% speedup on pattern matching)
-OUTPUT_REQUIREMENT_PATTERNS: Dict[str, List[re.Pattern]] = {
+OUTPUT_REQUIREMENT_PATTERNS: Dict[str, List[Pattern[str]]] = {
     key: [re.compile(pattern) for pattern in patterns]
     for key, patterns in _OUTPUT_REQUIREMENT_PATTERNS_RAW.items()
 }
 
 # Cache for tool mention patterns (avoid recompiling per-tool patterns)
 # Key: tool_name, Value: list of compiled patterns
-_TOOL_MENTION_PATTERN_CACHE: Dict[str, List[re.Pattern]] = {}
+_TOOL_MENTION_PATTERN_CACHE: Dict[str, List[Pattern[str]]] = {}
 
 # Common tool mention pattern templates (compiled once, tool name inserted)
 _TOOL_MENTION_TEMPLATES = [
@@ -73,7 +73,7 @@ _TOOL_MENTION_TEMPLATES = [
 ]
 
 
-def _get_tool_mention_patterns(tool_name: str) -> List[re.Pattern]:
+def _get_tool_mention_patterns(tool_name: str) -> List[Pattern[str]]:
     """Get or create compiled patterns for detecting tool mentions.
 
     Caches compiled patterns per tool name to avoid recompilation.
@@ -928,15 +928,16 @@ class ContinuationStrategy:
                 "Forcing summary."
             )
             # Emit ERROR event for stuck loop detection
-            self._event_bus.emit_error(
-                error=RuntimeError("Stuck loop detected - model planning but not executing"),
-                context={
-                    "intent": "STUCK_LOOP",
-                    "continuation_prompts": continuation_prompts,
-                    "content_length": content_length,
-                },
-                recoverable=True,
-            )
+            if self._event_bus is not None:
+                self._event_bus.emit_error(
+                    error=RuntimeError("Stuck loop detected - model planning but not executing"),
+                    context={
+                        "intent": "STUCK_LOOP",
+                        "continuation_prompts": continuation_prompts,
+                        "content_length": content_length,
+                    },
+                    recoverable=True,
+                )
             # Emit STATE event for continuation decision
             self._emit_event(
                 topic="state.continuation.request_summary",
@@ -1068,16 +1069,17 @@ class ContinuationStrategy:
                 "Will ask model to make proper tool call."
             )
             # Emit ERROR event for hallucinated tool calls
-            self._event_bus.emit_error(
-                error=RuntimeError(f"Hallucinated tool calls: {', '.join(mentioned_tools)}"),
-                context={
-                    "mentioned_tools": mentioned_tools,
-                    "content_length": content_length,
-                    "extraction_attempted": True,
-                    "extraction_failed": True,
-                },
-                recoverable=True,
-            )
+            if self._event_bus is not None:
+                self._event_bus.emit_error(
+                    error=RuntimeError(f"Hallucinated tool calls: {', '.join(mentioned_tools)}"),
+                    context={
+                        "mentioned_tools": mentioned_tools,
+                        "content_length": content_length,
+                        "extraction_attempted": True,
+                        "extraction_failed": True,
+                    },
+                    recoverable=True,
+                )
             # Emit STATE event for continuation decision
             self._emit_event(
                 topic="state.continuation.force_tool_execution",
@@ -1258,19 +1260,20 @@ class ContinuationStrategy:
                 "requesting summary"
             )
             # Emit METRIC event for budget exhaustion
-            self._event_bus.emit_metric(
-                metric_name="continuation_prompts_max_reached",
-                value=continuation_prompts,
-                unit="count",
-                tags={
-                    "max_prompts": str(max_continuation_prompts),
-                    "task_type": (
-                        "analysis"
-                        if is_analysis_task
-                        else ("action" if is_action_task else "default")
-                    ),
-                },
-            )
+            if self._event_bus is not None:
+                self._event_bus.emit_metric(
+                    metric="continuation_prompts_max_reached",
+                    value=continuation_prompts,
+                    unit="count",
+                    tags={
+                        "max_prompts": str(max_continuation_prompts),
+                        "task_type": (
+                            "analysis"
+                            if is_analysis_task
+                            else ("action" if is_action_task else "default")
+                        ),
+                    },
+                )
             # Emit STATE event for summary request
             self._emit_event(
                 topic="state.continuation.request_summary",

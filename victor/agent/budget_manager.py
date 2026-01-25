@@ -162,7 +162,11 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         Returns:
             BudgetStatus with current usage and limits
         """
-        return self._tracker.get_status(budget_type)
+        if self._tracker is None:
+            raise RuntimeError("BudgetTracker not initialized")
+        tracker = self._tracker
+        assert tracker is not None  # for mypy
+        return tracker.get_status(budget_type)
 
     def consume(self, budget_type: BudgetType, amount: int = 1) -> bool:
         """Consume budget for an operation.
@@ -176,7 +180,11 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         Returns:
             True if budget was available, False if exhausted
         """
-        return self._tracker.consume(budget_type, amount)
+        if self._tracker is None:
+            raise RuntimeError("BudgetTracker not initialized")
+        tracker = self._tracker
+        assert tracker is not None  # for mypy
+        return tracker.consume(budget_type, amount)
 
     def is_exhausted(self, budget_type: BudgetType) -> bool:
         """Check if a budget is exhausted.
@@ -189,7 +197,10 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         Returns:
             True if budget is fully consumed
         """
-        return self._tracker.is_exhausted(budget_type)
+        tracker = self._tracker
+        if tracker is None:
+            raise RuntimeError("BudgetTracker not initialized")
+        return tracker.is_exhausted(budget_type)
 
     def set_model_multiplier(self, multiplier: float) -> None:
         """Set the model-specific multiplier.
@@ -205,7 +216,10 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         Args:
             multiplier: Model multiplier value
         """
-        self._multiplier_calc.set_model_multiplier(multiplier)
+        calc = self._multiplier_calc
+        if calc is None:
+            raise RuntimeError("MultiplierCalculator not initialized")
+        calc.set_model_multiplier(multiplier)
 
     def set_mode_multiplier(self, multiplier: float) -> None:
         """Set the mode-specific multiplier.
@@ -220,7 +234,10 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         Args:
             multiplier: Mode multiplier value
         """
-        self._multiplier_calc.set_mode_multiplier(multiplier)
+        calc = self._multiplier_calc
+        if calc is None:
+            raise RuntimeError("MultiplierCalculator not initialized")
+        calc.set_mode_multiplier(multiplier)
 
     def set_productivity_multiplier(self, multiplier: float) -> None:
         """Set the productivity multiplier.
@@ -235,7 +252,10 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         Args:
             multiplier: Productivity multiplier value
         """
-        self._multiplier_calc.set_productivity_multiplier(multiplier)
+        calc = self._multiplier_calc
+        if calc is None:
+            raise RuntimeError("MultiplierCalculator not initialized")
+        calc.set_productivity_multiplier(multiplier)
 
     def reset(self, budget_type: Optional[BudgetType] = None) -> None:
         """Reset budget(s) to initial state.
@@ -245,7 +265,10 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         Args:
             budget_type: Specific budget to reset, or None for all
         """
-        self._tracker.reset(budget_type)
+        tracker = self._tracker
+        if tracker is None:
+            raise RuntimeError("BudgetTracker not initialized")
+        tracker.reset(budget_type)
 
     def get_prompt_budget_info(self) -> Dict[str, Any]:
         """Get budget information for system prompts.
@@ -255,7 +278,10 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         Returns:
             Dictionary with budget info for prompt building
         """
-        return self._tracker.get_prompt_budget_info()
+        tracker = self._tracker
+        if tracker is None:
+            raise RuntimeError("BudgetTracker not initialized")
+        return tracker.get_prompt_budget_info()
 
     def record_tool_call(self, tool_name: str, is_write_operation: bool = False) -> bool:
         """Record a tool call and consume appropriate budget.
@@ -273,7 +299,10 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         """
         # Auto-detect write operation if not specified
         if not is_write_operation:
-            is_write_operation = self._tool_classifier.is_write_operation(tool_name)
+            classifier = self._tool_classifier
+            if classifier is None:
+                raise RuntimeError("ToolCallClassifier not initialized")
+            is_write_operation = classifier.is_write_operation(tool_name)
 
         # Always consume from tool calls budget
         tool_available = self.consume(BudgetType.TOOL_CALLS)
@@ -287,7 +316,10 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
             budget_type = BudgetType.EXPLORATION
 
         # Update last tool
-        self._tracker.update_last_tool(budget_type, tool_name)
+        tracker = self._tracker
+        if tracker is None:
+            raise RuntimeError("BudgetTracker not initialized")
+        tracker.update_last_tool(budget_type, tool_name)
 
         logger.debug(
             f"BudgetManager: tool_call={tool_name}, "
@@ -307,7 +339,10 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
             budget_type: Type of budget to adjust
             base: New base value
         """
-        self._tracker.set_base_budget(budget_type, base)
+        tracker = self._tracker
+        if tracker is None:
+            raise RuntimeError("BudgetTracker not initialized")
+        tracker.set_base_budget(budget_type, base)
 
     def set_on_exhausted(self, callback: Callable[[BudgetType], None]) -> None:
         """Set callback for when a budget is exhausted.
@@ -317,7 +352,10 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         Args:
             callback: Function called with budget type when exhausted
         """
-        self._tracker.set_on_exhausted(callback)
+        tracker = self._tracker
+        if tracker is None:
+            raise RuntimeError("BudgetTracker not initialized")
+        tracker.set_on_exhausted(callback)
 
     def update_from_mode(self) -> None:
         """Update multiplier from current mode controller.
@@ -335,14 +373,17 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         Returns:
             Dictionary with detailed budget state
         """
-        return self._tracker.get_diagnostics()
+        tracker = self._tracker
+        if tracker is None:
+            raise RuntimeError("BudgetTracker not initialized")
+        return tracker.get_diagnostics()
 
     # =============================================================================
     # Backward Compatibility Properties
     # =============================================================================
 
     @property
-    def _budgets(self):
+    def _budgets(self) -> Dict[str, Any]:
         """Backward compatibility property for _budgets.
 
         Deprecated: Use get_status() or get_diagnostics() instead.
@@ -374,7 +415,7 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         return self._multiplier_calc.productivity_multiplier if self._multiplier_calc else 1.0
 
     @property
-    def _on_exhausted(self):
+    def _on_exhausted(self) -> "Callable[[BudgetType], None] | None":
         """Backward compatibility property for _on_exhausted.
 
         Deprecated: Callback is now managed by BudgetTracker.
@@ -382,7 +423,7 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         return self._tracker._on_exhausted if self._tracker else None
 
     @_on_exhausted.setter
-    def _on_exhausted(self, value):
+    def _on_exhausted(self, value: "Callable[[BudgetType], None] | None") -> None:
         """Backward compatibility setter for _on_exhausted.
 
         Deprecated: Use set_on_exhausted() instead.

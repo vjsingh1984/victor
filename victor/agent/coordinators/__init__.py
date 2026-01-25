@@ -175,7 +175,6 @@ from victor.agent.coordinators.tool_coordinator import (
 
 from victor.agent.coordinators.tool_selection_coordinator import (
     ToolSelectionCoordinator,
-    IToolSelectionCoordinator,
 )
 from victor.agent.coordinators.session_coordinator import (
     SessionCoordinator,
@@ -313,16 +312,8 @@ from victor.agent.coordinators.tool_call_protocol import (
     ToolCallCoordinatorConfig,
 )
 
-# Phase 2 - Prompt Builder Coordination
-from victor.agent.coordinators.prompt_builder_coordinator import (
-    PromptBuilderCoordinator,
-    create_prompt_builder_coordinator,
-)
-from victor.agent.coordinators.prompt_builder_protocol import (
-    IPromptBuilderCoordinator,
-    PromptContext,
-    PromptBuilderCoordinatorConfig,
-)
+# Note: PromptBuilderCoordinator and IPromptBuilderCoordinator are imported from prompt_coordinator
+# The prompt_builder_coordinator and prompt_builder_protocol modules are alternatives
 
 __all__ = [
     # Base configuration
@@ -365,7 +356,6 @@ __all__ = [
     "create_tool_coordinator",
     # ToolSelectionCoordinator
     "ToolSelectionCoordinator",
-    "IToolSelectionCoordinator",
     # SessionCoordinator
     "SessionCoordinator",
     "SessionInfo",
@@ -463,10 +453,4 @@ __all__ = [
     "ToolCallContext",
     "ToolCallResult",
     "ToolCallCoordinatorConfig",
-    # Phase 2 - Prompt Builder Coordination
-    "PromptBuilderCoordinator",
-    "create_prompt_builder_coordinator",
-    "IPromptBuilderCoordinator",
-    "PromptContext",
-    "PromptBuilderCoordinatorConfig",
 ]

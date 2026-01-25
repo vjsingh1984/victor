@@ -451,6 +451,7 @@ __all__ = (
         "AgentExecutionEvent",
         # Agent
         "ChatSession",
+        "AgentConfig",
         # Task
         "TaskResult",
         "FrameworkTaskType",

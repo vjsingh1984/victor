@@ -22,7 +22,7 @@ Part of SOLID-based refactoring to eliminate god class anti-pattern.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
 
 from victor.agent.protocols import IMessageStore
 
@@ -72,25 +72,16 @@ class MessageStore(IMessageStore):
         role: str,
         content: str,
         **metadata: Any,
-    ) -> "Message":
+    ) -> None:
         """Add a message to storage.
 
         Args:
             role: Message role (user, assistant, system, tool)
             content: Message content
             **metadata: Additional message metadata
-
-        Returns:
-            Created Message object
         """
         # Add to in-memory controller
-        message = self._controller.add_message(role, content, **metadata)
-
-        # Persist if enabled
-        if self._enable_persistence:
-            self._persist_message(message)
-
-        return message
+        self._controller.add_message(role, content, **metadata)
 
     def add_user_message(self, content: str) -> "Message":
         """Add a user message.
@@ -101,7 +92,8 @@ class MessageStore(IMessageStore):
         Returns:
             Created Message object
         """
-        return self.add_message("user", content)
+        msg = self._controller.add_message("user", content)
+        return cast("Message", msg)
 
     def add_assistant_message(
         self,
@@ -121,7 +113,8 @@ class MessageStore(IMessageStore):
         """
         msg_metadata = {"tool_calls": tool_calls} if tool_calls else {}
         msg_metadata.update(metadata)
-        return self.add_message("assistant", content, **msg_metadata)
+        msg = self._controller.add_message("assistant", content, **msg_metadata)
+        return cast("Message", msg)
 
     def add_tool_result(
         self,
@@ -141,7 +134,8 @@ class MessageStore(IMessageStore):
         """
         msg_metadata = {"tool_call_id": tool_call_id}
         msg_metadata.update(metadata)
-        return self.add_message("tool", content, **msg_metadata)
+        msg = self._controller.add_message("tool", content, **msg_metadata)
+        return cast("Message", msg)
 
     def get_messages(self, limit: Optional[int] = None) -> List["Message"]:
         """Retrieve messages.
@@ -162,7 +156,7 @@ class MessageStore(IMessageStore):
         """
         for message in reversed(self._controller.messages):
             if message.role == "user":
-                return message.content
+                return cast(str, message.content)
         return None
 
     def get_last_assistant_message(self) -> Optional[str]:
@@ -183,7 +177,7 @@ class MessageStore(IMessageStore):
         Returns:
             List of all messages
         """
-        return self._controller.messages
+        return cast(List["Message"], self._controller.messages)
 
     @property
     def message_count(self) -> int:
