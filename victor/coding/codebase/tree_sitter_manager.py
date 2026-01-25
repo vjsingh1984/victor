@@ -74,7 +74,7 @@ try:
     from victor.native.accelerators.ast_processor import get_ast_processor
 
     _ast_accelerator = get_ast_processor()
-    if _ast_accelerator.is_available():  # type: ignore[call-arg]
+    if _ast_accelerator.is_available():
         logger.info("AST processing: Using Rust accelerator (10x faster)")
     else:
         logger.info("AST processing: Using Python tree-sitter")
@@ -172,10 +172,12 @@ def run_query(tree: "Tree", query_src: str, language: str) -> Dict[str, List["No
     # Use Rust accelerator if available
     if _ast_accelerator is not None and _ast_accelerator.rust_available:
         try:
-            nodes: list[Any] = _ast_accelerator.execute_query(tree, query_src, language)  # type: ignore[call-arg]
+            from typing import cast
+
+            nodes_list = _ast_accelerator.execute_query(tree, query_src, language)  # type: ignore[call-arg]
             # Convert list of nodes to capture dict format
             # For now, return all nodes under a default capture name
-            return {"_all": nodes}  # type: ignore[dict-item]
+            return {"_all": cast(List["Node"], nodes_list)}
         except Exception as e:
             logger.debug(f"Rust query execution failed, falling back to Python: {e}")
 
@@ -216,7 +218,7 @@ def parse_file_accelerated(
     # Use Rust accelerator if available
     if _ast_accelerator is not None and _ast_accelerator.rust_available:
         try:
-            tree: "Tree | None" = _ast_accelerator.parse_to_ast(source_code, language, file_path)  # type: ignore[call-arg]
+            tree = _ast_accelerator.parse_to_ast(source_code, language, file_path)
             return tree
         except Exception as e:
             logger.debug(f"Rust parsing failed for {file_path}, falling back to Python: {e}")

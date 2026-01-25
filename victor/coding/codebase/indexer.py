@@ -452,7 +452,7 @@ EXTENSION_TO_LANGUAGE: Dict[str, str] = {
 
 # Tree-sitter symbol queries per language for lightweight multi-language graph capture.
 # Uses @def capture for end_line (function body boundaries) and @name for symbol name.
-SYMBOL_QUERIES: Dict[str, List[tuple[str, str]]] = {
+SYMBOL_QUERIES: Dict[str, List[Tuple[str, str]]] = {
     "python": [
         ("class", "(class_definition name: (identifier) @name) @def"),
         ("function", "(function_definition name: (identifier) @name) @def"),
@@ -653,7 +653,7 @@ CALL_QUERIES: Dict[str, str] = {
 }
 
 # Mapping of function/method node types to name field for caller resolution.
-ENCLOSING_NAME_FIELDS: Dict[str, List[tuple[str, str]]] = {
+ENCLOSING_NAME_FIELDS: Dict[str, List[Tuple[str, str]]] = {
     "python": [
         ("function_definition", "name"),
         ("class_definition", "name"),
@@ -900,7 +900,7 @@ class IndexedSymbol(BaseModel):
     parent_symbol: Optional[str] = None  # parent symbol name (for methods in classes)
     references: List[str] = Field(default_factory=list)  # Files that reference this symbol
     base_classes: List[str] = Field(default_factory=list)  # inheritance targets
-    composition: List[tuple[str, str]] = Field(default_factory=list)  # (owner, member) for has-a
+    composition: List[Tuple[str, str]] = Field(default_factory=list)  # (owner, member) for has-a
 
 
 # Backward compatibility alias
@@ -915,10 +915,10 @@ class FileMetadata(BaseModel):
     symbols: List[Symbol] = Field(default_factory=list)
     imports: List[str] = Field(default_factory=list)
     dependencies: List[str] = Field(default_factory=list)  # Files this file depends on
-    call_edges: List[tuple[str, str]] = Field(default_factory=list)  # (caller, callee) pairs
-    inherit_edges: List[tuple[str, str]] = Field(default_factory=list)  # (child, base)
-    implements_edges: List[tuple[str, str]] = Field(default_factory=list)  # (child, interface)
-    compose_edges: List[tuple[str, str]] = Field(default_factory=list)  # (owner, member)
+    call_edges: List[Tuple[str, str]] = Field(default_factory=list)  # (caller, callee) pairs
+    inherit_edges: List[Tuple[str, str]] = Field(default_factory=list)  # (child, base)
+    implements_edges: List[Tuple[str, str]] = Field(default_factory=list)  # (child, interface)
+    compose_edges: List[Tuple[str, str]] = Field(default_factory=list)  # (owner, member)
     references: List[str] = Field(default_factory=list)  # Identifier references (tree-sitter/AST)
     last_modified: float  # File mtime when indexed
     indexed_at: float = 0.0  # When this file was indexed
@@ -1715,11 +1715,14 @@ class CodebaseIndex:
         try:
             content = file_path.read_bytes()
             tree = parser.parse(content)
+            from tree_sitter import QueryCursor
+
             lang = parser.language
             if lang is None:
                 return list(refs)
             query = Query(lang, query_src)
-            captures = query.captures(tree.root_node)
+            cursor = QueryCursor(query)
+            captures = cursor.captures(tree.root_node)
             for node, _capture_name in captures:
                 node_text = node.text
                 if node_text is None:
@@ -1852,7 +1855,7 @@ class CodebaseIndex:
         except Exception:
             return []
 
-        regex_fallbacks: Dict[str, list[tuple[str, str]]] = {
+        regex_fallbacks: Dict[str, list[Tuple[str, str]]] = {
             "javascript": [
                 ("class", r"class\s+(\w+)"),
                 ("function", r"function\s+(\w+)"),
@@ -1885,9 +1888,9 @@ class CodebaseIndex:
 
     def _extract_inheritance(
         self, file_path: Path, language: str, symbols: List[Symbol]
-    ) -> List[tuple[str, str]]:
+    ) -> List[Tuple[str, str]]:
         """Extract child->base inheritance edges."""
-        edges: List[tuple[str, str]] = []
+        edges: List[Tuple[str, str]] = []
         # First check if symbols have base_classes populated (from AST path)
         if language == "python":
             for sym in symbols:
@@ -1935,11 +1938,14 @@ class CodebaseIndex:
             try:
                 content = file_path.read_bytes()
                 ts_tree = parser.parse(content)
+                from tree_sitter import QueryCursor
+
                 lang = parser.language
                 if lang is None:
                     return edges
                 query = Query(lang, query_src)
-                captures = query.captures(ts_tree.root_node)
+                cursor = QueryCursor(query)
+                captures = cursor.captures(ts_tree.root_node)
                 child = None
                 for node, capture_name in captures:
                     text = node.text.decode("utf-8", errors="ignore")
@@ -1963,9 +1969,9 @@ class CodebaseIndex:
 
     def _extract_implements(
         self, file_path: Path, language: str, symbols: List[Symbol]
-    ) -> List[tuple[str, str]]:
+    ) -> List[Tuple[str, str]]:
         """Extract child->interface implements edges for typed languages."""
-        edges: List[tuple[str, str]] = []
+        edges: List[Tuple[str, str]] = []
         query_src = IMPLEMENTS_QUERIES.get(language)
         parser = None
         try:
@@ -1977,10 +1983,16 @@ class CodebaseIndex:
 
         if parser is not None and query_src:
             try:
+                from tree_sitter import QueryCursor
+
                 content = file_path.read_bytes()
                 tree = parser.parse(content)
-                query = Query(parser.language, query_src)
-                captures = query.captures(tree.root_node)
+                lang = parser.language
+                if lang is None:
+                    return edges
+                query = Query(lang, query_src)
+                cursor = QueryCursor(query)
+                captures = cursor.captures(tree.root_node)
                 child = None
                 for node, capture_name in captures:
                     text = node.text.decode("utf-8", errors="ignore")
@@ -2007,9 +2019,9 @@ class CodebaseIndex:
 
     def _extract_composition(
         self, file_path: Path, language: str, symbols: List[Symbol]
-    ) -> List[tuple[str, str]]:
+    ) -> List[Tuple[str, str]]:
         """Extract has-a/composition edges (owner -> member type)."""
-        edges: List[tuple[str, str]] = []
+        edges: List[Tuple[str, str]] = []
 
         # Python handled via AST visitor (class attributes)
         if language == "python":
@@ -2031,11 +2043,14 @@ class CodebaseIndex:
             try:
                 content = file_path.read_bytes()
                 tree = parser.parse(content)
+                from tree_sitter import QueryCursor
+
                 lang = parser.language
                 if lang is None:
                     return edges
                 query = Query(lang, query_src)
-                captures = query.captures(tree.root_node)
+                cursor = QueryCursor(query)
+                captures = cursor.captures(tree.root_node)
                 owner = None
                 for node, capture_name in captures:
                     node_text = node.text
@@ -2115,7 +2130,7 @@ class CodebaseIndex:
 
     def _extract_calls_with_tree_sitter(
         self, file_path: Path, language: str
-    ) -> List[tuple[str, str]]:
+    ) -> List[Tuple[str, str]]:
         """Extract caller->callee pairs using tree-sitter (non-Python)."""
         query_src = CALL_QUERIES.get(language)
         if not query_src:
@@ -2141,9 +2156,16 @@ class CodebaseIndex:
         except Exception:
             return []
 
-        call_edges: List[tuple[str, str]] = []
+        from tree_sitter import QueryCursor
+
+        call_edges: List[Tuple[str, str]] = []
         try:
-            captures = query.captures(tree.root_node)
+            lang = parser.language
+            if lang is None:
+                return []
+            query_obj = Query(lang, query_src)
+            cursor = QueryCursor(query_obj)
+            captures = cursor.captures(tree.root_node)
             for node, _ in captures:
                 node_text = node.text
                 if node_text is None:
@@ -2856,8 +2878,8 @@ class SymbolVisitor(ast.NodeVisitor):
         self.metadata = metadata
         self.current_class: Optional[str] = None
         self.current_function: Optional[str] = None
-        self.call_edges: List[tuple[str, str]] = []
-        self.composition_edges: List[tuple[str, str]] = []
+        self.call_edges: List[Tuple[str, str]] = []
+        self.composition_edges: List[Tuple[str, str]] = []
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         """Visit class definition."""
@@ -3070,7 +3092,7 @@ class BackgroundIndexerService:
     def _run_incremental_reindex(self) -> None:
         """Perform incremental reindex using mtime detection."""
         if self._indexer is None:
-            self._indexer = CodebaseIndex(self.root)
+            self._indexer = CodebaseIndex(str(self.root))
 
         # Only reindex if there are changes (mtime-based detection)
         if not self._indexer._is_stale and self._indexer._is_indexed:

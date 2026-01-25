@@ -490,7 +490,7 @@ class SymbolStore:
             return True
 
         current_mtime = file_path.stat().st_mtime
-        last_modified: float = row[0]  # type: ignore[assignment]
+        last_modified: float = row[0]
         return current_mtime > last_modified
 
     def _store_file(
@@ -825,7 +825,7 @@ class SymbolStore:
             ],
         }
 
-        queries = SYMBOL_QUERIES.get(language, [])
+        queries: List[Tuple[str, Optional[str], str]] = SYMBOL_QUERIES.get(language, [])
 
         def walk_tree(node: Any) -> None:
             """Recursively walk tree and extract symbols."""

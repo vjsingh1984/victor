@@ -118,7 +118,10 @@ def extract_symbols_list(result: Dict[str, Any]) -> List[Dict[str, Any]]:
         return []
 
     output = result.get("output", {})
-    return output.get("symbols", [])
+    symbols = output.get("symbols")
+    if isinstance(symbols, list):
+        return symbols
+    return []
 
 
 def extract_search_results(result: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -134,7 +137,10 @@ def extract_search_results(result: Dict[str, Any]) -> List[Dict[str, Any]]:
         return []
 
     output = result.get("output", {})
-    return output.get("matches", output.get("results", []))
+    matches = output.get("matches") or output.get("results")
+    if isinstance(matches, list):
+        return matches
+    return []
 
 
 def prepare_edit_input(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -188,19 +194,19 @@ def _estimate_complexity(ctx: Dict[str, Any]) -> str:
 def is_python_file(ctx: Dict[str, Any]) -> bool:
     """Check if file is Python based on path or content."""
     path = ctx.get("path", "")
-    return path.endswith(".py") or path.endswith(".pyi")
+    return isinstance(path, str) and (path.endswith(".py") or path.endswith(".pyi"))
 
 
 def is_typescript_file(ctx: Dict[str, Any]) -> bool:
     """Check if file is TypeScript based on path."""
     path = ctx.get("path", "")
-    return path.endswith(".ts") or path.endswith(".tsx")
+    return isinstance(path, str) and (path.endswith(".ts") or path.endswith(".tsx"))
 
 
 def is_javascript_file(ctx: Dict[str, Any]) -> bool:
     """Check if file is JavaScript based on path."""
     path = ctx.get("path", "")
-    return path.endswith(".js") or path.endswith(".jsx")
+    return isinstance(path, str) and (path.endswith(".js") or path.endswith(".jsx"))
 
 
 # =============================================================================
@@ -235,7 +241,7 @@ class LazyToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
         self._tool_name = tool_name
         self._output_key = output_key
         self._input_mapping = input_mapping or {}
-        self._runnable: Optional[Runnable[Any]] = None
+        self._runnable: Optional[Runnable[Dict[str, Any], Dict[str, Any]]] = None
 
         # Use the framework's LazyToolRunnable for lazy loading
         self._lazy_loader = BaseLazyToolRunnable(
@@ -246,9 +252,9 @@ class LazyToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
 
     def _create_tool(self) -> Any:
         """Factory method to create the tool - used by BaseLazyToolRunnable."""
-        from victor.tools import get_tool_by_name
+        from victor.tools.registry import ToolRegistry
 
-        tool = get_tool_by_name(self._tool_name)
+        tool = ToolRegistry.instance().get(self._tool_name)
         if tool is None:
             raise ValueError(f"Tool '{self._tool_name}' not found")
         return tool
@@ -258,7 +264,7 @@ class LazyToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
         """Get tool name."""
         return self._tool_name
 
-    def _load_tool(self) -> Runnable:
+    def _load_tool(self) -> Runnable[Dict[str, Any], Dict[str, Any]]:
         """Load the tool and create runnable using the lazy loader."""
         if self._runnable is not None:
             return self._runnable
@@ -393,7 +399,7 @@ safe_edit_chain = chain(
 
 # Git Status and Diff Chain
 # Gets comprehensive git state
-git_status_chain = RunnableParallel(
+git_status_chain: Runnable[Dict[str, Any], Dict[str, Any]] = RunnableParallel(
     status=lazy_tool("git_status"),
     diff=lazy_tool("git_diff"),
     branch=lazy_tool("git_branch"),
@@ -445,7 +451,7 @@ test_discovery_chain = chain(
 
 # Comprehensive Review Chain
 # Parallel analysis for code review
-review_analysis_chain = RunnableParallel(
+review_analysis_chain: Runnable[Dict[str, Any], Dict[str, Any]] = RunnableParallel(
     content=lazy_tool("read"),
     symbols=lazy_tool("symbols"),
     git_diff=lazy_tool("git_diff"),
@@ -494,7 +500,7 @@ def create_exploration_chain(
     """
     config = config or ChainConfig()
 
-    steps: Dict[str, Runnable] = {
+    steps: Dict[str, Runnable[Dict[str, Any], Dict[str, Any]]] = {
         "content": lazy_tool("read"),
         "symbols": lazy_tool("symbols"),
         "overview": lazy_tool("overview"),
@@ -504,7 +510,7 @@ def create_exploration_chain(
         steps["git"] = git_status_chain
 
     return chain(
-        RunnableParallel(**steps),
+        RunnableParallel(steps),
         RunnableLambda(merge_analysis_results, name="merge"),
     )
 
@@ -528,7 +534,7 @@ def create_edit_verify_chain(
     Returns:
         Configured edit-verify chain
     """
-    verification_steps: Dict[str, Runnable] = {}
+    verification_steps: Dict[str, Runnable[Dict[str, Any], Dict[str, Any]]] = {}
 
     if check_lint:
         verification_steps["lint"] = lint_chain
@@ -542,7 +548,7 @@ def create_edit_verify_chain(
 
     return chain(
         safe_edit_chain,
-        RunnableParallel(**verification_steps),
+        RunnableParallel(verification_steps),
         RunnableLambda(
             lambda ctx: {
                 "success": all(v.get("success", True) for v in ctx.values() if isinstance(v, dict)),
@@ -599,7 +605,7 @@ def create_refactor_chain(
 # =============================================================================
 
 
-CODING_CHAINS: Dict[str, Runnable] = {
+CODING_CHAINS: Dict[str, Runnable[Dict[str, Any], Dict[str, Any]]] = {
     "explore_file": explore_file_chain,
     "analyze_function": analyze_function_chain,
     "safe_edit": safe_edit_chain,
@@ -611,7 +617,7 @@ CODING_CHAINS: Dict[str, Runnable] = {
 }
 
 
-def get_chain(name: str) -> Optional[Runnable[Any]]:
+def get_chain(name: str) -> Optional[Runnable[Any, Any]]:
     """Get a pre-built chain by name.
 
     Args:
