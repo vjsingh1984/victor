@@ -351,7 +351,7 @@ class TestRAGToolIntegration:
 
         with patch.object(tool, "_get_document_store", return_value=store):
             result = await tool.execute(
-                content="Test content for tool integration", doc_type="text"
+                {}, content="Test content for tool integration", doc_type="text"
             )
 
             assert result.success
@@ -367,7 +367,7 @@ class TestRAGToolIntegration:
         tool = RAGSearchTool()
 
         with patch.object(tool, "_get_document_store", return_value=populated_store):
-            result = await tool.execute(query="python programming", k=3)
+            result = await tool.execute({}, query="python programming", k=3)
 
             assert result.success
             assert "Found" in result.output or "relevant chunks" in result.output.lower()

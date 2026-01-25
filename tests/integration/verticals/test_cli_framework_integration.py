@@ -108,6 +108,9 @@ class TestCLIFrameworkIntegration:
             side_effect=lambda ctx: setattr(orch, "_vertical_context", ctx)
         )
 
+        # Add applied capabilities tracking for vertical integration
+        orch._applied_capabilities = set()
+
         # Implement CapabilityRegistryProtocol for vertical integration pipeline
         # The pipeline uses protocol-based capability checking
         capabilities = {

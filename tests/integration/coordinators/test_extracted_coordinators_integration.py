@@ -154,6 +154,8 @@ def mock_orchestrator():
     """Mock orchestrator for team coordinator."""
     orch = MagicMock()
     orch._team_specs = {}
+    # Also set vertical_context.team_specs to {} to prevent MagicMock fallback
+    orch.vertical_context.team_specs = {}
     return orch
 
 

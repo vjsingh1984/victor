@@ -25,6 +25,21 @@ from victor.framework.debugging import (
 from victor.framework.debugging.breakpoints import BreakpointType
 
 
+# Helper timeout for waiting on breakpoints
+BREAKPOINT_WAIT_TIMEOUT = 2.0
+TASK_COMPLETION_TIMEOUT = 5.0
+
+
+async def wait_for_pause(session, timeout: float = BREAKPOINT_WAIT_TIMEOUT) -> bool:
+    """Wait for debug session to pause with timeout."""
+    start = asyncio.get_event_loop().time()
+    while asyncio.get_event_loop().time() - start < timeout:
+        if session.is_paused:
+            return True
+        await asyncio.sleep(0.05)
+    return False
+
+
 @pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.slow
@@ -48,24 +63,30 @@ class TestWorkflowDebugging:
 
         execution_task = asyncio.create_task(execute_workflow())
 
-        # Wait for breakpoint to be hit
-        await asyncio.sleep(0.5)
+        try:
+            # Wait for breakpoint to be hit
+            paused = await wait_for_pause(debug_session)
+            assert paused, "Breakpoint was not hit within timeout"
 
-        # Check paused
-        assert debug_session.is_paused is True
+            context = debug_session.get_pause_context()
+            assert context is not None
+            assert context.node_id == "analyze"
+            assert bp.id in context.breakpoint_ids
 
-        context = debug_session.get_pause_context()
-        assert context is not None
-        assert context.node_id == "analyze"
-        assert bp.id in context.breakpoint_ids
+            # Continue execution
+            await debug_session.continue_execution()
 
-        # Continue execution
-        await debug_session.continue_execution()
-
-        # Wait for completion
-        result = await execution_task
-
-        assert result.success is True
+            # Wait for completion with timeout
+            result = await asyncio.wait_for(execution_task, timeout=TASK_COMPLETION_TIMEOUT)
+            assert result.success is True
+        finally:
+            # Ensure task is cleaned up
+            if not execution_task.done():
+                execution_task.cancel()
+                try:
+                    await execution_task
+                except asyncio.CancelledError:
+                    pass
 
     async def test_step_through_workflow(self, sample_workflow, debug_session):
         """Test stepping through workflow execution."""
@@ -78,23 +99,31 @@ class TestWorkflowDebugging:
             return await sample_workflow.invoke({"task": "test"}, debug_hook=hook)
 
         execution_task = asyncio.create_task(execute_workflow())
-        await asyncio.sleep(0.5)
 
-        # First breakpoint hit
-        assert debug_session.is_paused is True
+        try:
+            # Wait for first breakpoint hit
+            paused = await wait_for_pause(debug_session)
+            assert paused, "First breakpoint was not hit"
 
-        # Step over to next node
-        await debug_session.step_over()
-        await asyncio.sleep(0.5)
+            # Step over to next node
+            await debug_session.step_over()
 
-        # Should be paused again (in stepping mode)
-        assert debug_session.is_paused is True
+            # Wait for second pause (stepping mode)
+            paused = await wait_for_pause(debug_session)
+            assert paused, "Step did not pause at next node"
 
-        # Continue to completion
-        await debug_session.continue_execution()
-        result = await execution_task
+            # Continue to completion
+            await debug_session.continue_execution()
 
-        assert result.success is True
+            result = await asyncio.wait_for(execution_task, timeout=TASK_COMPLETION_TIMEOUT)
+            assert result.success is True
+        finally:
+            if not execution_task.done():
+                execution_task.cancel()
+                try:
+                    await execution_task
+                except asyncio.CancelledError:
+                    pass
 
     async def test_conditional_breakpoint(self, sample_workflow, event_bus):
         """Test conditional breakpoint."""
@@ -119,13 +148,19 @@ class TestWorkflowDebugging:
             return await sample_workflow.invoke({"task": "test"}, debug_hook=hook)
 
         execution_task = asyncio.create_task(execute_workflow())
-        await asyncio.sleep(0.5)
 
-        # Should complete without hitting breakpoint (errors only increments by 1)
-        result = await execution_task
-
-        assert result.success is True
-        assert session.is_paused is False
+        try:
+            # Should complete without hitting breakpoint (errors only increments by 1)
+            result = await asyncio.wait_for(execution_task, timeout=TASK_COMPLETION_TIMEOUT)
+            assert result.success is True
+            assert session.is_paused is False
+        finally:
+            if not execution_task.done():
+                execution_task.cancel()
+                try:
+                    await execution_task
+                except asyncio.CancelledError:
+                    pass
 
     async def test_exception_breakpoint(self, event_bus):
         """Test exception breakpoint.
@@ -168,26 +203,33 @@ class TestWorkflowDebugging:
 
         execution_task = asyncio.create_task(execute_workflow())
 
-        # Wait for breakpoint to be hit
-        await asyncio.sleep(0.5)
-
-        # Should be paused at exception breakpoint
-        if session.is_paused:
-            context = session.get_pause_context()
-            assert context is not None
-            assert context.position == BreakpointPosition.ON_ERROR
-            # Resume to let workflow complete with error
-            await session.continue_execution()
-
-        # Wait for completion with timeout
         try:
-            result = await asyncio.wait_for(execution_task, timeout=2.0)
+            # Wait for breakpoint to be hit
+            paused = await wait_for_pause(session)
+
+            # Should be paused at exception breakpoint
+            if paused:
+                context = session.get_pause_context()
+                assert context is not None
+                assert context.position == BreakpointPosition.ON_ERROR
+                # Resume to let workflow complete with error
+                await session.continue_execution()
+
+            # Wait for completion with timeout
+            result = await asyncio.wait_for(execution_task, timeout=TASK_COMPLETION_TIMEOUT)
             # Should fail due to exception
             assert result.success is False
         except asyncio.TimeoutError:
             # If still hanging, stop session and fail gracefully
             await session.stop()
             pytest.fail("Workflow did not complete after resuming from exception breakpoint")
+        finally:
+            if not execution_task.done():
+                execution_task.cancel()
+                try:
+                    await execution_task
+                except asyncio.CancelledError:
+                    pass
 
     async def test_multiple_breakpoints(self, sample_workflow, debug_session):
         """Test multiple breakpoints on different nodes."""
@@ -210,28 +252,36 @@ class TestWorkflowDebugging:
 
         execution_task = asyncio.create_task(execute_workflow())
 
-        # First breakpoint (analyze)
-        await asyncio.sleep(0.5)
-        if debug_session.is_paused:
-            context = debug_session.get_pause_context()
-            if context.node_id == "analyze":
-                hit_count["analyze"] += 1
-            await debug_session.continue_execution()
+        try:
+            # First breakpoint (analyze)
+            paused = await wait_for_pause(debug_session)
+            if paused:
+                context = debug_session.get_pause_context()
+                if context and context.node_id == "analyze":
+                    hit_count["analyze"] += 1
+                await debug_session.continue_execution()
 
-        # Second breakpoint (process)
-        await asyncio.sleep(0.5)
-        if debug_session.is_paused:
-            context = debug_session.get_pause_context()
-            if context.node_id == "process":
-                hit_count["process"] += 1
-            await debug_session.continue_execution()
+            # Second breakpoint (process)
+            paused = await wait_for_pause(debug_session)
+            if paused:
+                context = debug_session.get_pause_context()
+                if context and context.node_id == "process":
+                    hit_count["process"] += 1
+                await debug_session.continue_execution()
 
-        # Wait for completion
-        result = await execution_task
+            # Wait for completion
+            result = await asyncio.wait_for(execution_task, timeout=TASK_COMPLETION_TIMEOUT)
 
-        assert result.success is True
-        # Note: May not hit both breakpoints depending on timing
-        assert hit_count["analyze"] + hit_count["process"] >= 1
+            assert result.success is True
+            # Note: May not hit both breakpoints depending on timing
+            assert hit_count["analyze"] + hit_count["process"] >= 1
+        finally:
+            if not execution_task.done():
+                execution_task.cancel()
+                try:
+                    await execution_task
+                except asyncio.CancelledError:
+                    pass
 
     async def test_disabled_breakpoint(self, sample_workflow, debug_session):
         """Test that disabled breakpoints don't trigger."""
@@ -245,8 +295,11 @@ class TestWorkflowDebugging:
 
         hook = debug_session.create_hook()
 
-        # Execute workflow
-        result = await sample_workflow.invoke({"task": "test"}, debug_hook=hook)
+        # Execute workflow - no background task needed as breakpoint is disabled
+        result = await asyncio.wait_for(
+            sample_workflow.invoke({"task": "test"}, debug_hook=hook),
+            timeout=TASK_COMPLETION_TIMEOUT,
+        )
 
         # Should complete without pausing
         assert result.success is True
@@ -267,21 +320,30 @@ class TestWorkflowDebugging:
             )
 
         execution_task = asyncio.create_task(execute_workflow())
-        await asyncio.sleep(0.5)
 
-        if debug_session.is_paused:
-            # Get current state
-            state = debug_session.get_current_state()
-            assert state is not None
-            assert state["task"] == "initial_task"
-            assert state["counter"] == 0
+        try:
+            paused = await wait_for_pause(debug_session)
 
-            # Get pause context
-            context = debug_session.get_pause_context()
-            assert context is not None
-            assert context.node_id == "analyze"
+            if paused:
+                # Get current state
+                state = debug_session.get_current_state()
+                assert state is not None
+                assert state["task"] == "initial_task"
+                assert state["counter"] == 0
 
-            await debug_session.continue_execution()
+                # Get pause context
+                context = debug_session.get_pause_context()
+                assert context is not None
+                assert context.node_id == "analyze"
 
-        result = await execution_task
-        assert result.success is True
+                await debug_session.continue_execution()
+
+            result = await asyncio.wait_for(execution_task, timeout=TASK_COMPLETION_TIMEOUT)
+            assert result.success is True
+        finally:
+            if not execution_task.done():
+                execution_task.cancel()
+                try:
+                    await execution_task
+                except asyncio.CancelledError:
+                    pass

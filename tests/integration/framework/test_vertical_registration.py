@@ -32,12 +32,22 @@ class TestVerticalRegistrationIntegration:
         # Clear all caches
         VerticalDiscovery.clear_cache()
         EscapeHatchRegistry.reset_instance()
+        # Also clear class-level storage that persists across instance resets
+        EscapeHatchRegistry._class_conditions.clear()
+        EscapeHatchRegistry._class_transforms.clear()
+        EscapeHatchRegistry._class_global_conditions.clear()
+        EscapeHatchRegistry._class_global_transforms.clear()
 
     def teardown_method(self):
         """Cleanup test fixtures."""
         # Clear all caches
         VerticalDiscovery.clear_cache()
         EscapeHatchRegistry.reset_instance()
+        # Also clear class-level storage
+        EscapeHatchRegistry._class_conditions.clear()
+        EscapeHatchRegistry._class_transforms.clear()
+        EscapeHatchRegistry._class_global_conditions.clear()
+        EscapeHatchRegistry._class_global_transforms.clear()
 
     def test_verticals_register_escape_hatches_on_import(self):
         """Test that verticals auto-register escape hatches when imported."""
@@ -52,10 +62,12 @@ class TestVerticalRegistrationIntegration:
         from victor.coding import escape_hatches
 
         # Register escape hatches explicitly (simulating what happens on first import)
+        # Use replace=True since importing escape_hatches may trigger lazy initialization
         registry.register_from_vertical(
             "coding",
             conditions=escape_hatches.CONDITIONS,
             transforms=escape_hatches.TRANSFORMS,
+            replace=True,
         )
 
         # Should now have coding vertical escape hatches
