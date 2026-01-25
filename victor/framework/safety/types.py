@@ -72,7 +72,7 @@ class Severity(str, Enum):
         valid = [m.value for m in cls]
         raise ValueError(f"Invalid severity: '{value}'. Valid values: {valid}")
 
-    def __lt__(self, other: "Severity") -> bool:
+    def __lt__(self, other: "Severity") -> bool:  # type: ignore[override]
         """Compare severity levels (CRITICAL > HIGH > MEDIUM > LOW)."""
         order = {
             Severity.CRITICAL: 0,
@@ -82,7 +82,7 @@ class Severity(str, Enum):
         }
         return order[self] > order[other]
 
-    def __le__(self, other: "Severity") -> bool:
+    def __le__(self, other: "Severity") -> bool:  # type: ignore[override]
         """Less than or equal comparison."""
         return self < other or self == other
 

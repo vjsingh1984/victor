@@ -55,10 +55,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING, Union, cast
 
 try:
-    from cachetools import TTLCache
+    from cachetools import TTLCache  # type: ignore[import-untyped]
 except ImportError:
     # Fallback if cachetools is not installed
-    TTLCache = None  # type: ignore[import-untyped]
+    TTLCache = None
 
 if TYPE_CHECKING:
     from victor.workflows.definition import (

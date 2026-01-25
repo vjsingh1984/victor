@@ -318,7 +318,7 @@ class CapabilityRegistry:
                 selected = eps.select(group=group)
             else:
                 # Python 3.9 fallback
-                selected = eps.get(group, [])
+                selected = eps.get(group, [])  # type: ignore[arg-type]
 
             for ep in selected:
                 try:
