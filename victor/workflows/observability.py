@@ -251,7 +251,7 @@ class ObservabilityEmitter:
             # Wrap function in FunctionObserver
             wrapped = FunctionObserver(callback=observer, event_filter=event_filter)
             self._observers.append(wrapped)
-            actual_observer = wrapped
+            actual_observer: Union[StreamingObserver, FunctionObserver] = wrapped
         else:
             self._observers.append(observer)
             actual_observer = observer

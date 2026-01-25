@@ -196,6 +196,10 @@ logger = logging.getLogger(__name__)
 def _check_capability(obj: Any, capability_name: str, strict_mode: bool = False) -> bool:
     """Check if object has capability via registry.
 
+    .. deprecated:: 0.6.0
+        Use :class:`victor.agent.capability_registry.CapabilityHelper.check_capability`
+        instead. This function will be removed in v0.7.0.
+
     Uses protocol-based capability discovery. Orchestrators must implement
     CapabilityRegistryProtocol for proper capability checking.
 
@@ -214,50 +218,10 @@ def _check_capability(obj: Any, capability_name: str, strict_mode: bool = False)
     Raises:
         TypeError: If strict_mode=True and obj doesn't implement CapabilityRegistryProtocol
     """
-    # Check capability registry (protocol-based only)
-    if isinstance(obj, CapabilityRegistryProtocol):
-        return obj.has_capability(capability_name)
+    # Delegate to consolidated CapabilityHelper (DRY principle)
+    from victor.agent.capability_registry import CapabilityHelper
 
-    # Strict mode: raise TypeError for non-protocol objects
-    if strict_mode:
-        raise TypeError(
-            f"Object must implement CapabilityRegistryProtocol for capability checking. "
-            f"Got {type(obj).__name__} instead. "
-            f"Ensure your orchestrator uses CapabilityRegistryMixin."
-        )
-
-    # For objects not implementing protocol, show deprecation warning and fallback
-    warnings.warn(
-        f"Object {type(obj).__name__} does not implement CapabilityRegistryProtocol. "
-        f"Falling back to hasattr() checks for capability '{capability_name}'. "
-        f"This is deprecated and will be removed in a future version. "
-        f"Please add CapabilityRegistryMixin to your orchestrator.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    # Legacy fallback with public method mappings
-    # Note: This path is only used for objects not implementing CapabilityRegistryProtocol
-    public_methods = {
-        "enabled_tools": "set_enabled_tools",
-        "prompt_builder": "prompt_builder",
-        "vertical_middleware": "apply_vertical_middleware",
-        "vertical_safety_patterns": "apply_vertical_safety_patterns",
-        "vertical_context": "set_vertical_context",
-        "adaptive_mode_controller": "adaptive_mode_controller",
-    }
-
-    method_name = public_methods.get(capability_name, capability_name)
-
-    # Use protocol-based check if available (ISP compliance)
-    if isinstance(obj, CapabilityContainerProtocol):
-        return obj.has_capability(capability_name)
-
-    # Fallback to hasattr for legacy code (deprecated path)
-    return hasattr(obj, method_name) and (
-        callable(getattr(obj, method_name, None))
-        or not callable(getattr(obj, method_name, None))  # Allow properties
-    )
+    return CapabilityHelper.check_capability(obj, capability_name, strict=strict_mode)
 
 
 def _invoke_capability(
@@ -268,6 +232,10 @@ def _invoke_capability(
     **kwargs: Any,
 ) -> Any:
     """Invoke capability via registry or public method call.
+
+    .. deprecated:: 0.6.0
+        Use :class:`victor.agent.capability_registry.CapabilityHelper.invoke_capability`
+        instead. This function will be removed in v0.7.0.
 
     Uses protocol-based capability invocation. Orchestrators must implement
     CapabilityRegistryProtocol for proper capability invocation.
@@ -290,48 +258,10 @@ def _invoke_capability(
         TypeError: If strict_mode=True and obj doesn't implement CapabilityRegistryProtocol
         AttributeError: If capability cannot be invoked
     """
-    # Use capability registry if available (preferred)
-    if isinstance(obj, CapabilityRegistryProtocol):
-        try:
-            return obj.invoke_capability(capability_name, *args, **kwargs)
-        except (KeyError, TypeError) as e:
-            logger.debug(f"Registry invoke failed for {capability_name}: {e}")
-            # Fall through to public method fallback
+    # Delegate to consolidated CapabilityHelper (DRY principle)
+    from victor.agent.capability_registry import CapabilityHelper
 
-    # Strict mode: raise TypeError for non-protocol objects
-    if strict_mode:
-        raise TypeError(
-            f"Object must implement CapabilityRegistryProtocol for capability invocation. "
-            f"Got {type(obj).__name__} instead. "
-            f"Ensure your orchestrator uses CapabilityRegistryMixin."
-        )
-
-    # Show deprecation warning when falling back to hasattr
-    if not isinstance(obj, CapabilityRegistryProtocol):
-        warnings.warn(
-            f"Object {type(obj).__name__} does not implement CapabilityRegistryProtocol. "
-            f"Falling back to hasattr() checks for capability '{capability_name}'. "
-            f"This is deprecated and will be removed in a future version. "
-            f"Please add CapabilityRegistryMixin to your orchestrator.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-    # Fallback: use centralized capability method mappings
-    # Import from capability_registry (single source of truth)
-    from victor.agent.capability_registry import get_method_for_capability
-
-    method_name = get_method_for_capability(capability_name)
-    method = getattr(obj, method_name, None)
-    if callable(method):
-        return method(*args, **kwargs)
-
-    # No private attribute fallback - raise clear error instead
-    raise AttributeError(
-        f"Cannot invoke capability '{capability_name}' on {type(obj).__name__}. "
-        f"Expected method '{method_name}' not found. "
-        f"Object should implement CapabilityRegistryProtocol."
-    )
+    return CapabilityHelper.invoke_capability(obj, capability_name, *args, strict=strict_mode, **kwargs)
 
 
 # =============================================================================

@@ -1251,16 +1251,13 @@ class TestCreateVerticalToolDependencyProvider:
 
     def test_equivalent_to_wrapper_class(self):
         """Factory should produce equivalent results to wrapper classes."""
-        import warnings
         from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
         from victor.coding.tool_dependencies import CodingToolDependencyProvider
 
         factory_provider = create_vertical_tool_dependency_provider("coding")
 
-        # Wrapper class now emits deprecation warning
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            wrapper_provider = CodingToolDependencyProvider()
+        # CodingToolDependencyProvider is now an alias to factory result (instance)
+        wrapper_provider = CodingToolDependencyProvider
 
         # Both should have same required tools
         assert factory_provider.get_required_tools() == wrapper_provider.get_required_tools()
@@ -1272,15 +1269,10 @@ class TestCreateVerticalToolDependencyProvider:
         assert factory_provider.vertical == wrapper_provider.vertical
 
     def test_wrapper_class_emits_deprecation_warning(self):
-        """Wrapper classes should emit deprecation warning."""
-        import warnings
+        """Wrapper classes are now instances, not classes - no deprecation needed."""
         from victor.coding.tool_dependencies import CodingToolDependencyProvider
 
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            CodingToolDependencyProvider()
-
-            assert len(w) == 1
-            assert issubclass(w[0].category, DeprecationWarning)
-            assert "CodingToolDependencyProvider is deprecated" in str(w[0].message)
-            assert "create_vertical_tool_dependency_provider" in str(w[0].message)
+        # CodingToolDependencyProvider is now an instance (factory result), not a class
+        # No deprecation warning is emitted on access
+        assert isinstance(CodingToolDependencyProvider, object)
+        assert hasattr(CodingToolDependencyProvider, "get_dependencies")

@@ -305,12 +305,12 @@ class EntityExtractor:
             if hasattr(source_entities, '__await__'):
                 source_list = await source_entities
             else:
-                source_list = source_entities
+                source_list = source_entities  # type: ignore[assignment]
 
             if hasattr(target_entities, '__await__'):
                 target_list = await target_entities
             else:
-                target_list = target_entities
+                target_list = target_entities  # type: ignore[assignment]
 
             if source_list and target_list:
                 relation = EntityRelation(
@@ -349,7 +349,7 @@ class EntityExtractor:
         if hasattr(search_result, '__await__'):
             entities = await search_result
         else:
-            entities = search_result
+            entities = search_result  # type: ignore[assignment]
 
         return [f"{e.name} ({e.entity_type.value})" for e in entities]
 
@@ -368,7 +368,7 @@ class EntityExtractor:
         if hasattr(all_entities, '__await__'):
             entities_list = await all_entities
         else:
-            entities_list = all_entities
+            entities_list = all_entities  # type: ignore[assignment]
 
         if not entities_list:
             return "No entities tracked in this conversation."

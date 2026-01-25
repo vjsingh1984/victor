@@ -14,17 +14,18 @@
 
 """RAG Tool Dependencies - Tool relationships for RAG workflows.
 
-This module provides RAG-specific tool dependency configuration loaded from YAML.
-Extends the core YAMLToolDependencyProvider with RAG-specific data.
-Also provides composed tool patterns using ToolExecutionGraph.
+This module provides tool dependency configuration for RAG workflows.
+The core configuration is loaded from YAML (tool_dependencies.yaml),
+while composed patterns remain in Python for complex logic.
 
 Uses canonical tool names from ToolNames to ensure consistent naming
 across RL Q-values, workflow patterns, and vertical configurations.
 
-Migration Note:
-    This module has been migrated to use YAML-based configuration.
-    The tool dependencies are now loaded from tool_dependencies.yaml.
-    Backward compatibility is maintained - all existing exports still work.
+Simplified Usage:
+    - Use RAGToolDependencyProvider for vertical tool dependency management
+    - Use RAG_COMPOSED_PATTERNS for pre-defined RAG workflow patterns
+    - Use get_rag_tool_graph() for tool execution planning and suggestions
+    - reset_rag_tool_graph() clears the cached instance for testing
 
 Example:
     from victor.rag.tool_dependencies import (
@@ -32,6 +33,9 @@ Example:
         get_rag_tool_graph,
         RAG_COMPOSED_PATTERNS,
     )
+
+    # Get the canonical tool dependency provider
+    provider = RAGToolDependencyProvider
 
     # Get tool graph for RAG workflows
     graph = get_rag_tool_graph()
@@ -41,187 +45,75 @@ Example:
 
     # Plan tool sequence for document ingestion
     plan = graph.plan_for_goal({"rag_ingest", "rag_stats"})
+
+    # Access composed patterns
+    ingestion_pattern = RAG_COMPOSED_PATTERNS["document_ingestion"]
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, cast
+from typing import Any, Dict, List, Optional
 
-from victor.core.tool_dependency_loader import (
-    YAMLToolDependencyProvider,
-    load_tool_dependency_yaml,
-)
-from victor.core.tool_types import ToolDependency
+from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+from victor.framework.tool_naming import ToolNames
 from victor.tools.tool_graph import ToolExecutionGraph
 
 
-# Path to the YAML configuration file
-_YAML_CONFIG_PATH = Path(__file__).parent / "tool_dependencies.yaml"
-
-
-class RAGToolDependencyProvider(YAMLToolDependencyProvider):
-    """Tool dependency provider for RAG vertical.
-
-    .. deprecated::
-        Use ``create_vertical_tool_dependency_provider('rag')`` instead.
-        This class is maintained for backward compatibility.
-
-    Extends YAMLToolDependencyProvider to load RAG-specific tool
-    relationships from tool_dependencies.yaml.
-
-    Uses canonical ToolNames constants for consistency.
-
-    Example:
-        # Preferred (new code):
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
-        provider = create_vertical_tool_dependency_provider("rag")
-
-        # Deprecated (backward compatible):
-        provider = RAGToolDependencyProvider()
-
-    This class maintains backward compatibility with the previous
-    hand-coded Python implementation.
-    """
-
-    def __init__(self) -> None:
-        """Initialize the provider with RAG-specific config from YAML.
-
-        .. deprecated::
-            Use ``create_vertical_tool_dependency_provider('rag')`` instead.
-        """
-        import warnings
-
-        warnings.warn(
-            "RAGToolDependencyProvider is deprecated. "
-            "Use create_vertical_tool_dependency_provider('rag') instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        super().__init__(
-            yaml_path=_YAML_CONFIG_PATH,
-            canonicalize=True,
-        )
-
-
 # =============================================================================
-# Backward Compatibility Exports
+# RAGToolDependencyProvider (canonical provider)
 # =============================================================================
-# These module-level exports maintain backward compatibility with code that
-# imports the raw data structures directly.
+# Create canonical provider for RAG vertical
+RAGToolDependencyProvider = create_vertical_tool_dependency_provider("rag")
 
 
-def _load_config() -> Any:
-    """Load and cache the YAML configuration."""
-    from typing import Any
-
-    return load_tool_dependency_yaml(_YAML_CONFIG_PATH, canonicalize=True)
+# These represent higher-level operations composed of multiple tool calls
+# that commonly appear together in RAG workflows.
 
 
-def _get_transitions() -> Dict[str, List[Tuple[str, float]]]:
-    """Get tool transitions from YAML config."""
-    return cast(Dict[str, List[Tuple[str, float]]], _load_config().transitions)
-
-
-def _get_clusters() -> Dict[str, Set[str]]:
-    """Get tool clusters from YAML config."""
-    return cast(Dict[str, Set[str]], _load_config().clusters)
-
-
-def _get_sequences() -> Dict[str, List[str]]:
-    """Get tool sequences from YAML config."""
-    return cast(Dict[str, List[str]], _load_config().sequences)
-
-
-def _get_dependencies() -> List[ToolDependency]:
-    """Get tool dependencies from YAML config."""
-    return cast(List[ToolDependency], _load_config().dependencies)
-
-
-def _get_required_tools() -> Set[str]:
-    """Get required tools from YAML config."""
-    return cast(Set[str], _load_config().required_tools)
-
-
-def _get_optional_tools() -> Set[str]:
-    """Get optional tools from YAML config."""
-    return cast(Set[str], _load_config().optional_tools)
-
-
-def _get_composed_patterns() -> Dict[str, Dict[str, Any]]:
-    """Get composed patterns from YAML metadata.
-
-    The composed patterns are stored in the metadata.composed_patterns
-    section of the YAML file. We need to load them from the spec directly
-    since they're in metadata.
-    """
-    from victor.core.tool_dependency_loader import ToolDependencyLoader
-
-    loader = ToolDependencyLoader(canonicalize=False)
-    spec = loader._load_and_validate(_YAML_CONFIG_PATH)
-
-    patterns = spec.metadata.get("composed_patterns", {})
-
-    # Convert from YAML format to the expected Python format
-    result = {}
-    for name, data in patterns.items():
-        result[name] = {
-            "description": data.get("description", ""),
-            "sequence": data.get("sequence", []),
-            "inputs": (
-                set(data.get("inputs", []))
-                if isinstance(data.get("inputs"), list)
-                else data.get("inputs", set())
-            ),
-            "outputs": (
-                set(data.get("outputs", []))
-                if isinstance(data.get("outputs"), list)
-                else data.get("outputs", set())
-            ),
-            "weight": data.get("weight", 1.0),
-        }
-
-    return result
-
-
-# Backward compatibility: module-level exports accessed via __getattr__
-# These constants are deprecated and will emit warnings when accessed.
-_DEPRECATED_CONSTANTS = {
-    "RAG_TOOL_TRANSITIONS": _get_transitions,
-    "RAG_TOOL_CLUSTERS": _get_clusters,
-    "RAG_TOOL_SEQUENCES": _get_sequences,
-    "RAG_TOOL_DEPENDENCIES": _get_dependencies,
-    "RAG_REQUIRED_TOOLS": _get_required_tools,
-    "RAG_OPTIONAL_TOOLS": _get_optional_tools,
-    "RAG_COMPOSED_PATTERNS": _get_composed_patterns,
+# Uses canonical ToolNames constants for consistency
+RAG_COMPOSED_PATTERNS: Dict[str, Dict[str, Any]] = {
+    "document_ingestion": {
+        "description": "Ingest documents from local files",
+        "sequence": [ToolNames.LS, ToolNames.READ, "rag_ingest", "rag_stats"],
+        "inputs": {"document_path", "document_type"},
+        "outputs": {"document_ids", "chunk_count"},
+        "weight": 0.9,
+    },
+    "web_content_ingestion": {
+        "description": "Ingest content from web URLs",
+        "sequence": ["web_fetch", "rag_ingest", "rag_stats"],
+        "inputs": {"url"},
+        "outputs": {"document_id", "chunk_count"},
+        "weight": 0.85,
+    },
+    "semantic_search": {
+        "description": "Search knowledge base with semantic query",
+        "sequence": ["rag_search", "rag_query"],
+        "inputs": {"query"},
+        "outputs": {"relevant_chunks", "answer"},
+        "weight": 0.9,
+    },
+    "comprehensive_query": {
+        "description": "Query with multiple search strategies",
+        "sequence": ["rag_search", "rag_search", "rag_query"],
+        "inputs": {"query", "search_strategies"},
+        "outputs": {"answer", "sources"},
+        "weight": 0.85,
+    },
+    "index_cleanup": {
+        "description": "Clean up stale documents from index",
+        "sequence": ["rag_stats", "rag_list", "rag_delete", "rag_stats"],
+        "inputs": {"cleanup_criteria"},
+        "outputs": {"deleted_count", "remaining_count"},
+        "weight": 0.8,
+    },
+    "knowledge_base_audit": {
+        "description": "Audit knowledge base content and statistics",
+        "sequence": ["rag_stats", "rag_list"],
+        "inputs": set(),
+        "outputs": {"document_count", "total_chunks", "document_list"},
+        "weight": 0.75,
+    },
 }
-
-
-def _warn_deprecated(name: str) -> None:
-    """Emit deprecation warning for legacy constant access."""
-    import warnings
-
-    warnings.warn(
-        f"{name} is deprecated. Use RAGToolDependencyProvider() or "
-        f"create_vertical_tool_dependency_provider('rag') instead.",
-        DeprecationWarning,
-        stacklevel=3,
-    )
-
-
-def __getattr__(name: str) -> Any:
-    """Lazy loading of module-level exports for backward compatibility.
-
-    This allows existing code to import the module-level constants
-    while actually loading them from the YAML file.
-
-    .. deprecated::
-        These constants are deprecated. Use RAGToolDependencyProvider() or
-        create_vertical_tool_dependency_provider('rag') instead.
-    """
-    if name in _DEPRECATED_CONSTANTS:
-        _warn_deprecated(name)
-        return _DEPRECATED_CONSTANTS[name]()
-
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 # =============================================================================
@@ -258,12 +150,18 @@ def get_rag_tool_graph() -> ToolExecutionGraph:
     if _rag_tool_graph is not None:
         return _rag_tool_graph
 
-    # Load data from YAML via internal loader functions (avoids deprecation warnings)
-    transitions = _get_transitions()
-    clusters = _get_clusters()
-    sequences = _get_sequences()
-    dependencies = _get_dependencies()
-    composed_patterns = _get_composed_patterns()
+    # Load data from YAML via provider
+    provider = RAGToolDependencyProvider()
+    config = provider.get_config()
+
+    # Extract components from config
+    transitions = getattr(config, 'transitions', {})
+    clusters = getattr(config, 'clusters', {})
+    sequences = getattr(config, 'sequences', {})
+    dependencies = getattr(config, 'dependencies', [])
+
+    # Load composed patterns from constants
+    composed_patterns = RAG_COMPOSED_PATTERNS
 
     graph = ToolExecutionGraph(name="rag")
 
@@ -319,8 +217,7 @@ def get_composed_pattern(pattern_name: str) -> Optional[Dict[str, Any]]:
             print(f"Sequence: {pattern['sequence']}")
             print(f"Inputs: {pattern['inputs']}")
     """
-    patterns = _get_composed_patterns()
-    return patterns.get(pattern_name)
+    return RAG_COMPOSED_PATTERNS.get(pattern_name)
 
 
 def list_composed_patterns() -> List[str]:
@@ -329,22 +226,12 @@ def list_composed_patterns() -> List[str]:
     Returns:
         List of pattern names
     """
-    patterns = _get_composed_patterns()
-    return list(patterns.keys())
+    return list(RAG_COMPOSED_PATTERNS.keys())
 
 
-__all__ = [  # noqa: F822 - constants defined via __getattr__ for lazy loading
-    # Provider class
+__all__ = [
     "RAGToolDependencyProvider",
-    # Data exports (lazy-loaded with deprecation warnings)
-    "RAG_TOOL_DEPENDENCIES",
-    "RAG_TOOL_TRANSITIONS",
-    "RAG_TOOL_CLUSTERS",
-    "RAG_TOOL_SEQUENCES",
-    "RAG_REQUIRED_TOOLS",
-    "RAG_OPTIONAL_TOOLS",
     "RAG_COMPOSED_PATTERNS",
-    # Graph functions
     "get_rag_tool_graph",
     "reset_rag_tool_graph",
     "get_composed_pattern",

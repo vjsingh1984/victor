@@ -15,10 +15,14 @@ else:
         from victor.storage.graph.duckdb_store import DuckDBGraphStore as _DuckDBGraphStore
         _duckdb_available: Optional[type[_DuckDBGraphStore]] = _DuckDBGraphStore
     except Exception:
-        _duckdb_available = None
+        _duckdb_available: Optional[type[_DuckDBGraphStore]] = None
 
     # Type alias for external use
     DuckDBGraphStore: Optional[type[_DuckDBGraphStore]] = _duckdb_available  # type: ignore[misc]
+
+# For TYPE_CHECKING branch, define _duckdb_available as None
+if TYPE_CHECKING:
+    _duckdb_available: Optional[type[_DuckDBGraphStore]] = None
 
 
 def create_graph_store(

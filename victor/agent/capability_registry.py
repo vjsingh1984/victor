@@ -42,6 +42,7 @@ Example (caller):
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Set
 
 from victor.framework.protocols import (
@@ -866,4 +867,210 @@ class CapabilityRegistryMixin:
         return result if result is not None else []
 
 
-__all__ = ["CapabilityRegistryMixin"]
+# =============================================================================
+# CapabilityHelper: Consolidated Capability Check/Invoke Utilities
+# =============================================================================
+
+
+class CapabilityHelper:
+    """Consolidated helper for capability checking and invocation.
+
+    This class consolidates the duplicated _check_capability() and _invoke_capability()
+    functions that were previously spread across:
+    - victor/framework/vertical_integration.py
+    - victor/framework/step_handlers.py
+    - victor/agent/vertical_integration_adapter.py
+
+    Uses protocol-based capability discovery. Orchestrators must implement
+    CapabilityRegistryProtocol for proper capability checking.
+
+    SOLID Compliance:
+    - Uses protocol, not hasattr (DIP - Dependency Inversion)
+    - No private attribute access (SRP - Single Responsibility)
+
+    Usage:
+        from victor.agent.capability_registry import CapabilityHelper
+
+        # Check if capability exists
+        if CapabilityHelper.check_capability(obj, "enabled_tools"):
+            CapabilityHelper.invoke_capability(obj, "enabled_tools", {"read", "write"})
+
+        # With version requirement
+        if CapabilityHelper.check_capability(obj, "enabled_tools", min_version="1.1"):
+            CapabilityHelper.invoke_capability(
+                obj, "enabled_tools", {"read"}, min_version="1.1"
+            )
+    """
+
+    @staticmethod
+    def check_capability(
+        obj: Any,
+        capability_name: str,
+        min_version: Optional[str] = None,
+        strict: bool = False,
+    ) -> bool:
+        """Check if object has capability via registry with optional version check.
+
+        Args:
+            obj: Object to check (should implement CapabilityRegistryProtocol)
+            capability_name: Name of capability
+            min_version: Minimum required version (default: None = any version)
+            strict: If True, raise TypeError when obj doesn't implement protocol
+
+        Returns:
+            True if capability is available via the registry and meets version requirement
+
+        Raises:
+            TypeError: If strict=True and obj doesn't implement CapabilityRegistryProtocol
+
+        Example:
+            # Check for any version
+            if CapabilityHelper.check_capability(obj, "enabled_tools"):
+                ...
+
+            # Check for minimum version
+            if CapabilityHelper.check_capability(obj, "enabled_tools", min_version="1.1"):
+                ...
+
+            # Strict mode (raises error instead of fallback)
+            if CapabilityHelper.check_capability(obj, "enabled_tools", strict=True):
+                ...
+        """
+        # Check capability registry (protocol-based only)
+        if isinstance(obj, CapabilityRegistryProtocol):
+            return obj.has_capability(capability_name, min_version=min_version)
+
+        # Strict mode: raise TypeError for non-protocol objects
+        if strict:
+            raise TypeError(
+                f"Object must implement CapabilityRegistryProtocol for capability checking. "
+                f"Got {type(obj).__name__} instead. "
+                f"Ensure your orchestrator uses CapabilityRegistryMixin."
+            )
+
+        # For objects not implementing protocol, show deprecation warning and fallback
+        if min_version is not None:
+            logger.debug(
+                f"Version check requested for '{capability_name}' but object does not "
+                f"implement CapabilityRegistryProtocol. Falling back to hasattr check."
+            )
+
+        warnings.warn(
+            f"Object {type(obj).__name__} does not implement CapabilityRegistryProtocol. "
+            f"Falling back to hasattr() checks for capability '{capability_name}'. "
+            f"This is deprecated and will be removed in v0.7.0. "
+            f"Please add CapabilityRegistryMixin to your orchestrator.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+        # Legacy fallback with public method mappings
+        public_methods = {
+            "enabled_tools": "set_enabled_tools",
+            "prompt_builder": "prompt_builder",
+            "vertical_middleware": "apply_vertical_middleware",
+            "vertical_safety_patterns": "apply_vertical_safety_patterns",
+            "vertical_context": "set_vertical_context",
+            "adaptive_mode_controller": "adaptive_mode_controller",
+        }
+
+        method_name = public_methods.get(capability_name, capability_name)
+        return hasattr(obj, method_name) and (
+            callable(getattr(obj, method_name, None))
+            or not callable(getattr(obj, method_name, None))  # Allow properties
+        )
+
+    @staticmethod
+    def invoke_capability(
+        obj: Any,
+        capability_name: str,
+        *args: Any,
+        min_version: Optional[str] = None,
+        strict: bool = False,
+        **kwargs: Any,
+    ) -> Any:
+        """Invoke a capability on an object via public methods only.
+
+        SOLID Compliance (DIP): This method only uses public methods.
+        It never writes to private attributes (_attr) to maintain
+        proper encapsulation and dependency inversion.
+
+        Args:
+            obj: Object implementing the capability (should implement CapabilityRegistryProtocol)
+            capability_name: Name of the capability to invoke
+            *args: Arguments for capability (value to pass to the capability method)
+            min_version: Minimum required version (default: None = no check)
+            strict: If True, raise TypeError when obj doesn't implement protocol
+            **kwargs: Additional arguments for capability
+
+        Returns:
+            Result of capability invocation, True if capability was invoked successfully
+
+        Raises:
+            TypeError: If strict=True and obj doesn't implement CapabilityRegistryProtocol
+            AttributeError: If capability cannot be invoked via public methods
+
+        Example:
+            # Invoke without version check
+            CapabilityHelper.invoke_capability(obj, "enabled_tools", {"read", "write"})
+
+            # Invoke with version requirement
+            CapabilityHelper.invoke_capability(
+                obj, "enabled_tools", {"read", "write"}, min_version="1.1"
+            )
+
+            # Strict mode (raises error instead of fallback)
+            CapabilityHelper.invoke_capability(
+                obj, "enabled_tools", {"read", "write"}, strict=True
+            )
+        """
+        # Use capability registry if available (preferred)
+        if isinstance(obj, CapabilityRegistryProtocol):
+            try:
+                return obj.invoke_capability(capability_name, *args, min_version=min_version, **kwargs)
+            except (KeyError, TypeError) as e:
+                logger.debug(f"Registry invoke failed for {capability_name}: {e}")
+                # Fall through to public method fallback
+
+        # Strict mode: raise TypeError for non-protocol objects
+        if strict:
+            raise TypeError(
+                f"Object must implement CapabilityRegistryProtocol for capability invocation. "
+                f"Got {type(obj).__name__} instead. "
+                f"Ensure your orchestrator uses CapabilityRegistryMixin."
+            )
+
+        # Show deprecation warning when falling back to hasattr
+        if not isinstance(obj, CapabilityRegistryProtocol):
+            warnings.warn(
+                f"Object {type(obj).__name__} does not implement CapabilityRegistryProtocol. "
+                f"Falling back to hasattr() checks for capability '{capability_name}'. "
+                f"This is deprecated and will be removed in v0.7.0. "
+                f"Please add CapabilityRegistryMixin to your orchestrator.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        # Fallback: use public method mappings only (no private attributes)
+        # Note: Version checking not available without protocol implementation
+        if min_version is not None:
+            logger.debug(
+                f"Version check requested for '{capability_name}' but object does not "
+                f"implement CapabilityRegistryProtocol. Invoking without version check."
+            )
+
+        # Use centralized capability method mappings (single source of truth)
+        method_name = get_method_for_capability(capability_name)
+        method = getattr(obj, method_name, None)
+        if callable(method):
+            return method(*args, **kwargs)
+
+        # No private attribute fallback - raise clear error instead
+        raise AttributeError(
+            f"Cannot invoke capability '{capability_name}' on {type(obj).__name__}. "
+            f"Expected method '{method_name}' not found. "
+            f"Object should implement CapabilityRegistryProtocol."
+        )
+
+
+__all__ = ["CapabilityRegistryMixin", "CapabilityHelper", "get_capability_registry", "get_method_for_capability"]

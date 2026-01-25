@@ -341,11 +341,11 @@ class FeatureExtractor:
             Task text content
         """
         if hasattr(task, "content"):
-            return str(task.content)  # type: ignore[no-any-return]
+            return str(task.content)
         elif isinstance(task, str):
             return task
         elif hasattr(task, "data") and "content" in task.data:
-            return str(task.data["content"])  # type: ignore[no-any-return]
+            return str(task.data["content"])
         else:
             return str(task)
 

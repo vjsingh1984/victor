@@ -167,10 +167,11 @@ class TestCapabilityHelperEdgeCases:
         """invoke_capability should handle non-existent capabilities gracefully."""
         from victor.agent.capability_registry import CapabilityHelper
 
-        obj = MockOrchestrator()
+        # Use an object that doesn't implement the protocol to test strict mode
+        obj = NonProtocolObject()
 
-        # Should return None or raise KeyError
-        with pytest.raises((KeyError, TypeError, AttributeError)):
+        # Should raise TypeError in strict mode for non-protocol objects
+        with pytest.raises(TypeError):
             CapabilityHelper.invoke_capability(
                 obj, "nonexistent_capability", "value", strict=True
             )

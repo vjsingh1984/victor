@@ -42,6 +42,11 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from victor.core.events import ObservabilityBus, get_observability_bus
 from victor.core.events.emit_helper import emit_event_sync
+from victor.observability.batching_integration import (
+    BatchConfig,
+    BatchedObservabilityIntegration,
+    BatchStrategy,
+)
 from victor.observability.hooks import StateHookManager, TransitionHistory
 
 if TYPE_CHECKING:
@@ -76,6 +81,8 @@ class ObservabilityIntegration:
         event_bus: Optional["ObservabilityBus"] = None,
         session_id: Optional[str] = None,
         enable_cqrs_bridge: bool = False,
+        enable_batching: bool = False,
+        batch_config: Optional[BatchConfig] = None,
     ) -> None:
         """Initialize the integration.
 
@@ -85,6 +92,12 @@ class ObservabilityIntegration:
             enable_cqrs_bridge: Whether to enable CQRS event bridging.
                 When enabled, events are automatically forwarded between
                 the observability ObservabilityBus and CQRS EventDispatcher.
+            enable_batching: Whether to enable event batching (default: False).
+                When enabled, events are collected in batches before emission,
+                reducing I/O overhead and improving performance.
+            batch_config: Optional BatchConfig for fine-grained batching control.
+                If enable_batching is True but batch_config is None, default
+                BatchConfig (hybrid strategy, 100 batch size, 500ms wait) is used.
         """
         self._bus = event_bus or get_observability_bus()
         self._session_id = session_id
@@ -92,12 +105,34 @@ class ObservabilityIntegration:
         self._tool_start_times: Dict[str, float] = {}
         self._cqrs_bridge: Optional["UnifiedEventBridge"] = None
         self._state_hook_manager: Optional[StateHookManager] = None
+        self._batched_integration: Optional[BatchedObservabilityIntegration] = None
+        self._enable_batching = enable_batching
 
         # Note: session_id is stored in self._session_id for use in event emissions
         # The new ObservabilityBus doesn't have set_session_id() method
 
         if enable_cqrs_bridge:
             self._setup_cqrs_bridge()
+
+        if enable_batching:
+            self._setup_batching(batch_config)
+
+    def _setup_batching(self, config: Optional[BatchConfig] = None) -> None:
+        """Set up batched event emission.
+
+        Args:
+            config: Optional BatchConfig for fine-grained control.
+        """
+        self._batched_integration = BatchedObservabilityIntegration(config or BatchConfig())
+
+        # Set up emitter to forward to the event bus
+        async def emit_batch(events: List[Dict[str, Any]]) -> None:
+            for event in events:
+                topic = event.pop("_topic", "observability.event")
+                await self._bus.emit(topic=topic, data=event)
+
+        self._batched_integration.set_emitter(emit_batch)
+        logger.debug("Set up batched observability integration")
 
     @property
     def event_bus(self) -> "ObservabilityBus":
@@ -235,6 +270,47 @@ class ObservabilityIntegration:
         # Note: The new ObservabilityBus doesn't have set_session_id()
         # Session ID is stored in self._session_id for use in event emissions
 
+    # =========================================================================
+    # Lifecycle Management
+    # =========================================================================
+
+    async def start(self) -> None:
+        """Start the integration (including batching flush loop if enabled).
+
+        Call this method to start background tasks for the integration.
+        Currently only starts the batched observability flush loop if batching
+        is enabled.
+
+        Example:
+            integration = ObservabilityIntegration(enable_batching=True)
+            await integration.start()
+
+            # Use the integration...
+
+            await integration.shutdown()
+        """
+        if self._enable_batching and self._batched_integration is not None:
+            await self._batched_integration.start()
+            logger.debug("Started batched observability flush loop")
+
+    async def shutdown(self) -> None:
+        """Shutdown the integration gracefully.
+
+        Flushes any pending batched events and stops background tasks.
+        Should be called before application shutdown to ensure all events
+        are emitted.
+
+        Example:
+            await integration.shutdown()
+        """
+        if self._enable_batching and self._batched_integration is not None:
+            await self._batched_integration.shutdown()
+            logger.debug("Shut down batched observability integration")
+
+        if self._cqrs_bridge is not None:
+            self._cqrs_bridge.stop()
+            logger.debug("Stopped CQRS bridge")
+
     def wire_orchestrator(self, orchestrator: "AgentOrchestrator") -> None:
         """Wire EventBus into an AgentOrchestrator.
 
@@ -344,6 +420,39 @@ class ObservabilityIntegration:
         logger.debug("Wired observability into state machine with history-aware hooks")
 
     # =========================================================================
+    # Internal Helpers
+    # =========================================================================
+
+    def _emit_event_async(self, topic: str, data: Dict[str, Any]) -> None:
+        """Emit an event asynchronously, optionally using batching.
+
+        Args:
+            topic: Event topic.
+            data: Event data.
+        """
+        if self._enable_batching and self._batched_integration is not None:
+            # Use batched integration
+            event = {"_topic": topic, **data}
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self._batched_integration.emit_event(event))
+            except RuntimeError:
+                # No event loop running
+                logger.debug(f"No event loop, skipping batched event emission: {topic}")
+            except Exception as e:
+                logger.debug(f"Failed to emit batched event {topic}: {e}")
+        else:
+            # Direct emission (creates task per event)
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self._bus.emit(topic=topic, data=data))
+            except RuntimeError:
+                # No event loop running
+                logger.debug(f"No event loop, skipping event emission: {topic}")
+            except Exception as e:
+                logger.debug(f"Failed to emit event {topic}: {e}")
+
+    # =========================================================================
     # Tool Events
     # =========================================================================
 
@@ -361,24 +470,15 @@ class ObservabilityIntegration:
             tool_id: Optional tool call ID.
         """
         self._tool_start_times[tool_id or tool_name] = time.time()
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(
-                self._bus.emit(
-                    topic="tool.start",
-                    data={
-                        "tool_name": tool_name,
-                        "arguments": arguments,
-                        "tool_id": tool_id,
-                        "category": "tool",
-                    },
-                )
-            )
-        except RuntimeError:
-            # No event loop running
-            logger.debug("No event loop, skipping tool.start event emission")
-        except Exception as e:
-            logger.debug(f"Failed to emit tool start event: {e}")
+        self._emit_event_async(
+            topic="tool.start",
+            data={
+                "tool_name": tool_name,
+                "arguments": arguments,
+                "tool_id": tool_id,
+                "category": "tool",
+            },
+        )
 
     def on_tool_end(
         self,
@@ -402,47 +502,29 @@ class ObservabilityIntegration:
         duration_ms = (time.time() - start_time) * 1000 if start_time else None
 
         # Emit tool complete/end event
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(
-                self._bus.emit(
-                    topic="tool.end",
-                    data={
-                        "tool_name": tool_name,
-                        "result": result,
-                        "success": success,
-                        "tool_id": tool_id,
-                        "duration_ms": duration_ms,
-                        "category": "tool",
-                    },
-                )
-            )
-        except RuntimeError:
-            # No event loop running
-            logger.debug("No event loop, skipping tool.end event emission")
-        except Exception as e:
-            logger.debug(f"Failed to emit tool end event: {e}")
+        self._emit_event_async(
+            topic="tool.end",
+            data={
+                "tool_name": tool_name,
+                "result": result,
+                "success": success,
+                "tool_id": tool_id,
+                "duration_ms": duration_ms,
+                "category": "tool",
+            },
+        )
 
         if not success and error:
             # Emit tool error event
-            try:
-                loop = asyncio.get_running_loop()
-                loop.create_task(
-                    self._bus.emit(
-                        topic=f"error.{tool_name}",
-                        data={
-                            "tool_name": tool_name,
-                            "error": error,
-                            "tool_id": tool_id,
-                            "category": "error",
-                        },
-                    )
-                )
-            except RuntimeError:
-                # No event loop running
-                logger.debug("No event loop, skipping tool error event emission")
-            except Exception as e:
-                logger.debug(f"Failed to emit tool error event: {e}")
+            self._emit_event_async(
+                topic=f"error.{tool_name}",
+                data={
+                    "tool_name": tool_name,
+                    "error": error,
+                    "tool_id": tool_id,
+                    "category": "error",
+                },
+            )
 
     # =========================================================================
     # Model Events
