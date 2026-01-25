@@ -594,11 +594,15 @@ class CapabilityRegistryMixin:
             if method_key in self._capability_methods:
                 method = self._capability_methods[method_key]
                 if method:
-                    return method()
+                    result = method()
+                    if result is not None:
+                        return result
 
         # Fall back to attribute
         if cap.attribute:
-            return getattr(self, cap.attribute, None)
+            result = getattr(self, cap.attribute, None)
+            if result is not None:
+                return str(result)
 
         raise TypeError(f"Capability '{name}' has no getter or attribute")
 

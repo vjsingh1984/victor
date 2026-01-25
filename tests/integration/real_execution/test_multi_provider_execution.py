@@ -29,26 +29,16 @@ from victor.providers.base import BaseProvider
 
 
 # =============================================================================
-# Provider Parametrization Fixtures
+# Dynamic Test Parametrization Hook
 # =============================================================================
 
 
-@pytest.fixture(
-    params=[
-        "ollama",
-        "deepseek",
-        "xai",
-        "mistral",
-        "openai",
-        "zai",
-    ],
-    scope="session",
-)
-def available_providers(request):
-    """Return list of available providers in priority order.
+def pytest_generate_tests(metafunc):
+    """Dynamically parametrize tests based on available providers.
 
-    This is used to dynamically select which providers to test.
-    Providers are checked in order and the first available one is used.
+    This hook checks which providers are available and only parametrizes tests
+    with those providers. This avoids the complex async fixture chain that was
+    causing event loop issues.
     """
     from tests.integration.real_execution.conftest import (
         has_provider_api_key,
@@ -57,105 +47,132 @@ def available_providers(request):
         PROVIDER_MODELS,
     )
 
-    provider_name = request.param
+    # Only apply to tests that use provider fixtures
+    if {"provider", "provider_name", "model"}.isdisjoint(metafunc.fixturenames):
+        return
 
-    # Check if provider is available
-    if provider_name == "ollama":
-        if not is_ollama_running():
-            return None
-        if not any(
-            is_ollama_model_available(model)
-            for model in PROVIDER_MODELS["ollama"]
-        ):
-            return None
-    else:
-        if not has_provider_api_key(provider_name):
-            return None
+    # Determine which providers are available
+    provider_configs = []
 
-    return provider_name
+    # Check Ollama
+    if is_ollama_running() and any(
+        is_ollama_model_available(model)
+        for model in PROVIDER_MODELS["ollama"]
+    ):
+        provider_configs.append({
+            "provider_name": "ollama",
+            "model": PROVIDER_MODELS["ollama"][0],
+        })
 
+    # Check cloud providers
+    for provider in ["deepseek", "xai", "mistral", "openai", "zai"]:
+        if has_provider_api_key(provider):
+            provider_configs.append({
+                "provider_name": provider,
+                "model": PROVIDER_MODELS[provider][0],
+            })
 
-# Create simple provider fixtures that return (name, provider, model) tuples
-@pytest.fixture
-async def ollama_provider_tuple(ollama_provider, ollama_model_name):
-    """Return Ollama provider as tuple."""
-    return ("ollama", ollama_provider, ollama_model_name)
+    # Skip all tests if no providers available
+    if not provider_configs:
+        metafunc.parametrize("provider_name, model", [], ids=[])
+        return
 
-
-@pytest.fixture
-async def deepseek_provider_tuple(deepseek_provider, deepseek_model_name):
-    """Return DeepSeek provider as tuple."""
-    return ("deepseek", deepseek_provider, deepseek_model_name)
-
-
-@pytest.fixture
-async def xai_provider_tuple(xai_provider, xai_model_name):
-    """Return xAI provider as tuple."""
-    return ("xai", xai_provider, xai_model_name)
-
-
-@pytest.fixture
-async def mistral_provider_tuple(mistral_provider, mistral_model_name):
-    """Return Mistral provider as tuple."""
-    return ("mistral", mistral_provider, mistral_model_name)
+    # Parametrize with available providers
+    ids = [cfg["provider_name"] for cfg in provider_configs]
+    metafunc.parametrize(
+        "provider_name, model",
+        [(cfg["provider_name"], cfg["model"]) for cfg in provider_configs],
+        ids=ids,
+    )
 
 
-@pytest.fixture
-async def openai_provider_tuple(openai_provider, openai_model_name):
-    """Return OpenAI provider as tuple."""
-    return ("openai", openai_provider, openai_model_name)
+# =============================================================================
+# Provider Fixture
+# =============================================================================
 
 
 @pytest.fixture
-async def zai_provider_tuple(zai_provider, zai_model_name):
-    """Return ZAI provider as tuple."""
-    return ("zai", zai_provider, zai_model_name)
+async def provider(provider_name: str, model: str):
+    """Get provider instance for the given provider_name and model.
 
-
-@pytest.fixture(params=[
-    "ollama_provider_tuple",
-    "deepseek_provider_tuple",
-    "xai_provider_tuple",
-    "mistral_provider_tuple",
-    "openai_provider_tuple",
-    "zai_provider_tuple",
-])
-async def any_provider(request):
-    """Parametrized fixture that yields the first available provider.
-
-    Tests using this fixture will run once with the first available provider.
-    If a provider is not available, the test is skipped.
-
-    Yields:
-        Tuple of (provider_name, provider_instance, model_name)
+    This fixture is dynamically parametrized by pytest_generate_tests()
+    to only run with available providers.
     """
-    # Get the fixture result (it will skip if not available)
-    try:
-        result = await request.getfixturevalue(request.param)
-        yield result
-    except pytest.skip.Exception:
-        pytest.skip(f"Provider {request.param} not available")
+    import os
 
+    # Create provider directly without using getfixturevalue to avoid event loop issues
+    if provider_name == "ollama":
+        from victor.providers.ollama_provider import OllamaProvider
+        provider_instance = OllamaProvider(
+            base_url="http://localhost:11434",
+            timeout=120,
+        )
+        # Set model directly
+        provider_instance._selected_model = model
+    elif provider_name == "deepseek":
+        from victor.providers.deepseek_provider import DeepSeekProvider
+        api_key = os.getenv("DEEPSEEK_API_KEY")
+        if not api_key:
+            pytest.skip("DEEPSEEK_API_KEY not set")
+        provider_instance = DeepSeekProvider(
+            api_key=api_key,
+            model=model,
+            timeout=120,
+        )
+        provider_instance._selected_model = model
+    elif provider_name == "xai":
+        from victor.providers.xai_provider import XAIProvider
+        api_key = os.getenv("XAI_API_KEY")
+        if not api_key:
+            pytest.skip("XAI_API_KEY not set")
+        provider_instance = XAIProvider(
+            api_key=api_key,
+            model=model,
+            timeout=120,
+        )
+        provider_instance._selected_model = model
+    elif provider_name == "mistral":
+        from victor.providers.mistral_provider import MistralProvider
+        api_key = os.getenv("MISTRAL_API_KEY")
+        if not api_key:
+            pytest.skip("MISTRAL_API_KEY not set")
+        provider_instance = MistralProvider(
+            api_key=api_key,
+            model=model,
+            timeout=120,
+        )
+        provider_instance._selected_model = model
+    elif provider_name == "openai":
+        from victor.providers.openai_provider import OpenAIProvider
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            pytest.skip("OPENAI_API_KEY not set")
+        provider_instance = OpenAIProvider(
+            api_key=api_key,
+            model=model,
+            timeout=120,
+        )
+        provider_instance._selected_model = model
+    elif provider_name == "zai":
+        from victor.providers.zai_provider import ZAIProvider
+        api_key = os.getenv("ZAI_API_KEY")
+        if not api_key:
+            pytest.skip("ZAI_API_KEY not set")
+        provider_instance = ZAIProvider(
+            api_key=api_key,
+            base_url="https://api.z.ai/api/paas/v4/",
+            model=model,
+            timeout=60,
+        )
+        provider_instance._selected_model = model
+    else:
+        pytest.skip(f"Unknown provider: {provider_name}")
 
-@pytest.fixture
-async def selected_provider(any_provider: tuple) -> BaseProvider:
-    """Get the provider instance from any_provider."""
-    _, provider, _ = any_provider
-    return provider
+    yield provider_instance
 
-
-@pytest.fixture
-def selected_provider_name(any_provider: tuple) -> str:
-    """Get the provider name from any_provider."""
-    name, _, _ = any_provider
-    return name
-
-
-@pytest.fixture
-def selected_model(any_provider: tuple) -> str:
-    """Get the model name from any_provider."""
-    _, _, model = any_provider
-    return model
+    # Cleanup
+    if hasattr(provider_instance, "client") and provider_instance.client:
+        await provider_instance.client.aclose()
 
 
 # =============================================================================
@@ -167,9 +184,9 @@ def selected_model(any_provider: tuple) -> str:
 @pytest.mark.asyncio
 @pytest.mark.timeout(120)
 async def test_multi_provider_read_tool(
-    selected_provider: BaseProvider,
-    selected_model: str,
-    selected_provider_name: str,
+    provider: BaseProvider,
+    model: str,
+    provider_name: str,
     sample_code_file: str,
     temp_workspace: str,
 ):
@@ -181,15 +198,15 @@ async def test_multi_provider_read_tool(
     - Response time is acceptable
     """
     settings = Settings()
-    settings.provider = selected_provider_name
-    settings.model = selected_model
+    settings.provider = provider_name
+    settings.model = model
     settings.working_dir = temp_workspace
-    settings.airgapped_mode = (selected_provider_name == "ollama")
+    settings.airgapped_mode = (provider_name == "ollama")
 
     orchestrator = AgentOrchestrator(
         settings=settings,
-        provider=selected_provider,
-        model=selected_model,
+        provider=provider,
+        model=model,
     )
 
     start_time = time.time()
@@ -207,19 +224,19 @@ async def test_multi_provider_read_tool(
     content_lower = response.content.lower()
     assert (
         "greet" in content_lower or "add" in content_lower
-    ), f"[{selected_provider_name}] Response should mention functions: {response.content}"
+    ), f"[{provider_name}] Response should mention functions: {response.content}"
 
-    print(f"✓ [{selected_provider_name}] Read tool executed in {elapsed:.2f}s")
-    print(f"✓ [{selected_provider_name}] Response preview: {response.content[:200]}...")
+    print(f"✓ [{provider_name}] Read tool executed in {elapsed:.2f}s")
+    print(f"✓ [{provider_name}] Response preview: {response.content[:200]}...")
 
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
 @pytest.mark.timeout(120)
 async def test_multi_provider_edit_tool(
-    selected_provider: BaseProvider,
-    selected_model: str,
-    selected_provider_name: str,
+    provider: BaseProvider,
+    model: str,
+    provider_name: str,
     sample_code_file: str,
     temp_workspace: str,
 ):
@@ -233,15 +250,15 @@ async def test_multi_provider_edit_tool(
     from pathlib import Path
 
     settings = Settings()
-    settings.provider = selected_provider_name
-    settings.model = selected_model
+    settings.provider = provider_name
+    settings.model = model
     settings.working_dir = temp_workspace
-    settings.airgapped_mode = (selected_provider_name == "ollama")
+    settings.airgapped_mode = (provider_name == "ollama")
 
     orchestrator = AgentOrchestrator(
         settings=settings,
-        provider=selected_provider,
-        model=selected_model,
+        provider=provider,
+        model=model,
     )
 
     # Read original content
@@ -275,21 +292,21 @@ async def test_multi_provider_edit_tool(
     }
 
     assert any(success_indicators.values()), (
-        f"[{selected_provider_name}] Edit test requires at least one success indicator. "
+        f"[{provider_name}] Edit test requires at least one success indicator. "
         f"Got: {success_indicators}. "
         f"Response: {response.content[:200]}"
     )
 
-    print(f"✓ [{selected_provider_name}] Edit tool test completed in {elapsed:.2f}s")
+    print(f"✓ [{provider_name}] Edit tool test completed in {elapsed:.2f}s")
 
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
 @pytest.mark.timeout(120)
 async def test_multi_provider_shell_tool(
-    selected_provider: BaseProvider,
-    selected_model: str,
-    selected_provider_name: str,
+    provider: BaseProvider,
+    model: str,
+    provider_name: str,
     temp_workspace: str,
 ):
     """Test Shell tool execution across all available providers.
@@ -300,15 +317,15 @@ async def test_multi_provider_shell_tool(
     - Response is received
     """
     settings = Settings()
-    settings.provider = selected_provider_name
-    settings.model = selected_model
+    settings.provider = provider_name
+    settings.model = model
     settings.working_dir = temp_workspace
-    settings.airgapped_mode = (selected_provider_name == "ollama")
+    settings.airgapped_mode = (provider_name == "ollama")
 
     orchestrator = AgentOrchestrator(
         settings=settings,
-        provider=selected_provider,
-        model=selected_model,
+        provider=provider,
+        model=model,
     )
 
     start_time = time.time()
@@ -329,11 +346,11 @@ async def test_multi_provider_shell_tool(
     )
 
     assert command_keywords, (
-        f"[{selected_provider_name}] Response should mention command execution. "
+        f"[{provider_name}] Response should mention command execution. "
         f"Got: {response.content[:200]}"
     )
 
-    print(f"✓ [{selected_provider_name}] Shell tool test completed in {elapsed:.2f}s")
+    print(f"✓ [{provider_name}] Shell tool test completed in {elapsed:.2f}s")
 
 
 @pytest.mark.real_execution
@@ -341,7 +358,9 @@ async def test_multi_provider_shell_tool(
 @pytest.mark.asyncio
 @pytest.mark.timeout(180)
 async def test_cloud_provider_grep_tool(
-    any_provider: tuple,
+    provider: BaseProvider,
+    model: str,
+    provider_name: str,
     sample_code_file: str,
     temp_workspace: str,
 ):
@@ -355,8 +374,6 @@ async def test_cloud_provider_grep_tool(
     - Search results are returned
     - API integration works
     """
-    provider_name, provider, model = any_provider
-
     # Skip if this is Ollama (local provider)
     if provider_name == "ollama":
         pytest.skip("This test is for cloud providers only")
@@ -402,9 +419,9 @@ async def test_cloud_provider_grep_tool(
 @pytest.mark.asyncio
 @pytest.mark.timeout(300)
 async def test_multi_provider_multi_tool(
-    selected_provider: BaseProvider,
-    selected_model: str,
-    selected_provider_name: str,
+    provider: BaseProvider,
+    model: str,
+    provider_name: str,
     sample_code_file: str,
     temp_workspace: str,
 ):
@@ -424,15 +441,15 @@ async def test_multi_provider_multi_tool(
     from pathlib import Path
 
     settings = Settings()
-    settings.provider = selected_provider_name
-    settings.model = selected_model
+    settings.provider = provider_name
+    settings.model = model
     settings.working_dir = temp_workspace
-    settings.airgapped_mode = (selected_provider_name == "ollama")
+    settings.airgapped_mode = (provider_name == "ollama")
 
     orchestrator = AgentOrchestrator(
         settings=settings,
-        provider=selected_provider,
-        model=selected_model,
+        provider=provider,
+        model=model,
     )
 
     original_content = Path(sample_code_file).read_text()
@@ -441,14 +458,14 @@ async def test_multi_provider_multi_tool(
     # Turn 1: Read file
     response1 = await orchestrator.chat(user_message=f"Read the file {sample_code_file}.")
     assert response1.content is not None
-    print(f"✓ [{selected_provider_name}] Turn 1 (Read): {len(response1.content)} chars")
+    print(f"✓ [{provider_name}] Turn 1 (Read): {len(response1.content)} chars")
 
     # Turn 2: Add docstring
     response2 = await orchestrator.chat(
         user_message="Add a docstring to the greet function that explains what it does."
     )
     assert response2.content is not None
-    print(f"✓ [{selected_provider_name}] Turn 2 (Edit): {len(response2.content)} chars")
+    print(f"✓ [{provider_name}] Turn 2 (Edit): {len(response2.content)} chars")
 
     # Check for success indicators (robust to model variations)
     new_content = Path(sample_code_file).read_text()
@@ -472,7 +489,7 @@ async def test_multi_provider_multi_tool(
     }
 
     assert any(success_indicators.values()), (
-        f"[{selected_provider_name}] Multi-tool test requires at least one success indicator. "
+        f"[{provider_name}] Multi-tool test requires at least one success indicator. "
         f"Got: {success_indicators}"
     )
 
@@ -483,4 +500,4 @@ async def test_multi_provider_multi_tool(
     assert response3.content is not None
 
     elapsed = time.time() - start_time
-    print(f"✓ [{selected_provider_name}] Multi-tool execution completed in {elapsed:.2f}s")
+    print(f"✓ [{provider_name}] Multi-tool execution completed in {elapsed:.2f}s")

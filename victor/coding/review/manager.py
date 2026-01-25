@@ -131,7 +131,8 @@ class ReviewManager:
 
         # Group rules by category
         rules_by_category: dict[ReviewCategory, list[ReviewRule]] = {}
-        for rule in ruleset.get_enabled_rules():
+        enabled_rules = ruleset.get_enabled_rules() if ruleset is not None else []
+        for rule in enabled_rules:
             if rule.category not in rules_by_category:
                 rules_by_category[rule.category] = []
             rules_by_category[rule.category].append(rule)
@@ -427,7 +428,7 @@ class ReviewManager:
             Severity.HINT: ":bulb:",
         }.get(severity, ":grey_question:")
 
-    def _create_location(self, file_path: Path, line: int):
+    def _create_location(self, file_path: Path, line: int) -> Any:
         """Create a source location."""
         from victor.coding.review.protocol import SourceLocation
 

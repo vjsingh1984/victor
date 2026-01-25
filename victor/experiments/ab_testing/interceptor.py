@@ -20,7 +20,7 @@ to inject experiment configuration.
 
 import time
 import uuid
-from typing import Any, Callable, Dict, Optional
+from typing import Any, AsyncGenerator, Callable, Dict, Optional
 
 from victor.experiments.ab_testing.experiment import ABTestManager
 from victor.experiments.ab_testing.models import ExperimentConfig
@@ -361,7 +361,7 @@ class ExperimentCompiledGraphWrapper:
         initial_state: Dict[str, Any],
         user_id: str = "unknown",
         **kwargs: Any,
-    ):
+    ) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream graph execution with experiment configuration.
 
         Args:

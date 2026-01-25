@@ -329,14 +329,14 @@ def _register_event_services(container: ServiceContainer, settings: Settings) ->
     # Register ObservabilityBus as singleton
     container.register(
         ObservabilityBus,
-        lambda c: ObservabilityBus(backend=c.get(IEventBackend)),  # type: ignore[arg-type]
+        lambda c: ObservabilityBus(backend=c.get(IEventBackend)),
         ServiceLifetime.SINGLETON,
     )
 
     # Register AgentMessageBus as singleton
     container.register(
         AgentMessageBus,
-        lambda c: AgentMessageBus(backend=c.get(IEventBackend)),  # type: ignore[arg-type]
+        lambda c: AgentMessageBus(backend=c.get(IEventBackend)),
         ServiceLifetime.SINGLETON,
     )
 
@@ -403,7 +403,7 @@ def _register_signature_store(container: ServiceContainer, settings: Settings) -
 
     container.register(
         SignatureStoreProtocol,
-        lambda c: _create_signature_store(),  # type: ignore[arg-type]
+        lambda c: _create_signature_store(),
         ServiceLifetime.SINGLETON,
     )
 

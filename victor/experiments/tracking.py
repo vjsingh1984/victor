@@ -409,7 +409,7 @@ class ExperimentTracker:
         self._storage.create_run(run)
 
         # Create active run context manager
-        active_run = ActiveRun(run, self._storage, self._artifact_manager)
+        active_run = ActiveRun(run, self._storage)  # type: ignore[arg-type]
 
         # Track active run
         with self._active_runs_lock:
@@ -534,8 +534,13 @@ class ExperimentTracker:
                 # Parse pip freeze output
                 for line in result.stdout.strip().split("\n"):
                     if "==" in line:
-                        package, version = line.split("==", 1)
-                        env_info["dependencies"][package] = version
+                        parts = line.split("==", 1)
+                        if len(parts) == 2:
+                            package = parts[0]
+                            version = parts[1]
+                            dependencies = env_info.get("dependencies")
+                            if isinstance(dependencies, dict):
+                                dependencies[package] = version
         except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired):
             # pip not available or timeout
             pass

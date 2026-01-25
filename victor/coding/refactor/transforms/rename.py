@@ -120,12 +120,13 @@ class RenameSymbolTransform(BaseTransform):
             references = analyzer.find_references(file_source, file_path, old_name)
 
             for ref in references:
-                edit = CodeEdit(
-                    location=ref,
-                    new_text=new_name,
-                    description=f"Rename '{old_name}' to '{new_name}'",
-                )
-                preview.edits.append(edit)
+                if new_name is not None:
+                    edit = CodeEdit(
+                        location=ref,
+                        new_text=new_name,
+                        description=f"Rename '{old_name}' to '{new_name}'",
+                    )
+                    preview.edits.append(edit)
 
             if references:
                 preview.affected_files.append(file_path)
@@ -190,8 +191,8 @@ class RenameFileTransform(BaseTransform):
             return preview
 
         # Calculate old and new module names
-        old_module = source_file.stem
-        new_module = dest_file.stem
+        old_module = source_file.stem if source_file is not None else ""
+        new_module = dest_file.stem if dest_file is not None else ""
 
         # Find imports to update across all files
         for file_path, source in sources.items():

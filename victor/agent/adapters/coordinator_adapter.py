@@ -45,7 +45,7 @@ try:
     from victor.agent.coordinators.state_coordinator import StateScope
 except ImportError:
     # Fallback for testing - create a simple enum
-    StateScope = type(  # type: ignore[misc]
+    StateScope_Base = type(  # type: ignore[misc]
         "StateScope",
         (),
         {
@@ -54,6 +54,7 @@ except ImportError:
             "SNAPSHOT": "snapshot",
         },
     )
+    StateScope = StateScope_Base  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 

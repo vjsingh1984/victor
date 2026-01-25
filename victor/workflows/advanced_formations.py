@@ -72,7 +72,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union, cast
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
 from victor.teams.types import AgentMessage, MemberResult
@@ -162,7 +162,7 @@ class DynamicFormation(BaseFormationStrategy):
         self._current_phase = FormationPhase.EXPLORATION
         self._switches_made = 0
         self._formation_history: List[Dict[str, Any]] = []
-        self._phase_transitions: List[Dict[str, str]] = []
+        self._phase_transitions: List[Dict[str, Any]] = []
 
     def _default_switching_rules(self) -> Dict[str, str]:
         """Get default switching rules.
@@ -319,7 +319,8 @@ class DynamicFormation(BaseFormationStrategy):
 
         module = importlib.import_module(module_path)
         formation_class = getattr(module, class_name)
-        return formation_class()
+        instance = formation_class()
+        return cast("BaseFormationStrategy", instance)
 
     def _detect_triggers(self, results: List[MemberResult], context: TeamContext) -> List[str]:
         """Detect triggers for formation switching.
@@ -331,7 +332,7 @@ class DynamicFormation(BaseFormationStrategy):
         Returns:
             List of trigger names detected
         """
-        triggers = []
+        triggers: List[str] = []
 
         if not self.enable_auto_detection:
             return triggers
@@ -624,7 +625,7 @@ class AdaptiveFormation(BaseFormationStrategy):
 
     def __init__(
         self,
-        criteria: List[str] = None,
+        criteria: Optional[List[str]] = None,
         default_formation: str = "parallel",
         fallback_formation: str = "sequential",
         scoring_weights: Optional[Dict[str, Dict[str, float]]] = None,

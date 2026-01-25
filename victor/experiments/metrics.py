@@ -209,16 +209,17 @@ class MetricsAggregator:
         """
         if metric_names is None:
             # Get all unique metric names across runs
+            metric_names_list: list[str] | None = None
             metric_names = set()
             for run_id in run_ids:
                 metrics = self._storage.get_metrics(run_id)
                 metric_names.update(m.key for m in metrics)
-            metric_names = list(metric_names)
+            metric_names_list = list(metric_names)
 
-        comparison = {}
+        comparison: dict[str, dict[str, float]] = {}
         for run_id in run_ids:
             comparison[run_id] = {}
-            for metric_name in metric_names:
+            for metric_name in (metric_names_list or []):
                 stats = self.get_metric_statistics(run_id, metric_name)
                 if stats:
                     comparison[run_id][metric_name] = stats.last

@@ -478,7 +478,7 @@ class AgentBuilder:
             from victor.framework.service_provider import ToolConfiguratorService
             from typing import cast
 
-            return cast(ToolConfiguratorService, self._container.get(ToolConfiguratorService))
+            return cast(ToolConfiguratorService, self._container.get(ToolConfiguratorService.__class__))
         except Exception as e:
             logger.debug(f"Could not get ToolConfigurator from container: {e}")
             return None
@@ -495,7 +495,7 @@ class AgentBuilder:
             from victor.framework.service_provider import EventRegistryService
             from typing import cast
 
-            return cast(EventRegistryService, self._container.get(EventRegistryService))
+            return cast(EventRegistryService, self._container.get(EventRegistryService.__class__))
         except Exception as e:
             logger.debug(f"Could not get EventRegistry from container: {e}")
             return None
@@ -1169,7 +1169,7 @@ class AgentSession:
             except Exception as e:
                 logger.debug(f"on_turn_end hook error: {e}")
 
-        return result
+        return result  # type: ignore[no-any-return]
 
     async def stream(self, message: str) -> AsyncIterator[AgentExecutionEvent]:
         """Stream a response.

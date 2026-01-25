@@ -213,7 +213,7 @@ class FEPManager:
         except Exception as e:
             return False, f"Failed to update status: {e}"
 
-    def get_statistics(self) -> Dict[str, any]:
+    def get_statistics(self) -> Dict[str, Any]:
         """Get FEP statistics.
 
         Returns:

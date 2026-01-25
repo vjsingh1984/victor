@@ -171,8 +171,8 @@ class RedisCacheBackend(ICacheBackend):
         self._encoding = encoding
 
         # Connection objects (set in connect())
-        self._redis: Optional[aioredis.Redis] = None
-        self._pubsub: Optional[aioredis.PubSub] = None
+        self._redis: Optional["aioredis.Redis"] = None
+        self._pubsub: Optional["aioredis.client.PubSub"] = None
 
         # Connection state
         self._is_connected = False
@@ -192,14 +192,16 @@ class RedisCacheBackend(ICacheBackend):
 
         try:
             # Create Redis connection with connection pooling
-            self._redis = await aioredis.from_url(
+            from redis.asyncio.connection import Connection
+            self._redis = await aioredis.from_url(  # type: ignore[no-untyped-call]
                 self._redis_url,
                 max_connections=self._connection_pool_size,
                 decode_responses=False,  # We handle encoding ourselves
             )
 
             # Ping to verify connection
-            await self._redis.ping()
+            ping_result: Any = await self._redis.ping()
+            assert ping_result is not None
 
             # Create pubsub client for distributed invalidation
             self._pubsub = self._redis.pubsub()
@@ -351,7 +353,7 @@ class RedisCacheBackend(ICacheBackend):
 
         try:
             result = await self._redis.delete(redis_key)
-            return result > 0
+            return bool(result > 0)
 
         except Exception as e:
             logger.error(f"Error deleting key {redis_key}: {e}")

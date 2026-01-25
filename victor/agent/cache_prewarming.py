@@ -44,7 +44,7 @@ from typing import TYPE_CHECKING, List, Optional, Set
 
 if TYPE_CHECKING:
     from victor.agent.tool_selection import ToolSelector
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry  # type: ignore[attr-defined]
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +256,7 @@ class CachePrewarmer:
         if not self._enabled:
             return
 
-        async def prewarm_task():
+        async def prewarm_task() -> None:
             await asyncio.sleep(delay_seconds)
             try:
                 await self.prewarm_all()
@@ -278,16 +278,16 @@ class CachePrewarmer:
 
         context = AgentToolSelectionContext(
             stage=None,  # No specific stage
-            max_tools=10,  # Conservative limit
-            conversation_history=[],  # No history
+            conversation_stage=None,  # No specific stage
+            task_type="default",  # Default task type
             recent_tools=[],  # No recent tools
-            pending_actions=[],  # No pending actions
         )
 
         # Execute tool selection (will populate cache)
         await self._tool_selector.select_tools(
-            query=query,
-            context=context,
+            user_message=query,
+            use_semantic=True,
+            conversation_history=[],
         )
 
     def get_prewarmed_count(self) -> int:

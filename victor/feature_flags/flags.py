@@ -318,5 +318,5 @@ def get_flag_categories() -> List[str]:
         categories = get_flag_categories()
         print(categories)  # ['planning', 'memory', 'skills', ...]
     """
-    categories = {flag_def.get("category") for flag_def in FEATURE_FLAGS.values()}
+    categories = {flag_def.get("category") for flag_def in FEATURE_FLAGS.values() if isinstance(flag_def.get("category"), str)}
     return sorted(categories)

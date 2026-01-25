@@ -161,7 +161,7 @@ class _LazyDeprecatedProperty:
         self._cached_value = None
         self._loaded = False
 
-    def __get__(self, obj, objtype=None):
+    def __get__(self, obj: Any, objtype: Any = None) -> Any:
         if not self._loaded:
             warnings.warn(
                 self.deprecation_msg,
@@ -249,7 +249,7 @@ _deprecated = _DeprecatedConstants()
 
 
 # Module-level aliases that trigger deprecation warnings on access
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """Module-level __getattr__ to provide deprecated constant access.
 
     This allows existing code that imports the constants directly to continue

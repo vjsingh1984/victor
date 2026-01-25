@@ -20,7 +20,7 @@ storage implementations (SQLite, PostgreSQL, etc.) to be used interchangeably.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Dict, List, Optional, Protocol, Self
 
 from victor.experiments.entities import (
     Artifact,
@@ -246,10 +246,10 @@ class IStorageBackend(Protocol):
         """
         ...
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit."""
         self.close()

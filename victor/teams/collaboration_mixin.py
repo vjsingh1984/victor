@@ -62,7 +62,7 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
 
 if TYPE_CHECKING:
     from victor.teams.types import AgentMessage
@@ -102,7 +102,7 @@ class CollaborationMixin:
         coordinator.enable_collaboration(config)
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize collaboration mixin."""
         super().__init__(*args, **kwargs)
 
@@ -203,7 +203,7 @@ class CollaborationMixin:
         # Create protocol
         log_messages = config.get("log_messages", True)
         self._communication_protocol = TeamCommunicationProtocol(
-            members=self.members,
+            members=getattr(self, 'members', []),
             communication_type=comm_type,
             log_messages=log_messages,
         )
@@ -265,7 +265,7 @@ class CollaborationMixin:
         # Create framework
         max_rounds = config.get("max_rounds", 3)
         self._negotiation_framework = NegotiationFramework(
-            members=self.members,
+            members=getattr(self, 'members', []),
             voting_strategy=voting,
             negotiation_type=neg_type,
             max_rounds=max_rounds,
@@ -314,13 +314,16 @@ class CollaborationMixin:
             logger.warning("Collaboration not enabled")
             return None
 
-        return await self._communication_protocol.send_request(
-            sender_id=sender_id,
-            recipient_id=recipient_id,
-            content=content,
-            message_type=message_type,
-            timeout=timeout,
-            **metadata,
+        return cast(
+            "Optional[AgentMessage]",
+            await self._communication_protocol.send_request(
+                sender_id=sender_id,
+                recipient_id=recipient_id,
+                content=content,
+                message_type=message_type,
+                timeout=timeout,
+                **metadata,
+            ),
         )
 
     async def collaborative_broadcast(
@@ -329,7 +332,7 @@ class CollaborationMixin:
         content: str,
         message_type: str = "broadcast",
         exclude_sender: bool = True,
-        **metadata,
+        **metadata: Any,
     ) -> List[Optional[AgentMessage]]:
         """Broadcast a message to all team members.
 
@@ -353,12 +356,15 @@ class CollaborationMixin:
             logger.warning("Collaboration not enabled")
             return []
 
-        return await self._communication_protocol.broadcast(
-            sender_id=sender_id,
-            content=content,
-            message_type=message_type,
-            exclude_sender=exclude_sender,
-            **metadata,
+        return cast(
+            "List[Optional[AgentMessage]]",
+            await self._communication_protocol.broadcast(
+                sender_id=sender_id,
+                content=content,
+                message_type=message_type,
+                exclude_sender=exclude_sender,
+                **metadata,
+            ),
         )
 
     async def collaborative_multicast(
@@ -367,7 +373,7 @@ class CollaborationMixin:
         recipient_ids: List[str],
         content: str,
         message_type: str = "multicast",
-        **metadata,
+        **metadata: Any,
     ) -> Dict[str, Optional[AgentMessage]]:
         """Send a message to multiple specific recipients.
 
@@ -392,12 +398,15 @@ class CollaborationMixin:
             logger.warning("Collaboration not enabled")
             return {}
 
-        return await self._communication_protocol.multicast(
-            sender_id=sender_id,
-            recipient_ids=recipient_ids,
-            content=content,
-            message_type=message_type,
-            **metadata,
+        return cast(
+            "Dict[str, Optional[AgentMessage]]",
+            await self._communication_protocol.multicast(
+                sender_id=sender_id,
+                recipient_ids=recipient_ids,
+                content=content,
+                message_type=message_type,
+                **metadata,
+            ),
         )
 
     def subscribe_to_topic(self, topic: str, member: Any) -> None:
@@ -437,7 +446,7 @@ class CollaborationMixin:
             logger.warning("Collaboration not enabled")
             return 0
 
-        return await self._communication_protocol.publish(topic, message, sender_id)
+        return cast(int, await self._communication_protocol.publish(topic, message, sender_id))
 
     def get_communication_log(self) -> List[Any]:
         """Get all communication logs.
@@ -453,7 +462,7 @@ class CollaborationMixin:
         if not self._collaboration_enabled or not self._communication_protocol:
             return []
 
-        return self._communication_protocol.get_communication_log()
+        return cast("List[Any]", self._communication_protocol.get_communication_log())
 
     def get_communication_stats(self) -> Dict[str, Any]:
         """Get statistics about team communications.
@@ -468,7 +477,7 @@ class CollaborationMixin:
         if not self._collaboration_enabled or not self._communication_protocol:
             return {}
 
-        return self._communication_protocol.get_communication_stats()
+        return cast("Dict[str, Any]", self._communication_protocol.get_communication_stats())
 
     # ========================================================================
     # Shared Context Methods
@@ -515,7 +524,7 @@ class CollaborationMixin:
             logger.warning("Collaboration not enabled")
             return False
 
-        return await self._shared_context.set(key, value, member_id)
+        return cast(bool, await self._shared_context.set(key, value, member_id))
 
     async def shared_context_merge(self, key: str, value: Any, member_id: str) -> bool:
         """Merge a value into existing value.
@@ -539,7 +548,7 @@ class CollaborationMixin:
             logger.warning("Collaboration not enabled")
             return False
 
-        return await self._shared_context.merge(key, value, member_id)
+        return cast(bool, await self._shared_context.merge(key, value, member_id))
 
     async def shared_context_delete(self, key: str, member_id: str) -> bool:
         """Delete a key from shared context.
@@ -558,7 +567,7 @@ class CollaborationMixin:
             logger.warning("Collaboration not enabled")
             return False
 
-        return await self._shared_context.delete(key, member_id)
+        return cast(bool, await self._shared_context.delete(key, member_id))
 
     def get_shared_context_state(self) -> Dict[str, Any]:
         """Get current shared context state.
@@ -572,7 +581,7 @@ class CollaborationMixin:
         if not self._collaboration_enabled or not self._shared_context:
             return {}
 
-        return self._shared_context.get_state()
+        return cast("Dict[str, Any]", self._shared_context.get_state())
 
     def get_shared_context_history(self, key: Optional[str] = None) -> List[Any]:
         """Get shared context update history.
@@ -590,7 +599,7 @@ class CollaborationMixin:
         if not self._collaboration_enabled or not self._shared_context:
             return []
 
-        return self._shared_context.get_update_history(key)
+        return cast("List[Any]", self._shared_context.get_update_history(key))
 
     async def shared_context_rollback(self, to_timestamp: float) -> bool:
         """Rollback shared context to a specific timestamp.
@@ -609,7 +618,7 @@ class CollaborationMixin:
             logger.warning("Collaboration not enabled")
             return False
 
-        return await self._shared_context.rollback(to_timestamp)
+        return cast(bool, await self._shared_context.rollback(to_timestamp))
 
     # ========================================================================
     # Negotiation Methods
@@ -653,7 +662,10 @@ class CollaborationMixin:
                 metadata={"reason": "collaboration_not_enabled"},
             )
 
-        return await self._negotiation_framework.negotiate(proposals, topic, context)
+        return cast(
+            "NegotiationResult",
+            await self._negotiation_framework.negotiate(proposals, topic, context),
+        )
 
     def set_expertise_weights(self, weights: Dict[str, float]) -> None:
         """Set expertise weights for weighted voting.
@@ -707,10 +719,10 @@ class CollaborationMixin:
         """
         if not self._collaboration_enabled:
             # Fall back to regular execution
-            return await self.execute_task(task, context)
+            return cast("Dict[str, Any]", await getattr(self, 'execute_task')(task, context))
 
         # Execute task
-        result = await self.execute_task(task, context)
+        result = cast("Dict[str, Any]", await getattr(self, 'execute_task')(task, context))
 
         # Add collaboration metadata
         if self._communication_protocol:

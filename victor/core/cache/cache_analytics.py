@@ -229,7 +229,7 @@ class CacheAnalytics:
         self._lock = threading.RLock()
 
         # Background monitoring
-        self._monitoring_task: Optional[asyncio.Task] = None
+        self._monitoring_task: Optional["asyncio.Task[None]"] = None
         self._stop_event = asyncio.Event()
 
         logger.info(
@@ -369,7 +369,7 @@ class CacheAnalytics:
         if total_requests == 0:
             return 0.0
 
-        return (l1_evictions + l2_evictions) / total_requests
+        return float((l1_evictions + l2_evictions) / total_requests)
 
     def get_size_utilization(self) -> Dict[str, float]:
         """Get cache size utilization.
@@ -511,7 +511,7 @@ class CacheAnalytics:
             logger.warning("Monitoring already running")
             return
 
-        async def monitoring_loop():
+        async def monitoring_loop() -> None:
             """Background monitoring loop."""
             while not self._stop_event.is_set():
                 try:

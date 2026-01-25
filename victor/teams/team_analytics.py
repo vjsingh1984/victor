@@ -605,7 +605,7 @@ class TeamAnalytics:
         Returns:
             List of (member_id, score) tuples sorted by score
         """
-        member_scores: Dict[str, Dict[str, list]] = {}
+        member_scores: Dict[str, Dict[str, list[Any]]] = {}
 
         if team_id:
             execution_ids = self._team_executions.get(team_id, [])

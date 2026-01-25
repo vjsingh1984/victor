@@ -99,7 +99,7 @@ class TelemetryConfig:
     batch_timeout: int = 30
     batch_max_size: int = 512
     exporters: List[TelemetryExporter] = field(default_factory=list)
-    resource_attributes: dict = field(default_factory=dict)
+    resource_attributes: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_env(cls) -> "TelemetryConfig":
@@ -192,7 +192,7 @@ class TelemetryConfig:
             resource_attributes=resource_attrs,
         )
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert configuration to dictionary.
 
         Returns:
@@ -252,11 +252,11 @@ def get_telemetry_config() -> TelemetryConfig:
         errors = config.validate()
         if errors:
             logger.warning(f"Telemetry configuration errors: {errors}")
-        get_telemetry_config._config = config  # type: ignore
-    return get_telemetry_config._config
+        object.__setattr__(get_telemetry_config, "_config", config)
+    return object.__getattribute__(get_telemetry_config, "_config")  # type: ignore[no-any-return]
 
 
-def setup_telemetry(config: Optional[TelemetryConfig] = None):
+def setup_telemetry(config: Optional[TelemetryConfig] = None) -> None:
     """Setup OpenTelemetry based on configuration.
 
     This function initializes OpenTelemetry tracing and metrics

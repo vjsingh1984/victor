@@ -110,8 +110,8 @@ class DataAnalysisToolDependencyProvider(YAMLToolDependencyProvider):
 def _get_deprecated_config() -> "DataAnalysisToolDependencyProvider":
     """Lazily load provider for deprecated constant access."""
     if not hasattr(_get_deprecated_config, "_provider"):
-        _get_deprecated_config._provider = DataAnalysisToolDependencyProvider()
-    return _get_deprecated_config._provider
+        _get_deprecated_config._provider = DataAnalysisToolDependencyProvider()  # type: ignore[attr-defined]
+    return _get_deprecated_config._provider  # type: ignore[attr-defined]
 
 
 def _warn_deprecated(name: str) -> None:
@@ -129,25 +129,25 @@ class _DeprecatedTransitions:
 
     def __getitem__(self, key: str) -> List[Tuple[str, float]]:
         _warn_deprecated("DATA_ANALYSIS_TOOL_TRANSITIONS")
-        return _get_deprecated_config().get_tool_transitions().get(key, [])
+        return _get_deprecated_config().get_tool_transitions().get(key, [])  # type: ignore[no-any-return]
 
-    def __iter__(self):
+    def __iter__(self) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_TRANSITIONS")
         return iter(_get_deprecated_config().get_tool_transitions())
 
-    def items(self):
+    def items(self) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_TRANSITIONS")
         return _get_deprecated_config().get_tool_transitions().items()
 
-    def keys(self):
+    def keys(self) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_TRANSITIONS")
         return _get_deprecated_config().get_tool_transitions().keys()
 
-    def values(self):
+    def values(self) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_TRANSITIONS")
         return _get_deprecated_config().get_tool_transitions().values()
 
-    def get(self, key: str, default: Any = None):
+    def get(self, key: str, default: Any = None) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_TRANSITIONS")
         return _get_deprecated_config().get_tool_transitions().get(key, default)
 
@@ -159,23 +159,23 @@ class _DeprecatedClusters:
         _warn_deprecated("DATA_ANALYSIS_TOOL_CLUSTERS")
         return _get_deprecated_config().get_tool_clusters().get(key, set())
 
-    def __iter__(self):
+    def __iter__(self) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_CLUSTERS")
         return iter(_get_deprecated_config().get_tool_clusters())
 
-    def items(self):
+    def items(self) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_CLUSTERS")
         return _get_deprecated_config().get_tool_clusters().items()
 
-    def keys(self):
+    def keys(self) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_CLUSTERS")
         return _get_deprecated_config().get_tool_clusters().keys()
 
-    def values(self):
+    def values(self) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_CLUSTERS")
         return _get_deprecated_config().get_tool_clusters().values()
 
-    def get(self, key: str, default: Any = None):
+    def get(self, key: str, default: Any = None) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_CLUSTERS")
         return _get_deprecated_config().get_tool_clusters().get(key, default)
 
@@ -187,23 +187,23 @@ class _DeprecatedSequences:
         _warn_deprecated("DATA_ANALYSIS_TOOL_SEQUENCES")
         return _get_deprecated_config().get_tool_sequences().get(key, [])
 
-    def __iter__(self):
+    def __iter__(self) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_SEQUENCES")
         return iter(_get_deprecated_config().get_tool_sequences())
 
-    def items(self):
+    def items(self) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_SEQUENCES")
         return _get_deprecated_config().get_tool_sequences().items()
 
-    def keys(self):
+    def keys(self) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_SEQUENCES")
         return _get_deprecated_config().get_tool_sequences().keys()
 
-    def values(self):
+    def values(self) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_SEQUENCES")
         return _get_deprecated_config().get_tool_sequences().values()
 
-    def get(self, key: str, default: Any = None):
+    def get(self, key: str, default: Any = None) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_SEQUENCES")
         return _get_deprecated_config().get_tool_sequences().get(key, default)
 
@@ -211,11 +211,11 @@ class _DeprecatedSequences:
 class _DeprecatedDependencies:
     """Lazy loader for deprecated DATA_ANALYSIS_TOOL_DEPENDENCIES."""
 
-    def __iter__(self):
+    def __iter__(self) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_DEPENDENCIES")
         return iter(_get_deprecated_config().get_dependencies())
 
-    def __len__(self):
+    def __len__(self) -> int:
         _warn_deprecated("DATA_ANALYSIS_TOOL_DEPENDENCIES")
         return len(_get_deprecated_config().get_dependencies())
 
@@ -227,15 +227,15 @@ class _DeprecatedDependencies:
 class _DeprecatedRequiredTools:
     """Lazy loader for deprecated DATA_ANALYSIS_REQUIRED_TOOLS."""
 
-    def __iter__(self):
+    def __iter__(self) -> Any:
         _warn_deprecated("DATA_ANALYSIS_REQUIRED_TOOLS")
         return iter(_get_deprecated_config().get_required_tools())
 
-    def __len__(self):
+    def __len__(self) -> int:
         _warn_deprecated("DATA_ANALYSIS_REQUIRED_TOOLS")
         return len(_get_deprecated_config().get_required_tools())
 
-    def __contains__(self, item):
+    def __contains__(self, item: Any) -> bool:
         _warn_deprecated("DATA_ANALYSIS_REQUIRED_TOOLS")
         return item in _get_deprecated_config().get_required_tools()
 
@@ -243,15 +243,15 @@ class _DeprecatedRequiredTools:
 class _DeprecatedOptionalTools:
     """Lazy loader for deprecated DATA_ANALYSIS_OPTIONAL_TOOLS."""
 
-    def __iter__(self):
+    def __iter__(self) -> Any:
         _warn_deprecated("DATA_ANALYSIS_OPTIONAL_TOOLS")
         return iter(_get_deprecated_config().get_optional_tools())
 
-    def __len__(self):
+    def __len__(self) -> int:
         _warn_deprecated("DATA_ANALYSIS_OPTIONAL_TOOLS")
         return len(_get_deprecated_config().get_optional_tools())
 
-    def __contains__(self, item):
+    def __contains__(self, item: Any) -> bool:
         _warn_deprecated("DATA_ANALYSIS_OPTIONAL_TOOLS")
         return item in _get_deprecated_config().get_optional_tools()
 

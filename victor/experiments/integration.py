@@ -129,7 +129,6 @@ class WorkflowExperimentTracker:
         run = self._tracker.start_run(
             experiment_id=experiment.experiment_id,
             run_name=run_name,
-            params=params or {},
         )
 
         logger.info(f"Started tracking workflow '{workflow_name}' as run {run.run_id}")

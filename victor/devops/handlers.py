@@ -108,7 +108,7 @@ class ContainerOpsHandler(BaseHandler):
         else:
             raise ValueError(f"Unknown operation: {operation}")
 
-        result = await tool_registry.execute("shell", command=cmd)
+        result = await tool_registry.execute("shell", command=cmd, _exec_ctx=None)
 
         # Raise exception if operation failed
         if not result.success:
@@ -157,7 +157,7 @@ class TerraformHandler(BaseHandler):
 
         if workspace:
             result = await tool_registry.execute(
-                "shell", command=f"{self.binary} workspace select {workspace}"
+                "shell", command=f"{self.binary} workspace select {workspace}", _exec_ctx=None
             )
             tool_calls += 1
             if not result.success:
@@ -180,7 +180,7 @@ class TerraformHandler(BaseHandler):
         else:
             raise ValueError(f"Unknown operation: {operation}")
 
-        result = await tool_registry.execute("shell", command=cmd)
+        result = await tool_registry.execute("shell", command=cmd, _exec_ctx=None)
         tool_calls += 1
 
         # Raise exception if operation failed
@@ -247,14 +247,14 @@ class MLOpsHandler(BaseHandler):
     ) -> Tuple[Any, int]:
         """Execute MLOps operations."""
         operation = node.input_mapping.get("operation", "register")
-        model_name = node.input_mapping.get("model_name")
-        model_path = node.input_mapping.get("model_path")
-        metrics = node.input_mapping.get("metrics", {})
-        params = node.input_mapping.get("params", {})
+        model_name = node.input_mapping.get("model_name", "")
+        model_path = node.input_mapping.get("model_path", "")
+        metrics: Dict[str, Any] = node.input_mapping.get("metrics", {})
+        params: Dict[str, Any] = node.input_mapping.get("params", {})
         experiment_name = node.input_mapping.get("experiment_name", "default")
         stage = node.input_mapping.get("stage", "Staging")
-        version = node.input_mapping.get("version")
-        port = node.input_mapping.get("port", 5001)
+        version = node.input_mapping.get("version", "")
+        port = int(node.input_mapping.get("port", 5001))
 
         result = await self._run_mlops(
             operation=operation,
@@ -355,8 +355,8 @@ class MLOpsHandler(BaseHandler):
 
     def _register_model(
         self,
-        mlflow,
-        client,
+        mlflow: Any,
+        client: Any,
         model_name: str,
         model_path: str,
         metrics: Dict[str, Any],
@@ -390,7 +390,7 @@ class MLOpsHandler(BaseHandler):
             }
 
     def _log_experiment(
-        self, mlflow, experiment_name: str, metrics: Dict[str, Any], params: Dict[str, Any]
+        self, mlflow: Any, experiment_name: str, metrics: Dict[str, Any], params: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Log an experiment run."""
         mlflow.set_experiment(experiment_name)
@@ -425,7 +425,7 @@ class MLOpsHandler(BaseHandler):
             "note": "Run the command to start serving. Use tool_registry.execute('shell', command=...) to start.",
         }
 
-    def _compare_models(self, client, model_name: str) -> Dict[str, Any]:
+    def _compare_models(self, client: Any, model_name: str) -> Dict[str, Any]:
         """Compare versions of a registered model."""
         try:
             versions = client.search_model_versions(f"name='{model_name}'")
@@ -462,7 +462,7 @@ class MLOpsHandler(BaseHandler):
                 "error": f"Model comparison failed: {e}",
             }
 
-    def _promote_model(self, client, model_name: str, version: str, stage: str) -> Dict[str, Any]:
+    def _promote_model(self, client: Any, model_name: str, version: str, stage: str) -> Dict[str, Any]:
         """Promote a model version to a stage."""
         client.transition_model_version_stage(
             name=model_name,
@@ -478,7 +478,7 @@ class MLOpsHandler(BaseHandler):
             "stage": stage,
         }
 
-    def _list_models(self, client) -> Dict[str, Any]:
+    def _list_models(self, client: Any) -> Dict[str, Any]:
         """List all registered models."""
         models = client.search_registered_models()
 

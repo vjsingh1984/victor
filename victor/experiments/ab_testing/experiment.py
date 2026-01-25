@@ -516,7 +516,7 @@ class ABTestManager:
             conn.close()
 
             if row:
-                return row[0]
+                return str(row[0])
 
         # Allocate new variant
         variant_id = await self.allocator.allocate_variant(user_id, experiment, context)

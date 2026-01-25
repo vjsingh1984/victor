@@ -26,6 +26,20 @@ from datetime import datetime
 from victor.agent.mode_controller import AgentMode
 from victor.integrations.search_types import CodeSearchResult
 
+__all__ = [
+    "AgentMode",
+    "ToolCall",
+    "ChatMessage",
+    "ToolInvocation",
+    "ToolResult",
+    "ChatResponse",
+    "ClientStreamChunk",
+    "UndoRedoResult",
+    "AgentStatus",
+    "CodeSearchResult",
+    "VictorProtocol",
+]
+
 
 @dataclass
 class ChatMessage:

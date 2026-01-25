@@ -268,7 +268,7 @@ class FeatureFlagManager:
         # Get old value for audit log
         old_value = None
         try:
-            old_value = self.is_enabled(use_cache=False)
+            old_value = self._resolver.get(flag_name)
         except Exception:
             pass
 

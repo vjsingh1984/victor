@@ -476,17 +476,17 @@ def _include_hitl_api(
 
         # Create HITL store
         if persistent:
-            hitl_store = SQLiteHITLStore()  # type: ignore[assignment]
-            logger.info(f"HITL using SQLite store: {hitl_store.db_path}")
+            hitl_store_base: HITLStore = SQLiteHITLStore()
+            logger.info(f"HITL using SQLite store: {hitl_store_base.db_path}")
         else:
-            hitl_store = HITLStore()
+            hitl_store_base = HITLStore()
             logger.info("HITL using in-memory store")
 
-        app.state.hitl_store = hitl_store  # type: ignore[assignment]
+        app.state.hitl_store = hitl_store_base
 
         # Create HITL router
         hitl_router = create_hitl_router(
-            store=hitl_store,  # type: ignore[arg-type]
+            store=hitl_store_base,
             require_auth=bool(auth_token),
             auth_token=auth_token,
         )
@@ -530,14 +530,14 @@ def _include_workflow_editor_api(app: FastAPI) -> None:
 
             # Create convenience proxies for common endpoints
             @app.get("/api/v1/workflows/nodes/types", tags=["Workflows"])
-            async def get_node_types_proxy() -> JSONResponse:  # type: ignore[no-untyped-def]
+            async def get_node_types_proxy() -> Any:
                 """Get available workflow node types."""
                 from tools.workflow_editor.backend.api import get_node_types
 
                 return await get_node_types()
 
             @app.get("/api/v1/workflows/formations", tags=["Workflows"])
-            async def get_formations_proxy() -> JSONResponse:
+            async def get_formations_proxy() -> Any:
                 """Get available team formation types."""
                 from tools.workflow_editor.backend.api import get_formations
 
@@ -700,7 +700,7 @@ def _setup_health_check(app: FastAPI) -> None:
     """Setup unified health check."""
 
     @app.get("/health", tags=["System"])
-    async def unified_health_check():
+    async def unified_health_check() -> Dict[str, Any]:
         """Health check for all services."""
         status: Dict[str, Any] = {
             "status": "healthy",

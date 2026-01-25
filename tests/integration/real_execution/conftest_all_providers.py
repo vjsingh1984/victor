@@ -422,7 +422,7 @@ def _create_provider_fixture(provider_name: str):
     if provider_class is None:
         return None
 
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def provider_fixture():
         """Provider fixture created dynamically."""
         api_key = get_provider_api_key(provider_name)
@@ -549,11 +549,13 @@ def _create_provider_fixture(provider_name: str):
 
 
 # Create all provider fixtures dynamically
-for provider_name in PROVIDER_CONFIG.keys():
-    fixture = _create_provider_fixture(provider_name)
-    if fixture:
-        fixture.__name__ = f"{provider_name}_provider"
-        globals()[f"{provider_name}_provider"] = fixture
+# NOTE: Dynamic fixture creation with pytest-asyncio has issues.
+# Use explicit fixtures below instead.
+# for provider_name in PROVIDER_CONFIG.keys():
+#     fixture = _create_provider_fixture(provider_name)
+#     if fixture:
+#         fixture.__name__ = f"{provider_name}_provider"
+#         globals()[f"{provider_name}_provider"] = fixture
 
 
 # =============================================================================
@@ -713,3 +715,46 @@ def pytest_collection_modifyitems(items, config):
                         "See README.md for setup instructions."
                     )
                 )
+
+
+# =============================================================================
+# Explicit Provider Fixtures (pytest-asyncio compatible)
+# =============================================================================
+
+@pytest_asyncio.fixture
+async def ollama_provider():
+    """Ollama provider with automatic model selection."""
+    from victor.providers.ollama_provider import OllamaProvider
+
+    if not is_ollama_running():
+        pytest.skip("Ollama not available at localhost:11434")
+
+    config = PROVIDER_CONFIG.get("ollama")
+    model = None
+    for candidate_model in config["models"]:
+        if is_ollama_model_available(candidate_model):
+            model = candidate_model
+            break
+
+    if not model:
+        pytest.skip(f"No Ollama model found. Run: ollama pull {config['models'][0]}")
+
+    provider = OllamaProvider(
+        base_url="http://localhost:11434",
+        timeout=120,
+    )
+    provider._selected_model = model
+
+    yield provider
+
+    # Cleanup
+    if hasattr(provider, "close"):
+        try:
+            await provider.close()
+        except Exception:
+            pass
+    elif hasattr(provider, "client"):
+        try:
+            await provider.client.aclose()
+        except Exception:
+            pass

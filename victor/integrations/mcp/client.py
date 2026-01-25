@@ -102,7 +102,7 @@ class MCPClient:
         self.tools: List[MCPTool] = []
         self.resources: List[MCPResource] = []
 
-        self.process: Optional[subprocess.Popen[bytes]] = None
+        self.process: Optional[subprocess.Popen[str]] = None
         self.initialized = False
 
         # Health monitoring configuration
@@ -441,7 +441,10 @@ class MCPClient:
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(
                 None,
-                lambda: (self.process.stdin.write(request_json + "\n"), self.process.stdin.flush()),
+                lambda: (
+                    self.process.stdin.write(request_json + "\n"),
+                    self.process.stdin.flush()
+                ) if self.process.stdin else None,
             )
 
             # Read response with timeout to avoid indefinite blocking

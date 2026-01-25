@@ -190,7 +190,8 @@ class VictorAPIServer:
     async def _cors_middleware(self, request: Request, handler: Any) -> Response:
         """Handle CORS for browser-based clients."""
         if request.method == "OPTIONS":
-            return Response(  # type: ignore[return-value]
+            return Response(
+                text="",
                 headers={
                     "Access-Control-Allow-Origin": "*",
                     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -200,7 +201,7 @@ class VictorAPIServer:
 
         response = await handler(request)
         if not isinstance(response, Response):
-            response = Response(response)
+            response = Response(text=str(response))
         response.headers["Access-Control-Allow-Origin"] = "*"
         return response
 
@@ -1192,14 +1193,14 @@ class VictorAPIServer:
                             ext = entry.suffix.lower()
                             file_counts_dict = overview["file_counts"]
                             assert isinstance(file_counts_dict, dict)
-                            file_counts_dict[ext] = file_counts_dict.get(ext, 0) + 1  # type: ignore[attr-defined, operator]
+                            file_counts_dict[ext] = file_counts_dict.get(ext, 0) + 1
                             total_files_val = overview.get("total_files", 0)
                             assert isinstance(total_files_val, int)
-                            overview["total_files"] = total_files_val + 1  # type: ignore[index, operator]
+                            overview["total_files"] = total_files_val + 1
                             try:
                                 total_size_val = overview.get("total_size", 0)
                                 assert isinstance(total_size_val, int)
-                                overview["total_size"] = total_size_val + entry.stat().st_size  # type: ignore[index, operator]
+                                overview["total_size"] = total_size_val + entry.stat().st_size
                             except OSError:
                                 pass
 
@@ -1276,22 +1277,22 @@ class VictorAPIServer:
                                 lines = len(f.readlines())
                                 loc_val = metrics.get("lines_of_code", 0)
                                 assert isinstance(loc_val, int)
-                                metrics["lines_of_code"] = loc_val + lines  # type: ignore[operator, index]
+                                metrics["lines_of_code"] = loc_val + lines
                                 files_by_type = metrics["files_by_type"]
                                 assert isinstance(files_by_type, dict)
-                                files_by_type[ext] = files_by_type.get(ext, 0) + 1  # type: ignore[index]
+                                files_by_type[ext] = files_by_type.get(ext, 0) + 1
                                 file_sizes.append(
                                     {
                                         "path": str(path.relative_to(root)),
                                         "lines": lines,
-                                        "size": path.stat().st_size,  # type: ignore[call-overload]
+                                        "size": path.stat().st_size,
                                     }
                                 )
                         except Exception:
                             pass
 
             # Get largest files
-            file_sizes.sort(key=lambda x: x.get("lines", 0) if isinstance(x.get("lines"), int) else 0, reverse=True)
+            file_sizes.sort(key=lambda x: x.get("lines", 0) if isinstance(x.get("lines"), (int, float)) else 0, reverse=True)
             metrics["largest_files"] = file_sizes[:10]
 
             return web.json_response(metrics)
@@ -1406,11 +1407,12 @@ class VictorAPIServer:
                             line = line.strip()
                             if line and not line.startswith("#"):
                                 deps.append(line.split("==")[0].split(">=")[0].split("<")[0])
-                        dependencies["python"] = {  # type: ignore[assignment]
+                        python_deps: Dict[str, Any] = {
                             "file": req_file,
                             "count": len(deps),
                             "packages": deps[:20],
                         }
+                        dependencies["python"] = python_deps
                     break
 
             # Node dependencies
@@ -1420,30 +1422,33 @@ class VictorAPIServer:
                     pkg_data = json.loads(pkg_json.read_text())
                     deps = list(pkg_data.get("dependencies", {}).keys())
                     dev_deps = list(pkg_data.get("devDependencies", {}).keys())
-                    dependencies["node"] = {  # type: ignore[assignment]
+                    node_deps: Dict[str, Any] = {
                         "file": "package.json",
                         "dependencies": len(deps),
                         "devDependencies": len(dev_deps),
                         "packages": deps[:20],
                     }
+                    dependencies["node"] = node_deps
                 except json.JSONDecodeError:
                     pass
 
             # Rust dependencies
             cargo_toml = root / "Cargo.toml"
             if cargo_toml.exists():
-                dependencies["rust"] = {  # type: ignore[assignment]
+                rust_deps: Dict[str, Any] = {
                     "file": "Cargo.toml",
                     "exists": True,
                 }
+                dependencies["rust"] = rust_deps
 
             # Go dependencies
             go_mod = root / "go.mod"
             if go_mod.exists():
-                dependencies["go"] = {  # type: ignore[assignment]
+                go_deps: Dict[str, Any] = {
                     "file": "go.mod",
                     "exists": True,
                 }
+                dependencies["go"] = go_deps
 
             return web.json_response(
                 {
@@ -1760,19 +1765,20 @@ class VictorAPIServer:
     async def _mcp_servers(self, request: Request) -> Response:
         """Get list of configured MCP servers."""
         try:
-            from victor.integrations.mcp.registry import get_mcp_registry  # type: ignore[attr-defined]
+            from victor.integrations.mcp.registry import get_mcp_registry
 
             registry = get_mcp_registry()
             servers = []
 
             for name in registry.list_servers():
                 # Get server entry directly from registry
-                server_entry = registry._servers.get(name)  # type: ignore[attr-defined]
+                server_entry = registry._servers.get(name)
                 if server_entry:
                     # Check if client is connected
+                    status_val = server_entry.status.value if hasattr(server_entry.status, 'value') else str(server_entry.status)
                     is_connected = (
                         server_entry.client is not None
-                        and server_entry.status.value == "connected"
+                        and status_val == "connected"
                     )
                     servers.append(
                         {
@@ -1794,7 +1800,7 @@ class VictorAPIServer:
     async def _mcp_connect(self, request: Request) -> Response:
         """Connect to an MCP server."""
         try:
-            from victor.integrations.mcp.registry import get_mcp_registry  # type: ignore[attr-defined]
+            from victor.integrations.mcp.registry import get_mcp_registry
 
             data = await request.json()
             server_name = data.get("server")
@@ -1865,7 +1871,7 @@ class VictorAPIServer:
             rankings = []
             if hasattr(learner, "_q_table"):
                 selection_counts = getattr(learner, "_selection_counts", {})
-                for provider, q_value in learner._q_table.items():  # type: ignore[attr-defined]
+                for provider, q_value in learner._q_table.items():
                     rankings.append(
                         {
                             "provider": provider,
@@ -1889,9 +1895,9 @@ class VictorAPIServer:
             conn.close()
 
             stats = {
-                "strategy": getattr(learner, "strategy", "epsilon_greedy"),  # type: ignore[attr-defined]
-                "epsilon": round(getattr(learner, "epsilon", 0.0), 3),  # type: ignore[attr-defined]
-                "total_selections": getattr(learner, "_total_selections", 0),  # type: ignore[attr-defined]
+                "strategy": getattr(learner, "strategy", "epsilon_greedy"),
+                "epsilon": round(getattr(learner, "epsilon", 0.0), 3),
+                "total_selections": getattr(learner, "_total_selections", 0),
                 "provider_rankings": [
                     {
                         "provider": r["provider"],
@@ -2055,8 +2061,8 @@ class VictorAPIServer:
                 )
 
             old_strategy = getattr(learner, "strategy", None)
-            if old_strategy is not None:
-                old_strategy_value = old_strategy.value  # type: ignore[attr-defined]
+            if old_strategy is not None and hasattr(old_strategy, "value"):
+                old_strategy_value = old_strategy.value
             else:
                 old_strategy_value = "unknown"
             setattr(learner, "strategy", strategy)

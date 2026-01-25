@@ -399,7 +399,6 @@ async def test_provider_multi_tool(
 
 
 @pytest.mark.real_execution
-@pytest.mark.asyncio
 @pytest.mark.parametrize("provider_name", ALL_PROVIDERS)
 async def test_provider_simple_query(
     provider_name: str,

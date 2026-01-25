@@ -406,13 +406,13 @@ class FormationPredictor:
         y_array = np.array(y)
         weights_array = np.array(weights)
 
-        X: list[Any] = X_array.tolist()
-        y: list[Any] = y_array.tolist()
-        weights: list[float] = weights_array.tolist()
+        X_list: list[Any] = X_array.tolist()
+        y_list: list[Any] = y_array.tolist()
+        weights_list: list[float] = weights_array.tolist()
 
         # Scale features
         self._scaler = StandardScaler()
-        X_scaled = self._scaler.fit_transform(X)
+        X_scaled = self._scaler.fit_transform(X_list)
 
         # Train model
         self._model = RandomForestClassifier(
@@ -420,7 +420,7 @@ class FormationPredictor:
             max_depth=10,
             random_state=42,
         )
-        self._model.fit(X_scaled, y, sample_weight=weights)
+        self._model.fit(X_scaled, y_list, sample_weight=weights_list)
 
         logger.info(f"Trained formation predictor on {len(training_data)} examples")
 

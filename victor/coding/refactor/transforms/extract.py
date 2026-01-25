@@ -331,13 +331,14 @@ class ExtractVariableTransform(BaseTransform):
         )
 
         # 2. Replace expression with variable name
-        preview.edits.append(
-            CodeEdit(
-                location=request.target,
-                new_text=var_name,
-                description=f"Replace expression with '{var_name}'",
+        if var_name is not None:
+            preview.edits.append(
+                CodeEdit(
+                    location=request.target,
+                    new_text=var_name,
+                    description=f"Replace expression with '{var_name}'",
+                )
             )
-        )
 
         preview.affected_files.append(target_file)
 
@@ -399,12 +400,16 @@ class ExtractConstantTransform(BaseTransform):
 
         # Get the value to extract
         value = self._get_source_range(source, request.target)
-        const_name = request.extract_name.upper()
+        extract_name = request.extract_name
+        if extract_name is None:
+            preview.errors.append("Extract name is required")
+            return preview
+        const_name = extract_name.upper()
 
         # Check if name suggests uppercase
-        if request.extract_name != const_name:
+        if extract_name != const_name:
             preview.warnings.append(
-                f"Using uppercase name '{const_name}' instead of '{request.extract_name}'"
+                f"Using uppercase name '{const_name}' instead of '{extract_name}'"
             )
 
         # Find insertion point (after imports, before first class/function)

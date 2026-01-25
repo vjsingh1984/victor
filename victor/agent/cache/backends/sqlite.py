@@ -156,7 +156,7 @@ class SQLiteCacheBackend(ICacheBackend):
         self._lock = threading.RLock()
 
         # Cleanup task
-        self._cleanup_task: Optional[asyncio.Task] = None
+        self._cleanup_task: Optional[asyncio.Task[None]] = None
 
         # Connection state
         self._is_connected = False
@@ -282,7 +282,8 @@ class SQLiteCacheBackend(ICacheBackend):
         """
         )
 
-        self._conn.commit()
+        if self._conn:
+            self._conn.commit()
 
     async def get(self, key: str, namespace: str) -> Optional[Any]:
         """Get value from cache.
@@ -325,7 +326,8 @@ class SQLiteCacheBackend(ICacheBackend):
                         "DELETE FROM cache_entries WHERE key = ? AND namespace = ?",
                         (key, namespace),
                     )
-                    self._conn.commit()
+                    if self._conn:
+                        self._conn.commit()
                     return None
 
                 # Update access stats
@@ -337,7 +339,8 @@ class SQLiteCacheBackend(ICacheBackend):
                 """,
                     (time.time(), key, namespace),
                 )
-                self._conn.commit()
+                if self._conn:
+                    self._conn.commit()
 
                 # Deserialize value (with HMAC signature verification)
                 value = safe_pickle_loads(value_blob)
@@ -391,7 +394,8 @@ class SQLiteCacheBackend(ICacheBackend):
                     (key, namespace, value_blob, expires_at, time.time()),
                 )
 
-                self._conn.commit()
+                if self._conn:
+                    self._conn.commit()
 
                 logger.debug(f"Set key {namespace}:{key} with TTL {ttl}s")
 
@@ -425,7 +429,8 @@ class SQLiteCacheBackend(ICacheBackend):
                     (key, namespace),
                 )
 
-                self._conn.commit()
+                if self._conn:
+                    self._conn.commit()
 
                 deleted = self._cursor.rowcount > 0
                 return deleted
@@ -453,7 +458,8 @@ class SQLiteCacheBackend(ICacheBackend):
             with self._lock:
                 self._cursor.execute("DELETE FROM cache_entries WHERE namespace = ?", (namespace,))
 
-                self._conn.commit()
+                if self._conn:
+                    self._conn.commit()
 
                 count = self._cursor.rowcount
                 logger.info(f"Cleared {count} keys in namespace {namespace}")
@@ -527,7 +533,8 @@ class SQLiteCacheBackend(ICacheBackend):
                     (now,),
                 )
 
-                self._conn.commit()
+                if self._conn:
+                    self._conn.commit()
 
                 removed = self._cursor.rowcount
                 if removed > 0:

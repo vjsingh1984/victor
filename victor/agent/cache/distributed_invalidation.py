@@ -181,7 +181,7 @@ class DistributedCacheInvalidator:
         self._callbacks: List[Callable[[str, str], None]] = []
 
         # Background listener task
-        self._listener_task: Optional[asyncio.Task] = None
+        self._listener_task: Optional[asyncio.Task[None]] = None
         self._shutdown = False
 
         # Statistics
@@ -421,14 +421,17 @@ class DistributedCacheInvalidator:
         # Handle namespace-wide invalidation
         if key == "*":
             for cache in self._tiered_caches:
-                cleared = cache.clear(namespace)
-                self._stats.tiered_cache_clears += cleared
+                # TieredCache may not have clear() method
+                if hasattr(cache, 'clear'):
+                    cleared = cache.clear(namespace)  # type: ignore[attr-defined]
+                    self._stats.tiered_cache_clears += cleared
             return
 
         # Handle specific key invalidation
         for cache in self._tiered_caches:
-            if cache.delete(key, namespace):
-                self._stats.tiered_cache_clears += 1
+            if hasattr(cache, 'delete'):
+                if cache.delete(key, namespace):  # type: ignore[attr-defined]
+                    self._stats.tiered_cache_clears += 1
 
         # Call custom callbacks
         for callback in self._callbacks:
@@ -511,7 +514,12 @@ class DistributedCacheInvalidator:
         await self.start()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[Any],
+    ) -> None:
         """Async context manager exit."""
         await self.stop()
         await self.disconnect()

@@ -296,10 +296,10 @@ class TeamMemberSelector:
 
         # Basic features
         features.append(int(member.tool_budget))
-        features.append(float(member.can_delegate))
-        features.append(float(member.is_manager))
+        features.append(1.0 if member.can_delegate else 0.0)
+        features.append(1.0 if member.is_manager else 0.0)
         features.append(int(member.max_delegation_depth))
-        features.append(float(member.memory_enabled))
+        features.append(1.0 if member.memory_enabled else 0.0)
         features.append(int(len(member.expertise)))
         features.append(int(len(member.backstory)))
 
@@ -313,7 +313,7 @@ class TeamMemberSelector:
         # Role encoding (one-hot)
         roles = ["planner", "researcher", "executor", "reviewer", "tester"]
         for role in roles:
-            features.append(float(1.0 if member.role.value == role else 0.0))
+            features.append(1.0 if member.role.value == role else 0.0)
 
         return np.array(features)
 
@@ -356,12 +356,12 @@ class TeamMemberSelector:
         X_array = np.array(X)
         y_array = np.array(y)
 
-        X: list[Any] = X_array.tolist()
-        y: list[int] = y_array.tolist()
+        X_list: list[Any] = X_array.tolist()
+        y_list: list[int] = y_array.tolist()
 
         # Scale features
         self._scaler = StandardScaler()
-        X_scaled = self._scaler.fit_transform(X)
+        X_scaled = self._scaler.fit_transform(X_list)
 
         # Train model
         self._model = RandomForestClassifier(
@@ -369,7 +369,7 @@ class TeamMemberSelector:
             max_depth=10,
             random_state=42,
         )
-        self._model.fit(X_scaled, y)
+        self._model.fit(X_scaled, y_list)
 
         logger.info(f"Trained member selection model on {len(training_data)} examples")
 

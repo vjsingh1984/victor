@@ -123,7 +123,7 @@ class CacheBackendFactory:
     BACKEND_SQLITE = "sqlite"
 
     # Required options for each backend type
-    REQUIRED_OPTIONS: Dict[str, set] = {
+    REQUIRED_OPTIONS: Dict[str, set[str]] = {
         BACKEND_REDIS: {"redis_url"},
         BACKEND_MEMORY: set(),
         BACKEND_SQLITE: set(),
@@ -190,7 +190,7 @@ class CacheBackendFactory:
             )
 
     @staticmethod
-    def _create_memory_backend(options: Dict[str, Any]) -> MemoryCacheBackend:
+    def _create_memory_backend(options: Dict[str, Any]) -> ICacheBackend:
         """Create in-memory cache backend.
 
         Args:
@@ -271,7 +271,7 @@ class CacheBackendFactory:
         )
 
     @staticmethod
-    def create_default_backend() -> ICacheBackend:
+    def create_default_backend() -> "ICacheBackend":
         """Create a default cache backend (in-memory).
 
         Returns:

@@ -290,7 +290,7 @@ def create_caching_strategy(
 
 def _find_independent_groups(
     node_dependencies: Dict[str, List[str]],
-) -> List[set]:
+) -> List[set[str]]:
     """Find groups of nodes that can run in parallel.
 
     Args:

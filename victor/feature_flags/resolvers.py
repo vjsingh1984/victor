@@ -28,7 +28,7 @@ from __future__ import annotations
 import logging
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from victor.config.settings import Settings
 
@@ -189,9 +189,11 @@ class SettingsFlagResolver(FlagResolver):
         Note: Changes to Settings don't persist unless saved to profiles.yaml
         """
         if not hasattr(self._settings, "feature_flags"):
-            self._settings.feature_flags = {}
+            setattr(self._settings, "feature_flags", {})
 
-        self._settings.feature_flags[flag_name] = value
+        feature_flags = getattr(self._settings, "feature_flags")
+        if isinstance(feature_flags, dict):
+            feature_flags[flag_name] = value
         logger.info(f"Set feature flag {flag_name}={value} in settings")
         return True
 
@@ -369,7 +371,7 @@ class StagedRolloutResolver(FlagResolver):
     def __init__(
         self,
         rollout_percentage: float = 0.0,
-        user_id_provider: Optional[callable[[], str]] = None,
+        user_id_provider: Optional[Callable[[], str]] = None,
     ) -> None:
         """Initialize staged rollout resolver.
 
@@ -477,7 +479,7 @@ class ABTestingResolver(FlagResolver):
         self,
         variants: list[str],
         weights: Optional[list[float]] = None,
-        user_id_provider: Optional[callable[[], str]] = None,
+        user_id_provider: Optional[Callable[[], str]] = None,
     ) -> None:
         """Initialize A/B testing resolver.
 

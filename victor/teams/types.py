@@ -33,7 +33,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional, Set
 
 if TYPE_CHECKING:
     # Team member dependencies
@@ -901,7 +901,12 @@ class TeamMemberAdapter:
     async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:
         """Receive and optionally respond to a message."""
         if self.message_handler:
-            handler_result = await self.message_handler(message)
+            result = self.message_handler(message)
+            # Check if result is awaitable
+            if isinstance(result, Awaitable):
+                handler_result = await result
+            else:
+                handler_result = result
             # The handler is typed to return Optional[AgentMessage], so this should be safe
             return handler_result if isinstance(handler_result, AgentMessage) or handler_result is None else None
         return None

@@ -111,7 +111,7 @@ def run_sync_in_thread(coro: Awaitable[T]) -> T:
     """
     import concurrent.futures
 
-    def run_in_loop():
+    def run_in_loop() -> T:
         loop = asyncio.new_event_loop()
         try:
             return loop.run_until_complete(coro)

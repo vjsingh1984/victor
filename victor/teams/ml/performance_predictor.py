@@ -653,16 +653,16 @@ class PerformancePredictor:
         X_array = np.array(X)
         y_array = np.array(y)
 
-        X: list[Any] = X_array.tolist()
-        y: list[Any] = y_array.tolist()
+        X_list: list[Any] = X_array.tolist()
+        y_list: list[Any] = y_array.tolist()
 
         # Scale features
         scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
+        X_scaled = scaler.fit_transform(X_list)
 
         # Train model
         model = model_class(**model_params, random_state=42)
-        model.fit(X_scaled, y)
+        model.fit(X_scaled, y_list)
 
         # Store
         self._models[metric_name] = model

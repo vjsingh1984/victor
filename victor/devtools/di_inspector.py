@@ -37,7 +37,7 @@ import sys
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, cast
 
 
 # Configure logging
@@ -84,11 +84,11 @@ class ServiceDescriptor:
 class DIInspector:
     """Inspector for Victor's DI container."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the inspector."""
         self.services: Dict[str, ServiceDescriptor] = {}
         self.dependency_graph: Dict[str, Set[str]] = {}
-        self._container = None
+        self._container: Any = None
         self._has_loaded = False
 
     def load_container(self) -> bool:
@@ -132,11 +132,13 @@ class DIInspector:
         try:
             from victor.config.settings import Settings
             from victor.agent.service_provider import configure_orchestrator_services
+            from victor.core.container import ServiceContainer
 
             # Create default settings
             settings = Settings()
 
             # Register services
+            assert isinstance(self._container, ServiceContainer)
             configure_orchestrator_services(self._container, settings)
 
         except Exception as e:
@@ -202,7 +204,7 @@ class DIInspector:
         """Get type name."""
         try:
             if hasattr(type_obj, "__name__"):
-                return type_obj.__name__
+                return cast(str, type_obj.__name__)
             return str(type_obj)
         except Exception:
             return str(type_obj)
@@ -220,7 +222,7 @@ class DIInspector:
 
                 matches = re.findall(r"(\w+)\(", source)
                 if matches:
-                    return matches[0]
+                    return cast(Optional[str], matches[0])
         except Exception:
             pass
 

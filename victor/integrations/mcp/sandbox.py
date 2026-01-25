@@ -523,14 +523,14 @@ def create_sandboxed_mcp_client(
             super().__init__(**kwargs)
             self._sandbox = SandboxedProcess(sandbox_config)
             # Override process type to match our sandbox (uses text=True)
-            self.process: Optional[subprocess.Popen[str]] = None  # type: ignore[assignment]
+            self.process: Optional[subprocess.Popen[str]] = None
 
         async def connect(self, command: List[str]) -> bool:
             """Connect using sandboxed process."""
             self._command = command
 
             try:
-                self.process = await self._sandbox.start(command)  # type: ignore[assignment]
+                self.process = await self._sandbox.start(command)
                 success = await self.initialize()
 
                 if success:
@@ -551,7 +551,7 @@ def create_sandboxed_mcp_client(
 
             if self.process:
                 asyncio.create_task(self._sandbox.terminate(self.process))
-                self.process = None  # type: ignore[assignment]
+                self.process = None
                 self.initialized = False
 
     return SandboxedMCPClient(config)

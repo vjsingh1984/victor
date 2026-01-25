@@ -91,7 +91,7 @@ class DirectProtocolAdapter(VictorProtocol):
             usage=response.usage if hasattr(response, "usage") else {},
         )
 
-    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[ClientStreamChunk]:
+    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[ClientStreamChunk]:  # type: ignore[override]
         """Stream a chat response."""
         message = messages[-1].content if messages else ""
 
@@ -231,21 +231,48 @@ class DirectProtocolAdapter(VictorProtocol):
     async def get_history(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get change history."""
         if hasattr(self._orchestrator, "change_tracker"):
-            return self._orchestrator.change_tracker.get_history(limit)
+            history = self._orchestrator.change_tracker.get_history(limit)
+            return history if isinstance(history, list) else []
         return []
 
     async def apply_patch(self, patch: str, dry_run: bool = False) -> dict[str, Any]:
         """Apply a unified diff patch."""
-        from victor.tools.patch_tool import PatchTool
+        from victor.tools.patch_tool import parse_unified_diff, apply_patch
 
-        tool = PatchTool()
-        result = await tool.execute(patch=patch, dry_run=dry_run)
+        try:
+            patch_files = parse_unified_diff(patch)
+            if not patch_files:
+                return {
+                    "success": False,
+                    "files_modified": [],
+                    "preview": None,
+                    "error": "No valid patch data found",
+                }
 
-        return {
-            "success": result.success,
-            "files_modified": result.data.get("files_modified", []),
-            "preview": result.data.get("preview") if dry_run else None,
-        }
+            if dry_run:
+                return {
+                    "success": True,
+                    "files_modified": [pf.new_path or pf.old_path for pf in patch_files],
+                    "preview": patch,
+                }
+
+            results = []
+            for patch_file in patch_files:
+                result = apply_patch(patch_file)
+                results.append(result)
+
+            return {
+                "success": all(r.get("success", False) for r in results),
+                "files_modified": [r.get("file_path") for r in results if r.get("success")],
+                "preview": None,
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "files_modified": [],
+                "preview": None,
+                "error": str(e),
+            }
 
     async def close(self) -> None:
         """Close the connection and clean up resources."""
@@ -292,7 +319,7 @@ class HTTPProtocolAdapter(VictorProtocol):
         data = response.json()
         return ChatResponse.from_dict(data)
 
-    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[ClientStreamChunk]:
+    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[ClientStreamChunk]:  # type: ignore[override]
         """Stream a chat response."""
         async with self._client.stream(
             "POST",
@@ -415,7 +442,9 @@ class HTTPProtocolAdapter(VictorProtocol):
         """Get change history."""
         response = await self._client.get("/history", params={"limit": limit})
         response.raise_for_status()
-        return response.json().get("history", [])
+        data: dict[str, Any] = response.json()
+        history = data.get("history", [])
+        return history if isinstance(history, list) else []
 
     async def apply_patch(self, patch: str, dry_run: bool = False) -> dict[str, Any]:
         """Apply a unified diff patch."""
