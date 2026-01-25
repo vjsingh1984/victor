@@ -1,5 +1,8 @@
 # Entity Memory System
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 **Victor Framework**
 
 Victor's entity memory system provides context-aware conversations by extracting, storing, and retrieving entities mentioned across conversations.

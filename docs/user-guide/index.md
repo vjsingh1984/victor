@@ -12,11 +12,11 @@ This guide covers everything you need to use Victor effectively, from basic conv
 
 | Topic | Documentation | Use Case |
 |-------|--------------|----------|
-| **Basic Usage** | [Basic Usage](../getting-started/basic-usage.md) | Your first conversation |
+| **First Run** | [First Run](../getting-started/first-run.md) | Your first conversation |
 | **CLI Commands** | [CLI Reference](cli-reference.md) | All commands and options |
 | **Tools** | [Tools Guide](tools.md) | Tool system, selection, execution |
 | **Session Management** | [Session Management](session-management.md) | Save and restore sessions |
-| **Providers** | [Provider Guide](providers.md) | 21 LLM providers setup and switching |
+| **Providers** | [Provider Guide](providers.md) | Provider setup and switching |
 | **Workflows** | [Workflows Guide](workflows.md) | YAML-based automation |
 | **Configuration** | [Configuration →](../reference/configuration/) | Profiles and settings |
 
@@ -82,7 +82,7 @@ team = AgentTeam.hierarchical(
     subagents=["frontend", "backend", "testing"]
 )
 ```
-[Learn More → Multi-Agent Teams](../guides/multi-agent/)
+[Learn More → Multi-Agent Teams](../guides/MULTI_AGENT_TEAMS.md)
 
 ## Core Concepts
 
@@ -94,7 +94,7 @@ Start with Claude, continue with GPT-4, finish with a local model—all in one c
 
 - **Context Independence**: Conversation history managed separately from LLM
 - **Instant Switching**: Use `/provider` command anytime
-- **Full Support**: All 21 providers support context preservation
+- **Support varies by provider**: Context preservation depends on provider capabilities and configuration
 
 [Provider Guide →](providers.md)
 
@@ -112,14 +112,14 @@ Three modes for different workflows:
 
 ### 3. Tools System
 
-55+ tools organized by category:
+Tools organized by category (see catalog for current list):
 
-- **File Operations** (12 tools): Read, write, edit, search files
-- **Git** (8 tools): Version control, commits, branches
-- **Testing** (6 tools): Test execution, coverage, fixtures
-- **Search** (7 tools): Code search, grep, semantic search
-- **Web** (5 tools): HTTP requests, scraping, browsing
-- **And 8 more categories...**
+- **File Operations**: Read, write, edit, search files
+- **Git**: Version control, commits, branches
+- **Testing**: Test execution, coverage, fixtures
+- **Search**: Code search, grep, semantic search
+- **Web**: HTTP requests, scraping, browsing
+- **And more categories...**
 
 [Tools Guide →](tools.md) | [Full Tool Catalog →](../reference/tools/catalog.md)
 

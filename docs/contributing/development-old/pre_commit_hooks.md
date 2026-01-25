@@ -1,5 +1,8 @@
 # Pre-Commit Hooks for Victor
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 This document describes the pre-commit hook system for validating YAML workflows in Victor.
 
 ## Overview

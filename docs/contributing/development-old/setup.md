@@ -1,5 +1,8 @@
 # Development Environment Setup
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 This guide walks you through setting up a complete development environment for contributing to Victor.
 
 ## Prerequisites

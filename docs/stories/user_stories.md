@@ -2,9 +2,11 @@
 
 **Version**: 0.5.x
 **Last Updated**: 2025-01-14
-**Status**: Real-world scenarios and testimonials
+**Status**: Anonymized scenarios and testimonials
 
 ---
+
+> **Note**: These stories are anonymized and may include illustrative metrics. Do not treat them as audited performance claims.
 
 ## Introduction
 

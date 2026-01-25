@@ -1,22 +1,19 @@
 # Internal API Reference
 
-Developer documentation for Victor's internal protocols, components, and APIs.
+Developer documentation for Victor's internal protocols, components, and APIs. These documents are internal snapshots and may lag behind code changes.
 
 ## Quick Links
 
-| Document | Description | Lines |
-|----------|-------------|-------|
-| [Protocols API](protocols-api.md) | Protocol interfaces (ISP-compliant) | 1,371 |
-| [Providers API](providers-api.md) | LLM provider implementations | 1,218 |
-| [Tools API](tools-api.md) | Tool creation and registration | 1,010 |
-| [Workflows API](workflows-api.md) | Workflow system internals | 1,291 |
+| Document | Description |
+|----------|-------------|
+| [Protocols API](protocols-api.md) | Protocol interfaces |
+| [Providers API](providers-api.md) | Provider implementations |
+| [Tools API](tools-api.md) | Tool creation and registration |
+| [Workflows API](workflows-api.md) | Workflow system internals |
 
 ## Overview
 
-Victor's internal architecture follows SOLID principles with:
-- **98 protocols** for loose coupling and testability
-- **Protocol-based design** for dependency inversion
-- **Interface segregation** for focused, composable interfaces
+Victor's internal architecture emphasizes protocol‑based design, dependency inversion, and interface segregation. Verify specifics against the current codebase when making changes.
 
 ## Protocol Categories
 

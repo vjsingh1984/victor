@@ -7,6 +7,8 @@
 
 ---
 
+> **Note**: These stories are anonymized composites for illustration. Metrics are examples unless explicitly backed by external citations.
+
 ## Introduction
 
 This document captures 10 real-world scenarios where Victor AI's architectural refactoring delivered tangible benefits to users, teams, and organizations. Each story demonstrates specific improvements realized through the protocol-based design, SOLID compliance, and multi-agent coordination.

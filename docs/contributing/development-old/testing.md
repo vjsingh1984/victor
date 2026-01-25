@@ -1,5 +1,8 @@
 # Testing Guide
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 This guide covers Victor's testing infrastructure, patterns, and best practices for writing effective tests.
 
 ## Test Structure

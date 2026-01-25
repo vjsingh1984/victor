@@ -4,13 +4,13 @@ Welcome to Victor! Get up and running in minutes.
 
 ## What is Victor?
 
-**Victor** is a provider-agnostic AI coding assistant supporting 21 LLM providers through a unified interface.
+**Victor** is a provider-agnostic AI coding assistant supporting multiple LLM providers through a unified interface.
 
 **Key Features:**
-- **21 LLM Providers**: Cloud (Anthropic, OpenAI, Google) and local (Ollama, LM Studio, vLLM)
+- **Provider Options**: Cloud (Anthropic, OpenAI, Google) and local (Ollama, LM Studio, vLLM)
 - **Provider Switching**: Switch providers mid-conversation without losing context
-- **55+ Tools**: File operations, code editing, git, testing, search, and more
-- **5 Domain Verticals**: Coding, DevOps, RAG, Data Analysis, Research
+- **Tooling**: File ops, code editing, git, testing, search, and more
+- **Domain Verticals**: Coding, DevOps, RAG, Data Analysis, Research
 - **YAML Workflows**: Multi-step automation with scheduling
 
 ## Fastest Path to Running Victor
@@ -59,7 +59,7 @@ docker run -it -v ~/.victor:/root/.victor ghcr.io/vjsingh1984/victor:latest
 | [Installation](installation.md) | Install Victor (pipx, pip, Docker) | 5 min |
 | [First Run](first-run.md) | First steps and basic usage | 5 min |
 | [Local Models](local-models.md) | Ollama, LM Studio, vLLM setup | 10 min |
-| [Cloud Models](cloud-models.md) | Cloud provider setup (17 providers) | 10 min |
+| [Cloud Models](cloud-models.md) | Cloud provider setup | 10 min |
 | [Docker](docker.md) | Docker deployment | 5 min |
 | [Configuration](configuration.md) | Advanced configuration | 10 min |
 | [Troubleshooting](troubleshooting.md) | Solve common issues | As needed |

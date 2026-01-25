@@ -1,5 +1,8 @@
 # Registry Performance Benchmarks Report
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 **Date**: 2025-01-09
 **Framework Version**: Victor 0.5.0
 **Python**: 3.12.6

@@ -1,5 +1,8 @@
 # SOC2 Change Management Procedures - Victor AI
 
+> **Template**: This document describes intended controls. It does not assert current certification or compliance. Update with actual audit evidence and operational details.
+
+
 **Version:** 1.0
 **Last Updated:** 2026-01-20
 **Next Review:** 2026-04-20

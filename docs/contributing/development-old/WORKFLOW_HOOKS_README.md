@@ -1,5 +1,8 @@
 # Pre-Commit Hooks for Workflow Validation
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 Victor includes pre-commit hooks to automatically validate YAML workflow files before they are committed to git.
 
 ## Quick Start

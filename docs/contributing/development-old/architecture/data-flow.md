@@ -1,5 +1,8 @@
 # EventBus Backend Factory
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 ## Overview
 
 Victor now has a **configurable EventBus backend system** that allows you to choose how events are stored and retrieved. This is especially useful for cross-process scenarios (e.g., agent and dashboard running in separate processes).

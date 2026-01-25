@@ -1,6 +1,6 @@
 # Provider Guide
 
-Complete guide to using LLM providers in Victor. Victor supports 21 providers, from local inference to cloud APIs, with seamless mid-conversation switching.
+Complete guide to using LLM providers in Victor. Victor supports multiple providers, from local inference to cloud APIs, with mid‑conversation switching where supported.
 
 ## What is a Provider?
 
@@ -68,7 +68,7 @@ victor chat --provider anthropic "Design a REST API for a blog"
 
 ### Ollama (Recommended for Beginners)
 
-The easiest way to run models locally. Supports 100+ models with automatic model management.
+The easiest way to run models locally. Model availability depends on your Ollama installation and hardware.
 
 **Installation**:
 ```bash

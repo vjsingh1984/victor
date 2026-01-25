@@ -1,5 +1,8 @@
 # GDPR Data Processing Documentation - Victor AI
 
+> **Template**: This document describes intended controls. It does not assert current certification or compliance. Update with actual audit evidence and operational details.
+
+
 **Version:** 1.0
 **Last Updated:** 2026-01-20
 **Next Review:** 2026-07-20
@@ -469,7 +472,7 @@ record_of_processing_activities:
 **Processing:**
 - Customer code snippets sent for analysis
 - AI responses generated
-- No training on customer data (contractually prohibited)
+- Training use governed by provider terms and contract (verify per provider)
 
 **Legal Basis:** Contract (Article 6(1)(b))
 
@@ -479,8 +482,8 @@ record_of_processing_activities:
 
 **Security Measures:**
 - TLS for data transmission
-- No data retention (immediate processing)
-- No data used for training (contractual guarantee)
+- Retention governed by provider settings and contract
+- Training use restricted per provider terms (verify per provider)
 
 ### 7.2 Cloud Infrastructure Providers
 
@@ -500,10 +503,9 @@ record_of_processing_activities:
 **Data Location:** EU and US (multi-region)
 
 **Security Measures:**
-- SOC2 Type II certified
-- ISO 27001 certified
-- Customer-managed encryption keys available
-- Regular penetration testing
+- SOC2 / ISO certifications available per provider (verify current status)
+- Customer-managed encryption keys available (where supported)
+- Regular penetration testing (per provider)
 
 ---
 

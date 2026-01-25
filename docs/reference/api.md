@@ -176,7 +176,7 @@ victor mcp --sse --port 3000
 
 ### Capabilities
 
-- **Tools**: Exposes all 55+ Victor tools
+- **Tools**: Exposes Victor's tool suite
 - **Prompts**: System prompt templates
 - **Resources**: File access, project context
 
@@ -334,8 +334,8 @@ except ToolExecutionError as e:
 
 ## See Also
 
-- [Provider Reference](providers/) - All 21 LLM providers
-- [Tool Reference](tools/) - 55+ tools
+- [Provider Reference](providers/) - Current provider list
+- [Tool Reference](tools/) - Current tool list
 - [Workflow Reference](internals/workflows-api.md) - YAML workflows
 - [Configuration](configuration/) - Complete configuration guide
 

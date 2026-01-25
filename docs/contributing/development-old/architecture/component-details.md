@@ -1,5 +1,8 @@
 # Victor Framework + Vertical Architecture Analysis
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 Senior systems architect analysis of framework-vertical integration.
 
 ---

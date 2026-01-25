@@ -1,5 +1,8 @@
 # Victor Architecture Deep Dive (Appendix)
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 > Detailed reference content and diagrams.
 > Last Updated: December 2025
 

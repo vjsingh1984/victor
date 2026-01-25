@@ -1,5 +1,8 @@
 # Checkpoint System - Time-Travel Debugging
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 **Victor Framework**
 
 Victor's checkpoint system provides time-travel debugging capabilities similar to LangGraph, enabling safe rollback and exploration of alternate execution paths.

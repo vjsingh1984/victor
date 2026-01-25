@@ -458,7 +458,7 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
             result = response.json()
             embedding = result.get("embedding")
             if isinstance(embedding, list):
-                return embedding  # type: ignore[return-value]
+                return list(embedding)
             raise RuntimeError(f"Invalid embedding response: {result}")
         except Exception as e:
             raise RuntimeError(f"Failed to generate embedding: {e}")
@@ -558,4 +558,4 @@ def create_embedding_model(config: EmbeddingModelConfig) -> BaseEmbeddingModel:
             f"Unknown embedding model type: {config.embedding_type}. " f"Available: {available}"
         )
 
-    return model_class(config)
+    return model_class(config)  # type: ignore[abstract]

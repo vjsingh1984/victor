@@ -1,6 +1,6 @@
 # MkDocs Configuration for Victor Documentation
 site_name: Victor
-site_description: Provider-agnostic AI coding assistant supporting 21 LLM providers with 55 specialized tools across 5 domain verticals
+site_description: Provider-agnostic AI coding assistant with multiple LLM providers, tools, and domain verticals
 site_author: Vijaykumar Singh
 site_url: https://vjsingh1984.github.io/victor/
 repo_url: https://github.com/vjsingh1984/victor
@@ -124,14 +124,12 @@ nav:
   - Getting Started:
       - getting-started/index.md
       - Installation: getting-started/installation.md
-      - Quick Start: getting-started/quickstart.md
-      - Configuration: getting-started/configuration.md
       - First Run: getting-started/first-run.md
-      - Basic Usage: getting-started/basic-usage.md
-      - Advanced Quickstarts:
-          - Coordinator Mode: getting-started/coordinator_mode_quickstart.md
-          - Multi-Provider: getting-started/multi_provider_quickstart.md
-          - Plugin Development: getting-started/plugin_development_quickstart.md
+      - Local Models: getting-started/local-models.md
+      - Cloud Models: getting-started/cloud-models.md
+      - Docker: getting-started/docker.md
+      - Configuration: getting-started/configuration.md
+      - Troubleshooting: getting-started/troubleshooting.md
 
   - User Guide:
       - user-guide/index.md
@@ -145,10 +143,10 @@ nav:
       - FAQ: user-guide/faq.md
 
   - API Reference:
-      - api-reference/protocols.md
-      - api-reference/providers.md
-      - api-reference/tools.md
-      - api-reference/workflows.md
+      - reference/api/index.md
+      - HTTP API: reference/api/http-api.md
+      - MCP Server: reference/api/mcp-server.md
+      - Python API: reference/api/python-api.md
 
   - Tutorials:
       - Build Custom Tool: tutorials/build-custom-tool.md
@@ -168,8 +166,7 @@ nav:
 
   - Reference:
       - reference/index.md
-      - CLI Commands: reference/cli-commands.md
-      - Configuration Options: reference/configuration-options.md
+      - Configuration: reference/configuration/index.md
       - Environment Variables: reference/environment-variables.md
       - Errors: reference/errors.md
       - Embeddings: reference/embeddings.md
@@ -195,8 +192,6 @@ nav:
       - Best Practices: architecture/BEST_PRACTICES.md
       - Protocols Reference: architecture/PROTOCOLS_REFERENCE.md
       - Migration Guides: architecture/MIGRATION_GUIDES.md
-      - Workflow Consolidation: architecture/WORKFLOW_CONSOLIDATION.md
-      - Framework Analysis: architecture/VICTOR_FRAMEWORK_ANALYSIS.md
       - Architecture Decision Records:
           - ADR-001 Coordinator Architecture: adr/ADR-001-coordinator-architecture.md
           - ADR-002 YAML Vertical Config: adr/ADR-002-yaml-vertical-config.md

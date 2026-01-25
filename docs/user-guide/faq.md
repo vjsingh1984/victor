@@ -23,10 +23,10 @@
 
 ### What is Victor AI?
 
-Victor AI is an open-source coding assistant that supports 21 LLM providers with 55+ specialized tools across 5 domain verticals (Coding, DevOps, RAG, Data Analysis, Research). It provides both local and cloud LLM support through a unified CLI and Python API.
+Victor AI is an open-source coding assistant that supports multiple LLM providers and tools across domain verticals (Coding, DevOps, RAG, Data Analysis, Research). It provides both local and cloud LLM support through a unified CLI and Python API.
 
 **Key features**:
-- Provider agnostic (21 providers)
+- Provider agnostic (multiple providers)
 - Air-gapped mode support
 - Multi-agent team coordination
 - Semantic codebase search
@@ -36,20 +36,19 @@ Victor AI is an open-source coding assistant that supports 21 LLM providers with
 
 | Feature | Victor | Others |
 |---------|--------|--------|
-| **Providers** | 21 providers | 1-3 providers |
-| **Local Support** | Full offline support | Limited or none |
-| **Multi-Agent** | 5 team formations | Single agent |
-| **Extensibility** | Plugin verticals | Closed system |
-| **Cost** | Free + local only | Subscription only |
-| **Privacy** | 100% local possible | Cloud-only |
+| **Providers** | Multiple providers | Varies |
+| **Local Support** | Local/offline options | Varies |
+| **Multi-Agent** | Team workflows | Often single agent |
+| **Extensibility** | Vertical + plugin model | Often closed |
+| **Cost** | Open-source + BYO provider | Often subscription |
+| **Privacy** | Local‑only possible with supported providers | Often cloud‑only |
 
 ### Is Victor free?
 
-Yes! Victor is open-source and free to use. You can:
-- Use it completely free with local models (Ollama, LM Studio)
-- Use it free with your own API keys for cloud providers
-- No subscription, no usage limits
-- Full source code available
+Victor is open-source and free to use. Costs may come from model providers or local compute. You can:
+- Use local models if you have the hardware
+- Bring your own API keys for cloud providers
+- Use the source code without a subscription
 
 ### What can Victor do?
 
@@ -61,16 +60,14 @@ Victor can help with:
 - **Debugging**: Find and fix bugs
 - **Security**: Audit code for vulnerabilities
 - **Performance**: Identify bottlenecks
-- **And much more**: 55+ tools across 5 domains
+- **And much more**: See the tool catalog for the current list
 
 ### Is Victor suitable for production use?
 
-Yes! Victor 0.5 is production-ready:
-- 85% test coverage
-- SOLID principles compliant
-- 100% backward compatible
-- Comprehensive error handling
-- Active development and support
+It depends on your requirements. Review the production runbooks, test coverage, and known issues, and validate in staging before rollout.
+- [Production runbooks](../production/README.md)
+- [Testing guide](../testing/README.md)
+- [Known issues](../known_issues/README.md)
 
 ---
 
@@ -674,12 +671,10 @@ See: [Development Guide](../development/)
 
 ### Is Victor production-ready?
 
-Yes! Victor 0.5 is production-ready:
-- 85% test coverage
-- Comprehensive error handling
-- Active development
-- SOLID principles compliant
-- 100% backward compatible
+It depends on your requirements and deployment context. Review the production docs, validate in staging, and assess against your own SLOs.
+- [Production runbooks](../production/README.md)
+- [Testing guide](../testing/README.md)
+- [Known issues](../known_issues/README.md)
 
 ### What's the roadmap?
 

@@ -1,24 +1,24 @@
 # Reference Documentation
 
-Complete reference documentation for Victor AI Assistant.
+Reference documentation for Victor AI.
 
 ## Quick Links
 
 | Reference | Description |
 |-----------|-------------|
-| [**Providers**](providers/) | All 21 LLM providers with setup, models, and configuration |
-| [**Tools**](tools/) | 55+ tools organized by category |
-| [**Configuration**](configuration/) | Complete configuration reference (profiles, API keys, MCP) |
+| [**Providers**](providers/) | Provider setup, models, and configuration |
+| [**Tools**](tools/) | Tool catalog and usage |
+| [**Configuration**](configuration/) | Configuration reference (profiles, API keys, MCP) |
 | [**API**](api/) | HTTP API, MCP server, Python package API |
-| [**Verticals**](verticals/) | 5 domain-specific assistants |
+| [**Verticals**](verticals/) | Built‑in verticals and custom extensions |
 
 ---
 
 ## Provider Reference
 
-Complete reference for all 21 supported LLM providers.
+Provider reference (list varies by version and configuration).
 
-### Local Providers (No API Key Required)
+### Local Providers (Examples)
 
 | Provider | Description | Quick Start |
 |----------|-------------|-------------|
@@ -27,7 +27,7 @@ Complete reference for all 21 supported LLM providers.
 | vLLM | Fast local inference | `vllm serve qwen2.5-coder:7b` |
 | llama.cpp | Lightweight inference | `llama-cli model -p prompt` |
 
-### Cloud Providers (API Key Required)
+### Cloud Providers (Examples)
 
 | Provider | Models | Pricing | Setup |
 |----------|--------|--------|------|
@@ -35,7 +35,7 @@ Complete reference for all 21 supported LLM providers.
 | OpenAI | GPT-4, o1 | Pay-per-use | `export OPENAI_API_KEY=sk-...` |
 | Google | Gemini 2.0 | Pay-per-use | `export GOOGLE_API_KEY=...` |
 | Azure | Azure OpenAI | Pay-per-use | Azure portal setup |
-| And 17 more... | See full list | See full list | See full list |
+| More providers | See full list | See full list | See full list |
 
 [**Full Provider Reference →**](providers/)
 
@@ -43,21 +43,21 @@ Complete reference for all 21 supported LLM providers.
 
 ## Tool Reference
 
-55+ tools organized by category for code operations, testing, search, and more.
+Tools organized by category for code operations, testing, search, and more.
 
 ### Tool Categories
 
-| Category | Tools | Use Case |
+| Category | Example Tools | Use Case |
 |----------|-------|----------|
-| **File Operations** | 12 tools | Read, write, edit, search files |
-| **Git** | 8 tools | Version control, commits, branches |
-| **Testing** | 6 tools | Test execution, coverage, fixtures |
-| **Search** | 7 tools | Code search, grep, semantic search |
-| **Web** | 5 tools | HTTP requests, scraping, browsing |
-| **Database** | 4 tools | SQL execution, schema inspection |
-| **CI/CD** | 4 tools | GitHub Actions, Jenkins, GitLab CI |
-| **Docker** | 3 tools | Container management, docker-compose |
-| **And 8 more...** | See full list | See full list |
+| **File Operations** | Read, write, edit, search | File IO |
+| **Git** | Status, commit, branch | Version control |
+| **Testing** | Test runs, coverage | Validation |
+| **Search** | Code and text search | Discovery |
+| **Web** | HTTP requests, scraping | Web access |
+| **Database** | SQL execution | Data access |
+| **CI/CD** | Pipeline tooling | Automation |
+| **Docker** | Container management | Environments |
+| **More** | See full list | See full list |
 
 [**Tool Catalog →**](tools/catalog.md)
 
@@ -77,10 +77,10 @@ Complete configuration for Victor's behavior and integrations.
 
 ### Quick Configuration
 
-**Local model (default)**:
+**Local model (if available)**:
 ```bash
-# No configuration needed
-victor  # Automatically uses Ollama
+# If a local provider is installed and configured
+victor
 ```
 
 **Cloud provider**:
@@ -89,7 +89,7 @@ export ANTHROPIC_API_KEY=sk-...
 victor chat --provider anthropic
 ```
 
-**Profiles** (`~/.victor/profiles.yaml`):
+**Profiles** (`~/.victor/profiles.yaml`, example):
 ```yaml
 profiles:
   development:
@@ -145,7 +145,7 @@ Domain-specific assistants for specialized tasks.
 |----------|-------------|-------|
 | **Coding** | Software development | `victor --vertical coding` |
 | **DevOps** | DevOps and infrastructure | `victor --vertical devops` |
-| **RAG** | Retrieval-augmented generation | `victor --vertical rag` |
+| **RAG** | Retrieval‑augmented generation | `victor --vertical rag` |
 | **Data Analysis** | Data science workflows | `victor --vertical dataanalysis` |
 | **Research** | Research and analysis | `victor --vertical research` |
 

@@ -1,5 +1,8 @@
 # Testing Strategy for Victor
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 ## Current State
 
 **Test Coverage**: 0% (as of 2025-11-24)

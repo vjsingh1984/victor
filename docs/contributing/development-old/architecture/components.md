@@ -1,5 +1,8 @@
 # Victor Components Reference
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 **Quick reference for Victor's core components and interfaces.**
 
 ## Tool System

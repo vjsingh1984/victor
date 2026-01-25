@@ -1,5 +1,8 @@
 # Victor Plugin Development Guide
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 This guide covers how to create custom tool plugins for Victor, allowing you to extend its capabilities with domain-specific tools.
 
 ## Overview

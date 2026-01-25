@@ -1,6 +1,6 @@
 # Tools Guide
 
-Victor provides 55+ specialized tools that enable the AI assistant to interact with your codebase, execute commands, search the web, and perform complex operations. This guide covers how tools work, how they are selected, and how to configure them.
+Victor provides a broad set of specialized tools that enable the AI assistant to interact with your codebase, execute commands, search the web, and perform complex operations. This guide covers how tools work, how they are selected, and how to configure them.
 
 ## Overview
 
@@ -470,7 +470,7 @@ If wrong tools are being selected:
 
 ## Reference
 
-- [Full Tool Catalog](../reference/tools/catalog.md) - All 55+ tools with parameters
+- [Full Tool Catalog](../reference/tools/catalog.md) - Current tool list and parameters
 - [Tool Calling Details](../reference/tools/tool-calling.md) - Provider-specific behavior
 - [Configuration Reference](../reference/configuration/) - All settings
 - [Custom Tool Tutorial](../guides/custom-tools/) - Build your own tools

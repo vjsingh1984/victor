@@ -53,7 +53,8 @@ from victor.coding.codebase.symbol_resolver import SymbolResolver
 
 if TYPE_CHECKING:
     from victor.coding.codebase.embeddings.base import BaseEmbeddingProvider
-    from victor.coding.codebase.graph.protocol import GraphStoreProtocol
+    from victor.coding.codebase.graph.protocol import GraphStoreProtocol as CodingGraphStoreProtocol
+    from victor.storage.graph.protocol import GraphStoreProtocol
 
 # Import Rust accelerator for stdlib detection via unified facade (5-10x faster)
 try:
@@ -687,9 +688,10 @@ ENCLOSING_NAME_FIELDS: Dict[str, List[tuple[str, str]]] = {
 # Try to import watchdog for file watching
 try:
     from watchdog.events import FileSystemEventHandler
-    from watchdog.observers import Observer
+    from watchdog.observers import Observer as _Observer
 
     WATCHDOG_AVAILABLE = True
+    Observer: type[_Observer] = _Observer
 except ImportError:
     WATCHDOG_AVAILABLE = False
     Observer = None
@@ -1085,11 +1087,11 @@ class CodebaseIndex:
 
         # Graph store (per-repo, embedded in project.db)
         if graph_store is None:
-            self.graph_store: Optional["GraphStoreProtocol"] = create_graph_store(
+            self.graph_store: Optional["GraphStoreProtocol"] = create_graph_store(  # type: ignore[assignment]
                 project_path=self.root
             )
         else:
-            self.graph_store = graph_store
+            self.graph_store = graph_store  # type: ignore[assignment]
         self._graph_nodes: List[GraphNode] = []
         self._graph_edges: List[GraphEdge] = []
         self._pending_call_edges: List[tuple[str, str, str]] = []  # caller_id, callee_name, file
@@ -1454,7 +1456,7 @@ class CodebaseIndex:
             - unchanged: Count of files that didn't need updating
             - errors: List of files that failed to index
         """
-        stats = {
+        stats: Dict[str, Any] = {
             "updated": [],
             "added": [],
             "removed": [],
@@ -1499,24 +1501,32 @@ class CodebaseIndex:
                     existing_mtime = self.files[rel_path].last_modified
                     if current_mtime <= existing_mtime:
                         # File unchanged
-                        stats["unchanged"] += 1
+                        unchanged = stats["unchanged"]
+                        if isinstance(unchanged, int):
+                            stats["unchanged"] = unchanged + 1
                         continue
 
                     # File modified - reindex it
                     language = self._detect_language(file_path)
                     await self._index_single_file(file_path, language)
-                    stats["updated"].append(rel_path)
+                    updated = stats["updated"]
+                    if isinstance(updated, list):
+                        updated.append(rel_path)
                     logger.debug(f"Updated index for: {rel_path}")
                 else:
                     # New file - add to index
                     language = self._detect_language(file_path)
                     await self._index_single_file(file_path, language)
-                    stats["added"].append(rel_path)
+                    added = stats["added"]
+                    if isinstance(added, list):
+                        added.append(rel_path)
                     logger.debug(f"Added to index: {rel_path}")
 
             except Exception as e:
                 logger.warning(f"Failed to reindex {rel_path}: {e}")
-                stats["errors"].append({"file": rel_path, "error": str(e)})
+                errors = stats["errors"]
+                if isinstance(errors, list):
+                    errors.append({"file": rel_path, "error": str(e)})
 
         # Detect and remove deleted files (only if we scanned all files)
         if not files:
@@ -1524,7 +1534,9 @@ class CodebaseIndex:
                 if indexed_path not in current_files:
                     # File was deleted - remove from index
                     await self._remove_file_from_index(indexed_path)
-                    stats["removed"].append(indexed_path)
+                    removed = stats["removed"]
+                    if isinstance(removed, list):
+                        removed.append(indexed_path)
                     logger.debug(f"Removed from index: {indexed_path}")
 
         # Clear staleness flag and update changed files set
@@ -1534,12 +1546,16 @@ class CodebaseIndex:
             self._last_indexed = time.time()
 
         # Log summary
-        total_changes = len(stats["updated"]) + len(stats["added"]) + len(stats["removed"])
+        updated = stats["updated"]
+        added = stats["added"]
+        removed = stats["removed"]
+        unchanged = stats["unchanged"]
+        total_changes = (len(updated) if isinstance(updated, list) else 0) + (len(added) if isinstance(added, list) else 0) + (len(removed) if isinstance(removed, list) else 0)
         if total_changes > 0:
             logger.info(
-                f"Incremental reindex: {len(stats['updated'])} updated, "
-                f"{len(stats['added'])} added, {len(stats['removed'])} removed, "
-                f"{stats['unchanged']} unchanged"
+                f"Incremental reindex: {len(updated) if isinstance(updated, list) else 0} updated, "
+                f"{len(added) if isinstance(added, list) else 0} added, {len(removed) if isinstance(removed, list) else 0} removed, "
+                f"{unchanged if isinstance(unchanged, int) else 0} unchanged"
             )
         else:
             logger.debug(f"Incremental reindex: no changes detected ({stats['unchanged']} files)")
@@ -1699,10 +1715,16 @@ class CodebaseIndex:
         try:
             content = file_path.read_bytes()
             tree = parser.parse(content)
-            query = Query(parser.language, query_src)
+            lang = parser.language
+            if lang is None:
+                return list(refs)
+            query = Query(lang, query_src)
             captures = query.captures(tree.root_node)
             for node, _capture_name in captures:
-                text = node.text.decode("utf-8", errors="ignore")
+                node_text = node.text
+                if node_text is None:
+                    continue
+                text = node_text.decode("utf-8", errors="ignore")
                 if text:
                     refs.add(text)
         except Exception:
@@ -1795,12 +1817,18 @@ class CodebaseIndex:
                     try:
                         from tree_sitter import QueryCursor
 
-                        query = Query(parser.language, query_src)
+                        lang = parser.language
+                        if lang is None:
+                            continue
+                        query = Query(lang, query_src)
                         cursor = QueryCursor(query)
                         captures_dict = cursor.captures(tree.root_node)
                         for _capture_name, nodes in captures_dict.items():
                             for node in nodes:
-                                text = node.text.decode("utf-8", errors="ignore")
+                                node_text = node.text
+                                if node_text is None:
+                                    continue
+                                text = node_text.decode("utf-8", errors="ignore")
                                 if not text:
                                     continue
                                 symbols.append(
@@ -1878,13 +1906,15 @@ class CodebaseIndex:
                     if isinstance(node, py_ast.ClassDef):
                         for base in node.bases:
                             try:
-                                base_name = (
-                                    py_ast.unparse(base)
-                                    if hasattr(py_ast, "unparse")
-                                    else getattr(base, "id", None)
-                                )
+                                base_expr = base
+                                if hasattr(py_ast, "unparse"):
+                                    base_name = py_ast.unparse(base_expr)
+                                else:
+                                    base_name = getattr(base_expr, "id", None)
+                                    if base_name is None:
+                                        base_name = str(base_expr)
                             except Exception:
-                                base_name = getattr(base, "id", None)
+                                base_name = getattr(base, "id", str(base))
                             if base_name:
                                 edges.append((node.name, base_name))
             except Exception:
@@ -1904,9 +1934,12 @@ class CodebaseIndex:
         if parser is not None and query_src:
             try:
                 content = file_path.read_bytes()
-                tree = parser.parse(content)
-                query = Query(parser.language, query_src)
-                captures = query.captures(tree.root_node)
+                ts_tree = parser.parse(content)
+                lang = parser.language
+                if lang is None:
+                    return edges
+                query = Query(lang, query_src)
+                captures = query.captures(ts_tree.root_node)
                 child = None
                 for node, capture_name in captures:
                     text = node.text.decode("utf-8", errors="ignore")
@@ -1962,14 +1995,14 @@ class CodebaseIndex:
         if not edges:
             # Regex fallback for implements
             try:
-                text = file_path.read_text(encoding="utf-8")
+                text_content = file_path.read_text(encoding="utf-8")
             except Exception:
                 return edges
-            for match in re.finditer(r"class\s+(\w+)\s+implements\s+([\w, ]+)", text):
-                child = match.group(1)
+            for match in re.finditer(r"class\s+(\w+)\s+implements\s+([\w, ]+)", text_content):
+                child_name = match.group(1)
                 bases = [b.strip() for b in match.group(2).split(",") if b.strip()]
                 for base in bases:
-                    edges.append((child, base))
+                    edges.append((child_name, base))
         return edges
 
     def _extract_composition(
@@ -1998,11 +2031,17 @@ class CodebaseIndex:
             try:
                 content = file_path.read_bytes()
                 tree = parser.parse(content)
-                query = Query(parser.language, query_src)
+                lang = parser.language
+                if lang is None:
+                    return edges
+                query = Query(lang, query_src)
                 captures = query.captures(tree.root_node)
                 owner = None
                 for node, capture_name in captures:
-                    text = node.text.decode("utf-8", errors="ignore")
+                    node_text = node.text
+                    if node_text is None:
+                        continue
+                    text = node_text.decode("utf-8", errors="ignore")
                     if capture_name == "owner":
                         owner = text
                     elif capture_name == "type" and owner:
@@ -2055,7 +2094,10 @@ class CodebaseIndex:
                     field = current.child_by_field_name(field_name)
                     if not field:
                         continue
-                    text = field.text.decode("utf-8", errors="ignore")
+                    field_text = field.text
+                    if field_text is None:
+                        continue
+                    text = field_text.decode("utf-8", errors="ignore")
                     if node_type in (
                         "class_declaration",
                         "interface_declaration",
@@ -2092,7 +2134,10 @@ class CodebaseIndex:
         content = file_path.read_bytes()
         tree = parser.parse(content)
         try:
-            query = Query(parser.language, query_src)
+            lang = parser.language
+            if lang is None:
+                return []
+            query = Query(lang, query_src)
         except Exception:
             return []
 
@@ -2100,7 +2145,10 @@ class CodebaseIndex:
         try:
             captures = query.captures(tree.root_node)
             for node, _ in captures:
-                callee = node.text.decode("utf-8", errors="ignore")
+                node_text = node.text
+                if node_text is None:
+                    continue
+                callee = node_text.decode("utf-8", errors="ignore")
                 caller = self._find_enclosing_symbol_name(node, language)
                 if caller and callee:
                     call_edges.append((caller, callee))

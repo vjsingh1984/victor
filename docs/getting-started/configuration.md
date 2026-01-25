@@ -663,8 +663,8 @@ victor keys --set anthropic --keyring
 ## Next Steps
 
 - [User Guide](../user-guide/) - Daily usage patterns
-- [Provider Reference](../reference/providers/) - All 21 providers
-- [Tool Catalog](../reference/tools/catalog.md) - 55+ tools
+- [Provider Reference](../reference/providers/) - Current provider list
+- [Tool Catalog](../reference/tools/catalog.md) - Current tool list
 - [Workflow Guide](../guides/workflow-development/) - Automation
 
 ---

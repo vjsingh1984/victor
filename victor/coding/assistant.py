@@ -33,7 +33,8 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type
 if TYPE_CHECKING:
     from victor.framework.prompt_builder import PromptBuilder
 
-from victor.core.verticals.base import StageDefinition, VerticalBase, VerticalConfig
+from victor.core.verticals.base import VerticalBase, VerticalConfig
+from victor.framework.stage_manager import StageDefinition
 from victor.core.verticals.defaults.tool_defaults import (
     COMMON_REQUIRED_TOOLS,
     merge_required_tools,
@@ -380,7 +381,8 @@ class CodingAssistant(VerticalBase):
                 GitSafetyMiddleware(block_dangerous=False, warn_on_risky=True),
             ]
 
-        return cls._get_cached_extension("middleware", _create_middleware)
+        result = cls._get_cached_extension("middleware", _create_middleware)
+        return result  # type: ignore[no-any-return]
 
     @classmethod
     def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
@@ -393,12 +395,13 @@ class CodingAssistant(VerticalBase):
             Tool dependency provider
         """
 
-        def _create():
+        def _create() -> Optional[ToolDependencyProviderProtocol]:
             from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
 
             return create_vertical_tool_dependency_provider("coding")
 
-        return cls._get_cached_extension("tool_dependency_provider", _create)
+        result = cls._get_cached_extension("tool_dependency_provider", _create)
+        return result  # type: ignore[no-any-return]
 
     @classmethod
     def get_composed_chains(cls) -> Dict[str, Any]:
@@ -426,7 +429,8 @@ class CodingAssistant(VerticalBase):
 
             return CODING_CHAINS
 
-        return cls._get_cached_extension("composed_chains", _create)
+        result = cls._get_cached_extension("composed_chains", _create)
+        return result  # type: ignore[no-any-return]
 
     @classmethod
     def get_personas(cls) -> Dict[str, Any]:
@@ -460,7 +464,8 @@ class CodingAssistant(VerticalBase):
 
             return CODING_PERSONAS
 
-        return cls._get_cached_extension("personas", _create)
+        result = cls._get_cached_extension("personas", _create)
+        return result  # type: ignore[no-any-return]
 
     @classmethod
     def get_handlers(cls) -> Dict[str, Any]:

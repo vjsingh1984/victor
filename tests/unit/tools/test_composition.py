@@ -14,8 +14,10 @@
 
 """Tests for LCEL-style tool composition."""
 
+from __future__ import annotations
+
 import asyncio
-from typing import Any, Dict
+from typing import Any, Callable, Dict
 
 import pytest
 
@@ -42,7 +44,7 @@ from victor.tools.composition import (
 class MockRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
     """Mock runnable for testing."""
 
-    def __init__(self, name: str, transform: callable | None = None):
+    def __init__(self, name: str, transform: Callable[[Dict[str, Any]], Dict[str, Any]] | None = None):
         self._name = name
         self._transform = transform or (lambda x: x)
         self.invoke_count = 0

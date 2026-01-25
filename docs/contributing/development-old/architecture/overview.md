@@ -1,5 +1,8 @@
 # Victor Architecture Overview
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 **Visual guide to Victor's system architecture and component relationships.**
 
 ## System Architecture

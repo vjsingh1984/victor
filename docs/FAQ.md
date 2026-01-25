@@ -21,42 +21,42 @@
 
 ### What is Victor AI?
 
-Victor AI is an open-source AI coding assistant that supports **21 LLM providers** with **55+ specialized tools** across 5 domain verticals (Coding, DevOps, RAG, Data Analysis, Research). It provides both local and cloud LLM support through a unified CLI and Python API.
+Victor AI is an open-source AI coding assistant that supports multiple LLM providers, tools, and domain verticals (e.g., Coding, DevOps, RAG, Data Analysis, Research). It provides both local and cloud LLM support through a unified CLI and Python API.
 
 **Key differentiators:**
 - Provider agnostic - switch models without losing context
 - Multi-agent teams - coordinate specialized agents
-- Air-gapped mode - 100% offline support
+- Air-gapped mode - local/offline operation with supported providers
 - Semantic codebase search - context-aware understanding
 - YAML workflows - automate repetitive tasks
 
 ### Is Victor AI free?
 
-Yes! Victor AI is:
+Yes. Victor AI is:
 - **Open source** - No licensing fees
-- **Free to use** - With local models (Ollama, LM Studio)
+- **Free to use** - With local models (compute costs apply)
 - **Bring your own key** - Use your own API keys for cloud providers
-- **No subscription** - Pay only for what you use (API costs)
+- **No subscription** - Pay only for provider usage where applicable
 
 ### How is Victor different from GitHub Copilot?
 
 | Feature | Victor AI | GitHub Copilot |
 |---------|-----------|----------------|
-| **Providers** | 21 providers | OpenAI only |
-| **Local Support** | Full offline support | None |
-| **Multi-Agent** | 5 team formations | Single agent |
+| **Providers** | Multiple providers | OpenAI only |
+| **Local Support** | Local/offline options | None |
+| **Multi-Agent** | Team workflows | Single agent |
 | **Provider Switching** | Yes, mid-conversation | No |
 | **Extensibility** | Custom verticals | Limited |
-| **Cost** | Free + API costs | Subscription only |
-| **Privacy** | 100% local possible | Cloud-only |
+| **Cost** | Open-source + provider costs | Subscription only |
+| **Privacy** | Local-only possible with supported providers | Cloud-only |
 
 ### Can I use Victor offline?
 
-Yes! Victor supports **air-gapped mode**:
+Yes. Victor supports **air-gapped mode** with local providers:
 - Use local models (Ollama, LM Studio, vLLM)
 - No internet connection required
 - Full tool functionality
-- 100% data privacy
+- Data stays on your machine with local-only configurations
 
 ```bash
 export VICTOR_AIRGAPPED_MODE=true
@@ -190,14 +190,14 @@ victor chat --provider ollama "Brainstorm ideas"
 
 ### Which models are supported?
 
-All models from 21 providers:
+Models depend on your configured providers. Examples include:
 - **Anthropic**: Claude Sonnet 4, Opus, Haiku
 - **OpenAI**: GPT-4o, GPT-4, o1-preview
 - **Google**: Gemini 2.0, Gemini 1.5 Pro
 - **Local (Ollama)**: Qwen2.5, DeepSeek, CodeLlama, etc.
-- And 17 more providers...
+- And more...
 
-[Full provider list](README.md#supported-providers)
+[Full provider list](./reference/providers/)
 
 ---
 
@@ -263,7 +263,7 @@ victor chat --mode plan "Analyze this architecture"
 
 ### What tools does Victor have?
 
-55+ tools across 5 domains:
+Tools across multiple domains (see the catalog for the current list):
 
 **Coding:**
 - File operations (read, write, search)

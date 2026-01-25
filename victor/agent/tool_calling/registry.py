@@ -20,7 +20,7 @@ provider name and model.
 """
 
 import logging
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, List, Optional, Type
 
 from victor.agent.tool_calling.base import BaseToolCallingAdapter
 

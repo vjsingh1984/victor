@@ -497,15 +497,15 @@ class UsageAnalytics:
                 }
 
             # Add recommendations
-            recommendations = []
+            recommendations: List[str] = []
             if "semantic" in insights and "keyword" in insights:
                 if insights["semantic"]["avg_selection_time_ms"] > 100:
                     recommendations.append(
                         "Semantic selection is slow. Consider caching embeddings."
                     )
 
-            insights["recommendations"] = recommendations
-            insights["status"] = "ok"
+            insights["recommendations"] = recommendations  # type: ignore[assignment]
+            insights["status"] = "ok"  # type: ignore[assignment]
 
             return insights
 
@@ -544,7 +544,7 @@ class UsageAnalytics:
                     "max_ms": sorted_samples[-1],
                 }
 
-            insights["status"] = "ok" if insights else "no_data"
+            insights["status"] = "ok" if insights else "no_data"  # type: ignore[assignment]
             return insights
 
     # ========================================================================
@@ -570,7 +570,7 @@ class UsageAnalytics:
 
         # Error distribution
         errors = [r.error_type for r in records if r.error_type]
-        error_counts = {}
+        error_counts: Dict[str, int] = {}
         for error in errors:
             error_counts[error] = error_counts.get(error, 0) + 1
 
@@ -972,7 +972,7 @@ class UsageAnalytics:
             self._buffer_lock = threading.Lock()
             self._buffer_size = 100
             self._flush_interval = 5.0
-            self._flush_task: Optional[asyncio.Task] = None
+            self._flush_task: Optional[asyncio.Task[None]] = None
             self._auto_flush_running = False
             self._total_buffered = 0
             self._total_flushed = 0

@@ -4,9 +4,14 @@ This directory contains the MkDocs-based documentation for Victor.
 
 ## Quick Start
 
-New contributors should start with the [Quick Start Guide](QUICKSTART.md) for fast setup.
+New contributors should start with:
+- [Documentation Index](../index.md)
+- [Getting Started](../getting-started/index.md)
+- [Contributing Index](./index.md)
 
-For deployment and configuration, see the [Deployment Guide](DEPLOYMENT.md).
+For deployment and operations context, see:
+- [CI/CD](../ci_cd/README.md)
+- [Production](../production/README.md)
 
 ## Building Documentation Locally
 
@@ -62,15 +67,16 @@ mkdocs build -v
 
 ```
 docs/
-├── index.md                          # Landing page
-├── getting-started/                  # Getting started guide
+├── index.md                          # Documentation index
+├── getting-started/                  # Installation + first run
 │   ├── index.md
 │   ├── installation.md
-│   ├── quickstart.md
-│   ├── configuration.md
 │   ├── first-run.md
-│   └── basic-usage.md
-├── user-guide/                       # User guide
+│   ├── local-models.md
+│   ├── cloud-models.md
+│   ├── docker.md
+│   └── troubleshooting.md
+├── user-guide/                       # End‑user docs
 │   ├── index.md
 │   ├── cli-reference.md
 │   ├── tui-mode.md
@@ -79,38 +85,33 @@ docs/
 │   ├── workflows.md
 │   ├── session-management.md
 │   └── troubleshooting.md
-├── api-reference/                    # API reference
-│   ├── protocols.md
-│   ├── providers.md
-│   ├── tools.md
-│   └── workflows.md
-├── tutorials/                        # Tutorials
-│   ├── coordinator_quickstart.md     # Coordinator-based architecture quick start
-│   ├── coordinator_recipes.md        # Coordinator customization recipes
-│   ├── coordinator_video_tutorial.md # Video tutorial script
+├── tutorials/                        # Hands‑on tutorials
 │   ├── build-custom-tool.md
 │   ├── create-workflow.md
-│   └── integrate-provider.md
-├── examples/                         # Usage examples
-│   ├── coordinator_examples.md       # Coordinator usage examples
-│   ├── migration_examples.md         # Before/after migration examples
-│   └── cache_invalidation_example.md
-├── reference/                        # Reference documentation
+│   ├── integrate-provider.md
+│   ├── vertical_creation_guide.md
+│   ├── coordinator_quickstart.md
+│   ├── coordinator_recipes.md
+│   └── batch-processor-quickstart.md
+├── guides/                           # How‑to guides and deep dives
+│   └── index.md
+├── reference/                        # Reference docs
 │   ├── index.md
-│   ├── cli-reference.md (in user-guide/)
-│   ├── configuration/ (subdirectory with index.md, keys.md)
-│   └── environment-variables.md
-├── verticals/                        # Vertical-specific docs
-│   ├── coding.md
-│   ├── devops.md
-│   ├── rag.md
-│   ├── data-analysis.md
-│   └── research.md
-└── development/                      # Development guide
-    ├── index.md
-    ├── setup.md
-    ├── code-style.md
-    └── testing.md
+│   ├── api/
+│   ├── configuration/
+│   ├── providers/
+│   ├── tools/
+│   └── verticals/
+├── architecture/                     # Architecture and design
+├── performance/                      # Performance tuning
+├── workflows/                        # Workflow patterns
+├── extensions/                       # Extension development
+├── observability/                    # Metrics/logging/tracing
+├── operations/                       # Ops and deployment
+├── production/                       # Production runbooks
+├── security/                         # Security practices
+├── testing/                          # Testing docs and QA
+└── contributing/                     # Contributor docs
 ```
 
 ## Deployment to GitHub Pages

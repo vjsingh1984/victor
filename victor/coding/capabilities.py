@@ -142,7 +142,7 @@ def get_code_style(orchestrator: Any) -> Dict[str, Any]:
     """
     # SOLID DIP: Read from VerticalContext instead of direct attribute access
     context = orchestrator.vertical_context
-    return context.get_capability_config(
+    result = context.get_capability_config(
         "code_style",
         {
             "formatter": "black",
@@ -151,6 +151,7 @@ def get_code_style(orchestrator: Any) -> Dict[str, Any]:
             "enforce_type_hints": True,
         },
     )
+    return result  # type: ignore[no-any-return]
 
 
 def configure_test_requirements(
@@ -274,7 +275,7 @@ class CodingCapabilityProvider(BaseVerticalCapabilityProvider):
         style = provider.get_capability_config(orchestrator, "code_style")
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the coding capability provider."""
         super().__init__("coding")
 
@@ -402,7 +403,7 @@ def _get_provider() -> CodingCapabilityProvider:
     """Get or create provider instance."""
     global _provider_instance
     if _provider_instance is None:
-        _provider_instance = CodingCapabilityProvider()
+        _provider_instance = CodingCapabilityProvider()  # type: ignore[no-untyped-call]
     return _provider_instance
 
 

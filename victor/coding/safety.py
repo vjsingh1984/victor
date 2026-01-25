@@ -81,13 +81,35 @@ class CodingSafetyExtension(SafetyExtensionProtocol):
             include_files=True,
         )
 
+    def add_dangerous_pattern(self, pattern: str) -> None:
+        """Add a custom dangerous pattern.
+
+        Args:
+            pattern: Regex pattern to add as dangerous
+        """
+        from victor.security.safety.types import SafetyPattern
+
+        custom_pattern = SafetyPattern(
+            pattern=pattern,
+            description="Custom dangerous pattern",
+            risk_level="HIGH",
+            category="custom",
+        )
+        # Add to scanner's patterns by extending it
+        if not hasattr(self, '_custom_patterns'):
+            self._custom_patterns: List[SafetyPattern] = []
+        self._custom_patterns.append(custom_pattern)
+
     def get_bash_patterns(self) -> List[SafetyPattern]:
         """Get coding-specific bash command patterns.
 
         Returns:
             List of safety patterns for dangerous bash commands
         """
-        return self._scanner.all_patterns
+        base_patterns = self._scanner.all_patterns
+        if hasattr(self, '_custom_patterns'):
+            return base_patterns + self._custom_patterns
+        return base_patterns
 
     def get_file_patterns(self) -> List[SafetyPattern]:
         """Get coding-specific file operation patterns.

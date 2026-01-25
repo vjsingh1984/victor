@@ -1,5 +1,8 @@
 # Tool Selection Architecture
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 **Status**: Release 2 (Strategy Pattern) - ✅ Complete
 **Plan Reference**: `~/.claude/plans/stateless-brewing-crane.md`
 **Priority**: HIGH (Priority 7)

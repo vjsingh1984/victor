@@ -1,5 +1,8 @@
 # Vertical Development Guide
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 This guide covers how to develop custom verticals for Victor, enabling domain-specific AI assistants with specialized tools, prompts, and workflows.
 
 ## Overview

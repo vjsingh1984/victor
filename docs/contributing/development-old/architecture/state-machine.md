@@ -1,5 +1,8 @@
 # State Machine Architecture
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 Victor uses a state machine to track conversation progress and manage tool availability during agent sessions. This document explains the state machine architecture, stages, transitions, and how to integrate with it.
 
 ## Overview

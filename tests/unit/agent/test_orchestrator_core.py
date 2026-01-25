@@ -1757,7 +1757,7 @@ class TestApplyTaskGuidance:
         # Should not raise
 
 
-class TestAddMessage_v2:
+class TestAddMessage_v2:  # type: ignore[no-redef]
     """Tests for add_message method."""
 
     def test_add_user_message(self, orchestrator):
@@ -2139,7 +2139,7 @@ class TestSequenceTracker:
             assert isinstance(stats, dict)
 
 
-class TestUsageAnalytics_v2:
+class TestUsageAnalytics_v2:  # type: ignore[no-redef]
     """Tests for usage analytics integration."""
 
     def test_usage_analytics_exists(self, orchestrator):
@@ -2190,7 +2190,7 @@ class TestGetCurrentProviderInfo:
         assert "name" in info or "provider" in info
 
 
-class TestClassifyTaskKeywords_v2:
+class TestClassifyTaskKeywords_v2:  # type: ignore[no-redef]
     """Tests for _classify_task_keywords method."""
 
     def test_classify_code_generation(self, orchestrator):
@@ -2216,7 +2216,7 @@ class TestClassifyTaskKeywords_v2:
         assert isinstance(result, dict)
 
 
-class TestApplyIntentGuard_v2:
+class TestApplyIntentGuard_v2:  # type: ignore[no-redef]
     """Tests for _apply_intent_guard method."""
 
     def test_guard_for_non_write_task(self, orchestrator):
@@ -2307,7 +2307,7 @@ class TestParseToolCallsWithAdapter:
         assert result is not None
 
 
-class TestMetricsCollector_v2:
+class TestMetricsCollector_v2:  # type: ignore[no-redef]
     """Tests for metrics collector integration."""
 
     def test_metrics_collector_exists(self, orchestrator):
@@ -2643,7 +2643,7 @@ class TestIntelligentPipelineIntegration:
             await orchestrator._record_intelligent_outcome(True, 0.9, True, True)
 
 
-class TestApplyTaskGuidance_v2:
+class TestApplyTaskGuidance_v2:  # type: ignore[no-redef]
     """Tests for _apply_task_guidance method."""
 
     def test_apply_task_guidance_analysis_task(self, orchestrator):
@@ -3187,7 +3187,7 @@ class TestLogToolCall:
         orchestrator._log_tool_call("read_file", {"path": "/test"})
 
 
-class TestComponentAccessors_v2:
+class TestComponentAccessors_v2:  # type: ignore[no-redef]
     """Tests for component accessor properties."""
 
     def test_conversation_controller_accessor(self, orchestrator):
@@ -3236,7 +3236,7 @@ class TestComponentAccessors_v2:
         # May be None or ObservabilityIntegration - just test no error
 
 
-class TestRecoveryIntegration_v2:
+class TestRecoveryIntegration_v2:  # type: ignore[no-redef]
     """Tests for recovery_integration property."""
 
     def test_recovery_integration_accessor(self, orchestrator):
@@ -3246,7 +3246,7 @@ class TestRecoveryIntegration_v2:
         assert integration is not None
 
 
-class TestUsageAnalytics_v2:
+class TestUsageAnalytics_v2:  # type: ignore[no-redef]
     """Tests for usage_analytics property."""
 
     def test_usage_analytics_accessor(self, orchestrator):
@@ -3258,7 +3258,7 @@ class TestUsageAnalytics_v2:
         assert isinstance(analytics, UsageAnalytics)
 
 
-class TestSequenceTracker_v2:
+class TestSequenceTracker_v2:  # type: ignore[no-redef]
     """Tests for sequence_tracker property."""
 
     def test_sequence_tracker_accessor(self, orchestrator):
@@ -3270,7 +3270,7 @@ class TestSequenceTracker_v2:
         assert isinstance(tracker, ToolSequenceTracker)
 
 
-class TestContextCompactor_v2:
+class TestContextCompactor_v2:  # type: ignore[no-redef]
     """Tests for context_compactor property."""
 
     def test_context_compactor_accessor(self, orchestrator):
@@ -3295,7 +3295,7 @@ class TestRecoveryHandler:
             assert isinstance(handler, RecoveryHandler)
 
 
-class TestProviderManager_v2:
+class TestProviderManager_v2:  # type: ignore[no-redef]
     """Tests for provider_manager property."""
 
     def test_provider_manager_accessor(self, orchestrator):
@@ -3307,7 +3307,7 @@ class TestProviderManager_v2:
         assert isinstance(manager, ProviderManager)
 
 
-class TestToolOutputFormatter_v2:
+class TestToolOutputFormatter_v2:  # type: ignore[no-redef]
     """Tests for tool_output_formatter property."""
 
     def test_tool_output_formatter_accessor(self, orchestrator):
@@ -3333,7 +3333,7 @@ class TestCreateBackgroundTask:
         assert len(orchestrator._background_tasks) >= initial_count
 
 
-class TestSwitchModel_v2:
+class TestSwitchModel_v2:  # type: ignore[no-redef]
     """Tests for switch_model method."""
 
     def test_switch_model_returns_bool(self, orchestrator):
@@ -3360,7 +3360,7 @@ class TestCurrentProviderModel:
         assert isinstance(model, str)
 
 
-class TestGetCurrentProviderInfo_v2:
+class TestGetCurrentProviderInfo_v2:  # type: ignore[no-redef]
     """Tests for get_current_provider_info method."""
 
     def test_returns_dict_with_required_keys(self, orchestrator):

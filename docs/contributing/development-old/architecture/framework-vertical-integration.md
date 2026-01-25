@@ -1,5 +1,8 @@
 # Framework & Vertical Integration Architecture
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 **Target Audience**: Framework developers extending Victor with new verticals or capabilities.
 
 ## Overview

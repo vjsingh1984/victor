@@ -1,5 +1,8 @@
 # Architecture Deep Dive
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 A comprehensive view of Victor's architecture, focusing on the new modular components introduced for improved extensibility, SOLID compliance, and performance.
 
 ## Overview

@@ -1,5 +1,8 @@
 # AgentOrchestrator vs Workflow System: Architectural Analysis
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 ## Executive Summary
 
 The Victor codebase demonstrates a **complementary, layered architecture** where AgentOrchestrator and the workflow system serve distinct purposes:

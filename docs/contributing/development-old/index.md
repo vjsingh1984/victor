@@ -1,5 +1,8 @@
 # Development Guide
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 **Everything you need to contribute to Victor.**
 
 ## Quick Start

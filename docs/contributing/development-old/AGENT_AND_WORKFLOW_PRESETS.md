@@ -1,5 +1,8 @@
 # Agent and Workflow Presets
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 **Victor Framework**
 
 This guide covers the preset system for agents and workflows, which provides ready-to-use configurations for common patterns.

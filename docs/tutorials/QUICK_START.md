@@ -51,11 +51,11 @@ pip install victor-ai[native]      # Rust-accelerated extensions
 
 ### 1. Choose Your Provider
 
-Victor supports 21+ LLM providers. Start with one that fits your needs:
+Victor supports multiple LLM providers. Start with one that fits your needs:
 
-#### Free & Local (Recommended for Beginners)
+#### Free & Local (Good for Getting Started)
 
-**Ollama** (100% Free, Runs Offline):
+**Ollama** (Free to use, runs offline; hardware/compute costs apply):
 ```bash
 # Install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
@@ -90,7 +90,7 @@ export GOOGLE_API_KEY="..."
 victor chat --provider google --model gemini-1.5-pro
 ```
 
-See [PROVIDERS.md](../reference/PROVIDERS.md) for all 21 providers.
+See the [Provider Reference](../reference/providers/) for the current list.
 
 ### 2. Basic Chat
 
@@ -481,7 +481,7 @@ pip install -e ".[dev]"
 
 ## Cost-Saving Tips
 
-1. **Use Ollama for development** - 100% free
+1. **Use Ollama for development** - free to use (local compute required)
 2. **Mix providers strategically** - 90% cost savings
 3. **Use appropriate models** - Don't overpay for simple tasks
 4. **Set tool budgets** - Control tool usage costs

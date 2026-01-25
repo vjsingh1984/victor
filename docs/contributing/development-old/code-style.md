@@ -1,5 +1,8 @@
 # Code Style Guide
 
+> **Archived**: This document is kept for historical context and may be outdated. See `docs/contributing/index.md` for current guidance.
+
+
 Victor enforces consistent code style through automated tools. This guide covers formatting, linting, and style conventions.
 
 ## Quick Reference
