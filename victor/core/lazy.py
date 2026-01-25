@@ -222,7 +222,7 @@ class SingletonFactory:
                 # Double-check inside lock
                 if service_type not in cls._instances:
                     if factory is None:
-                        instance = cast(T, service_type())
+                        instance = service_type()
                         cls._instances[service_type] = instance
                     else:
                         cls._instances[service_type] = factory()

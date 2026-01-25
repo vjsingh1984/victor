@@ -1375,10 +1375,10 @@ def handle_errors_async(
     recovery_hint: Optional[str] = None,
     reraise: bool = False,
     default_return: Optional[Any] = None,
-) -> Callable[[Callable[..., T]], Callable[..., T]]:
+) -> Callable[[Callable[..., Awaitable[T]]], Callable[..., Awaitable[T]]]:
     """Async version of handle_errors decorator."""
 
-    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+    def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> T:
             handler = ErrorHandler()
@@ -1400,7 +1400,7 @@ def handle_errors_async(
                     ) from e
                 return cast(T, default_return)
 
-        return wrapper
+        return wrapper  # type: ignore[return-value]
 
     return decorator
 

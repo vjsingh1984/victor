@@ -104,6 +104,7 @@ class DatabaseManager:
     # Singleton instance
     _instance: Optional["DatabaseManager"] = None
     _init_lock = threading.Lock()
+    _initialized: bool
 
     # Legacy database paths relative to ~/.victor/
     LEGACY_DATABASES = {
@@ -177,7 +178,9 @@ class DatabaseManager:
                 timeout=30.0,
             )
             self._local.conn.row_factory = sqlite3.Row
-        return self._local.conn
+        conn: Any = self._local.conn
+        assert isinstance(conn, sqlite3.Connection)
+        return conn
 
     def get_connection(self) -> sqlite3.Connection:
         """Get database connection.
@@ -609,7 +612,7 @@ class DatabaseManager:
             self._write_lock = threading.Lock()
             self._batch_size = 100
             self._flush_interval = 5.0
-            self._flush_task: Optional[asyncio.Task] = None
+            self._flush_task: Optional[asyncio.Task[None]] = None
             self._is_flushing = False
 
     async def execute_async(
@@ -982,7 +985,9 @@ class ProjectDatabaseManager:
                 timeout=30.0,
             )
             self._local.conn.row_factory = sqlite3.Row
-        return self._local.conn
+        conn: Any = self._local.conn
+        assert isinstance(conn, sqlite3.Connection)
+        return conn
 
     def get_connection(self) -> sqlite3.Connection:
         """Get database connection."""

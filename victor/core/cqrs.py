@@ -85,6 +85,7 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    TypeAlias,
 )
 from uuid import uuid4
 
@@ -177,9 +178,12 @@ class QueryHandler(ABC, Generic[TResult]):
         ...
 
 
+# =============================================================================
 # Handler function types
-CommandHandlerFunc = Callable[[Command], Awaitable[Any]]
-QueryHandlerFunc = Callable[[Query[TResult]], Awaitable[TResult]]
+# =============================================================================
+
+CommandHandlerFunc: TypeAlias = Callable[[Command], Awaitable[Any]]
+QueryHandlerFunc: TypeAlias = Callable[[Query[TResult]], Awaitable[TResult]]
 
 
 # =============================================================================
@@ -188,7 +192,7 @@ QueryHandlerFunc = Callable[[Query[TResult]], Awaitable[TResult]]
 
 # Global registries for decorator-based registration
 _COMMAND_HANDLERS: Dict[Type[Command], CommandHandlerFunc] = {}
-_QUERY_HANDLERS: Dict[Type[Query], QueryHandlerFunc] = {}
+_QUERY_HANDLERS: Dict[Type[Query[Any]], Callable[[Query[Any]], Awaitable[Any]]] = {}
 
 
 def command_handler(
@@ -211,8 +215,8 @@ def command_handler(
 
 
 def query_handler(
-    query_type: Type[Query],
-) -> Callable[[QueryHandlerFunc], QueryHandlerFunc]:
+    query_type: Type[Query[Any]],
+) -> Callable[[Callable[[Query[Any]], Awaitable[Any]]], Callable[[Query[Any]], Awaitable[Any]]]:
     """Decorator to register a query handler function.
 
     Example:
@@ -221,7 +225,7 @@ def query_handler(
             return await user_repo.get(query.user_id)
     """
 
-    def decorator(func: QueryHandlerFunc[Any, Any]) -> QueryHandlerFunc:
+    def decorator(func: Callable[[Query[Any]], Awaitable[Any]]) -> Callable[[Query[Any]], Awaitable[Any]]:
         _QUERY_HANDLERS[query_type] = func
         logger.debug(f"Registered query handler for {query_type.__name__}")
         return func
@@ -234,7 +238,7 @@ def get_registered_command_handlers() -> Dict[Type[Command], CommandHandlerFunc]
     return _COMMAND_HANDLERS.copy()
 
 
-def get_registered_query_handlers() -> Dict[Type[Query], QueryHandlerFunc]:
+def get_registered_query_handlers() -> Dict[Type[Query[Any]], Callable[[Query[Any]], Awaitable[Any]]]:
     """Get all registered query handlers."""
     return _QUERY_HANDLERS.copy()
 
@@ -391,7 +395,7 @@ class CachingQueryMiddleware(QueryMiddleware):
         self._ttl = ttl
         self._timestamps: Dict[str, float] = {}
 
-    def _get_cache_key(self, query: Query[Any, Any]) -> str:
+    def _get_cache_key(self, query: Query[Any]) -> str:
         """Generate cache key from query."""
         query_dict = {k: v for k, v in query.__dict__.items() if k not in ("query_id", "timestamp")}
         return f"{type(query).__name__}:{hash(frozenset(query_dict.items()))}"
@@ -420,7 +424,7 @@ class CachingQueryMiddleware(QueryMiddleware):
         self._timestamps[key] = time.time()
         return result
 
-    def invalidate(self, query_type: Optional[Type[Query]] = None) -> None:
+    def invalidate(self, query_type: Optional[Type[Query[Any]]] = None) -> None:
         """Invalidate cache entries."""
         if query_type is None:
             self._cache.clear()
@@ -492,7 +496,7 @@ class CommandBus:
         self._middleware.append(middleware)
         return self
 
-    async def execute(self, command: Command) -> CommandResult:
+    async def execute(self, command: Command) -> CommandResult[Any]:
         """Execute a command through the handler pipeline.
 
         Args:
@@ -520,7 +524,7 @@ class CommandBus:
         chain = final_handler
         for middleware in reversed(self._middleware):
 
-            def create_next(mw: CommandMiddleware, next_fn: Callable[..., Any]) -> Callable:
+            def create_next(mw: CommandMiddleware, next_fn: Callable[[Command], Awaitable[Any]]) -> Callable[[Command], Awaitable[Any]]:
                 async def wrapped(cmd: Command) -> Any:
                     return await mw.execute(cmd, next_fn)
 
@@ -571,13 +575,13 @@ class QueryBus:
 
     def __init__(self) -> None:
         """Initialize query bus."""
-        self._handlers: Dict[Type[Query], QueryHandlerFunc] = {}
+        self._handlers: Dict[Type[Query[Any]], QueryHandlerFunc[Any]] = {}
         self._middleware: List[QueryMiddleware] = []
 
     def register(
         self,
-        query_type: Type[Query],
-        handler: Union[QueryHandlerFunc, QueryHandler],
+        query_type: Type[Query[Any]],
+        handler: Union[QueryHandlerFunc[Any], QueryHandler[Any]],
     ) -> None:
         """Register a handler for a query type.
 
@@ -642,11 +646,11 @@ class QueryBus:
             ) -> Callable[[Query[TResult]], Awaitable[TResult]]:
                 async def wrapped(q: Query[TResult]) -> TResult:
                     result = await mw.execute(q, next_fn)
-                    return cast(TResult, result)
+                    return result
 
                 return wrapped
 
-            chain = create_next(middleware, chain)
+            chain: Callable[[Query[TResult]], Awaitable[TResult]] = create_next(middleware, chain)
 
         try:
             data = await chain(query)
@@ -719,15 +723,15 @@ class Mediator:
     def register_command(
         self,
         command_type: Type[Command],
-        handler: Union[CommandHandlerFunc, CommandHandler],
+        handler: Union[CommandHandlerFunc, CommandHandler[Any]],
     ) -> None:
         """Register a command handler."""
         self._command_bus.register(command_type, handler)
 
     def register_query(
         self,
-        query_type: Type[Query],
-        handler: Union[QueryHandlerFunc, QueryHandler],
+        query_type: Type[Query[TResult]],
+        handler: Union[QueryHandlerFunc[TResult], QueryHandler[TResult]],
     ) -> None:
         """Register a query handler."""
         self._query_bus.register(query_type, handler)
@@ -739,7 +743,7 @@ class Mediator:
 
     async def send(
         self, message: Union[Command, Query[TResult]]
-    ) -> Union[CommandResult, QueryResult[TResult]]:
+    ) -> Union[CommandResult[Any], QueryResult[TResult]]:
         """Send a command or query for execution.
 
         Args:

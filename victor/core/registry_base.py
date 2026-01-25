@@ -84,7 +84,7 @@ class SingletonRegistry(ABC, Generic[T]):
     """
 
     # Class-level singleton state (overridden by each subclass)
-    _instance: ClassVar[Optional["SingletonRegistry"]] = None
+    _instance: ClassVar[Optional[T]] = None
     _lock: ClassVar[threading.Lock] = threading.Lock()
     _instantiation_allowed: ClassVar[bool] = True  # Set False for strict singletons
 
@@ -131,11 +131,12 @@ class SingletonRegistry(ABC, Generic[T]):
                     was_allowed = cls._instantiation_allowed
                     cls._instantiation_allowed = True
                     try:
-                        cls._instance = cls()  # type: ignore
+                        instance = cls()
+                        cls._instance = cast(T, instance)
                         logger.debug(f"{cls.__name__} singleton instance created")
                     finally:
                         cls._instantiation_allowed = was_allowed
-        return cls._instance
+        return cast(T, cls._instance)
 
     @classmethod
     def reset_instance(cls) -> None:

@@ -377,10 +377,10 @@ class CacheConfigManager:
 
     def configure_registry(
         self,
-        registry_class: Type[UniversalRegistry],
+        registry_class: Type[UniversalRegistry[Any]],
         cache_name: str,
         env_prefix: Optional[str] = None,
-    ) -> UniversalRegistry:
+    ) -> UniversalRegistry[Any]:
         """Configure a UniversalRegistry instance with cache settings.
 
         Args:
@@ -404,10 +404,11 @@ class CacheConfigManager:
         )
 
         # Return registry instance (configuration applied via cache strategy)
+        max_size = config.max_size or 0
         return registry_class.get_registry(
             cache_name,
             config.strategy,
-            max_size=config.max_size,
+            max_size=max_size,
         )
 
     def list_configs(self) -> Dict[str, CacheConfig]:
@@ -488,10 +489,10 @@ def get_cache_config(
 
 
 def configure_registry(
-    registry_class: Type[UniversalRegistry],
+    registry_class: Type[UniversalRegistry[Any]],
     cache_name: str,
     env_prefix: Optional[str] = None,
-) -> UniversalRegistry:
+) -> UniversalRegistry[Any]:
     """Configure a UniversalRegistry with cache settings.
 
     Args:

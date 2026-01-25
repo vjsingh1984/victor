@@ -279,8 +279,8 @@ class CallableHealthCheck(BaseHealthCheck):
         result = self._check_fn()
         if asyncio.iscoroutine(result):
             coro_result = await result
-            return cast(ComponentHealth, coro_result)
-        return cast(ComponentHealth, result)
+            return coro_result
+        return result  # type: ignore[return-value]
 
 
 class ProviderHealthCheck(BaseHealthCheck):
@@ -645,6 +645,8 @@ class HealthChecker:
                         last_check=datetime.now(timezone.utc),
                     )
                 else:
+                    # result is ComponentHealth here
+                    assert isinstance(result, ComponentHealth)
                     component_healths[check.name] = result
 
         # Determine overall status

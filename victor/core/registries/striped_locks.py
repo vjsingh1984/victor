@@ -194,7 +194,7 @@ class StripedLockManager:
         stripe_index = self._get_stripe_index(key)
         return self._stripes[stripe_index]
 
-    def acquire_lock_with_metrics(self, key: str) -> threading.RLock:
+    def acquire_lock_with_metrics(self, key: str) -> Any:  # threading.RLock or MetricLock
         """Acquire lock for a specific key with metrics collection.
 
         Args:
