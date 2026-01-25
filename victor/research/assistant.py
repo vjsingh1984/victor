@@ -229,7 +229,10 @@ class ResearchAssistant(VerticalBase):
                 create_vertical_tool_dependency_provider("research")
             )
 
-        return cls._get_cached_extension("tool_dependency_provider", _create)
+        return cast(
+            Optional[ToolDependencyProviderProtocol],
+            cls._get_cached_extension("tool_dependency_provider", _create)
+        )
 
     @classmethod
     def get_handlers(cls) -> Dict[str, Any]:

@@ -678,8 +678,8 @@ class TeamDashboardServer:
                 "member_count": member_count,
                 "recursion_depth": recursion_depth,
                 "start_time": (
-                    self._execution_states[execution_id].start_time.isoformat()
-                    if self._execution_states[execution_id].start_time is not None
+                    start_time.isoformat()
+                    if (start_time := self._execution_states[execution_id].start_time) is not None
                     else None
                 ),
             },

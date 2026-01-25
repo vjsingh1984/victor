@@ -82,7 +82,7 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, cast
 
 from victor.agent.cache.backends.memory import MemoryCacheBackend
 from victor.agent.cache.backends.protocol import ICacheBackend
@@ -204,11 +204,13 @@ class CacheBackendFactory:
         default_ttl = options.get("default_ttl_seconds", 3600)
         enable_stats = options.get("enable_stats", True)
 
-        backend: ICacheBackend = MemoryCacheBackend(
-            default_ttl_seconds=default_ttl,
-            enable_stats=enable_stats,
+        return cast(
+            ICacheBackend,
+            MemoryCacheBackend(
+                default_ttl_seconds=default_ttl,
+                enable_stats=enable_stats,
+            )
         )
-        return backend
 
     @staticmethod
     def _create_redis_backend(options: Dict[str, Any]) -> RedisCacheBackend:

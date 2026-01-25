@@ -1544,7 +1544,7 @@ class UnifiedWorkflowCompiler:
         )
 
         # Lazy-loaded compilers
-        self._graph_compiler: Optional["WorkflowGraphCompiler"] = None
+        self._graph_compiler: Optional["WorkflowGraphCompiler[Any]"] = None
         self._definition_compiler: Optional["WorkflowDefinitionCompiler"] = None
 
         # Compilation stats

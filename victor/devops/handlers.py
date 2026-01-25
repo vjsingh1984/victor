@@ -249,8 +249,8 @@ class MLOpsHandler(BaseHandler):
         operation = node.input_mapping.get("operation", "register")
         model_name = node.input_mapping.get("model_name", "")
         model_path = node.input_mapping.get("model_path", "")
-        metrics_input = node.input_mapping.get("metrics", {})
-        params_input = node.input_mapping.get("params", {})
+        metrics_input: Any = node.input_mapping.get("metrics", {})
+        params_input: Any = node.input_mapping.get("params", {})
         metrics: Dict[str, Any] = (
             metrics_input
             if isinstance(metrics_input, dict)

@@ -213,8 +213,8 @@ class TestPipelineCacheKeyIncludesYAML:
     def test_cache_key_includes_yaml_hash(self, tmp_path, monkeypatch):
         """Cache key should include YAML config hash."""
         from unittest.mock import MagicMock, patch
-        from victor.framework.vertical_integration import EnhancedVerticalIntegrator
-        from victor.core.verticals.vertical_base import VerticalBase
+        from victor.framework.vertical_integration import VerticalIntegrationPipeline
+        from victor.core.verticals.base import VerticalBase
 
         # Create a mock vertical with a config path
         class MockVertical(VerticalBase):
@@ -230,38 +230,37 @@ class TestPipelineCacheKeyIncludesYAML:
         yaml_file = config_dir / "vertical.yaml"
         yaml_file.write_text("name: test\nversion: 1.0\n")
 
-        integrator = EnhancedVerticalIntegrator()
+        pipeline = VerticalIntegrationPipeline()
 
-        with patch.object(integrator, "_find_yaml_config") as mock_find:
+        with patch.object(pipeline, "_find_yaml_config") as mock_find:
             mock_find.return_value = yaml_file
 
             # Generate cache key
-            key1 = integrator._generate_cache_key(MockVertical)
+            key1 = pipeline._generate_cache_key(MockVertical)
 
             # Modify YAML
             yaml_file.write_text("name: test\nversion: 2.0\n")
 
             # Generate new cache key
-            key2 = integrator._generate_cache_key(MockVertical)
+            key2 = pipeline._generate_cache_key(MockVertical)
 
             # Keys should be different because YAML changed
-            # Note: This test may not pass until implementation is complete
-            # because the current implementation doesn't include YAML hash
+            assert key1 != key2, "Cache key should change when YAML config changes"
 
     def test_yaml_change_invalidates_cache(self, tmp_path):
         """Changing YAML config should invalidate cache."""
         from unittest.mock import MagicMock, patch
-        from victor.framework.vertical_integration import EnhancedVerticalIntegrator
-        from victor.core.verticals.vertical_base import VerticalBase
+        from victor.framework.vertical_integration import VerticalIntegrationPipeline
+        from victor.core.verticals.base import VerticalBase
 
         # Create a mock vertical
         class MockVertical(VerticalBase):
             name = "test_vertical"
 
-        # Create integrator
-        integrator = EnhancedVerticalIntegrator(enable_cache=True)
+        # Create pipeline
+        pipeline = VerticalIntegrationPipeline(enable_cache=True)
 
         # If YAML hashing is implemented, changing YAML should change the cache key
         # This is a placeholder test that verifies the method exists
-        assert hasattr(integrator, "_generate_cache_key")
-        assert hasattr(integrator, "_hash_source_file")
+        assert hasattr(pipeline, "_generate_cache_key")
+        assert hasattr(pipeline, "_hash_source_file")

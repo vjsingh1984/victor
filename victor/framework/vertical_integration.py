@@ -1212,10 +1212,17 @@ class VerticalIntegrationPipeline:
                 f"source={source_hash}",
             ]
 
+            # Include YAML config hash if available (Phase 2.3 fix)
+            yaml_path = self._find_yaml_config(vertical)
+            if yaml_path:
+                yaml_hash = self._hash_yaml_config(yaml_path)
+                key_parts.append(f"yaml={yaml_hash}")
+
             key_string = "|".join(key_parts)
             full_hash = hashlib.sha256(key_string.encode()).hexdigest()
 
-            return f"v1_{vertical.name}_{full_hash[:16]}"
+            # Version bump to v5 to indicate YAML-aware caching
+            return f"v5_{vertical.name}_{full_hash[:16]}"
 
         except Exception as e:
             logger.warning(f"Failed to generate cache key: {e}")
@@ -1265,9 +1272,17 @@ class VerticalIntegrationPipeline:
                                 f"module={module_name}",
                                 f"file={file_hash}",
                             ]
+
+                            # Include YAML config hash if available (Phase 2.3 fix)
+                            yaml_path = self._find_yaml_config(vertical)
+                            if yaml_path:
+                                yaml_hash = self._hash_yaml_config(yaml_path)
+                                key_parts.append(f"yaml={yaml_hash}")
+
                             key_string = "|".join(key_parts)
                             full_hash = hashlib.sha256(key_string.encode()).hexdigest()
-                            return f"v2_{vertical.name}_{full_hash[:16]}"
+                            # Version bump to v6 to indicate YAML-aware caching
+                            return f"v6_{vertical.name}_{full_hash[:16]}"
                     except Exception:
                         pass  # Fall back to id-based key
 

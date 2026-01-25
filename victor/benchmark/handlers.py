@@ -205,7 +205,7 @@ class EnvironmentSetupHandler(BaseHandler):
     ) -> Tuple[Any, int]:
         """Execute environment setup."""
         language = node.input_mapping.get("language", "python")
-        deps_input = node.input_mapping.get("dependencies", [])
+        deps_input: Any = node.input_mapping.get("dependencies", [])
         dependencies: List[str] = (
             deps_input
             if isinstance(deps_input, list)
@@ -372,7 +372,7 @@ class LanguageDetectorHandler(BaseHandler):
         tool_registry: "ToolRegistry",
     ) -> Tuple[Any, int]:
         """Execute language detection."""
-        files_input = node.input_mapping.get("files", [])
+        files_input: Any = node.input_mapping.get("files", [])
         files: List[str] = (
             files_input
             if isinstance(files_input, list)
@@ -507,7 +507,7 @@ class MultiSolutionValidatorHandler(BaseHandler):
         tool_registry: "ToolRegistry",
     ) -> Tuple[Any, int]:
         """Execute multi-solution validation."""
-        solutions_input = node.input_mapping.get("solutions", [])
+        solutions_input: Any = node.input_mapping.get("solutions", [])
         solutions: List[str] = (
             solutions_input
             if isinstance(solutions_input, list)
@@ -515,7 +515,7 @@ class MultiSolutionValidatorHandler(BaseHandler):
             if isinstance(solutions_input, str)
             else []
         )
-        test_cases_input = node.input_mapping.get("test_cases", [])
+        test_cases_input: Any = node.input_mapping.get("test_cases", [])
         test_cases: List[str] = (
             test_cases_input
             if isinstance(test_cases_input, list)
@@ -622,7 +622,7 @@ class CodeTesterHandler(BaseHandler):
     ) -> Tuple[Any, int]:
         """Execute code testing."""
         code = node.input_mapping.get("code", "")
-        test_cases_input = node.input_mapping.get("test_cases", [])
+        test_cases_input: Any = node.input_mapping.get("test_cases", [])
         test_cases: List[str] = (
             test_cases_input
             if isinstance(test_cases_input, list)

@@ -81,7 +81,7 @@ class WebScraperHandler(BaseHandler):
         if isinstance(url, str) and url.startswith("$ctx."):
             url = context.get(url[5:]) or url
 
-        selectors_input = node.input_mapping.get("selectors", {})
+        selectors_input: Any = node.input_mapping.get("selectors", {})
         selectors: Dict[str, Any] = (
             selectors_input
             if isinstance(selectors_input, dict)

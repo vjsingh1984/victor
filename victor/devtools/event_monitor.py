@@ -202,7 +202,7 @@ class EventMonitor:
             # Subscribe to all events
             import asyncio
             from typing import Any, Awaitable
-            from victor.observability.events import MessagingEvent
+            from victor.core.events.protocols import MessagingEvent
 
             async def _subscribe_wrapper() -> None:
                 await bus.subscribe("*", cast(Callable[[MessagingEvent], Awaitable[None]], self._on_observability_event))

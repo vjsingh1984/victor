@@ -1292,14 +1292,14 @@ class VictorAPIServer:
                             pass
 
             # Get largest files - use numeric key for sorting
-            file_sizes.sort(
-                key=lambda x: (
-                    x.get("lines", 0) or 0
-                    if isinstance(x.get("lines", 0), (int, float))
-                    else 0
-                ),
-                reverse=True
-            )
+            def get_sort_key(item: Dict[str, Any]) -> int:
+                """Get numeric sort key from file item."""
+                lines = item.get("lines", 0)
+                if isinstance(lines, (int, float)):
+                    return int(lines)
+                return 0
+
+            file_sizes.sort(key=get_sort_key, reverse=True)
             metrics["largest_files"] = file_sizes[:10]
 
             return web.json_response(metrics)
