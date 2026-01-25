@@ -43,8 +43,6 @@ Usage:
     await manager.cancel_agent(agent_id)
 """
 
-from __future__ import annotations
-
 import asyncio
 import logging
 import time

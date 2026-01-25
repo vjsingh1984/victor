@@ -41,6 +41,8 @@ Usage:
     print(f"Removed {stats['duplicates_removed']} duplicate blocks")
 """
 
+from __future__ import annotations
+
 import hashlib
 import logging
 import re
