@@ -52,6 +52,23 @@ except ImportError:
 from victor.dataanalysis.handlers import StatsComputeHandler
 from victor.framework.handler_registry import HandlerRegistry
 
+# Import handlers module to trigger @handler_decorator registration
+import victor.dataanalysis.handlers  # noqa: F401
+
+
+@pytest.fixture(autouse=True)
+def register_dataanalysis_handlers():
+    """Register dataanalysis handlers before each test in this class.
+
+    This fixture ensures handlers are registered even after conftest resets.
+    """
+    # Re-import to trigger decorator registration after any resets
+    import importlib
+
+    importlib.reload(victor.dataanalysis.handlers)
+    yield
+    # Handlers remain registered for next test
+
 
 class MockToolResult:
     """Mock tool result for testing."""
@@ -652,14 +669,14 @@ class TestHandlersRegistration:
     def test_handlers_dict_exists(self):
         """Test that HandlerRegistry contains expected handlers."""
         registry = HandlerRegistry.get_instance()
-        handlers = registry.list_handlers("dataanalysis")
+        handlers = registry.list_by_vertical("dataanalysis")
         assert isinstance(handlers, list)
         assert len(handlers) > 0
 
     def test_expected_handlers_present(self):
         """Test that expected handlers are present."""
         registry = HandlerRegistry.get_instance()
-        handlers = registry.list_handlers("dataanalysis")
+        handlers = registry.list_by_vertical("dataanalysis")
 
         expected_handlers = [
             "stats_compute",
@@ -677,7 +694,7 @@ class TestHandlersRegistration:
         from victor.dataanalysis.handlers import StatsComputeHandler
 
         registry = HandlerRegistry.get_instance()
-        handler = registry.get_handler("dataanalysis", "stats_compute")
+        handler = registry.get("stats_compute")
         assert handler is not None
         assert isinstance(handler, StatsComputeHandler)
 
@@ -686,6 +703,6 @@ class TestHandlersRegistration:
         from victor.dataanalysis.handlers import StatsComputeHandler
 
         registry = HandlerRegistry.get_instance()
-        handler = registry.get_handler("dataanalysis", "stats_compute")
+        handler = registry.get("stats_compute")
         assert hasattr(handler, "execute")
         assert callable(handler.execute)

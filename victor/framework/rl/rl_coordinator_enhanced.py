@@ -1098,9 +1098,10 @@ class EnhancedRLCoordinator:
         # Select action using exploration strategy
         action = self.exploration.select_action(q_values, available_actions, self.total_steps)
 
-        # Ensure action is of correct type
-        if not isinstance(action, list) or action not in available_actions:
+        # Validate action is in available_actions
+        if action not in available_actions:
             # Fallback to first available action
+            logger.warning(f"Selected action {action} not in available_actions, using first")
             action = available_actions[0]
 
         # Update statistics
