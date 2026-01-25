@@ -41,16 +41,21 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 import traceback
 from dataclasses import dataclass, field
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, List, Optional
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
     from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
+
+    ComputeHandlerType = Callable[[ComputeNode, WorkflowContext, ToolRegistry], Coroutine[Any, Any, NodeResult]]
+else:
+    ComputeHandlerType = Any
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +138,7 @@ class HandlerErrorBoundary:
 
     async def execute(
         self,
-        handler: Callable[..., Any],
+        handler: ComputeHandlerType,
         handler_name: str,
         node: "ComputeNode",
         context: "WorkflowContext",
@@ -260,7 +265,9 @@ class HandlerErrorBoundary:
         )
 
 
-def with_error_boundary(handler_name: str):
+def with_error_boundary(
+    handler_name: str,
+) -> Callable[[ComputeHandlerType], ComputeHandlerType]:
     """Decorator to wrap handler with error boundary.
 
     Provides automatic error boundary wrapping for compute handlers,
@@ -268,6 +275,9 @@ def with_error_boundary(handler_name: str):
 
     Args:
         handler_name: Name for error reporting
+
+    Returns:
+        Decorator function that wraps compute handlers
 
     Example:
         @with_error_boundary("my_custom_handler")
@@ -279,7 +289,7 @@ def with_error_boundary(handler_name: str):
         register_compute_handler("my_custom", my_handler)
     """
 
-    def decorator(func: Callable[..., Any]) -> Callable:
+    def decorator(func: ComputeHandlerType) -> ComputeHandlerType:
         @wraps(func)
         async def wrapper(
             node: "ComputeNode",
@@ -341,7 +351,7 @@ class ParallelToolsHandler:
         # Build params from input mapping
         params = self._build_params(node, context)
 
-        async def execute_tool(tool_name: str) -> tuple:
+        async def execute_tool(tool_name: str) -> tuple[str, Any, Optional[str]]:
             nonlocal tool_calls_used
             async with semaphore:
                 try:
@@ -829,7 +839,7 @@ class DataTransformHandler:
             return result
         return data
 
-    def _to_list(self, data: Any) -> list:
+    def _to_list(self, data: Any) -> list[Any]:
         """Convert to list."""
         if isinstance(data, list):
             return data
@@ -837,12 +847,12 @@ class DataTransformHandler:
             return list(data.values())
         return [data]
 
-    def _to_dict(self, data: Any) -> dict:
+    def _to_dict(self, data: Any) -> dict[str, Any]:
         """Convert to dict."""
         if isinstance(data, dict):
             return data
         if isinstance(data, list):
-            return dict(enumerate(data))
+            return {str(i): v for i, v in enumerate(data)}
         return {"value": data}
 
     def _filter_none(self, data: Any) -> Any:
@@ -931,9 +941,7 @@ class ConditionalBranchHandler:
         - Context variables: ${var_name} or just var_name
         """
         # Replace context variables
-        import re
-
-        def replace_var(match):
+        def replace_var(match: Any) -> str:
             var_name = match.group(1)
             value = context_data.get(var_name)
             if value is None:
