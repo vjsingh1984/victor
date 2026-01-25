@@ -227,12 +227,13 @@ def _process_file_parallel(
             # Symbol extraction
             # Uses @name capture for symbol name/start_line, @def capture for end_line
             query_defs = SYMBOL_QUERIES.get(language, [])
-            if parser.language is None:
+            lang = parser.language
+            if lang is None:
                 raise ValueError(f"Parser language not available for {language}")
 
             for sym_type, query_src in query_defs:
                 try:
-                    query = Query(parser.language, query_src)
+                    query = Query(lang, query_src)
                     cursor = QueryCursor(query)
                     captures_dict = cursor.captures(tree.root_node)
 
@@ -249,7 +250,7 @@ def _process_file_parallel(
                         node_text = node.text
                         if node_text is None:
                             continue
-                        text = node_text.decode("utf-8", errors="ignore")
+                        text = decoded_text = node_text.decode("utf-8", errors="ignore")
                         if text:
                             name_line = node.start_point[0]
                             # Default end_line to name node's end
@@ -275,18 +276,21 @@ def _process_file_parallel(
 
             # Call edge extraction
             call_query_src = CALL_QUERIES.get(language)
-            if call_query_src and parser.language:
+            if call_query_src:
                 try:
-                    query = Query(parser.language, call_query_src)
+                    lang = parser.language
+                    if lang is None:
+                        raise ValueError("Parser language is None")
+                    query = Query(lang, call_query_src)
                     cursor = QueryCursor(query)
                     captures_dict = cursor.captures(tree.root_node)
 
                     callee_nodes = captures_dict.get("callee", [])
                     for node in callee_nodes:
-                        node_text = node.text
-                        if node_text is None:
+                        node_bytes = node.text
+                        if node_bytes is None:
                             continue
-                        callee = node_text.decode("utf-8", errors="ignore")
+                        callee = node_bytes.decode("utf-8", errors="ignore")
                         # Find enclosing function as caller
                         caller = _find_enclosing_function(node, language)
                         if caller and callee and callee not in {"function", caller}:
@@ -296,17 +300,20 @@ def _process_file_parallel(
 
             # Reference extraction
             ref_query_src = REFERENCE_QUERIES.get(language)
-            if ref_query_src and parser.language:
+            if ref_query_src:
                 try:
-                    query = Query(parser.language, ref_query_src)
+                    lang = parser.language
+                    if lang is None:
+                        raise ValueError("Parser language is None")
+                    query = Query(lang, ref_query_src)
                     cursor = QueryCursor(query)
                     captures_dict = cursor.captures(tree.root_node)
                     for _capture_name, nodes in captures_dict.items():
                         for node in nodes:
-                            node_text = node.text
-                            if node_text is None:
+                            node_bytes = node.text
+                            if node_bytes is None:
                                 continue
-                            ref = node_text.decode("utf-8", errors="ignore")
+                            ref = node_bytes.decode("utf-8", errors="ignore")
                             if ref and len(ref) > 1:  # Skip single-char identifiers
                                 references.append(ref)
                 except Exception:
@@ -703,16 +710,21 @@ ENCLOSING_NAME_FIELDS: Dict[str, List[Tuple[str, str]]] = {
 
 
 # Try to import watchdog for file watching
-try:
+if TYPE_CHECKING:
     from watchdog.events import FileSystemEventHandler
-    from watchdog.observers import Observer as _Observer
+    from watchdog.observers import BaseObserver as Observer
+    WATCHDOG_AVAILABLE: bool = True
+else:
+    try:
+        from watchdog.events import FileSystemEventHandler
+        from watchdog.observers import Observer as _Observer
 
-    WATCHDOG_AVAILABLE = True
-    Observer = _Observer
-except ImportError:
-    WATCHDOG_AVAILABLE = False
-    Observer = None  # type: ignore[assignment]
-    FileSystemEventHandler = object  # type: ignore[misc,assignment]
+        WATCHDOG_AVAILABLE = True
+        Observer = _Observer  # type: ignore[misc,assignment]
+    except ImportError:
+        WATCHDOG_AVAILABLE = False
+        Observer = None  # type: ignore[assignment]
+        FileSystemEventHandler = object  # type: ignore[misc,assignment]
 
 
 # Module-level function for ProcessPoolExecutor (must be picklable)
@@ -806,8 +818,8 @@ class CodebaseFileHandler(FileSystemEventHandler):
     def __init__(
         self,
         on_change: Callable[[str], None],
-        file_patterns: Optional[List[str]] = None,
-        ignore_patterns: Optional[List[str]] = None,
+        file_patterns: List[str] | None = None,
+        ignore_patterns: List[str] | None = None,
     ):
         """Initialize file handler.
 
@@ -818,8 +830,8 @@ class CodebaseFileHandler(FileSystemEventHandler):
         """
         super().__init__()
         self.on_change = on_change
-        self.file_patterns = file_patterns or ["*.py"]
-        self.ignore_patterns = ignore_patterns or [
+        self.file_patterns = file_patterns if file_patterns is not None else ["*.py"]
+        self.ignore_patterns = ignore_patterns if ignore_patterns is not None else [
             "__pycache__",
             ".git",
             "node_modules",
@@ -1095,7 +1107,7 @@ class CodebaseIndex:
 
         # File watcher
         self._watcher_enabled = enable_watcher and WATCHDOG_AVAILABLE
-        self._observer: Optional[Any] = None  # Observer
+        self._observer: Optional["Observer"] = None
         self._file_handler: Optional[CodebaseFileHandler] = None
 
         # Callbacks for change notifications (e.g., SymbolStore)
@@ -1492,7 +1504,7 @@ class CodebaseIndex:
         # Determine which files to process
         if files:
             # Explicit file list provided
-            files_to_check = [Path(f) if not isinstance(f, Path) else f for f in files]
+            files_to_check = [(Path(f) if isinstance(f, str) else f) for f in files]
         else:
             # Auto-detect: check all watched files for changes
             files_to_check = []
@@ -1727,9 +1739,6 @@ class CodebaseIndex:
         except Exception:
             return list(refs)
 
-        if parser is None:
-            return list(refs)
-
         try:
             content = file_path.read_bytes()
             tree = parser.parse(content)
@@ -1927,19 +1936,29 @@ class CodebaseIndex:
                 for node in py_ast.walk(tree):
                     if isinstance(node, py_ast.ClassDef):
                         class_name = node.name
-                        for base in node.bases:  # type: ignore[assignment]
+                        for base in node.bases:
+                            base_name_result: str | None = None
                             try:
                                 if hasattr(py_ast, "unparse"):
-                                    base_unparsed: Any = py_ast.unparse(base)  # type: ignore[arg-type]
-                                    base_name_result: str | None = str(base_unparsed) if base_unparsed else None
+                                    from typing import cast
+                                    base_name_result = py_ast.unparse(cast(py_ast.AST, base))
                                 else:
                                     base_id_attr: Any = getattr(base, "id", None)
                                     base_name_result = str(base_id_attr) if base_id_attr else None
                                     if base_name_result is None:
-                                        base_name_result = str(base)
+                                        # For Name nodes, get id; for Attribute nodes, use attr
+                                        if isinstance(base, py_ast.Name):
+                                            base_name_result = base.id
+                                        elif isinstance(base, py_ast.Attribute):
+                                            base_name_result = f"{cast(py_ast.Name, base.value).id}.{base.attr}"  # type: ignore[attr-defined]
+                                        else:
+                                            base_name_result = None
                             except Exception:
-                                base_fallback: Any = getattr(base, "id", str(base))
-                                base_name_result = str(base_fallback) if base_fallback else None
+                                # Last resort: try to get the id or use a placeholder
+                                if hasattr(base, "id"):
+                                    base_name_result = str(getattr(base, "id", ""))
+                                else:
+                                    base_name_result = None
                             if base_name_result:
                                 edges.append((class_name, base_name_result))
             except Exception:
@@ -2170,8 +2189,6 @@ class CodebaseIndex:
         try:
             parser = get_parser(language)
         except Exception:
-            return []
-        if parser is None:
             return []
 
         content = file_path.read_bytes()
@@ -2740,11 +2757,10 @@ class CodebaseIndex:
             settings = load_settings()
             default_persist_dir = get_project_paths(self.root).embeddings_dir
 
-            # Merge extra_config to preserve rebuild_on_corruption flag
+            # Merge extra_config (rebuild_on_corruption is not supported by storage providers)
             extra_config = config.get("extra_config", {}).copy()
-            # Pass rebuild_on_corruption flag through config
-            if self._rebuild_on_corruption:
-                extra_config["rebuild_on_corruption"] = True
+            # Note: rebuild_on_corruption flag is stored but not passed to initialize
+            # as storage providers don't support this parameter
 
             # Use settings as defaults, allow config to override
             embedding_config = EmbeddingConfig(

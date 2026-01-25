@@ -254,7 +254,10 @@ class LazyToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
         """Factory method to create the tool - used by BaseLazyToolRunnable."""
         from victor.tools.registry import ToolRegistry
 
-        tool = ToolRegistry.instance().get(self._tool_name)
+        # Note: ToolRegistry should be accessed via container or singleton
+        # This is a temporary workaround - proper DI should be used
+        tool_registry = ToolRegistry()
+        tool = tool_registry.get(self._tool_name)
         if tool is None:
             raise ValueError(f"Tool '{self._tool_name}' not found")
         return tool

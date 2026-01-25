@@ -167,8 +167,8 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
         self._auto_fix = auto_fix
         self._max_iterations = max_iterations
         self._enable_rl = enable_rl
-        self._inner_middleware = None
-        self._rl_hooks = None
+        self._inner_middleware: Optional[Any] = None
+        self._rl_hooks: Optional[Any] = None
         # Track timing for RL
         self._tool_start_times: Dict[str, float] = {}
 

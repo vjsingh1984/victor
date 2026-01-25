@@ -698,7 +698,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         PLAN/EXPLORE modes get higher limits to allow thorough file exploration.
         """
-        multiplier = float(self.exploration_multiplier)  # type: ignore[arg-type]
+        multiplier = float(self.exploration_multiplier) if self.exploration_multiplier is not None else 1.0
         effective = int(self._base_max_overlapping_reads * multiplier)
         return max(self._base_max_overlapping_reads, effective)
 

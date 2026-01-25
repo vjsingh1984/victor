@@ -1158,7 +1158,7 @@ class APIKeysProxy:
 
 # Module-level api_keys attribute for backward compatibility
 # This provides dict-like access to configured API keys
-api_keys = APIKeysProxy()  # type: ignore[no-untyped-call]
+api_keys = APIKeysProxy()
 
 
 def create_api_keys_template() -> str:

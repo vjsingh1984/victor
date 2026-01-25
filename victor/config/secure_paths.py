@@ -749,7 +749,7 @@ def create_cache_manifest(cache_dir: Path) -> bool:
                 file_hash = compute_file_hash(file_path)
                 if file_hash:
                     if isinstance(manifest.get("files"), dict):
-                        manifest["files"][rel_path] = {  # type: ignore[index]
+                        manifest["files"][rel_path] = {
                             "hash": file_hash,
                             "size": file_path.stat().st_size,
                         }
@@ -1074,11 +1074,11 @@ def get_security_status() -> Dict[str, Any]:
         import keyring
 
         if isinstance(status.get("keyring"), dict):
-            status["keyring"]["available"] = True  # type: ignore[index]
+            status["keyring"]["available"] = True
         try:
             backend = keyring.get_keyring()
             if isinstance(status.get("keyring"), dict):
-                status["keyring"]["backend"] = type(backend).__name__  # type: ignore[index]
+                status["keyring"]["backend"] = type(backend).__name__
         except Exception:
             pass
     except ImportError:
@@ -1089,7 +1089,7 @@ def get_security_status() -> Dict[str, Any]:
     if embeddings_dir.exists():
         is_valid, _ = verify_cache_integrity(embeddings_dir)
         if isinstance(status.get("cache_integrity"), dict):
-            status["cache_integrity"]["embeddings_verified"] = is_valid  # type: ignore[index]
+            status["cache_integrity"]["embeddings_verified"] = is_valid
 
     return status
 

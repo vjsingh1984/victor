@@ -21,7 +21,7 @@ enabling the framework to resolve coding vertical dependencies.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, List, Type
+from typing import TYPE_CHECKING, Any, List, Type
 
 from victor.core.verticals.protocols import ServiceProviderProtocol
 
@@ -97,6 +97,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
         settings: "Settings",
     ) -> None:
         """Register coding middleware services."""
+        from typing import Any
         from victor.core.container import ServiceLifetime
 
         def create_middleware(_: Any) -> Any:
@@ -118,6 +119,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
         settings: "Settings",
     ) -> None:
         """Register coding safety extension."""
+        from typing import Any
         from victor.core.container import ServiceLifetime
 
         def create_safety(_: Any) -> Any:
@@ -137,6 +139,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
         settings: "Settings",
     ) -> None:
         """Register coding prompt contributor."""
+        from typing import Any
         from victor.core.container import ServiceLifetime
 
         def create_prompts(_: Any) -> Any:
@@ -158,6 +161,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
         settings: "Settings",
     ) -> None:
         """Register mode configuration provider."""
+        from typing import Any
         from victor.core.container import ServiceLifetime
         from victor.core.verticals.protocols import ModeConfigProviderProtocol
 
@@ -178,6 +182,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
         settings: "Settings",
     ) -> None:
         """Register tool dependency provider."""
+        from typing import Any
         from victor.core.container import ServiceLifetime
         from victor.core.verticals.protocols import ToolDependencyProviderProtocol
 

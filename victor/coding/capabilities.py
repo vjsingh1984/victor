@@ -403,7 +403,7 @@ def _get_provider() -> CodingCapabilityProvider:
     """Get or create provider instance."""
     global _provider_instance
     if _provider_instance is None:
-        _provider_instance = CodingCapabilityProvider()  # type: ignore[no-untyped-call]
+        _provider_instance = CodingCapabilityProvider()
     return _provider_instance
 
 

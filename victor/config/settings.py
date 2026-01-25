@@ -1603,6 +1603,15 @@ class Settings(BaseSettings):
                     max_tokens=4096,
                     description=None,
                     tool_selection=None,
+                    grounding_threshold=None,
+                    loop_repeat_threshold=None,
+                    max_continuation_prompts=None,
+                    max_tool_calls_per_turn=None,
+                    quality_threshold=None,
+                    session_idle_timeout=None,
+                    timeout=None,
+                    tool_cache_enabled=None,
+                    tool_deduplication_enabled=None,
                 )
             }
 

@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from victor.framework.prompt_builder import PromptBuilder
 
 from victor.core.verticals.base import VerticalBase, VerticalConfig
-from victor.framework.stage_manager import StageDefinition
+from victor.core.vertical_types import StageDefinition
 from victor.core.verticals.defaults.tool_defaults import (
     COMMON_REQUIRED_TOOLS,
     merge_required_tools,
