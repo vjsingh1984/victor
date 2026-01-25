@@ -387,7 +387,8 @@ class OrchestratorProtocolAdapter:
         """
         if self._conversation is None:
             return 0
-        return len(self._conversation.messages)
+        messages = self._conversation.messages
+        return len(messages) if messages is not None else 0
 
     # ========================================================================
     # Health Check Methods

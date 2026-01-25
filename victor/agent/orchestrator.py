@@ -1864,7 +1864,7 @@ class AgentOrchestrator(
         try:
             logger.info("Starting background embedding preload...")
             # Initialize the actual tool_selector (not the deprecated semantic_selector)
-            if hasattr(self.tool_selector, "initialize_tool_embeddings"):
+            if self.tool_selector is not None and hasattr(self.tool_selector, "initialize_tool_embeddings"):
                 await self.tool_selector.initialize_tool_embeddings(self.tools)
             logger.info(
                 f"{self._presentation.icon('success')} Tool embeddings preloaded successfully in background"
@@ -1961,7 +1961,14 @@ class AgentOrchestrator(
                 "reason": "Search coordinator not available",
                 "search_type": "keyword"
             }
-        return self._search_coordinator.route_search_query(query)
+        result = self._search_coordinator.route_search_query(query)
+        # Ensure the result has the expected structure
+        return result if isinstance(result, dict) else {
+            "recommended_tool": "code_search",
+            "confidence": 0.5,
+            "reason": "Unexpected result type from search coordinator",
+            "search_type": "keyword"
+        }
 
     def get_recommended_search_tool(self, query: str) -> str:
         """Get the recommended search tool name for a query.
@@ -1976,7 +1983,8 @@ class AgentOrchestrator(
         """
         if self._search_coordinator is None:
             return "code_search"
-        return self._search_coordinator.get_recommended_search_tool(query)
+        tool = self._search_coordinator.get_recommended_search_tool(query)
+        return tool if isinstance(tool, str) else "code_search"
 
     def _record_tool_execution(
         self,
@@ -2016,7 +2024,7 @@ class AgentOrchestrator(
 
         # Also record to SemanticToolSelector's internal tracker for confidence boosting
         # This enables the 15-20% accuracy improvement via workflow pattern detection
-        if hasattr(self, "tool_selector") and hasattr(self.tool_selector, "record_tool_execution"):
+        if self.tool_selector is not None and hasattr(self.tool_selector, "record_tool_execution"):
             self.tool_selector.record_tool_execution(tool_name, success=success)
 
         # Record to RL tool_selector learner for Q-learning optimization
@@ -2084,9 +2092,20 @@ class AgentOrchestrator(
         """
         if self._metrics_coordinator is None:
             # Return empty TokenUsage if coordinator not available
-            from victor.providers.base import TokenUsage
+            from victor.evaluation.protocol import TokenUsage
             return TokenUsage(input_tokens=0, output_tokens=0, total_tokens=0)
-        return self._metrics_coordinator.get_token_usage()
+        result = self._metrics_coordinator.get_token_usage()
+        # Ensure result is a dict with expected keys
+        if isinstance(result, dict):
+            from victor.evaluation.protocol import TokenUsage
+            return TokenUsage(
+                input_tokens=result.get("input_tokens", 0),
+                output_tokens=result.get("output_tokens", 0),
+                total_tokens=result.get("total_tokens", 0)
+            )
+        # Return empty TokenUsage if result is not as expected
+        from victor.evaluation.protocol import TokenUsage
+        return TokenUsage(input_tokens=0, output_tokens=0, total_tokens=0)
 
     def reset_token_usage(self) -> None:
         """Reset cumulative token usage tracking.
@@ -2636,7 +2655,7 @@ class AgentOrchestrator(
 
         # Delegate to the extracted formatter
         if self._tool_output_formatter is None:
-            return output
+            return str(output) if output is not None else ""
         return self._tool_output_formatter.format_tool_output(
             tool_name=tool_name,
             args=args,

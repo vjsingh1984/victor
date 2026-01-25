@@ -160,7 +160,7 @@ def deprecated_property(
 
     def decorator(func: F) -> F:
         @functools.wraps(func)
-        def wrapper(self, *args: Any, **kwargs: Any) -> Any:
+        def wrapper(self) -> Any:
             # Build deprecation message
             parts = [f"Property '{func.__name__}' is deprecated"]
 

@@ -162,7 +162,7 @@ class ToolRegistrar:
 
     def __init__(
         self,
-        tools: ToolRegistry,
+        tools: "ToolRegistry",
         settings: Any,
         provider: Optional[BaseProvider] = None,
         model: Optional[str] = None,

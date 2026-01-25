@@ -113,7 +113,7 @@ class TaskCoordinator:
     def prepare_task(
         self,
         user_message: str,
-        unified_task_type: "TaskType",
+        unified_task_type: "TrackerTaskType",
         conversation_controller: "ConversationController",
     ) -> tuple[Any, int]:
         """Prepare task-specific guidance and budget adjustments.
