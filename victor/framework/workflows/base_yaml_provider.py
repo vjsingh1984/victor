@@ -483,7 +483,7 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
         workflow_name: str,
         context: Optional[Dict[str, Any]] = None,
         thread_id: Optional[str] = None,
-    ) -> "GraphExecutionResult":
+    ) -> "GraphExecutionResult[Any]":
         """Execute a workflow using the unified compiler.
 
         This method compiles the workflow using the UnifiedWorkflowCompiler
@@ -516,7 +516,7 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
         workflow_name: str,
         context: Optional[Dict[str, Any]] = None,
         thread_id: Optional[str] = None,
-    ) -> AsyncIterator[tuple]:
+    ) -> AsyncIterator[tuple[Any, Any]]:
         """Stream workflow execution using the unified compiler.
 
         This method compiles the workflow using the UnifiedWorkflowCompiler

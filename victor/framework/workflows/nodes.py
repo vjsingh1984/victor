@@ -393,8 +393,13 @@ class TeamNode:
             )
 
         # Execute via unified coordinator
-        result = await coordinator.execute_team_config(team_config)
-        return result
+        result_dict: Dict[str, Any] = await coordinator.execute_task(
+            task=team_config.task,
+            context=team_config.context or {}
+        )
+        # Convert dict result to TeamResult
+        from victor.teams import TeamResult
+        return TeamResult(**result_dict)  # type: ignore[arg-type]
 
     def _merge_team_result(
         self,

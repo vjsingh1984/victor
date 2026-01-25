@@ -236,10 +236,10 @@ config = MemoryConfig(
 ## Next Steps
 
 - See individual guides for detailed feature documentation:
-  - [MULTIMODAL_GUIDE.md](MULTIMODAL_GUIDE.md) - Multi-Modal processing
-  - [ADVANCED_RAG_GUIDE.md](ADVANCED_RAG_GUIDE.md) - Advanced RAG features
-  - [AGENT_SWARMING_GUIDE.md](AGENT_SWARMING_GUIDE.md) - Agent coordination
-  - [TOOL_COMPOSITION_GUIDE.md](TOOL_COMPOSITION_GUIDE.md) - Tool orchestration
+  - [Multimodal Capabilities](guides/MULTIMODAL_CAPABILITIES.md) - Multi-modal processing
+  - [RAG Vertical Guide](verticals/rag.md) - Advanced RAG features
+  - [Multi-Agent Teams](guides/MULTI_AGENT_TEAMS.md) - Agent coordination
+  - [Tooling Guide](user-guide/tools.md) - Tool orchestration
 
 ## Contributing
 

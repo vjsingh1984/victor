@@ -116,7 +116,7 @@ class TeamSpecRegistry:
         coding_teams = registry.find_by_vertical("coding")
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the registry."""
         self._teams: Dict[str, TeamSpecEntry] = {}
         self._lock = threading.RLock()
@@ -503,7 +503,7 @@ def get_team_registry() -> TeamSpecRegistry:
     if _registry_instance is None:
         with _registry_lock:
             if _registry_instance is None:
-                _registry_instance = TeamSpecRegistry()
+                _registry_instance = TeamSpecRegistry()  # type: ignore[no-untyped-call]
 
     return _registry_instance
 

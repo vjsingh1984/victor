@@ -358,8 +358,8 @@ assert isinstance(provider_manager, IProviderManager)
 
 ## References
 
-- [Work Stream 2: Protocol Definitions](../parallel_work_streams_plan.md#work-stream-2-missing-protocol-definitions)
-- [Protocol Reference](../api-reference/protocols.md)
+- [Protocol Roadmap](../roadmap/future_roadmap.md)
+- [Protocol Reference](../reference/internals/protocols-api.md)
 - [ADR-001: Coordinator Architecture](./ADR-001-coordinator-architecture.md)
 
 ---

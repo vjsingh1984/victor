@@ -193,11 +193,12 @@ class FrameworkShim:
         ensure_bootstrapped(self._settings, vertical=vertical_name)
 
         # Step 1: Create base orchestrator
-        self._orchestrator = await AgentOrchestrator.from_settings(
+        orchestrator = await AgentOrchestrator.from_settings(
             self._settings,
             profile_name=self._profile_name,
             thinking=self._thinking,
         )
+        self._orchestrator = orchestrator
 
         # Step 2: Apply vertical configuration
         if self._vertical:
@@ -209,7 +210,7 @@ class FrameworkShim:
 
         logger.debug(f"FrameworkShim created orchestrator: session_id={self._session_id}")
 
-        return self._orchestrator
+        return self._orchestrator  # type: ignore[return-value]
 
     def _apply_vertical(self, vertical: Type["VerticalBase"]) -> None:
         """Apply vertical configuration to orchestrator.
@@ -268,10 +269,12 @@ class FrameworkShim:
             session_id=self._session_id,
             enable_cqrs_bridge=self._enable_cqrs_bridge,
         )
-        self._observability.wire_orchestrator(self._orchestrator)
+        if self._orchestrator is not None:
+            self._observability.wire_orchestrator(self._orchestrator)
 
-        # Store reference on orchestrator for access
-        self._orchestrator.observability = self._observability
+            # Store reference on orchestrator for access
+            if hasattr(self._orchestrator, 'observability'):
+                self._orchestrator.observability = self._observability  # type: ignore[union-attr]
 
         logger.debug(
             f"Wired observability: session_id={self._session_id}, "

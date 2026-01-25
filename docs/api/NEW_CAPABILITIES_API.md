@@ -1123,7 +1123,7 @@ The following APIs are deprecated and should be replaced:
 
 ## Additional Resources
 
-- [User Guide](../USER_GUIDE.md)
+- [User Guide](../user-guide/index.md)
 - [Hierarchical Planning Guide](../guides/HIERARCHICAL_PLANNING.md)
 - [Enhanced Memory Guide](../guides/ENHANCED_MEMORY.md)
 - [Dynamic Skills Guide](../guides/DYNAMIC_SKILLS.md)

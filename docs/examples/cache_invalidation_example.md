@@ -517,8 +517,8 @@ for mw in middleware_chain._middleware:
 
 ## Additional Resources
 
-- [FileWatcher Documentation](../agent/cache/file_watcher.py)
-- [DependencyExtractor Documentation](../agent/cache/dependency_extractor.py)
-- [Middleware Protocols](../framework/middleware_protocols.py)
-- [Middleware Implementations](../framework/middleware_implementations.py)
-- [VerticalBase Documentation](../core/verticals/base.py)
+- FileWatcher: `victor/agent/cache/file_watcher.py`
+- DependencyExtractor: `victor/agent/cache/dependency_extractor.py`
+- Middleware Protocols: `victor/framework/middleware_protocols.py`
+- Middleware Implementations: `victor/framework/middleware_implementations.py`
+- VerticalBase: `victor/core/verticals/base.py`

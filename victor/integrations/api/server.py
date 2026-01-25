@@ -1926,7 +1926,8 @@ class VictorAPIServer:
             task_type = request.query.get("task_type")
 
             # Get available providers from learner's Q-table
-            available = list(learner._q_table.keys()) if learner._q_table else ["ollama"]
+            q_table = getattr(learner, "_q_table", None)
+            available = list(q_table.keys()) if q_table else ["ollama"]
 
             # Get recommendation from coordinator
             recommendation = coordinator.get_recommendation(
@@ -1944,7 +1945,7 @@ class VictorAPIServer:
             if hasattr(learner, "_q_table"):
                 q_table = getattr(learner, "_q_table", None)
                 if isinstance(q_table, dict):
-                    for provider, q_value in q_table.items():  # type: ignore[attr-defined]
+                    for provider, q_value in q_table.items():
                         rankings.append(
                             {
                                 "provider": provider,
@@ -2002,8 +2003,8 @@ class VictorAPIServer:
             except ValueError:
                 return web.json_response({"error": "rate must be a number"}, status=400)
 
-            old_rate = learner.epsilon
-            learner.epsilon = rate
+            old_rate = getattr(learner, "epsilon", 0.3)
+            setattr(learner, "epsilon", rate)
 
             return web.json_response(
                 {
@@ -2048,13 +2049,17 @@ class VictorAPIServer:
                     status=400,
                 )
 
-            old_strategy = learner.strategy.value
-            learner.strategy = strategy
+            old_strategy = getattr(learner, "strategy", None)
+            if old_strategy is not None:
+                old_strategy_value = old_strategy.value  # type: ignore[attr-defined]
+            else:
+                old_strategy_value = "unknown"
+            setattr(learner, "strategy", strategy)
 
             return web.json_response(
                 {
                     "success": True,
-                    "old_strategy": old_strategy,
+                    "old_strategy": old_strategy_value,
                     "new_strategy": strategy.value,
                 }
             )

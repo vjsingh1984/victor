@@ -483,9 +483,9 @@ Edit `docs/dashboard/coordinator_performance.html`:
 
 ## Related Documentation
 
-- [Orchestrator Refactoring Analysis](../metrics/orchestrator_refactoring_analysis.md)
-- [Coordinator Architecture](../architecture/coordinator-based-orchestrator.md)
-- [Performance Benchmarks](../development/performance-testing.md)
+- [Orchestrator Refactoring Analysis](../reference/internals/orchestrator_refactoring_analysis.md)
+- [Coordinator Architecture](../architecture/coordinator_based_architecture.md)
+- [Performance Benchmarks](../performance/benchmark_results.md)
 
 ## Support
 

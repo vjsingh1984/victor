@@ -197,7 +197,7 @@ Models depend on your configured providers. Examples include:
 - **Local (Ollama)**: Qwen2.5, DeepSeek, CodeLlama, etc.
 - And more...
 
-[Full provider list](./reference/providers/)
+[Full provider list](reference/providers/index.md)
 
 ---
 
@@ -291,7 +291,7 @@ Tools across multiple domains (see the catalog for the current list):
 - Document indexing
 - Semantic retrieval
 
-[List all tools](docs/user-guide/tools.md)
+[List all tools](user-guide/tools.md)
 
 ### How do I use workflows?
 
@@ -306,7 +306,7 @@ victor workflow run code-review --file myfile.py
 victor workflow create my-workflow.yaml
 ```
 
-[Learn more about workflows](docs/user-guide/workflows.md)
+[Learn more about workflows](user-guide/workflows.md)
 
 ### What are multi-agent teams?
 
@@ -552,7 +552,7 @@ async def main():
 asyncio.run(main())
 ```
 
-[Full API documentation](docs/api/README.md)
+[Full API documentation](api/README.md)
 
 ### How do I configure Victor?
 
@@ -613,7 +613,7 @@ steps:
 victor workflow run my_workflow --file myfile.py
 ```
 
-[Learn more about workflows](docs/user-guide/workflows.md)
+[Learn more about workflows](user-guide/workflows.md)
 
 ### How do I create custom tools?
 
@@ -717,7 +717,7 @@ export VICTOR_TRACK_TOKENS=true
 
 ### How do I contribute?
 
-[Contributing guide](CONTRIBUTING.md)
+[Contributing guide](contributing/index.md)
 
 **Quick start:**
 ```bash
@@ -739,12 +739,12 @@ pytest
 ### Where can I learn more?
 
 **Documentation:**
-- [Quick Start](QUICKSTART.md)
-- [Tutorial](TUTORIAL.md)
-- [Recipe Book](RECIPES.md)
-- [User Guide](docs/user-guide/index.md)
-- [API Reference](docs/api/README.md)
-- [Architecture](ARCHITECTURE.md)
+- [Quick Start](tutorials/QUICK_START.md)
+- [Tutorials](tutorials/README.md)
+- [Recipe Book](tutorials/COMMON_WORKFLOWS.md)
+- [User Guide](user-guide/index.md)
+- [API Reference](api/README.md)
+- [Architecture](architecture/ARCHITECTURE.md)
 
 **Examples:**
 - [Examples Directory](examples/)
@@ -814,13 +814,13 @@ pytest
 ## Additional Resources
 
 ### Official Documentation
-- [README](README.md) - Project overview
-- [CLAUDE.md](CLAUDE.md) - Developer quick reference
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
+- [Documentation Home](index.md) - Project overview
+- `CLAUDE.md` - Developer quick reference (repo root)
+- [Architecture](architecture/ARCHITECTURE.md) - System architecture
 
 ### Community
 - [GitHub Repository](https://github.com/vjsingh1984/victor)
-- [Contributing Guide](CONTRIBUTING.md)
+- [Contributing Guide](contributing/index.md)
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ### Related Projects

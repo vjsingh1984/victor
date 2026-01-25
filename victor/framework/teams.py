@@ -463,7 +463,8 @@ class AgentTeam:
         )
 
         # Create coordinator
-        coordinator = TeamCoordinator(orchestrator)
+        # Type ignore: OrchestratorProtocol vs IAgentOrchestrator - at runtime this is compatible
+        coordinator = TeamCoordinator(orchestrator)  # type: ignore[arg-type]
 
         return cls(coordinator, config)
 

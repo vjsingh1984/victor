@@ -225,7 +225,7 @@ class ChatCoordinator:
 ## References
 
 - [Coordinator-Based Architecture Guide](../architecture/coordinator_based_architecture.md)
-- [Orchestrator Refactoring Analysis](../metrics/orchestrator_refactoring_analysis.md)
+- [Orchestrator Refactoring Analysis](../reference/internals/orchestrator_refactoring_analysis.md)
 - [Migration Guide](../migration/orchestrator_refactoring_guide.md)
 - [ADR-004: Protocol-Based Design](./ADR-004-protocol-based-design.md)
 

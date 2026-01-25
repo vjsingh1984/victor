@@ -345,8 +345,8 @@ victor chat --provider anthropic       # Specific provider
 
 - [Testing Guide](testing.md) - Learn testing patterns and fixtures
 - [Code Style Guide](code-style.md) - Formatting and linting standards
-- [Architecture Overview](architecture/overview.md) - System design
-- [Contributing Guide](../../CONTRIBUTING.md) - Pull request process
+- [Architecture Overview](../architecture/overview.md) - System design
+- [Contributing Guide](index.md) - Pull request process
 
 ---
 

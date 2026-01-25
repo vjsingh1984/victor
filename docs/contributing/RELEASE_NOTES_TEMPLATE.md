@@ -136,14 +136,14 @@ victor-ai-[version].tar.gz: SHA256
 
 For complete list of changes, see:
 - [GitHub Commits](https://github.com/vjsingh1984/victor/commits/v[version])
-- [MIGRATION.md](docs/MIGRATION.md) for breaking changes
-- [CHANGELOG.md](CHANGELOG.md) for full history
+- MIGRATION guide: `docs/MIGRATION_GUIDE.md` for breaking changes
+- CHANGELOG: `CHANGELOG.md` (repo root) for full history
 
 ---
 
 ## Previous Releases
 
-See [CHANGELOG.md](CHANGELOG.md) for details on previous releases.
+See `CHANGELOG.md` (repo root) for details on previous releases.
 
 ---
 

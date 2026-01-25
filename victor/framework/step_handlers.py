@@ -1017,7 +1017,8 @@ class CapabilityConfigStepHandler(BaseStepHandler):
                 f"victor.{vertical.name}.capabilities", fromlist=["get_capability_configs"]
             )
             if hasattr(module, "get_capability_configs"):
-                return module.get_capability_configs()
+                configs = module.get_capability_configs()
+                return configs if isinstance(configs, dict) else {}
         except (ImportError, AttributeError):
             pass
 
@@ -1211,9 +1212,9 @@ class FrameworkStepHandler(BaseStepHandler):
             if self._workflow_registry is not None:
                 registry = self._workflow_registry
             else:
-                from victor.workflows.registry import get_workflow_registry
+                from victor.workflows.registry import get_global_registry
 
-                registry = get_workflow_registry()
+                registry = get_global_registry()
 
             for name, workflow in workflows.items():
                 registry.register(
@@ -1571,10 +1572,11 @@ class FrameworkStepHandler(BaseStepHandler):
             if hasattr(provider, "get_capabilities"):
                 for cap in provider.get_capabilities():
                     if hasattr(cap, "name") and hasattr(cap, "handler"):
+                        cap_type = getattr(cap, "capability_type", None)
                         loader.register_capability(
                             name=cap.name,
                             handler=cap.handler,
-                            capability_type=getattr(cap, "capability_type", None),
+                            capability_type=cap_type if cap_type is not None else "custom",  # type: ignore[arg-type]
                             version=getattr(cap, "version", "1.0"),
                         )
 
@@ -1980,7 +1982,7 @@ class ExtensionsStepHandler(BaseStepHandler):
     modifying this class.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize with sub-handlers and registry."""
         self._middleware_handler = MiddlewareStepHandler()
         self._safety_handler = SafetyStepHandler()

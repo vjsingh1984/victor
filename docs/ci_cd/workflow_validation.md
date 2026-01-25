@@ -491,10 +491,10 @@ bash scripts/hooks/validate_workflows.sh --ci victor/*/workflows/*.yaml
 
 ## Related Documentation
 
-- [Workflow Development Guide](../development/workflows.md)
-- [Testing Guide](../development/testing.md)
+- [Workflow Development Guide](../guides/workflow-development/dsl.md)
+- [Testing Guide](../testing/TESTING_GUIDE.md)
 - [CI/CD Overview](./README.md)
-- [Performance Optimization](../performance/workflows.md)
+- [Performance Optimization](../performance/optimization_guide.md)
 
 ## Support
 

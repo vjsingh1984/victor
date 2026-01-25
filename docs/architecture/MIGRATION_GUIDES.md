@@ -352,7 +352,7 @@ if isinstance(vertical, ToolProvider):
 
 ### Complete Example: Research Vertical Migration
 
-See [ISP_MIGRATION_GUIDE.md](../ISP_MIGRATION_GUIDE.md) for complete Research vertical migration example.
+See [Vertical Development Guide](../reference/internals/VERTICAL_DEVELOPMENT_GUIDE.md) for a complete vertical migration example.
 
 ---
 
@@ -492,7 +492,7 @@ agent = await Agent.create(vertical=MyVerticalAssistant)
 
 ### Complete Example: Security Vertical
 
-See [vertical_template_guide.md](../vertical_template_guide.md) for complete example.
+See [External Vertical Developer Guide](../reference/internals/EXTERNAL_VERTICAL_DEVELOPER_GUIDE.md) for a complete example.
 
 ---
 
@@ -1139,9 +1139,9 @@ class MyComponent:
 
 - [Protocol Reference](./PROTOCOLS_REFERENCE.md)
 - [Best Practices](./BEST_PRACTICES.md)
-- [ISP Migration Guide](../ISP_MIGRATION_GUIDE.md)
-- [Vertical Template Guide](../vertical_template_guide.md)
-- [Testing Guide](../testing/)
+- [Vertical Development Guide](../reference/internals/VERTICAL_DEVELOPMENT_GUIDE.md)
+- [External Vertical Developer Guide](../reference/internals/EXTERNAL_VERTICAL_DEVELOPER_GUIDE.md)
+- [Testing Guide](../testing/README.md)
 
 ---
 

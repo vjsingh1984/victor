@@ -567,7 +567,7 @@ Potential improvements for future versions:
 
 ## References
 
-- [Basic Caching (Track 5)](../performance/caching.md)
-- [Tool Selection Architecture](../architecture/tool_selection.md)
-- [Performance Best Practices](../performance/best_practices.md)
-- [Configuration Reference](../configuration/settings.md)
+- [Basic Caching Guide](../performance/optimization_guide.md)
+- [Tool Selection Architecture](../architecture/overview.md)
+- [Performance Best Practices](../performance/optimization_guide.md)
+- [Configuration Reference](../reference/configuration/index.md)

@@ -38,4 +38,4 @@ pytest tests/unit -v
 
 For contribution workflow, PR expectations, and governance, see the root guide:
 
-- [CONTRIBUTING.md](../../CONTRIBUTING.md)
+- Root CONTRIBUTING: `CONTRIBUTING.md`

@@ -102,7 +102,7 @@ VICTOR_VERBOSE_VALIDATION=1 ./scripts/hooks/validate_workflows.sh path/to/workfl
 
 ## Documentation
 
-See [docs/development/pre_commit_hooks.md](pre_commit_hooks.md) for complete documentation.
+See [PRE_COMMIT_HOOKS.md](PRE_COMMIT_HOOKS.md) for complete documentation.
 
 ## Performance
 

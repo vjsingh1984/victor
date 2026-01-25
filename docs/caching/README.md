@@ -435,7 +435,7 @@ return result
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](../../CONTRIBUTING.md) for guidelines.
+Contributions are welcome! Please see [Contributing Guide](../contributing/index.md) for guidelines.
 
 ## License
 

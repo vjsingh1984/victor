@@ -522,7 +522,7 @@ collector.set_enabled(False)
 
 ## Further Reading
 
-- [Workflow Execution](../workflows/README.md) - Workflow system overview
-- [Team Formation](../../teams/README.md) - Multi-agent team coordination
-- [Event Bus Taxonomy](../../core/events/taxonomy.md) - Unified event taxonomy
-- [Metrics System](../../observability/metrics.md) - Core metrics infrastructure
+- [Workflow Execution](../user-guide/workflows.md) - Workflow system overview
+- [Team Formation](../teams/collaboration.md) - Multi-agent team coordination
+- Event Bus Taxonomy - Unified event taxonomy (internal)
+- [Metrics System](./PRODUCTION_METRICS.md) - Core metrics infrastructure

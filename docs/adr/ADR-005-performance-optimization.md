@@ -523,8 +523,8 @@ jobs:
 
 ## References
 
-- [Orchestrator Refactoring Performance Analysis](../metrics/orchestrator_refactoring_analysis.md)
-- [Cache Performance Analysis](../metrics/cache_performance_analysis.md)
+- [Orchestrator Refactoring Performance Analysis](../reference/internals/orchestrator_refactoring_analysis.md)
+- [Cache Performance Analysis](../performance/benchmark_results.md)
 - [ADR-001: Coordinator Architecture](./ADR-001-coordinator-architecture.md)
 - [ADR-003: Distributed Caching](./ADR-003-distributed-caching.md)
 

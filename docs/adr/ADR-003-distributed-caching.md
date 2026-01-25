@@ -372,8 +372,8 @@ cache_manager = ToolCacheManager(
 
 ## References
 
-- [Work Stream 1: Tool Cache Invalidation](../parallel_work_streams_plan.md#work-stream-1-tool-cache-invalidation-architecture)
-- [Performance Analysis](../metrics/cache_performance_analysis.md)
+- [Caching Roadmap](../roadmap/future_roadmap.md)
+- [Performance Analysis](../performance/benchmark_results.md)
 - [ADR-005: Performance Optimization](./ADR-005-performance-optimization.md)
 
 ---

@@ -342,10 +342,10 @@ extensions:
 
 ## References
 
-- [YAML Vertical Configuration Summary](../yaml_vertical_config_summary.md)
-- [External Vertical Developer Guide](../EXTERNAL_VERTICAL_DEVELOPER_GUIDE.md)
-- [Workflow Architecture](../architecture/workflows.md)
-- [ADR-003: Generic Middleware](./ADR-003-generic-middleware.md)
+- [Vertical Development Guide](../reference/internals/VERTICAL_DEVELOPMENT_GUIDE.md)
+- [External Vertical Developer Guide](../reference/internals/EXTERNAL_VERTICAL_DEVELOPER_GUIDE.md)
+- [Workflow Architecture](../reference/internals/workflows-api.md)
+- [Protocol-Based Design](../architecture/PROTOCOLS_REFERENCE.md)
 
 ---
 

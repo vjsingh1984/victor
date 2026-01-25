@@ -177,7 +177,7 @@ class ToolConfigurator:
         """Initialize configurator."""
         self._tool_catalog: Dict[str, ToolConfigEntry] = {}
         self._filters: List[ToolFilterProtocol] = []
-        self._hooks: Dict[str, List[Callable]] = {
+        self._hooks: Dict[str, List[Callable[..., Any]]] = {
             "pre_configure": [],
             "post_configure": [],
         }
@@ -382,7 +382,8 @@ class ToolConfigurator:
         """
         # Use capability-based check first (protocol-first approach)
         if hasattr(orchestrator, "get_enabled_tools") and callable(orchestrator.get_enabled_tools):
-            return orchestrator.get_enabled_tools()
+            tools = orchestrator.get_enabled_tools()
+            return tools if isinstance(tools, set) else set(tools) if tools is not None else set()
 
         # Fall back to all available
         return self._get_available_tools(orchestrator)

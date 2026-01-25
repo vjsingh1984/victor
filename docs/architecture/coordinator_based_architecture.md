@@ -821,8 +821,8 @@ The architecture is **production-ready** and provides a solid foundation for Vic
 
 ## References
 
-- [Performance Analysis](../metrics/orchestrator_refactoring_analysis.md)
+- [Performance Analysis](../reference/internals/orchestrator_refactoring_analysis.md)
 - [Migration Guide](../migration/orchestrator_refactoring_guide.md)
-- [Strategic Plan](../parallel_work_streams_plan.md)
-- [Testing Strategy](../development/testing/strategy.md)
-- [Code Style](../development/code-style.md)
+- [Strategic Plan](../roadmap/future_roadmap.md)
+- [Testing Guide](../testing/TESTING_GUIDE.md)
+- [Code Style](../contributing/code-style.md)

@@ -525,11 +525,11 @@ class UnifiedMemoryCoordinator:
         self,
         query: str,
         limit: int = 20,
-        memory_types: Optional[List[MemoryType]] = None,
+        memory_types: Optional[List[Any]] = None,
+        session_id: Optional[str] = None,
         filters: Optional[Dict[str, Any]] = None,
         min_relevance: float = 0.0,
-        session_id: Optional[str] = None,
-    ) -> List[MemoryResult]:
+    ) -> List[Any]:
         """Federated search across registered providers.
 
         Searches all matching providers in parallel and returns
@@ -539,9 +539,9 @@ class UnifiedMemoryCoordinator:
             query: Search query
             limit: Maximum results to return
             memory_types: Filter to specific memory types (default: all)
+            session_id: Optional session context
             filters: Additional provider-specific filters
             min_relevance: Minimum relevance threshold
-            session_id: Optional session context
 
         Returns:
             Ranked, deduplicated results from all sources

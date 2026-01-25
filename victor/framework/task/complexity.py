@@ -332,7 +332,7 @@ class TaskComplexityService:
         self._rl_learner = None
 
         # Compile regex patterns
-        self._patterns: Dict[TaskComplexity, List[Tuple[re.Pattern, float, str]]] = {
+        self._patterns: Dict[TaskComplexity, List[Tuple[re.Pattern[str], float, str]]] = {
             complexity: [] for complexity in TaskComplexity
         }
         for complexity, patterns in PATTERNS.items():
@@ -375,7 +375,7 @@ class TaskComplexityService:
             logger.debug(f"Fast classification failed: {e}")
         return None
 
-    def _get_semantic_classifier(self):
+    def _get_semantic_classifier(self) -> Any:
         """Lazy-load the semantic classifier."""
         if self._semantic_classifier is None and self.use_semantic:
             try:
@@ -389,7 +389,7 @@ class TaskComplexityService:
                 self.use_semantic = False
         return self._semantic_classifier
 
-    def _get_rl_learner(self):
+    def _get_rl_learner(self) -> Any:
         """Lazy-load the RL complexity learner.
 
         Uses the RL coordinator's learner registry if available.
@@ -399,7 +399,7 @@ class TaskComplexityService:
             try:
                 from victor.framework.rl.coordinator import RLCoordinator
 
-                coordinator = RLCoordinator.get_instance()
+                coordinator = RLCoordinator.get_instance()  # type: ignore[attr-defined]
                 # Check if complexity learner is registered
                 self._rl_learner = coordinator.get_learner("complexity")
                 if self._rl_learner is None:

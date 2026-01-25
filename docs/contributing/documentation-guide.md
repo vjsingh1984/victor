@@ -321,8 +321,8 @@ When contributing documentation:
 5. Ensure all links are valid
 6. Check for spelling and grammar errors
 
-For more information, see the [Development Guide](development/).
+For more information, see the [Contributing Guide](../contributing/index.md).
 
 ---
 
-Back to [README.md](../README.md)
+Back to [Documentation Home](../index.md)

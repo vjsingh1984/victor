@@ -577,5 +577,5 @@ print(f"Created: {checkpoint_id}")
 
 - [Entity Memory System](ENTITY_MEMORY.md)
 - [Agent and Workflow Presets](AGENT_AND_WORKFLOW_PRESETS.md)
-- [CLI Reference](../cli/README.md)
+- [CLI Reference](../user-guide/cli-reference.md)
 - [Architecture Overview](../architecture/ARCHITECTURE.md)

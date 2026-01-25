@@ -6,9 +6,9 @@ Visual documentation for Victor's architecture, workflows, and data flow.
 
 | Diagram Type | Count | Location |
 |--------------|-------|----------|
-| **Architecture** | 4 Mermaid | [Architecture →](architecture/) |
-| **Workflows** | 55 SVG | [Workflows →](../workflow-diagrams/) |
-| **Sequences** | 3 Mermaid | [Sequences →](sequences/) |
+| **Architecture** | 4 Mermaid | [Architecture →](architecture/system-overview.mmd) |
+| **Workflows** | 55 SVG | [Workflows →](../workflow-diagrams/index.md) |
+| **Sequences** | 3 Mermaid | [Sequences →](sequences/tool-execution.mmd) |
 
 ---
 
@@ -96,7 +96,7 @@ Multi-agent team formations and coordination.
 
 Auto-generated SVG diagrams for 55 workflows.
 
-**Location**: [workflow-diagrams/](../workflow-diagrams/)
+**Location**: [workflow-diagrams/](../workflow-diagrams/index.md)
 
 **Naming Convention**: `{workflow-name}.svg`
 
@@ -466,10 +466,10 @@ Use high contrast colors for accessibility:
 
 ## Additional Resources
 
-- **Architecture**: [Architecture Deep Dive →](../development/architecture/deep-dive.md)
-- **Design Patterns**: [Architecture Overview →](../development/architecture/overview.md)
-- **Data Flow**: [Data Flow →](../development/architecture/data-flow.md)
-- **Contributing**: [Contributing Guide →](../../CONTRIBUTING.md)
+- **Architecture**: [Architecture Deep Dive →](../architecture/ARCHITECTURE.md)
+- **Design Patterns**: [Architecture Overview →](../architecture/overview.md)
+- **Data Flow**: [Data Flow →](../architecture/overview.md)
+- **Contributing**: [Contributing Guide →](../contributing/index.md)
 
 ---
 

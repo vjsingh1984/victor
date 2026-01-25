@@ -151,7 +151,7 @@ helm upgrade victor ./config/helm/victor \
 
 ## Next Steps
 
-1. Read the [full infrastructure guide](../INFRASTRUCTURE.md)
+1. Read the [full infrastructure guide](README.md)
 2. Configure monitoring and alerting
 3. Set up backup procedures
 4. Review security best practices
@@ -182,6 +182,6 @@ kubectl rollout undo deployment/victor-api -n victor
 
 ## Support
 
-- [Documentation](../INFRASTRUCTURE.md)
+- [Documentation](README.md)
 - [GitHub Issues](https://github.com/vijayksingh/victor/issues)
 - [Discussions](https://github.com/vijayksingh/victor/discussions)

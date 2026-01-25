@@ -234,7 +234,7 @@ def create_team_spec(
     vertical: str,
     formation: TeamFormation,
     members: List[TeamMemberSpec],
-    **kwargs,
+    **kwargs: Any,
 ) -> TeamSpec:
     """Factory function for creating team specs.
 

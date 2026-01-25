@@ -107,15 +107,15 @@ Guides for upgrading between versions.
 
 ## Additional Resources
 
-- [Developer Guide](../development/) - Development setup and workflows
-- [API Reference](../reference/) - Complete API documentation
-- [Testing Guide](../development/testing.md) - Testing strategy
+- [Developer Guide](../contributing/index.md) - Development setup and workflows
+- [API Reference](../reference/index.md) - Complete API documentation
+- [Testing Guide](../testing/TESTING_GUIDE.md) - Testing strategy
 
 ---
 
 <div align="center">
 
-**[← Back to Documentation](../README.md)**
+**[← Back to Documentation](../index.md)**
 
 **Architecture Documentation**
 

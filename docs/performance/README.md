@@ -298,11 +298,11 @@ When adding new benchmarks:
 ## Additional Resources
 
 - [CI/CD Integration Guide](BENCHMARK_CI_INTEGRATION.md)
-- [Benchmark Configuration](../../configs/benchmark_config.yaml)
-- [Comprehensive Benchmark Script](../../scripts/benchmark_comprehensive.py)
-- [Comparison Tool](../../scripts/compare_benchmarks.py)
-- [Tool Selection Benchmarks](../../tests/benchmarks/test_tool_selection_benchmark.py)
-- [Workflow Execution Benchmarks](../../tests/performance/workflow_execution_benchmarks.py)
+- Benchmark Configuration: `configs/benchmark_config.yaml`
+- Comprehensive Benchmark Script: `scripts/benchmark_comprehensive.py`
+- Comparison Tool: `scripts/compare_benchmarks.py`
+- Tool Selection Benchmarks: `tests/benchmarks/test_tool_selection_benchmark.py`
+- Workflow Execution Benchmarks: `tests/performance/workflow_execution_benchmarks.py`
 
 ## Performance Targets
 

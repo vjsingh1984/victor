@@ -88,7 +88,7 @@ class ToolCategory(str, Enum):
 # The YAML loader falls back to hardcoded defaults if the file is unavailable.
 
 
-def _load_builtin_category_tools() -> dict:
+def _load_builtin_category_tools() -> dict[str, Any]:
     """Load category-to-tools mapping from YAML configuration.
 
     Returns:
@@ -138,7 +138,7 @@ def _load_builtin_category_tools() -> dict:
 _BUILTIN_CATEGORY_TOOLS: Optional[dict[str, Any]] = None
 
 
-def _get_builtin_category_tools() -> dict:
+def _get_builtin_category_tools() -> dict[str, Any]:
     """Get the builtin category tools, loading from YAML if needed."""
     global _BUILTIN_CATEGORY_TOOLS
     if _BUILTIN_CATEGORY_TOOLS is None:
@@ -290,7 +290,7 @@ class ToolCategoryRegistry:
             try:
                 from victor.tools.metadata_registry import ToolMetadataRegistry
 
-                metadata_registry = ToolMetadataRegistry.get_instance()
+                metadata_registry = ToolMetadataRegistry.get_instance()  # type: ignore[attr-defined]
                 registry_tools = metadata_registry.get_tools_by_category(category_lower)
                 if registry_tools:
                     result.update(registry_tools)
@@ -340,7 +340,7 @@ class ToolCategoryRegistry:
         try:
             from victor.tools.metadata_registry import ToolMetadataRegistry
 
-            metadata_registry = ToolMetadataRegistry.get_instance()
+            metadata_registry = ToolMetadataRegistry.get_instance()  # type: ignore[attr-defined]
             categories.update(metadata_registry.get_all_categories())
         except (ImportError, Exception):
             pass
@@ -620,8 +620,9 @@ class ToolSet:
         """
         if self._resolved_names_cache is None:
             # Use object.__setattr__ to bypass frozen dataclass if needed
-            object.__setattr__(self, "_resolved_names_cache", self.get_tool_names())
-        return self._resolved_names_cache
+            resolved = self.get_tool_names()
+            object.__setattr__(self, "_resolved_names_cache", resolved)
+        return self._resolved_names_cache if self._resolved_names_cache is not None else set()
 
     def invalidate_cache(self) -> None:
         """Invalidate the resolved names cache.

@@ -353,7 +353,7 @@ When adding new validation rules:
 
 ## See Also
 
-- [Workflow Validation Guide](../../workflows/VALIDATION.md) - Detailed workflow validation rules
-- [Workflow Authoring Guide](../../workflows/AUTHORING.md) - How to write workflows
+- [Workflow Validation Guide](../testing/TESTING_GUIDE.md) - Detailed workflow validation rules
+- [Workflow Authoring Guide](../guides/workflow-development/dsl.md) - How to write workflows
 - [Pre-Commit Documentation](https://pre-commit.com/) - Official pre-commit documentation
 - [YAML Syntax Reference](https://yaml.org/spec/1.2/spec.html) - YAML specification

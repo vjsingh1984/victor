@@ -11,7 +11,7 @@ Comprehensive production metrics and monitoring setup has been successfully crea
 
 ### 1. Documentation ✅
 
-#### [PRODUCTION_METRICS.md](docs/observability/PRODUCTION_METRICS.md)
+#### [PRODUCTION_METRICS.md](PRODUCTION_METRICS.md)
 **Location**: `/Users/vijaysingh/code/codingagent/docs/observability/PRODUCTION_METRICS.md`
 
 **Contents**:
@@ -556,10 +556,10 @@ python scripts/generate_metrics_report.py --format markdown --output metrics_rep
 
 ## Support and Documentation
 
-- **Production Metrics Guide**: [docs/observability/PRODUCTION_METRICS.md](docs/observability/PRODUCTION_METRICS.md)
-- **Monitoring Setup Guide**: [docs/observability/MONITORING_SETUP.md](docs/observability/MONITORING_SETUP.md)
-- **Configuration Guide**: [configs/README.md](configs/README.md)
-- **Quick Reference**: [docs/observability/QUICK_REFERENCE.md](docs/observability/QUICK_REFERENCE.md)
+- **Production Metrics Guide**: [PRODUCTION_METRICS.md](PRODUCTION_METRICS.md)
+- **Monitoring Setup Guide**: [MONITORING_SETUP.md](MONITORING_SETUP.md)
+- **Configuration Guide**: [Configuration Reference](../reference/configuration/index.md)
+- **Quick Reference**: [QUICK_REFERENCE.md](QUICK_REFERENCE.md)
 
 ---
 

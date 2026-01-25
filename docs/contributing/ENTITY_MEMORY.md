@@ -465,6 +465,6 @@ config.enable_code_aware_extraction = False
 ## See Also
 
 - [Agent and Workflow Presets](AGENT_AND_WORKFLOW_PRESETS.md)
-- [Conversation Management](../architecture/CONVERSATION.md)
-- [CLI Reference](../cli/README.md)
-- [Storage Architecture](../architecture/STORAGE.md)
+- [Conversation Management](../user-guide/session-management.md)
+- [CLI Reference](../user-guide/cli-reference.md)
+- [Storage Architecture](../architecture/overview.md)

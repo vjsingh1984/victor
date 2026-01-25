@@ -451,7 +451,7 @@ All raw benchmark data is available in JSON format:
 
 - [Baseline Report](baseline_report.md)
 - [SLA Definition](sla_definition.md)
-- [Performance Profiling Guide](../profiling/README.md)
+- [Performance Profiling Guide](../observability/performance_monitoring.md)
 
 ### C. Change Log
 

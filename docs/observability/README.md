@@ -377,9 +377,9 @@ See [STRUCTURED_LOGGING.md](STRUCTURED_LOGGING.md) for:
 
 ## Additional Resources
 
-- **Main Documentation**: [../../README.md](../../README.md)
-- **Architecture**: [../../docs/architecture/](../../docs/architecture/)
-- **Examples**: [../../examples/observability/](../../examples/observability/)
+- **Main Documentation**: [../index.md](../index.md)
+- **Architecture**: [../architecture/overview.md](../architecture/overview.md)
+- **Examples**: `examples/observability/`
 
 ## Support
 

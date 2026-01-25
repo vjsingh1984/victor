@@ -294,8 +294,8 @@ groups:
 
 - [Baseline Performance Report](baseline_report.md)
 - [Benchmark Results](benchmark_results.md)
-- [Performance Profiling Guide](../profiling/README.md)
-- [Monitoring Setup](../monitoring/README.md)
+- [Performance Profiling Guide](../observability/performance_monitoring.md)
+- [Monitoring Setup](../observability/MONITORING_SETUP.md)
 
 ## Change Log
 

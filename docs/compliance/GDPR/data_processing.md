@@ -544,18 +544,18 @@ Victor AI's current processing activities are not considered high-risk. However,
 3. Integration of biometric authentication
 4. Other high-risk processing
 
-**DPIA Template Available:** See [Data Protection Impact Assessment](./data_protection_impact.md)
+**DPIA Template Available:** Data Protection Impact Assessment (not yet published)
 
 ---
 
 ## 10. Related Documents
 
-- [GDPR Data Subject Rights](./data_subject_rights.md)
-- [GDPR Consent Management](./consent_management.md)
-- [GDPR Data Breach Procedures](./data_breach_procedures.md)
-- [GDPR Privacy Policy](./privacy_policy.md)
-- [GDPR Data Protection Impact Assessment](./data_protection_impact.md)
-- [GDPR Checklist](./gdpr_checklist.md)
+- GDPR Data Subject Rights (not yet published)
+- GDPR Consent Management (not yet published)
+- GDPR Data Breach Procedures (not yet published)
+- GDPR Privacy Policy (not yet published)
+- GDPR Data Protection Impact Assessment (not yet published)
+- GDPR Checklist (not yet published)
 
 ---
 

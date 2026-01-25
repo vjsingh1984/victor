@@ -545,9 +545,9 @@ python -m memory_profiler scripts/benchmark_comprehensive.py run --all
 
 ## Additional Resources
 
-- [Benchmark Configuration](../configs/benchmark_config.yaml)
-- [Comprehensive Benchmark Script](../scripts/benchmark_comprehensive.py)
-- [Comparison Tool](../scripts/compare_benchmarks.py)
+- Benchmark Configuration: `configs/benchmark_config.yaml`
+- Comprehensive Benchmark Script: `scripts/benchmark_comprehensive.py`
+- Comparison Tool: `scripts/compare_benchmarks.py`
 - [pytest-benchmark Documentation](https://pytest-benchmark.readthedocs.io/)
 
 ## Contributing

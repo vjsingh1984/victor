@@ -290,10 +290,10 @@ export VICTOR_SEMANTIC_SIMILARITY_THRESHOLD=0.25
 
 ## See Also
 
-- [CLAUDE.md](../CLAUDE.md) - Project instructions and architecture
-- [Architecture](../architecture/) - Detailed architecture documentation
+- `CLAUDE.md` - Project instructions and architecture (repo root)
+- [Architecture](../architecture/overview.md) - Detailed architecture documentation
 - [Best Practices](../architecture/BEST_PRACTICES.md) - Usage patterns and guidelines
-- [Migration Guides](../architecture/MIGRATION_GUIDE.md) - How to migrate to new patterns
+- [Migration Guides](../architecture/MIGRATION_GUIDES.md) - How to migrate to new patterns
 
 ## Support
 

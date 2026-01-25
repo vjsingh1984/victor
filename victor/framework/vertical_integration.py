@@ -1018,7 +1018,7 @@ class VerticalIntegrationPipeline:
     def __init__(
         self,
         strict_mode: bool = False,
-        pre_hooks: Optional[List[Callable[[Any, Type], None]]] = None,
+        pre_hooks: Optional[List[Callable[[Any, type[Any]], None]]] = None,
         post_hooks: Optional[List[Callable[[Any, IntegrationResult], None]]] = None,
         step_registry: Optional["StepHandlerRegistry"] = None,
         use_step_handlers: bool = True,
@@ -1050,6 +1050,9 @@ class VerticalIntegrationPipeline:
 
         # Initialize cache (eagerly, to avoid attribute errors in tests)
         self._cache: Dict[str, bytes] = {}
+
+        # Initialize step handler registry
+        self._step_registry: Optional["StepHandlerRegistry"] = None
 
         # Initialize extension handler registry (OCP compliance)
         self._extension_registry = extension_registry or get_extension_handler_registry()
@@ -1155,7 +1158,7 @@ class VerticalIntegrationPipeline:
         # Run post-hooks
         for hook in self._post_hooks:
             try:
-                hook(orchestrator, result)
+                hook(orchestrator, result)  # type: ignore[arg-type]
             except Exception as e:
                 result.add_warning(f"Post-hook error: {e}")
 

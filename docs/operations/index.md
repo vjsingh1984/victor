@@ -18,5 +18,5 @@ Concise guidance for running Victor in production.
 
 ## Related
 
-- [Security Policy](../../SECURITY.md)
-- [Support](../../SUPPORT.md)
+- Security Policy: `SECURITY.md` (repo root)
+- Support: `SUPPORT.md` (repo root)

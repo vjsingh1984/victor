@@ -231,9 +231,9 @@ class EventBroadcaster:
             if client.is_subscribed(event.type.value):
                 try:
                     # Call send if it's a coroutine function
-                    result = client.send(event_json)
-                    if asyncio.iscoroutine(result):
-                        await asyncio.wait_for(result, timeout=5.0)
+                    send_result = client.send(event_json)
+                    if asyncio.iscoroutine(send_result):
+                        await asyncio.wait_for(send_result, timeout=5.0)
                     client.last_activity = time.time()
                 except Exception as e:
                     logger.warning(f"Failed to send to {client_id}: {e}")
@@ -300,9 +300,11 @@ class WebSocketEventHandler:
 
             elif msg_type == "ping":
                 # Respond with pong
-                await self._broadcaster._clients[client_id].send(
+                send_result = self._broadcaster._clients[client_id].send(
                     json.dumps({"type": "pong", "timestamp": time.time()})
                 )
+                if asyncio.iscoroutine(send_result):
+                    await send_result
 
         except json.JSONDecodeError:
             logger.warning(f"Invalid JSON from {client_id}")
@@ -365,7 +367,7 @@ class EventBusAdapter:
                             logger.debug(f"Skipping async subscribe to {internal_type}")
                         else:
                             # Old sync API
-                            event_bus.subscribe(internal_type, self._on_event)
+                            event_bus.subscribe(internal_type, self._on_event)  # type: ignore[arg-type]
                             self._subscriptions.append(internal_type)
                 except Exception as e:
                     logger.debug(f"Failed to subscribe to {internal_type}: {e}")
@@ -532,7 +534,7 @@ class EventBridge:
 
     async def handle_connection(
         self,
-        websocket,
+        websocket: Any,
         client_id: Optional[str] = None,
     ) -> None:
         """Handle a new WebSocket connection.

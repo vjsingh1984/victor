@@ -469,7 +469,7 @@ create_workflow_from_preset(name: str, **kwargs) -> Optional[WorkflowDefinition]
 
 ## See Also
 
-- [Workflow Definition Guide](../workflows/README.md)
-- [Multi-Agent Teams](../teams/README.md)
-- [CLI Reference](../cli/README.md)
-- [Workflow Visualization](../workflows/visualization.md)
+- [Workflow Definition Guide](../user-guide/workflows.md)
+- [Multi-Agent Teams](../teams/collaboration.md)
+- [CLI Reference](../user-guide/cli-reference.md)
+- [Workflow Visualization](../workflow-diagrams/index.md)

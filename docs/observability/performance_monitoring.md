@@ -718,8 +718,8 @@ Monitor multiple Victor AI clusters:
 - [Prometheus Documentation](https://prometheus.io/docs/)
 - [Grafana Documentation](https://grafana.com/docs/)
 - [AlertManager Documentation](https://prometheus.io/docs/alerting/latest/alertmanager/)
-- [Victor AI Architecture](../architecture/README.md)
-- [Performance Benchmarks](../performance/benchmarks.md)
+- [Victor AI Architecture](../architecture/overview.md)
+- [Performance Benchmarks](../performance/benchmark_results.md)
 
 ## Support
 

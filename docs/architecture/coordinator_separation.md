@@ -874,10 +874,10 @@ This is **not harmful duplication**—it's **good architecture** following indus
 
 ## Further Reading
 
-- [Coordinator-Based Architecture](/docs/architecture/coordinator_based_architecture.md)
-- [Framework API Reference](/docs/FRAMEWORK_API.md)
-- [Development Guide](/docs/development/)
+- [Coordinator-Based Architecture](coordinator_based_architecture.md)
+- [Framework API Reference](../reference/internals/FRAMEWORK_API.md)
+- [Development Guide](../contributing/index.md)
 
 ## Diagram
 
-See [Coordinators Architecture Diagram](/docs/architecture/diagrams/coordinators.mmd) for a visual representation of this architecture.
+See [Coordinators Architecture Diagram](diagrams/coordinators.mmd) for a visual representation of this architecture.

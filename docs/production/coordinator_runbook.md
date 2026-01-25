@@ -832,9 +832,9 @@ receivers:
 ## Additional Resources
 
 - [Victor Documentation](https://docs.victor.ai)
-- [Architecture Guide](./architecture.md)
-- [API Reference](./api-reference.md)
-- [Deployment Guide](./deployment.md)
+- [Architecture Guide](../architecture/overview.md)
+- [API Reference](../reference/api/index.md)
+- [Deployment Guide](../operations/deployment/enterprise.md)
 - [Internal Wiki](https://wiki.example.com/victor)
 
 ---

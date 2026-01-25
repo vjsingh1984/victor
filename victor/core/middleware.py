@@ -879,19 +879,25 @@ class PipelineBuilder(Generic[TRequest, TResponse]):
 # =============================================================================
 
 
-def create_default_pipeline[TRequest, TResponse]() -> MiddlewarePipeline[TRequest, TResponse]:
+def create_default_pipeline() -> MiddlewarePipeline[Any, Any]:
     """Create pipeline with default middleware.
 
     Returns:
         Pipeline with logging, timing, and error handling.
     """
-    return PipelineBuilder[TRequest, TResponse]().with_error_handling().with_logging().with_timing().build()
+    return (
+        PipelineBuilder[Any, Any]()
+        .with_error_handling()
+        .with_logging()
+        .with_timing()
+        .build()
+    )
 
 
-def create_resilient_pipeline[TRequest, TResponse](
+def create_resilient_pipeline(
     max_retries: int = 3,
     timeout: float = 30.0,
-) -> MiddlewarePipeline[TRequest, TResponse]:
+) -> MiddlewarePipeline[Any, Any]:
     """Create pipeline with resilience features.
 
     Args:
@@ -902,7 +908,7 @@ def create_resilient_pipeline[TRequest, TResponse](
         Pipeline with retry, timeout, and error handling.
     """
     return (
-        PipelineBuilder[TRequest, TResponse]()
+        PipelineBuilder[Any, Any]()
         .with_error_handling()
         .with_logging()
         .with_timeout(timeout)

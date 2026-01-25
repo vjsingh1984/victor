@@ -568,7 +568,7 @@ except Exception as e:
 
 - [Setup Guide](setup.md) - Development environment setup
 - [Testing Guide](testing.md) - Testing patterns and fixtures
-- [Contributing Guide](../../CONTRIBUTING.md) - Pull request process
+- [Contributing Guide](index.md) - Pull request process
 
 ---
 
