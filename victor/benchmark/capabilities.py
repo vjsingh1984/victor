@@ -439,10 +439,10 @@ def code_quality_capability(
     enable_linting: bool = True,
     enable_formatting: bool = True,
     **kwargs: Any,
-) -> Callable:
+) -> Callable[[Any], None]:
     """Code quality capability handler."""
 
-    def handler(orchestrator: Any) -> Callable[..., None]:
+    def handler(orchestrator: Any) -> None:
         configure_code_quality_checks(
             orchestrator,
             enable_linting=enable_linting,
@@ -450,7 +450,7 @@ def code_quality_capability(
             **kwargs,
         )
 
-    return handler
+    return handler  # type: ignore[return-value]
 
 
 @capability(
@@ -463,10 +463,10 @@ def performance_capability(
     measure_latency: bool = True,
     benchmark_iterations: int = 10,
     **kwargs: Any,
-) -> Callable:
+) -> Callable[[Any], None]:
     """Performance benchmarking capability handler."""
 
-    def handler(orchestrator: Any) -> Callable[..., None]:
+    def handler(orchestrator: Any) -> None:
         configure_performance_benchmarking(
             orchestrator,
             measure_latency=measure_latency,
@@ -474,7 +474,7 @@ def performance_capability(
             **kwargs,
         )
 
-    return handler
+    return handler  # type: ignore[return-value]
 
 
 # =============================================================================

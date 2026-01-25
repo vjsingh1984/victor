@@ -357,6 +357,8 @@ class NodeExecutorFactory:
                         SubAgentOrchestrator,
                         SubAgentRole,
                     )
+                    from victor.agent.orchestrator import AgentOrchestrator
+                    from typing import cast
 
                     # Map role string to SubAgentRole enum
                     role_map = {
@@ -370,17 +372,18 @@ class NodeExecutorFactory:
                     role = role_map.get(node.role.lower(), SubAgentRole.EXECUTOR)
 
                     # Create sub-agent orchestrator
-                    sub_orchestrator = SubAgentOrchestrator(orchestrator)
+                    # Cast to AgentOrchestrator (SubAgentOrchestrator expects it)
+                    sub_orchestrator = SubAgentOrchestrator(cast(AgentOrchestrator, orchestrator))
 
                     # Create the coroutine for execution
-                    async def _run_sub_agent():
-                        return await sub_orchestrator.execute_task(
+                    async def _run_sub_agent() -> Dict[str, Any]:
+                        result = await sub_orchestrator.spawn(
                             role=role,
                             task=goal,
-                            context=input_context,
                             tool_budget=node.tool_budget,
                             allowed_tools=node.allowed_tools,
                         )
+                        return result.to_dict() if hasattr(result, "to_dict") else {"output": str(result)}
 
                     # Execute with timeout if configured
                     if timeout_seconds:
@@ -414,13 +417,8 @@ class NodeExecutorFactory:
                                 )
                             return state
                     else:
-                        result = await _run_sub_agent()
-
-                    output = {
-                        "response": result.response if result else None,
-                        "success": result.success if result else False,
-                        "tool_calls": result.tool_calls_used if result else 0,
-                    }
+                        result_dict = await _run_sub_agent()
+                        output = result_dict
 
                 # Store output in state
                 output_key = node.output_key or node.id
@@ -481,7 +479,7 @@ class NodeExecutorFactory:
                     )
 
                 # Raise WorkflowExecutionError if not continuing on error
-                if not node.continue_on_error:
+                if not getattr(node, "continue_on_error", False):
                     raise WorkflowExecutionError(
                         message=error_msg,
                         workflow_id=workflow_id,
@@ -526,7 +524,7 @@ class NodeExecutorFactory:
                     )
 
                 # Raise WorkflowExecutionError if not continuing on error
-                if not node.continue_on_error:
+                if not getattr(node, "continue_on_error", False):
                     raise WorkflowExecutionError(
                         error_msg,
                         workflow_id=workflow_id,
@@ -555,9 +553,10 @@ class NodeExecutorFactory:
 
             async def execute_agent_with_retry(state: Dict[str, Any]) -> Dict[str, Any]:
                 """Wrapper that applies retry policy to agent execution."""
+                from typing import cast
                 result = await retry_executor.execute_async(lambda: execute_agent(state))
                 if result.success:
-                    return result.result
+                    return cast(Dict[str, Any], result.result)
                 else:
                     # Return last state with error info
                     state = dict(state)
@@ -632,6 +631,8 @@ class NodeExecutorFactory:
                         from victor.workflows.executor import WorkflowContext
 
                         context = WorkflowContext(dict(state))
+                        if tool_registry is None:
+                            raise ValueError(f"Tool registry is required for compute node '{node.id}'")
                         result = await handler(node, context, tool_registry)
 
                         # Transfer context changes back to state
@@ -758,7 +759,7 @@ class NodeExecutorFactory:
                     )
 
                 # Raise WorkflowExecutionError if not continuing on error
-                if not node.continue_on_error:
+                if not getattr(node, "continue_on_error", False):
                     raise WorkflowExecutionError(
                         error_msg,
                         workflow_id=workflow_id,
@@ -787,9 +788,10 @@ class NodeExecutorFactory:
 
             async def execute_compute_with_retry(state: Dict[str, Any]) -> Dict[str, Any]:
                 """Wrapper that applies retry policy to compute execution."""
+                from typing import cast
                 result = await retry_executor.execute_async(lambda: execute_compute(state))
                 if result.success:
-                    return result.result
+                    return cast(Dict[str, Any], result.result)
                 else:
                     # Return last state with error info
                     state = dict(state)
@@ -885,7 +887,7 @@ class NodeExecutorFactory:
                     # Execute all child nodes in true parallel with asyncio.gather
                     async def run_child(
                         child_node: "WorkflowNode", executor: Callable[..., Any]
-                    ) -> tuple:
+                    ) -> tuple[str, bool, Any]:
                         # Use selective copy instead of full deepcopy for performance
                         # Shallow copies most keys, deep copies only mutable internal structures
                         child_state = factory._copy_state_for_parallel(state)

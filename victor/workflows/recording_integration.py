@@ -124,7 +124,7 @@ def record_workflow(
     record_state_snapshots: bool = False,
     compress: bool = True,
     tags: Optional[list[str]] = None,
-):
+) -> Iterator[ExecutionRecorder]:
     """Context manager for automatic workflow recording.
 
     Args:
@@ -186,10 +186,10 @@ async def save_workflow_recording(
     if storage:
         recording_id = await storage.save(recorder)
         metadata = await storage.get_metadata(recording_id)
-        return cast(Dict[str, Any], metadata)
+        return metadata.to_dict() if metadata else {}  # type: ignore[union-attr]
 
     if filepath:
-        metadata = await recorder.save(filepath)
+        metadata: RecordingMetadata = await recorder.save(str(filepath))  # type: ignore[arg-type]
         return metadata.to_dict()
 
     raise ValueError("Must provide either filepath or storage")

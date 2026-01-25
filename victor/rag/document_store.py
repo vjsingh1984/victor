@@ -45,7 +45,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 logger = logging.getLogger(__name__)
 
@@ -244,6 +244,7 @@ class DocumentStore:
 
         # Create or open table
         try:
+            assert self._db is not None
             self._table = await asyncio.to_thread(self._db.open_table, self.config.table_name)
             logger.info(f"Opened existing table: {self.config.table_name}")
 
@@ -274,7 +275,7 @@ class DocumentStore:
             )
 
             self._table = await asyncio.to_thread(
-                self._db.create_table, self.config.table_name, schema=schema
+                self._db.create_table, self.config.table_name, schema=schema  # type: ignore[arg-type]
             )
             logger.info(f"Created new table: {self.config.table_name}")
 
@@ -295,6 +296,7 @@ class DocumentStore:
         try:
             # Get all unique doc_ids and their metadata from chunks
             # We query chunk_index=0 to get one chunk per document
+            assert self._table is not None
             all_data = await asyncio.to_thread(lambda: self._table.to_pandas())
 
             if all_data.empty:
@@ -485,7 +487,8 @@ class DocumentStore:
 
         if use_hybrid:
             # Hybrid search: combine vector + FTS
-            def do_hybrid_search():
+            def do_hybrid_search() -> List[Any]:
+                assert self._table is not None
                 search_query = self._table.search(query_embedding).limit(fetch_limit)
                 if where_clause:
                     search_query = search_query.where(where_clause)
@@ -494,7 +497,8 @@ class DocumentStore:
             results = await asyncio.to_thread(do_hybrid_search)
         else:
             # Vector-only search
-            def do_vector_search():
+            def do_vector_search() -> List[Any]:
+                assert self._table is not None
                 search_query = self._table.search(query_embedding).limit(fetch_limit)
                 if where_clause:
                     search_query = search_query.where(where_clause)
@@ -657,7 +661,7 @@ class DocumentStore:
                 # Use the same BGE model as core embedding service
                 self._model = SentenceTransformer(DEFAULT_EMBEDDING_MODEL)
             embedding = self._model.encode(text, convert_to_numpy=True)
-            return embedding.tolist()
+            return cast(List[float], embedding.tolist())
         except ImportError:
             # Simple hash-based fallback for testing
             import hashlib
@@ -691,6 +695,7 @@ class DocumentStore:
             return 0
 
         # Delete from LanceDB
+        assert self._table is not None
         await asyncio.to_thread(lambda: self._table.delete(f"doc_id = '{doc_id}'"))
 
         return 1  # LanceDB doesn't return count

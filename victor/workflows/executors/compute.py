@@ -181,17 +181,17 @@ class ComputeNodeExecutor:
         if "_node_results" not in state:
             state["_node_results"] = {}
 
-        from victor.framework.graph import GraphNodeResult
-        state["_node_results"][node.id] = GraphNodeResult(
-            node_id=node.id,
-            status="completed",
-            result=output,
-            metadata={
+        # Store node result as dict for observability
+        state["_node_results"][node.id] = {
+            "node_id": node.id,
+            "status": "completed",
+            "result": output,
+            "metadata": {
                 "handler": node.handler,
                 "tools": node.tools if hasattr(node, "tools") else [],
                 "tool_calls_used": tool_calls_used,
             },
-        )
+        }
 
         logger.info(f"Compute node {node.id} completed successfully")
         return state

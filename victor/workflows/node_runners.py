@@ -212,17 +212,17 @@ class AgentNodeRunner(BaseNodeRunner):
         )
     """
 
-    def __init__(self, sub_agents: Optional["SubAgentManager"] = None):
+    def __init__(self, sub_agents: Optional["SubAgentOrchestrator"] = None):
         """Initialize the agent runner.
 
         Args:
-            sub_agents: SubAgentManager for spawning agents.
+            sub_agents: SubAgentOrchestrator for spawning agents.
         """
         super().__init__(["agent"])
         self._sub_agents = sub_agents
 
-    def set_sub_agents(self, sub_agents: "SubAgentManager") -> None:
-        """Set the sub-agent manager (for deferred initialization)."""
+    def set_sub_agents(self, sub_agents: "SubAgentOrchestrator") -> None:
+        """Set the sub-agent orchestrator (for deferred initialization)."""
         self._sub_agents = sub_agents
 
     async def _execute_impl(
@@ -363,7 +363,13 @@ class ComputeNodeRunner(BaseNodeRunner):
             if handler:
                 # Prepare inputs
                 inputs = self._resolve_inputs(node_config.get("inputs", {}), context)
-                result = await handler(inputs, context)
+                # Call handler with expected signature (node, context, tool_registry)
+                # Note: Using inputs as node dict for compatibility
+                result = await handler(  # type: ignore[call-arg]
+                    inputs,
+                    context,
+                    self._tool_registry,  # type: ignore[arg-type]
+                )
 
                 # Store output
                 if "data" not in context:
@@ -847,7 +853,7 @@ class NodeRunnerRegistry:
         parallel_runner.register_runner("compute", compute_runner)
         parallel_runner.register_runner("transform", transform_runner)
         if team_runner:
-            parallel_runner.register_runner("team", team_runner)
+            parallel_runner.register_runner("team", team_runner)  # type: ignore[arg-type]
 
         registry.register(agent_runner)
         registry.register(compute_runner)
@@ -856,7 +862,7 @@ class NodeRunnerRegistry:
         registry.register(condition_runner)
         registry.register(parallel_runner)
         if team_runner:
-            registry.register(team_runner)
+            registry.register(team_runner)  # type: ignore[arg-type]
 
         return registry
 

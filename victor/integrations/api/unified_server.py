@@ -476,8 +476,8 @@ def _include_hitl_api(
 
         # Create HITL store
         if persistent:
-            hitl_store_base: HITLStore = SQLiteHITLStore()
-            logger.info(f"HITL using SQLite store: {hitl_store_base.db_path}")
+            hitl_store_base: HITLStore = SQLiteHITLStore()  # type: ignore[assignment]
+            logger.info(f"HITL using SQLite store: {hitl_store_base.db_path}")  # type: ignore[attr-defined]
         else:
             hitl_store_base = HITLStore()
             logger.info("HITL using in-memory store")
@@ -734,7 +734,7 @@ def _setup_health_check(app: FastAPI) -> None:
         if not workflow_editor_dist.exists():
             status["services"]["workflow_editor"] = "not_built"
 
-        return JSONResponse(content=status)
+        return JSONResponse(content=status)  # type: ignore[return-value]
 
 
 def run_unified_server(

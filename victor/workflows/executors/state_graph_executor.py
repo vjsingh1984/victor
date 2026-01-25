@@ -247,15 +247,15 @@ class StateGraphExecutor(Generic[StateType]):
             _start_time: float
 
             @property
-            def orchestrator(self) -> typing_Any:
+            def orchestrator(self) -> Any:
                 return None
 
             @property
-            def settings(self) -> typing_Any:
+            def settings(self) -> Any:
                 return None
 
             @property
-            def services(self) -> typing_Any:
+            def services(self) -> Any:
                 return None
 
             @property
@@ -271,9 +271,9 @@ class StateGraphExecutor(Generic[StateType]):
                 return self._start_time
 
         return _ExecutionContextImpl(
-            thread_id=thread_id,
-            graph_id=getattr(self._graph, 'graph_id', None) or "unknown",
-            start_time=time.time(),
+            _thread_id=thread_id,
+            _graph_id=getattr(self._graph, 'graph_id', None) or "unknown",
+            _start_time=time.time(),
         )  # type: ignore[return-value]
 
 

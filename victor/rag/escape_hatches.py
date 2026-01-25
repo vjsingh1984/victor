@@ -29,7 +29,7 @@ Example YAML usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
 logger = logging.getLogger(__name__)
 
@@ -305,7 +305,10 @@ def merge_retrieved_chunks(ctx: Dict[str, Any]) -> Dict[str, Any]:
                         all_chunks.append(chunk)
 
     # Sort by relevance score
-    all_chunks.sort(key=lambda x: x.get("relevance_score", x.get("score", 0)), reverse=True)
+    all_chunks.sort(
+        key=lambda x: cast(float, x.get("relevance_score", x.get("score", 0))),
+        reverse=True,
+    )
 
     return {
         "chunks": all_chunks,
@@ -340,7 +343,8 @@ def format_context_window(ctx: Dict[str, Any]) -> Dict[str, Any]:
             source = chunk.get("source", chunk.get("document_id", f"source_{i}"))
 
             # Rough token estimation (4 chars per token)
-            chunk_tokens = len(text) // 4
+            text_len = len(text) if text is not None else 0
+            chunk_tokens = text_len // 4
 
             if current_tokens + chunk_tokens > max_tokens:
                 break

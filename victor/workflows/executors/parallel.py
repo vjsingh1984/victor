@@ -82,7 +82,7 @@ class ParallelNodeExecutor:
         start_time = time.time()
 
         # Make mutable copy of state
-        state = dict(state)
+        state: "WorkflowState" = dict(state)  # type: ignore[assignment]
 
         try:
             # Step 1: Get parallel results (populated by child nodes)
@@ -117,7 +117,7 @@ class ParallelNodeExecutor:
                         first_success = result
                         break
                 if first_success:
-                    state["_parallel_first"] = first_success
+                    state["_parallel_first"] = first_success  # type: ignore[typeddict-unknown-key]
                 else:
                     state["_error"] = "No parallel node succeeded"
 

@@ -1292,7 +1292,7 @@ class VictorAPIServer:
                             pass
 
             # Get largest files
-            file_sizes.sort(key=lambda x: x.get("lines", 0) if isinstance(x.get("lines"), (int, float)) else 0, reverse=True)
+            file_sizes.sort(key=lambda x: x.get("lines", 0) or 0, reverse=True)  # type: ignore[arg-type]
             metrics["largest_files"] = file_sizes[:10]
 
             return web.json_response(metrics)
@@ -1827,7 +1827,7 @@ class VictorAPIServer:
     async def _mcp_disconnect(self, request: Request) -> Response:
         """Disconnect from an MCP server."""
         try:
-            from victor.integrations.mcp.registry import get_mcp_registry  # type: ignore[attr-defined]
+            from victor.integrations.mcp.registry import get_mcp_registry
 
             data = await request.json()
             server_name = data.get("server")

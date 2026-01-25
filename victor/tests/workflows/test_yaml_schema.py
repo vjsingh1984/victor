@@ -35,7 +35,7 @@ from unittest.mock import patch, MagicMock
 class TestYAMLWorkflowParsing:
     """Test YAML workflow parsing."""
 
-    def test_parse_basic_workflow(self):
+    def test_parse_basic_workflow(self) -> None:
         """Test parsing minimal valid workflow."""
         yaml_content = """
 workflows:
@@ -58,7 +58,7 @@ workflows:
             workflows = {workflows_result.name: workflows_result}
 
         assert "test_workflow" in workflows
-        wf = workflows["test_workflow"]
+        wf = workflows["test_workflow"]  # type: ignore[index]
         assert wf.name == "test_workflow"
         assert len(wf.nodes) == 1
         assert "start" in wf.nodes
@@ -90,7 +90,7 @@ workflows:
             workflows = workflows_result
         else:
             workflows = {workflows_result.name: workflows_result}
-        wf = workflows["compute_test"]
+        wf = workflows["compute_test"]  # type: ignore[index]
 
         assert len(wf.nodes) == 1
         node = wf.nodes["compute_step"]
@@ -141,13 +141,13 @@ workflows:
             workflows = workflows_result
         else:
             workflows = {workflows_result.name: workflows_result}
-        wf = workflows["parallel_test"]
+        wf = workflows["parallel_test"]  # type: ignore[index]
 
         parallel_node = wf.nodes["parallel_step"]
         assert isinstance(parallel_node, ParallelNode)
         assert len(parallel_node.parallel_nodes) == 3
 
-    def test_parse_hitl_node(self):
+    def test_parse_hitl_node(self) -> None:
         """Test parsing human-in-the-loop node."""
         yaml_content = """
 workflows:
@@ -176,7 +176,7 @@ workflows:
             workflows = workflows_result
         else:
             workflows = {workflows_result.name: workflows_result}
-        wf = workflows["hitl_test"]
+        wf = workflows["hitl_test"]  # type: ignore[index]
 
         hitl_node = wf.nodes["human_review"]
         # HITL nodes are parsed but may have different structure
@@ -187,7 +187,7 @@ workflows:
 class TestMetadataParsing:
     """Test workflow metadata parsing."""
 
-    def test_parse_vertical_metadata(self):
+    def test_parse_vertical_metadata(self) -> None:
         """Test parsing vertical metadata."""
         yaml_content = """
 workflows:
@@ -212,7 +212,7 @@ workflows:
             workflows = workflows_result
         else:
             workflows = {workflows_result.name: workflows_result}
-        wf = workflows["meta_test"]
+        wf = workflows["meta_test"]  # type: ignore[index]
 
         assert wf.metadata.get("vertical") == "dataanalysis"
         assert wf.metadata.get("category") == "eda"
@@ -222,7 +222,7 @@ workflows:
 class TestBatchConfigParsing:
     """Test batch configuration parsing."""
 
-    def test_parse_batch_config(self):
+    def test_parse_batch_config(self) -> None:
         """Test parsing batch execution configuration."""
         yaml_content = """
 workflows:
@@ -247,7 +247,7 @@ workflows:
             workflows = workflows_result
         else:
             workflows = {workflows_result.name: workflows_result}
-        wf = workflows["batch_test"]
+        wf = workflows["batch_test"]  # type: ignore[index]
 
         # batch_config may be stored in metadata or as separate attribute
         if hasattr(wf, "batch_config") and wf.batch_config is not None:
@@ -263,7 +263,7 @@ workflows:
 class TestTemporalContextParsing:
     """Test temporal context parsing."""
 
-    def test_parse_temporal_context(self):
+    def test_parse_temporal_context(self) -> None:
         """Test parsing temporal context configuration."""
         yaml_content = """
 workflows:
@@ -286,7 +286,7 @@ workflows:
             workflows = workflows_result
         else:
             workflows = {workflows_result.name: workflows_result}
-        wf = workflows["temporal_test"]
+        wf = workflows["temporal_test"]  # type: ignore[index]
 
         # temporal_context may be stored in metadata or as separate attribute
         if hasattr(wf, "temporal_context") and wf.temporal_context is not None:
@@ -301,7 +301,7 @@ workflows:
 class TestInputMappingParsing:
     """Test input mapping and context reference parsing."""
 
-    def test_parse_context_references(self):
+    def test_parse_context_references(self) -> None:
         """Test parsing $ctx context references."""
         yaml_content = """
 workflows:
@@ -332,13 +332,13 @@ workflows:
             workflows = workflows_result
         else:
             workflows = {workflows_result.name: workflows_result}
-        wf = workflows["ctx_test"]
+        wf = workflows["ctx_test"]  # type: ignore[index]
 
         node1 = wf.nodes["step1"]
         # $ctx. prefix is stripped during parsing
         assert "target_symbol" in str(node1.input_mapping) or "symbol" in str(node1.input_mapping)
 
-    def test_parse_nested_context_references(self):
+    def test_parse_nested_context_references(self) -> None:
         """Test parsing nested context references like $ctx.data.field."""
         yaml_content = """
 workflows:
@@ -361,18 +361,18 @@ workflows:
             workflows = workflows_result
         else:
             workflows = {workflows_result.name: workflows_result}
-        wf = workflows["nested_test"]
+        wf = workflows["nested_test"]  # type: ignore[index]
 
         node = wf.nodes["analyze"]
         # Check that input mapping contains the references
-        assert node.input_mapping is not None
-        assert len(node.input_mapping) > 0
+        assert node.input_mapping is not None  # type: ignore[union-attr]
+        assert len(node.input_mapping) > 0  # type: ignore[union-attr]
 
 
 class TestConstraintParsing:
     """Test constraint parsing."""
 
-    def test_parse_compute_constraints(self):
+    def test_parse_compute_constraints(self) -> None:
         """Test parsing compute node constraints."""
         yaml_content = """
 workflows:
@@ -397,19 +397,19 @@ workflows:
             workflows = workflows_result
         else:
             workflows = {workflows_result.name: workflows_result}
-        wf = workflows["constraint_test"]
+        wf = workflows["constraint_test"]  # type: ignore[index]
 
         node = wf.nodes["compute_node"]
-        assert node.constraints is not None
-        assert node.constraints.llm_allowed is False
-        assert node.constraints.timeout == 60
-        assert node.constraints.network_allowed is False
+        assert node.constraints is not None  # type: ignore[union-attr]
+        assert node.constraints.llm_allowed is False  # type: ignore[union-attr]
+        assert node.constraints.timeout == 60  # type: ignore[union-attr]
+        assert node.constraints.network_allowed is False  # type: ignore[union-attr]
 
 
 class TestLLMConfigParsing:
     """Test LLM configuration parsing for agent nodes."""
 
-    def test_parse_llm_config(self):
+    def test_parse_llm_config(self) -> None:
         """Test parsing LLM configuration."""
         yaml_content = """
 workflows:
@@ -434,21 +434,21 @@ workflows:
             workflows = workflows_result
         else:
             workflows = {workflows_result.name: workflows_result}
-        wf = workflows["llm_test"]
+        wf = workflows["llm_test"]  # type: ignore[index]
 
         node = wf.nodes["agent_node"]
-        if node.llm_config is not None:
+        if node.llm_config is not None:  # type: ignore[union-attr]
             # llm_config may be a dict or LLMConfig object
-            if hasattr(node.llm_config, "temperature"):
-                assert node.llm_config.temperature == 0.3
-            elif isinstance(node.llm_config, dict):
-                assert node.llm_config.get("temperature") == 0.3
+            if hasattr(node.llm_config, "temperature"):  # type: ignore[union-attr]
+                assert node.llm_config.temperature == 0.3  # type: ignore[union-attr]
+            elif isinstance(node.llm_config, dict):  # type: ignore[union-attr]
+                assert node.llm_config.get("temperature") == 0.3  # type: ignore[union-attr]
 
 
 class TestErrorHandling:
     """Test error handling for invalid YAML schemas."""
 
-    def test_missing_workflows_key(self):
+    def test_missing_workflows_key(self) -> None:
         """Test behavior when workflows key is missing."""
         yaml_content = """
 not_workflows:
@@ -467,7 +467,7 @@ not_workflows:
         # Should return empty dict since no valid workflows
         assert len(workflows) == 0
 
-    def test_missing_nodes(self):
+    def test_missing_nodes(self) -> None:
         """Test behavior when nodes are missing."""
         yaml_content = """
 workflows:
@@ -529,14 +529,14 @@ workflows:
 
         try:
             workflows_result = load_workflow_from_yaml(yaml_content)
-        # Handle Union type - convert single workflow to dict
-        if isinstance(workflows_result, dict):
-            workflows = workflows_result
-        else:
-            workflows = {workflows_result.name: workflows_result}
+            # Handle Union type - convert single workflow to dict
+            if isinstance(workflows_result, dict):
+                workflows = workflows_result
+            else:
+                workflows = {workflows_result.name: workflows_result}
             # If no error, check that workflow was created with defaults
             if "missing_fields" in workflows:
-                node = workflows["missing_fields"].nodes.get("incomplete")
+                node = workflows["missing_fields"].nodes.get("incomplete")  # type: ignore[index]
                 # Node should exist but may have default values
                 assert node is not None
         except (ValueError, KeyError, TypeError, YAMLWorkflowError):
@@ -547,7 +547,7 @@ workflows:
 class TestMultipleWorkflows:
     """Test parsing multiple workflows from single file."""
 
-    def test_parse_multiple_workflows(self):
+    def test_parse_multiple_workflows(self) -> None:
         """Test parsing file with multiple workflow definitions."""
         yaml_content = """
 workflows:
@@ -585,7 +585,7 @@ workflows:
 class TestDirectoryLoading:
     """Test loading workflows from directory."""
 
-    def test_load_from_directory(self, tmp_path):
+    def test_load_from_directory(self, tmp_path) -> None:
         """Test loading all YAML files from a directory."""
         # Create test YAML file
         yaml_file = tmp_path / "test_workflow.yaml"
@@ -608,7 +608,7 @@ workflows:
 
         assert "dir_workflow" in workflows
 
-    def test_skip_non_yaml_files(self, tmp_path):
+    def test_skip_non_yaml_files(self, tmp_path) -> None:
         """Test that non-YAML files are skipped."""
         # Create YAML and non-YAML files
         yaml_file = tmp_path / "valid.yaml"

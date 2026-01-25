@@ -212,6 +212,7 @@ class TestExecutorIsolationIntegration:
 
             # Check that devops vertical would use docker
             config = IsolationMapper.VERTICAL_DEFAULTS.get("devops")
+            assert config is not None
             assert config.sandbox_type == "docker"
         except ImportError:
             pytest.skip("WorkflowExecutor not available")
@@ -225,6 +226,7 @@ class TestExecutorIsolationIntegration:
 
             # Check that coding vertical would use process
             config = IsolationMapper.VERTICAL_DEFAULTS.get("coding")
+            assert config is not None
             assert config.sandbox_type == "process"
         except ImportError:
             pytest.skip("WorkflowExecutor not available")

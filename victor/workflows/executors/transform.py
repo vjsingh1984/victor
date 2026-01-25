@@ -81,7 +81,7 @@ class TransformNodeExecutor:
         start_time = time.time()
 
         # Make mutable copy of state
-        state = dict(state)
+        state: "WorkflowState" = dict(state)  # type: ignore[assignment]
 
         try:
             # Step 1: Execute transform function
@@ -89,20 +89,21 @@ class TransformNodeExecutor:
 
             # Step 2: Merge transformed data back into state
             for key, value in transformed.items():
-                state[key] = value
+                state[key] = value  # type: ignore[typeddict-unknown-key]
 
             # Step 3: Update node results for observability
             if "_node_results" not in state:
                 state["_node_results"] = {}
 
-            state["_node_results"][node.id] = GraphNodeResult(
-                node_id=node.id,
-                status="completed",
-                result={"transformed_keys": list(transformed.keys())},
-                metadata={
+            # Store result as dict instead of GraphNodeResult
+            state["_node_results"][node.id] = {
+                "node_id": node.id,
+                "status": "completed",
+                "result": {"transformed_keys": list(transformed.keys())},
+                "metadata": {
                     "duration_seconds": time.time() - start_time,
                 },
-            )
+            }
 
             logger.info(f"Transform node {node.id} completed successfully")
             return state

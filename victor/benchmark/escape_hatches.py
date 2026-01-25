@@ -447,7 +447,7 @@ class RunTestsHandler:
         start_time = time.time()
 
         test_file = node.input_mapping.get("test_file", "")
-        timeout = node.input_mapping.get("timeout", self.default_timeout)
+        timeout = int(node.input_mapping.get("timeout", self.default_timeout))
         test_framework = node.input_mapping.get("framework", "pytest")
 
         if not test_file:
@@ -993,10 +993,9 @@ HANDLERS = {
 def register_handlers() -> None:
     """Register Benchmark handlers with the workflow executor."""
     from victor.workflows.executor import register_compute_handler
-    from typing import cast
 
     for name, handler in HANDLERS.items():
-        register_compute_handler(name, cast(object, handler))
+        register_compute_handler(name, handler)
         logger.debug(f"Registered Benchmark handler: {name}")
 
 

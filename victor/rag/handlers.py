@@ -85,6 +85,7 @@ class VectorSearchHandler(BaseHandler):
 
         result = await tool_registry.execute(
             "vector_search",
+            _exec_ctx=None,  # No execution context in workflow handler
             query=query,
             top_k=top_k,
             collection=collection,
@@ -138,7 +139,9 @@ class ChunkProcessorHandler(BaseHandler):
         chunks = []
         doc_list = documents if isinstance(documents, list) else [documents]
         for doc in doc_list:
-            doc_chunks = self._chunk_document(doc, strategy, chunk_size, overlap)
+            doc_chunks = self._chunk_document(
+                doc, strategy, int(chunk_size) if isinstance(chunk_size, (int, str)) else 512, int(overlap) if isinstance(overlap, (int, str)) else 50
+            )
             chunks.extend(doc_chunks)
 
         output = {

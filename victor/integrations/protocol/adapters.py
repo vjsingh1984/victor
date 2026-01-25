@@ -237,7 +237,8 @@ class DirectProtocolAdapter(VictorProtocol):
 
     async def apply_patch(self, patch: str, dry_run: bool = False) -> dict[str, Any]:
         """Apply a unified diff patch."""
-        from victor.tools.patch_tool import parse_unified_diff, apply_patch
+        from victor.tools.patch_tool import parse_unified_diff, apply_patch_to_content
+        from pathlib import Path
 
         try:
             patch_files = parse_unified_diff(patch)
@@ -258,8 +259,26 @@ class DirectProtocolAdapter(VictorProtocol):
 
             results = []
             for patch_file in patch_files:
-                result = apply_patch(patch_file)
-                results.append(result)
+                target_path = patch_file.new_path or patch_file.old_path
+                if not target_path:
+                    results.append({"success": False, "error": "Missing file path in patch"})
+                    continue
+
+                target = Path(target_path).expanduser().resolve()
+                if not target.exists() or patch_file.is_new_file:
+                    results.append({"success": False, "error": f"File not found: {target_path}"})
+                    continue
+
+                original_content = target.read_text()
+                success, new_content, errors = apply_patch_to_content(
+                    original_content, patch_file.hunks
+                )
+
+                if success:
+                    target.write_text(new_content)
+                    results.append({"success": True, "file_path": str(target)})
+                else:
+                    results.append({"success": False, "error": "; ".join(errors), "file_path": str(target)})
 
             return {
                 "success": all(r.get("success", False) for r in results),

@@ -823,11 +823,11 @@ class VictorFastAPIServer:
                         return JSONResponse(manifest.__dict__)
                     return JSONResponse(manifest)
                 else:
-                    manifest = discovery.discover_all()
+                    manifest_obj = discovery.discover_all()
                     # Convert to dict if it's a dataclass
-                    if hasattr(manifest, "__dict__"):
-                        return JSONResponse(manifest.__dict__)
-                    return JSONResponse(manifest)
+                    if hasattr(manifest_obj, "__dict__"):
+                        return JSONResponse(manifest_obj.__dict__)
+                    return JSONResponse(manifest_obj)
 
             except Exception as e:
                 logger.exception("Capabilities discovery error")
@@ -2355,7 +2355,7 @@ Respond with just the command to run."""
 
             import asyncio
 
-            execute_steps_task: asyncio.Task[None] = asyncio.create_task(execute_steps())  # type: ignore[misc]
+            execute_steps_task: asyncio.Task[None] = asyncio.create_task(execute_steps())
 
             return JSONResponse(
                 {
@@ -2596,7 +2596,7 @@ Respond with just the command to run."""
                             }
                         )
 
-            execute_team_task: asyncio.Task[None] = asyncio.create_task(execute_team())  # type: ignore[misc]
+            execute_team_task: asyncio.Task[None] = asyncio.create_task(execute_team())
 
             return JSONResponse(
                 {

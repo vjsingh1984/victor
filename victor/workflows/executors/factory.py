@@ -107,7 +107,7 @@ class NodeExecutorFactory:
         self._executor_types[node_type] = executor_class
         logger.debug(f"Registered executor type: {node_type} -> {executor_class.__name__}")
 
-    def create_executor(self, node: "WorkflowNode") -> Callable[["WorkflowState"], "WorkflowState"]:
+    def create_executor(self, node: "WorkflowNode") -> Callable[["WorkflowState"], Any]:
         """Create an executor function for a workflow node.
 
         This is the main factory method. It dispatches to the appropriate
@@ -116,8 +116,8 @@ class NodeExecutorFactory:
         Args:
             node: Workflow node definition
 
-        Returns: Callable[..., Any]: Async executor function that takes WorkflowState and
-                     returns WorkflowState
+        Returns:
+            Async executor function that takes WorkflowState and returns WorkflowState
 
         Raises:
             ValueError: If node type is not supported
@@ -138,7 +138,9 @@ class NodeExecutorFactory:
 
         # Return wrapper function that matches StateGraph signature
         async def executor_wrapper(state: "WorkflowState") -> "WorkflowState":
-            return await executor.execute(node, state)
+            result = await executor.execute(node, state)
+            # Ensure result is a WorkflowState (dict)
+            return result if isinstance(result, dict) else state
 
         return executor_wrapper
 

@@ -16,12 +16,16 @@ from victor.security.penetration_testing import (
 )
 
 
-async def example_basic_usage():
+async def example_basic_usage() -> None:
     """Basic usage example."""
     from victor.agent.orchestrator import AgentOrchestrator
 
     # Create the agent to test
-    agent = AgentOrchestrator()
+    agent = AgentOrchestrator(
+        settings=None,  # type: ignore[arg-type]
+        provider=None,  # type: ignore[arg-type]
+        model=None,  # type: ignore[arg-type]
+    )
 
     # Create security test suite
     suite = SecurityTestSuite(
@@ -47,25 +51,29 @@ async def example_basic_usage():
         print(f"{i}. {rec}")
 
 
-async def example_individual_tests():
+async def example_individual_tests() -> None:
     """Run individual security tests."""
     from victor.agent.orchestrator import AgentOrchestrator
 
-    agent = AgentOrchestrator()
+    agent = AgentOrchestrator(
+        settings=None,  # type: ignore[arg-type]
+        provider=None,  # type: ignore[arg-type]
+        model=None,  # type: ignore[arg-type]
+    )
     suite = SecurityTestSuite()
 
     # Test specific vulnerabilities
-    prompt_injection_report = await suite.test_prompt_injection(agent)
+    prompt_injection_report = await suite.test_prompt_injection(agent)  # type: ignore
     print(f"Prompt Injection Tests: {prompt_injection_report.passed}")
 
-    auth_bypass_report = await suite.test_authorization_bypass(agent)
+    auth_bypass_report = await suite.test_authorization_bypass(agent)  # type: ignore
     print(f"Authorization Bypass Tests: {auth_bypass_report.passed}")
 
-    code_injection_report = await suite.test_code_injection(agent)
+    code_injection_report = await suite.test_code_injection(agent)  # type: ignore
     print(f"Code Injection Tests: {code_injection_report.passed}")
 
 
-async def example_custom_exploit_patterns():
+async def example_custom_exploit_patterns() -> None:
     """Create custom exploit patterns for specific threats."""
     # Define custom exploit pattern
     sql_injection_pattern = ExploitPattern(
@@ -119,11 +127,15 @@ async def example_report_formats() -> None:
     Path("security_report.json").write_text(json_report)
 
 
-async def example_filter_by_severity():
+async def example_filter_by_severity() -> None:
     """Filter vulnerabilities by severity level."""
     from victor.agent.orchestrator import AgentOrchestrator
 
-    agent = AgentOrchestrator()
+    agent = AgentOrchestrator(
+        settings=None,  # type: ignore[arg-type]
+        provider=None,  # type: ignore[arg-type]
+        model=None,  # type: ignore[arg-type]
+    )
     suite = SecurityTestSuite()
 
     # Run audit
@@ -143,7 +155,7 @@ async def example_filter_by_severity():
         print("No critical vulnerabilities found!")
 
 
-async def main():
+async def main() -> None:
     """Run all examples."""
     print("=" * 80)
     print("Victor AI Penetration Testing Examples")

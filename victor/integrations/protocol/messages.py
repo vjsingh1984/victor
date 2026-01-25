@@ -304,7 +304,7 @@ class UnifiedMessage:
         return cls(
             id=data.get("id", ""),
             role=MessageRole(data.get("role", "user")),
-            content=content,  # type: ignore[arg-type]
+            content=content,
             timestamp=data.get("timestamp", time.time()),
             tool_calls=tool_calls,
             metadata=data.get("metadata", {}),

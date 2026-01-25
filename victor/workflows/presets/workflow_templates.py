@@ -496,7 +496,7 @@ def list_workflow_presets_by_category() -> Dict[str, List[str]]:
     return by_category
 
 
-def create_workflow_from_preset(preset_name: str, **kwargs) -> Optional[WorkflowDefinition]:
+def create_workflow_from_preset(preset_name: str, **kwargs: Any) -> Optional[WorkflowDefinition]:
     """Create a workflow from a preset with optional customization.
 
     Args:

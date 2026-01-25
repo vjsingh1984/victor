@@ -209,14 +209,14 @@ class RecordingStorage(ABC):
         pass
 
     @abstractmethod
-    async def load(self, recording_id: str):
+    async def load(self, recording_id: str) -> Optional[ExecutionReplayer]:
         """Load a recording.
 
         Args:
             recording_id: Recording identifier
 
         Returns:
-            ExecutionReplayer instance
+            ExecutionReplayer instance or None if not found
         """
         pass
 
@@ -437,14 +437,14 @@ class FileRecordingStorage(RecordingStorage):
 
         return str(metadata.recording_id)
 
-    async def load(self, recording_id: str):
+    async def load(self, recording_id: str) -> Optional[ExecutionReplayer]:
         """Load a recording.
 
         Args:
             recording_id: Recording identifier
 
         Returns:
-            ExecutionReplayer instance
+            ExecutionReplayer instance or None if not found
 
         Raises:
             FileNotFoundError: If recording not found
@@ -649,14 +649,14 @@ class InMemoryRecordingStorage(RecordingStorage):
 
         return str(metadata.recording_id)
 
-    async def load(self, recording_id: str):
+    async def load(self, recording_id: str) -> Optional[ExecutionReplayer]:
         """Load a recording.
 
         Args:
             recording_id: Recording identifier
 
         Returns:
-            ExecutionReplayer instance
+            ExecutionReplayer instance or None if not found
 
         Raises:
             FileNotFoundError: If recording not found

@@ -23,7 +23,8 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from victor.workflows.definition import ConditionNode, WorkflowState
+    from victor.workflows.definition import ConditionNode
+    from victor.workflows.adapters import WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +66,6 @@ class ConditionNodeExecutor:
             graph compilation via ConditionEvaluator.create_router(). This
             executor is a passthrough since routing is already resolved.
         """
-        from victor.framework.graph import GraphNodeResult
-
         logger.debug(f"Condition node {node.id} is passthrough (routing handled by StateGraph)")
 
         # Make mutable copy of state
@@ -76,14 +75,14 @@ class ConditionNodeExecutor:
         if "_node_results" not in state:
             state["_node_results"] = {}
 
-        state["_node_results"][node.id] = GraphNodeResult(
-            node_id=node.id,
-            status="completed",
-            result={"passthrough": True, "condition": True},
-            metadata={
+        state["_node_results"][node.id] = {
+            "node_id": node.id,
+            "status": "completed",
+            "result": {"passthrough": True, "condition": True},
+            "metadata": {
                 "branches": list(node.branches.keys()) if hasattr(node, "branches") else [],
             },
-        )
+        }
 
         return state
 

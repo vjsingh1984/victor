@@ -537,9 +537,9 @@ async def query_filings(
     top_k: int = 5,
     synthesize: bool = False,
     provider: str = "ollama",
-    model: str = None,
-    filter_sector: str = None,
-    filter_symbol: str = None,
+    model: Optional[str] = None,
+    filter_sector: Optional[str] = None,
+    filter_symbol: Optional[str] = None,
 ) -> None:
     """Query ingested SEC filings.
 
@@ -631,7 +631,7 @@ async def show_stats() -> None:
     print("=" * 60)
 
 
-def list_companies(preset: str = None, sector: str = None) -> None:
+def list_companies(preset: Optional[str] = None, sector: Optional[str] = None) -> None:
     """List available companies."""
     print("\n" + "=" * 60)
 
@@ -669,7 +669,7 @@ def list_companies(preset: str = None, sector: str = None) -> None:
     print()
 
 
-def main():
+def main() -> None:
     """Main entry point."""
     parser = argparse.ArgumentParser(
         description="SEC Filing RAG Demo - Ingest and query 10-K/10-Q filings for S&P 500 stocks"
@@ -787,7 +787,7 @@ def main():
                 provider=args.provider,
                 model=args.model,
                 filter_sector=args.sector,
-                filter_symbol=args.company[0] if args.company else None,
+                filter_symbol=args.company[0] if args.company else None,  # type: ignore[arg-type]
             )
         )
         return
