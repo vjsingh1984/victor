@@ -59,7 +59,7 @@ class MemoryStats:
     total_objects: int = 0
     total_size: int = 0
     gc_counts: tuple[int, int, int] = field(default_factory=lambda: (0, 0, 0))
-    pool_stats: Dict[str, Dict[str, int]] = field(default_factory=dict)
+    pool_stats: Dict[str, Dict[str, float]] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -405,7 +405,7 @@ class MemoryOptimizer:
         stats.gc_counts = gc.get_count()
 
         # Get pool stats
-        stats.pool_stats = {name: pool.get_stats() for name, pool in self._pools.items()}  # type: ignore[assignment]
+        stats.pool_stats = {name: pool.get_stats() for name, pool in self._pools.items()}
 
         return stats
 

@@ -76,6 +76,7 @@ from typing import (
     Optional,
     Set,
     TypeVar,
+    cast,
 )
 
 F = TypeVar("F", bound=Callable[..., Any])
@@ -777,7 +778,7 @@ class LazyComponentLoader:
         return dfs(key)
 
 
-def lazy_load(component_key: str) -> Callable[[F], Any]:  # Return Any to avoid wrapped function type mismatch
+def lazy_load(component_key: str) -> Callable[[F], F]:
     """Decorator for lazy-loading component dependencies.
 
     This decorator wraps a function or method to lazily load
@@ -827,7 +828,7 @@ def lazy_load(component_key: str) -> Callable[[F], Any]:  # Return Any to avoid 
 
             return func(*args, **kwargs)
 
-        return wrapper
+        return cast(F, wrapper)
 
     return decorator
 
