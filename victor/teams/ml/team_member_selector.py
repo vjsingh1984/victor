@@ -208,7 +208,10 @@ class TeamMemberSelector:
             feature_vector = self._scaler.transform([feature_vector])[0]
 
         # Predict score
-        score = float(self._model.predict_proba([feature_vector])[0][1])
+        if self._model is not None:
+            score = float(self._model.predict_proba([feature_vector])[0][1])  # type: ignore[union-attr]
+        else:
+            raise RuntimeError("Model not trained")
 
         return score, 0.8, [f"Model-based score: {score:.3f}"]
 
@@ -295,7 +298,7 @@ class TeamMemberSelector:
         features.append(member.tool_budget)
         features.append(float(member.can_delegate))
         features.append(float(member.is_manager))
-        features.append(member.max_delegation_depth)
+        features.append(int(member.max_delegation_depth))
         features.append(float(member.memory_enabled))
         features.append(len(member.expertise))
         features.append(len(member.backstory))
@@ -303,9 +306,9 @@ class TeamMemberSelector:
         # Expertise overlap
         if task_features.required_expertise:
             overlap = len(set(member.expertise) & set(task_features.required_expertise))
-            features.append(overlap / len(task_features.required_expertise))
+            features.append(int(overlap / len(task_features.required_expertise)))
         else:
-            features.append(0.0)
+            features.append(0)
 
         # Role encoding (one-hot)
         roles = ["planner", "researcher", "executor", "reviewer", "tester"]
@@ -350,8 +353,8 @@ class TeamMemberSelector:
             X.append(feature_vector)
             y.append(int(success))
 
-        X = np.array(X)
-        y = np.array(y)
+        X: list[Any] = np.array(X).tolist()  # type: ignore[assignment]
+        y: list[int] = np.array(y).tolist()  # type: ignore[assignment]
 
         # Scale features
         self._scaler = StandardScaler()

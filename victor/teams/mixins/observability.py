@@ -133,7 +133,7 @@ class ObservabilityMixin:
         try:
             from victor.core.events import ObservabilityBus as EventBus
 
-            bus = EventBus.get_instance()
+            bus = EventBus.get_instance()  # type: ignore[attr-defined]
             bus.publish(
                 event_type=f"team.{event_name}",
                 data={

@@ -387,7 +387,7 @@ class PerformancePredictor:
         return PerformancePrediction(
             metric_name="execution_time",
             predicted_value=round(predicted_time, 2),
-            confidence_interval=tuple(round(x, 2) for x in confidence_interval),
+            confidence_interval=(round(confidence_interval[0], 2), round(confidence_interval[1], 2)),
             confidence=0.65,
             factors=factors,
         )
@@ -451,7 +451,7 @@ class PerformancePredictor:
         return PerformancePrediction(
             metric_name="success_rate",
             predicted_value=round(predicted_rate, 3),
-            confidence_interval=tuple(round(x, 3) for x in confidence_interval),
+            confidence_interval=(round(confidence_interval[0], 3), round(confidence_interval[1], 3)),
             confidence=0.60,
             factors=factors,
         )
@@ -515,7 +515,7 @@ class PerformancePredictor:
         return PerformancePrediction(
             metric_name="quality_score",
             predicted_value=round(predicted_score, 3),
-            confidence_interval=tuple(round(x, 3) for x in confidence_interval),
+            confidence_interval=(round(confidence_interval[0], 3), round(confidence_interval[1], 3)),
             confidence=0.62,
             factors=factors,
         )
@@ -650,8 +650,8 @@ class PerformancePredictor:
             X.append(feature_vector)
             y.append(value)
 
-        X = np.array(X)
-        y = np.array(y)
+        X: list[Any] = np.array(X).tolist()  # type: ignore[assignment]
+        y: list[Any] = np.array(y).tolist()  # type: ignore[assignment]
 
         # Scale features
         scaler = StandardScaler()

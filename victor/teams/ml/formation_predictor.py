@@ -181,7 +181,10 @@ class FormationPredictor:
             feature_vector = self._scaler.transform([feature_vector])[0]
 
         # Predict probabilities
-        probs = self._model.predict_proba([feature_vector])[0]
+        if self._model is not None:
+            probs = self._model.predict_proba([feature_vector])[0]  # type: ignore[union-attr]
+        else:
+            raise RuntimeError("Model not trained")
 
         # Create probability dict
         prob_dict = dict(zip(self._formations, probs))
@@ -264,7 +267,7 @@ class FormationPredictor:
         probabilities = {k: v / total for k, v in scores.items()}
 
         # Select best formation
-        best_formation_str = max(scores, key=scores.get)
+        best_formation_str = max(scores, key=scores.get)  # type: ignore[arg-type]
         best_formation = TeamFormation(best_formation_str)
         confidence = probabilities[best_formation_str]
 
@@ -399,9 +402,9 @@ class FormationPredictor:
             y.append(self._formations.index(formation.value))
             weights.append(2.0 if success else 1.0)
 
-        X = np.array(X)
-        y = np.array(y)
-        weights = np.array(weights)
+        X: list[Any] = np.array(X).tolist()  # type: ignore[assignment]
+        y: list[Any] = np.array(y).tolist()  # type: ignore[assignment]
+        weights: list[float] = np.array(weights).tolist()  # type: ignore[assignment]
 
         # Scale features
         self._scaler = StandardScaler()

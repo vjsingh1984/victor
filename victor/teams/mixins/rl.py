@@ -107,16 +107,13 @@ class RLMixin:
 
             hooks = get_rl_hooks()
             if hooks:
-                hooks.record_event(
+                hooks.emit(  # type: ignore[attr-defined]
                     RLEvent(
-                        event_type=RLEventType.TEAM_COMPLETED,
-                        data={
-                            "team_name": team_name,
-                            "formation": formation,
-                            "success": success,
-                            "quality_score": quality_score,
-                            **(metadata or {}),
-                        },
+                        type=RLEventType.TEAM_COMPLETED,
+                        team_formation=formation,
+                        success=success,
+                        quality_score=quality_score,
+                        metadata=metadata or {},
                     )
                 )
         except ImportError:
