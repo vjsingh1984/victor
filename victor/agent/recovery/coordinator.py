@@ -434,10 +434,10 @@ class RecoveryCoordinator:
         if failure_type == FailureType.CONTEXT_OVERFLOW and self._context_compactor:
             try:
                 # Use check_and_compact which performs compaction if needed
-                result = self._context_compactor.check_and_compact()
-                if result.action_taken:
+                compaction_result = self._context_compactor.check_and_compact()
+                if compaction_result.action_taken:
                     outcome.compaction_performed = True
-                    outcome.tokens_freed = result.tokens_saved
+                    outcome.tokens_freed = compaction_result.tokens_saved
             except Exception as e:
                 logger.warning(f"Context compaction failed: {e}")
 

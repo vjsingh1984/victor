@@ -388,20 +388,3 @@ class SharedToolRegistry:
             logger.debug(f"Using cached tool instances (mode={cache_key})")
 
         return cast(List[Any], self._tool_instances_cache.get(cache_key, []))
-
-    def get_tool_classes(self, airgapped_mode: bool = False) -> Dict[str, type]:
-        """Get discovered tool classes, optionally filtered by mode.
-
-        Args:
-            airgapped_mode: If True, filter out web tools that require network
-
-        Returns:
-            Dictionary mapping tool names to their classes
-        """
-        if airgapped_mode:
-            return {
-                name: cls
-                for name, cls in self._tool_classes.items()
-                if not name.startswith("web_")
-            }
-        return self._tool_classes.copy()

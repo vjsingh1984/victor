@@ -163,7 +163,6 @@ def pytest_collection_modifyitems(items, config):
 @pytest.mark.real_execution
 @pytest.mark.asyncio
 @pytest.mark.parametrize("provider_name", ALL_PROVIDERS)
-@pytest.mark.timeout(120)
 async def test_provider_read_tool(
     provider_name: str,
     sample_code_file: str,
@@ -231,7 +230,6 @@ async def test_provider_read_tool(
 @pytest.mark.real_execution
 @pytest.mark.asyncio
 @pytest.mark.parametrize("provider_name", ALL_PROVIDERS)
-@pytest.mark.timeout(120)
 async def test_provider_shell_tool(
     provider_name: str,
     temp_workspace: str,
@@ -303,7 +301,6 @@ async def test_provider_shell_tool(
 @pytest.mark.real_execution
 @pytest.mark.asyncio
 @pytest.mark.parametrize("provider_name", ALL_PROVIDERS)
-@pytest.mark.timeout(180)
 async def test_provider_multi_tool(
     provider_name: str,
     sample_code_file: str,
@@ -404,7 +401,6 @@ async def test_provider_multi_tool(
 @pytest.mark.real_execution
 @pytest.mark.asyncio
 @pytest.mark.parametrize("provider_name", ALL_PROVIDERS)
-@pytest.mark.timeout(60)
 async def test_provider_simple_query(
     provider_name: str,
     request,

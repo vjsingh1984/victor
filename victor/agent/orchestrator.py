@@ -2816,6 +2816,8 @@ class AgentOrchestrator(
         last_error = None
         for attempt in range(max_attempts):
             try:
+                if self.tools is None:
+                    raise RuntimeError("Tools registry not available")
                 result = await self.tools.execute(tool_name, context=context, **tool_args)
 
                 if result.success:

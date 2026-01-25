@@ -40,6 +40,7 @@ from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import pytest
+import pytest_asyncio
 import httpx
 
 # Local providers

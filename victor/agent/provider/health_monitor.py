@@ -173,4 +173,5 @@ class ProviderHealthMonitor(IProviderHealthMonitor):
         if not self._health_checker:
             return []
 
-        return list(self._health_checker.get_healthy_providers())  # type: ignore[no-any-return]
+        healthy_providers = self._health_checker.get_healthy_providers()
+        return list(healthy_providers) if healthy_providers is not None else []

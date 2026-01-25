@@ -26,7 +26,7 @@ Examples of redundancy:
 import logging
 from collections import deque
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Deque, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Deque, Dict, List, Optional, Set, cast
 
 if TYPE_CHECKING:
     from victor.agent.protocols import ToolDeduplicationTrackerProtocol
@@ -355,8 +355,8 @@ def get_deduplication_tracker() -> "ToolDeduplicationTrackerProtocol":
 
     # Legacy fallback
     if _deduplication_tracker is None:
-        _deduplication_tracker = ToolDeduplicationTracker()  # type: ignore[abstract]
-    return _deduplication_tracker
+        _deduplication_tracker = ToolDeduplicationTracker()
+    return cast("ToolDeduplicationTrackerProtocol", _deduplication_tracker)
 
 
 def reset_deduplication_tracker() -> None:

@@ -433,15 +433,16 @@ class AutonomousPlanner:
                         progress_callback(step, StepStatus.IN_PROGRESS)
 
                     role = self._map_role_string(step.sub_agent_role)
-                    tasks.append(
-                        SubAgentTask(
-                            role=role,
-                            task=step.description,
-                            tool_budget=step.estimated_tool_calls,
+                    if SubAgentTask is not None:
+                        tasks.append(
+                            SubAgentTask(
+                                role=role,
+                                task=step.description,
+                                tool_budget=step.estimated_tool_calls,
+                            )
                         )
-                    )
 
-                fan_out_result = await self.sub_agent_orchestrator.fan_out(tasks, max_concurrent)  # type: ignore[arg-type]
+                fan_out_result = await self.sub_agent_orchestrator.fan_out(tasks, max_concurrent)
 
                 # Process results
                 for step, subagent_result in zip(

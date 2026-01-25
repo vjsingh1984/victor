@@ -309,7 +309,7 @@ class SystemPromptBuilder:
             self._tool_guidance = get_tool_guidance_strategy(self.provider_name)
 
         # Cache merged task hints from vertical contributors
-        self._merged_task_hints = None
+        self._merged_task_hints: dict[str, str] | None = None
 
     def is_cloud_provider(self) -> bool:
         """Check if the provider is a cloud-based API with robust tool calling."""

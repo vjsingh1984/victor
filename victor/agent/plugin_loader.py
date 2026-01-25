@@ -163,7 +163,7 @@ class PluginLoader:
 
             # Use centralized path for plugins directory
             plugin_dirs: List[Path] = [get_project_paths().global_plugins_dir]
-            plugin_dirs.extend(self._config.plugin_dirs)
+            plugin_dirs.extend(Path(p) for p in self._config.plugin_dirs)
 
             plugin_config = getattr(self._settings, "plugin_config", {})
 
