@@ -31,9 +31,9 @@
 [Cut to screen recording of Victor in action]
 
 **Host (voiceover)**:
-"Victor is an open-source AI coding assistant supporting 21 LLM providers with over 55 specialized tools. But what makes Victor unique is its architecture."
+"Victor is an open-source AI coding assistant supporting multiple LLM providers with a broad tool suite. But what makes Victor unique is its architecture."
 
-[Animated diagram appears: Monolith → Coordinators]
+[Animated diagram appears: Monolith -> Coordinators]
 
 **Host (voiceover)**:
 "Recently, Victor underwent a major architectural refactoring. We took a 6,000-line monolithic orchestrator and broke it down into 15 specialized coordinators. The result? A 93% reduction in complexity, 10x faster test execution, and an 85% test coverage."
@@ -252,7 +252,7 @@ config = orchestrator._config_coordinator.get_config()
 "And what do you get in return? Let's look at the metrics:"
 
 - 93% reduction in core complexity
-- 10x faster test execution (45s → 12s)
+- 10x faster test execution (45s -> 12s)
 - 85% test coverage (up from 65%)
 - < 5% performance overhead (well below 10% goal)
 
@@ -351,7 +351,7 @@ Resources:
 - Migration Guide: [link]
 - Architecture Deep Dive: [link]
 
-Victor AI is an open-source AI coding assistant supporting 21 LLM providers.
+Victor AI is an open-source AI coding assistant supporting multiple LLM providers.
 Learn more: [website]
 
 #VictorAI #LLM #Architecture #Tutorial #Python

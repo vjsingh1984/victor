@@ -1,5 +1,8 @@
 # Victor AI 0.5.0 Configuration Reference
 
+> **Note**: This legacy API documentation is retained for reference. For current docs, see `docs/reference/api/`.
+
+
 Complete reference for all configuration options in Victor AI.
 
 **Table of Contents**

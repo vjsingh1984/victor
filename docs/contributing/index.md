@@ -25,7 +25,7 @@ pytest tests/unit -v
 | [Code Style](./code-style.md) | Formatting and linting rules |
 | [Testing](./testing.md) | Test strategy and commands |
 | [FEP Process](./FEP_PROCESS.md) | Feature proposals and approvals |
-| [Pre‑Commit Hooks](./PRE_COMMIT_HOOKS.md) | Local checks before commit |
+| [Pre-Commit Hooks](./PRE_COMMIT_HOOKS.md) | Local checks before commit |
 | [Documentation Guide](./documentation-guide.md) | Docs structure and workflow |
 
 ## Project Orientation
@@ -34,11 +34,7 @@ pytest tests/unit -v
 - [Reference Index](../reference/index.md)
 - [Guides Index](../guides/index.md)
 
-## Legacy & Archived Docs
-
-Older documentation lives under `docs/contributing/development-old/`. It is kept for historical context and may be out of date.
-
-## Repo‑Level Guide
+## Repo-Level Guide
 
 For contribution workflow, PR expectations, and governance, see the root guide:
 

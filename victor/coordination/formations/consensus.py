@@ -20,7 +20,7 @@ Multiple rounds if needed until consensus or timeout.
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
 
@@ -76,7 +76,7 @@ class ConsensusFormation(BaseFormationStrategy):
             round_results = await asyncio.gather(*round_tasks, return_exceptions=True)
 
             # Process results
-            processed_results = []
+            processed_results: List[MemberResult] = []
             for i, result in enumerate(round_results):
                 if isinstance(result, Exception):
                     processed_results.append(
@@ -89,7 +89,7 @@ class ConsensusFormation(BaseFormationStrategy):
                         )
                     )
                 else:
-                    processed_results.append(result)
+                    processed_results.append(cast(MemberResult, result))
 
             all_results.extend(processed_results)
 
@@ -149,7 +149,7 @@ class ConsensusFormation(BaseFormationStrategy):
     ) -> "MemberResult":
         """Execute a single agent."""
         logger.debug(f"ConsensusFormation: round {round_num + 1}, agent {agent.id}")
-        return await agent.execute(task, context)
+        return cast("MemberResult", await agent.execute(task, context))
 
     def _check_consensus(self, results: List["MemberResult"]) -> bool:
         """Check if results indicate consensus.
@@ -219,7 +219,8 @@ class ConsensusFormation(BaseFormationStrategy):
             return set(content1.keys()) == set(content2.keys())
 
         # Default: exact match
-        return content1 == content2
+        result: bool = content1 == content2
+        return result
 
     def validate_context(self, context: TeamContext) -> bool:
         """Consensus formation requires shared state for comparing results."""

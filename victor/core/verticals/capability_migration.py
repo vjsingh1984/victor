@@ -45,7 +45,7 @@ from __future__ import annotations
 
 import logging
 import warnings
-from typing import TYPE_CHECKING, Any, Callable, Optional, Type, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, TypeVar, cast
 
 if TYPE_CHECKING:
     from victor.core.verticals.capability_injector import CapabilityInjector
@@ -201,8 +201,8 @@ def migrate_to_injector(
             )
 
             # Create property that uses injector
-            def make_property(cap_name: str):
-                def getter(self):
+            def make_property(cap_name: str) -> property:
+                def getter(self) -> Any:
                     return injector.get_capability(cap_name)
 
                 return property(getter)
@@ -246,10 +246,8 @@ def get_capability_or_create(
     if capability is None:
         logger.debug(f"Capability '{capability_name}' not in injector, creating with factory")
         capability = factory()
-        # Type: ignore because factory() returns Any but we need T
-        return capability  # type: ignore[return-value]
-    # Type: ignore because injector returns Any but we need T
-    return capability  # type: ignore[return-value]
+        return cast(T, capability)
+    return cast(T, capability)
 
 
 # =============================================================================

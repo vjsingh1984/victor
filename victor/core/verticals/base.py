@@ -570,7 +570,7 @@ class VerticalBase(
     # =========================================================================
 
     @classmethod
-    def get_prompt_builder(cls):  # No type hint to avoid circular import
+    def get_prompt_builder(cls) -> Any:  # No specific type to avoid circular import
         """Get configured PromptBuilder for this vertical.
 
         Provides a PromptBuilder instance pre-configured with vertical-specific
@@ -799,7 +799,7 @@ class VerticalBase(
     # =========================================================================
 
     @classmethod
-    def implements_protocol(cls, protocol_type: Type[Protocol]) -> bool:
+    def implements_protocol(cls, protocol_type: Type[Any]) -> bool:
         """Check if this vertical implements a specific protocol.
 
         This method provides ISP-compliant protocol checking, allowing verticals
@@ -822,7 +822,7 @@ class VerticalBase(
         return ProtocolBasedExtensionLoader.implements_protocol(cls, protocol_type)
 
     @classmethod
-    def register_protocol(cls, protocol_type: Type[Protocol]) -> None:
+    def register_protocol(cls, protocol_type: Type[Any]) -> None:
         """Register this vertical as implementing a protocol.
 
         This method allows verticals to explicitly declare protocol conformance,
@@ -846,7 +846,7 @@ class VerticalBase(
         ProtocolBasedExtensionLoader.register_protocol(protocol_type, cls)
 
     @classmethod
-    def list_implemented_protocols(cls) -> List[Type[Protocol]]:
+    def list_implemented_protocols(cls) -> List[Type[Any]]:
         """List all protocols explicitly implemented by this vertical.
 
         Returns:
@@ -1123,7 +1123,7 @@ class VerticalBase(
             teams = provider.list_teams()
             review_team = provider.get_team("code_review_team")
         """
-        from victor.core.teams import BaseYAMLTeamProvider
+        from victor.core.teams.base_provider import BaseYAMLTeamProvider
 
         return BaseYAMLTeamProvider.get_provider(cls.name)
 
@@ -1295,7 +1295,7 @@ class VerticalRegistry:
                     return None
 
                 vertical_class: Optional[Type[VerticalBase]] = vertical_class_any
-                if not issubclass(vertical_class, VerticalBase):
+                if vertical_class is None or not issubclass(vertical_class, VerticalBase):
                     return None
 
                 # Register it now that it's loaded

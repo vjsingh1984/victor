@@ -41,7 +41,7 @@ Victor AI is an open-source coding assistant that supports multiple LLM provider
 | **Multi-Agent** | Team workflows | Often single agent |
 | **Extensibility** | Vertical + plugin model | Often closed |
 | **Cost** | Open-source + BYO provider | Often subscription |
-| **Privacy** | Local‑only possible with supported providers | Often cloud‑only |
+| **Privacy** | Local-only possible with supported providers | Often cloud-only |
 
 ### Is Victor free?
 
@@ -274,7 +274,7 @@ result = await coordinator.execute_task(
 
 Use teams for:
 - **Complex reviews**: Multiple perspectives
-- **Multi-stage tasks**: Research → Review → Execute
+- **Multi-stage tasks**: Research -> Review -> Execute
 - **Cross-domain work**: Security + Performance + Testing
 - **Quality assurance**: Consensus on critical decisions
 

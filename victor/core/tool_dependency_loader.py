@@ -641,7 +641,7 @@ _VERTICAL_CANONICALIZE_SETTINGS: Dict[str, bool] = {
 def create_vertical_tool_dependency_provider(
     vertical: str,
     canonicalize: Optional[bool] = None,
-) -> YAMLToolDependencyProvider:
+) -> Union["YAMLToolDependencyProvider", "EmptyToolDependencyProvider"]:
     """Factory function to create tool dependency providers for verticals.
 
     Consolidates vertical-specific tool dependency provider creation into

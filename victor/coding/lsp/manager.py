@@ -16,6 +16,7 @@
 
 import logging
 import shutil
+import types
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -71,7 +72,12 @@ class LSPConnectionPool:
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[types.TracebackType],
+    ) -> None:
         """Async context manager exit - ensures all servers are stopped."""
         await self.stop_all()
 

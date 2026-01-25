@@ -1,15 +1,15 @@
 # Provider Reference
 
-Complete reference for all 21 supported LLM providers in Victor.
+Complete reference for supported LLM providers in Victor.
 
 ## Quick Links
 
 | Category | Providers | Setup Guide |
 |----------|-----------|-------------|
-| **Local** | Ollama, LM Studio, vLLM, llama.cpp | [Local Providers →](#local-providers) |
-| **Cloud** | Anthropic, OpenAI, Google, xAI, etc. | [Cloud Providers →](#cloud-providers) |
-| **Enterprise** | Azure, AWS Bedrock, Vertex AI | [Enterprise →](#enterprise-providers) |
-| **Platforms** | Hugging Face, Replicate | [Platforms →](#open-model-platforms) |
+| **Local** | Ollama, LM Studio, vLLM, llama.cpp | [Local Providers ->](#local-providers) |
+| **Cloud** | Anthropic, OpenAI, Google, xAI, etc. | [Cloud Providers ->](#cloud-providers) |
+| **Enterprise** | Azure, AWS Bedrock, Vertex AI | [Enterprise ->](#enterprise-providers) |
+| **Platforms** | Hugging Face, Replicate | [Platforms ->](#open-model-platforms) |
 
 ## Provider Comparison
 
@@ -30,7 +30,7 @@ Complete reference for all 21 supported LLM providers in Victor.
 | **Replicate** | 20K+ models | ✅ | ✅ | ✅ | Yes | Pay-per-use |
 | **And 9 more...** | See below | Varied | Varied | Varied | Varied | Varied |
 
-[Full Comparison Table →](comparison.md)
+[Full Comparison Table ->](comparison.md)
 
 ### Feature Support Matrix
 
@@ -130,7 +130,7 @@ ollama run qwen2.5-coder:7b "Hello"
 ollama logs
 ```
 
-[Full Setup Guide →](setup.md#ollama)
+[Full Setup Guide ->](setup.md#ollama)
 
 ### LM Studio
 
@@ -166,7 +166,7 @@ profiles:
 - Model discovery built-in
 - Easy GPU configuration
 
-[Full Setup Guide →](setup.md#lm-studio)
+[Full Setup Guide ->](setup.md#lm-studio)
 
 ### vLLM
 
@@ -209,7 +209,7 @@ profiles:
 - **Batching**: Automatic request batching
 - **Memory**: Efficient with PagedAttention
 
-[Full Setup Guide →](setup.md#vllm)
+[Full Setup Guide ->](setup.md#vllm)
 
 ### llama.cpp
 
@@ -240,7 +240,7 @@ victor chat --provider llama-cpp
 - Broad model support
 - Low memory footprint
 
-[Full Setup Guide →](setup.md#llama-cpp)
+[Full Setup Guide ->](setup.md#llama-cpp)
 
 ---
 
@@ -294,7 +294,7 @@ profiles:
 - Free tier: 5 requests/min
 - Paid: 50-100 requests/min (depends on tier)
 
-[Full Documentation →](https://docs.anthropic.com/)
+[Full Documentation ->](https://docs.anthropic.com/)
 
 ### OpenAI
 
@@ -344,7 +344,7 @@ profiles:
 - Tier 2: 10,000 RPM
 - Tier 3: 30,000 RPM
 
-[Full Documentation →](https://platform.openai.com/docs/)
+[Full Documentation ->](https://platform.openai.com/docs/)
 
 ### Google
 
@@ -392,7 +392,7 @@ profiles:
 - Free experimental models
 - Excellent multimodal
 
-[Full Documentation →](https://ai.google.dev/gemini-api/docs)
+[Full Documentation ->](https://ai.google.dev/gemini-api/docs)
 
 ### xAI
 
@@ -1008,11 +1008,11 @@ victor chat --timeout 60
 
 ### Getting Help
 
-- **Documentation**: [Full docs →](../../README.md)
-- **Issues**: [GitHub Issues →](https://github.com/vjsingh1984/victor/issues)
-- **Discussions**: [GitHub Discussions →](https://github.com/vjsingh1984/victor/discussions)
-- **Setup Guide**: [Detailed setup →](setup.md)
+- **Documentation**: [Full docs ->](../../README.md)
+- **Issues**: [GitHub Issues ->](https://github.com/vjsingh1984/victor/issues)
+- **Discussions**: [GitHub Discussions ->](https://github.com/vjsingh1984/victor/discussions)
+- **Setup Guide**: [Detailed setup ->](setup.md)
 
 ---
 
-**Next**: [Provider Comparison →](comparison.md) | [Tool Catalog →](../tools/catalog.md) | [Configuration →](../configuration/)
+**Next**: [Provider Comparison ->](comparison.md) | [Tool Catalog ->](../tools/catalog.md) | [Configuration ->](../configuration/)

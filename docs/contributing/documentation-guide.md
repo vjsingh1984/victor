@@ -76,7 +76,7 @@ docs/
 │   ├── cloud-models.md
 │   ├── docker.md
 │   └── troubleshooting.md
-├── user-guide/                       # End‑user docs
+├── user-guide/                       # End-user docs
 │   ├── index.md
 │   ├── cli-reference.md
 │   ├── tui-mode.md
@@ -85,7 +85,7 @@ docs/
 │   ├── workflows.md
 │   ├── session-management.md
 │   └── troubleshooting.md
-├── tutorials/                        # Hands‑on tutorials
+├── tutorials/                        # Hands-on tutorials
 │   ├── build-custom-tool.md
 │   ├── create-workflow.md
 │   ├── integrate-provider.md
@@ -93,7 +93,7 @@ docs/
 │   ├── coordinator_quickstart.md
 │   ├── coordinator_recipes.md
 │   └── batch-processor-quickstart.md
-├── guides/                           # How‑to guides and deep dives
+├── guides/                           # How-to guides and deep dives
 │   └── index.md
 ├── reference/                        # Reference docs
 │   ├── index.md

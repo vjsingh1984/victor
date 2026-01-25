@@ -90,7 +90,5 @@ After removing the duplicate:
 
 ### Related Issues
 
-- `docs/archive/architecture-diagram-review.md` - Original issue identified
-- `docs/archive/ARCHITECTURE_DIAGRAM_UPDATE_SUMMARY.md` - Confirmed duplicate
-- `docs/archive/workflow-diagram-consolidation.md` - Consolidation notes
+- Historical reports (archived separately)
 - `OSS_READNESS_REPORT.md` - OSS preparation checklist

@@ -58,6 +58,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import (
     Any,
+    AsyncIterator,
     Callable,
     Dict,
     Generic,
@@ -178,7 +179,7 @@ class UnitOfWork(UnitOfWorkProtocol):
     def __init__(self) -> None:
         """Initialize Unit of Work."""
         self._identity_map: Dict[str, TrackedEntity] = {}
-        self._repositories: Dict[Type[Entity], Repository] = {}
+        self._repositories: Dict[Type[Entity], Repository[Any]] = {}
         self._new_entities: List[Entity] = []
         self._modified_entities: Set[str] = set()
         self._deleted_entities: Set[str] = set()
@@ -195,7 +196,7 @@ class UnitOfWork(UnitOfWorkProtocol):
         self._repositories[entity_type] = repository
         logger.debug(f"Registered repository for {entity_type.__name__}")
 
-    def _get_repository(self, entity: Entity) -> Repository:
+    def _get_repository(self, entity: Entity) -> Repository[Any]:
         """Get repository for entity type."""
         entity_type = type(entity)
         if entity_type not in self._repositories:
@@ -431,7 +432,7 @@ class SQLiteUnitOfWork(UnitOfWork):
         """
         super().__init__()
         self._db_path = db_path
-        self._connection = None
+        self._connection: Optional[Any] = None
 
     async def begin_transaction(self) -> None:
         """Begin a database transaction."""
@@ -576,7 +577,7 @@ def create_unit_of_work(backend: str = "memory", **kwargs: Any) -> UnitOfWork:
 
 
 @asynccontextmanager
-async def transactional(*repositories: tuple[Repository, Type[Entity]]):
+async def transactional(*repositories: tuple[Repository[Entity], Type[Entity]]) -> AsyncIterator[UnitOfWork]:
     """Context manager for transactional operations.
 
     Example:

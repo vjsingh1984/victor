@@ -52,7 +52,7 @@ from __future__ import annotations
 import logging
 import threading
 from abc import ABC
-from typing import Any, ClassVar, Dict, Generic, List, Optional, Set, TypeVar
+from typing import Any, ClassVar, Dict, Generic, List, Optional, Set, TypeVar, cast
 
 logger = logging.getLogger(__name__)
 

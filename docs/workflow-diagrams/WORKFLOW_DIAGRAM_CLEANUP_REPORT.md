@@ -199,9 +199,7 @@ Analyzed all 54 workflow diagrams:
 ## Related Issues
 
 References to this duplicate issue found in:
-- `docs/archive/architecture-diagram-review.md` - Original identification
-- `docs/archive/ARCHITECTURE_DIAGRAM_UPDATE_SUMMARY.md` - Confirmed as duplicate
-- `docs/archive/workflow-diagram-consolidation.md` - Consolidation planning
+- Historical reports (archived separately)
 - `OSS_READINESS_REPORT.md` - OSS preparation checklist item
 
 ---

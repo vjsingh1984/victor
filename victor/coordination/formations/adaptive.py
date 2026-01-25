@@ -201,6 +201,9 @@ class AdaptiveFormation(BaseFormationStrategy):
                 f"(switch {self._switch_count}/{self.max_switches})"
             )
 
+            if self._current_formation is None:
+                raise RuntimeError("No formation selected")
+
             results = await self._current_formation.execute(agents, context, task)
 
             # Calculate performance metrics
@@ -208,9 +211,10 @@ class AdaptiveFormation(BaseFormationStrategy):
             performance_score = self._evaluate_performance(results, duration)
 
             # Track performance score for this formation
-            if formation_used not in self._performance_scores:
-                self._performance_scores[formation_used] = []
-            self._performance_scores[formation_used].append(performance_score)
+            if formation_used is not None:
+                if formation_used not in self._performance_scores:
+                    self._performance_scores[formation_used] = []
+                self._performance_scores[formation_used].append(performance_score)
 
             # Check if we should switch formations
             if self._should_switch_formation(performance_score, results):
@@ -434,10 +438,10 @@ class AdaptiveFormation(BaseFormationStrategy):
         # Return result from first successful result
         for result in results:
             if result.success:
-                return result.result
+                return result.output
 
         # Fallback to first result
-        return results[0].result if results else None
+        return results[0].output if results else None
 
     def validate_context(self, context: TeamContext) -> bool:
         """Validate that context has required agents.

@@ -1,5 +1,8 @@
 # New Capabilities API Reference
 
+> **Note**: This legacy API documentation is retained for reference. For current docs, see `docs/reference/api/`.
+
+
 Complete API reference for Victor AI's new agentic capabilities.
 
 ## Table of Contents

@@ -1,6 +1,6 @@
 # Provider Guide
 
-Complete guide to using LLM providers in Victor. Victor supports multiple providers, from local inference to cloud APIs, with mid‑conversation switching where supported.
+Complete guide to using LLM providers in Victor. Victor supports multiple providers, from local inference to cloud APIs, with mid-conversation switching where supported.
 
 ## What is a Provider?
 

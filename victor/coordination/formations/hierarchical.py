@@ -19,7 +19,7 @@ then synthesizes results.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
 from victor.teams.types import AgentMessage, MemberResult, MessageType
@@ -185,8 +185,8 @@ class HierarchicalFormation(BaseFormationStrategy):
             message_type=MessageType.RESULT,
             sender_id="system",
             recipient_id=manager.id,
-            content={
-                "task": "Synthesize worker results",
+            content="Synthesize worker results",
+            data={
                 "worker_results": [
                     {
                         "agent_id": r.member_id,
@@ -212,7 +212,7 @@ class HierarchicalFormation(BaseFormationStrategy):
     ) -> MemberResult:
         """Execute a single worker."""
         logger.debug(f"HierarchicalFormation: executing worker {index+1}: {worker.id}")
-        return await worker.execute(task, context)
+        return cast(MemberResult, await worker.execute(task, context))
 
     def validate_context(self, context: TeamContext) -> bool:
         """Hierarchical formation requires delegation support."""

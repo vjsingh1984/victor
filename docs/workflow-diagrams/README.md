@@ -209,7 +209,7 @@ SVG diagrams can be viewed in:
 
 1. **Check version** in metadata header
 2. **Increment version** if significant changes
-3. **Archive old version** to `archive/` if breaking changes
+3. **Archive old version** to an external archive repo if breaking changes
 4. **Update metadata** with new date and description
 5. **Update index.md** if node/edge count changes significantly
 

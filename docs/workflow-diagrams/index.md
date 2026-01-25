@@ -357,7 +357,7 @@ Edges: 12
 
 3. **Remove Obsolete Diagrams**
    - [ ] Identify workflows no longer used
-   - [ ] Move to `archive/` instead of deleting
+   - [ ] Move to an external archive repo, or delete after review
    - [ ] Document reason for deprecation
 
 ### Phase 4: Documentation and Tooling (Week 4+)
@@ -421,7 +421,7 @@ Edges: 12
 1. **Version Control**
    - Increment version in metadata header
    - Add changelog to vertical README
-   - Keep previous version in `archive/` if breaking change
+   - Keep previous version in an external archive repo if needed
 
 2. **Validation**
    - Ensure SVG is valid XML
@@ -437,12 +437,12 @@ Edges: 12
 ### Removing Workflows
 
 1. **Deprecation Process**
-   - Move to `archive/{vertical}/{workflow}-{version}.svg`
-   - Add to `archive/DEPRECATED.md` with reason
+   - If needed, move to an external archive repo with versioned paths
+   - Record deprecations in this doc or a local DEPRECATED list
    - Update code references
 
-2. **Do Not Delete**
-   - Keep archive for historical reference
+2. **Deletion**
+   - Delete after review if no longer needed
    - Document migration path to new workflow
    - Update all references in codebase
 

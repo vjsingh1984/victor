@@ -39,7 +39,7 @@ import platform
 import pwd
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 logger = logging.getLogger(__name__)
 
@@ -735,7 +735,7 @@ def create_cache_manifest(cache_dir: Path) -> bool:
     if not cache_dir.exists():
         return False
 
-    manifest = {
+    manifest: Dict[str, Any] = {
         "version": 1,
         "created": str(Path.cwd()),
         "files": {},
@@ -748,10 +748,11 @@ def create_cache_manifest(cache_dir: Path) -> bool:
                 rel_path = str(file_path.relative_to(cache_dir))
                 file_hash = compute_file_hash(file_path)
                 if file_hash:
-                    manifest["files"][rel_path] = {
-                        "hash": file_hash,
-                        "size": file_path.stat().st_size,
-                    }
+                    if isinstance(manifest.get("files"), dict):
+                        manifest["files"][rel_path] = {  # type: ignore[index]
+                            "hash": file_hash,
+                            "size": file_path.stat().st_size,
+                        }
 
         # Write manifest with secure permissions
         manifest_path = get_cache_manifest_path(cache_dir)
@@ -912,7 +913,7 @@ def load_plugin_trust_store() -> dict:
 
     try:
         with open(trust_path) as f:
-            return json.load(f)
+            return cast("dict[str, Any]", json.load(f))
     except Exception as e:
         logger.warning(f"Failed to load plugin trust store: {e}")
         return {"version": 1, "trusted_plugins": {}, "trusted_signers": []}
@@ -1033,7 +1034,7 @@ def list_trusted_plugins() -> list[dict[str, Any]]:
 # =============================================================================
 
 
-def get_security_status() -> dict:
+def get_security_status() -> Dict[str, Any]:
     """Get comprehensive security status.
 
     Returns:
@@ -1041,7 +1042,7 @@ def get_security_status() -> dict:
     """
     import platform
 
-    status = {
+    status: Dict[str, Any] = {
         "platform": {
             "system": platform.system(),
             "release": platform.release(),
@@ -1072,10 +1073,12 @@ def get_security_status() -> dict:
     try:
         import keyring
 
-        status["keyring"]["available"] = True
+        if isinstance(status.get("keyring"), dict):
+            status["keyring"]["available"] = True  # type: ignore[index]
         try:
             backend = keyring.get_keyring()
-            status["keyring"]["backend"] = type(backend).__name__
+            if isinstance(status.get("keyring"), dict):
+                status["keyring"]["backend"] = type(backend).__name__  # type: ignore[index]
         except Exception:
             pass
     except ImportError:
@@ -1085,7 +1088,8 @@ def get_security_status() -> dict:
     embeddings_dir = get_victor_dir() / "embeddings"
     if embeddings_dir.exists():
         is_valid, _ = verify_cache_integrity(embeddings_dir)
-        status["cache_integrity"]["embeddings_verified"] = is_valid
+        if isinstance(status.get("cache_integrity"), dict):
+            status["cache_integrity"]["embeddings_verified"] = is_valid  # type: ignore[index]
 
     return status
 
@@ -1116,8 +1120,8 @@ class PluginSandboxPolicy:
     allow_network: bool = True
     allow_subprocess: bool = True
     allow_file_write: bool = True
-    allowed_paths: list = field(default_factory=list)
-    blocked_paths: list = field(default_factory=list)
+    allowed_paths: List[str] = field(default_factory=list)
+    blocked_paths: List[str] = field(default_factory=list)
     require_trust: bool = False
     max_memory_mb: int = 0
 
@@ -1327,7 +1331,7 @@ def check_sandbox_action(
     return True, "allowed"
 
 
-def get_sandbox_summary() -> dict:
+def get_sandbox_summary() -> Dict[str, Any]:
     """Get summary of sandbox configuration.
 
     Returns:

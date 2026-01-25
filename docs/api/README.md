@@ -1,5 +1,8 @@
 # Victor AI 0.5.0 API Documentation
 
+> **Note**: This legacy API documentation is retained for reference. For current docs, see `docs/reference/api/`.
+
+
 Complete API reference documentation for Victor AI's public interfaces.
 
 ## Documentation Files

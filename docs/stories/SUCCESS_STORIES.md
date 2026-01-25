@@ -52,7 +52,7 @@ Implemented Victor AI with:
 ### Testimonial
 
 > "Victor AI transformed our development process. Features that used to take two weeks now ship in four days. The code review workflow alone saves us 15+ hours per week. Our developers can actually focus on building instead of debugging."
-> — Sarah Chen, CTO at TechFlow Inc.
+> - Sarah Chen, CTO at TechFlow Inc.
 
 ### Business Impact
 
@@ -102,7 +102,7 @@ Deployed Victor AI's refactoring capabilities:
 ### Testimonial
 
 > "We thought modernizing our legacy codebase would take years. Victor AI's protocol-based refactoring approach helped us eliminate 90% of our technical debt in just 4 months. The architecture is now modular, testable, and maintainable."
-> — Michael Rodriguez, VP of Engineering at GlobalTech Corp.
+> - Michael Rodriguez, VP of Engineering at GlobalTech Corp.
 
 ### Business Impact
 
@@ -117,8 +117,8 @@ Deployed Victor AI's refactoring capabilities:
 
 ### Project Profile
 - **Project:** DataForge (data engineering toolkit)
-- **Stars:** 245 → 1,245 (408% growth)
-- **Contributors:** 3 → 18 (500% growth)
+- **Stars:** 245 -> 1,245 (408% growth)
+- **Contributors:** 3 -> 18 (500% growth)
 - **Use Case:** Community-driven development
 
 ### The Challenge
@@ -201,12 +201,12 @@ Implemented Victor AI for agency workflows:
 ### Testimonial
 
 > "Victor AI is a game-changer for agencies. We now onboard to new codebases in 2 days instead of 2 weeks. Our project delivery time dropped from 12 weeks to 5 weeks. Clients are thrilled with the speed and quality. Our margins have nearly doubled."
-> — Jennifer Walsh, CEO at DevShop Agency
+> - Jennifer Walsh, CEO at DevShop Agency
 
 ### Business Impact
 
 - **Revenue:** $2.4M annual increase (faster delivery = more projects)
-- **Profit Margin:** 18% → 34% (89% increase)
+- **Profit Margin:** 18% -> 34% (89% increase)
 - **Client Retention:** 94% (up from 76%)
 - **Employee Satisfaction:** 8.9/10 (up from 6.8/10)
 
@@ -250,7 +250,7 @@ Leveraged Victor AI as a "virtual team":
 ### Testimonial
 
 > "As a solo developer, Victor AI is like having a team of experts. It handled code generation, reviews, testing, and DevOps. I launched my SaaS in 2.5 months with enterprise-grade quality. I'm now generating $4K MRR with just one product."
-> — Marcus Lee, Independent Developer
+> - Marcus Lee, Independent Developer
 
 ### Impact
 
@@ -298,13 +298,13 @@ Adopted Victor AI's Research and Data Analysis verticals:
 ### Testimonial
 
 > "Victor AI revolutionized our research process. We now prototype ideas in 3 days instead of 4 weeks. The reproducibility of our experiments improved from 45% to 94%. Our publication rate tripled, and we secured $1.2M in grant funding."
-> — Dr. Emily Zhang, AI Research Lab Director
+> - Dr. Emily Zhang, AI Research Lab Director
 
 ### Academic Impact
 
-- **Publications:** 2 → 6 papers per year
-- **Citations:** 45 → 210 (367% increase)
-- **Grant Funding:** $500K → $1.2M (+140%)
+- **Publications:** 2 -> 6 papers per year
+- **Citations:** 45 -> 210 (367% increase)
+- **Grant Funding:** $500K -> $1.2M (+140%)
 - **Student Satisfaction:** 9.2/10 (improved research experience)
 
 ---
@@ -348,12 +348,12 @@ Implemented Victor AI for quality assurance:
 ### Testimonial
 
 > "Our junior developers now perform like seniors thanks to Victor AI's automated reviews and mentoring. Test coverage increased from 35% to 87%. Production incidents dropped from 15 to 1 per month. Our senior developers can finally focus on architecture instead of fixing mistakes."
-> — David Park, CTO at LearnPath
+> - David Park, CTO at LearnPath
 
 ### Team Impact
 
-- **Junior Developer Velocity:** +125% (4 → 9 stories/sprint)
-- **Senior Developer Focus:** 40% reviews → 15% reviews (freed for strategy)
+- **Junior Developer Velocity:** +125% (4 -> 9 stories/sprint)
+- **Senior Developer Focus:** 40% reviews -> 15% reviews (freed for strategy)
 - **Hiring Efficiency:** Can now hire juniors with confidence
 - **Team Morale:** 8.7/10 (up from 6.4/10)
 
@@ -397,13 +397,13 @@ Deployed Victor AI for security-focused development:
 ### Testimonial
 
 > "Victor AI made SOC 2 compliance achievable. We eliminated 89% of security vulnerabilities and passed our audit on the first try. Our secure development practices are now automated. We've closed 6x more enterprise deals because we're SOC 2 compliant."
-> — Robert Kim, CISO at SecurePay
+> - Robert Kim, CISO at SecurePay
 
 ### Business Impact
 
-- **Enterprise Revenue:** $2.4M → $8.8M (267% increase)
-- **Sales Cycle:** 6 months → 2 months (67% faster)
-- **Security Costs:** $180K/year → $45K/year (75% savings)
+- **Enterprise Revenue:** $2.4M -> $8.8M (267% increase)
+- **Sales Cycle:** 6 months -> 2 months (67% faster)
+- **Security Costs:** $180K/year -> $45K/year (75% savings)
 - **Customer Trust:** 98% satisfaction (up from 82%)
 
 ---
@@ -446,14 +446,14 @@ Built custom Victor AI workflows:
 ### Testimonial
 
 > "Victor AI automated our entire content pipeline. We now publish 4x more content with 18x faster turnaround. SEO rankings improved dramatically, and revenue per article tripled. Our editors focus on quality instead of manual tasks."
-> — Amanda Foster, Editor-in-Chief at MediaHub
+> - Amanda Foster, Editor-in-Chief at MediaHub
 
 ### Revenue Impact
 
-- **Monthly Content Revenue:** $9K → $102K (1,033% increase)
-- **Editorial Costs:** $52K/month → $28K/month (46% reduction)
-- **Ad Revenue:** $45K/month → $180K/month (300% increase)
-- **Team Productivity:** 200 → 850 articles/month (325% increase)
+- **Monthly Content Revenue:** $9K -> $102K (1,033% increase)
+- **Editorial Costs:** $52K/month -> $28K/month (46% reduction)
+- **Ad Revenue:** $45K/month -> $180K/month (300% increase)
+- **Team Productivity:** 200 -> 850 articles/month (325% increase)
 
 ---
 
@@ -495,13 +495,13 @@ Implemented Victor AI with HIPAA-focused workflows:
 ### Testimonial
 
 > "Victor AI ensured our HIPAA compliance from day one. Zero PHI leaks, zero violations. Our audit preparation dropped from 6 weeks to 1 week. We've now onboarded 8 healthcare clients who trust our security."
-> — Dr. Lisa Wong, CEO at HealthTech Solutions
+> - Dr. Lisa Wong, CEO at HealthTech Solutions
 
 ### Business Impact
 
-- **Healthcare Clients:** 2 → 8 (4x increase)
-- **Deal Size:** $50K → $150K (200% increase)
-- **Insurance Premiums:** $45K/year → $18K/year (60% savings)
+- **Healthcare Clients:** 2 -> 8 (4x increase)
+- **Deal Size:** $50K -> $150K (200% increase)
+- **Insurance Premiums:** $45K/year -> $18K/year (60% savings)
 - **Client Trust:** 100% retention (zero incidents)
 
 ---

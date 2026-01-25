@@ -45,7 +45,7 @@ import hashlib
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Optional, Set
+from typing import Any, Dict, Optional, Set
 
 # Import native extensions with fallback
 try:

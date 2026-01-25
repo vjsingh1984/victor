@@ -33,7 +33,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional, Type, TypeVar, Callable
+from typing import Any, Dict, Optional, Protocol, Type, TypeVar, Callable
 
 from victor.config.settings import Settings, load_settings, get_project_paths
 from victor.core.container import (

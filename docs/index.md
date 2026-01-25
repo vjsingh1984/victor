@@ -27,7 +27,7 @@ Victor AI is an open-source AI coding assistant with multiple providers, tools, 
 | [Local Models](./getting-started/local-models.md) | Local model setup | 10 min |
 | [Cloud Models](./getting-started/cloud-models.md) | Cloud provider setup | 10 min |
 | [Configuration](./getting-started/configuration.md) | Profiles and settings | 10 min |
-| [User Guide](./user-guide/index.md) | Day‑to‑day usage | 30 min |
+| [User Guide](./user-guide/index.md) | Day-to-day usage | 30 min |
 | [FAQ](./user-guide/faq.md) | Frequently asked questions | 5 min |
 | [Troubleshooting](./getting-started/troubleshooting.md) | Common issues and fixes | 10 min |
 
@@ -44,7 +44,7 @@ Victor AI is an open-source AI coding assistant with multiple providers, tools, 
 | [Documentation Guide](./contributing/documentation-guide.md) | Doc workflow and structure |
 | [CI/CD](./ci_cd/README.md) | CI/CD docs |
 | [Testing Hub](./testing/README.md) | Test suites and QA |
-| [Root CONTRIBUTING](../CONTRIBUTING.md) | Repo‑level contribution guide |
+| [Root CONTRIBUTING](../CONTRIBUTING.md) | Repo-level contribution guide |
 
 ---
 
@@ -106,7 +106,7 @@ Victor AI is an open-source AI coding assistant with multiple providers, tools, 
 
 ## Reports & Historical Material
 
-Historical reports and internal snapshots live alongside the docs. Treat metrics and completion claims as time‑bound unless explicitly tied to a release or external audit.
+Historical reports and internal snapshots live alongside the docs. Treat metrics and completion claims as time-bound unless explicitly tied to a release or external audit.
 
 - [Changes](./changes/README.md)
 - [Refactoring](./refactoring/README.md)
@@ -119,7 +119,7 @@ Historical reports and internal snapshots live alongside the docs. Treat metrics
 
 <div align="center">
 
-**[← Back to Top](#victor-ai-documentation-index)**
+**[<- Back to Top](#victor-ai-documentation-index)**
 
 **Victor AI Documentation**
 

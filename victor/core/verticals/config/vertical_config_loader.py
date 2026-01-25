@@ -43,7 +43,8 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
-from victor.core.verticals.base import StageDefinition, VerticalConfig
+from victor.core.vertical_types import StageDefinition
+from victor.core.verticals.base import VerticalConfig
 from victor.framework.tools import ToolSet
 
 logger = logging.getLogger(__name__)
@@ -176,7 +177,7 @@ class VerticalConfigLoader:
         # Build tools
         tools_config = core.get("tools", {})
         tools_list = self._parse_tools(tools_config)
-        tools = ToolSet(tools_list)
+        tools = ToolSet(set(tools_list))
 
         # Build system prompt
         prompt_config = core.get("system_prompt", {})
@@ -253,7 +254,7 @@ class VerticalConfigLoader:
         """
         # Get tools list
         if "list" in tools_config:
-            tools_list = tools_config["list"]
+            tools_list = list(tools_config["list"]) if isinstance(tools_config["list"], list) else []
         else:
             # Start with empty if using capabilities (future feature)
             tools_list = []
@@ -279,7 +280,8 @@ class VerticalConfigLoader:
 
         if source == "inline":
             # Inline prompt text
-            return prompt_config.get("text", "")
+            text = prompt_config.get("text", "")
+            return str(text) if text else ""
 
         elif source == "file":
             # Load from file
@@ -302,7 +304,7 @@ class VerticalConfigLoader:
             # For now, just return template as-is
             # NOTE: Variable substitution (e.g., {{project_name}}, {{version}}) needs Jinja2-like template engine
             # Deferred: Low priority - static prompts work for current use cases
-            return template
+            return str(template) if template else ""
 
         else:
             logger.warning(f"Unknown prompt source: {source}")

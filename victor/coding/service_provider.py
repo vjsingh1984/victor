@@ -99,7 +99,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
         """Register coding middleware services."""
         from victor.core.container import ServiceLifetime
 
-        def create_middleware(_):
+        def create_middleware(_: Any) -> Any:
             from victor.coding.middleware import CodeCorrectionMiddleware
 
             enabled = getattr(settings, "enable_code_correction", True)
@@ -120,7 +120,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
         """Register coding safety extension."""
         from victor.core.container import ServiceLifetime
 
-        def create_safety(_):
+        def create_safety(_: Any) -> Any:
             from victor.coding.safety import CodingSafetyExtension
 
             return CodingSafetyExtension()
@@ -139,7 +139,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
         """Register coding prompt contributor."""
         from victor.core.container import ServiceLifetime
 
-        def create_prompts(_):
+        def create_prompts(_: Any) -> Any:
             from victor.coding.prompts import CodingPromptContributor
 
             # Use extended grounding for local providers
@@ -161,11 +161,10 @@ class CodingServiceProvider(ServiceProviderProtocol):
         from victor.core.container import ServiceLifetime
         from victor.core.verticals.protocols import ModeConfigProviderProtocol
 
-        def create_mode_config(_):
+        def create_mode_config(_: Any) -> Any:
             from victor.coding.mode_config import CodingModeConfigProvider
 
-            default_mode = getattr(settings, "default_mode", "default")
-            return CodingModeConfigProvider(default_mode=default_mode)
+            return CodingModeConfigProvider()
 
         container.register_or_replace(
             ModeConfigProviderProtocol,
@@ -182,7 +181,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
         from victor.core.container import ServiceLifetime
         from victor.core.verticals.protocols import ToolDependencyProviderProtocol
 
-        def create_tool_deps(_):
+        def create_tool_deps(_: Any) -> Any:
             from victor.core.tool_dependency_loader import (
                 create_vertical_tool_dependency_provider,
             )
@@ -195,7 +194,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
             ServiceLifetime.SINGLETON,
         )
 
-    def get_required_services(self) -> List[Type]:
+    def get_required_services(self) -> List[type[Any]]:
         """Get list of required service types.
 
         Returns:
@@ -203,7 +202,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
         """
         return []  # No hard requirements
 
-    def get_optional_services(self) -> List[Type]:
+    def get_optional_services(self) -> List[type[Any]]:
         """Get list of optional service types.
 
         Returns:

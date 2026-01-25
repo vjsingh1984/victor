@@ -46,7 +46,7 @@ import ctypes
 import logging
 import os
 from pathlib import Path
-from typing import Dict, Optional, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
@@ -267,7 +267,7 @@ def _get_key_from_keyring(provider: str) -> Optional[str]:
         import keyring
 
         key = keyring.get_password(KEYRING_SERVICE, f"{provider}_api_key")
-        return key
+        return key if key is not None else None
     except Exception as e:
         logger.debug(f"Keyring access failed for {provider}: {e}")
         return None
@@ -366,7 +366,7 @@ class SecureString:
 
         self._cleared = True
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Clear memory on deletion."""
         self.clear()
 
@@ -581,7 +581,8 @@ class APIKeyManager:
             api_keys = data.get("api_keys", data)  # Support both formats
 
             # Get key for this provider only
-            return api_keys.get(provider)
+            key = api_keys.get(provider)
+            return key if key is not None else None
 
         except Exception as e:
             logger.warning(f"Failed to load API key from {self.keys_file}: {e}")
@@ -763,7 +764,7 @@ class APIKeyManager:
                 secure_str.clear()
         self._cache.clear()
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Ensure cache is cleared on deletion."""
         self.clear_cache()
 
@@ -928,7 +929,7 @@ def get_service_key(service: str) -> Optional[str]:
                     success=True,
                     key_length=len(file_key),
                 )
-                return file_key
+                return file_key if isinstance(file_key, str) else None
         except Exception:
             pass
 
@@ -1079,7 +1080,7 @@ class APIKeysProxy:
         anthropic_key = keys.get("anthropic")
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the API keys proxy."""
         self._manager: Optional[APIKeyManager] = None
 
@@ -1129,11 +1130,11 @@ class APIKeysProxy:
         configured = self._get_manager().list_configured_providers()
         return f"APIKeysProxy(configured={configured})"
 
-    def keys(self):
+    def keys(self) -> List[str]:
         """Return list of providers with configured keys."""
         return self._get_manager().list_configured_providers()
 
-    def values(self):
+    def values(self) -> List[str]:
         """Return list of configured API key values."""
         result = []
         for provider in self._get_manager().list_configured_providers():
@@ -1143,7 +1144,7 @@ class APIKeysProxy:
                 result.append(f"{key[:8]}...{key[-4:]}")
         return result
 
-    def items(self):
+    def items(self) -> List[Tuple[str, str]]:
         """Return list of (provider, masked_key) tuples."""
         result = []
         for provider in self._get_manager().list_configured_providers():
@@ -1157,7 +1158,7 @@ class APIKeysProxy:
 
 # Module-level api_keys attribute for backward compatibility
 # This provides dict-like access to configured API keys
-api_keys = APIKeysProxy()
+api_keys = APIKeysProxy()  # type: ignore[no-untyped-call]
 
 
 def create_api_keys_template() -> str:

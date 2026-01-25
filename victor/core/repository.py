@@ -74,6 +74,7 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    cast,
     runtime_checkable,
 )
 
@@ -137,6 +138,7 @@ class Entity:
         self.version += 1
 
 
+T_contra = TypeVar("T_contra", bound=Entity, contravariant=True)
 T = TypeVar("T", bound=Entity)
 
 
@@ -146,14 +148,14 @@ T = TypeVar("T", bound=Entity)
 
 
 @runtime_checkable
-class Specification(Protocol[T]):
+class Specification(Protocol[T_contra]):
     """Protocol for query specifications.
 
     Specifications encapsulate query criteria and can be combined
     using boolean logic (and, or, not).
     """
 
-    def is_satisfied_by(self, entity: T) -> bool:
+    def is_satisfied_by(self, entity: T_contra) -> bool:
         """Check if entity satisfies this specification."""
         ...
 
@@ -469,14 +471,14 @@ class InMemoryRepository(Repository[T], Generic[T]):
     Supports optimistic concurrency control.
     """
 
-    def __init__(self, entity_class: Optional[Type[T]] = None):
+    def __init__(self, entity_class: Optional[Type[T]] = None) -> None:
         """Initialize in-memory repository.
 
         Args:
             entity_class: Optional entity class for type hints
         """
         self._store: Dict[str, T] = {}
-        self._entity_class = entity_class
+        self._entity_class: Optional[Type[T]] = entity_class
         self._lock = asyncio.Lock()
 
     async def add(self, entity: T) -> None:
@@ -565,7 +567,7 @@ class SQLiteRepository(Repository[T], Generic[T]):
         table_name: str,
         entity_class: Type[T],
         create_table: bool = True,
-    ):
+    ) -> None:
         """Initialize SQLite repository.
 
         Args:
@@ -576,7 +578,7 @@ class SQLiteRepository(Repository[T], Generic[T]):
         """
         self._db_path = str(db_path)
         self._table_name = table_name
-        self._entity_class = entity_class
+        self._entity_class: Type[T] = entity_class
         self._lock = asyncio.Lock()
 
         if create_table:
@@ -643,7 +645,7 @@ class SQLiteRepository(Repository[T], Generic[T]):
                 row = cursor.fetchone()
                 if row:
                     data = json.loads(row[0])
-                    return self._entity_class.from_dict(data)
+                    return cast(T, self._entity_class.from_dict(data))
                 return None
 
     async def update(self, entity: T) -> None:
@@ -710,7 +712,7 @@ class SQLiteRepository(Repository[T], Generic[T]):
                 entities = []
                 for row in cursor:
                     data = json.loads(row[0])
-                    entity = self._entity_class.from_dict(data)
+                    entity = cast(T, self._entity_class.from_dict(data))
 
                     if specification is None or specification.is_satisfied_by(entity):
                         entities.append(entity)

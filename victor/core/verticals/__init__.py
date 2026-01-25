@@ -30,8 +30,8 @@ Verticals (coding, rag, devops, research, dataanalysis) are separate
 modules at the same level as core in the victor namespace.
 """
 
+from victor.core.vertical_types import StageDefinition
 from victor.core.verticals.base import (
-    StageDefinition,
     VerticalBase,
     VerticalConfig,
     VerticalRegistry,

@@ -172,7 +172,7 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
         # Track timing for RL
         self._tool_start_times: Dict[str, float] = {}
 
-    def _get_inner(self):
+    def _get_inner(self) -> Optional[Any]:
         """Lazy-load the inner middleware."""
         if self._inner_middleware is None:
             try:
@@ -192,7 +192,7 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
                 return None
         return self._inner_middleware
 
-    def _get_rl_hooks(self):
+    def _get_rl_hooks(self) -> Optional[Any]:
         """Lazy-load the RL hooks."""
         if self._rl_hooks is None and self._enable_rl:
             try:
@@ -220,7 +220,7 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
             return False
         return inner.should_validate(tool_name)
 
-    def validate_and_fix(self, tool_name: str, arguments: Dict[str, Any]):
+    def validate_and_fix(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
         """Validate and optionally fix code in arguments.
 
         Delegates to the inner middleware.
@@ -253,7 +253,7 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
             )
         return inner.validate_and_fix(tool_name, arguments)
 
-    def apply_correction(self, arguments: Dict[str, Any], correction_result):
+    def apply_correction(self, arguments: Dict[str, Any], correction_result: Any) -> Dict[str, Any]:
         """Apply a correction to the arguments.
 
         Delegates to the inner middleware.

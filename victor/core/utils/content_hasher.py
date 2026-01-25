@@ -76,7 +76,7 @@ from typing import Any, Dict, List, Optional
 
 # Try to import native acceleration
 _NATIVE_NORMALIZE_AVAILABLE = False
-_native_normalize_block = None
+_native_normalize_block: Any = None
 
 try:
     from victor.processing.native import normalize_block as _native_normalize_block

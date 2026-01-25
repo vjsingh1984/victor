@@ -1,5 +1,8 @@
 # Victor AI 0.5.0 Protocol Reference
 
+> **Note**: This legacy API documentation is retained for reference. For current docs, see `docs/reference/api/`.
+
+
 Complete reference for all protocol interfaces in Victor AI.
 
 **Table of Contents**

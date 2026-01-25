@@ -201,7 +201,7 @@ class VerticalExtensionLoader(ABC):
 
     # Mapping of extension types to their import path patterns
     # Format: extension_key -> (module_path_suffix, class_name_suffix)
-    _extension_patterns: ClassVar[Dict[str, tuple]] = {
+    _extension_patterns: ClassVar[Dict[str, tuple[str, str]]] = {
         "safety_extension": ("safety", "SafetyExtension"),
         "prompt_contributor": ("prompts", "PromptContributor"),
         "mode_config_provider": ("mode_config", "ModeConfigProvider"),
@@ -238,7 +238,7 @@ class VerticalExtensionLoader(ABC):
             # Only add if not already defined in the class
             if method_name not in cls.__dict__:
 
-                def _make_getter(ext_type: str, mod_suffix: str, cls_suffix: str) -> classmethod:
+                def _make_getter(ext_type: str, mod_suffix: str, cls_suffix: str) -> Any:
                     """Factory to create getter methods with proper closure."""
 
                     def _getter(subcls: type) -> Any:
@@ -1149,7 +1149,7 @@ class VerticalExtensionLoader(ABC):
         ttl_entries = [v for _, v in entries if v.ttl is not None]
         ttl_remaining = 0.0
         if ttl_entries:
-            remaining = [max(0, v.ttl - v.get_age()) for v in ttl_entries]
+            remaining = [max(0, (v.ttl or 0) - v.get_age()) for v in ttl_entries]
             ttl_remaining = sum(remaining) / len(remaining)
 
         stats = {

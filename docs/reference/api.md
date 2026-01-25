@@ -6,10 +6,10 @@ Complete reference for Victor AI's APIs and interfaces.
 
 | API | Description | Documentation |
 |-----|-------------|--------------|
-| **HTTP API** | REST endpoints for HTTP clients | [HTTP API →](api/http-api.md) |
-| **MCP Server** | Model Context Protocol server | [MCP →](api/mcp-server.md) |
-| **Python API** | Programmatic access | [Python →](api/python-api.md) |
-| **CLI Commands** | Command-line interface | [CLI →](../user-guide/cli-reference.md) |
+| **HTTP API** | REST endpoints for HTTP clients | [HTTP API ->](api/http-api.md) |
+| **MCP Server** | Model Context Protocol server | [MCP ->](api/mcp-server.md) |
+| **Python API** | Programmatic access | [Python ->](api/python-api.md) |
+| **CLI Commands** | Command-line interface | [CLI ->](../user-guide/cli-reference.md) |
 
 ---
 
@@ -142,7 +142,7 @@ curl -H "Authorization: Bearer YOUR_API_KEY" \
 export VICTOR_API_KEY=your-key
 ```
 
-[Full HTTP API Documentation →](api/http-api.md)
+[Full HTTP API Documentation ->](api/http-api.md)
 
 ---
 
@@ -180,7 +180,7 @@ victor mcp --sse --port 3000
 - **Prompts**: System prompt templates
 - **Resources**: File access, project context
 
-[Full MCP Documentation →](api/mcp-server.md)
+[Full MCP Documentation ->](api/mcp-server.md)
 
 ---
 
@@ -235,7 +235,7 @@ victor chat --tools read,write,edit
 victor chat --tool-budget 20
 ```
 
-[Full CLI Documentation →](../user-guide/cli-reference.md)
+[Full CLI Documentation ->](../user-guide/cli-reference.md)
 
 ---
 
@@ -267,7 +267,7 @@ executor = container.get(ToolExecutorProtocol)
 result = await executor.execute_tool(tool, arguments)
 ```
 
-[Full Protocol Documentation →](internals/protocols-api.md)
+[Full Protocol Documentation ->](internals/protocols-api.md)
 
 ---
 
@@ -300,7 +300,7 @@ config = AgentConfig(
 agent = await Agent.create(config=config)
 ```
 
-[Full Configuration Documentation →](configuration/)
+[Full Configuration Documentation ->](configuration/)
 
 ---
 
@@ -328,7 +328,7 @@ except ToolExecutionError as e:
     # Handle error
 ```
 
-[Full Error Documentation →](errors.md)
+[Full Error Documentation ->](errors.md)
 
 ---
 
@@ -343,7 +343,7 @@ except ToolExecutionError as e:
 
 <div align="center">
 
-**[← Back to Reference](index.md)**
+**[<- Back to Reference](index.md)**
 
 **API Reference**
 

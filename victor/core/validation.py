@@ -70,6 +70,7 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    cast,
 )
 
 from pydantic import (
@@ -229,7 +230,7 @@ class RegexRule(ValidationRule):
 
     def __init__(
         self,
-        pattern: Union[str, Pattern],
+        pattern: Union[str, Pattern[str]],
         message: str = "Value does not match expected pattern",
         code: str = "regex_mismatch",
     ) -> None:
@@ -750,7 +751,7 @@ class VerticalModeConfigSchema(BaseModel):
     def validate_task_budgets(cls, v: Any) -> Dict[str, int]:
         """Validate task budget values are within range."""
         if not isinstance(v, dict):
-            return v
+            return cast(Dict[str, int], v)
         for task, budget in v.items():
             if not isinstance(budget, int):
                 raise ValueError(f"Budget for task '{task}' must be an integer")
@@ -758,7 +759,7 @@ class VerticalModeConfigSchema(BaseModel):
                 raise ValueError(
                     f"Budget for task '{task}' must be between 1 and 500, got {budget}"
                 )
-        return v
+        return cast(Dict[str, int], v)
 
     model_config = {"extra": "forbid"}
 
@@ -845,7 +846,7 @@ class ConfigValidator:
     def _get_nested(self, data: Dict[str, Any], path: str) -> Any:
         """Get nested value by dot-separated path."""
         parts = path.split(".")
-        current = data
+        current: Any = data
 
         for part in parts:
             if isinstance(current, dict):

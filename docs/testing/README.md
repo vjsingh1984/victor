@@ -4,6 +4,8 @@
 
 Welcome to the Victor testing documentation. This directory contains comprehensive information about test coverage, quality metrics, and improvement plans.
 
+> **Note**: Coverage and test counts are time-bound snapshots. Verify against current reports before making decisions.
+
 ## Quick Links
 
 - **[Test Coverage Report](test_coverage_report.md)** - Comprehensive coverage analysis with module-by-module breakdown

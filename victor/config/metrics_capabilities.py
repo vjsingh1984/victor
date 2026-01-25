@@ -237,7 +237,7 @@ def _get_model_pricing(
     for pattern, model_config in models.items():
         if fnmatch.fnmatch(model, pattern):
             pricing = model_config.get("cost_metrics", {}).get("pricing")
-            if pricing:
+            if pricing and isinstance(pricing, dict):
                 return pricing
 
     # Check provider pricing
@@ -247,19 +247,22 @@ def _get_model_pricing(
 
     # Try exact match first
     if model in pricing_config:
-        return pricing_config[model]
+        pricing = pricing_config[model]
+        if isinstance(pricing, dict):
+            return pricing
 
     # Try pattern matching
     for pattern, pricing in pricing_config.items():
         if fnmatch.fnmatch(model, pattern):
-            return pricing
+            if isinstance(pricing, dict):
+                return pricing
 
     return None
 
 
 def _deep_copy(d: Dict[str, Any]) -> Dict[str, Any]:
     """Create a deep copy of a dict (simple implementation)."""
-    result = {}
+    result: Dict[str, Any] = {}
     for key, value in d.items():
         if isinstance(value, dict):
             result[key] = _deep_copy(value)

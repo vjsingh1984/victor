@@ -251,14 +251,14 @@ docs/workflow-diagrams/
 ### Modifying Existing Diagrams
 1. Increment version in metadata header
 2. Add changelog to vertical README
-3. Keep previous version in `archive/` if breaking change
+3. Keep previous version in an external archive repo if breaking change
 4. Update `index.md` if structure changes
 
 ### Removing Workflows
-1. Move to `archive/{vertical}/{workflow}-{version}.svg`
-2. Add to `archive/DEPRECATED.md` with reason
+1. Move to an external archive repo with versioned paths if needed
+2. Record deprecation reason in this file or a local DEPRECATED list
 3. Update all references in codebase
-4. Do not delete - keep for historical reference
+4. Delete after review if no longer needed
 
 ---
 

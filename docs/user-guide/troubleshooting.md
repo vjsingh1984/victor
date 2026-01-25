@@ -30,7 +30,7 @@ victor logs --tail 50
 - Config should show your profiles
 - Logs should show recent activity
 
-[Still having issues? → Jump to specific sections below](#common-issues)
+[Still having issues? -> Jump to specific sections below](#common-issues)
 
 ---
 
@@ -1107,6 +1107,6 @@ CLAUDE.md                   # AI instructions
 
 ---
 
-**Still stuck?** [Open an issue →](https://github.com/vjsingh1984/victor/issues/new)
+**Still stuck?** [Open an issue ->](https://github.com/vjsingh1984/victor/issues/new)
 
 **Next**: [User Guide](/user-guide/index.md) | [Provider Reference](/user-guide/providers.md) | [Configuration Reference](/reference/configuration/)

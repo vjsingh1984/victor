@@ -364,7 +364,7 @@ This collection provides extensive tutorials and examples for users and develope
 
 **User-Facing:**
 - Installation and setup (3 approaches)
-- Provider usage (21 providers)
+- Provider usage (multiple providers)
 - Project initialization
 - 16 common workflows
 - Troubleshooting (18 issues)

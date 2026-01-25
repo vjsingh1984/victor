@@ -18,7 +18,7 @@ This guide covers everything you need to use Victor effectively, from basic conv
 | **Session Management** | [Session Management](session-management.md) | Save and restore sessions |
 | **Providers** | [Provider Guide](providers.md) | Provider setup and switching |
 | **Workflows** | [Workflows Guide](workflows.md) | YAML-based automation |
-| **Configuration** | [Configuration →](../reference/configuration/) | Profiles and settings |
+| **Configuration** | [Configuration ->](../reference/configuration/) | Profiles and settings |
 
 ## Common Tasks
 
@@ -31,31 +31,31 @@ This guide covers everything you need to use Victor effectively, from basic conv
 /resume                          # Interactive session restore
 /resume 20250107_153045          # Restore specific session
 ```
-[Full Guide →](session-management.md)
+[Full Guide ->](session-management.md)
 
 **Code Review**
 ```bash
 victor "Review this PR for bugs and improvements"
 ```
-[Tools Guide →](tools.md#code-analysis)
+[Tools Guide ->](tools.md#code-analysis)
 
 **Refactoring**
 ```bash
 victor --mode build "Refactor to use dependency injection"
 ```
-[Tools Guide →](tools.md#file-operations)
+[Tools Guide ->](tools.md#file-operations)
 
 **Testing**
 ```bash
 victor "Write unit tests for auth.py"
 ```
-[Tools Guide →](tools.md#shell-and-execution)
+[Tools Guide ->](tools.md#shell-and-execution)
 
 **Git Operations**
 ```bash
 victor "Create commit for these changes"
 ```
-[Tools Guide →](tools.md#git-operations)
+[Tools Guide ->](tools.md#git-operations)
 
 ### Advanced Features
 
@@ -65,13 +65,13 @@ victor chat --provider anthropic
 /provider openai --model gpt-4
 /provider ollama --model qwen2.5-coder:7b
 ```
-[Provider Guide →](providers.md)
+[Provider Guide ->](providers.md)
 
 **Workflow Execution**
 ```bash
 victor workflow run code-review
 ```
-[Workflows Guide →](workflows.md)
+[Workflows Guide ->](workflows.md)
 
 **Multi-Agent Teams**
 ```python
@@ -82,7 +82,7 @@ team = AgentTeam.hierarchical(
     subagents=["frontend", "backend", "testing"]
 )
 ```
-[Learn More → Multi-Agent Teams](../guides/MULTI_AGENT_TEAMS.md)
+[Learn More -> Multi-Agent Teams](../guides/MULTI_AGENT_TEAMS.md)
 
 ## Core Concepts
 
@@ -90,13 +90,13 @@ team = AgentTeam.hierarchical(
 
 Victor's key differentiator: **switch models without losing context**.
 
-Start with Claude, continue with GPT-4, finish with a local model—all in one conversation.
+Start with Claude, continue with GPT-4, finish with a local model-all in one conversation.
 
 - **Context Independence**: Conversation history managed separately from LLM
 - **Instant Switching**: Use `/provider` command anytime
 - **Support varies by provider**: Context preservation depends on provider capabilities and configuration
 
-[Provider Guide →](providers.md)
+[Provider Guide ->](providers.md)
 
 ### 2. Execution Modes
 
@@ -108,7 +108,7 @@ Three modes for different workflows:
 | **PLAN** | Analysis and planning | No | Understanding code |
 | **EXPLORE** | Understanding only | No | Learning codebase |
 
-[Learn More →](cli-reference.md#modes)
+[Learn More ->](cli-reference.md#modes)
 
 ### 3. Tools System
 
@@ -121,7 +121,7 @@ Tools organized by category (see catalog for current list):
 - **Web**: HTTP requests, scraping, browsing
 - **And more categories...**
 
-[Tools Guide →](tools.md) | [Full Tool Catalog →](../reference/tools/catalog.md)
+[Tools Guide ->](tools.md) | [Full Tool Catalog ->](../reference/tools/catalog.md)
 
 ### 4. Workflows
 
@@ -145,7 +145,7 @@ workflows:
           command: pytest tests/
 ```
 
-[Workflows Guide →](workflows.md) | [DSL Reference →](../guides/workflow-development/dsl.md)
+[Workflows Guide ->](workflows.md) | [DSL Reference ->](../guides/workflow-development/dsl.md)
 
 ### 5. Project Context
 
@@ -155,7 +155,7 @@ Configure project-specific instructions:
 - **`CLAUDE.md`**: AI assistant project instructions
 - **Auto-discovery**: Victor finds these files automatically
 
-[Learn More →](../reference/configuration/index.md#victormd)
+[Learn More ->](../reference/configuration/index.md#victormd)
 
 ## Configuration
 
@@ -183,25 +183,25 @@ profiles:
     model: gpt-4
 ```
 
-[Full Configuration Guide →](../reference/configuration/)
+[Full Configuration Guide ->](../reference/configuration/)
 
 ## Troubleshooting
 
 **Installation Issues**
-- Victor not found after install? → [Getting Started →](../getting-started/installation.md)
-- Permission errors? → [Troubleshooting →](troubleshooting.md)
+- Victor not found after install? -> [Getting Started ->](../getting-started/installation.md)
+- Permission errors? -> [Troubleshooting ->](troubleshooting.md)
 
 **Provider Issues**
-- API key errors? → [Provider Reference →](../reference/providers/)
-- Connection timeouts? → [Troubleshooting →](troubleshooting.md)
-- Model not found? → [Provider Reference →](../reference/providers/)
+- API key errors? -> [Provider Reference ->](../reference/providers/)
+- Connection timeouts? -> [Troubleshooting ->](troubleshooting.md)
+- Model not found? -> [Provider Reference ->](../reference/providers/)
 
 **Performance Issues**
-- Slow responses? → [Performance Benchmarks →](../operations/performance/benchmarks.md)
-- High memory usage? → [Performance Benchmarks →](../operations/performance/benchmarks.md)
-- Tool execution errors? → [Troubleshooting →](troubleshooting.md)
+- Slow responses? -> [Performance Benchmarks ->](../operations/performance/benchmarks.md)
+- High memory usage? -> [Performance Benchmarks ->](../operations/performance/benchmarks.md)
+- Tool execution errors? -> [Troubleshooting ->](troubleshooting.md)
 
-[Full Troubleshooting Guide →](troubleshooting.md)
+[Full Troubleshooting Guide ->](troubleshooting.md)
 
 ## Integration
 
@@ -213,7 +213,7 @@ profiles:
   run: victor chat "Review this PR" --mode plan
 ```
 
-[More Guides →](../guides/index.md)
+[More Guides ->](../guides/index.md)
 
 ### HTTP API
 
@@ -222,7 +222,7 @@ Start REST API server:
 victor serve --port 8080
 ```
 
-[API Reference →](../reference/api/http-api.md)
+[API Reference ->](../reference/api/http-api.md)
 
 ### MCP Server
 
@@ -231,13 +231,13 @@ Run as MCP server:
 victor mcp --stdio
 ```
 
-[MCP Server Reference →](../reference/api/mcp-server.md)
+[MCP Server Reference ->](../reference/api/mcp-server.md)
 
 ### VS Code Extension
 
 Install from marketplace or build from source.
 
-[VS Code Setup →](../../vscode-victor/README.md)
+[VS Code Setup ->](../../vscode-victor/README.md)
 
 ## Advanced Usage
 
@@ -264,7 +264,7 @@ Coordinate specialized AI agents for complex tasks.
 - **Consensus**: Agents vote on decisions
 - **Debate**: Agents debate to consensus
 
-[Full Multi-Agent Guide →](../guides/multi-agent/)
+[Full Multi-Agent Guide ->](../guides/multi-agent/)
 
 ### Observability
 
@@ -280,7 +280,7 @@ def on_tool_execution(event):
 EventBus.subscribe("tool.execution", on_tool_execution)
 ```
 
-[Full Observability Guide →](../guides/observability/)
+[Full Observability Guide ->](../guides/observability/)
 
 ## Best Practices
 
@@ -316,7 +316,7 @@ Define workflows for common operations:
 - Documentation generation
 - Deployment
 
-[Workflows Guide →](workflows.md)
+[Workflows Guide ->](workflows.md)
 
 ### 5. Leverage Tool Composition
 
@@ -331,7 +331,7 @@ pipe(read_file, analyze_code, write_report)
 parallel(run_tests, run_linter, run_coverage)
 ```
 
-[Tool Catalog →](../reference/tools/catalog.md)
+[Tool Catalog ->](../reference/tools/catalog.md)
 
 ## Examples
 
@@ -392,15 +392,15 @@ result = await team.run("Implement user registration feature")
 
 ## Additional Resources
 
-- **Session Management**: [Session Management →](session-management.md)
-- **Troubleshooting**: [Troubleshooting Guide →](troubleshooting.md)
-- **Reference**: [Provider Reference →](../reference/providers/)
-- **Reference**: [Tool Catalog →](../reference/tools/)
-- **Workflows**: [Workflows Guide →](workflows.md)
-- **Guides**: [Multi-Agent Teams →](../guides/multi-agent/)
-- **Guides**: [Integration →](../guides/integration/)
-- **Development**: [Contributing →](../../CONTRIBUTING.md)
+- **Session Management**: [Session Management ->](session-management.md)
+- **Troubleshooting**: [Troubleshooting Guide ->](troubleshooting.md)
+- **Reference**: [Provider Reference ->](../reference/providers/)
+- **Reference**: [Tool Catalog ->](../reference/tools/)
+- **Workflows**: [Workflows Guide ->](workflows.md)
+- **Guides**: [Multi-Agent Teams ->](../guides/multi-agent/)
+- **Guides**: [Integration ->](../guides/integration/)
+- **Development**: [Contributing ->](../../CONTRIBUTING.md)
 
 ---
 
-**Next**: [Basic Usage →](../getting-started/basic-usage.md)
+**Next**: [Basic Usage ->](../getting-started/basic-usage.md)

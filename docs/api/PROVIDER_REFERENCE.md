@@ -1,5 +1,8 @@
 # Victor AI 0.5.0 Provider Reference
 
+> **Note**: This legacy API documentation is retained for reference. For current docs, see `docs/reference/api/`.
+
+
 Complete reference for all 21 supported LLM providers.
 
 **Table of Contents**

@@ -440,7 +440,7 @@ class ProfilesYAMLSettingsSource(PydanticBaseSettingsSource):
         super().__init__(settings_cls)
         self.profiles_path = GLOBAL_VICTOR_DIR / "profiles.yaml"
 
-    def get_field_value(self, field: Field, field_name: str) -> Any:
+    def get_field_value(self, field: Any, field_name: str) -> Any:
         """Get field value from profiles.yaml."""
         if not self.profiles_path.exists():
             return None
@@ -737,7 +737,7 @@ class Settings(BaseSettings):
             getattr(self, "__pydantic_private__", {})
             # Check if use_semantic_tool_selection was explicitly set (not using default)
             # by looking at __pydantic_fields_set__
-            field_set = getattr(self, "__pydantic_fields_set__", set())
+            field_set: set[str] = getattr(self, "__pydantic_fields_set__", set())
             if "use_semantic_tool_selection" in field_set:
                 import warnings
 
@@ -824,7 +824,7 @@ class Settings(BaseSettings):
 
     # RL-based threshold learning per (embedding_model, task_type, tool_context)
     enable_semantic_threshold_rl_learning: bool = False  # Enable automatic threshold learning
-    semantic_threshold_overrides: dict = {}  # Format: {"model:task:tool": threshold}
+    semantic_threshold_overrides: dict[str, float] = {}  # Format: {"model:task:tool": threshold}
 
     # Tool call deduplication
     enable_tool_deduplication: bool = (
@@ -881,7 +881,7 @@ class Settings(BaseSettings):
     # Interaction Mode
     # When True (one-shot mode), auto-continue when model asks for user input
     # When False (interactive mode), return to user for choice
-    one_shot_mode: bool = False
+    # Note: one_shot_mode is defined above in the Headless Mode Settings section
 
     # MCP
     use_mcp_tools: bool = False
@@ -1176,7 +1176,7 @@ class Settings(BaseSettings):
     # Provider/model-specific continuation prompt overrides (learned via RL)
     # Format: {"provider:model": {"analysis": N, "action": N, "default": N}}
     # Example: {"ollama:qwen3-coder-tools:30b": {"analysis": 8, "action": 6, "default": 4}}
-    continuation_prompt_overrides: dict = {}
+    continuation_prompt_overrides: dict[str, dict[str, int]] = {}
 
     # Enable RL-based learning of optimal continuation prompts per provider/model
     # Tracks success rates and adjusts limits automatically (future feature)
@@ -1598,7 +1598,7 @@ class Settings(BaseSettings):
             return {
                 "default": ProfileConfig(
                     provider="lmstudio",
-                    model=default_model,
+                    model_name=default_model,
                     temperature=0.7,
                     max_tokens=4096,
                     description=None,

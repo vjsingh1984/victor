@@ -10,7 +10,7 @@ Reference documentation for Victor AI.
 | [**Tools**](tools/) | Tool catalog and usage |
 | [**Configuration**](configuration/) | Configuration reference (profiles, API keys, MCP) |
 | [**API**](api/) | HTTP API, MCP server, Python package API |
-| [**Verticals**](verticals/) | Built‑in verticals and custom extensions |
+| [**Verticals**](verticals/) | Built-in verticals and custom extensions |
 
 ---
 
@@ -37,7 +37,7 @@ Provider reference (list varies by version and configuration).
 | Azure | Azure OpenAI | Pay-per-use | Azure portal setup |
 | More providers | See full list | See full list | See full list |
 
-[**Full Provider Reference →**](providers/)
+[**Full Provider Reference ->**](providers/)
 
 ---
 
@@ -59,7 +59,7 @@ Tools organized by category for code operations, testing, search, and more.
 | **Docker** | Container management | Environments |
 | **More** | See full list | See full list |
 
-[**Tool Catalog →**](tools/catalog.md)
+[**Tool Catalog ->**](tools/catalog.md)
 
 ---
 
@@ -69,11 +69,11 @@ Complete configuration for Victor's behavior and integrations.
 
 | File | Purpose | Reference |
 |------|---------|----------|
-| `profiles.yaml` | Provider and model profiles | [profiles.yaml →](configuration/index.md#profilesyaml) |
-| `config.yaml` | Global settings and options | [config.yaml →](configuration/index.md#configyaml) |
-| `mcp.yaml` | MCP server configuration | [mcp.yaml →](configuration/index.md#mcpyaml) |
-| `.victor.md` | Project context and instructions | [.victor.md →](../user-guide/index.md#5-project-context) |
-| `CLAUDE.md` | AI assistant project instructions | [CLAUDE.md →](../../CLAUDE.md) |
+| `profiles.yaml` | Provider and model profiles | [profiles.yaml ->](configuration/index.md#profilesyaml) |
+| `config.yaml` | Global settings and options | [config.yaml ->](configuration/index.md#configyaml) |
+| `mcp.yaml` | MCP server configuration | [mcp.yaml ->](configuration/index.md#mcpyaml) |
+| `.victor.md` | Project context and instructions | [.victor.md ->](../user-guide/index.md#5-project-context) |
+| `CLAUDE.md` | AI assistant project instructions | [CLAUDE.md ->](../../CLAUDE.md) |
 
 ### Quick Configuration
 
@@ -100,7 +100,7 @@ profiles:
     model: gpt-4
 ```
 
-[**Full Configuration Reference →**](configuration/)
+[**Full Configuration Reference ->**](configuration/)
 
 ---
 
@@ -114,7 +114,7 @@ Programmatic access to Victor's capabilities.
 
 - **Endpoints**: Chat, streaming, workflows, agents
 - **Authentication**: API key or token-based
-- **Documentation**: [HTTP API →](api/http-api.md)
+- **Documentation**: [HTTP API ->](api/http-api.md)
 
 ### MCP Server
 
@@ -122,7 +122,7 @@ Programmatic access to Victor's capabilities.
 
 - **Protocol**: MCP stdio or SSE transport
 - **Capabilities**: Tool exposure, prompt templates
-- **Documentation**: [MCP Server →](api/mcp-server.md)
+- **Documentation**: [MCP Server ->](api/mcp-server.md)
 
 ### Python API
 
@@ -133,7 +133,7 @@ agent = await Agent.create(provider="anthropic")
 result = await agent.run("Write tests for auth.py")
 ```
 
-- **Documentation**: [Python API →](api/python-api.md)
+- **Documentation**: [Python API ->](api/python-api.md)
 
 ---
 
@@ -145,11 +145,11 @@ Domain-specific assistants for specialized tasks.
 |----------|-------------|-------|
 | **Coding** | Software development | `victor --vertical coding` |
 | **DevOps** | DevOps and infrastructure | `victor --vertical devops` |
-| **RAG** | Retrieval‑augmented generation | `victor --vertical rag` |
+| **RAG** | Retrieval-augmented generation | `victor --vertical rag` |
 | **Data Analysis** | Data science workflows | `victor --vertical dataanalysis` |
 | **Research** | Research and analysis | `victor --vertical research` |
 
-[**Full Vertical Reference →**](verticals/)
+[**Full Vertical Reference ->**](verticals/)
 
 ---
 
@@ -200,26 +200,26 @@ victor workflow schedule code-review --cron "0 9 * * 1"
 
 | Task | Command | Documentation |
 |------|---------|--------------|
-| **Code Review** | `victor "Review this PR"` | [User Guide →](../user-guide/) |
-| **Refactoring** | `victor "Refactor to use DI"` | [User Guide →](../user-guide/) |
-| **Testing** | `victor "Write unit tests"` | [User Guide →](../user-guide/) |
-| **Git Operations** | `victor "Create commit for changes"` | [Tool Catalog →](tools/catalog.md) |
-| **CI/CD** | See guides overview | [Guides →](../guides/index.md) |
+| **Code Review** | `victor "Review this PR"` | [User Guide ->](../user-guide/) |
+| **Refactoring** | `victor "Refactor to use DI"` | [User Guide ->](../user-guide/) |
+| **Testing** | `victor "Write unit tests"` | [User Guide ->](../user-guide/) |
+| **Git Operations** | `victor "Create commit for changes"` | [Tool Catalog ->](tools/catalog.md) |
+| **CI/CD** | See guides overview | [Guides ->](../guides/index.md) |
 
 ---
 
 ## Additional Resources
 
-- **Troubleshooting**: [Troubleshooting Guide →](../user-guide/troubleshooting.md)
-- **Development**: [Development Guide →](../development/)
-- **Architecture**: [Architecture Deep Dive →](../development/architecture/deep-dive.md)
-- **Community**: [Support →](../README.md#community--support)
+- **Troubleshooting**: [Troubleshooting Guide ->](../user-guide/troubleshooting.md)
+- **Development**: [Development Guide ->](../development/)
+- **Architecture**: [Architecture Deep Dive ->](../development/architecture/deep-dive.md)
+- **Community**: [Support ->](../README.md#community--support)
 
 ---
 
 <div align="center">
 
-**[← Back to Documentation](../README.md)**
+**[<- Back to Documentation](../README.md)**
 
 **Reference Documentation**
 

@@ -13,7 +13,7 @@ Developer documentation for Victor's internal protocols, components, and APIs. T
 
 ## Overview
 
-Victor's internal architecture emphasizes protocol‑based design, dependency inversion, and interface segregation. Verify specifics against the current codebase when making changes.
+Victor's internal architecture emphasizes protocol-based design, dependency inversion, and interface segregation. Verify specifics against the current codebase when making changes.
 
 ## Protocol Categories
 
@@ -55,7 +55,7 @@ result = await executor.execute_tool(tool, arguments)
 
 <div align="center">
 
-**[← Back to Reference](../index.md)**
+**[<- Back to Reference](../index.md)**
 
 **Internal APIs**
 

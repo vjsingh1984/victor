@@ -529,7 +529,7 @@ class TieredToolConfig:
         """
         from victor.tools.metadata_registry import ToolMetadataRegistry
 
-        registry = ToolMetadataRegistry.get_instance()
+        registry = ToolMetadataRegistry.get_instance()  # type: ignore[attr-defined]
         all_tools = registry.get_all_tool_names()
         # Semantic pool = all tools - base tools (mandatory + vertical_core)
         base = self.get_base_tools()
@@ -556,7 +556,7 @@ class TieredToolConfig:
         """
         from victor.tools.metadata_registry import ToolMetadataRegistry
 
-        registry = ToolMetadataRegistry.get_instance()
+        registry = ToolMetadataRegistry.get_instance()  # type: ignore[attr-defined]
         base = self.get_base_tools()
         registry_stage_tools = registry.get_tools_by_stage(stage)
         return base | registry_stage_tools
