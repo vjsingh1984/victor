@@ -15,11 +15,17 @@
 """Optimized singleton reset for faster test execution.
 
 This module provides a faster alternative to tests/singleton_reset.py by:
-1. Only resetting critical singletons (48 → 3 resets)
+1. Only resetting critical singletons (48 → 4 resets)
 2. Skipping expensive resets (observability, storage, processing)
 3. Using lazy evaluation (only import if needed)
 
 Performance: ~0.01s per reset vs 0.8s for full reset
+
+Critical Singletons Reset:
+1. DI Container (ServiceContainer) - Holds service instances
+2. Mode Config (ModeConfigRegistry) - Affects agent behavior
+3. Vertical Config Cache (VerticalBase._config_cache) - Prevents pollution
+4. Handler Registry (HandlerRegistry) - Prevents "already registered" errors
 
 Usage:
     # In conftest.py, for faster tests:
@@ -84,10 +90,13 @@ class FastSingletonResetRegistry:
         - Are quick to reset (< 10ms each)
         """
 
-        # Only 3 critical singletons that cause test pollution:
+        # 6 critical singletons that cause test pollution:
         # 1. DI Container - CRITICAL (holds service instances)
         # 2. Mode Config - CRITICAL (affects agent behavior)
         # 3. Vertical Config Cache - CRITICAL (fast, prevents pollution)
+        # 4. Handler Registry - CRITICAL (handlers persist causing "already registered" errors)
+        # 5. Escape Hatch Registry - CRITICAL (conditions persist causing "already registered" errors)
+        # 6. Discovery Cache - CRITICAL (vertical discovery state persists)
 
         # DI Container - CRITICAL
         def _reset_container():
@@ -122,6 +131,44 @@ class FastSingletonResetRegistry:
                 pass
 
         self.register(_reset_vertical_cache)
+
+        # Handler Registry - CRITICAL (prevents "already registered" errors)
+        def _reset_handler_registry():
+            try:
+                from victor.framework.handler_registry import HandlerRegistry
+
+                HandlerRegistry.reset_instance()
+            except ImportError:
+                pass
+
+        self.register(_reset_handler_registry)
+
+        # Escape Hatch Registry - CRITICAL (prevents "condition already registered" errors)
+        def _reset_escape_hatch_registry():
+            try:
+                from victor.framework.escape_hatch_registry import EscapeHatchRegistry
+
+                EscapeHatchRegistry.reset_instance()
+                # Also clear class-level storage that persists across instance resets
+                EscapeHatchRegistry._class_conditions.clear()
+                EscapeHatchRegistry._class_transforms.clear()
+                EscapeHatchRegistry._class_global_conditions.clear()
+                EscapeHatchRegistry._class_global_transforms.clear()
+            except (ImportError, AttributeError):
+                pass
+
+        self.register(_reset_escape_hatch_registry)
+
+        # Discovery cache - CRITICAL (prevents vertical discovery pollution)
+        def _reset_discovery_cache():
+            try:
+                from victor.framework.discovery import clear_discovery_cache
+
+                clear_discovery_cache()
+            except (ImportError, AttributeError):
+                pass
+
+        self.register(_reset_discovery_cache)
 
 
 _global_fast_registry: Optional[FastSingletonResetRegistry] = None
