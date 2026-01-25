@@ -34,7 +34,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 
 from rich.console import Console
 
@@ -351,7 +351,8 @@ class OrchestratorFactory(ModeAwareMixin):
         # Store profile name for session tracking
         orchestrator._profile_name = profile_name
         # Track active session ID for parallel session support
-        orchestrator.active_session_id: Optional[str] = None
+        if not hasattr(orchestrator, 'active_session_id'):
+            setattr(orchestrator, 'active_session_id', None)
         # Bootstrap DI container - ensures all services are available
         # This is idempotent and will only bootstrap if not already done
         orchestrator._container = self.container
@@ -411,11 +412,11 @@ class OrchestratorFactory(ModeAwareMixin):
         )
         core_services = CoreServices(
             sanitizer=orchestrator.sanitizer,
-            prompt_builder=orchestrator.prompt_builder,
+            prompt_builder=orchestrator.prompt_builder,  # type: ignore[arg-type]
             project_context=orchestrator.project_context,
             complexity_classifier=orchestrator.task_classifier,
             action_authorizer=orchestrator.intent_detector,
-            search_router=orchestrator.search_router,
+            search_router=orchestrator.search_router,  # type: ignore[arg-type]
         )
         conversation_components = ConversationComponents(
             conversation_controller=orchestrator._conversation_controller,
@@ -469,23 +470,24 @@ class OrchestratorFactory(ModeAwareMixin):
         )
 
     @property
-    def container(self):
+    def container(self) -> Any:
         """Get or create the DI container."""
         if self._container is None:
             from victor.core.bootstrap import ensure_bootstrapped
             from victor.agent.protocols import ResponseSanitizerProtocol
+            from victor.core.container import ServiceContainer
 
-            self._container = ensure_bootstrapped(self.settings)
+            new_container: ServiceContainer = ensure_bootstrapped(self.settings)
+            self._container = new_container  # type: ignore[assignment]
 
             # Verify orchestrator services are registered
             # If ResponseSanitizer is not registered, bootstrapping was incomplete
-            if not self._container.is_registered(ResponseSanitizerProtocol):
+            if not new_container.is_registered(ResponseSanitizerProtocol):
                 # Need to re-bootstrap with orchestrator services
                 from victor.core.bootstrap import bootstrap_container
-                from victor.core.container import set_container
 
                 # Create a new fully-bootstrapped container
-                self._container = bootstrap_container(self.settings)
+                self._container = bootstrap_container(self.settings)  # type: ignore[assignment]
 
         return self._container
 
@@ -493,7 +495,7 @@ class OrchestratorFactory(ModeAwareMixin):
         """Create response sanitizer (from DI container)."""
         from victor.agent.protocols import ResponseSanitizerProtocol
 
-        return self.container.get(ResponseSanitizerProtocol)
+        return self.container.get(ResponseSanitizerProtocol)  # type: ignore[no-any-return]
 
     def create_prompt_builder(
         self,
@@ -539,19 +541,19 @@ class OrchestratorFactory(ModeAwareMixin):
         """Create complexity classifier (from DI container)."""
         from victor.agent.protocols import ComplexityClassifierProtocol
 
-        return self.container.get(ComplexityClassifierProtocol)
+        return self.container.get(ComplexityClassifierProtocol)  # type: ignore[no-any-return]
 
     def create_action_authorizer(self) -> "ActionAuthorizer":
         """Create action authorizer (from DI container)."""
         from victor.agent.protocols import ActionAuthorizerProtocol
 
-        return self.container.get(ActionAuthorizerProtocol)
+        return self.container.get(ActionAuthorizerProtocol)  # type: ignore[no-any-return]
 
     def create_search_router(self) -> "SearchRouter":
         """Create search router (from DI container)."""
         from victor.agent.protocols import SearchRouterProtocol
 
-        return self.container.get(SearchRouterProtocol)
+        return self.container.get(SearchRouterProtocol)  # type: ignore[no-any-return]
 
     def create_presentation_adapter(self) -> Any:
         """Create presentation adapter for icon/emoji rendering.
@@ -897,20 +899,20 @@ class OrchestratorFactory(ModeAwareMixin):
         """Create usage analytics (from DI container)."""
         from victor.agent.protocols import UsageAnalyticsProtocol
 
-        return self.container.get(UsageAnalyticsProtocol)
+        return self.container.get(UsageAnalyticsProtocol)  # type: ignore[no-any-return]
 
     def create_sequence_tracker(self) -> "ToolSequenceTracker":
         """Create tool sequence tracker (from DI container)."""
         from victor.agent.protocols import ToolSequenceTrackerProtocol
 
-        return self.container.get(ToolSequenceTrackerProtocol)
+        return self.container.get(ToolSequenceTrackerProtocol)  # type: ignore[no-any-return]
 
     def create_recovery_handler(self) -> Optional["RecoveryHandler"]:
         """Create recovery handler (from DI container)."""
         from victor.agent.protocols import RecoveryHandlerProtocol
 
         # RecoveryHandler is always registered, but may be disabled via settings
-        return self.container.get(RecoveryHandlerProtocol)
+        return self.container.get(RecoveryHandlerProtocol)  # type: ignore[no-any-return]
 
     def create_observability(self) -> Optional["ObservabilityIntegration"]:
         """Create observability integration if enabled."""
@@ -923,7 +925,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("Observability integration created")
         return observability
 
-    def create_tracers(self) -> tuple:
+    def create_tracers(self) -> tuple[Any, Any]:
         """Create execution and tool call tracers for debugging.
 
         Returns:
@@ -2022,7 +2024,7 @@ class OrchestratorFactory(ModeAwareMixin):
         Returns:
             ToolRegistry instance for tool storage and management
         """
-        from victor.tools.base import ToolRegistry
+        from victor.tools.registry import ToolRegistry
 
         registry = ToolRegistry()
         logger.debug("ToolRegistry created")
@@ -2234,11 +2236,14 @@ class OrchestratorFactory(ModeAwareMixin):
         manager.initialize_tool_adapter()
 
         # Log adapter configuration
-        logger.info(
-            f"Tool calling adapter: {manager.tool_adapter.provider_name}, "
-            f"native={manager.capabilities.native_tool_calls}, "
-            f"format={manager.capabilities.tool_call_format.value}"
-        )
+        caps = manager.capabilities
+        adapter = manager.tool_adapter
+        if caps and adapter:
+            logger.info(
+                f"Tool calling adapter: {adapter.provider_name}, "
+                f"native={caps.native_tool_calls}, "
+                f"format={caps.tool_call_format.value}"
+            )
 
         # Return manager and exposed attributes for backward compatibility
         return (
@@ -2332,7 +2337,8 @@ class OrchestratorFactory(ModeAwareMixin):
         stats = pool.get_pool_stats()
         logger.info(f"Provider pool stats: {stats}")
 
-        return pool, True
+        # Return pool as BaseProvider (ProviderPool is a BaseProvider subclass)
+        return pool, True  # type: ignore[return-value]
 
     async def _create_provider_for_url(
         self,
@@ -2459,13 +2465,13 @@ class OrchestratorFactory(ModeAwareMixin):
         """
         # Use adapter's recommended budget, with settings override
         # Note: For analysis tasks, this may be increased dynamically in stream_chat()
-        default_budget = tool_calling_caps.recommended_tool_budget
+        default_budget: int = tool_calling_caps.recommended_tool_budget
 
         # Ensure minimum budget of 50 for meaningful work
         default_budget = max(default_budget, 50)
 
         # Allow settings to override
-        tool_budget = getattr(self.settings, "tool_call_budget", default_budget)
+        tool_budget: int = getattr(self.settings, "tool_call_budget", default_budget)
 
         logger.debug(
             f"Tool budget initialized: {tool_budget} "
@@ -2474,7 +2480,7 @@ class OrchestratorFactory(ModeAwareMixin):
         )
         return tool_budget
 
-    def initialize_execution_state(self) -> tuple[list, list, set, bool]:
+    def initialize_execution_state(self) -> tuple[list[str], list[str], set[tuple[str, str]], bool]:
         """Initialize execution state containers.
 
         Creates empty containers for tracking tool execution state during
@@ -2956,7 +2962,7 @@ class OrchestratorFactory(ModeAwareMixin):
                 task = config.task or task
 
                 # Merge config settings with kwargs (kwargs override config)
-                merged_kwargs = {}
+                merged_kwargs: Dict[str, Any] = {}
 
                 # Common settings
                 if config.provider != "anthropic":
@@ -3032,12 +3038,12 @@ class OrchestratorFactory(ModeAwareMixin):
             from victor.framework.agent import Agent
 
             # Create foreground Agent
-            agent = Agent(orchestrator)
+            agent = Agent(orchestrator)  # type: ignore[arg-type]
 
             # Apply tools if specified
             tools = kwargs.get("tools")
             if tools:
-                from victor.framework.tools import configure_tools
+                from victor.framework.tools import configure_tools  # type: ignore[attr-defined]
 
                 configure_tools(orchestrator, tools, airgapped=kwargs.get("airgapped", False))
 
@@ -3054,27 +3060,31 @@ class OrchestratorFactory(ModeAwareMixin):
         elif mode == "background":
             # Import BackgroundAgent
             from victor.agent.background_agent import BackgroundAgent
+            import uuid
+            import time
 
             # Create background agent
-            agent = BackgroundAgent(
-                orchestrator=orchestrator,
+            background_agent = BackgroundAgent(
+                id=str(uuid.uuid4()),
+                name=f"Background-{int(time.time())}",
+                description=task or kwargs.get("task", "Background task"),
                 task=task or kwargs.get("task", ""),
-                mode_type=kwargs.get("mode_type", "build"),
-                websocket=kwargs.get("websocket", False),
-                enable_observability=kwargs.get("enable_observability", True),
+                mode=kwargs.get("mode_type", "build"),
+                orchestrator=orchestrator,
             )
-            return agent
+            return background_agent
 
         elif mode == "team_member":
             # Import TeamMember
             from victor.teams.types import TeamMember
+            import uuid
 
             # Create team member (wraps existing agent/team member)
             member = TeamMember(
-                agent_ref=kwargs.get("agent_ref"),
+                id=str(uuid.uuid4()),
                 role=kwargs.get("role", "team_member"),
-                capabilities=kwargs.get("capabilities", []),
-                description=kwargs.get("description", ""),
+                name=kwargs.get("name", kwargs.get("role", "team_member")),
+                goal=kwargs.get("description", ""),
             )
             return member
 
@@ -3090,7 +3100,7 @@ def create_orchestrator_factory(
     settings: "Settings",
     provider: "BaseProvider",
     model: str,
-    **kwargs,
+    **kwargs: Any,
 ) -> OrchestratorFactory:
     """Create an OrchestratorFactory instance.
 
