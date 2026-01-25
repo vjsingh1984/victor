@@ -40,7 +40,7 @@ This design enables:
 
 import asyncio
 import logging
-from typing import Any, AsyncIterator, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, AsyncIterator, Dict, List, Optional, TYPE_CHECKING, cast
 from unittest.mock import Mock
 
 from victor.framework.task import TaskComplexity
@@ -60,6 +60,7 @@ if TYPE_CHECKING:
 
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
     from victor.protocols.agent import IAgentOrchestrator
+    from victor.agent.orchestrator import AgentOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,14 @@ class ChatCoordinator:
         self._intent_classification_handler: Optional["IntentClassificationHandler"] = None
         self._continuation_handler: Optional["ContinuationHandler"] = None
         self._tool_execution_handler: Optional["ToolExecutionHandler"] = None
+
+    def _orch(self) -> "AgentOrchestrator":
+        """Get the actual orchestrator instance for accessing internal attributes.
+
+        Returns:
+            The actual AgentOrchestrator instance
+        """
+        return cast("AgentOrchestrator", self._orchestrator)
 
     # =====================================================================
     # Public API
@@ -146,6 +155,10 @@ class ChatCoordinator:
             content=combined_content,
             role="assistant",
             tool_calls=tool_calls_list if tool_calls_list else None,
+            model=None,
+            raw_response=None,
+            stop_reason=None,
+            usage=None,
         )
 
     async def stream_chat(self, user_message: str) -> AsyncIterator[StreamChunk]:
@@ -159,7 +172,7 @@ class ChatCoordinator:
         Returns:
             AsyncIterator yielding StreamChunk objects with incremental response
         """
-        orch = self._orchestrator
+        orch = self._orch()
         try:
             async for chunk in self._stream_chat_impl(user_message):
                 yield chunk
@@ -205,7 +218,7 @@ class ChatCoordinator:
 
             This method uses StreamingChatContext to centralize state management.
         """
-        orch = self._orchestrator
+        orch = self._orch()
 
         # Initialize and prepare using StreamingChatContext
         stream_ctx = await self._create_stream_context(user_message)
@@ -679,7 +692,7 @@ class ChatCoordinator:
         int,
     ]:
         """Prepare streaming state and return commonly used values."""
-        orch = self._orchestrator
+        orch = self._orch()
 
         # Initialize streaming state via MetricsCoordinator
         orch._metrics_coordinator.start_streaming()
@@ -811,7 +824,7 @@ class ChatCoordinator:
         """
         from victor.agent.streaming import create_stream_context
 
-        orch = self._orchestrator
+        orch = self._orch()
 
         # Get all prepared data from _prepare_stream
         (
@@ -894,7 +907,7 @@ class ChatCoordinator:
         Returns:
             Tuple of (task_classification, complexity_tool_budget)
         """
-        orch = self._orchestrator
+        orch = self._orch()
 
         # Wire reminder_manager dependency if not already set
         if orch.task_coordinator._reminder_manager is None:
@@ -984,7 +997,7 @@ class ChatCoordinator:
         Args:
             user_message: The user's message
         """
-        orch = self._orchestrator
+        orch = self._orch()
 
         # Delegate to TaskCoordinator
         orch.task_coordinator.apply_intent_guard(user_message, orch.conversation_controller)
@@ -1011,7 +1024,7 @@ class ChatCoordinator:
             needs_execution: Whether execution is needed
             max_exploration_iterations: Maximum exploration iterations
         """
-        orch = self._orchestrator
+        orch = self._orch()
 
         # Set initial temperature and tool_budget in TaskCoordinator
         orch.task_coordinator.temperature = orch.temperature
@@ -1029,8 +1042,8 @@ class ChatCoordinator:
         )
 
         # Sync temperature and tool_budget back to orchestrator
-        orch.temperature = orch.task_coordinator.temperature
-        orch.tool_budget = orch.task_coordinator.tool_budget
+        orch.temperature = orch.task_coordinator.temperature  # type: ignore[misc]
+        orch.tool_budget = orch.task_coordinator.tool_budget  # type: ignore[misc]
 
     async def _select_tools_for_turn(self, context_msg: str, goals: Any) -> Any:
         """Select and prioritize tools for the current turn.
@@ -1042,7 +1055,7 @@ class ChatCoordinator:
         Returns:
             Selected and prioritized tools, or None if tooling not allowed
         """
-        orch = self._orchestrator
+        orch = self._orch()
 
         provider_supports_tools = orch.provider.supports_tools()
         tooling_allowed = provider_supports_tools and orch._model_supports_tool_calls()
@@ -1165,7 +1178,7 @@ class ChatCoordinator:
         Returns:
             Maximum context length for the current provider/model
         """
-        orch = self._orchestrator
+        orch = self._orch()
         # Use context_manager which has provider-aware context limits
         return orch._context_manager.get_max_context_chars()
 
@@ -1187,10 +1200,10 @@ class ChatCoordinator:
         Yields:
             StreamChunk objects for notifications or final chunks
         """
-        orch = self._orchestrator
+        orch = self._orch()
 
         # 1. Check for cancellation
-        if orch._check_cancellation():
+        if cast(bool, orch._check_cancellation()):
             logger.info("Stream cancelled by user request")
             orch._metrics_coordinator.stop_streaming()
             orch._record_intelligent_outcome(
@@ -1246,7 +1259,7 @@ class ChatCoordinator:
             stream_ctx: The streaming context
             max_total_iterations: Maximum iterations allowed
         """
-        orch = self._orchestrator
+        orch = self._orch()
         unique_resources = orch.unified_tracker.unique_resources
         logger.debug(
             f"Iteration {stream_ctx.total_iterations}/{max_total_iterations}: "
@@ -1298,7 +1311,7 @@ class ChatCoordinator:
         """
         from victor.providers.base import StreamChunk
 
-        orch = self._orchestrator
+        orch = self._orch()
         chunks = []
 
         # Check context length (handle both dict and object access)
@@ -1334,12 +1347,15 @@ class ChatCoordinator:
             # Add notification chunk
             chunks.append(
                 StreamChunk(
-                    chunk_type="system_message",
                     content=(
                         f"\n\n[Research loop limit reached ({total_iterations}/{max_total_iterations}) - "
                         "generating comprehensive summary...]\n"
                     ),
-                    metadata={"iteration_limit": True, "total_iterations": total_iterations},
+                    metadata={
+                        "chunk_type": "system_message",
+                        "iteration_limit": True,
+                        "total_iterations": total_iterations,
+                    },
                 )
             )
 
@@ -1394,7 +1410,7 @@ class ChatCoordinator:
         Returns:
             Number of seconds to wait before retrying
         """
-        orch = self._orchestrator
+        orch = self._orch()
         base_wait = orch._provider_coordinator.get_rate_limit_wait_time(exc)
         backoff_multiplier = 2**attempt
         wait_time = base_wait * backoff_multiplier
@@ -1472,7 +1488,7 @@ class ChatCoordinator:
         Returns:
             Tuple of (full_content, tool_calls, total_tokens, garbage_detected)
         """
-        orch = self._orchestrator
+        orch = self._orch()
 
         full_content = ""
         tool_calls = None
@@ -1543,7 +1559,7 @@ class ChatCoordinator:
         Returns:
             Tuple of (chunk, consecutive_garbage_chunks, garbage_detected)
         """
-        orch = self._orchestrator
+        orch = self._orch()
         if chunk.content and orch.sanitizer.is_garbage_content(chunk.content):
             consecutive_garbage_chunks += 1
             if consecutive_garbage_chunks >= max_garbage_chunks:
@@ -1600,7 +1616,7 @@ class ChatCoordinator:
         import time
         from victor.agent.recovery_coordinator import StreamingRecoveryContext
 
-        orch = self._orchestrator
+        orch = self._orch()
 
         elapsed_time = 0.0
         if orch._streaming_controller.current_session:
@@ -1660,7 +1676,7 @@ class ChatCoordinator:
         from victor.agent.tool_call_extractor import ExtractedToolCall
         from victor.providers.base import StreamChunk
 
-        orch = self._orchestrator
+        orch = self._orch()
 
         # Convert ExtractedToolCall to tool call format
         tool_call = {
@@ -1681,11 +1697,13 @@ class ChatCoordinator:
             extracted_call.arguments,
         )
         yield StreamChunk(
-            chunk_type="tool_start",
             content="",
-            tool_name=extracted_call.tool_name,
-            tool_args=extracted_call.arguments,
-            metadata={"status_message": status_msg},
+            metadata={
+                "chunk_type": "tool_start",
+                "tool_name": extracted_call.tool_name,
+                "tool_args": extracted_call.arguments,
+                "status_message": status_msg,
+            },
         )
 
         # Execute the tool call
@@ -1709,16 +1727,20 @@ class ChatCoordinator:
 
                     if error:
                         yield StreamChunk(
-                            chunk_type="tool_error",
                             content=str(error),
-                            tool_name=tool_name,
-                            metadata={"error": error},
+                            metadata={
+                                "chunk_type": "tool_error",
+                                "tool_name": tool_name,
+                                "error": error,
+                            },
                         )
                     else:
                         yield StreamChunk(
-                            chunk_type="tool_result",
                             content=output,
-                            tool_name=tool_name,
+                            metadata={
+                                "chunk_type": "tool_result",
+                                "tool_name": tool_name,
+                            },
                         )
 
                         # Add tool result message to conversation
@@ -1727,10 +1749,12 @@ class ChatCoordinator:
         except Exception as e:
             logger.error(f"Error executing extracted tool call: {e}")
             yield StreamChunk(
-                chunk_type="tool_error",
                 content=f"Error executing {extracted_call.tool_name}: {str(e)}",
-                tool_name=extracted_call.tool_name,
-                metadata={"error": str(e)},
+                metadata={
+                    "chunk_type": "tool_error",
+                    "tool_name": extracted_call.tool_name,
+                    "error": str(e),
+                },
             )
 
     async def _handle_budget_exhausted(
@@ -1756,12 +1780,12 @@ class ChatCoordinator:
 
         # Generate budget exhausted message
         yield StreamChunk(
-            chunk_type="system_message",
             content=(
                 f"\n\n[Tool Budget Exhausted: {stream_ctx.tool_calls_used}/{stream_ctx.tool_budget} used]\n"
                 f"Continuing without tool execution. Results may be limited."
             ),
             metadata={
+                "chunk_type": "system_message",
                 "tool_calls_used": stream_ctx.tool_calls_used,
                 "tool_budget": stream_ctx.tool_budget,
                 "budget_exhausted": True,
@@ -1789,17 +1813,17 @@ class ChatCoordinator:
 
         # Generate notification message
         yield StreamChunk(
-            chunk_type="system_message",
             content=(
                 "\n\n[Generating comprehensive final summary based on all information gathered...]\n"
             ),
             metadata={
+                "chunk_type": "system_message",
                 "force_final_response": True,
             },
         )
 
         # Actually generate a final summary by calling the provider
-        orch = self._orchestrator
+        orch = self._orch()
 
         # Add a system message requesting comprehensive summary
         task_type = "analysis" if stream_ctx.is_analysis_task else "general task"
@@ -1832,9 +1856,9 @@ class ChatCoordinator:
                     orch.add_message("assistant", sanitized)
                     # Yield in chunks for better UX
                     yield StreamChunk(
-                        chunk_type="content",
                         content=sanitized,
                         is_final=True,
+                        metadata={"chunk_type": "content"},
                     )
                     logger.info(f"Generated final summary: {len(sanitized)} chars")
                 else:
@@ -1843,9 +1867,9 @@ class ChatCoordinator:
                     if plain_text:
                         orch.add_message("assistant", plain_text)
                         yield StreamChunk(
-                            chunk_type="content",
                             content=plain_text,
                             is_final=True,
+                            metadata={"chunk_type": "content"},
                         )
                         logger.info(
                             f"Generated final summary (plain text): {len(plain_text)} chars"
@@ -1860,18 +1884,18 @@ class ChatCoordinator:
                 )
                 fallback_summary = self._generate_fallback_summary(orch, stream_ctx)
                 yield StreamChunk(
-                    chunk_type="content",
                     content=fallback_summary,
                     is_final=True,
+                    metadata={"chunk_type": "content"},
                 )
         except Exception as e:
             logger.error(f"Error generating final summary: {e}, generating fallback")
             # Generate fallback summary on error
             fallback_summary = self._generate_fallback_summary(orch, stream_ctx)
             yield StreamChunk(
-                chunk_type="content",
                 content=fallback_summary,
                 is_final=True,
+                metadata={"chunk_type": "content"},
             )
 
     def _generate_fallback_summary(
@@ -1976,7 +2000,7 @@ class ChatCoordinator:
         Returns:
             RecoveryAction with the action to take
         """
-        orch = self._orchestrator
+        orch = self._orch()
         # Call handle_response with individual parameters instead of detect_and_handle
         return await orch._recovery_integration.handle_response(
             content=full_content,
@@ -2020,7 +2044,7 @@ class ChatCoordinator:
         Returns:
             StreamChunk to yield, or None
         """
-        orch = self._orchestrator
+        orch = self._orch()
 
         if recovery_action.action == "force_summary":
             stream_ctx.force_completion = True
@@ -2050,7 +2074,7 @@ class ChatCoordinator:
         Returns:
             Tuple of (success, tool_calls, final_chunk)
         """
-        orch = self._orchestrator
+        orch = self._orch()
 
         # Try to recover with a simple prompt
         try:
@@ -2091,7 +2115,7 @@ class ChatCoordinator:
         Returns:
             Validation result dict or None
         """
-        orch = self._orchestrator
+        orch = self._orch()
 
         if not orch._intelligent_integration:
             return None
@@ -2122,7 +2146,7 @@ class ChatCoordinator:
         Returns:
             StreamChunk if cancellation detected, None otherwise
         """
-        orch = self._orchestrator
+        orch = self._orch()
 
         # Check if cancellation was requested
         if orch._check_cancellation():
@@ -2141,7 +2165,7 @@ class ChatCoordinator:
         """
         from victor.agent.streaming.iteration import IterationAction
 
-        orch = self._orchestrator
+        orch = self._orch()
 
         # Delegate to streaming handler's check_time_limit
         if not orch._streaming_handler:
@@ -2170,7 +2194,7 @@ class ChatCoordinator:
         """
         from victor.agent.recovery_coordinator import StreamingRecoveryContext
 
-        orch = self._orchestrator
+        orch = self._orch()
 
         # Delegate to recovery coordinator's check_progress
         if orch._recovery_coordinator:
