@@ -136,6 +136,80 @@ class AgentSessionService(Protocol):
 
 
 # =============================================================================
+# Registry Service Protocols (Phase 12.1 - DIP Compliance)
+# =============================================================================
+
+
+@runtime_checkable
+class WorkflowRegistryService(Protocol):
+    """Protocol for workflow registry services."""
+
+    def register(self, name: str, workflow: Any, replace: bool = False) -> None:
+        """Register a workflow."""
+        ...
+
+    def get(self, name: str) -> Any:
+        """Get a workflow by name."""
+        ...
+
+
+@runtime_checkable
+class TeamRegistryService(Protocol):
+    """Protocol for team registry services."""
+
+    def register_from_vertical(self, vertical: str, specs: dict, replace: bool = False) -> None:
+        """Register team specs from a vertical."""
+        ...
+
+    def get(self, name: str) -> Any:
+        """Get a team spec by name."""
+        ...
+
+
+@runtime_checkable
+class ChainRegistryService(Protocol):
+    """Protocol for chain registry services."""
+
+    def register(self, name: str, chain: Any, vertical: str = "", replace: bool = False) -> None:
+        """Register a chain."""
+        ...
+
+    def get(self, name: str) -> Any:
+        """Get a chain by name."""
+        ...
+
+
+@runtime_checkable
+class PersonaRegistryService(Protocol):
+    """Protocol for persona registry services."""
+
+    def register(self, name: str, spec: Any, vertical: str = "", replace: bool = False) -> None:
+        """Register a persona."""
+        ...
+
+    def get(self, name: str) -> Any:
+        """Get a persona by name."""
+        ...
+
+
+@runtime_checkable
+class HandlerRegistryService(Protocol):
+    """Protocol for handler registry services."""
+
+    def register(self, name: str, handler: Any, vertical: str = "", replace: bool = False) -> None:
+        """Register a handler."""
+        ...
+
+    def get(self, name: str) -> Any:
+        """Get a handler by name."""
+        ...
+
+    def sync_with_executor(self, direction: str = "to_executor", replace: bool = False) -> None:
+        """Sync handlers with workflow executor."""
+        ...
+
+
+# =============================================================================
 # Service Factory Functions
 # =============================================================================
 
@@ -170,6 +244,36 @@ def _create_agent_builder(container: ServiceContainer) -> "AgentBuilder":
     # Store container reference for dependency injection during build
     builder._container = container
     return builder
+
+
+def _create_workflow_registry(container: ServiceContainer) -> Any:
+    """Factory for creating WorkflowRegistry."""
+    from victor.workflows.registry import get_global_registry
+    return get_global_registry()
+
+
+def _create_team_registry(container: ServiceContainer) -> Any:
+    """Factory for creating TeamRegistry."""
+    from victor.framework.team_registry import get_team_registry
+    return get_team_registry()
+
+
+def _create_chain_registry(container: ServiceContainer) -> Any:
+    """Factory for creating ChainRegistry."""
+    from victor.framework.chain_registry import get_chain_registry
+    return get_chain_registry()
+
+
+def _create_persona_registry(container: ServiceContainer) -> Any:
+    """Factory for creating PersonaRegistry."""
+    from victor.framework.persona_registry import get_persona_registry
+    return get_persona_registry()
+
+
+def _create_handler_registry(container: ServiceContainer) -> Any:
+    """Factory for creating HandlerRegistry."""
+    from victor.framework.handler_registry import get_handler_registry
+    return get_handler_registry()
 
 
 def _create_agent_bridge(container: ServiceContainer) -> "AgentBridge":
@@ -262,6 +366,11 @@ class FrameworkServiceProvider:
         include_event_registry: bool = True,
         include_builder: bool = True,
         include_bridge: bool = True,
+        include_workflow_registry: bool = False,
+        include_team_registry: bool = False,
+        include_chain_registry: bool = False,
+        include_persona_registry: bool = False,
+        include_handler_registry: bool = False,
     ) -> None:
         """Initialize provider with options.
 
@@ -270,11 +379,21 @@ class FrameworkServiceProvider:
             include_event_registry: Register EventRegistry service
             include_builder: Register AgentBuilder service
             include_bridge: Register AgentBridge service
+            include_workflow_registry: Register WorkflowRegistry service (Phase 12.1)
+            include_team_registry: Register TeamRegistry service (Phase 12.1)
+            include_chain_registry: Register ChainRegistry service (Phase 12.1)
+            include_persona_registry: Register PersonaRegistry service (Phase 12.1)
+            include_handler_registry: Register HandlerRegistry service (Phase 12.1)
         """
         self._include_tool_config = include_tool_config
         self._include_event_registry = include_event_registry
         self._include_builder = include_builder
         self._include_bridge = include_bridge
+        self._include_workflow_registry = include_workflow_registry
+        self._include_team_registry = include_team_registry
+        self._include_chain_registry = include_chain_registry
+        self._include_persona_registry = include_persona_registry
+        self._include_handler_registry = include_handler_registry
         self._registered = False
 
     def get_registrations(self) -> list[ServiceRegistration]:
@@ -322,6 +441,57 @@ class FrameworkServiceProvider:
                     factory=_create_agent_bridge,
                     lifetime=ServiceLifetime.SCOPED,
                     description="Agent bridge service (scoped)",
+                )
+            )
+
+        # Registry services (Phase 12.1 - DIP Compliance)
+        if self._include_workflow_registry:
+            registrations.append(
+                ServiceRegistration(
+                    service_type=WorkflowRegistryService,
+                    factory=_create_workflow_registry,
+                    lifetime=ServiceLifetime.SINGLETON,
+                    description="Workflow registry service",
+                )
+            )
+
+        if self._include_team_registry:
+            registrations.append(
+                ServiceRegistration(
+                    service_type=TeamRegistryService,
+                    factory=_create_team_registry,
+                    lifetime=ServiceLifetime.SINGLETON,
+                    description="Team registry service",
+                )
+            )
+
+        if self._include_chain_registry:
+            registrations.append(
+                ServiceRegistration(
+                    service_type=ChainRegistryService,
+                    factory=_create_chain_registry,
+                    lifetime=ServiceLifetime.SINGLETON,
+                    description="Chain registry service",
+                )
+            )
+
+        if self._include_persona_registry:
+            registrations.append(
+                ServiceRegistration(
+                    service_type=PersonaRegistryService,
+                    factory=_create_persona_registry,
+                    lifetime=ServiceLifetime.SINGLETON,
+                    description="Persona registry service",
+                )
+            )
+
+        if self._include_handler_registry:
+            registrations.append(
+                ServiceRegistration(
+                    service_type=HandlerRegistryService,
+                    factory=_create_handler_registry,
+                    lifetime=ServiceLifetime.SINGLETON,
+                    description="Handler registry service",
                 )
             )
 
@@ -398,20 +568,24 @@ class FrameworkScope:
         self._active = True
 
     def get_configurator(self) -> Any:
-        """Get tool configurator service."""
+        """Get tool configurator service.
+
+        Returns the singleton instance from the parent container.
+        """
         from typing import cast
 
-        # Use factory function to get service
-        service_impl = _create_tool_configurator(self._scope._parent)
-        return cast(ToolConfiguratorService, service_impl)
+        # Get singleton from parent container (not scope - singletons are shared)
+        return cast(ToolConfiguratorService, self._container.get(ToolConfiguratorService))
 
     def get_registry(self) -> Any:
-        """Get event registry service."""
+        """Get event registry service.
+
+        Returns the singleton instance from the parent container.
+        """
         from typing import cast
 
-        # Use factory function to get service
-        service_impl = _create_event_registry(self._scope._parent)
-        return cast(EventRegistryService, service_impl)
+        # Get singleton from parent container (not scope - singletons are shared)
+        return cast(EventRegistryService, self._container.get(EventRegistryService))
 
     def get_builder(self) -> Any:
         """Get agent builder service.
@@ -451,6 +625,7 @@ class FrameworkScope:
 def configure_framework_services(
     container: Optional[ServiceContainer] = None,
     replace_existing: bool = False,
+    include_registries: bool = False,
 ) -> ServiceContainer:
     """Configure all framework services in a container.
 
@@ -459,6 +634,7 @@ def configure_framework_services(
     Args:
         container: Target container (uses global if None)
         replace_existing: If True, replace existing registrations
+        include_registries: If True, include all registry services (Phase 12.1)
 
     Returns:
         Configured service container
@@ -467,14 +643,20 @@ def configure_framework_services(
         # Use global container
         container = configure_framework_services()
 
-        # Use custom container
+        # Use custom container with registries
         my_container = ServiceContainer()
-        configure_framework_services(my_container)
+        configure_framework_services(my_container, include_registries=True)
     """
     if container is None:
         container = get_container()
 
-    provider = FrameworkServiceProvider()
+    provider = FrameworkServiceProvider(
+        include_workflow_registry=include_registries,
+        include_team_registry=include_registries,
+        include_chain_registry=include_registries,
+        include_persona_registry=include_registries,
+        include_handler_registry=include_registries,
+    )
     provider.register_services(container, replace_existing=replace_existing)
 
     return container
