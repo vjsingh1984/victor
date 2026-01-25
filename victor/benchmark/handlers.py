@@ -114,7 +114,7 @@ class BenchmarkTestRunnerHandler(BaseHandler):
         else:
             cmd = f"python {test_file}"
 
-        result = await tool_registry.execute("shell", command=cmd, timeout=timeout + 10)
+        result = await tool_registry.execute("shell", {}, command=cmd, timeout=timeout + 10)
 
         output_text = result.output if hasattr(result, "output") else str(result)
         test_output = self._parse_test_output(output_text, framework)
@@ -205,7 +205,7 @@ class EnvironmentSetupHandler(BaseHandler):
     ) -> Tuple[Any, int]:
         """Execute environment setup."""
         language = node.input_mapping.get("language", "python")
-        dependencies = node.input_mapping.get("dependencies", [])
+        dependencies: List[str] = node.input_mapping.get("dependencies", [])
         workspace = node.input_mapping.get("workspace", "")
 
         # Resolve context variables
@@ -229,6 +229,7 @@ class EnvironmentSetupHandler(BaseHandler):
             deps_str = " ".join(dependencies)
             result = await tool_registry.execute(
                 "shell",
+                {},
                 command=f"pip install {deps_str}",
                 timeout=120,
             )
@@ -299,7 +300,7 @@ class LiveExecutorHandler(BaseHandler):
         if test_input:
             cmd = f"echo '{test_input}' | {cmd}"
 
-        result = await tool_registry.execute("shell", command=cmd, timeout=timeout)
+        result = await tool_registry.execute("shell", {}, command=cmd, timeout=timeout)
 
         output = {
             "success": result.success if hasattr(result, "success") else False,
@@ -309,7 +310,7 @@ class LiveExecutorHandler(BaseHandler):
         }
 
         # Check for common error patterns
-        stdout = output.get("stdout", "")
+        stdout = str(output.get("stdout", ""))
         if "Error" in stdout or "Exception" in stdout or "Traceback" in stdout:
             output["success"] = False
             output["error_type"] = "runtime_error"
@@ -364,7 +365,7 @@ class LanguageDetectorHandler(BaseHandler):
         tool_registry: "ToolRegistry",
     ) -> Tuple[Any, int]:
         """Execute language detection."""
-        files = node.input_mapping.get("files", [])
+        files: List[str] = node.input_mapping.get("files", [])
 
         # Resolve context variables
         if isinstance(files, str) and files.startswith("$ctx."):
@@ -438,6 +439,7 @@ class PolyglotVerifierHandler(BaseHandler):
         if language == "python":
             syntax_result = await tool_registry.execute(
                 "shell",
+                {},
                 command="python -m py_compile *.py 2>&1 || true",
                 timeout=30,
             )
@@ -449,6 +451,7 @@ class PolyglotVerifierHandler(BaseHandler):
         if test_command:
             test_result = await tool_registry.execute(
                 "shell",
+                {},
                 command=test_command,
                 timeout=180,
             )
@@ -490,8 +493,8 @@ class MultiSolutionValidatorHandler(BaseHandler):
         tool_registry: "ToolRegistry",
     ) -> Tuple[Any, int]:
         """Execute multi-solution validation."""
-        solutions = node.input_mapping.get("solutions", [])
-        test_cases = node.input_mapping.get("test_cases", [])
+        solutions: List[str] = node.input_mapping.get("solutions", [])
+        test_cases: List[str] = node.input_mapping.get("test_cases", [])
         timeout_per = node.input_mapping.get("timeout_per_solution", 30)
 
         # Resolve context variables
@@ -523,6 +526,7 @@ class MultiSolutionValidatorHandler(BaseHandler):
                 # Execute
                 result = await tool_registry.execute(
                     "shell",
+                    {},
                     command=f"python {code_file}",
                     timeout=timeout_per,
                 )
@@ -590,7 +594,7 @@ class CodeTesterHandler(BaseHandler):
     ) -> Tuple[Any, int]:
         """Execute code testing."""
         code = node.input_mapping.get("code", "")
-        test_cases = node.input_mapping.get("test_cases", [])
+        test_cases: List[str] = node.input_mapping.get("test_cases", [])
 
         # Resolve context variables
         if isinstance(code, str) and code.startswith("$ctx."):
@@ -615,6 +619,7 @@ class CodeTesterHandler(BaseHandler):
 
         result = await tool_registry.execute(
             "shell",
+            {},
             command=f"python {code_file}",
             timeout=60,
         )
@@ -696,6 +701,7 @@ class SyntaxCheckHandler(BaseHandler):
             if language == "javascript":
                 result = await tool_registry.execute(
                     "shell",
+                    {},
                     command=f"node --check {code_file}",
                     timeout=10,
                 )
@@ -708,6 +714,7 @@ class SyntaxCheckHandler(BaseHandler):
             elif language == "typescript":
                 result = await tool_registry.execute(
                     "shell",
+                    {},
                     command=f"tsc --noEmit {code_file}",
                     timeout=30,
                 )

@@ -466,7 +466,7 @@ class CommandBus:
     def register(
         self,
         command_type: Type[Command],
-        handler: Union[CommandHandlerFunc[Command], CommandHandler[Command]],
+        handler: Union[CommandHandlerFunc, CommandHandler[Command]],
     ) -> None:
         """Register a handler for a command type.
 
@@ -651,7 +651,7 @@ class QueryBus:
 
                 return wrapped
 
-            chain = create_next(middleware, chain)  # type: ignore[assignment]
+            chain = create_next(middleware, chain)
 
         try:
             data = await chain(query)

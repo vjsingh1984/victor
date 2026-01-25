@@ -38,7 +38,7 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple, Set
+from typing import Any, Callable, Dict, List, Optional, Tuple, Set, cast
 from pathlib import Path
 from collections import OrderedDict
 
@@ -273,7 +273,7 @@ class ResponseCache:
                         )
                         self.enable_semantic = False
                         return None
-        return self._embedding_service  # type: ignore[no-any-return]
+        return self._embedding_service
 
     def _generate_key(self, messages: List[Message]) -> str:
         """Generate cache key from messages.
@@ -311,7 +311,7 @@ class ResponseCache:
             # Compute embedding (run in thread pool to avoid blocking)
             loop = asyncio.get_event_loop()
             embedding = await loop.run_in_executor(None, service.get_embedding, text)
-            return embedding
+            return cast(Optional[List[float]], embedding)
         except Exception as e:
             logger.warning(f"Failed to compute embedding: {e}")
             return None

@@ -90,7 +90,7 @@ def run_sync(coro: Awaitable[T]) -> T:
         # No running loop - safe to use asyncio.run()
         pass
 
-    return asyncio.run(coro)
+    return asyncio.run(coro)  # type: ignore[arg-type]
 
 
 def run_sync_in_thread(coro: Awaitable[T]) -> T:
@@ -121,7 +121,7 @@ def run_sync_in_thread(coro: Awaitable[T]) -> T:
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(run_in_loop)
         result = future.result()
-        return cast(T, result)
+        return result
 
 
 def async_to_sync(func: Callable[..., Awaitable[T]]) -> Callable[..., T]:
@@ -199,7 +199,7 @@ class SyncAsyncBridge:
         def wrapper(self, *args: Any, **kwargs: Any) -> T:
             coro = async_method(self, *args, **kwargs)
             result = self._run_sync(coro)
-            return cast(T, result)
+            return result
 
         return wrapper
 

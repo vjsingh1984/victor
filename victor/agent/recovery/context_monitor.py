@@ -31,7 +31,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
 logger = logging.getLogger(__name__)
 
@@ -429,7 +429,8 @@ class ContextWindowMonitor:
         if tokens_until_overflow <= 0:
             return 0.0
 
-        return tokens_until_overflow / growth_rate
+        result = tokens_until_overflow / growth_rate
+        return cast(Optional[float], result)
 
     def reset(self) -> None:
         """Reset monitor state."""

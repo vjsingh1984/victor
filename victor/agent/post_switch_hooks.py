@@ -114,7 +114,7 @@ class PromptBuilderHook:
         get_model: Callable[[], str],
         get_tool_adapter: Callable[[], Any],
         get_capabilities: Callable[[], "ToolCallingCapabilities"],
-        get_prompt_contributors: Callable[[], list],
+        get_prompt_contributors: Callable[[], list[Any]],
     ):
         """Initialize the hook.
 
@@ -255,14 +255,14 @@ def create_standard_hooks(
     get_provider_name: Callable[[], str],
     get_model: Callable[[], str],
     get_tool_adapter: Callable[[], Any],
-    get_prompt_contributors: Callable[[], list],
+    get_prompt_contributors: Callable[[], list[Any]],
     build_system_prompt: Callable[[], str],
     set_system_prompt: Callable[[str], None],
     get_project_context: Callable[[], Any],
     get_settings: Callable[[], "Settings"],
     set_tool_budget: Callable[[int], None],
     get_sticky_budget: Callable[[], bool],
-) -> list:
+) -> list[Any]:
     """Create the standard set of post-switch hooks.
 
     This factory creates all four standard hooks with proper dependencies.

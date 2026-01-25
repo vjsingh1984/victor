@@ -307,7 +307,11 @@ class FallbackParsingMixin:
         """Parse JSON tool calls from content (fallback).
 
         Looks for JSON objects with 'name' and 'arguments' or 'parameters'.
-        Handles JSON in markdown code fences (```json ... ```) as well as raw JSON.
+        Handles:
+        - JSON in markdown code fences (```json ... ```)
+        - Raw JSON objects
+        - Multiple consecutive JSON objects (common with some local models)
+        - Trailing metadata/stats (e.g., "📊 ~49 tokens (est.) | 30.7s | 1.6 tok/s")
 
         Args:
             content: Response content to parse
@@ -320,6 +324,12 @@ class FallbackParsingMixin:
         if not content:
             return ToolCallParseResult()
 
+        # Strip trailing metadata/stats that some models add
+        # Pattern: emoji or text at end followed by token/time stats
+        # Examples: "📊 ~49 tokens (est.) | 30.7s | 1.6 tok/s", "Generated 150 tokens in 5.2s"
+        metadata_pattern = r"\n[📊⚡✨⏱️💾]?\s*(?:~?\d+\.?\d*\s*(?:tokens?|chars?|bytes?)|(?:generated|completed|processed).*?(?:\d+\.?\d*\s*(?:seconds?|s|ms)|\d+:\d+)).*?$"
+        content = re.sub(metadata_pattern, "", content, flags=re.MULTILINE | re.IGNORECASE).strip()
+
         # Try to extract JSON from markdown code fences first
         # Pattern matches ```json ... ``` or ``` ... ```
         code_fence_pattern = r"```(?:json)?\s*\n?(.*?)\n?```"
@@ -331,7 +341,12 @@ class FallbackParsingMixin:
         # Also try the raw content (might be pure JSON without fences)
         json_candidates.append(content)
 
+        tool_calls: List[ToolCall] = []
+        warnings: List[str] = []
+        remaining_content = content
+
         for json_str in json_candidates:
+            # Try parsing as a single JSON object/array first
             try:
                 data = json.loads(json_str)
                 if isinstance(data, dict) and "name" in data:
@@ -342,18 +357,126 @@ class FallbackParsingMixin:
                         continue  # Try next candidate
 
                     args = data.get("arguments") or data.get("parameters", {})
-                    parsed_args, _ = self.parse_json_arguments(args)
+                    parsed_args, warning = self.parse_json_arguments(args)
+                    if warning:
+                        warnings.append(f"{name}: {warning}")
 
-                    return ToolCallParseResult(
-                        tool_calls=[ToolCall(name=name, arguments=parsed_args)],
-                        remaining_content="",
-                        parse_method="json_fallback",
-                        confidence=0.9,
-                    )
+                    tool_calls.append(ToolCall(name=name, arguments=parsed_args))
+                    remaining_content = ""
+                    break
+                elif isinstance(data, list) and data:
+                    # Handle array of tool calls
+                    for item in data:
+                        if isinstance(item, dict) and "name" in item:
+                            name = item.get("name", "")
+                            if validate_name_fn and not validate_name_fn(name):
+                                warnings.append(f"Skipped invalid tool name: {name}")
+                                continue
+
+                            args = item.get("arguments") or item.get("parameters", {})
+                            parsed_args, warning = self.parse_json_arguments(args)
+                            if warning:
+                                warnings.append(f"{name}: {warning}")
+
+                            tool_calls.append(ToolCall(name=name, arguments=parsed_args))
+
+                    if tool_calls:
+                        remaining_content = ""
+                        break
             except json.JSONDecodeError:
-                continue  # Try next candidate
+                # If single JSON parse fails, try extracting multiple JSON objects
+                # Pattern to match JSON objects like {...}{...} or {...}\n{...}
+                json_objects = self._extract_multiple_json_objects(json_str)
+
+                for json_obj in json_objects:
+                    try:
+                        data = json.loads(json_obj)
+                        if isinstance(data, dict) and "name" in data:
+                            name = data.get("name", "")
+
+                            # Validate name if validator provided
+                            if validate_name_fn and not validate_name_fn(name):
+                                warnings.append(f"Skipped invalid tool name: {name}")
+                                continue
+
+                            args = data.get("arguments") or data.get("parameters", {})
+                            parsed_args, warning = self.parse_json_arguments(args)
+                            if warning:
+                                warnings.append(f"{name}: {warning}")
+
+                            tool_calls.append(ToolCall(name=name, arguments=parsed_args))
+                    except json.JSONDecodeError:
+                        continue
+
+                if tool_calls:
+                    # Remove parsed JSON objects from content
+                    for json_obj in json_objects:
+                        if json_obj in remaining_content:
+                            remaining_content = remaining_content.replace(json_obj, "", 1)
+                    remaining_content = remaining_content.strip()
+                    break
+
+        if tool_calls:
+            return ToolCallParseResult(
+                tool_calls=tool_calls,
+                remaining_content=remaining_content,
+                parse_method="json_fallback",
+                confidence=0.9,
+                warnings=warnings,
+            )
 
         return ToolCallParseResult(remaining_content=content)
+
+    def _extract_multiple_json_objects(self, content: str) -> List[str]:
+        """Extract multiple JSON objects from content.
+
+        Handles cases where models output multiple JSON objects back-to-back
+        without array syntax, like: {"name":"read"}{"name":"write"}
+
+        Args:
+            content: Content that may contain multiple JSON objects
+
+        Returns:
+            List of extracted JSON object strings
+        """
+        json_objects = []
+
+        # Use a state machine to find complete JSON objects
+        brace_count = 0
+        in_string = False
+        escape_next = False
+        start_pos = -1
+
+        for i, char in enumerate(content):
+            if escape_next:
+                escape_next = False
+                continue
+
+            if char == "\\":
+                escape_next = True
+                continue
+
+            if char == '"' and not escape_next:
+                in_string = not in_string
+                continue
+
+            if in_string:
+                continue
+
+            if char == "{":
+                if brace_count == 0:
+                    start_pos = i
+                brace_count += 1
+            elif char == "}":
+                if brace_count > 0:
+                    brace_count -= 1
+                    if brace_count == 0 and start_pos >= 0:
+                        # Found a complete JSON object
+                        json_obj = content[start_pos:i+1]
+                        json_objects.append(json_obj)
+                        start_pos = -1
+
+        return json_objects
 
     def parse_xml_from_content(
         self,

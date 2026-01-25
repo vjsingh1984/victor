@@ -234,7 +234,7 @@ class PerformanceMonitor:
         self,
         operation_name: str,
         category: OperationCategory = OperationCategory.GENERAL,
-    ):
+    ) -> Any:
         """Context manager for tracking an operation.
 
         Args:
@@ -468,7 +468,7 @@ def timed(
     monitor: Optional[PerformanceMonitor] = None,
     operation_name: Optional[str] = None,
     category: OperationCategory = OperationCategory.GENERAL,
-):
+) -> Any:
     """Decorator to time function executions.
 
     Args:
@@ -487,7 +487,7 @@ def timed(
     if monitor is None:
         monitor = get_performance_monitor()
 
-    def decorator(func):
+    def decorator(func: Any) -> Any:
         name = operation_name or func.__name__
 
         @wraps(func)

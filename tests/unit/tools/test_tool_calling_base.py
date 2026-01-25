@@ -22,11 +22,12 @@ from victor.agent.tool_calling.base import (
     ToolCall,
     ToolCallParseResult,
     BaseToolCallingAdapter,
+    FallbackParsingMixin,
 )
 from victor.providers.base import ToolDefinition
 
 
-class ConcreteToolCallingAdapter(BaseToolCallingAdapter):
+class ConcreteToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
     """Concrete implementation for testing abstract base class."""
 
     def __init__(
@@ -421,3 +422,205 @@ class TestBaseToolCallingAdapterSanitizeContent:
         content = "   Result   "
         result = adapter.sanitize_content(content)
         assert result == "Result"
+
+
+class TestMultipleJsonObjectParsing:
+    """Tests for parsing multiple JSON objects from content."""
+
+    def test_parse_single_json_object(self):
+        """Test parsing a single JSON tool call."""
+        adapter = ConcreteToolCallingAdapter()
+        content = '{"name": "read", "arguments": {"path": "/tmp/file.py"}}'
+        result = adapter.parse_json_from_content(content)
+
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].name == "read"
+        assert result.tool_calls[0].arguments == {"path": "/tmp/file.py"}
+        assert result.parse_method == "json_fallback"
+
+    def test_parse_multiple_json_objects(self):
+        """Test parsing multiple consecutive JSON objects without array syntax."""
+        adapter = ConcreteToolCallingAdapter()
+        # Multiple JSON objects back-to-back (no comma, no array)
+        content = '{"name": "read", "arguments": {"path": "/tmp/file.py"}}{"name": "write", "arguments": {"path": "/tmp/out.py", "content": "hello"}}'
+
+        result = adapter.parse_json_from_content(content)
+
+        assert len(result.tool_calls) == 2
+        assert result.tool_calls[0].name == "read"
+        assert result.tool_calls[1].name == "write"
+        assert result.tool_calls[1].arguments["content"] == "hello"
+
+    def test_parse_json_with_trailing_metadata(self):
+        """Test parsing JSON with trailing token/time stats."""
+        adapter = ConcreteToolCallingAdapter()
+        content = '''{"name": "read", "arguments": {"path": "/tmp/file.py"}}
+
+📊 ~49 tokens (est.) | 30.7s | 1.6 tok/s'''
+
+        result = adapter.parse_json_from_content(content)
+
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].name == "read"
+        assert "📊" not in result.remaining_content
+
+    def test_parse_json_with_various_metadata_formats(self):
+        """Test parsing JSON with various trailing metadata formats."""
+        adapter = ConcreteToolCallingAdapter()
+
+        # Format 1: Emoji with stats
+        content1 = '{"name": "read", "arguments": {"path": "f"}}\n⚡ 150 tokens in 5.2s'
+        result1 = adapter.parse_json_from_content(content1)
+        assert len(result1.tool_calls) == 1
+        assert "⚡" not in result1.remaining_content
+
+        # Format 2: Plain text metadata
+        content2 = '{"name": "read", "arguments": {"path": "f"}}\nGenerated 150 tokens in 5.2s'
+        result2 = adapter.parse_json_from_content(content2)
+        assert len(result2.tool_calls) == 1
+
+        # Format 3: Tilde format
+        content3 = '{"name": "read", "arguments": {"path": "f"}}\n~49 chars | 30.7s'
+        result3 = adapter.parse_json_from_content(content3)
+        assert len(result3.tool_calls) == 1
+
+    def test_parse_json_array(self):
+        """Test parsing JSON array of tool calls."""
+        adapter = ConcreteToolCallingAdapter()
+        content = '''[{"name": "read", "arguments": {"path": "/tmp/file.py"}}, {"name": "write", "arguments": {"path": "/tmp/out.py"}}]'''
+
+        result = adapter.parse_json_from_content(content)
+
+        assert len(result.tool_calls) == 2
+        assert result.tool_calls[0].name == "read"
+        assert result.tool_calls[1].name == "write"
+
+    def test_parse_json_in_code_fences(self):
+        """Test parsing JSON in markdown code fences."""
+        adapter = ConcreteToolCallingAdapter()
+        content = '```json\n{"name": "read", "arguments": {"path": "/tmp/file.py"}}\n```'
+
+        result = adapter.parse_json_from_content(content)
+
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].name == "read"
+
+    def test_extract_nested_json_objects(self):
+        """Test extracting JSON objects with nested braces."""
+        adapter = ConcreteToolCallingAdapter()
+
+        # JSON with nested object in arguments
+        content = '{"name": "edit", "arguments": {"path": "/tmp/f.py", "old_string": "old", "new_string": {"nested": "value"}}}'
+        result = adapter.parse_json_from_content(content)
+
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].name == "edit"
+        assert result.tool_calls[0].arguments["new_string"] == {"nested": "value"}
+
+    def test_json_with_string_containing_braces(self):
+        """Test JSON where string values contain braces."""
+        adapter = ConcreteToolCallingAdapter()
+
+        # String with braces inside (in JSON, braces don't need escaping in strings)
+        content = r'{"name": "grep", "arguments": {"query": "function() {", "path": "."}}'
+        result = adapter.parse_json_from_content(content)
+
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].name == "grep"
+        assert result.tool_calls[0].arguments["query"] == "function() {"
+
+    def test_multiple_json_with_metadata(self):
+        """Test multiple JSON objects with trailing metadata (real Ollama case)."""
+        adapter = ConcreteToolCallingAdapter()
+
+        # Simulate real Ollama output with duplicate calls and stats
+        content = '''{
+  "name": "read",
+  "arguments": {
+    "path": "/private/var/folders/.../workspace/sample.py"
+  }
+}{
+  "name": "read",
+  "arguments": {
+    "path": "/private/var/folders/.../workspace/sample.py"
+  }
+}
+
+📊 ~49 tokens (est.) | 30.7s | 1.6 tok/s'''
+
+        result = adapter.parse_json_from_content(content)
+
+        # Should parse both JSON objects
+        assert len(result.tool_calls) == 2
+        assert all(tc.name == "read" for tc in result.tool_calls)
+        # Metadata should be removed
+        assert "📊" not in result.remaining_content
+
+
+class TestExtractMultipleJsonObjects:
+    """Tests for _extract_multiple_json_objects helper method."""
+
+    def test_simple_objects(self):
+        """Test extracting simple adjacent JSON objects."""
+        adapter = ConcreteToolCallingAdapter()
+        content = '{"a": 1}{"b": 2}'
+        objects = adapter._extract_multiple_json_objects(content)
+
+        assert len(objects) == 2
+        assert objects[0] == '{"a": 1}'
+        assert objects[1] == '{"b": 2}'
+
+    def test_objects_with_newlines(self):
+        """Test extracting objects separated by newlines."""
+        adapter = ConcreteToolCallingAdapter()
+        content = '{"a": 1}\n{"b": 2}\n{"c": 3}'
+        objects = adapter._extract_multiple_json_objects(content)
+
+        assert len(objects) == 3
+
+    def test_nested_braces(self):
+        """Test handling nested braces correctly."""
+        adapter = ConcreteToolCallingAdapter()
+        content = '{"outer": {"inner": "value"}}{"second": "data"}'
+        objects = adapter._extract_multiple_json_objects(content)
+
+        assert len(objects) == 2
+        assert '"inner": "value"' in objects[0]
+        assert objects[1] == '{"second": "data"}'
+
+    def test_braces_in_strings(self):
+        """Test handling braces inside string literals."""
+        adapter = ConcreteToolCallingAdapter()
+        content = '{"pattern": "{.*}"}{"other": "value"}'
+        objects = adapter._extract_multiple_json_objects(content)
+
+        assert len(objects) == 2
+        assert '"pattern": "{.*}"' in objects[0]
+
+    def test_escaped_quotes_in_strings(self):
+        """Test handling escaped quotes in strings."""
+        adapter = ConcreteToolCallingAdapter()
+        content = r'{"text": "He said \"hello\""}{"num": 42}'
+        objects = adapter._extract_multiple_json_objects(content)
+
+        assert len(objects) == 2
+        assert '"text":' in objects[0]
+
+    def test_empty_strings(self):
+        """Test that empty strings return no objects."""
+        adapter = ConcreteToolCallingAdapter()
+        objects = adapter._extract_multiple_json_objects("")
+        assert len(objects) == 0
+
+        objects2 = adapter._extract_multiple_json_objects("   ")
+        assert len(objects2) == 0
+
+    def test_incomplete_json_objects(self):
+        """Test that incomplete JSON is ignored."""
+        adapter = ConcreteToolCallingAdapter()
+        content = '{"valid": true} {"incomplete": true'
+        objects = adapter._extract_multiple_json_objects(content)
+
+        # Only the complete object should be extracted
+        assert len(objects) == 1
+        assert '"valid": true' in objects[0]

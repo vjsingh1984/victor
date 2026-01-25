@@ -338,13 +338,14 @@ class TUISessionHandler(BaseSessionHandler):
         try:
             # Import TUI here to avoid circular imports
             from victor.ui.tui import VictorTUI
+            from typing import cast
 
             tui_app = VictorTUI(
-                agent=agent,
+                agent=cast("UIAgentProtocol", agent),
                 provider=config.provider,
                 model=config.model,
                 stream=True,
-                settings=config.profile,  # This would be settings object, need to fix
+                settings=None,  # TUI will create default settings if needed
             )
             await tui_app.run_async()
 

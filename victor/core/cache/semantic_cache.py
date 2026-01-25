@@ -52,7 +52,7 @@ import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import numpy as np
 
@@ -209,7 +209,7 @@ class SemanticCache:
                         logger.error(f"Failed to initialize embedding service: {e}")
                         raise
 
-        return self._embedding_service  # type: ignore[no-any-return]
+        return self._embedding_service
 
     def _generate_key(self, messages: List[Message]) -> str:
         """Generate exact match cache key from messages.
@@ -294,7 +294,7 @@ class SemanticCache:
             norms[norms == 0] = 1
 
             similarities = dot_products / norms
-            return similarities.tolist()
+            return cast(List[float], similarities.tolist())
         except Exception as e:
             logger.warning(f"Failed to calculate batch cosine similarity: {e}")
             return [0.0] * len(cache_vecs)
@@ -352,9 +352,11 @@ class SemanticCache:
                 logger.warning("Failed to compute embedding, semantic matching disabled")
 
         # Create cache entry
+        # If embedding is None, use empty array
+        embedding_array = embedding if embedding is not None else np.array([], dtype=np.float32)
         entry = SemanticCacheEntry(
             key=key,
-            embedding=embedding,
+            embedding=embedding_array,
             response=response,
             ttl=ttl,
             metadata=metadata or {},

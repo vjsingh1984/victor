@@ -55,9 +55,7 @@ def benchmark_task_to_framework_task(
     # Build context dictionary
     context: Dict[str, Any] = {
         "task_id": benchmark_task.task_id,
-        "benchmark_type": (
-            benchmark_task.benchmark_type.value if benchmark_task.benchmark_type else None
-        ),
+        "benchmark": benchmark_task.benchmark.value if hasattr(benchmark_task.benchmark, 'value') else str(benchmark_task.benchmark),
     }
 
     if include_context:
@@ -73,9 +71,10 @@ def benchmark_task_to_framework_task(
             context["base_commit"] = benchmark_task.base_commit
 
     # Build list of relevant files if available
+    # Note: context_files is not in BenchmarkTask, using hints as alternative
     files: List[str] = []
-    if benchmark_task.context_files:
-        files.extend(benchmark_task.context_files)
+    # context_files not available in BenchmarkTask protocol
+    # Files would need to be extracted from hints or other context
 
     # Determine tool budget based on complexity
     tool_budget = _estimate_tool_budget(benchmark_task)
@@ -127,15 +126,15 @@ def framework_result_to_benchmark_result(
         task_id=task_id,
         status=status,
         generated_code=framework_result.content,
-        tests_passed=tests_passed,
-        tests_total=tests_total,
-        tests_failed=(tests_total - tests_passed) if tests_passed and tests_total else None,
+        tests_passed=tests_passed or 0,
+        tests_total=tests_total or 0,
+        tests_failed=(tests_total - tests_passed) if tests_passed and tests_total else 0,
         tokens_used=metadata.get("tokens_used", 0),
         tokens_input=metadata.get("tokens_input", 0),
         tokens_output=metadata.get("tokens_output", 0),
         tool_calls=len(framework_result.tool_calls) if framework_result.tool_calls else 0,
         turns=metadata.get("turns", 0),
-        error_message=framework_result.error,
+        error_message=framework_result.error or "",
     )
 
 

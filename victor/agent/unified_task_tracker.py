@@ -700,7 +700,8 @@ class UnifiedTaskTracker(ModeAwareMixin):
         """
         multiplier = float(self.exploration_multiplier or 1.0)
         effective = int(self._base_max_overlapping_reads * multiplier)
-        return max(self._base_max_overlapping_reads, effective)
+        result = max(self._base_max_overlapping_reads, effective)
+        return cast(int, result)
 
     @property
     def max_searches_per_prefix(self) -> int:
@@ -710,7 +711,8 @@ class UnifiedTaskTracker(ModeAwareMixin):
         """
         multiplier = float(self.exploration_multiplier or 1.0)
         effective = int(self._base_max_searches_per_prefix * multiplier)
-        return max(self._base_max_searches_per_prefix, effective)
+        result = max(self._base_max_searches_per_prefix, effective)
+        return cast(int, result)
 
     # =========================================================================
     # Configuration

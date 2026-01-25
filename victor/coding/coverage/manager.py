@@ -449,7 +449,7 @@ class CoverageManager:
         except Exception:
             pass  # Git info is optional
 
-    def _serialize_report(self, report: CoverageReport) -> dict:
+    def _serialize_report(self, report: CoverageReport) -> dict[str, Any]:
         """Serialize a coverage report to JSON-compatible dict."""
         return {
             "timestamp": report.timestamp.isoformat(),

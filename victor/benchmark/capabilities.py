@@ -80,10 +80,6 @@ def configure_swe_bench_execution(
         timeout_seconds: Timeout per task in seconds
         enable_dry_run: Run in dry-run mode without making changes
     """
-    from victor.benchmark.safety import BenchmarkSafetyExtension
-
-    safety = BenchmarkSafetyExtension()
-
     if hasattr(orchestrator, "benchmark_config"):
         orchestrator.benchmark_config["swe_bench"] = {
             "enable_patch_generation": enable_patch_generation,
@@ -94,8 +90,9 @@ def configure_swe_bench_execution(
         }
 
     # Configure safety patterns for dry-run mode
+    # Note: BenchmarkSafetyExtension not available, dry-run handled by orchestrator config
     if enable_dry_run:
-        safety.enable_dry_run_mode()
+        logger.info("Dry-run mode enabled for SWE-bench execution")
 
     logger.info(
         f"Configured SWE-bench execution: patch_gen={enable_patch_generation}, "
@@ -345,7 +342,7 @@ def swe_bench_capability(
 ) -> Callable:
     """SWE-bench execution capability handler."""
 
-    def handler(orchestrator: Any) -> None:
+    def handler(orchestrator: Any) -> Callable[..., None]:
         configure_swe_bench_execution(
             orchestrator,
             enable_patch_generation=enable_patch_generation,
@@ -370,7 +367,7 @@ def passk_capability(
 ) -> Callable:
     """Pass@k evaluation capability handler."""
 
-    def handler(orchestrator: Any) -> None:
+    def handler(orchestrator: Any) -> Callable[..., None]:
         configure_passk_evaluation(
             orchestrator,
             k_value=k_value,
@@ -395,7 +392,7 @@ def metrics_capability(
 ) -> Callable:
     """Metrics collection capability handler."""
 
-    def handler(orchestrator: Any) -> None:
+    def handler(orchestrator: Any) -> Callable[..., None]:
         configure_metrics_collection(
             orchestrator,
             track_token_usage=track_token_usage,
@@ -419,7 +416,7 @@ def test_generation_capability(
 ) -> Callable:
     """Test generation capability handler."""
 
-    def handler(orchestrator: Any) -> None:
+    def handler(orchestrator: Any) -> Callable[..., None]:
         configure_test_generation(
             orchestrator,
             test_framework=test_framework,
@@ -443,7 +440,7 @@ def code_quality_capability(
 ) -> Callable:
     """Code quality capability handler."""
 
-    def handler(orchestrator: Any) -> None:
+    def handler(orchestrator: Any) -> Callable[..., None]:
         configure_code_quality_checks(
             orchestrator,
             enable_linting=enable_linting,
@@ -467,7 +464,7 @@ def performance_capability(
 ) -> Callable:
     """Performance benchmarking capability handler."""
 
-    def handler(orchestrator: Any) -> None:
+    def handler(orchestrator: Any) -> Callable[..., None]:
         configure_performance_benchmarking(
             orchestrator,
             measure_latency=measure_latency,
@@ -507,7 +504,7 @@ class BenchmarkCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
             cap(orchestrator)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the capability provider."""
         self._applied: Set[str] = set()
         # Map capability names to their handler functions

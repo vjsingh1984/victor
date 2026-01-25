@@ -49,7 +49,7 @@ from __future__ import annotations
 import logging
 import warnings
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from victor.core.tool_dependency_base import ToolDependencyConfig
 from victor.core.tool_dependency_loader import (
@@ -161,7 +161,7 @@ class _LazyDeprecatedProperty:
         self._cached_value = None
         self._loaded = False
 
-    def __get__(self, obj: Any, objtype: Any = None) -> Any:
+    def __get__(self, obj: "Any", objtype: "Any" = None) -> "Any":
         if not self._loaded:
             warnings.warn(
                 self.deprecation_msg,

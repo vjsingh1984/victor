@@ -116,8 +116,11 @@ async def create_agent_callback(
         }
 
     # Store agent reference for cleanup
-    agent_callback._agent = agent
-    agent_callback._partial_data = None  # For timeout handling
+    # Use a dict to avoid attr-defined errors on the callable
+    if not hasattr(agent_callback, "_agent"):
+        agent_callback._agent = agent  # type: ignore[attr-defined]
+    if not hasattr(agent_callback, "_partial_data"):
+        agent_callback._partial_data = None  # type: ignore[attr-defined]
 
     return agent_callback
 
@@ -152,7 +155,7 @@ async def _setup_workspace(
             )
             await checkout_proc.communicate()
 
-        return work_dir
+        return work_dir if work_dir else None
 
     except Exception as e:
         logger.warning(f"Workspace setup failed: {e}")
@@ -203,7 +206,7 @@ class HighLevelEvaluationRunner:
         await self._ensure_agent()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Context manager exit - cleanup agent."""
         await self.close()
 
@@ -255,7 +258,7 @@ class HighLevelEvaluationRunner:
             tool_calls=len(trace.tool_calls),
             turns=trace.turns,
             duration_seconds=trace.duration_seconds,
-            error_message=trace.error,
+            error_message=trace.error or "",
         )
 
         self._results.append(result)

@@ -39,7 +39,7 @@ class CompletionProviderRegistry:
     - Priority-based provider ordering
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the registry."""
         self._providers: dict[str, BaseCompletionProvider] = {}
         self._factories: dict[str, Callable[[], BaseCompletionProvider]] = {}

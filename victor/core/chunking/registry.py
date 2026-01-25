@@ -19,10 +19,13 @@ strategy selection based on document type.
 """
 
 import logging
-from typing import Dict, List, Optional, Type
+from typing import Dict, List, Optional, Type, TYPE_CHECKING
 
 from victor.core.chunking.base import Chunk, ChunkingConfig, ChunkingStrategy
 from victor.core.chunking.detector import detect_document_type
+
+if TYPE_CHECKING:
+    from victor.core.chunking.strategies.text import TextChunkingStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +93,7 @@ class ChunkingRegistry:
             return strategy
 
         # Default to text strategy
-        return self._strategies.get("text") or TextChunkingStrategy(self.config)  # type: ignore[arg-type]
+        return self._strategies.get("text") or TextChunkingStrategy(self.config)  # type: ignore[name-defined]
 
     def chunk(
         self,

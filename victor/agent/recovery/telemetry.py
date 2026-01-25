@@ -137,6 +137,8 @@ class RecoveryTelemetryCollector:
     def _init_db(self) -> None:
         """Initialize SQLite database."""
         try:
+            if self._db_path is None:
+                return
             self._db_path.parent.mkdir(parents=True, exist_ok=True)
             conn = sqlite3.connect(str(self._db_path))
             cursor = conn.cursor()

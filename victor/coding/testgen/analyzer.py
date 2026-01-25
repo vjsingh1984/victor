@@ -216,7 +216,7 @@ class TestTargetAnalyzer:
             return [("default", None)]
 
         type_lower = type_hint.lower()
-        values = []
+        values: list[tuple[str, Any]] = []
 
         # Basic types
         if "int" in type_lower:
@@ -279,7 +279,7 @@ class TestTargetAnalyzer:
     def detect_error_conditions(
         self,
         func_sig: FunctionSignature,
-    ) -> list[tuple[str, str, type]]:
+    ) -> list[tuple[str, str, type[Exception]]]:
         """Detect likely error conditions for a function.
 
         Args:
@@ -288,7 +288,7 @@ class TestTargetAnalyzer:
         Returns:
             List of (description, input_expr, expected_exception) tuples
         """
-        errors = []
+        errors: list[tuple[str, str, type[Exception]]] = []
 
         # Check parameter types for common error cases
         for param_name, type_hint in func_sig.parameters:

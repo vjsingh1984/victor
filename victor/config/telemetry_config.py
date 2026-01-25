@@ -53,7 +53,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, List
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -282,7 +282,7 @@ def setup_telemetry(config: Optional[TelemetryConfig] = None) -> None:
 
     if not config.enabled:
         logger.info("Telemetry is disabled")
-        return None, None
+        return None  # type: ignore[return-value]
 
     try:
         from victor.observability.telemetry import setup_opentelemetry
@@ -307,7 +307,7 @@ def setup_telemetry(config: Optional[TelemetryConfig] = None) -> None:
     except ImportError as e:
         logger.error(f"OpenTelemetry dependencies not installed: {e}")
         logger.info("Install with: pip install victor-ai[observability]")
-        return None, None
+        return None  # type: ignore[return-value]
     except Exception as e:
         logger.error(f"Failed to setup telemetry: {e}")
-        return None, None
+        return None  # type: ignore[return-value]

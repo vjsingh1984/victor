@@ -201,13 +201,13 @@ class ParallelToolExecutor:
                     )
                     result.failed_count += 1
                 else:
-                    exec_result: ToolExecutionResult = res
-                    if exec_result.success:
+                    # exec_result is already typed as ToolExecutionResult
+                    if res.success:
                         result.completed_count += 1
                     else:
                         result.failed_count += 1
-                        if exec_result.error:
-                            result.errors.append(exec_result.error)
+                        if res.error:
+                            result.errors.append(res.error)
 
                 results_by_index[idx] = exec_result
                 completed.add(idx)

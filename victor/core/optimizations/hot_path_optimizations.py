@@ -278,7 +278,7 @@ class ThreadSafeMemoized:
         """
 
         @wraps(func)
-        def wrapped(*args, **kwargs):
+        def wrapped(*args: Any, **kwargs: Any) -> Any:
             # Create cache key from args and kwargs
             key = (args, tuple(sorted(kwargs.items())))
 
@@ -418,7 +418,7 @@ class cached_property:
 def timed(
     logger_instance: Optional[logging.Logger] = None,
     level: int = logging.DEBUG,
-):
+) -> Any:
     """Decorator to time function execution.
 
     Logs execution time for performance monitoring.
@@ -438,7 +438,7 @@ def timed(
 
     def decorator(func: F) -> F:
         @wraps(func)
-        def wrapped(*args, **kwargs):
+        def wrapped(*args: Any, **kwargs: Any) -> Any:
             start_time = time.perf_counter()
             try:
                 result = func(*args, **kwargs)
@@ -490,7 +490,7 @@ def retry(
 
     def decorator(func: F) -> F:
         @wraps(func)
-        def wrapped(*args, **kwargs):
+        def wrapped(*args: Any, **kwargs: Any) -> Any:
             last_exception = None
             delay = base_delay
 

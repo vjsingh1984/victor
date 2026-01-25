@@ -437,7 +437,7 @@ class RecoveryCoordinator:
                 compaction_result = self._context_compactor.check_and_compact()
                 if compaction_result.action_taken:
                     outcome.compaction_performed = True
-                    outcome.tokens_freed = compaction_result.tokens_saved
+                    outcome.tokens_freed = compaction_result.tokens_freed
             except Exception as e:
                 logger.warning(f"Context compaction failed: {e}")
 

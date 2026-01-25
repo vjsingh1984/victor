@@ -73,7 +73,7 @@ class CodeValidationHandler(BaseHandler):
         tool_registry: "ToolRegistry",
     ) -> Tuple[Any, int]:
         """Execute code validation checks."""
-        files = node.input_mapping.get("files", [])
+        files: Any = node.input_mapping.get("files", [])
         checks = node.input_mapping.get("checks", ["lint"])
 
         if isinstance(files, str):
@@ -111,7 +111,7 @@ class CodeValidationHandler(BaseHandler):
             else:
                 return {"passed": True, "message": f"Unknown check: {check}"}
 
-            result = await tool_registry.execute("shell", command=cmd)
+            result = await tool_registry.execute("shell", {}, command=cmd)
             return {
                 "passed": result.success,
                 "output": result.output,
@@ -159,7 +159,7 @@ class TestRunnerHandler(BaseHandler):
         else:
             cmd = f"{framework} {test_path}"
 
-        result = await tool_registry.execute("shell", command=cmd)
+        result = await tool_registry.execute("shell", {}, command=cmd)
 
         # Raise exception if test execution failed
         if not result.success:

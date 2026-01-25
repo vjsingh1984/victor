@@ -63,7 +63,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Set, Tuple, cast
 
 logger = logging.getLogger(__name__)
 
@@ -439,10 +439,10 @@ class CacheInvalidator:
             self._dependency_graph = InvalidationDependencyGraph()
 
         # Invalidation event handlers
-        self._event_handlers: Dict[str, List[Callable]] = {}
+        self._event_handlers: Dict[str, List[Callable[..., None]]] = {}
 
         # Background cleanup task
-        self._cleanup_task: Optional[asyncio.Task] = None
+        self._cleanup_task: Optional[asyncio.Task[None]] = None
         self._stop_event = asyncio.Event()
 
         # Metrics
@@ -481,7 +481,7 @@ class CacheInvalidator:
             self._invalidations += 1
             logger.debug(f"Invalidated cache entry: {key}")
 
-        return deleted
+        return cast(bool, deleted)
 
     async def invalidate_namespace(self, namespace: str) -> int:
         """Invalidate all entries in a namespace.
@@ -516,7 +516,7 @@ class CacheInvalidator:
 
         self._invalidations += count
         logger.info(f"Invalidated {count} entries in namespace: {namespace}")
-        return count
+        return cast(int, count)
 
     async def invalidate_all(self) -> None:
         """Invalidate all cache entries."""
@@ -648,7 +648,7 @@ class CacheInvalidator:
             logger.warning("Cleanup task already running")
             return
 
-        async def cleanup_loop():
+        async def cleanup_loop() -> None:
             """Background cleanup loop."""
             while not self._stop_event.is_set():
                 try:
@@ -691,7 +691,7 @@ class CacheInvalidator:
         Returns:
             Dictionary with statistics
         """
-        stats = {
+        stats: Dict[str, Any] = {
             "strategy": self.config.strategy.value,
             "invalidations": self._invalidations,
             "tag_invalidations": self._tag_invalidations,

@@ -244,15 +244,19 @@ def example_complete_workflow() -> None:
             print(f"Using: {suggested.name}")
 
     # Step 2: Adapt to specific context
-    adapted = manager.adapt_persona(
-        suggested,
-        context={
-            "task_type": "architecture",
-            "urgency": "normal",
-            "complexity": "high",
-            "user_preference": "detailed",
-        },
-    )
+    if suggested:
+        adapted = manager.adapt_persona(
+            suggested,
+            context={
+                "task_type": "architecture",
+                "urgency": "normal",
+                "complexity": "high",
+                "user_preference": "detailed",
+            },
+        )
+    else:
+        print("No suitable persona found")
+        return
 
     print(f"\nSelected: {adapted.base_persona.name}")
     print(f"Adaptations: {len(adapted.context_adjustments)}")

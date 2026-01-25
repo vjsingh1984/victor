@@ -233,7 +233,9 @@ class BenchmarkModeConfigProvider(RegistryBasedModeConfigProvider):
         registry = ModeConfigRegistry.get_instance()
         mode = registry.get_mode("benchmark", mode_name)
         if mode and mode.metadata:
-            return mode.metadata.get("timeout_seconds", 300)
+            timeout = mode.metadata.get("timeout_seconds", 300)
+            if isinstance(timeout, int):
+                return timeout
         return 300
 
     def get_quality_threshold(self, mode_name: str) -> float:
@@ -248,7 +250,9 @@ class BenchmarkModeConfigProvider(RegistryBasedModeConfigProvider):
         registry = ModeConfigRegistry.get_instance()
         mode = registry.get_mode("benchmark", mode_name)
         if mode and mode.metadata:
-            return mode.metadata.get("quality_threshold", 0.75)
+            threshold = mode.metadata.get("quality_threshold", 0.75)
+            if isinstance(threshold, (int, float)):
+                return float(threshold)
         return 0.75
 
 

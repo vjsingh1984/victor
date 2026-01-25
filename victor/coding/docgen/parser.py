@@ -52,7 +52,7 @@ class BaseDocstringParser(ABC):
         pass
 
     @abstractmethod
-    def parse(self, docstring: str) -> dict:
+    def parse(self, docstring: str) -> dict[str, Any]:
         """Parse a docstring into components.
 
         Args:
@@ -114,10 +114,10 @@ class GoogleDocstringParser(BaseDocstringParser):
                 result["parameters"] = self._parse_parameters(section_content)
 
             elif section_name.lower() == "returns":
-                result["returns"] = self._parse_return(section_content)  # type: ignore[assignment]
+                result["returns"] = self._parse_return(section_content)
 
             elif section_name.lower() == "yields":
-                result["yields"] = self._parse_return(section_content)  # type: ignore[assignment]
+                result["yields"] = self._parse_return(section_content)
 
             elif section_name.lower() == "raises":
                 result["raises"] = self._parse_raises(section_content)
@@ -143,7 +143,7 @@ class GoogleDocstringParser(BaseDocstringParser):
         """Split docstring into sections."""
         sections = {}
         current_section = "_description"
-        current_content = []
+        current_content: list[str] = []
 
         for line in docstring.split("\n"):
             match = self.SECTION_REGEX.match(line)
@@ -293,12 +293,12 @@ class NumpyDocstringParser(BaseDocstringParser):
         re.MULTILINE | re.IGNORECASE,
     )
 
-    def parse(self, docstring: str) -> dict:
+    def parse(self, docstring: str) -> dict[str, Any]:
         """Parse NumPy-style docstring."""
         if not docstring:
             return {}
 
-        result = {
+        result: dict[str, Any] = {
             "description": "",
             "long_description": "",
             "parameters": [],
@@ -325,10 +325,10 @@ class NumpyDocstringParser(BaseDocstringParser):
                 result["parameters"] = self._parse_numpy_params(section_content)
 
             elif section_name.lower() == "returns":
-                result["returns"] = self._parse_numpy_return(section_content)  # type: ignore[assignment]
+                result["returns"] = self._parse_numpy_return(section_content)
 
             elif section_name.lower() == "yields":
-                result["yields"] = self._parse_numpy_return(section_content)  # type: ignore[assignment]
+                result["yields"] = self._parse_numpy_return(section_content)
 
             elif section_name.lower() == "raises":
                 result["raises"] = self._parse_numpy_raises(section_content)
@@ -349,7 +349,7 @@ class NumpyDocstringParser(BaseDocstringParser):
         sections = {}
         lines = docstring.split("\n")
         current_section = "_description"
-        current_content = []
+        current_content: list[str] = []
         i = 0
 
         while i < len(lines):
@@ -548,9 +548,9 @@ class CodeAnalyzer:
                     if isinstance(target, ast.Name) and target.id == "__all__":
                         if isinstance(node.value, ast.List):
                             module_doc.all_exports = [
-                                elt.value
+                                str(elt.value)
                                 for elt in node.value.elts
-                                if isinstance(elt, ast.Constant)
+                                if isinstance(elt, ast.Constant) and isinstance(elt.value, (str, bytes, int, float, bool))
                             ]
 
         # Extract functions and classes

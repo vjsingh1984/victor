@@ -26,7 +26,7 @@ Features:
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from victor.agent.tool_calling.base import ToolCall
 
@@ -93,7 +93,8 @@ class ToolCallSignatureManager:
         """
         if self.use_rust:
             try:
-                return victor_native.compute_tool_call_signature(tool_name, arguments)
+                result = victor_native.compute_tool_call_signature(tool_name, arguments)
+                return cast(int, result)
             except Exception as e:
                 logger.error(f"Rust signature computation failed: {e}")
                 raise
@@ -134,10 +135,11 @@ class ToolCallSignatureManager:
 
         if self.use_rust:
             try:
-                return victor_native.batch_compute_tool_call_signatures(
+                result = victor_native.batch_compute_tool_call_signatures(
                     tool_names,
                     arguments_list,
                 )
+                return cast(List[int], result)
             except Exception as e:
                 logger.error(f"Rust batch signature computation failed: {e}")
                 raise

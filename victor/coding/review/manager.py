@@ -21,7 +21,7 @@ import logging
 import time
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from victor.coding.review.analyzers import (
     BaseAnalyzer,

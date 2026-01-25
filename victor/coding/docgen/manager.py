@@ -348,7 +348,7 @@ class DocGenManager:
                 + stats["methods_documented"]
             )
 
-            stats["coverage_percent"] = (documented / total * 100) if total > 0 else 100
+            stats["coverage_percent"] = int((documented / total * 100)) if total > 0 else 100
 
             coverage[str(py_file)] = stats
 

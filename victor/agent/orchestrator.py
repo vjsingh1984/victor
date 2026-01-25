@@ -61,7 +61,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Any, AsyncIterator, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
+from typing import Any, AsyncIterator, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, cast
 
 # Consolidated imports - all imports organized by category
 # See victor/agent/orchestrator_imports.py for the complete import structure
@@ -2079,7 +2079,8 @@ class AgentOrchestrator(
                 "total_cost": 0.0
             }
         conv_summary = self.conversation_state.get_state_summary() if self.conversation_state else {}
-        return self._metrics_coordinator.get_tool_usage_stats(conversation_state_summary=conv_summary)
+        result = self._metrics_coordinator.get_tool_usage_stats(conversation_state_summary=conv_summary)
+        return cast(Dict[str, Any], result)
 
     def get_token_usage(self) -> "TokenUsage":
         """Get cumulative token usage for evaluation tracking.
@@ -2621,7 +2622,7 @@ class AgentOrchestrator(
             provider_name=self.provider.name,
             model=self.model,
             tool_budget=self.tool_budget,
-            unified_tracker_config=self.unified_tracker.config,
+            unified_tracker_config=self.unified_tracker.config if self.unified_tracker else None,
             task_completion_signals=None,  # Legacy caller doesn't use this
             # Task Completion Detection Enhancement (Phase 2 - Feature Flag Protected)
             task_completion_detector=self._task_completion_detector,  # type: ignore[call-arg]
@@ -3298,7 +3299,8 @@ class AgentOrchestrator(
         """
         if self._metrics_coordinator is None:
             return False
-        return self._metrics_coordinator.is_streaming()
+        result = self._metrics_coordinator.is_streaming()
+        return cast(bool, result)
 
     def _check_cancellation(self) -> bool:
         """Check if cancellation has been requested.
@@ -3714,9 +3716,9 @@ class AgentOrchestrator(
         if components.attributes:
             orchestrator.__dict__.update(components.attributes)
         else:
-            orchestrator.provider = components.provider.provider  # type: ignore[assignment]
-            orchestrator.model = components.provider.model  # type: ignore[assignment]
-            orchestrator.provider_name = components.provider.provider_name  # type: ignore[assignment]
+            orchestrator.provider = components.provider.provider
+            orchestrator.model = components.provider.model
+            orchestrator.provider_name = components.provider.provider_name
             orchestrator.tool_adapter = components.provider.tool_adapter
             orchestrator._tool_calling_caps_internal = components.provider.tool_calling_caps
 
@@ -3729,7 +3731,7 @@ class AgentOrchestrator(
 
             orchestrator._conversation_controller = components.conversation.conversation_controller
             orchestrator.memory_manager = components.conversation.memory_manager
-            orchestrator._memory_session_id = components.conversation.memory_session_id
+            orchestrator._memory_session_id = components.conversation.memory_session_id or ""
             orchestrator.conversation_state = components.conversation.conversation_state
 
             orchestrator.tools = components.tools.tool_registry

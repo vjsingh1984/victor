@@ -712,7 +712,7 @@ ENCLOSING_NAME_FIELDS: Dict[str, List[Tuple[str, str]]] = {
 # Try to import watchdog for file watching
 if TYPE_CHECKING:
     from watchdog.events import FileSystemEventHandler
-    from watchdog.observers.api import BaseObserver as Observer  # type: ignore[attr-defined]
+    from watchdog.observers.api import BaseObserver as Observer
     WATCHDOG_AVAILABLE: bool = True
 else:
     try:
@@ -1941,7 +1941,7 @@ class CodebaseIndex:
                             try:
                                 if hasattr(py_ast, "unparse"):
                                     from typing import cast
-                                    base_name_result = py_ast.unparse(cast(py_ast.expr, base))  # type: ignore[arg-type]
+                                    base_name_result = py_ast.unparse(cast(py_ast.expr, base))
                                 else:
                                     base_id_attr: Any = getattr(base, "id", None)
                                     base_name_result = str(base_id_attr) if base_id_attr else None

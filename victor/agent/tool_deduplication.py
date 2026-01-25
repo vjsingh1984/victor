@@ -345,18 +345,18 @@ def get_deduplication_tracker() -> "ToolDeduplicationTrackerProtocol":
     # Try DI container first
     try:
         from victor.core.container import get_container
-        from victor.agent.protocols import ToolDeduplicationTrackerProtocol
 
         container = get_container()
-        if container.is_registered(ToolDeduplicationTrackerProtocol):
-            return container.get(ToolDeduplicationTrackerProtocol)
+        # Try to get the concrete class from container
+        if container.is_registered(ToolDeduplicationTracker):
+            return container.get(ToolDeduplicationTracker)
     except Exception:
         pass  # Fall back to legacy singleton
 
     # Legacy fallback
     if _deduplication_tracker is None:
         _deduplication_tracker = ToolDeduplicationTracker()
-    return cast("ToolDeduplicationTrackerProtocol", _deduplication_tracker)
+    return _deduplication_tracker
 
 
 def reset_deduplication_tracker() -> None:

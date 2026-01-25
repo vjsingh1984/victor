@@ -912,9 +912,9 @@ class PersonaManager:
             if new_constraints:
                 if persona.constraints:
                     # Merge constraints
-                    if new_constraints.preferred_tools:
+                    if new_constraints.preferred_tools and persona.constraints.preferred_tools:
                         persona.constraints.preferred_tools.update(new_constraints.preferred_tools)
-                    if new_constraints.forbidden_tools:
+                    if new_constraints.forbidden_tools and persona.constraints.forbidden_tools:
                         persona.constraints.forbidden_tools.update(new_constraints.forbidden_tools)
                 else:
                     persona.constraints = new_constraints

@@ -467,7 +467,7 @@ class RunTestsHandler:
             cmd = f"python {test_file}"
 
         try:
-            result = await tool_registry.execute("shell", command=cmd, timeout=timeout + 10)
+            result = await tool_registry.execute("shell", {}, command=cmd, timeout=timeout + 10)
 
             # Parse test output
             output_text = result.output if hasattr(result, "output") else str(result)
@@ -596,6 +596,7 @@ class ValidatePatchHandler:
             try:
                 result = await tool_registry.execute(
                     "shell",
+                    {},
                     command=f"echo '{patch}' | git apply --check -",
                 )
                 validation_result["applicable"] = (
@@ -992,9 +993,10 @@ HANDLERS = {
 def register_handlers() -> None:
     """Register Benchmark handlers with the workflow executor."""
     from victor.workflows.executor import register_compute_handler
+    from typing import cast
 
     for name, handler in HANDLERS.items():
-        register_compute_handler(name, handler)
+        register_compute_handler(name, cast(object, handler))
         logger.debug(f"Registered Benchmark handler: {name}")
 
 

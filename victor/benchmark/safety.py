@@ -25,7 +25,7 @@ Safety rules cover:
 - Data privacy (prevent uploading benchmark data externally)
 """
 
-from typing import Optional
+from typing import Any, Optional
 
 from victor.framework.config import SafetyEnforcer, SafetyLevel, SafetyRule
 
@@ -140,7 +140,7 @@ def create_benchmark_resource_safety_rules(
     """
     if block_excessive_timeouts:
         # Capture max_timeout_seconds in default arg for lambda
-        def check_excessive_timeout(op: str, max_seconds=max_timeout_seconds) -> bool:
+        def check_excessive_timeout(op: str, max_seconds: int = max_timeout_seconds) -> bool:
             """Check if operation has timeout exceeding max_seconds."""
             # Check for timeout keywords
             if not any(
@@ -438,7 +438,7 @@ def create_all_benchmark_safety_rules(
     resource_rules: bool = True,
     test_rules: bool = True,
     data_rules: bool = True,
-    **kwargs,
+    **kwargs: Any,
 ) -> None:
     """Register all benchmark safety rules.
 

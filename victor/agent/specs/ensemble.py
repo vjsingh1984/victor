@@ -371,8 +371,17 @@ class Parallel(Ensemble):
                         error=str(res),
                     )
                 )
-            else:
+            elif isinstance(res, AgentResult):
                 result.agent_results.append(res)
+            else:
+                # Unexpected type, convert to error result
+                result.agent_results.append(
+                    AgentResult(
+                        agent_name=self.agents[i].name,
+                        status=ExecutionStatus.FAILED,
+                        error=f"Unexpected result type: {type(res)}",
+                    )
+                )
 
         # Check for failures
         failed = [r for r in result.agent_results if not r.success]

@@ -20,7 +20,7 @@ multi-line suggestions (Copilot-style).
 
 import logging
 import time
-from typing import Any, AsyncIterator, Optional
+from typing import Any, AsyncIterator, Dict, Optional
 
 from victor.coding.completion.protocol import (
     CompletionCapabilities,
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 # FIM (Fill-In-the-Middle) prompt templates per language
-FIM_TEMPLATES = {
+FIM_TEMPLATES: Dict[str, Dict[str, str]] = {
     "default": {
         "prefix": "<PRE>",
         "suffix": "<SUF>",
@@ -88,7 +88,7 @@ class AICompletionProvider(StreamingCompletionProvider):
         provider: Optional[Any] = None,
         model: Optional[str] = None,
         max_context_lines: int = 100,
-        fim_template: str = "default",
+        fim_template: str | Dict[str, str] = "default",
     ):
         """Initialize the AI completion provider.
 
@@ -106,7 +106,7 @@ class AICompletionProvider(StreamingCompletionProvider):
 
         # Set FIM template
         if isinstance(fim_template, dict):
-            self._fim_template = fim_template
+            self._fim_template: Dict[str, str] = fim_template
         else:
             self._fim_template = FIM_TEMPLATES.get(fim_template, FIM_TEMPLATES["default"])
 
@@ -134,14 +134,22 @@ class AICompletionProvider(StreamingCompletionProvider):
         try:
             from victor.providers.registry import ProviderRegistry
 
-            registry = ProviderRegistry()
             # Try to get Ollama for local completions
-            self._provider = registry.get_provider("ollama")
-            if self._provider is None:
-                # Fall back to any available provider
-                self._provider = registry.get_default_provider()
+            provider_class = ProviderRegistry.get_optional("ollama")
+            if provider_class is not None:
+                self._provider = provider_class()
+            else:
+                # Fall back to any available provider - try anthropic
+                provider_class = ProviderRegistry.get_optional("anthropic")
+                if provider_class is not None:
+                    self._provider = provider_class()
+                else:
+                    # Last resort - try to create any available provider
+                    providers = ProviderRegistry.list_providers()
+                    if providers:
+                        self._provider = ProviderRegistry.create(providers[0])
             return self._provider
-        except ImportError:
+        except Exception:
             logger.debug("Provider registry not available")
             return None
 
@@ -252,7 +260,7 @@ class AICompletionProvider(StreamingCompletionProvider):
             logger.warning(f"AI inline completion failed: {e}")
             return InlineCompletionList(items=[])
 
-    async def stream_inline_completion(self, params: InlineCompletionParams) -> AsyncIterator[str]:
+    async def stream_inline_completion(self, params: InlineCompletionParams):  # type: ignore[override]
         """Stream inline completion tokens.
 
         Args:
@@ -264,6 +272,7 @@ class AICompletionProvider(StreamingCompletionProvider):
         provider = self._get_provider()
         if provider is None:
             return
+            yield  # Make this a generator (unreachable)
 
         try:
             # Build FIM prompt
@@ -332,9 +341,11 @@ class AICompletionProvider(StreamingCompletionProvider):
             Extracted completion text
         """
         if hasattr(response, "content"):
-            return response.content or ""
+            content = response.content
+            return content if content else ""
         if hasattr(response, "text"):
-            return response.text or ""
+            text = response.text
+            return text if text else ""
         if isinstance(response, dict):
             return response.get("content", response.get("text", ""))
         return str(response) if response else ""

@@ -1240,7 +1240,7 @@ GENERAL_CODING_PROMPTS: List[Tuple[str, str]] = [
 # =============================================================================
 
 
-def build_complete_corpus() -> list:
+def build_complete_corpus() -> list[tuple[str, str, str]]:
     """Build the complete corpus with all categories.
 
     Returns:
@@ -1301,7 +1301,7 @@ def build_complete_corpus() -> list:
     return corpus
 
 
-def get_corpus_stats() -> dict:
+def get_corpus_stats() -> dict[str, Any]:
     """Get statistics about the corpus.
 
     Returns:
@@ -1588,7 +1588,7 @@ def build_extended_corpus_with_benchmarks(
     return corpus
 
 
-def get_benchmark_stats() -> dict:
+def get_benchmark_stats() -> dict[str, Any]:
     """Get statistics about available benchmark datasets.
 
     Returns:

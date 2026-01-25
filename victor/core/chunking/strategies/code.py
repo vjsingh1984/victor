@@ -21,7 +21,7 @@ use victor_coding.codebase.chunker.CodeChunker instead.
 
 import logging
 import re
-from typing import List
+from typing import Any, List
 
 from victor.core.chunking.base import Chunk, ChunkingConfig, ChunkingStrategy
 
@@ -147,7 +147,7 @@ class CodeChunkingStrategy(ChunkingStrategy):
 
             # If section is too large, sub-chunk it
             if len(section) > self.config.max_chunk_size:
-                sub_chunks = self._chunk_large_definition(section, start, def_type, symbol_name)
+                sub_chunks = self._chunk_large_definition(section, start, def_type, symbol_name or "")
                 chunks.extend(sub_chunks)
             elif len(section) >= self.config.min_chunk_size:
                 chunks.append(

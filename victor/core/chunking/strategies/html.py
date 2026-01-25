@@ -19,7 +19,7 @@ Preserves semantic structure by chunking at paragraph, section, and table bounda
 """
 
 import logging
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 from victor.core.chunking.base import Chunk, ChunkingConfig, ChunkingStrategy
 

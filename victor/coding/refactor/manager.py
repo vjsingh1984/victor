@@ -239,6 +239,7 @@ class RefactorManager:
 
         # Apply transform
         request.preview = False  # Actually apply changes
+        assert analyzer is not None  # analyzer should always be available
         result = transform.apply(request, sources, analyzer)
         result.backup_paths = backup_paths
 
