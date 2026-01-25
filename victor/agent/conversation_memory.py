@@ -998,8 +998,9 @@ class ConversationStore:
             )
             row = cursor.fetchone()
             if row:
-                self._provider_ids[provider_lower] = row[0]
-                return row[0]
+                provider_id = int(row[0])
+                self._provider_ids[provider_lower] = provider_id
+                return provider_id
         except sqlite3.Error as e:
             logger.warning(f"Failed to get/create provider ID for {provider}: {e}")
 

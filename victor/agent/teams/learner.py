@@ -363,6 +363,19 @@ class TeamCompositionLearner:
         # Otherwise exploit: get best known composition
         return self._exploit_best(category, context)
 
+    def get_recommendation(self, task_type: str) -> TeamRecommendation:
+        """Get team recommendation for a task type.
+
+        Alias for suggest_team() for compatibility with mode_workflow_team_coordinator.
+
+        Args:
+            task_type: Task type or description
+
+        Returns:
+            TeamRecommendation with suggested composition
+        """
+        return self.suggest_team(task_type)
+
     def _exploit_best(
         self,
         category: TaskCategory,

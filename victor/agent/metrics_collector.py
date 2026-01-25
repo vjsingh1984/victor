@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 from victor.agent.stream_handler import StreamMetrics
-from victor.tools.base import CostTier
+from victor.tools.enums import CostTier
 
 if TYPE_CHECKING:
     from victor.agent.tool_pipeline import ToolCallResult

@@ -186,7 +186,7 @@ class Episode:
         access_boost = min(self.access_count * 0.05, 0.2)  # Max 20% boost
 
         effective = min(decayed_importance + reward_boost + access_boost, 1.0)
-        return float(max(effective, 0.0))
+        return max(effective, 0.0)
 
     def __repr__(self) -> str:
         """String representation of episode."""
@@ -306,7 +306,7 @@ class MemoryIndex:
     """
 
     embeddings: Dict[str, np.ndarray] = field(default_factory=dict)
-    metadata_index: Dict[str, Any] = field(
+    metadata_index: Dict[str, Dict[str, List[str]]] = field(
         default_factory=lambda: {"by_key": {}}
     )  # key -> value -> [episode_ids]
     action_index: Dict[str, List[str]] = field(default_factory=dict)  # action -> [episode_ids]
@@ -352,15 +352,16 @@ class MemoryIndex:
             metadata: Metadata dictionary
         """
         for key, value in metadata.items():
-            if key not in self.metadata_index["by_key"]:
-                self.metadata_index["by_key"][key] = {}
+            by_key = self.metadata_index.get("by_key", {})
+            if key not in by_key:
+                by_key[key] = {}
 
             value_str = str(value)
-            if value_str not in self.metadata_index["by_key"][key]:
-                self.metadata_index["by_key"][key][value_str] = []
+            if value_str not in by_key[key]:
+                by_key[key][value_str] = []
 
-            if episode_id not in self.metadata_index["by_key"][key][value_str]:
-                self.metadata_index["by_key"][key][value_str].append(episode_id)
+            if episode_id not in by_key[key][value_str]:
+                by_key[key][value_str].append(episode_id)
 
     def index_actions(self, episode_id: str, actions: List[str]) -> None:
         """Index episode actions for action-based lookup.
@@ -409,10 +410,11 @@ class MemoryIndex:
         self.remove_embedding(episode_id)
 
         # Remove from metadata index
-        for key in self.metadata_index["by_key"]:
-            for value in self.metadata_index["by_key"][key]:
-                if episode_id in self.metadata_index["by_key"][key][value]:
-                    self.metadata_index["by_key"][key][value].remove(episode_id)
+        by_key = self.metadata_index.get("by_key", {})
+        for key in by_key:
+            for value in by_key[key]:
+                if episode_id in by_key[key][value]:
+                    by_key[key][value].remove(episode_id)
 
         # Remove from action index
         for action in self.action_index:
@@ -440,11 +442,12 @@ class MemoryIndex:
             return []
 
         result_sets = []
+        by_key = self.metadata_index.get("by_key", {})
         for key, value in filters.items():
-            if key in self.metadata_index["by_key"]:
+            if key in by_key:
                 value_str = str(value)
-                if value_str in self.metadata_index["by_key"][key]:
-                    result_sets.append(set(self.metadata_index["by_key"][key][value_str]))
+                if value_str in by_key[key]:
+                    result_sets.append(set(by_key[key][value_str]))
 
         if not result_sets:
             return []
@@ -936,7 +939,7 @@ class EpisodicMemory:
 
         return semantic_memory
 
-    def _default_consolidation(self, episodes: List[Episode]) -> Dict[str, Any]:
+    def _default_consolidation(self, episodes: List[Episode]) -> Dict[str, Dict[str, Any]]:
         """Default consolidation function.
 
         Extracts common patterns from episodes:
@@ -951,7 +954,7 @@ class EpisodicMemory:
         Returns:
             Dictionary of {fact: metadata}
         """
-        knowledge: Dict[str, Any] = {}
+        knowledge: Dict[str, Dict[str, Any]] = {}
 
         if not episodes:
             return knowledge

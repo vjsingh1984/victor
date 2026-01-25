@@ -124,7 +124,7 @@ class MemoryManager:
             return self._get_in_memory_context()
 
         try:
-            if self._conversation_store is None:
+            if self._conversation_store is None or self._session_id is None:
                 return self._get_in_memory_context()
             return self._conversation_store.get_context_messages(
                 session_id=self._session_id,
@@ -170,6 +170,12 @@ class MemoryManager:
             }
 
         try:
+            if self._conversation_store is None or self._session_id is None:
+                return {
+                    "enabled": True,
+                    "session_id": self._session_id,
+                    "error": "Session not available",
+                }
             stats = self._conversation_store.get_session_stats(self._session_id)
             if not stats:
                 return {
@@ -250,6 +256,8 @@ class MemoryManager:
                 "system": MessageRole.SYSTEM,
             }
             msg_role = role_map.get(role, MessageRole.USER)
+            if self._conversation_store is None or self._session_id is None:
+                return False
             self._conversation_store.add_message(
                 session_id=self._session_id,
                 role=msg_role,
@@ -324,7 +332,11 @@ class SessionRecoveryManager:
         # Direct recovery through memory manager
         try:
             # Validate session exists
-            stats = self._memory_manager._conversation_store.get_session_stats(session_id)
+            store = self._memory_manager._conversation_store
+            if store is None:
+                logger.warning("Conversation store not available")
+                return False
+            stats = store.get_session_stats(session_id)
             if stats is None:
                 logger.warning(f"Session {session_id} not found")
                 return False

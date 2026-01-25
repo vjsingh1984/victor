@@ -443,7 +443,7 @@ class AgentModeController:
             "verbose_planning": config.verbose_planning,
         }
 
-    def get_mode_list(self) -> List[Dict[str, str]]:
+    def get_mode_list(self) -> List[Dict[str, Any]]:
         """Get list of available modes.
 
         Returns:
@@ -464,7 +464,7 @@ class AgentModeController:
 _mode_controller: Optional[AgentModeController] = None
 
 
-def get_mode_controller() -> AgentModeController:
+def get_mode_controller() -> "ModeControllerProtocol":
     """Get or create the mode controller.
 
     Resolution order:
@@ -483,7 +483,11 @@ def get_mode_controller() -> AgentModeController:
 
         container = get_container()
         if container.is_registered(ModeControllerProtocol):
-            return container.get(ModeControllerProtocol)
+            controller = container.get(ModeControllerProtocol)
+            # Ensure we return the actual instance, not the protocol class
+            if isinstance(controller, type):
+                raise RuntimeError("Expected controller instance, got class")
+            return controller
     except Exception:
         pass  # Fall back to legacy singleton
 

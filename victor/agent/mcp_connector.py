@@ -40,7 +40,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
-from victor.tools.base import ToolRegistry
+from victor.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +111,7 @@ class MCPConnector:
         registry: ToolRegistry,
         settings: Any,
         config: Optional[MCPConnectorConfig] = None,
-        task_callback: Optional[Callable[[Any, str], asyncio.Task]] = None,
+        task_callback: Optional[Callable[[Any, str], asyncio.Task[Any]]] = None,
     ):
         """Initialize the MCP connector.
 
@@ -127,7 +127,7 @@ class MCPConnector:
         self._task_callback = task_callback
 
         self._mcp_registry: Optional[Any] = None
-        self._pending_tasks: List[asyncio.Task] = []
+        self._pending_tasks: List[asyncio.Task[Any]] = []
         self._connected = False
 
     @property
@@ -140,7 +140,7 @@ class MCPConnector:
         """Get the underlying MCP registry."""
         return self._mcp_registry
 
-    def set_task_callback(self, callback: Callable[[Any, str], asyncio.Task]) -> None:
+    def set_task_callback(self, callback: Callable[[Any, str], asyncio.Task[Any]]) -> None:
         """Set callback for creating background tasks.
 
         Args:
@@ -148,7 +148,7 @@ class MCPConnector:
         """
         self._task_callback = callback
 
-    def _create_task(self, coro: Any, name: str) -> Optional[asyncio.Task]:
+    def _create_task(self, coro: Any, name: str) -> Optional[asyncio.Task[Any]]:
         """Create a background task using callback or directly."""
         if self._task_callback:
             return self._task_callback(coro, name)

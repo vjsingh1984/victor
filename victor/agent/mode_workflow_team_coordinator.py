@@ -843,6 +843,7 @@ def create_coordinator(
         Configured coordinator
     """
     # Create team selector based on strategy
+    team_selector: TeamSelectionStrategyProtocol
     if selection_strategy == "rule":
         team_selector = RuleBasedTeamSelector()
     elif selection_strategy == "learning":

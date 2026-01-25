@@ -375,7 +375,8 @@ from victor.config.config_loaders import get_provider_limits
 from victor.config.settings import Settings
 from victor.config.model_capabilities import ToolCallingMatrix
 
-from victor.agent.conversation_state import ConversationStateMachine, ConversationStage
+from victor.agent.conversation_state import ConversationStateMachine
+from victor.agent.conversation_state import ConversationStage  # noqa: F401
 from victor.agent.action_authorizer import ActionIntent, INTENT_BLOCKED_TOOLS
 from victor.agent.prompt_builder import get_task_type_hint, SystemPromptBuilder
 from victor.agent.search_router import SearchRoute, SearchType
@@ -512,7 +513,8 @@ from victor.core.errors import (
 # TOOL IMPORTS
 # =============================================================================
 
-from victor.tools.base import CostTier, ToolRegistry
+from victor.tools.enums import CostTier  # noqa: F401
+from victor.tools.registry import ToolRegistry  # noqa: F401
 from victor.tools.code_executor_tool import CodeSandbox
 from victor.tools.mcp_bridge_tool import get_mcp_tool_definitions
 from victor.tools.plugin_registry import ToolPluginRegistry

@@ -113,7 +113,7 @@ class EmbeddingManager(IEmbeddingManager):
                 k=k,
                 filters=filters,
             )
-            return results
+            return cast(List[Any], results)
         except Exception as e:
             logger.error(f"Semantic search failed: {e}")
             return []
