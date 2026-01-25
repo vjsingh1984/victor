@@ -7,7 +7,7 @@
 #   make build        # Build distribution packages
 #   make release      # Create a release (requires version)
 
-.PHONY: help install install-dev test lint format clean build build-binary docker release security security-full load-test load-test-quick load-test-report benchmark dev-tools check-protocol lint-vertical validate-config profile-coordinators coverage-report generate-docs qa qa-fast qa-report release-checklist release-validate
+.PHONY: help install install-dev test test-all test-integration test-multimodal test-cov test-cov-all test-ci test-fast lint format clean build build-binary docker release security security-full load-test load-test-quick load-test-report benchmark dev-tools check-protocol lint-vertical validate-config profile-coordinators coverage-report generate-docs qa qa-fast qa-report release-checklist release-validate
 
 # Default target
 help:
@@ -16,8 +16,14 @@ help:
 	@echo "Development:"
 	@echo "  make install       Install for development"
 	@echo "  make install-dev   Install with all dev dependencies"
-	@echo "  make test          Run unit tests"
-	@echo "  make test-all      Run all tests including integration"
+	@echo "  make test          Run unit tests (no coverage)"
+	@echo "  make test-all      Run all tests including integration (no coverage)"
+	@echo "  make test-integration Run integration tests (no coverage)"
+	@echo "  make test-multimodal Run multimodal tests (no coverage)"
+	@echo "  make test-cov      Run tests with coverage report"
+	@echo "  make test-cov-all  Run all tests with coverage"
+	@echo "  make test-ci       Run tests with CI config (with coverage)"
+	@echo "  make test-fast     Run tests with no coverage, stop on first failure"
 	@echo "  make lint          Run linters"
 	@echo "  make format        Format code"
 	@echo "  make clean         Clean build artifacts"
@@ -72,8 +78,23 @@ test:
 test-all:
 	pytest -v --tb=short
 
+test-integration:
+	pytest tests/integration -v --tb=short --no-cov
+
+test-multimodal:
+	pytest tests/integration/agent/multimodal -v --tb=short --no-cov
+
 test-cov:
-	pytest tests/unit --cov=victor --cov-report=html --cov-report=term-missing
+	pytest tests/unit --cov=victor --cov-report=html --cov-report=term-missing --cov-report=xml
+
+test-cov-all:
+	pytest --cov=victor --cov-report=html --cov-report=term-missing --cov-report=xml --cov-branch
+
+test-ci:
+	pytest -c pytest-ci.ini -v --tb=short
+
+test-fast:
+	pytest -v --tb=short --no-cov -x
 
 lint:
 	ruff check victor
