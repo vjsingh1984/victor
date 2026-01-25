@@ -310,7 +310,7 @@ class MemoryCoordinator:
 
         try:
             messages_list = self._conversation_store.get_recent_messages(
-                session_id=self._session_id or "default", count=1000
+                self._session_id or "default", count=1000
             )
             return [
                 msg.model_dump() if hasattr(msg, 'model_dump') else msg  # type: ignore[misc]

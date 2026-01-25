@@ -850,11 +850,11 @@ ollama serve
 
 ## Additional Resources
 
-- **Provider Reference**: [Full Reference Documentation](../reference/providers/)
+- **Provider Reference**: [Full Reference Documentation](../reference/providers/index.md)
 - **Provider Comparison**: [Comparison Table](../reference/providers/comparison.md)
 - **Setup Guide**: [Detailed Setup](../reference/providers/setup.md)
 - **Tool Catalog**: [55 Tools](../reference/tools/catalog.md)
-- **Configuration**: [Profiles and Settings](../reference/configuration/)
+- **Configuration**: [Profiles and Settings](../reference/configuration/index.md)
 
 ---
 

@@ -111,20 +111,20 @@ def mock_orchestrator() -> MagicMock:
 class TestGetCompiler:
     """Tests for the get_compiler() method."""
 
-    def test_get_compiler_returns_unified_compiler(self, test_provider) -> None:
+    def test_get_compiler_returns_unified_compiler(self, test_provider: Any) -> None:
         """Test that get_compiler returns a UnifiedWorkflowCompiler."""
         from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
         compiler = test_provider.provider.get_compiler()
         assert isinstance(compiler, UnifiedWorkflowCompiler)
 
-    def test_get_compiler_is_cached(self, test_provider) -> None:
+    def test_get_compiler_is_cached(self, test_provider: Any) -> None:
         """Test that get_compiler returns the same instance."""
         compiler1 = test_provider.provider.get_compiler()
         compiler2 = test_provider.provider.get_compiler()
         assert compiler1 is compiler2
 
-    def test_get_compiler_enables_caching(self, test_provider) -> None:
+    def test_get_compiler_enables_caching(self, test_provider: Any) -> None:
         """Test that the compiler has caching enabled."""
         compiler = test_provider.provider.get_compiler()
         # Check that caching is enabled via the compiler's internal state
@@ -157,7 +157,7 @@ class TestCompileWorkflow:
                 compiled = test_provider.provider.compile_workflow("test_workflow")
                 assert isinstance(compiled, CachedCompiledGraph)
 
-    def test_compile_workflow_has_workflow_name(self, test_provider, yaml_workflow_file) -> None:
+    def test_compile_workflow_has_workflow_name(self, test_provider: Any, yaml_workflow_file: Any) -> None:
         """Test that compiled workflow has correct workflow_name."""
         with patch.object(
             test_provider.provider, "_get_workflow_path", return_value=yaml_workflow_file
@@ -168,7 +168,7 @@ class TestCompileWorkflow:
                 compiled = test_provider.provider.compile_workflow("test_workflow")
                 assert compiled.workflow_name == "test_workflow"
 
-    def test_compile_workflow_raises_for_unknown_workflow(self, test_provider, tmp_path) -> None:
+    def test_compile_workflow_raises_for_unknown_workflow(self, test_provider: Any, tmp_path: Any) -> None:
         """Test that compile_workflow raises ValueError for unknown workflow."""
         with pytest.raises(ValueError, match="Workflow not found"):
             test_provider.provider.compile_workflow("nonexistent_workflow")

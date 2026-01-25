@@ -625,8 +625,8 @@ members:
 ### Further Reading
 
 - [Team Node Usage Guide](./team_nodes.md)
-- [Workflow DSL Documentation](./workflow_dsl.md)
-- [Formation Pattern Reference](./formations.md)
+- [Workflow DSL Documentation](../guides/workflow-development/dsl.md)
+- [Formation Pattern Reference](./advanced_formations.md)
 
 ---
 

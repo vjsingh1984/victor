@@ -45,7 +45,7 @@ from victor.workflows.ml_formation_selector import (
 
 
 @pytest.fixture
-def sample_task():
+def sample_task() -> Any:
     """Create a sample task message."""
     return AgentMessage(
         sender_id="user",
@@ -55,7 +55,7 @@ def sample_task():
 
 
 @pytest.fixture
-def mock_agents():
+def mock_agents() -> Any:
     """Create mock agents for testing."""
 
     async def mock_execute(task: str, context: Dict[str, Any] = None) -> str:
@@ -72,6 +72,7 @@ def mock_agents():
 
 
 @pytest.fixture
+def sample_task() -> Any:
 def team_context(mock_agents: Any) -> Any:
     """Create a team context with mock agents."""
     shared_state = {f"agent_{i}": agent for i, agent in enumerate(mock_agents)}
@@ -83,6 +84,7 @@ def team_context(mock_agents: Any) -> Any:
 
 
 @pytest.fixture
+def sample_task() -> Any:
 def sample_training_data(tmp_path: Any) -> Any:
     """Create sample training data for testing."""
     examples = [
@@ -234,6 +236,7 @@ def sample_training_data(tmp_path: Any) -> Any:
 
 
 @pytest.fixture
+def sample_task() -> Any:
 def trained_model_path(tmp_path: Any, sample_training_data: Any) -> Any:
     """Create a trained model for testing."""
     try:
@@ -268,7 +271,7 @@ class TestFeatureExtractor:
         assert extractor.use_embeddings is False
         assert extractor.embedding_model is None
 
-    def test_extract_features_basic(self, sample_task, team_context, mock_agents) -> None:
+    def test_extract_features_basic(self, sample_task: Any, team_context: Any, mock_agents: Any) -> None:
         """Test basic feature extraction."""
         extractor = FeatureExtractor()
         features = extractor.extract_features(sample_task, team_context, mock_agents)
@@ -346,7 +349,7 @@ class TestFeatureExtractor:
         features = extractor.extract_dependencies(indep_task.content, MagicMock())
         assert features < 0.5
 
-    def test_feature_vector_conversion(self, sample_task, team_context, mock_agents) -> None:
+    def test_feature_vector_conversion(self, sample_task: Any, team_context: Any, mock_agents: Any) -> None:
         """Test conversion to feature vector."""
         extractor = FeatureExtractor()
         features = extractor.extract_features(sample_task, team_context, mock_agents)
@@ -357,7 +360,7 @@ class TestFeatureExtractor:
         assert all(isinstance(v, float) for v in vector)
         assert all(0.0 <= v <= 1.0 for v in vector)  # All normalized
 
-    def test_serialization(self, sample_task, team_context, mock_agents) -> None:
+    def test_serialization(self, sample_task: Any, team_context: Any, mock_agents: Any) -> None:
         """Test TaskFeatures serialization."""
         extractor = FeatureExtractor()
         features = extractor.extract_features(sample_task, team_context, mock_agents)
@@ -387,7 +390,7 @@ class TestModelTrainer:
         assert trainer.test_size == 0.2
         assert trainer.random_state == 42
 
-    def test_load_training_data(self, sample_training_data) -> None:
+    def test_load_training_data(self, sample_training_data: Any) -> None:
         """Test loading training data from JSON."""
         trainer = ModelTrainer()
         X, y = trainer._load_training_data(str(sample_training_data))
@@ -398,7 +401,7 @@ class TestModelTrainer:
         assert all(isinstance(label, int) for label in y)
         assert all(0 <= label < 5 for label in y)  # 5 formations
 
-    def test_train_model(self, sample_training_data) -> None:
+    def test_train_model(self, sample_training_data: Any) -> None:
         """Test model training."""
         trainer = ModelTrainer(algorithm="random_forest", test_size=0.2)
         metrics = trainer.train(str(sample_training_data))
@@ -411,7 +414,7 @@ class TestModelTrainer:
         assert metrics.training_time_seconds > 0.0
         assert metrics.inference_time_seconds >= 0.0
 
-    def test_save_and_load_model(self, sample_training_data, tmp_path) -> None:
+    def test_save_and_load_model(self, sample_training_data: Any, tmp_path: Any) -> None:
         """Test model persistence."""
         # Train model
         trainer = ModelTrainer(algorithm="random_forest")
@@ -428,7 +431,7 @@ class TestModelTrainer:
         assert new_trainer.model is not None
         assert new_trainer.scaler is not None
 
-    def test_model_algorithms(self, sample_training_data) -> None:
+    def test_model_algorithms(self, sample_training_data: Any) -> None:
         """Test different ML algorithms."""
         algorithms = ["random_forest", "gradient_boosting"]
 
@@ -439,7 +442,7 @@ class TestModelTrainer:
             assert metrics.accuracy > 0.0, f"{algorithm} failed to train"
             assert metrics.f1_score > 0.0, f"{algorithm} has poor F1 score"
 
-    def test_update_model(self, sample_training_data) -> None:
+    def test_update_model(self, sample_training_data: Any) -> None:
         """Test online learning update."""
         trainer = ModelTrainer(algorithm="random_forest")
         trainer.train(str(sample_training_data))
@@ -483,7 +486,7 @@ class TestAdaptiveFormationML:
         assert selector.enable_online_learning is False
         assert selector.model is None  # No model loaded
 
-    def test_initialization_with_model(self, trained_model_path) -> None:
+    def test_initialization_with_model(self, trained_model_path: Any) -> None:
         """Test initialization with trained model."""
         model_path, metrics = trained_model_path
         selector = AdaptiveFormationML(model_path=model_path)
@@ -580,7 +583,7 @@ class TestAdaptiveFormationML:
         # Should trigger update
         assert len(selector._execution_buffer) == 0  # Cleared after update
 
-    def test_get_feature_importance(self, trained_model_path) -> None:
+    def test_get_feature_importance(self, trained_model_path: Any) -> None:
         """Test getting feature importance from model."""
         model_path, _ = trained_model_path
         selector = AdaptiveFormationML(model_path=model_path)
@@ -692,7 +695,7 @@ class TestMLFormationIntegration:
         formation = await selector.predict_formation(sample_task, team_context, mock_agents)
         assert formation in ["sequential", "parallel", "hierarchical", "pipeline", "consensus"]
 
-    def test_data_collection_pipeline(self, tmp_path) -> None:
+    def test_data_collection_pipeline(self, tmp_path: Any) -> None:
         """Test training data collection from execution logs."""
         # Create sample execution logs
         log_dir = tmp_path / "logs"

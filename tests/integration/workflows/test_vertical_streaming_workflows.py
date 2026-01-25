@@ -37,6 +37,7 @@ from unittest.mock import MagicMock
 
 
 @pytest.fixture
+def coding_provider() -> Any:
 def coding_provider():
     """Fixture providing CodingWorkflowProvider."""
     from victor.coding.workflows.provider import CodingWorkflowProvider
@@ -45,6 +46,7 @@ def coding_provider():
 
 
 @pytest.fixture
+def coding_provider() -> Any:
 def devops_provider():
     """Fixture providing DevOpsWorkflowProvider."""
     from victor.devops.workflows import DevOpsWorkflowProvider
@@ -53,6 +55,7 @@ def devops_provider():
 
 
 @pytest.fixture
+def coding_provider() -> Any:
 def research_provider():
     """Fixture providing ResearchWorkflowProvider."""
     from victor.research.workflows import ResearchWorkflowProvider
@@ -61,6 +64,7 @@ def research_provider():
 
 
 @pytest.fixture
+def coding_provider() -> Any:
 def dataanalysis_provider():
     """Fixture providing DataAnalysisWorkflowProvider."""
     from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
@@ -76,14 +80,14 @@ def dataanalysis_provider():
 class TestCodingWorkflowProvider:
     """Tests for CodingWorkflowProvider canonical API."""
 
-    def test_provider_has_workflows(self, coding_provider) -> None:
+    def test_provider_has_workflows(self, coding_provider: Any) -> None:
         """Test provider has expected workflows available."""
         workflows = coding_provider.get_workflow_names()
         assert len(workflows) > 0
         # Should have common coding workflows
         assert "code_review" in workflows or "feature_implementation" in workflows
 
-    def test_get_workflow_returns_valid_definition(self, coding_provider) -> None:
+    def test_get_workflow_returns_valid_definition(self, coding_provider: Any) -> None:
         """Test get_workflow returns valid workflow definitions."""
         workflow_names = coding_provider.get_workflow_names()
         for name in workflow_names:
@@ -98,14 +102,14 @@ class TestCodingWorkflowProvider:
 class TestDevOpsWorkflowProvider:
     """Tests for DevOpsWorkflowProvider canonical API."""
 
-    def test_provider_has_workflows(self, devops_provider) -> None:
+    def test_provider_has_workflows(self, devops_provider: Any) -> None:
         """Test provider has expected workflows available."""
         workflows = devops_provider.get_workflow_names()
         assert len(workflows) > 0
         # Should have common devops workflows (deploy, cicd, container_*)
         assert "deploy" in workflows or "cicd" in workflows
 
-    def test_get_workflow_returns_valid_definition(self, devops_provider) -> None:
+    def test_get_workflow_returns_valid_definition(self, devops_provider: Any) -> None:
         """Test get_workflow returns valid workflow definitions."""
         workflow_names = devops_provider.get_workflow_names()
         for name in workflow_names:
@@ -120,14 +124,14 @@ class TestDevOpsWorkflowProvider:
 class TestResearchWorkflowProvider:
     """Tests for ResearchWorkflowProvider canonical API."""
 
-    def test_provider_has_workflows(self, research_provider) -> None:
+    def test_provider_has_workflows(self, research_provider: Any) -> None:
         """Test provider has expected workflows available."""
         workflows = research_provider.get_workflow_names()
         assert len(workflows) > 0
         # Should have common research workflows
         assert "deep_research" in workflows or "fact_check" in workflows
 
-    def test_get_workflow_returns_valid_definition(self, research_provider) -> None:
+    def test_get_workflow_returns_valid_definition(self, research_provider: Any) -> None:
         """Test get_workflow returns valid workflow definitions."""
         workflow_names = research_provider.get_workflow_names()
         for name in workflow_names:
@@ -142,14 +146,14 @@ class TestResearchWorkflowProvider:
 class TestDataAnalysisWorkflowProvider:
     """Tests for DataAnalysisWorkflowProvider canonical API."""
 
-    def test_provider_has_workflows(self, dataanalysis_provider) -> None:
+    def test_provider_has_workflows(self, dataanalysis_provider: Any) -> None:
         """Test provider has expected workflows available."""
         workflows = dataanalysis_provider.get_workflow_names()
         assert len(workflows) > 0
         # Should have common data analysis workflows
         assert "eda_workflow" in workflows or "ml_pipeline" in workflows
 
-    def test_get_workflow_returns_valid_definition(self, dataanalysis_provider) -> None:
+    def test_get_workflow_returns_valid_definition(self, dataanalysis_provider: Any) -> None:
         """Test get_workflow returns valid workflow definitions."""
         workflow_names = dataanalysis_provider.get_workflow_names()
         for name in workflow_names:
@@ -193,7 +197,7 @@ class TestCanonicalWorkflowAPI:
             ("dataanalysis", dataanalysis_provider),
         ]
 
-    def test_all_providers_have_compile_workflow(self, all_providers) -> None:
+    def test_all_providers_have_compile_workflow(self, all_providers: Any) -> None:
         """Test all providers implement compile_workflow (canonical API)."""
         for name, provider in all_providers:
             assert hasattr(
@@ -202,7 +206,7 @@ class TestCanonicalWorkflowAPI:
             # Verify it's callable
             assert callable(provider.compile_workflow), f"{name} compile_workflow not callable"
 
-    def test_compile_workflow_returns_compiled_graph(self, all_providers) -> None:
+    def test_compile_workflow_returns_compiled_graph(self, all_providers: Any) -> None:
         """Test compile_workflow returns a CompiledGraph instance."""
         for name, provider in all_providers:
             workflows = provider.get_workflow_names()
@@ -233,7 +237,7 @@ class TestCanonicalWorkflowAPI:
             except ValueError as e:
                 assert "Workflow not found: nonexistent" in str(e)
 
-    def test_all_providers_have_canonical_convenience_methods(self, all_providers) -> None:
+    def test_all_providers_have_canonical_convenience_methods(self, all_providers: Any) -> None:
         """Test all providers have canonical convenience methods."""
         canonical_methods = [
             "compile_workflow",
@@ -246,7 +250,7 @@ class TestCanonicalWorkflowAPI:
                     provider, method
                 ), f"{name} provider missing canonical method {method}"
 
-    def test_canonical_api_consistency(self, all_providers) -> None:
+    def test_canonical_api_consistency(self, all_providers: Any) -> None:
         """Test all providers have consistent canonical API surface."""
         expected_canonical_methods = [
             "get_workflows",

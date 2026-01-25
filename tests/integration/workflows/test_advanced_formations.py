@@ -50,7 +50,7 @@ from victor.workflows.advanced_formations_schema import (
 
 
 @pytest.fixture
-def mock_agents():
+def mock_agents() -> Any:
     """Create mock agents for testing."""
     from victor.teams.types import MemberResult
 
@@ -88,7 +88,7 @@ def team_context(mock_agents: Any) -> Any:
 
 
 @pytest.fixture
-def sample_task():
+def sample_task() -> Any:
     """Create a sample task message."""
     return AgentMessage(
         sender_id="user",

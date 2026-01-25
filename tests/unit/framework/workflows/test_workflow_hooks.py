@@ -315,7 +315,7 @@ class TestErrorHandling:
         # Should not raise exception
         assert result is None
 
-    def test_logs_warning_for_invalid_module(self, caplog) -> None:
+    def test_logs_warning_for_invalid_module(self, caplog: Any) -> None:
         """Should log warning when module cannot be imported."""
         import logging
 
@@ -329,7 +329,7 @@ class TestErrorHandling:
         # Warning should mention the module path
         assert any("nonexistent" in record.message for record in caplog.records)
 
-    def test_logs_warning_for_missing_provider(self, caplog) -> None:
+    def test_logs_warning_for_missing_provider(self, caplog: Any) -> None:
         """Should log warning when no capability provider found in module."""
         import logging
 

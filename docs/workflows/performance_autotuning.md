@@ -937,8 +937,8 @@ python scripts/workflows/autotune.py rollback --team-id my_team --list
 
 - [Team Node Performance Guide](./team_node_performance.md) - Performance characteristics
 - [Team Node Usage Guide](./team_nodes.md) - Team node basics
-- [Workflow DSL Documentation](./workflow_dsl.md) - YAML workflow syntax
-- [Formation Pattern Reference](./formations.md) - Formation patterns
+- [Workflow DSL Documentation](../guides/workflow-development/dsl.md) - YAML workflow syntax
+- [Formation Pattern Reference](./advanced_formations.md) - Formation patterns
 
 ---
 

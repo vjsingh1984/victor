@@ -114,12 +114,14 @@ def create_mock_subagent_orchestrator():
 
 
 @pytest.fixture
+def mock_orchestrator() -> Any:
 def mock_orchestrator():
     """Fixture providing a mock orchestrator."""
     return create_mock_orchestrator()
 
 
 @pytest.fixture
+def mock_orchestrator() -> Any:
 def simple_workflow():
     """Create a simple linear workflow for testing."""
 
@@ -148,6 +150,7 @@ def simple_workflow():
 
 
 @pytest.fixture
+def mock_orchestrator() -> Any:
 def conditional_workflow():
     """Create a workflow with conditional branching."""
 
@@ -205,6 +208,7 @@ def conditional_workflow():
 
 
 @pytest.fixture
+def mock_orchestrator() -> Any:
 def error_workflow():
     """Create a workflow that can fail for error handling tests."""
 
@@ -404,7 +408,7 @@ class TestCheckpointFunctionality:
         """Test that checkpoint contains complete workflow state."""
         captured_checkpoints = []
 
-        def capture_checkpoint(*args, **kwargs):
+        def capture_checkpoint(*args, **kwargs) -> Any:
             captured_checkpoints.append(kwargs)
 
         def step_a(ctx: Dict[str, Any]) -> Dict[str, Any]:

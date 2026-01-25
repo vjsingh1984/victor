@@ -39,6 +39,7 @@ from victor.workflows.orchestrator_pool import OrchestratorPool
 
 
 @pytest.fixture
+def mock_settings() -> Any:
 def mock_settings():
     """Create mock settings with test profiles."""
     settings = Mock(spec=Settings)
@@ -75,6 +76,7 @@ def mock_settings():
 
 
 @pytest.fixture
+def mock_settings() -> Any:
 def mock_orchestrator():
     """Create mock orchestrator."""
     orchestrator = Mock()
@@ -83,6 +85,7 @@ def mock_orchestrator():
 
 
 @pytest.fixture
+def mock_settings() -> Any:
 def mock_provider():
     """Create mock provider."""
     provider = Mock()
@@ -146,7 +149,7 @@ class TestDefaultOrchestrator:
                 assert orchestrator == mock_orchestrator
                 mock_registry.create.assert_called_once_with("ollama")
 
-    def test_get_default_orchestrator_profile_not_found(self, mock_settings) -> None:
+    def test_get_default_orchestrator_profile_not_found(self, mock_settings: Any) -> None:
         """Test error when default profile is not found."""
         # Mock empty profiles
         mock_settings.load_profiles.return_value = {}
@@ -165,7 +168,7 @@ class TestDefaultOrchestrator:
 class TestProfileBasedOrchestrator:
     """Test profile-based orchestrator creation."""
 
-    def test_get_orchestrator_for_profile(self, mock_settings, mock_orchestrator, mock_provider) -> None:
+    def test_get_orchestrator_for_profile(self, mock_settings: Any, mock_orchestrator: Any, mock_provider: Any) -> None:
         """Test getting orchestrator for a specific profile."""
         with patch("victor.workflows.orchestrator_pool.ProviderRegistry") as mock_registry:
             with patch(
@@ -186,7 +189,7 @@ class TestProfileBasedOrchestrator:
                 assert orchestrator == mock_orchestrator
                 mock_registry.create.assert_called_once_with("anthropic")
 
-    def test_get_orchestrator_profile_not_found(self, mock_settings) -> None:
+    def test_get_orchestrator_profile_not_found(self, mock_settings: Any) -> None:
         """Test error when requested profile is not found."""
         pool = OrchestratorPool(mock_settings)
 
@@ -202,7 +205,7 @@ class TestProfileBasedOrchestrator:
 class TestOrchestratorCaching:
     """Test orchestrator caching and reuse."""
 
-    def test_orchestrator_reuse_from_cache(self, mock_settings, mock_orchestrator, mock_provider) -> None:
+    def test_orchestrator_reuse_from_cache(self, mock_settings: Any, mock_orchestrator: Any, mock_provider: Any) -> None:
         """Test that cached orchestrator is reused on subsequent calls."""
         with patch("victor.workflows.orchestrator_pool.ProviderRegistry") as mock_registry:
             with patch(
@@ -226,7 +229,7 @@ class TestOrchestratorCaching:
                 # Factory should only be called once (cached)
                 assert mock_factory.create_orchestrator.call_count == 1
 
-    def test_provider_reuse_from_cache(self, mock_settings, mock_orchestrator, mock_provider) -> None:
+    def test_provider_reuse_from_cache(self, mock_settings: Any, mock_orchestrator: Any, mock_provider: Any) -> None:
         """Test that cached provider is reused."""
         with patch("victor.workflows.orchestrator_pool.ProviderRegistry") as mock_registry:
             with patch(
@@ -284,7 +287,7 @@ class TestOrchestratorCaching:
                 cached = pool.get_cached_profiles()
                 assert set(cached) == {"default", "anthropic", "openai"}
 
-    def test_clear_cache_single_profile(self, mock_settings, mock_orchestrator, mock_provider) -> None:
+    def test_clear_cache_single_profile(self, mock_settings: Any, mock_orchestrator: Any, mock_provider: Any) -> None:
         """Test clearing cache for a single profile."""
         with patch("victor.workflows.orchestrator_pool.ProviderRegistry") as mock_registry:
             with patch(
@@ -310,7 +313,7 @@ class TestOrchestratorCaching:
                 pool.get_orchestrator("default")
                 assert mock_factory.create_orchestrator.call_count == 2
 
-    def test_clear_cache_all_profiles(self, mock_settings, mock_orchestrator, mock_provider) -> None:
+    def test_clear_cache_all_profiles(self, mock_settings: Any, mock_orchestrator: Any, mock_provider: Any) -> None:
         """Test clearing cache for all profiles."""
         with patch("victor.workflows.orchestrator_pool.ProviderRegistry") as mock_registry:
             with patch(
@@ -337,7 +340,7 @@ class TestOrchestratorCaching:
                 # Verify all cleared
                 assert pool.get_cached_profiles() == []
 
-    def test_get_cached_profiles(self, mock_settings, mock_orchestrator, mock_provider) -> None:
+    def test_get_cached_profiles(self, mock_settings: Any, mock_orchestrator: Any, mock_provider: Any) -> None:
         """Test getting list of cached profiles."""
         with patch("victor.workflows.orchestrator_pool.ProviderRegistry") as mock_registry:
             with patch(
@@ -372,7 +375,7 @@ class TestOrchestratorCaching:
 class TestErrorHandling:
     """Test error handling in OrchestratorPool."""
 
-    def test_provider_creation_failure(self, mock_settings) -> None:
+    def test_provider_creation_failure(self, mock_settings: Any) -> None:
         """Test handling of provider creation failure."""
         with patch("victor.workflows.orchestrator_pool.ProviderRegistry") as mock_registry:
             # Setup mock to raise error
@@ -383,7 +386,7 @@ class TestErrorHandling:
             with pytest.raises(RuntimeError, match="Failed to create provider"):
                 pool.get_orchestrator("default")
 
-    def test_orchestrator_creation_failure(self, mock_settings, mock_provider) -> None:
+    def test_orchestrator_creation_failure(self, mock_settings: Any, mock_provider: Any) -> None:
         """Test handling of orchestrator creation failure."""
         with patch("victor.workflows.orchestrator_pool.ProviderRegistry") as mock_registry:
             with patch(
@@ -411,7 +414,7 @@ class TestErrorHandling:
 class TestLifecycle:
     """Test orchestrator pool lifecycle management."""
 
-    def test_shutdown_closes_orchestrators(self, mock_settings, mock_provider) -> None:
+    def test_shutdown_closes_orchestrators(self, mock_settings: Any, mock_provider: Any) -> None:
         """Test that shutdown closes all orchestrators."""
         with patch("victor.workflows.orchestrator_pool.ProviderRegistry") as mock_registry:
             with patch(
@@ -449,7 +452,7 @@ class TestLifecycle:
                 # Verify caches cleared
                 assert pool.get_cached_profiles() == []
 
-    def test_shutdown_handles_close_errors(self, mock_settings, mock_provider, caplog) -> None:
+    def test_shutdown_handles_close_errors(self, mock_settings: Any, mock_provider: Any, caplog: Any) -> None:
         """Test that shutdown handles errors gracefully."""
         import logging
 

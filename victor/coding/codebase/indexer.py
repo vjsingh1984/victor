@@ -227,6 +227,9 @@ def _process_file_parallel(
             # Symbol extraction
             # Uses @name capture for symbol name/start_line, @def capture for end_line
             query_defs = SYMBOL_QUERIES.get(language, [])
+            if parser.language is None:
+                raise ValueError(f"Parser language not available for {language}")
+
             for sym_type, query_src in query_defs:
                 try:
                     query = Query(parser.language, query_src)
@@ -243,7 +246,10 @@ def _process_file_parallel(
                         def_by_start_line[def_node.start_point[0]] = def_node
 
                     for node in name_nodes:
-                        text = node.text.decode("utf-8", errors="ignore")
+                        node_text = node.text
+                        if node_text is None:
+                            continue
+                        text = node_text.decode("utf-8", errors="ignore")
                         if text:
                             name_line = node.start_point[0]
                             # Default end_line to name node's end
@@ -277,7 +283,10 @@ def _process_file_parallel(
 
                     callee_nodes = captures_dict.get("callee", [])
                     for node in callee_nodes:
-                        callee = node.text.decode("utf-8", errors="ignore")
+                        node_text = node.text
+                        if node_text is None:
+                            continue
+                        callee = node_text.decode("utf-8", errors="ignore")
                         # Find enclosing function as caller
                         caller = _find_enclosing_function(node, language)
                         if caller and callee and callee not in {"function", caller}:
@@ -294,7 +303,10 @@ def _process_file_parallel(
                     captures_dict = cursor.captures(tree.root_node)
                     for _capture_name, nodes in captures_dict.items():
                         for node in nodes:
-                            ref = node.text.decode("utf-8", errors="ignore")
+                            node_text = node.text
+                            if node_text is None:
+                                continue
+                            ref = node_text.decode("utf-8", errors="ignore")
                             if ref and len(ref) > 1:  # Skip single-char identifiers
                                 references.append(ref)
                 except Exception:
@@ -305,19 +317,20 @@ def _process_file_parallel(
     # Python-specific: extract imports via ast (more reliable than tree-sitter)
     if language == "python":
         try:
-            tree = py_ast.parse(content, filename=file_path_str)
-            for node in py_ast.walk(tree):
-                if isinstance(node, py_ast.Import):
-                    for alias in node.names:
+            py_tree = py_ast.parse(content, filename=file_path_str)
+            for py_node in py_ast.walk(py_tree):
+                if isinstance(py_node, py_ast.Import):
+                    for alias in py_node.names:
                         imports.append(alias.name)
-                elif isinstance(node, py_ast.ImportFrom):
-                    if node.module:
-                        imports.append(node.module)
+                elif isinstance(py_node, py_ast.ImportFrom):
+                    if py_node.module:
+                        imports.append(py_node.module)
 
             # Extract inheritance from AST (more complete than tree-sitter)
-            for node in py_ast.walk(tree):
-                if isinstance(node, py_ast.ClassDef):
-                    for base in node.bases:
+            for py_node in py_ast.walk(py_tree):
+                if isinstance(py_node, py_ast.ClassDef):
+                    class_name = py_node.name
+                    for base in py_node.bases:
                         try:
                             base_name = (
                                 py_ast.unparse(base)
@@ -325,11 +338,11 @@ def _process_file_parallel(
                                 else getattr(base, "id", None)
                             )
                             if base_name:
-                                inherit_edges.append((node.name, base_name))
+                                inherit_edges.append((class_name, base_name))
                         except Exception:
                             base_name = getattr(base, "id", None)
                             if base_name:
-                                inherit_edges.append((node.name, base_name))
+                                inherit_edges.append((class_name, base_name))
         except Exception:
             pass
 
@@ -369,7 +382,11 @@ def _find_enclosing_function(node: Any, language: str) -> Optional[str]:
             # Find the name child
             for child in current.children:
                 if child.type in ("identifier", "property_identifier", "name"):
-                    return child.text.decode("utf-8", errors="ignore")
+                    child_bytes = child.text
+                    if child_bytes is not None:
+                        from typing import cast
+                        result = cast(str, child_bytes.decode("utf-8", errors="ignore"))
+                        return result
         current = current.parent
     return None
 
@@ -730,22 +747,21 @@ def _parse_file_worker(args: Tuple[str, str]) -> Optional[Dict[str, Any]]:
 
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef):
-                symbols.append(
-                    {
-                        "name": node.name,
-                        "type": "class",
-                        "file_path": rel_path,
-                        "line_number": node.lineno,
-                        "docstring": ast.get_docstring(node),
-                        "signature": None,
-                    }
-                )
+                symbol_entry: Dict[str, Any] = {
+                    "name": node.name,
+                    "type": "class",
+                    "file_path": rel_path,
+                    "line_number": node.lineno,
+                    "docstring": ast.get_docstring(node),
+                    "signature": None,
+                }
+                symbols.append(symbol_entry)
             elif isinstance(node, ast.FunctionDef):
                 # Check if it's a method (inside a class)
                 name = node.name
                 # Build signature
-                args = [arg.arg for arg in node.args.args]
-                signature = f"{node.name}({', '.join(args)})"
+                args_list: List[str] = [arg.arg for arg in node.args.args]
+                signature = f"{node.name}({', '.join(args_list)})"
                 symbols.append(
                     {
                         "name": name,
@@ -1087,11 +1103,11 @@ class CodebaseIndex:
 
         # Graph store (per-repo, embedded in project.db)
         if graph_store is None:
-            self.graph_store: Optional["GraphStoreProtocol"] = create_graph_store(  # type: ignore[assignment]
+            self.graph_store: Optional["GraphStoreProtocol"] = create_graph_store(
                 project_path=self.root
             )
         else:
-            self.graph_store = graph_store  # type: ignore[assignment]
+            self.graph_store = graph_store
         self._graph_nodes: List[GraphNode] = []
         self._graph_edges: List[GraphEdge] = []
         self._pending_call_edges: List[tuple[str, str, str]] = []  # caller_id, callee_name, file
@@ -1725,13 +1741,14 @@ class CodebaseIndex:
             query = Query(lang, query_src)
             cursor = QueryCursor(query)
             captures = cursor.captures(tree.root_node)
-            for node, _capture_name in captures:
-                node_text = node.text
-                if node_text is None:
-                    continue
-                text = node_text.decode("utf-8", errors="ignore")
-                if text:
-                    refs.add(text)
+            for capture_name, nodes in captures.items():
+                for node in nodes:
+                    node_text = node.text
+                    if node_text is None:
+                        continue
+                    text = node_text.decode("utf-8", errors="ignore")
+                    if text:
+                        refs.add(text)
         except Exception:
             # Graceful degradation; fall back to existing refs
             pass
@@ -1909,19 +1926,22 @@ class CodebaseIndex:
                 tree = py_ast.parse(file_path.read_text(encoding="utf-8"), filename=str(file_path))
                 for node in py_ast.walk(tree):
                     if isinstance(node, py_ast.ClassDef):
-                        for base in node.bases:
+                        class_name = node.name
+                        for base in node.bases:  # type: ignore[assignment]
                             try:
-                                base_expr = base
                                 if hasattr(py_ast, "unparse"):
-                                    base_name: str | None = py_ast.unparse(base_expr)
+                                    base_unparsed: Any = py_ast.unparse(base)  # type: ignore[arg-type]
+                                    base_name_result: str | None = str(base_unparsed) if base_unparsed else None
                                 else:
-                                    base_name = getattr(base_expr, "id", None)
-                                    if base_name is None:
-                                        base_name = str(base_expr)
+                                    base_attr: Any = getattr(base, "id", None)
+                                    base_name_result = str(base_attr) if base_attr else None
+                                    if base_name_result is None:
+                                        base_name_result = str(base)
                             except Exception:
-                                base_name = getattr(base, "id", str(base))
-                            if base_name:
-                                edges.append((node.name, base_name))
+                                base_attr: Any = getattr(base, "id", str(base))
+                                base_name_result = str(base_attr) if base_attr else None
+                            if base_name_result:
+                                edges.append((class_name, base_name_result))
             except Exception:
                 pass
             if edges:
@@ -1948,15 +1968,18 @@ class CodebaseIndex:
                 query = Query(lang, query_src)
                 cursor = QueryCursor(query)
                 captures = cursor.captures(ts_tree.root_node)
-                child = None
+                child_name: Optional[str] = None
                 for capture_name, nodes in captures.items():
-                    for node in nodes:
-                        text = node.text.decode("utf-8", errors="ignore") if node.text else ""
+                    for ts_node in nodes:
+                        node_bytes = ts_node.text
+                        if node_bytes is None:
+                            continue
+                        text = node_bytes.decode("utf-8", errors="ignore")
                         if capture_name == "child":
-                            child = text
-                        elif capture_name == "base" and child:
-                            edges.append((child, text))
-                            child = None
+                            child_name = text
+                        elif capture_name == "base" and child_name:
+                            edges.append((child_name, text))
+                            child_name = None
             except Exception:
                 pass
 
@@ -1996,15 +2019,15 @@ class CodebaseIndex:
                 query = Query(lang, query_src)
                 cursor = QueryCursor(query)
                 captures = cursor.captures(tree.root_node)
-                child = None
+                child_name: Optional[str] = None
                 for capture_name, nodes in captures.items():
                     for node in nodes:
                         text = node.text.decode("utf-8", errors="ignore") if node.text else ""
                         if capture_name == "child":
-                            child = text
-                        elif capture_name in {"interface", "base"} and child:
-                            edges.append((child, text))
-                            child = None
+                            child_name = text
+                        elif capture_name in {"interface", "base"} and child_name:
+                            edges.append((child_name, text))
+                            child_name = None
             except Exception:
                 pass
 
@@ -2055,7 +2078,7 @@ class CodebaseIndex:
                 query = Query(lang, query_src)
                 cursor = QueryCursor(query)
                 captures = cursor.captures(tree.root_node)
-                owner = None
+                owner_name: Optional[str] = None
                 for capture_name, nodes in captures.items():
                     for node in nodes:
                         node_text = node.text
@@ -2063,9 +2086,9 @@ class CodebaseIndex:
                             continue
                         text = node_text.decode("utf-8", errors="ignore")
                         if capture_name == "owner":
-                            owner = text
-                        elif capture_name == "type" and owner:
-                            edges.append((owner, text))
+                            owner_name = text
+                        elif capture_name == "type" and owner_name:
+                            edges.append((owner_name, text))
                 # Do not clear owner on missing type; next owner will overwrite.
             except Exception:
                 pass
@@ -2742,12 +2765,9 @@ class CodebaseIndex:
             )
 
             # Create embedding provider
-            from typing import cast
-            from victor.storage.vector_stores.base import BaseEmbeddingProvider as StorageBaseEmbeddingProvider
-
             created_provider = EmbeddingRegistry.create(embedding_config)
-            # Cast to match expected type (they're compatible)
-            self.embedding_provider = cast(StorageBaseEmbeddingProvider, created_provider)
+            # Store as compatible type (they have the same interface)
+            self.embedding_provider = created_provider  # type: ignore[assignment]
             print(
                 f"✓ Embeddings enabled: {embedding_config.embedding_model} + "
                 f"{embedding_config.vector_store}"
@@ -2792,9 +2812,8 @@ class CodebaseIndex:
 
         # Ensure provider is initialized
         if not self.embedding_provider._initialized:
-            await self.embedding_provider.initialize(
-                rebuild_on_corruption=self._rebuild_on_corruption
-            )
+            # Note: storage providers don't support rebuild_on_corruption parameter
+            await self.embedding_provider.initialize()
 
         # Query expansion to improve recall (fix false negatives)
         queries_to_search = [query]

@@ -516,16 +516,8 @@ class ConversationController:
                 score += 0.5
 
             # Semantic relevance (if enabled and embedding service available)
-            if (
-                current_query
-                and self._embedding_service
-                and self.config.compaction_strategy
-                in (CompactionStrategy.SEMANTIC, CompactionStrategy.HYBRID)
-            ):
-                similarity = self._compute_semantic_similarity(msg.content, current_query)
-                if similarity > self.config.semantic_relevance_threshold:
-                    score += similarity * 3.0
-                    reason_parts.append(f"semantic:{similarity:.2f}")
+            # Note: Can't use async here in sync context, skip semantic scoring
+            # For full semantic scoring, use async version of this method
 
             scored.append(MessageImportance(msg, i, score, "+".join(reason_parts)))
 
@@ -726,15 +718,16 @@ class ConversationController:
                 relevant_context.append(context)
 
             # Get relevant summaries
-            relevant_summaries = self._conversation_store.get_relevant_summaries(
-                self._session_id,
-                query,
-                limit=2,
-            )
-
-            for summary, score in relevant_summaries:
-                context = f"[Prior context summary (relevance: {score:.2f})]: {summary}"
-                relevant_context.append(context)
+            # Note: get_relevant_summaries is async, skip in sync context
+            # relevant_summaries = await self._conversation_store.get_relevant_summaries(
+            #     self._session_id,
+            #     query,
+            #     limit=2,
+            # )
+            #
+            # for summary, score in relevant_summaries:
+            #     context = f"[Prior context summary (relevance: {score:.2f})]: {summary}"
+            #     relevant_context.append(context)
 
         except (OSError, IOError) as e:
             logger.warning(f"Failed to retrieve relevant history (I/O error): {e}")

@@ -33,6 +33,7 @@ from victor.workflows.recursion import RecursionContext, RecursionDepthError
 
 
 @pytest.fixture
+def mock_orchestrator() -> Any:
 def mock_orchestrator():
     """Create a mock orchestrator."""
     orchestrator = MagicMock()
@@ -46,6 +47,7 @@ def mock_orchestrator():
 
 
 @pytest.fixture
+def mock_orchestrator() -> Any:
 def compiler(mock_orchestrator: Any) -> Any:
     """Create a compiler with mock orchestrator."""
     return UnifiedWorkflowCompiler(
@@ -279,7 +281,7 @@ workflows:
         # The exit() happens in finally block after execution completes
         assert recursion_ctx.current_depth >= 0
 
-    def test_recursion_context_default_depth(self, compiler) -> None:
+    def test_recursion_context_default_depth(self, compiler: Any) -> None:
         """Test that default max_recursion_depth is 3 when not specified."""
         # Create workflow without max_recursion_depth
         workflow_def = WorkflowDefinition(

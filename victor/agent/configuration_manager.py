@@ -116,10 +116,10 @@ class ConfigurationManager:
             # Get enabled tools from the access controller
             # Use get_allowed_tools as fallback for get_enabled_tools
             if hasattr(controller, "get_enabled_tools"):
-                enabled_tools = controller.get_enabled_tools()  # type: ignore[attr-defined]
+                enabled_tools = controller.get_enabled_tools()
             else:
                 enabled_tools = controller.get_allowed_tools()
-            return cast(Set[str], enabled_tools)  # type: ignore[no-any-return]
+            return cast(Set[str], enabled_tools)
         except Exception as e:
             logger.warning(f"Failed to get enabled tools: {e}")
             return set()

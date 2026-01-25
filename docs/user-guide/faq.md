@@ -577,7 +577,7 @@ result = await coordinator.execute_task(
 
 ### More troubleshooting?
 
-See the [Troubleshooting Guide](TROUBLESHOOTING.md)
+See the [Troubleshooting Guide](troubleshooting.md)
 
 ---
 
@@ -667,7 +667,7 @@ We welcome contributions!
 4. Add tests
 5. Submit a pull request
 
-See: [Development Guide](../development/)
+See: [Development Guide](../contributing/index.md)
 
 ### Is Victor production-ready?
 
@@ -678,7 +678,7 @@ It depends on your requirements and deployment context. Review the production do
 
 ### What's the roadmap?
 
-See: [ROADMAP.md](../ROADMAP.md)
+See: [ROADMAP.md](../roadmap/future_roadmap.md)
 
 Key areas:
 - Enhanced team coordination
@@ -750,4 +750,4 @@ await coordinator.execute_task("Review and fix auth.py", {})
 
 ---
 
-**Still have questions?** Check the [Troubleshooting Guide](TROUBLESHOOTING.md) or [create an issue](https://github.com/vjsingh1984/victor/issues/new)
+**Still have questions?** Check the [Troubleshooting Guide](troubleshooting.md) or [create an issue](https://github.com/vjsingh1984/victor/issues/new)

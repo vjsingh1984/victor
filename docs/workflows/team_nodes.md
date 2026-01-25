@@ -1566,8 +1566,8 @@ class RecursionContext:
 
 ### See Also
 
-- [Team Configuration System](../architecture/teams.md) - Team specification architecture
-- [State Merging Guide](../architecture/state_merging.md) - State merge strategies
+- [Team Configuration System](../teams/team_templates.md) - Team specification architecture
+- [State Merging Guide](../teams/collaboration.md) - State merge strategies
 - [Error Handling Guide](../guides/RESILIENCE.md) - Error handling patterns
 
 ---

@@ -58,12 +58,14 @@ def create_mock_orchestrator():
 
 
 @pytest.fixture
+def mock_orchestrator() -> Any:
 def mock_orchestrator():
     """Fixture providing a mock orchestrator."""
     return create_mock_orchestrator()
 
 
 @pytest.fixture
+def mock_orchestrator() -> Any:
 def three_node_workflow():
     """Create a workflow with exactly 3 transform nodes for testing."""
 
@@ -92,6 +94,7 @@ def three_node_workflow():
 
 
 @pytest.fixture
+def mock_orchestrator() -> Any:
 def failing_workflow():
     """Create a workflow that will fail at a specific node."""
 
@@ -116,6 +119,7 @@ def failing_workflow():
 
 
 @pytest.fixture
+def mock_orchestrator() -> Any:
 def long_running_workflow():
     """Create a workflow with nodes that take time to execute."""
 

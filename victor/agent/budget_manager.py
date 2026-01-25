@@ -480,8 +480,8 @@ class ExtendedBudgetManager(BudgetManager):
         super().__post_init__()
         if self._mode_checker is None:
             # Create concrete implementation instead of abstract class
-            from victor.agent.budget.mode_completion import ModeCompletionCheckerImpl
-            self._mode_checker = ModeCompletionCheckerImpl()
+            from victor.agent.budget.mode_completion_checker import ModeCompletionChecker
+            self._mode_checker = ModeCompletionChecker()
 
     def set_mode(self, mode: str) -> None:
         """Set current operating mode.
@@ -663,6 +663,12 @@ def create_mode_completion_criteria(
     Returns:
         Configured ModeCompletionCriteria instance
     """
-    # Create concrete implementation instead of abstract class
-    from victor.agent.budget.mode_completion import ModeCompletionCriteriaImpl
-    return ModeCompletionCriteriaImpl(custom_criteria=custom_criteria)  # type: ignore[abstract]
+    # Create concrete implementation
+    from victor.agent.budget.mode_completion_checker import ModeCompletionChecker, ModeCompletionConfig
+
+    config = ModeCompletionConfig()
+    if custom_criteria:
+        # Apply custom criteria if provided
+        for mode, criteria in custom_criteria.items():
+            setattr(config, f"{mode.lower()}_criteria", criteria)
+    return ModeCompletionChecker(config=config)

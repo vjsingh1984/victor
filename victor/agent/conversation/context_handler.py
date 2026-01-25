@@ -22,7 +22,7 @@ Part of SOLID-based refactoring to eliminate god class anti-pattern.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from victor.agent.conversation_controller import ConversationController, ContextMetrics
 from victor.agent.protocols import IContextOverflowHandler
@@ -112,7 +112,7 @@ class ContextOverflowHandler(IContextOverflowHandler):
                     f"{metrics.message_count} messages"
                 )
 
-                return metrics
+                return cast(Optional["ContextMetrics"], metrics)
             else:
                 # Fallback if compact_context not available
                 logger.warning("compact_context not available on controller")

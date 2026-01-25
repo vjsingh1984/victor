@@ -178,10 +178,11 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             )
 
             self._db = EmbeddedProximaDB(config=config)
-            await self._db.start()
-            self._started = True
             if self._db is not None:
-                self._server_url = self._db.rest_url
+                await self._db.start()
+                self._started = True
+                # Access rest_url safely (db is not None here)
+                self._server_url = getattr(self._db, "rest_url", self._server_url)
             print(f"Started embedded ProximaDB: {self._server_url}")
 
         except ImportError:
@@ -343,7 +344,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
 
         # Add content to metadata for retrieval
         full_metadata = {"content": content, **(metadata or {})}
-        vector_data["metadata"] = self._convert_metadata(full_metadata)
+        vector_data["metadata"] = self._convert_metadata(full_metadata)  # type: ignore[assignment]
 
         # Insert into collection
         if self._client is None:

@@ -130,7 +130,7 @@ ollama run qwen2.5-coder:7b "Hello"
 ollama logs
 ```
 
-[Full Setup Guide ->](setup.md#ollama)
+[Full Setup Guide ->](setup.md)
 
 ### LM Studio
 
@@ -166,7 +166,7 @@ profiles:
 - Model discovery built-in
 - Easy GPU configuration
 
-[Full Setup Guide ->](setup.md#lm-studio)
+[Full Setup Guide ->](setup.md)
 
 ### vLLM
 
@@ -209,7 +209,7 @@ profiles:
 - **Batching**: Automatic request batching
 - **Memory**: Efficient with PagedAttention
 
-[Full Setup Guide ->](setup.md#vllm)
+[Full Setup Guide ->](setup.md)
 
 ### llama.cpp
 
@@ -240,7 +240,7 @@ victor chat --provider llama-cpp
 - Broad model support
 - Low memory footprint
 
-[Full Setup Guide ->](setup.md#llama-cpp)
+[Full Setup Guide ->](setup.md)
 
 ---
 

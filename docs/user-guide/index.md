@@ -6,7 +6,7 @@ Complete guide for daily usage of Victor AI Assistant.
 
 This guide covers everything you need to use Victor effectively, from basic conversations to advanced workflows and multi-agent teams.
 
-**New to Victor?** Start with [Getting Started](../getting-started/).
+**New to Victor?** Start with [Getting Started](../getting-started/index.md).
 
 ## Quick Reference
 
@@ -18,7 +18,7 @@ This guide covers everything you need to use Victor effectively, from basic conv
 | **Session Management** | [Session Management](session-management.md) | Save and restore sessions |
 | **Providers** | [Provider Guide](providers.md) | Provider setup and switching |
 | **Workflows** | [Workflows Guide](workflows.md) | YAML-based automation |
-| **Configuration** | [Configuration ->](../reference/configuration/) | Profiles and settings |
+| **Configuration** | [Configuration ->](../reference/configuration/index.md) | Profiles and settings |
 
 ## Common Tasks
 
@@ -183,7 +183,7 @@ profiles:
     model: gpt-4
 ```
 
-[Full Configuration Guide ->](../reference/configuration/)
+[Full Configuration Guide ->](../reference/configuration/index.md)
 
 ## Troubleshooting
 
@@ -192,9 +192,9 @@ profiles:
 - Permission errors? -> [Troubleshooting ->](troubleshooting.md)
 
 **Provider Issues**
-- API key errors? -> [Provider Reference ->](../reference/providers/)
+- API key errors? -> [Provider Reference ->](../reference/providers/index.md)
 - Connection timeouts? -> [Troubleshooting ->](troubleshooting.md)
-- Model not found? -> [Provider Reference ->](../reference/providers/)
+- Model not found? -> [Provider Reference ->](../reference/providers/index.md)
 
 **Performance Issues**
 - Slow responses? -> [Performance Benchmarks ->](../operations/performance/benchmarks.md)
@@ -237,7 +237,7 @@ victor mcp --stdio
 
 Install from marketplace or build from source.
 
-[VS Code Setup ->](../../vscode-victor/README.md)
+VS Code extension setup is maintained outside this docs set.
 
 ## Advanced Usage
 
@@ -264,7 +264,7 @@ Coordinate specialized AI agents for complex tasks.
 - **Consensus**: Agents vote on decisions
 - **Debate**: Agents debate to consensus
 
-[Full Multi-Agent Guide ->](../guides/multi-agent/)
+[Full Multi-Agent Guide ->](../guides/MULTI_AGENT_TEAMS.md)
 
 ### Observability
 
@@ -280,7 +280,7 @@ def on_tool_execution(event):
 EventBus.subscribe("tool.execution", on_tool_execution)
 ```
 
-[Full Observability Guide ->](../guides/observability/)
+[Full Observability Guide ->](../guides/observability/index.md)
 
 ## Best Practices
 
@@ -394,13 +394,13 @@ result = await team.run("Implement user registration feature")
 
 - **Session Management**: [Session Management ->](session-management.md)
 - **Troubleshooting**: [Troubleshooting Guide ->](troubleshooting.md)
-- **Reference**: [Provider Reference ->](../reference/providers/)
-- **Reference**: [Tool Catalog ->](../reference/tools/)
+- **Reference**: [Provider Reference ->](../reference/providers/index.md)
+- **Reference**: [Tool Catalog ->](../reference/tools/catalog.md)
 - **Workflows**: [Workflows Guide ->](workflows.md)
-- **Guides**: [Multi-Agent Teams ->](../guides/multi-agent/)
-- **Guides**: [Integration ->](../guides/integration/)
-- **Development**: [Contributing ->](../../CONTRIBUTING.md)
+- **Guides**: [Multi-Agent Teams ->](../guides/MULTI_AGENT_TEAMS.md)
+- **Guides**: [Integration ->](../guides/integration/mcp-clients.md)
+- **Development**: [Contributing ->](../contributing/index.md)
 
 ---
 
-**Next**: [Basic Usage ->](../getting-started/basic-usage.md)
+**Next**: [Basic Usage ->](../getting-started/first-run.md)

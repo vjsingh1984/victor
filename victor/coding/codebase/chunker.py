@@ -903,7 +903,7 @@ class TierAwareChunker:
 
         # Lazy-load text chunker to avoid import cycles
         if text_chunker is not None:
-            self._text_chunker = text_chunker
+            self._text_chunker: "TextChunkerProtocol | None" = text_chunker
         else:
             self._text_chunker = None  # Lazy-loaded on first use
 

@@ -255,7 +255,9 @@ class ConversationManager:
         Returns:
             The created Message object
         """
-        return self._message_store.add_message(role, content)
+        self._message_store.add_message(role, content)
+        # Return the last message from the controller
+        return self._controller.messages[-1]
 
     def add_user_message(self, content: str) -> "Message":
         """Add a user message.

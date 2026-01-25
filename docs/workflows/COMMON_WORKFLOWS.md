@@ -22,7 +22,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 victor chat --provider anthropic "Hello, Victor!"
 ```
 
-**Documentation:** [Installation Guide](docs/getting-started/installation.md)
+**Documentation:** [Installation Guide](../getting-started/installation.md)
 
 ---
 
@@ -45,7 +45,7 @@ victor chat --mode explore "Analyze this codebase"
 # (automatically saved in ~/.victor/conversations/)
 ```
 
-**Documentation:** [User Guide Index](docs/user-guide/index.md)
+**Documentation:** [User Guide Index](../user-guide/index.md)
 
 ---
 
@@ -70,7 +70,7 @@ victor chat --provider anthropic "Review the refactored code"
 - `plan`: 2.5x exploration, sandbox mode
 - `explore`: 3.0x exploration, no edits
 
-**Documentation:** [Modes Explanation](docs/reference/quick-reference.md#agent-modes)
+**Documentation:** [Modes Explanation](../reference/quick-reference.md#agent-modes)
 
 ---
 
@@ -103,7 +103,7 @@ review = await reviewer.run(f"Review:\n{code.content}")
 - Fast iteration (Groq: 300+ tok/s)
 - Quality assurance (Anthropic: best results)
 
-**Documentation:** [Provider Comparison](docs/reference/providers/comparison.md)
+**Documentation:** [Provider Comparison](../reference/providers/comparison.md)
 
 ---
 
@@ -126,7 +126,7 @@ pytest tests/unit/auth/test_auth.py -v
 pytest tests/unit/auth/ --cov=src/auth --cov-report=html
 ```
 
-**Documentation:** [Testing Guide](docs/development/testing.md)
+**Documentation:** [Testing Guide](../contributing/testing.md)
 
 ---
 
@@ -145,7 +145,7 @@ victor chat --provider anthropic "Design a REST API"
 
 **Key benefit:** Conversation context is preserved when switching providers!
 
-**Documentation:** [Provider Guide](docs/user-guide/providers.md)
+**Documentation:** [Provider Guide](../user-guide/providers.md)
 
 ---
 
@@ -180,7 +180,7 @@ nodes:
 victor workflow run code-review.yaml --target src/auth.py
 ```
 
-**Documentation:** [Workflow Reference](docs/reference/internals/workflows-api.md)
+**Documentation:** [Workflow Reference](../reference/internals/workflows-api.md)
 
 ---
 
@@ -200,7 +200,7 @@ victor chat " diagnose the Ollama connection issue"
 victor doctor  # (if available)
 ```
 
-**Documentation:** [Troubleshooting](docs/getting-started/troubleshooting.md)
+**Documentation:** [Troubleshooting](../getting-started/troubleshooting.md)
 
 ---
 
@@ -222,9 +222,9 @@ victor chat "How does the ToolCoordinator work?"
 ```
 
 **Documentation:**
-- [Architecture Overview](docs/architecture/overview.md)
-- [30 Mermaid Diagrams](docs/diagrams/)
-- [Component Reference](docs/architecture/COMPONENT_REFERENCE.md)
+- [Architecture Overview](../architecture/overview.md)
+- [30 Mermaid Diagrams](../diagrams/)
+- [Component Reference](../architecture/COMPONENT_REFERENCE.md)
 
 ---
 
@@ -252,7 +252,7 @@ git commit -m "feat: add feature X"
 git push origin feature/my-feature
 ```
 
-**Documentation:** [Contributing Guide](docs/development/CONTRIBUTING.md)
+**Documentation:** [Contributing Guide](../contributing/index.md)
 
 ---
 
@@ -446,29 +446,29 @@ export ANTHROPIC_API_KEY=sk-ant-...
 victor keys --set anthropic --keyring
 ```
 
-**Documentation:** [Troubleshooting Guide](docs/getting-started/troubleshooting.md)
+**Documentation:** [Troubleshooting Guide](../getting-started/troubleshooting.md)
 
 ---
 
 ## Learning Resources
 
 ### For Beginners
-1. [Installation](docs/getting-started/installation.md) - 5 min
-2. [First Run](docs/getting-started/first-run.md) - 3 min
-3. [Local Models](docs/getting-started/local-models.md) - 10 min
-4. [FAQ](docs/FAQ.md) - 5 min
+1. [Installation](../getting-started/installation.md) - 5 min
+2. [First Run](../getting-started/first-run.md) - 3 min
+3. [Local Models](../getting-started/local-models.md) - 10 min
+4. [FAQ](../FAQ.md) - 5 min
 
 ### For Intermediate Users
-1. [User Guide](docs/user-guide/index.md) - 30 min
-2. [Provider Guide](docs/user-guide/providers.md) - All 21 providers
-3. [Tool Catalog](docs/reference/tools/catalog.md) - 55+ tools
-4. [Workflows](docs/user-guide/workflows.md) - Automation
+1. [User Guide](../user-guide/index.md) - 30 min
+2. [Provider Guide](../user-guide/providers.md) - All 21 providers
+3. [Tool Catalog](../reference/tools/catalog.md) - 55+ tools
+4. [Workflows](../user-guide/workflows.md) - Automation
 
 ### For Advanced Users
-1. [Architecture Overview](docs/architecture/overview.md) - System design
-2. [30 Mermaid Diagrams](docs/diagrams/) - Visual documentation
-3. [API Reference](docs/reference/api.md) - Python API
-4. [Contributing Guide](docs/development/CONTRIBUTING.md) - Development
+1. [Architecture Overview](../architecture/overview.md) - System design
+2. [30 Mermaid Diagrams](../diagrams/) - Visual documentation
+3. [API Reference](../reference/api.md) - Python API
+4. [Contributing Guide](../contributing/index.md) - Development
 
 ---
 
@@ -486,7 +486,7 @@ Victor AI is designed for flexibility and power. Use these workflows to:
 
 <div align="center">
 
-**[← Back to Documentation](docs/index.md)**
+**[← Back to Documentation](../index.md)**
 
 **Common Workflows**
 

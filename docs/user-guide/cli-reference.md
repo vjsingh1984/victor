@@ -95,6 +95,24 @@ victor chat --resume myproj-9Kx7Z2
 
 ---
 
+## Modes
+
+Victor supports three execution modes that control whether edits are allowed:
+
+| Mode | Description | File Edits |
+|------|-------------|-----------|
+| **build** | Full implementation mode | Yes |
+| **plan** | Analysis and planning | No |
+| **explore** | Understanding only | No |
+
+Use `--mode` with `victor chat`:
+
+```bash
+victor chat --mode plan "Analyze this module"
+```
+
+---
+
 ### victor init
 
 Initialize Victor in the current directory. Creates `.victor/` directory with configuration files.
@@ -710,5 +728,5 @@ These options are available for most commands:
 
 - [TUI Mode Guide](./tui-mode.md) - Interactive TUI interface
 - [Tool Catalog](../reference/tools/catalog.md) - Available tools
-- [Provider Reference](../reference/providers/) - Provider details
+- [Provider Reference](../reference/providers/index.md) - Provider details
 - [Workflow DSL](../guides/workflow-development/dsl.md) - Workflow syntax

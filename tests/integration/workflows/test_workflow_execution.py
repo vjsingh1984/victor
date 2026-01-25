@@ -40,6 +40,7 @@ from victor.workflows import (
 
 
 @pytest.fixture
+def mock_orchestrator() -> Any:
 def mock_orchestrator():
     """Create a mock orchestrator for testing."""
     orchestrator = MagicMock()
@@ -50,6 +51,7 @@ def mock_orchestrator():
 
 
 @pytest.fixture
+def mock_orchestrator() -> Any:
 def mock_subagent_result():
     """Create a mock subagent result."""
     result = MagicMock()

@@ -129,7 +129,7 @@ Contains:
 **Python Version**: 3.11.13
 **Platform**: macOS (Darwin 25.2.0)
 
-**Questions**: Refer to FINAL_VALIDATION_REPORT.md for detailed information
+**Questions**: Refer to the testing reports in `docs/testing/` for detailed information.
 
 ---
 
@@ -142,4 +142,4 @@ Validation results are point‑in‑time internal assessments and are not a prod
 ---
 
 *Index created: 2026-01-14 12:40:00 UTC*
-*For detailed analysis, see FINAL_VALIDATION_REPORT.md*
+*For detailed analysis, see `docs/testing/` reports.*

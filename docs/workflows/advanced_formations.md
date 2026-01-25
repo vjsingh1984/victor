@@ -669,7 +669,7 @@ result = await coordinator.execute_task(task, context)
 
 ## References
 
-- [Team Formations Overview](../teams/README.md)
-- [Workflow Configuration](./workflow_configuration.md)
-- [Team YAML Schema](../config/teams/README.md)
-- [Formation Strategies API](../api/formations.md)
+- [Team Formations Overview](../teams/collaboration.md)
+- [Workflow Configuration](../guides/workflow-development/dsl.md)
+- [Team YAML Schema](../teams/team_templates.md)
+- [Formation Strategies API](./ml_formation_selection.md)

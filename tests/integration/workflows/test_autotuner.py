@@ -128,7 +128,7 @@ def sample_workflow_config() -> Dict[str, Any]:
 class TestPerformanceAnalyzer:
     """Test PerformanceAnalyzer functionality."""
 
-    def test_analyze_performance_with_slow_execution(self, sample_metrics) -> None:
+    def test_analyze_performance_with_slow_execution(self, sample_metrics: Any) -> None:
         """Test analysis detects slow execution."""
         analyzer = PerformanceAnalyzer(metrics_history=sample_metrics)
 
@@ -142,7 +142,7 @@ class TestPerformanceAnalyzer:
         assert insight.severity > 0.5
         assert insight.current_value > insight.baseline_value
 
-    def test_analyze_performance_with_high_latency_outliers(self, sample_metrics) -> None:
+    def test_analyze_performance_with_high_latency_outliers(self, sample_metrics: Any) -> None:
         """Test analysis detects high P95 latency."""
         analyzer = PerformanceAnalyzer(metrics_history=sample_metrics)
 
@@ -152,7 +152,7 @@ class TestPerformanceAnalyzer:
         p95_insights = [i for i in insights if i.bottleneck == "high_latency_outliers"]
         assert len(p95_insights) > 0
 
-    def test_analyze_performance_with_low_success_rate(self, sample_metrics) -> None:
+    def test_analyze_performance_with_low_success_rate(self, sample_metrics: Any) -> None:
         """Test analysis detects low success rate."""
         analyzer = PerformanceAnalyzer(metrics_history=sample_metrics)
 
@@ -162,7 +162,7 @@ class TestPerformanceAnalyzer:
         success_insights = [i for i in insights if i.bottleneck == "low_success_rate"]
         assert len(success_insights) > 0
 
-    def test_analyze_performance_with_excessive_tool_usage(self, sample_metrics) -> None:
+    def test_analyze_performance_with_excessive_tool_usage(self, sample_metrics: Any) -> None:
         """Test analysis detects excessive tool usage."""
         analyzer = PerformanceAnalyzer(metrics_history=sample_metrics)
 
@@ -172,7 +172,7 @@ class TestPerformanceAnalyzer:
         tool_insights = [i for i in insights if i.bottleneck == "excessive_tool_usage"]
         assert len(tool_insights) > 0
 
-    def test_analyze_formation_performance(self, sample_metrics) -> None:
+    def test_analyze_formation_performance(self, sample_metrics: Any) -> None:
         """Test formation-specific performance analysis."""
         analyzer = PerformanceAnalyzer(metrics_history=sample_metrics)
 
@@ -182,7 +182,7 @@ class TestPerformanceAnalyzer:
         formation_insights = [i for i in insights if "formation" in i.bottleneck]
         assert len(formation_insights) > 0
 
-    def test_analyze_team_size_efficiency(self, sample_metrics) -> None:
+    def test_analyze_team_size_efficiency(self, sample_metrics: Any) -> None:
         """Test team size analysis."""
         # Add more data points for slow_team to meet the 3 data point requirement
         # Need avg duration > 30s per member = 30 * 8 = 240s average
@@ -218,7 +218,7 @@ class TestPerformanceAnalyzer:
         size_insights = [i for i in insights if i.bottleneck == "oversized_team"]
         assert len(size_insights) > 0
 
-    def test_load_metrics_from_file(self, sample_metrics, tmp_path) -> None:
+    def test_load_metrics_from_file(self, sample_metrics: Any, tmp_path: Any) -> None:
         """Test loading metrics from JSON file."""
         metrics_file = tmp_path / "metrics.json"
 
@@ -258,7 +258,7 @@ class TestPerformanceAnalyzer:
 class TestOptimizationStrategies:
     """Test optimization strategies."""
 
-    def test_team_sizing_strategy(self, sample_metrics) -> None:
+    def test_team_sizing_strategy(self, sample_metrics: Any) -> None:
         """Test team sizing strategy."""
         strategy = TeamSizingStrategy()
 
@@ -347,7 +347,7 @@ class TestOptimizationStrategies:
         assert suggestions[0].type == OptimizationType.TIMEOUT_TUNING
         assert "timeout_seconds" in suggestions[0].suggested_config
 
-    def test_apply_team_sizing(self, sample_workflow_config) -> None:
+    def test_apply_team_sizing(self, sample_workflow_config: Any) -> None:
         """Test applying team sizing optimization."""
         strategy = TeamSizingStrategy()
 
@@ -366,7 +366,7 @@ class TestOptimizationStrategies:
 
         assert new_config["member_count"] == 5
 
-    def test_apply_formation_selection(self, sample_workflow_config) -> None:
+    def test_apply_formation_selection(self, sample_workflow_config: Any) -> None:
         """Test applying formation selection."""
         strategy = FormationSelectionStrategy()
 
@@ -394,7 +394,7 @@ class TestOptimizationStrategies:
 class TestPerformanceAutotuner:
     """Test PerformanceAutotuner functionality."""
 
-    def test_suggest_optimizations(self, sample_metrics, sample_workflow_config) -> None:
+    def test_suggest_optimizations(self, sample_metrics: Any, sample_workflow_config: Any) -> None:
         """Test optimization suggestion generation."""
         analyzer = PerformanceAnalyzer(metrics_history=sample_metrics)
         autotuner = PerformanceAutotuner(analyzer=analyzer)
@@ -497,7 +497,7 @@ class TestPerformanceAutotuner:
 
         assert not success
 
-    def test_get_optimization_history(self, sample_metrics, sample_workflow_config) -> None:
+    def test_get_optimization_history(self, sample_metrics: Any, sample_workflow_config: Any) -> None:
         """Test getting optimization history."""
         analyzer = PerformanceAnalyzer(metrics_history=sample_metrics)
         autotuner = PerformanceAutotuner(analyzer=analyzer)
@@ -506,7 +506,7 @@ class TestPerformanceAutotuner:
         history = autotuner.get_optimization_history("test_team")
         assert isinstance(history, list)
 
-    def test_optimization_result_to_dict(self, sample_workflow_config) -> None:
+    def test_optimization_result_to_dict(self, sample_workflow_config: Any) -> None:
         """Test OptimizationResult serialization."""
         optimization = OptimizationSuggestion(
             type=OptimizationType.TEAM_SIZING,
@@ -590,7 +590,7 @@ class TestAutotunerIntegration:
         success = await autotuner.rollback_optimization("test_team")
         assert success
 
-    def test_multiple_teams_analysis(self, sample_metrics) -> None:
+    def test_multiple_teams_analysis(self, sample_metrics: Any) -> None:
         """Test analyzing performance for multiple teams."""
         # Extend sample_metrics with more slow_team data to trigger oversized_team detection
         # Need avg duration > 30s per member = 30 * 8 = 240s average
@@ -666,7 +666,7 @@ class TestAutotunerIntegration:
         assert result_strict.validation_status in ["passed", "failed", "inconclusive"]
         assert result_lenient.validation_status in ["passed", "failed", "inconclusive"]
 
-    def test_strategy_configuration(self, sample_metrics) -> None:
+    def test_strategy_configuration(self, sample_metrics: Any) -> None:
         """Test custom strategy configuration."""
         custom_strategies = [TeamSizingStrategy(), FormationSelectionStrategy()]
 

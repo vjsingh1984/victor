@@ -803,7 +803,7 @@ See example workflows for production-ready team node usage:
 
 ## Further Reading
 
-- [YAML Workflow Reference](../api-reference/workflows.md)
-- [Team Formation Types](../architecture/TEAMS.md)
-- [Workflow Best Practices](../development/WORKFLOW_GUIDELINES.md)
-- [State Merging Strategies](../architecture/STATE_MERGING.md)
+- [YAML Workflow Reference](../reference/internals/workflows-api.md)
+- [Team Formation Types](../teams/collaboration.md)
+- [Workflow Best Practices](../guides/workflow-development/examples.md)
+- [State Merging Strategies](../teams/collaboration.md)

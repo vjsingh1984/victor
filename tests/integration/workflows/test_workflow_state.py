@@ -95,12 +95,14 @@ def create_mock_orchestrator():
 
 
 @pytest.fixture
+def mock_orchestrator() -> Any:
 def mock_orchestrator():
     """Fixture providing a mock orchestrator."""
     return create_mock_orchestrator()
 
 
 @pytest.fixture
+def mock_orchestrator() -> Any:
 def state_modification_workflow():
     """Workflow that modifies state in multiple ways."""
 
@@ -133,6 +135,7 @@ def state_modification_workflow():
 
 
 @pytest.fixture
+def mock_orchestrator() -> Any:
 def nested_state_workflow():
     """Workflow that works with deeply nested state."""
 

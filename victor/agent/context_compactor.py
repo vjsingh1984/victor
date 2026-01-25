@@ -42,7 +42,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, cast
 
 from victor.config.orchestrator_constants import (
     COMPACTION_CONFIG,
@@ -418,18 +418,24 @@ class ContextCompactor:
         rl_action = None
         if self._rl_enabled and self.pruning_learner is not None:
             try:
+                # Get provider and model from provider_type
+                provider = self.provider_type or "anthropic"
+                model = "claude-sonnet-4-5"  # Default model
+
                 recommendation = self.pruning_learner.get_recommendation(
-                    context_utilization=utilization,
-                    tool_call_count=tool_call_count,
-                    task_complexity=task_complexity,
-                    provider_type=self.provider_type,
+                    provider=provider,
+                    model=model,
+                    task_type=task_complexity,
                 )
-                rl_action = recommendation.action
-                rl_config = recommendation.metadata.get("config", {})
-                self._last_rl_action = rl_action
-                logger.debug(
-                    f"RL recommendation: action={rl_action}, confidence={recommendation.confidence:.2f}"
-                )
+                if recommendation is not None:
+                    # recommendation.value is a dict with "action" and "config"
+                    value_dict = cast(Dict[str, Any], recommendation.value)
+                    rl_action = value_dict.get("action")
+                    rl_config = value_dict.get("config", {})
+                    self._last_rl_action = rl_action
+                    logger.debug(
+                        f"RL recommendation: action={rl_action}, confidence={recommendation.confidence:.2f}"
+                    )
             except Exception as e:
                 logger.warning(f"RL recommendation failed: {e}")
 
@@ -525,15 +531,29 @@ class ContextCompactor:
             metrics = self.controller.get_context_metrics() if self.controller else None
             utilization = metrics.utilization if metrics else 0.5
 
-            self.pruning_learner.record_outcome(
-                context_utilization=utilization,
-                tool_call_count=0,  # Will be refined later
-                action=self._last_rl_action,
-                task_success=task_success,
-                tokens_saved=tokens_saved,
-                task_complexity="medium",
-                provider_type=self.provider_type,
+            # Create RLOutcome with proper metadata
+            from victor.framework.rl.base import RLOutcome
+            from datetime import datetime, timezone
+
+            outcome = RLOutcome(
+                provider=self.provider_type or "anthropic",
+                model="unknown",
+                task_type="medium",
+                success=task_success,
+                quality_score=1.0 if task_success else 0.0,
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                metadata={
+                    "context_utilization": utilization,
+                    "tool_call_count": 0,
+                    "action": self._last_rl_action or "moderate",
+                    "tokens_saved": tokens_saved,
+                    "task_complexity": "medium",
+                    "provider_type": self.provider_type,
+                },
+                vertical="coding",
             )
+
+            self.pruning_learner.record_outcome(outcome)
             self._last_task_success = task_success
             logger.debug(
                 f"Recorded RL outcome: action={self._last_rl_action}, "
@@ -550,6 +570,9 @@ class ContextCompactor:
         Returns:
             Tuple of (should_compact, trigger_reason)
         """
+        if self.controller is None:
+            return False, CompactionTrigger.NONE
+
         metrics = self.controller.get_context_metrics()
 
         if metrics.is_overflow_risk:
@@ -654,7 +677,7 @@ class ContextCompactor:
             return f"{content[:half]}\n... [content truncated] ...\n{content[-half:]}"
 
         # Priority lines (errors, paths, important markers)
-        priority_indices: set = set()
+        priority_indices: set[int] = set()
         for i, line in enumerate(lines):
             if self.ERROR_PATTERN.search(line):
                 priority_indices.add(i)
@@ -809,6 +832,20 @@ class ContextCompactor:
         Returns:
             Dictionary with compaction statistics
         """
+        if self.controller is None:
+            return {
+                "current_utilization": 0.0,
+                "current_chars": 0,
+                "current_messages": 0,
+                "compaction_count": self._compaction_count,
+                "total_chars_freed": self._total_chars_freed,
+                "total_tokens_freed": self._total_tokens_freed,
+                "last_compaction_turn": self._last_compaction_turn,
+                "proactive_threshold": self.config.proactive_threshold,
+                "proactive_enabled": self.config.enable_proactive,
+                "truncation_enabled": self.config.enable_tool_truncation,
+            }
+
         metrics = self.controller.get_context_metrics()
 
         return {
@@ -830,6 +867,9 @@ class ContextCompactor:
         Returns:
             List of compaction summary strings
         """
+        if self.controller is None:
+            return []
+
         return self.controller.get_compaction_summaries()
 
     # ========================================================================
@@ -853,7 +893,7 @@ class ContextCompactor:
         if not hasattr(self, "_monitor_task"):
             import asyncio
 
-            self._monitor_task: Optional[asyncio.Task] = None
+            self._monitor_task: Optional[asyncio.Task[None]] = None
             self._async_running = False
             self._check_interval_seconds = 30.0
             self._last_check_time = 0.0

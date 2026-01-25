@@ -34,6 +34,8 @@ victor logs --tail 50
 
 ---
 
+## Common Issues
+
 ## Installation Issues
 
 ### Issue: Command Not Found
@@ -1025,10 +1027,10 @@ logging:
 
 ### Documentation
 
-- **Full Docs**: [Documentation Home](/index.md)
-- **User Guide**: [User Guide](/user-guide/index.md)
-- **Reference**: [Provider Reference](/user-guide/providers.md)
-- **Configuration**: [Configuration Reference](/reference/configuration/)
+- **Full Docs**: [Documentation Home](../index.md)
+- **User Guide**: [User Guide](index.md)
+- **Reference**: [Provider Reference](providers.md)
+- **Configuration**: [Configuration Reference](../reference/configuration/index.md)
 
 ### Community
 
@@ -1109,4 +1111,4 @@ CLAUDE.md                   # AI instructions
 
 **Still stuck?** [Open an issue ->](https://github.com/vjsingh1984/victor/issues/new)
 
-**Next**: [User Guide](/user-guide/index.md) | [Provider Reference](/user-guide/providers.md) | [Configuration Reference](/reference/configuration/)
+**Next**: [User Guide](index.md) | [Provider Reference](providers.md) | [Configuration Reference](../reference/configuration/index.md)

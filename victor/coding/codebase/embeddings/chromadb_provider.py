@@ -348,7 +348,7 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         # Count documents after deletion
         count_after = self.collection.count()
 
-        return count_before - count_after
+        return int(count_before) - int(count_after)
 
     async def clear_index(self) -> None:
         """Clear entire index."""

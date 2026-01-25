@@ -211,4 +211,4 @@ python scripts/benchmark_team_nodes.py compare \
 
 - [Full Performance Guide](./team_node_performance.md)
 - [Team Node Usage](./team_nodes.md)
-- [Workflow Documentation](../workflows.md)
+- [Workflow Documentation](../user-guide/workflows.md)

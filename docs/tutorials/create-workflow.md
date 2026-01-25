@@ -1133,4 +1133,4 @@ Now that you understand Victor workflows, explore:
 - **Node Types**: [docs/reference/workflow-nodes.md](/docs/reference/workflow-nodes.md)
 - **Escape Hatches**: [victor/coding/escape_hatches.py](/victor/coding/escape_hatches.py)
 - **Example Workflows**: [victor/workflows/mode_workflows.yaml](/victor/workflows/mode_workflows.yaml)
-- **API Reference**: [docs/api-reference/workflows.md](/docs/api-reference/workflows.md)
+- **API Reference**: [docs/api-reference/workflows.md](../reference/internals/workflows-api.md)

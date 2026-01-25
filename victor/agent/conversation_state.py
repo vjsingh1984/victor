@@ -90,7 +90,7 @@ Migration Example:
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, cast
 
 from victor.tools.metadata_registry import get_tools_by_stage as registry_get_tools_by_stage
 from victor.core.events import ObservabilityBus
@@ -409,7 +409,8 @@ class ConversationStateMachine:
             List of stages that can be transitioned to
         """
         if self._transition_engine:
-            return self._transition_engine.get_valid_transitions()
+            result = self._transition_engine.get_valid_transitions()
+            return cast(List[ConversationStage], result)
         # Fallback: all stages
         return list(ConversationStage)
 
@@ -424,7 +425,8 @@ class ConversationStateMachine:
             True if transition is valid
         """
         if self._transition_engine:
-            return self._transition_engine.can_transition(target_stage, confidence)
+            result = self._transition_engine.can_transition(target_stage, confidence)
+            return cast(bool, result)
         # Fallback: always allow
         return True
 
@@ -903,7 +905,7 @@ class ConversationStateMachine:
         """
         # Use StageTransitionEngine's detailed priorities if available
         if self._transition_engine:
-            multiplier = self._transition_engine.get_tool_priority_multiplier(tool_name)
+            multiplier = cast(float, self._transition_engine.get_tool_priority_multiplier(tool_name))
             # If engine has a specific multiplier (not default 1.0), use it
             if multiplier != 1.0:
                 # Convert multiplier (1.0-2.0) to boost (0.0-0.2)

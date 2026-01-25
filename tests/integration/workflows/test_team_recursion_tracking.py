@@ -260,7 +260,7 @@ class TestTeamCoordinatorRecursionIntegration:
 
         # Add a member that raises an exception
         class FailingMember:
-            def __init__(self):
+            def __init__(self) -> Any:
                 self.id = "failing_member"
                 self.role = "test"
 

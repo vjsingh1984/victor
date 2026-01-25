@@ -265,7 +265,7 @@ class TestExecutionReplayer:
 
         return filepath
 
-    def test_load_recording(self, sample_recording) -> None:
+    def test_load_recording(self, sample_recording: Any) -> None:
         """Test loading a recording."""
         replayer = ExecutionReplayer.load(sample_recording)
 
@@ -275,7 +275,7 @@ class TestExecutionReplayer:
         )  # workflow_start, node_start, node_complete, state_snapshot, node_start, node_complete, workflow_complete
         assert len(replayer.snapshots) == 1
 
-    def test_step_forward(self, sample_recording) -> None:
+    def test_step_forward(self, sample_recording: Any) -> None:
         """Test stepping forward through events."""
         replayer = ExecutionReplayer.load(sample_recording)
 
@@ -287,7 +287,7 @@ class TestExecutionReplayer:
         # Position should be at 2
         assert replayer.current_position == 2
 
-    def test_step_backward(self, sample_recording) -> None:
+    def test_step_backward(self, sample_recording: Any) -> None:
         """Test stepping backward through events."""
         replayer = ExecutionReplayer.load(sample_recording)
         replayer.current_position = 4
@@ -298,7 +298,7 @@ class TestExecutionReplayer:
         # Position should be at 2
         assert replayer.current_position == 2
 
-    def test_get_event(self, sample_recording) -> None:
+    def test_get_event(self, sample_recording: Any) -> None:
         """Test getting a specific event."""
         replayer = ExecutionReplayer.load(sample_recording)
 
@@ -309,7 +309,7 @@ class TestExecutionReplayer:
         assert event is not None
         assert event.event_type == RecordingEventType.WORKFLOW_START
 
-    def test_get_node_events(self, sample_recording) -> None:
+    def test_get_node_events(self, sample_recording: Any) -> None:
         """Test getting events for a specific node."""
         replayer = ExecutionReplayer.load(sample_recording)
 
@@ -321,7 +321,7 @@ class TestExecutionReplayer:
         assert node1_events[1].event_type == RecordingEventType.NODE_COMPLETE
         assert node1_events[2].event_type == RecordingEventType.STATE_SNAPSHOT
 
-    def test_jump_to_event(self, sample_recording) -> None:
+    def test_jump_to_event(self, sample_recording: Any) -> None:
         """Test jumping to a specific event."""
         replayer = ExecutionReplayer.load(sample_recording)
 
@@ -360,7 +360,7 @@ class TestExecutionReplayer:
         assert diff["node_diff"]["only_in_other"] == set()
         assert len(diff["node_diff"]["common"]) == 1  # node1
 
-    def test_visualize(self, sample_recording, tmp_path) -> None:
+    def test_visualize(self, sample_recording: Any, tmp_path: Any) -> None:
         """Test generating visualization."""
         replayer = ExecutionReplayer.load(sample_recording)
 
