@@ -571,7 +571,7 @@ class TestSemanticToolSelectorIntegration:
     @pytest.mark.asyncio
     async def test_initialize_populates_registry(self):
         """initialize_tool_embeddings should populate ToolMetadataRegistry."""
-        from victor.tools.base import ToolRegistry
+        from victor.tools.registry import ToolRegistry
         from victor.tools.semantic_selector import SemanticToolSelector
 
         # Create tool registry with test tools

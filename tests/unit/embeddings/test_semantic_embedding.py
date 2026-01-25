@@ -19,7 +19,8 @@ import numpy as np
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.tools.semantic_selector import SemanticToolSelector
-from victor.tools.base import ToolRegistry, BaseTool
+from victor.tools.base import BaseTool
+from victor.tools.registry import ToolRegistry
 
 
 class MockTool(BaseTool):

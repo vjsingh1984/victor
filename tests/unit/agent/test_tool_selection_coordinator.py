@@ -65,7 +65,7 @@ class TestToolSelectionCoordinator:
     def coordinator(self):
         """Create a ToolSelectionCoordinator instance for testing."""
         from victor.agent.coordinators import ToolSelectionCoordinator
-        from victor.tools.base import ToolRegistry
+        from victor.tools.registry import ToolRegistry
 
         registry = ToolRegistry()
         return ToolSelectionCoordinator(tool_registry=registry)
@@ -337,7 +337,7 @@ class TestToolSelectionCoordinatorIntegration:
     def test_coordinator_implements_protocol(self):
         """Test that coordinator implements IToolSelectionCoordinator."""
         from victor.agent.coordinators import ToolSelectionCoordinator
-        from victor.tools.base import ToolRegistry
+        from victor.tools.registry import ToolRegistry
 
         registry = ToolRegistry()
         coordinator = ToolSelectionCoordinator(tool_registry=registry)
@@ -347,7 +347,7 @@ class TestToolSelectionCoordinatorIntegration:
     def test_coordinator_maintains_orchestrator_compatibility(self):
         """Test that coordinator maintains orchestrator compatibility."""
         from victor.agent.coordinators import ToolSelectionCoordinator
-        from victor.tools.base import ToolRegistry
+        from victor.tools.registry import ToolRegistry
 
         registry = ToolRegistry()
         coordinator = ToolSelectionCoordinator(tool_registry=registry)

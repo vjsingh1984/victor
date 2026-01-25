@@ -27,7 +27,8 @@ from victor.integrations.mcp.protocol import (
     MCPResource,
     MCPMessageType,
 )
-from victor.tools.base import ToolRegistry, BaseTool, ToolResult
+from victor.tools.base import BaseTool, ToolResult
+from victor.tools.registry import ToolRegistry
 
 
 class MockTool(BaseTool):

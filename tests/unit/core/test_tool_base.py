@@ -21,8 +21,8 @@ from victor.tools.base import (
     ToolParameter,
     ToolResult,
     BaseTool,
-    ToolRegistry,
 )
+from victor.tools.registry import ToolRegistry
 
 
 class TestToolParameter:

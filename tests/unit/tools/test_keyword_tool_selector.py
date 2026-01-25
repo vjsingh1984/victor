@@ -22,7 +22,8 @@ from unittest.mock import MagicMock, patch
 
 from victor.agent.protocols import ToolSelectionContext
 from victor.providers.base import ToolDefinition
-from victor.tools.base import BaseTool, ToolRegistry, ToolResult
+from victor.tools.base import BaseTool, ToolResult
+from victor.tools.registry import ToolRegistry
 from victor.tools.keyword_tool_selector import KeywordToolSelector
 
 

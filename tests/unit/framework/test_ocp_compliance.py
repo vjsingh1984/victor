@@ -26,7 +26,7 @@ import ast
 import os
 import re
 from pathlib import Path
-from typing import List, Set, Tuple
+from typing import TYPE_CHECKING, List, Set, Tuple
 
 import pytest
 

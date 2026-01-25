@@ -18,7 +18,7 @@ Verifies that all RL configs implement get_rl_config() per RLConfigProviderProto
 """
 
 import pytest
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 @pytest.mark.parametrize(

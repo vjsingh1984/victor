@@ -56,7 +56,8 @@ from victor.agent.safety import (
     ConfirmationRequest,
     set_confirmation_callback,
 )
-from victor.tools.base import BaseTool, ToolRegistry
+from victor.tools.base import BaseTool
+from victor.tools.registry import ToolRegistry
 
 
 # =============================================================================
