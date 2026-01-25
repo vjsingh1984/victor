@@ -292,13 +292,13 @@ class TeamMemberSelector:
         Returns:
             Feature vector
         """
-        features = []
+        features: list[float] = []
 
         # Basic features
-        features.append(int(member.tool_budget))
+        features.append(float(member.tool_budget))
         features.append(1.0 if member.can_delegate else 0.0)
         features.append(1.0 if member.is_manager else 0.0)
-        features.append(int(member.max_delegation_depth))
+        features.append(float(member.max_delegation_depth))
         features.append(1.0 if member.memory_enabled else 0.0)
         features.append(float(len(member.expertise)))
         features.append(float(len(member.backstory)))

@@ -347,9 +347,9 @@ class AICompletionProvider(StreamingCompletionProvider):
             return content if content else ""
         if hasattr(response, "text"):
             text = response.text
-            return text if text else ""
+            return str(text) if text else ""
         if isinstance(response, dict):
-            return response.get("content", response.get("text", ""))
+            return str(response.get("content", response.get("text", "")))
         return str(response) if response else ""
 
     def _clean_completion(self, completion: str, suffix: str) -> str:

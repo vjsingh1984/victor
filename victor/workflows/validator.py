@@ -25,7 +25,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from victor.workflows.linter import WorkflowLinter, lint_file, lint_dict
+from victor.workflows.linter import WorkflowLinter, LinterResult, lint_file, lint_dict
 from victor.workflows.validation_rules import DEFAULT_RULES, Severity, ValidationRule
 
 logger = logging.getLogger(__name__)
@@ -102,13 +102,13 @@ class WorkflowValidator:
         """
         result = self.validate_dict(workflow_def)
 
-        if not result.is_valid:
+        if result and not result.is_valid:
             errors = [issue.message for issue in result.issues if issue.severity == Severity.ERROR]
             raise ValueError(f"Workflow validation failed: {'; '.join(errors)}")
 
         return True
 
-    def validate_file(self, file_path: str | Path) -> "ValidationResult":
+    def validate_file(self, file_path: str | Path) -> LinterResult:
         """Validate a workflow file.
 
         Args:
@@ -119,7 +119,7 @@ class WorkflowValidator:
         """
         return self.linter.lint_file(file_path)
 
-    def validate_dict(self, workflow: Dict[str, Any]) -> "ValidationResult":
+    def validate_dict(self, workflow: Dict[str, Any]) -> LinterResult:
         """Validate a workflow dictionary.
 
         Args:
@@ -132,7 +132,7 @@ class WorkflowValidator:
 
     def validate_directory(
         self, directory: str | Path, pattern: str = "*.yaml", recursive: bool = False
-    ) -> "ValidationResult":
+    ) -> LinterResult:
         """Validate all workflow files in a directory.
 
         Args:

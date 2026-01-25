@@ -410,7 +410,7 @@ class WorkflowScheduler:
         """
         self._schedules: Dict[str, ScheduledWorkflow] = {}
         self._running = False
-        self._task: Optional[asyncio.Task] = None
+        self._task: Optional[asyncio.Task[None]] = None
         self._check_interval = check_interval
         self._executor = executor
         self._lock = threading.RLock()

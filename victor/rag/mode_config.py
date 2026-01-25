@@ -107,7 +107,7 @@ class RAGModeConfigProvider(RegistryBasedModeConfigProvider):
     ensuring consistency with default modes.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize with RAG vertical name."""
         super().__init__(vertical="rag")
 
@@ -127,7 +127,10 @@ def get_rag_mode_config(mode_name: str) -> ModeDefinition:
         ModeDefinition for the requested mode
     """
     registry = ModeConfigRegistry.get_instance()
-    return registry.get_mode("rag", mode_name)
+    mode = registry.get_mode("rag", mode_name)
+    if mode is None:
+        raise ValueError(f"Mode '{mode_name}' not found for RAG vertical")
+    return mode
 
 
 def get_rag_task_budget(task_type: str) -> int:

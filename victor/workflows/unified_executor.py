@@ -207,9 +207,11 @@ class StateGraphExecutor:
     def _get_default_tool_registry(self) -> Optional["ToolRegistry"]:
         """Get the default tool registry if available."""
         try:
-            from victor.tools.registry import get_tool_registry
+            from victor.tools.registry import ToolRegistry
+            from victor.core.container import ServiceContainer
 
-            return get_tool_registry()
+            container = ServiceContainer()
+            return container.get(ToolRegistry) if container.has(ToolRegistry) else None
         except Exception:
             return None
 

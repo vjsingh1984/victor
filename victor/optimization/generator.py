@@ -375,7 +375,7 @@ class WorkflowVariantGenerator:
         Returns:
             Tuple of (success, changes)
         """
-        changes = []
+        changes: List[Dict[str, Any]] = []
 
         # Parse tool mapping (e.g., "tool_a -> tool_b")
         if " -> " not in opportunity.target:

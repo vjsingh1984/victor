@@ -385,7 +385,7 @@ class ImageProcessor:
             return None
 
         try:
-            img = Image.open(image_path)
+            img: Any = Image.open(image_path)
 
             # Calculate new size
             width, height = img.size

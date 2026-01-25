@@ -334,11 +334,11 @@ class CacheLevel:
 
         # Check if still over capacity
         while len(self._cache) >= self.config.max_size:
-            key: Optional[str] = self.get_entry_for_eviction()
-            if key is None:
+            evict_key: Optional[str] = self.get_entry_for_eviction()
+            if evict_key is None:
                 break
-            if key is not None:
-                del self._cache[key]
+            if evict_key is not None:
+                del self._cache[evict_key]
                 self._evictions += 1
 
     def size(self) -> int:

@@ -56,7 +56,7 @@ class ResearchAssistant(VerticalBase):
         - HandlerProvider: Provides workflow compute handlers
     """
 
-    name: str = "research"
+    name = "research"  # type: ignore
     description = "Web research, fact-checking, literature synthesis, and report generation"
     version = "0.5.0"
 
@@ -229,7 +229,7 @@ class ResearchAssistant(VerticalBase):
                 create_vertical_tool_dependency_provider("research")
             )
 
-        return cls._get_cached_extension("tool_dependency_provider", _create)  # type: ignore
+        return cls._get_cached_extension("tool_dependency_provider", _create)
 
     @classmethod
     def get_handlers(cls) -> Dict[str, Any]:

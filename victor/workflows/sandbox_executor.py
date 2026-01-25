@@ -282,10 +282,11 @@ class SandboxedExecutor:
             )
 
             # Communicate with process
+            input_bytes = input_data.encode() if input_data else None  # type: ignore[arg-type]
             stdout, stderr = await asyncio.wait_for(
                 asyncio.get_event_loop().run_in_executor(
                     None,
-                    lambda: process.communicate(input_data.encode() if input_data else None),
+                    lambda: process.communicate(input_bytes),
                 ),
                 timeout=limits.timeout_seconds,
             )

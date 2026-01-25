@@ -250,12 +250,13 @@ class WorkflowVisualizer:
         )
 
         # Try to import HITLNode for enhanced metadata
+        HITLNode: Optional[Any] = None
         try:
-            from victor.workflows.hitl import HITLNode
+            from victor.workflows.hitl import HITLNode as HITLNodeImport
 
+            HITLNode = HITLNodeImport
             has_hitl = True
         except ImportError:
-            HITLNode = None
             has_hitl = False
 
         # Build nodes

@@ -147,7 +147,7 @@ class WorkflowOptimizer:
                 variant_generator=self.variant_generator,
             )
         elif self.config.search_algorithm == "simulated_annealing":
-            self.search_optimizer = SimulatedAnnealingOptimizer(
+            self.search_optimizer: HillClimbingOptimizer = SimulatedAnnealingOptimizer(  # type: ignore[assignment]
                 variant_generator=self.variant_generator,
             )
         else:
@@ -285,12 +285,13 @@ class WorkflowOptimizer:
         logger.info(f"Using {len(opportunities)} opportunities for optimization")
 
         # Run optimization
+        profile_data = await self.analyze_workflow(
+            workflow_id=workflow_id,
+            experiment_tracker=experiment_tracker,
+        )
         result = await self.search_optimizer.optimize_workflow(
             workflow_config=workflow_config,
-            profile=await self.analyze_workflow(
-                workflow_id=workflow_id,
-                experiment_tracker=experiment_tracker,
-            ),
+            profile=profile_data,  # type: ignore[arg-type]
             opportunities=opportunities,
             max_iterations=self.config.max_iterations,
             score_function=custom_score_function,

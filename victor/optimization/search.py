@@ -56,7 +56,7 @@ class OptimizationResult:
     best_score: float
     iterations: int
     converged: bool
-    score_history: List[float] = None
+    score_history: Optional[List[float]] = None
 
     def __post_init__(self) -> None:
         if self.score_history is None:
@@ -195,7 +195,7 @@ class HillClimbingOptimizer:
             # Check if improvement found
             improvement = best_neighbor_score - current_score
 
-            if improvement > convergence_threshold:
+            if improvement > convergence_threshold and best_neighbor is not None:
                 # Move to best neighbor
                 current_config = best_neighbor[0]
                 current_score = best_neighbor_score

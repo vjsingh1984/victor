@@ -392,11 +392,14 @@ class WorkflowStateManager:
         if not from_snapshot or not to_snapshot:
             raise ValueError("One or both snapshots not found")
 
-        diff = self.compute_diff(from_snapshot_id, to_snapshot_id)
+        # Use actual snapshot IDs
+        from_id = from_snapshot.snapshot_id
+        to_id = to_snapshot.snapshot_id
+        diff = self.compute_diff(from_id, to_id)
 
         lines = []
         lines.append("=" * 60)
-        lines.append(f"STATE DIFF: {from_snapshot_id} -> {to_snapshot_id}")
+        lines.append(f"STATE DIFF: {from_id} -> {to_id}")
         lines.append("=" * 60)
 
         # Added keys
@@ -782,8 +785,13 @@ class WorkflowStateManager:
         if isinstance(data, str):
             data = json.loads(data)
 
+        state_data = data["state"]
+        # Ensure state_data is a dict
+        if isinstance(state_data, str):
+            state_data = json.loads(state_data)
+
         snapshot_id = self.capture_state(
-            data["state"],
+            state_data,
             node_id=data.get("node_id"),
             metadata=data.get("metadata", {}),
         )

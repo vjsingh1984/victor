@@ -907,6 +907,10 @@ class NodeExecutorFactory:
                             logger.error(f"Parallel execution failed: {result}")
                             continue
 
+                        if not isinstance(result, tuple) or len(result) != 3:
+                            logger.error(f"Invalid parallel result format: {result}")
+                            continue
+
                         child_id, success, result_data = result
                         if success and isinstance(result_data, dict):
                             # Merge state changes from parallel execution
@@ -982,7 +986,7 @@ class NodeExecutorFactory:
                     )
 
                 # Raise WorkflowExecutionError if not continuing on error
-                if not node.continue_on_error:
+                if not getattr(node, "continue_on_error", False):
                     raise WorkflowExecutionError(
                         error_msg,
                         workflow_id=workflow_id,

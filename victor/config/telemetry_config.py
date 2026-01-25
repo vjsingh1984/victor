@@ -256,7 +256,7 @@ def get_telemetry_config() -> TelemetryConfig:
     return object.__getattribute__(get_telemetry_config, "_config")  # type: ignore[no-any-return]
 
 
-def setup_telemetry(config: Optional[TelemetryConfig] = None) -> None:
+def setup_telemetry(config: Optional[TelemetryConfig] = None) -> Optional[Tuple[Any, Any]]:
     """Setup OpenTelemetry based on configuration.
 
     This function initializes OpenTelemetry tracing and metrics
@@ -282,7 +282,7 @@ def setup_telemetry(config: Optional[TelemetryConfig] = None) -> None:
 
     if not config.enabled:
         logger.info("Telemetry is disabled")
-        return None  # type: ignore[return-value]
+        return None
 
     try:
         from victor.observability.telemetry import setup_opentelemetry
@@ -307,7 +307,7 @@ def setup_telemetry(config: Optional[TelemetryConfig] = None) -> None:
     except ImportError as e:
         logger.error(f"OpenTelemetry dependencies not installed: {e}")
         logger.info("Install with: pip install victor-ai[observability]")
-        return None  # type: ignore[return-value]
+        return None
     except Exception as e:
         logger.error(f"Failed to setup telemetry: {e}")
-        return None  # type: ignore[return-value]
+        return None

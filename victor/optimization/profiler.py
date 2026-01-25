@@ -183,7 +183,7 @@ class WorkflowProfiler:
 
             if experiment:
                 # Get runs for this experiment
-                runs = tracker.search_runs(
+                runs = tracker.get_runs(  # type: ignore[attr-defined]
                     experiment_ids=[workflow_id],
                 )
 
@@ -215,7 +215,7 @@ class WorkflowProfiler:
         Returns:
             Dictionary mapping node IDs to statistics
         """
-        node_data = defaultdict(
+        node_data: Dict[str, Dict[str, Any]] = defaultdict(
             lambda: {
                 "durations": [],
                 "input_tokens": [],
@@ -223,12 +223,7 @@ class WorkflowProfiler:
                 "costs": [],
                 "successes": [],
                 "errors": defaultdict(int),
-                "tool_calls": defaultdict(
-                    lambda: {
-                        "count": 0,
-                        "cost": 0,
-                    }
-                ),
+                "tool_calls": [],
             }
         )
 
@@ -301,7 +296,7 @@ class WorkflowProfiler:
         Returns:
             List of detected bottlenecks
         """
-        bottlenecks = []
+        bottlenecks: List[Dict[str, Any]] = []
 
         if not node_stats:
             return bottlenecks

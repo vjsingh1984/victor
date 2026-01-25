@@ -439,7 +439,7 @@ class CacheInvalidator:
             self._dependency_graph = InvalidationDependencyGraph()
 
         # Invalidation event handlers
-        self._event_handlers: Dict[str, List[Callable[..., None]]] = {}
+        self._event_handlers: Dict[str, List[Callable[..., Awaitable[None]]]] = {}
 
         # Background cleanup task
         self._cleanup_task: Optional[asyncio.Task[None]] = None

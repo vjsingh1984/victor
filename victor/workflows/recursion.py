@@ -163,7 +163,7 @@ class RecursionContext:
         with self._lock:
             return (self.current_depth + levels) <= self.max_depth
 
-    def get_depth_info(self) -> dict:
+    def get_depth_info(self) -> Dict[str, Any]:
         """Get current recursion depth information (thread-safe).
 
         Returns:
@@ -212,7 +212,7 @@ class RecursionContext:
                 f"stack={self.execution_stack})"
             )
 
-    def __deepcopy__(self, memo):
+    def __deepcopy__(self, memo: Dict[int, Any]) -> "RecursionContext":
         """Custom deepcopy to support checkpointing.
 
         When checkpointing creates a deep copy of workflow state, we need to
@@ -277,6 +277,11 @@ class RecursionGuard:
         self._ctx.enter(self._operation_type, self._identifier)
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
+        """Exit the recursion guard.
+
+        Returns:
+            False to indicate exceptions should not be suppressed
+        """
         self._ctx.exit()
         return False  # Don't suppress exceptions
