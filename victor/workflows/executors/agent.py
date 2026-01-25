@@ -204,7 +204,10 @@ class AgentNodeExecutor:
         if role not in role_map:
             raise ValueError(f"Unknown agent role: {role}. Must be one of {list(role_map.keys())}")
 
-        return cast("SubAgentRole", role_map[role])
+        result = role_map[role]
+        # The role_map values are already SubAgentRole enum members
+        # But mypy can't infer this, so we use a type ignore
+        return result  # type: ignore[no-any-return]
 
     def _substitute_context(self, template: str, context: Dict[str, Any]) -> str:
         """Substitute context variables in template string.
