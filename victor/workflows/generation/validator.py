@@ -1467,7 +1467,7 @@ class RequirementValidator:
             score=score,
         )
 
-    def _check_completeness(self, requirements: Any) -> List[str]:
+    def _check_completeness(self, requirements: Any) -> List[Any]:
         """Check for missing required information."""
         from victor.workflows.generation.requirements import RequirementValidationError
 
@@ -1570,7 +1570,7 @@ class RequirementValidator:
 
         return errors
 
-    def _check_consistency(self, requirements: Any) -> tuple[List[str], List[str]]:
+    def _check_consistency(self, requirements: Any) -> tuple[List[Any], List[Any]]:
         """Check for contradictions.
 
         Returns:
@@ -1663,7 +1663,7 @@ class RequirementValidator:
 
         return errors, warnings
 
-    def _check_feasibility(self, requirements: Any) -> tuple[List[str], List[str]]:
+    def _check_feasibility(self, requirements: Any) -> tuple[List[Any], List[Any]]:
         """Check if requirements can be implemented.
 
         Returns:
@@ -1742,7 +1742,7 @@ class RequirementValidator:
 
         return errors, warnings
 
-    def _check_specificity(self, requirements: Any) -> List[str]:
+    def _check_specificity(self, requirements: Any) -> List[Any]:
         """Check if requirements are specific enough.
 
         Args:
@@ -1875,7 +1875,7 @@ class RequirementValidator:
         # Clamp to [0, 1]
         return max(0.0, min(1.0, score))
 
-    def _detect_cycles(self, dependencies: Any) -> List[str]:
+    def _detect_cycles(self, dependencies: Any) -> List[Any]:
         """Detect cycles in dependency graph using DFS.
 
         Args:

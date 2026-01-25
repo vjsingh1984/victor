@@ -471,6 +471,7 @@ class WorkflowExecutor:
         self._tool_registry = tool_registry
         self._service_registry = service_registry
         self._services_started = False
+        self._cache: Optional["WorkflowCache"] = None
 
         # Initialize cache if config provided
         if cache is not None:
@@ -479,8 +480,6 @@ class WorkflowExecutor:
             from victor.workflows.cache import WorkflowCache
 
             self._cache = WorkflowCache(cache_config)
-        else:
-            self._cache = None
 
     @property
     def sub_agents(self) -> "SubAgentOrchestrator":
@@ -491,7 +490,8 @@ class WorkflowExecutor:
 
             # Use the orchestrator directly if it has the required interface
             # SubAgentOrchestrator will adapt to the orchestrator protocol
-            self._sub_agents = SubAgentOrchestrator(self.orchestrator)
+            # Type ignore: orchestrator is WorkflowAgentProtocol but SubAgentOrchestrator accepts AgentOrchestrator
+            self._sub_agents = SubAgentOrchestrator(self.orchestrator)  # type: ignore[arg-type]
         return self._sub_agents
 
     @property

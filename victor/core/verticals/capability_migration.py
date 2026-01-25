@@ -248,7 +248,8 @@ def get_capability_or_create(
         created = factory()
         # Type ignore needed because factory() returns Any but we need T
         return created  # type: ignore[no-any-return]
-    return capability  # type: ignore[no-any-return]
+    # Type ignore: get_capability returns Any but we need T
+    return capability  # type: ignore[no-any-return, misc]
 
 
 # =============================================================================

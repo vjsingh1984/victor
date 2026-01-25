@@ -1263,7 +1263,7 @@ class TransformingValidator(BaseValidator):
 
         if value is None:
             from victor.framework.validation.pipeline import ValidationResult
-            return ValidationResult(is_valid=True)
+            return ValidationResult(is_valid=True)  # type: ignore[no-any-return]
 
         # Transform the value
         try:
@@ -1275,7 +1275,7 @@ class TransformingValidator(BaseValidator):
                 result,
                 f"Transform failed: {e}",
             )
-            return result
+            return result  # type: ignore[no-any-return]
 
         # Create a copy of data with transformed value
         if path:

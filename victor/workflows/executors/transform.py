@@ -107,7 +107,7 @@ class TransformNodeExecutor:
             }
 
             logger.info(f"Transform node {node.id} completed successfully")
-            return state_dict
+            return state_dict  # type: ignore[return-value]
 
         except Exception as e:
             logger.error(f"Transform node '{node.id}' failed: {e}", exc_info=True)

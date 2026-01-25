@@ -140,7 +140,10 @@ class NodeExecutorFactory:
         async def executor_wrapper(state: "WorkflowState") -> "WorkflowState":
             result = await executor.execute(node, state)
             # Ensure result is a WorkflowState (dict)
-            return result if isinstance(result, dict) else state
+            if isinstance(result, dict):
+                return result  # type: ignore[return-value]
+            else:
+                return state
 
         return executor_wrapper
 

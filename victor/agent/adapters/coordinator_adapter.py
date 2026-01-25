@@ -42,15 +42,18 @@ if TYPE_CHECKING:
 
 # Import StateScope at runtime for use in adapter
 try:
-    from victor.agent.coordinators.state_coordinator import StateScope
+    from victor.agent.coordinators.state_coordinator import StateScope as StateScopeType
 except ImportError:
     # Fallback for testing - create a simple type
-    class StateScope:
+    class StateScopeType:
         """Fallback StateScope for testing."""
 
         CHECKPOINT = "checkpoint"
         ROLLBACK = "rollback"
         SNAPSHOT = "snapshot"
+
+# Re-export for consistency
+StateScope = StateScopeType
 
 logger = logging.getLogger(__name__)
 

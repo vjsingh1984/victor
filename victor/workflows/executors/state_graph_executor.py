@@ -274,7 +274,7 @@ class StateGraphExecutor(Generic[StateType]):
             _thread_id=thread_id,
             _graph_id=getattr(self._graph, 'graph_id', None) or "unknown",
             _start_time=time.time(),
-        )  # type: ignore[return-value]
+        )
 
 
 __all__ = [

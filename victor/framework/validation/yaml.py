@@ -416,6 +416,9 @@ class ValidatorFactory:
         # Get the transform type
         transform_type = cfg.get("transform", "strip")
 
+        # Initialize transform variable
+        transform: Callable[[Any], Any]
+
         if transform_type == "strip":
 
             def _strip_transform(x: Any) -> Any:
@@ -453,7 +456,7 @@ class ValidatorFactory:
                 """Strip whitespace from strings."""
                 return x.strip() if isinstance(x, str) else x
 
-            transform: Callable[[Any], Any] = _default_strip_transform
+            transform = _default_strip_transform
 
         return TransformingValidator(
             validator=cast(BaseValidator, inner),

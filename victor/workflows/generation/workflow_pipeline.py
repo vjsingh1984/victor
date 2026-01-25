@@ -374,7 +374,7 @@ class WorkflowGenerationPipeline:
 
         try:
             # Convert graph to schema
-            schema = graph.to_dict()
+            schema = graph.to_dict()  # type: ignore[attr-defined]
             result.schema = schema
 
             # Refine schema
@@ -431,7 +431,11 @@ class WorkflowGenerationPipeline:
         from victor.workflows.generation.validator import WorkflowValidator
 
         validator = WorkflowValidator()
-        return await validator.validate(schema)
+        result = validator.validate(schema)
+        # Handle both sync and async validators
+        if isinstance(result, asyncio.Future) or hasattr(result, '__await__'):
+            return await result
+        return result
 
     async def _refine_schema(
         self, schema: Dict[str, Any], validation: WorkflowGenerationValidationResult
@@ -454,9 +458,13 @@ class WorkflowGenerationPipeline:
                 iterations=0,
             )
 
-        return await self._refiner.refine(schema, validation)
+        result = self._refiner.refine(schema, validation)
+        # Handle both sync and async refiners
+        if isinstance(result, asyncio.Future) or hasattr(result, '__await__'):
+            return await result
+        return result
 
-    async def _compile_to_graph(self, schema: Dict[str, Any]) -> StateGraph:
+    async def _compile_to_graph(self, schema: Dict[str, Any]) -> StateGraph[Any]:
         """Compile schema to executable StateGraph.
 
         Args:
@@ -473,7 +481,7 @@ class WorkflowGenerationPipeline:
             from victor.framework.graph import StateGraph
 
             # Use StateGraph.from_schema() to create graph
-            graph = StateGraph.from_schema(
+            graph: StateGraph[Any] = StateGraph.from_schema(
                 schema,
                 node_registry={},  # Will be populated during execution
                 condition_registry={},  # Will be populated during execution

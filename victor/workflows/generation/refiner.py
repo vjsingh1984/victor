@@ -216,9 +216,10 @@ class SchemaRefiner:
         node_type = node.get("type", "")
         defaults = self.DEFAULTS.get(node_type, {})
 
-        if missing_field in defaults and isinstance(defaults, dict):
+        if isinstance(defaults, dict) and missing_field in defaults:
             default_value = defaults[missing_field]
-            node[missing_field] = default_value
+            if isinstance(node, dict):
+                node[missing_field] = default_value
 
             return WorkflowFix(
                 fix_type="schema_add",
@@ -341,8 +342,9 @@ class SchemaRefiner:
             )
 
         elif field_name == "timeout":
-            clamped_value = max(0, float(current_value))
-            node[field_name] = int(clamped_value)
+            clamped_timeout: int = int(max(0, float(current_value)))
+            if isinstance(node, dict):
+                node[field_name] = clamped_timeout
 
             return WorkflowFix(
                 fix_type="schema_clamp",

@@ -798,7 +798,7 @@ class HITLExecutor:
             request.request_id,
             external_ref,
             timeout=node.timeout,
-        )
+        )  # type: ignore[no-any-return]
 
         if response is not None:
             return response

@@ -1256,7 +1256,8 @@ class HybridFormation(BaseFormationStrategy):
             total_duration = time.time() - start_time
 
             # Return final results with metadata
-            final_results: List[MemberResult] = phase_results[-1]["results"] if phase_results else []
+            from typing import cast
+            final_results: List[MemberResult] = cast(List[MemberResult], phase_results[-1]["results"]) if phase_results else []
             return self._enhance_results(
                 final_results,
                 phases_completed,

@@ -76,14 +76,14 @@ class ComputeNodeExecutor:
                 if isinstance(source, str) and source.startswith("$ctx."):
                     context_key = source[5:]
                     if context_key in state:
-                        params[param_name] = state[context_key]
+                        params[param_name] = state[context_key]  # type: ignore[literal-required]
                     else:
                         params[param_name] = context_key
                 # Handle $state. prefix (also from state)
                 elif isinstance(source, str) and source.startswith("$state."):
                     context_key = source[7:]
                     if context_key in state:
-                        params[param_name] = state[context_key]
+                        params[param_name] = state[context_key]  # type: ignore[literal-required]
                     else:
                         params[param_name] = context_key
                 # Direct value

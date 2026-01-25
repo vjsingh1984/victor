@@ -861,12 +861,7 @@ class DockerDeploymentHandler(DeploymentHandler):
                 import docker
 
                 # docker.from_env() is a runtime function, not in type stubs
-                docker_module = docker
-                if hasattr(docker_module, 'from_env'):
-                    self._client = docker.from_env()
-                else:
-                    # DockerClient is not directly accessible, use from_env
-                    self._client = docker.from_env()
+                self._client = docker.from_env()  # type: ignore[attr-defined]
             except ImportError:
                 raise RuntimeError("docker package not installed. Install with: pip install docker")
         return self._client
@@ -960,10 +955,11 @@ class DockerDeploymentHandler(DeploymentHandler):
 
         # Parse output if JSON
         try:
+            from typing import cast
             parsed_result = json.loads(output.decode())
             if isinstance(parsed_result, dict) and "state" in parsed_result:
-                return parsed_result["state"]
-            return parsed_result if isinstance(parsed_result, dict) else state
+                return cast(Dict[str, Any], parsed_result["state"])
+            return cast(Dict[str, Any], parsed_result) if isinstance(parsed_result, dict) else state
         except json.JSONDecodeError:
             return state
 
@@ -1145,10 +1141,11 @@ class KubernetesDeploymentHandler(DeploymentHandler):
 
         # Parse output if JSON
         try:
+            from typing import cast
             parsed_result = json.loads(resp)
             if isinstance(parsed_result, dict) and "state" in parsed_result:
-                return parsed_result["state"]
-            return parsed_result if isinstance(parsed_result, dict) else state
+                return cast(Dict[str, Any], parsed_result["state"])
+            return cast(Dict[str, Any], parsed_result) if isinstance(parsed_result, dict) else state
         except json.JSONDecodeError:
             logger.warning(f"Could not parse pod exec output: {resp}")
             return state

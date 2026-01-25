@@ -662,7 +662,7 @@ class SlackTransport(BaseTransport):
         blocks.append(
             {
                 "type": "context",
-                "elements": [
+                "elements": [  # type: ignore[list-item]
                     {
                         "type": "mrkdwn",
                         "text": f"⏱️ Timeout: {request.timeout}s | Request ID: `{req_id_short}...`",

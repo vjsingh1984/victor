@@ -495,7 +495,7 @@ def create_custom_pack(
         description=description or f"Custom pack extending {extends}",
     )
     # Return tools list as expected by the signature
-    return pack.tools
+    return list(pack.tools)  # type: ignore[return-value]
 
 
 # Auto-register default packs on import

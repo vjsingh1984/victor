@@ -143,7 +143,7 @@ class ParallelNodeExecutor:
             ))
 
             logger.info(f"Parallel node {node.id} completed with strategy: {join_strategy}")
-            return state_dict
+            return state_dict  # type: ignore[return-value]
 
         except Exception as e:
             logger.error(f"Parallel node '{node.id}' failed: {e}", exc_info=True)

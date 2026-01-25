@@ -563,7 +563,7 @@ class ServiceConfigYAML:
 
         return ServiceConfig(
             name=self.name,
-            provider=self.provider if self.provider else "default",
+            provider=self.provider if self.provider else "local",  # type: ignore[arg-type]
             image=self.image,
             command=[self.command] if self.command else None,
             ports=port_mappings,
@@ -2079,7 +2079,7 @@ class WorkflowArgument:
         }
         converter = type_map.get(self.type, str)
         try:
-            converted = converter(value)  # type: ignore[arg-type, no-any-return]
+            converted = converter(value)  # type: ignore[arg-type]
         except (ValueError, TypeError) as e:
             raise YAMLWorkflowError(f"Invalid value for argument '{self.name}': {e}")
 

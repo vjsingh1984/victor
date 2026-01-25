@@ -84,7 +84,7 @@ class ConditionNodeExecutor:
             },
         }
 
-        return state_dict
+        return state_dict  # type: ignore[return-value]
 
     def supports_node_type(self, node_type: str) -> bool:
         """Check if this executor supports the given node type."""

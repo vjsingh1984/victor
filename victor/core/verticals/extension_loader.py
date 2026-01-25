@@ -83,8 +83,10 @@ Related Modules:
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, List, Optional, Set, Type, cast
 
@@ -198,9 +200,15 @@ class VerticalExtensionLoader(ABC):
     # None = no expiration, 3600 = 1 hour default
     default_extension_ttl: ClassVar[Optional[int]] = 3600
 
+    # Maximum cache size (number of entries). Exceeding this triggers LRU eviction.
+    _cache_max_size: ClassVar[int] = 1000
+
+    # Thread lock for cache access (RLock for reentrant operations)
+    _cache_lock: ClassVar[threading.RLock] = threading.RLock()
+
     # Extension cache (shared across all verticals)
-    # Now uses ExtensionCacheEntry for TTL and version tracking
-    _extensions_cache: Dict[str, ExtensionCacheEntry] = {}
+    # Uses OrderedDict for LRU ordering - oldest entries are at the front
+    _extensions_cache: OrderedDict[str, ExtensionCacheEntry] = OrderedDict()
 
     # Version tracker for cache invalidation
     _extension_versions: Dict[str, str] = {}
@@ -227,6 +235,46 @@ class VerticalExtensionLoader(ABC):
         "composed_chains",
         "personas",
     }
+
+    @classmethod
+    def _evict_lru_if_needed(cls) -> int:
+        """Evict least recently used entries if cache exceeds max size.
+
+        Uses LRU (Least Recently Used) eviction policy. The OrderedDict
+        maintains insertion/access order, with oldest entries at the front.
+
+        This method should be called while holding _cache_lock.
+
+        Returns:
+            Number of entries evicted.
+        """
+        evicted = 0
+
+        # First, remove any expired entries
+        expired_keys = [
+            key for key, entry in cls._extensions_cache.items()
+            if entry.is_expired()
+        ]
+        for key in expired_keys:
+            del cls._extensions_cache[key]
+            evicted += 1
+            logger.debug(f"Evicted expired cache entry: {key}")
+
+        # Then evict oldest entries if still over capacity
+        while len(cls._extensions_cache) > cls._cache_max_size:
+            # OrderedDict: first item is the oldest (LRU)
+            oldest_key = next(iter(cls._extensions_cache))
+            del cls._extensions_cache[oldest_key]
+            evicted += 1
+            logger.debug(f"Evicted LRU cache entry: {oldest_key}")
+
+        if evicted > 0:
+            logger.debug(
+                f"Cache eviction complete: evicted {evicted} entries, "
+                f"current size {len(cls._extensions_cache)}/{cls._cache_max_size}"
+            )
+
+        return evicted
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         """Auto-generate extension getter methods for subclasses.
@@ -363,6 +411,14 @@ class VerticalExtensionLoader(ABC):
         The cache uses a composite key of (class_name, extension_key) to
         ensure proper isolation between different vertical subclasses.
 
+        Thread Safety:
+            All cache operations are protected by _cache_lock (RLock).
+            The lock is reentrant to allow nested calls.
+
+        LRU Eviction:
+            When cache exceeds _cache_max_size, oldest entries are evicted.
+            Access updates the entry's position in the OrderedDict.
+
         Args:
             key: Unique key for this extension type (e.g., "middleware",
                  "safety_extension", "workflow_provider")
@@ -384,51 +440,63 @@ class VerticalExtensionLoader(ABC):
         # Use composite key to avoid collisions between different vertical classes
         cache_key = f"{cls.__name__}:{key}"
 
-        # Get version for this key if available
-        version = cls._extension_versions.get(cache_key, "")
+        with cls._cache_lock:
+            # Get version for this key if available
+            version = cls._extension_versions.get(cache_key, "")
 
-        # Check cache with TTL validation
-        if cache_key in cls._extensions_cache:
-            entry = cls._extensions_cache[cache_key]
+            # Check cache with TTL validation
+            if cache_key in cls._extensions_cache:
+                entry = cls._extensions_cache[cache_key]
 
-            # Check if entry is expired
-            if entry.is_expired():
-                logger.debug(
-                    f"Extension cache entry expired for {cache_key} "
-                    f"(age={entry.get_age():.1f}s, ttl={entry.ttl})"
-                )
-                del cls._extensions_cache[cache_key]
-            # Check if version has changed
-            elif version and entry.version != version:
-                logger.debug(
-                    f"Extension cache version mismatch for {cache_key} "
-                    f"(cached={entry.version}, current={version})"
-                )
-                del cls._extensions_cache[cache_key]
-            # Cache hit - update access count and return
-            else:
-                entry.access_count += 1
-                logger.debug(
-                    f"Extension cache hit for {cache_key} "
-                    f"(accesses={entry.access_count}, age={entry.get_age():.1f}s)"
-                )
-                return entry.value
+                # Check if entry is expired
+                if entry.is_expired():
+                    logger.debug(
+                        f"Extension cache entry expired for {cache_key} "
+                        f"(age={entry.get_age():.1f}s, ttl={entry.ttl})"
+                    )
+                    del cls._extensions_cache[cache_key]
+                # Check if version has changed
+                elif version and entry.version != version:
+                    logger.debug(
+                        f"Extension cache version mismatch for {cache_key} "
+                        f"(cached={entry.version}, current={version})"
+                    )
+                    del cls._extensions_cache[cache_key]
+                # Cache hit - update access count and move to end for LRU
+                else:
+                    entry.access_count += 1
+                    # Move to end to mark as recently used (LRU)
+                    cls._extensions_cache.move_to_end(cache_key)
+                    logger.debug(
+                        f"Extension cache hit for {cache_key} "
+                        f"(accesses={entry.access_count}, age={entry.get_age():.1f}s)"
+                    )
+                    return entry.value
 
-        # Cache miss - create new entry
-        logger.debug(f"Extension cache miss for {cache_key} - creating new instance")
+            # Cache miss - create new entry (outside lock to avoid blocking)
+            logger.debug(f"Extension cache miss for {cache_key} - creating new instance")
+
+        # Create value outside the lock to minimize lock contention
         value = factory()
 
         # Use provided TTL or default
         if ttl is None:
             ttl = cls.default_extension_ttl
 
-        # Create and cache entry
-        entry = ExtensionCacheEntry(
-            value=value,
-            ttl=ttl,
-            version=version,
-        )
-        cls._extensions_cache[cache_key] = entry
+        with cls._cache_lock:
+            # Get version again in case it changed
+            version = cls._extension_versions.get(cache_key, "")
+
+            # Create and cache entry
+            entry = ExtensionCacheEntry(
+                value=value,
+                ttl=ttl,
+                version=version,
+            )
+            cls._extensions_cache[cache_key] = entry
+
+            # Evict LRU entries if needed
+            cls._evict_lru_if_needed()
 
         return value
 
@@ -1033,6 +1101,9 @@ class VerticalExtensionLoader(ABC):
     ) -> int:
         """Invalidate cache entries by key or version.
 
+        Thread Safety:
+            All operations are protected by _cache_lock.
+
         Args:
             extension_key: Specific extension key to invalidate (e.g., "middleware",
                           "safety_extension"). If None, checks version instead.
@@ -1056,34 +1127,35 @@ class VerticalExtensionLoader(ABC):
         cache_prefix = f"{cls.__name__}:"
         count = 0
 
-        if extension_key:
-            # Invalidate specific extension
-            cache_key = f"{cache_prefix}{extension_key}"
-            if cache_key in cls._extensions_cache:
-                del cls._extensions_cache[cache_key]
-                count += 1
-                logger.debug(f"Invalidated extension cache: {cache_key}")
-        elif version:
-            # Invalidate all entries with this version
-            keys_to_remove = [
-                k
-                for k, v in cls._extensions_cache.items()
-                if k.startswith(cache_prefix) and v.version == version
-            ]
-            for key in keys_to_remove:
-                del cls._extensions_cache[key]
-                count += 1
-            logger.debug(
-                f"Invalidated {count} extension(s) for version {version} "
-                f"in vertical {cls.__name__}"
-            )
-        else:
-            # Clear all for this vertical
-            keys_to_remove = [k for k in cls._extensions_cache if k.startswith(cache_prefix)]
-            for key in keys_to_remove:
-                del cls._extensions_cache[key]
-                count = len(keys_to_remove)
-            logger.debug(f"Cleared {count} extension(s) for vertical {cls.__name__}")
+        with cls._cache_lock:
+            if extension_key:
+                # Invalidate specific extension
+                cache_key = f"{cache_prefix}{extension_key}"
+                if cache_key in cls._extensions_cache:
+                    del cls._extensions_cache[cache_key]
+                    count += 1
+                    logger.debug(f"Invalidated extension cache: {cache_key}")
+            elif version:
+                # Invalidate all entries with this version
+                keys_to_remove = [
+                    k
+                    for k, v in cls._extensions_cache.items()
+                    if k.startswith(cache_prefix) and v.version == version
+                ]
+                for key in keys_to_remove:
+                    del cls._extensions_cache[key]
+                    count += 1
+                logger.debug(
+                    f"Invalidated {count} extension(s) for version {version} "
+                    f"in vertical {cls.__name__}"
+                )
+            else:
+                # Clear all for this vertical
+                keys_to_remove = [k for k in cls._extensions_cache if k.startswith(cache_prefix)]
+                for key in keys_to_remove:
+                    del cls._extensions_cache[key]
+                    count = len(keys_to_remove)
+                logger.debug(f"Cleared {count} extension(s) for vertical {cls.__name__}")
 
         return count
 
@@ -1094,6 +1166,9 @@ class VerticalExtensionLoader(ABC):
         When an extension's implementation changes, call this method to update
         the version. Subsequent cache accesses will invalidate old cached entries.
 
+        Thread Safety:
+            Protected by _cache_lock.
+
         Args:
             extension_key: Extension key (e.g., "middleware", "safety_extension")
             version: New version string
@@ -1102,12 +1177,16 @@ class VerticalExtensionLoader(ABC):
             cls.update_extension_version("middleware", "2.0.0")
         """
         cache_key = f"{cls.__name__}:{extension_key}"
-        cls._extension_versions[cache_key] = version
+        with cls._cache_lock:
+            cls._extension_versions[cache_key] = version
         logger.debug(f"Updated extension version: {cache_key} -> {version}")
 
     @classmethod
     def get_extension_cache_stats(cls, detailed: bool = False) -> Dict[str, Any]:
         """Get cache statistics for this vertical.
+
+        Thread Safety:
+            Protected by _cache_lock.
 
         Args:
             detailed: If True, include per-entry breakdown and additional metrics
@@ -1125,72 +1204,77 @@ class VerticalExtensionLoader(ABC):
             - entries: (detailed=True) Per-entry breakdown
         """
         cache_prefix = f"{cls.__name__}:"
-        entries = [(k, v) for k, v in cls._extensions_cache.items() if k.startswith(cache_prefix)]
 
-        if not entries:
-            return {
+        with cls._cache_lock:
+            entries = [(k, v) for k, v in cls._extensions_cache.items() if k.startswith(cache_prefix)]
+
+            if not entries:
+                return {
+                    "vertical": cls.__name__,
+                    "total_entries": 0,
+                    "expired_entries": 0,
+                    "total_accesses": 0,
+                    "avg_age": 0.0,
+                    "min_age": 0.0,
+                    "max_age": 0.0,
+                    "cache_hit_rate": 0.0,
+                    "ttl_remaining": 0.0,
+                }
+
+            expired_count = sum(1 for _, v in entries if v.is_expired())
+            total_accesses = sum(v.access_count for _, v in entries)
+            ages = [v.get_age() for _, v in entries]
+            avg_age = sum(ages) / len(entries)
+
+            # Calculate cache hit rate (accesses per entry = effectiveness)
+            # Higher is better - means entries are being reused
+            cache_hit_rate = total_accesses / len(entries) if entries else 0.0
+
+            # Calculate min/max ages
+            min_age = min(ages) if ages else 0.0
+            max_age = max(ages) if ages else 0.0
+
+            # Calculate average TTL remaining (for entries with TTL)
+            ttl_entries = [v for _, v in entries if v.ttl is not None]
+            ttl_remaining = 0.0
+            if ttl_entries:
+                remaining = [max(0, (v.ttl or 0) - v.get_age()) for v in ttl_entries]
+                ttl_remaining = sum(remaining) / len(remaining)
+
+            stats: Dict[str, Any] = {
                 "vertical": cls.__name__,
-                "total_entries": 0,
-                "expired_entries": 0,
-                "total_accesses": 0,
-                "avg_age": 0.0,
-                "min_age": 0.0,
-                "max_age": 0.0,
-                "cache_hit_rate": 0.0,
-                "ttl_remaining": 0.0,
+                "total_entries": len(entries),
+                "expired_entries": expired_count,
+                "total_accesses": total_accesses,
+                "avg_age": avg_age,
+                "min_age": min_age,
+                "max_age": max_age,
+                "cache_hit_rate": cache_hit_rate,
+                "ttl_remaining": ttl_remaining,
             }
 
-        expired_count = sum(1 for _, v in entries if v.is_expired())
-        total_accesses = sum(v.access_count for _, v in entries)
-        ages = [v.get_age() for _, v in entries]
-        avg_age = sum(ages) / len(entries)
-
-        # Calculate cache hit rate (accesses per entry = effectiveness)
-        # Higher is better - means entries are being reused
-        cache_hit_rate = total_accesses / len(entries) if entries else 0.0
-
-        # Calculate min/max ages
-        min_age = min(ages) if ages else 0.0
-        max_age = max(ages) if ages else 0.0
-
-        # Calculate average TTL remaining (for entries with TTL)
-        ttl_entries = [v for _, v in entries if v.ttl is not None]
-        ttl_remaining = 0.0
-        if ttl_entries:
-            remaining = [max(0, (v.ttl or 0) - v.get_age()) for v in ttl_entries]
-            ttl_remaining = sum(remaining) / len(remaining)
-
-        stats = {
-            "vertical": cls.__name__,
-            "total_entries": len(entries),
-            "expired_entries": expired_count,
-            "total_accesses": total_accesses,
-            "avg_age": avg_age,
-            "min_age": min_age,
-            "max_age": max_age,
-            "cache_hit_rate": cache_hit_rate,
-            "ttl_remaining": ttl_remaining,
-        }
-
-        if detailed:
-            # Add per-entry breakdown
-            stats["entries"] = [
-                {
-                    "key": k.split(":")[-1],  # Remove vertical prefix
-                    "age": v.get_age(),
-                    "ttl": v.ttl,
-                    "access_count": v.access_count,
-                    "version": v.version,
-                    "is_expired": v.is_expired(),
-                }
-                for k, v in entries
-            ]
+            if detailed:
+                # Add per-entry breakdown
+                stats["entries"] = [
+                    {
+                        "key": k.split(":")[-1],  # Remove vertical prefix
+                        "age": v.get_age(),
+                        "ttl": v.ttl,
+                        "access_count": v.access_count,
+                        "version": v.version,
+                        "is_expired": v.is_expired(),
+                    }
+                    for k, v in entries
+                ]
 
         return stats
 
     @classmethod
     def get_global_cache_stats(cls) -> Dict[str, Any]:
         """Get global cache statistics across all verticals.
+
+        Thread Safety:
+            Protected by _cache_lock.
 
         Returns:
             Dictionary with global statistics including:
@@ -1199,27 +1283,28 @@ class VerticalExtensionLoader(ABC):
             - total_accesses: Sum of all access counts
             - verticals: Per-vertical statistics
         """
-        # Group entries by vertical
-        vertical_stats: Dict[str, Dict[str, Any]] = {}
-        for key, entry in cls._extensions_cache.items():
-            # Extract vertical name from composite key "ClassName:extension_key"
-            parts = key.split(":", 1)
-            vertical_name = parts[0] if parts else "unknown"
+        with cls._cache_lock:
+            # Group entries by vertical
+            vertical_stats: Dict[str, Dict[str, Any]] = {}
+            for key, entry in cls._extensions_cache.items():
+                # Extract vertical name from composite key "ClassName:extension_key"
+                parts = key.split(":", 1)
+                vertical_name = parts[0] if parts else "unknown"
 
-            if vertical_name not in vertical_stats:
-                vertical_stats[vertical_name] = {
-                    "entries": 0,
-                    "accesses": 0,
-                    "expired": 0,
-                }
+                if vertical_name not in vertical_stats:
+                    vertical_stats[vertical_name] = {
+                        "entries": 0,
+                        "accesses": 0,
+                        "expired": 0,
+                    }
 
-            vertical_stats[vertical_name]["entries"] += 1
-            vertical_stats[vertical_name]["accesses"] += entry.access_count
-            if entry.is_expired():
-                vertical_stats[vertical_name]["expired"] += 1
+                vertical_stats[vertical_name]["entries"] += 1
+                vertical_stats[vertical_name]["accesses"] += entry.access_count
+                if entry.is_expired():
+                    vertical_stats[vertical_name]["expired"] += 1
 
-        total_entries = sum(s["entries"] for s in vertical_stats.values())
-        total_accesses = sum(s["accesses"] for s in vertical_stats.values())
+            total_entries = sum(s["entries"] for s in vertical_stats.values())
+            total_accesses = sum(s["accesses"] for s in vertical_stats.values())
 
         return {
             "total_entries": total_entries,
@@ -1232,23 +1317,27 @@ class VerticalExtensionLoader(ABC):
     def clear_extension_cache(cls, *, clear_all: bool = False) -> None:
         """Clear the extension cache for this vertical.
 
+        Thread Safety:
+            Protected by _cache_lock.
+
         Args:
             clear_all: If True, clear cache for all verticals.
                        If False (default), clear only for this class.
         """
-        if clear_all:
-            cls._extensions_cache.clear()
-            cls._extension_versions.clear()
-        else:
-            cache_key = cls.__name__
-            # Clear composite extensions cache entry
-            cls._extensions_cache.pop(cache_key, None)
-            # Also clear individual extension cache entries (format: "ClassName:key")
-            prefix = f"{cache_key}:"
-            keys_to_remove = [k for k in cls._extensions_cache if k.startswith(prefix)]
-            for key in keys_to_remove:
-                cls._extensions_cache.pop(key, None)
-            # Also clear version entries
-            version_keys = [k for k in cls._extension_versions if k.startswith(prefix)]
-            for key in version_keys:
-                cls._extension_versions.pop(key, None)
+        with cls._cache_lock:
+            if clear_all:
+                cls._extensions_cache.clear()
+                cls._extension_versions.clear()
+            else:
+                cache_key = cls.__name__
+                # Clear composite extensions cache entry
+                cls._extensions_cache.pop(cache_key, None)
+                # Also clear individual extension cache entries (format: "ClassName:key")
+                prefix = f"{cache_key}:"
+                keys_to_remove = [k for k in cls._extensions_cache if k.startswith(prefix)]
+                for key in keys_to_remove:
+                    cls._extensions_cache.pop(key, None)
+                # Also clear version entries
+                version_keys = [k for k in cls._extension_versions if k.startswith(prefix)]
+                for key in version_keys:
+                    cls._extension_versions.pop(key, None)
