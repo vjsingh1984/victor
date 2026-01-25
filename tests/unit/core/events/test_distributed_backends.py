@@ -271,10 +271,16 @@ class TestKafkaEventBackend:
     @pytest.fixture
     def mock_consumer(self):
         """Create mock Kafka consumer."""
+        import asyncio
+
+        async def mock_getone():
+            """Mock getone that times out quickly."""
+            raise asyncio.TimeoutError()
+
         mock = AsyncMock()
         mock.start = AsyncMock()
         mock.stop = AsyncMock()
-        mock.getone = AsyncMock()
+        mock.getone = mock_getone
         return mock
 
     @pytest.fixture
@@ -422,6 +428,9 @@ class TestKafkaEventBackend:
                 assert result is True
                 assert not handle.is_active
                 assert len(backend._subscriptions) == 0
+
+                # Clean up: disconnect to stop the background consume loop
+                await backend.disconnect()
 
     @pytest.mark.asyncio
     async def test_health_check(self, config, mock_producer):
@@ -653,4 +662,5 @@ class TestDistributedBackendIntegration:
                 # Verify publish was called
                 assert mock_producer.send_and_wait.called
 
+                # Clean up: disconnect to stop the background consume loop
                 await backend.disconnect()
