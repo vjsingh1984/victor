@@ -119,7 +119,7 @@ class ServiceScope:
             parent: Parent container to inherit singleton services from
         """
         self._parent = parent
-        self._scoped_instances: Dict[Type, Any] = {}
+        self._scoped_instances: Dict[Type[Any], Any] = {}
         self._disposed = False
         self._lock = threading.Lock()
 
@@ -152,7 +152,7 @@ class ServiceScope:
                 return cast(T, self._scoped_instances[service_type])
 
         # Transient - always create new
-        return cast(T, descriptor.create_instance(self._parent))
+        return descriptor.create_instance(self._parent)
 
     def dispose(self) -> None:
         """Dispose all scoped services."""
@@ -226,7 +226,7 @@ class ServiceContainer:
 
     def __init__(self) -> None:
         """Initialize empty container."""
-        self._descriptors: Dict[Type, ServiceDescriptor] = {}
+        self._descriptors: Dict[Type[Any], ServiceDescriptor[Any]] = {}
         self._lock = threading.RLock()
         self._disposed = False
 
@@ -413,7 +413,7 @@ class ServiceContainer:
         """
         return ServiceScope(self)
 
-    def get_registered_types(self) -> list[Type]:
+    def get_registered_types(self) -> list[Type[Any]]:
         """Get list of all registered service types.
 
         Returns:

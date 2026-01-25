@@ -375,7 +375,7 @@ class SessionProjection(Projection):
     Provides optimized read access to session data.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize session projection."""
         self.sessions: Dict[str, Dict[str, Any]] = {}
         self.message_counts: Dict[str, int] = {}
@@ -529,7 +529,7 @@ class StartSessionHandler(CommandHandler[StartSessionCommand]):
         self.event_store = event_store
         self.dispatcher = dispatcher
 
-    async def handle(self, command: StartSessionCommand) -> Dict[str, Any]:
+    async def handle(self, command: StartSessionCommand) -> Dict[str, Any]:  # type: ignore[override]
         """Handle start session command.
 
         Returns:
@@ -567,7 +567,7 @@ class ChatHandler(CommandHandler[ChatCommand]):
         self.event_store = event_store
         self.dispatcher = dispatcher
 
-    async def handle(self, command: ChatCommand) -> Dict[str, Any]:
+    async def handle(self, command: ChatCommand) -> Dict[str, Any]:  # type: ignore[override]
         """Handle chat command.
 
         Returns:
@@ -602,7 +602,7 @@ class ExecuteToolHandler(CommandHandler[ExecuteToolCommand]):
         self.event_store = event_store
         self.dispatcher = dispatcher
 
-    async def handle(self, command: ExecuteToolCommand) -> Dict[str, Any]:
+    async def handle(self, command: ExecuteToolCommand) -> Dict[str, Any]:  # type: ignore[override]
         """Handle tool execution command.
 
         Returns:
@@ -651,7 +651,7 @@ class EndSessionHandler(CommandHandler[EndSessionCommand]):
         self.dispatcher = dispatcher
         self.projection = projection
 
-    async def handle(self, command: EndSessionCommand) -> Dict[str, Any]:
+    async def handle(self, command: EndSessionCommand) -> Dict[str, Any]:  # type: ignore[override]
         """Handle end session command.
 
         Returns:
@@ -712,7 +712,7 @@ class GetSessionHandler(QueryHandler[Dict[str, Any]]):
     def __init__(self, projection: SessionProjection):
         self.projection = projection
 
-    async def handle(self, query: GetSessionQuery) -> Dict[str, Any]:
+    async def handle(self, query: GetSessionQuery) -> Dict[str, Any]:  # type: ignore[override]
         """Handle get session query.
 
         Returns:
@@ -752,7 +752,7 @@ class GetConversationHistoryHandler(QueryHandler[Dict[str, Any]]):
     def __init__(self, projection: SessionProjection):
         self.projection = projection
 
-    async def handle(self, query: GetConversationHistoryQuery) -> Dict[str, Any]:
+    async def handle(self, query: GetConversationHistoryQuery) -> Dict[str, Any]:  # type: ignore[override]
         """Handle get conversation history query.
 
         Returns:
@@ -790,7 +790,7 @@ class GetSessionMetricsHandler(QueryHandler[Dict[str, Any]]):
     def __init__(self, projection: SessionProjection):
         self.projection = projection
 
-    async def handle(self, query: GetSessionMetricsQuery) -> Dict[str, Any]:
+    async def handle(self, query: GetSessionMetricsQuery) -> Dict[str, Any]:  # type: ignore[override]
         """Handle get session metrics query.
 
         Returns:
@@ -842,7 +842,7 @@ class AgentCommandBus:
         session = await bus.execute(GetSessionQuery(session_id=session_id))
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the agent command bus with all infrastructure."""
         # Event infrastructure
         self.event_store = InMemoryEventStore()
@@ -903,7 +903,7 @@ class AgentCommandBus:
             GetSessionMetricsHandler(self.projection),
         )
 
-    async def execute(self, message: Command | Query) -> CommandResult | QueryResult:
+    async def execute(self, message: Command | Query[Any]) -> CommandResult[Any] | QueryResult[Any]:
         """Execute a command or query.
 
         Args:

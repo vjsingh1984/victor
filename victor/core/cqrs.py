@@ -575,13 +575,13 @@ class QueryBus:
 
     def __init__(self) -> None:
         """Initialize query bus."""
-        self._handlers: Dict[Type[Query[Any]], QueryHandlerFunc[Any]] = {}
+        self._handlers: Dict[Type[Query[Any]], Callable[[Query[Any]], Awaitable[Any]]] = {}
         self._middleware: List[QueryMiddleware] = []
 
     def register(
         self,
         query_type: Type[Query[Any]],
-        handler: Union[QueryHandlerFunc[Any], QueryHandler[Any]],
+        handler: Union[Callable[[Query[Any]], Awaitable[Any]], QueryHandler[Any]],
     ) -> None:
         """Register a handler for a query type.
 
@@ -731,7 +731,7 @@ class Mediator:
     def register_query(
         self,
         query_type: Type[Query[TResult]],
-        handler: Union[QueryHandlerFunc[TResult], QueryHandler[TResult]],
+        handler: Union[Callable[[Query[TResult]], Awaitable[TResult]], QueryHandler[TResult]],
     ) -> None:
         """Register a query handler."""
         self._query_bus.register(query_type, handler)

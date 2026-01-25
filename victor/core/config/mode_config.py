@@ -218,7 +218,7 @@ class ModeConfigRegistry:
     _instance: Optional["ModeConfigRegistry"] = None
     _lock = threading.Lock()
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the registry."""
         self._configs: Dict[str, VerticalModeConfig] = {}
         # Config directory is victor/config/modes/
@@ -358,6 +358,9 @@ class ModeConfigRegistry:
         Returns:
             AgentMode instance
 
+        Raises:
+            ValueError: If mode is not found
+
         Example:
             mode = registry.get_mode("coding", "plan")
         """
@@ -371,6 +374,9 @@ class ModeConfigRegistry:
         if not mode:
             # Fall back to build mode
             mode = config.get_mode("build")
+
+        if not mode:
+            raise ValueError(f"Mode '{mode_name}' not found for vertical '{vertical_name}'")
 
         return mode
 

@@ -33,7 +33,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional, Type, TypeVar
+from typing import Any, Dict, Optional, Type, TypeVar, Callable
 
 from victor.config.settings import Settings, load_settings, get_project_paths
 from victor.core.container import (
@@ -116,9 +116,9 @@ class InMemoryCacheService:
 class LazyEmbeddingService:
     """Lazy-loading embedding service that initializes on first use."""
 
-    def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5"):
+    def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5") -> None:
         self._model_name = model_name
-        self._model = None
+        self._model: Optional[Any] = None
 
     def _ensure_loaded(self) -> None:
         if self._model is not None:
@@ -149,7 +149,7 @@ class LazyEmbeddingService:
 # =============================================================================
 
 
-class SignatureStoreProtocol:
+class SignatureStoreProtocol(Protocol):
     """Protocol for failed signature storage."""
 
     def is_known_failure(self, tool_name: str, args: Dict[str, Any]) -> bool: ...
@@ -157,7 +157,7 @@ class SignatureStoreProtocol:
     def record_failure(self, tool_name: str, args: Dict[str, Any], error_message: str) -> None: ...
 
 
-class UsageLoggerProtocol:
+class UsageLoggerProtocol(Protocol):
     """Protocol for usage logging."""
 
     def log_event(self, event_type: str, data: Dict[str, Any]) -> None: ...
@@ -233,9 +233,10 @@ def bootstrap_container(
     # Apply overrides for testing
     if override_services:
         for service_type, instance in override_services.items():
+            factory: Callable[[ServiceContainer], Any] = lambda c, inst=instance: inst
             container.register_or_replace(
                 service_type,
-                lambda c, inst=instance: inst,
+                factory,
                 ServiceLifetime.SINGLETON,
             )
 
@@ -251,7 +252,7 @@ def _register_core_services(container: ServiceContainer, settings: Settings) -> 
 
     # Cache service
     container.register(
-        CacheServiceProtocol,
+        CacheServiceProtocol,  # type: ignore[type-abstract]
         lambda c: InMemoryCacheService(max_size=1000),
         ServiceLifetime.SINGLETON,
     )
@@ -315,22 +316,22 @@ def _register_event_services(container: ServiceContainer, settings: Settings) ->
 
     # Register IEventBackend as singleton
     container.register(
-        IEventBackend,
+        IEventBackend,  # type: ignore[type-abstract]
         lambda c: create_event_backend(backend_config),
         ServiceLifetime.SINGLETON,
     )
 
     # Register ObservabilityBus as singleton
     container.register(
-        ObservabilityBus,
-        lambda c: ObservabilityBus(backend=c.get(IEventBackend)),
+        ObservabilityBus,  # type: ignore[type-abstract]
+        lambda c: ObservabilityBus(backend=c.get(IEventBackend)),  # type: ignore[type-abstract]
         ServiceLifetime.SINGLETON,
     )
 
     # Register AgentMessageBus as singleton
     container.register(
-        AgentMessageBus,
-        lambda c: AgentMessageBus(backend=c.get(IEventBackend)),
+        AgentMessageBus,  # type: ignore[type-abstract]
+        lambda c: AgentMessageBus(backend=c.get(IEventBackend)),  # type: ignore[type-abstract]
         ServiceLifetime.SINGLETON,
     )
 
@@ -342,14 +343,14 @@ def _register_analytics_services(container: ServiceContainer, settings: Settings
 
     # Metrics service
     container.register(
-        MetricsServiceProtocol,
+        MetricsServiceProtocol,  # type: ignore[type-abstract]
         lambda c: NullMetricsService(),  # No-op by default
         ServiceLifetime.SINGLETON,
     )
 
     # Logger service
     container.register(
-        LoggerServiceProtocol,
+        LoggerServiceProtocol,  # type: ignore[type-abstract]
         lambda c: ConsoleLoggerService(enabled=True),
         ServiceLifetime.SINGLETON,
     )
@@ -357,7 +358,7 @@ def _register_analytics_services(container: ServiceContainer, settings: Settings
     # Enhanced usage logger
     paths = get_project_paths()
     container.register(
-        UsageLoggerProtocol,
+        UsageLoggerProtocol,  # type: ignore[type-abstract]
         lambda c: _create_usage_logger(paths.global_logs_dir / "usage.jsonl", settings),
         ServiceLifetime.SINGLETON,
     )
@@ -367,7 +368,7 @@ def _register_embedding_services(container: ServiceContainer, settings: Settings
     """Register embedding/ML services."""
 
     container.register(
-        EmbeddingServiceProtocol,
+        EmbeddingServiceProtocol,  # type: ignore[type-abstract]
         lambda c: LazyEmbeddingService(settings.unified_embedding_model),
         ServiceLifetime.SINGLETON,
     )
@@ -691,9 +692,10 @@ def _ensure_vertical_activated(
             # Update the extensions in container
             extensions = loader.get_extensions()
             if extensions:
+                ext_factory: Callable[[ServiceContainer], Any] = lambda c, ext=extensions: ext
                 container.register_or_replace(
                     VerticalExtensions,
-                    lambda c, ext=extensions: ext,
+                    ext_factory,
                     ServiceLifetime.SINGLETON,
                 )
 
