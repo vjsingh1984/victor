@@ -1,0 +1,133 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Safety patterns for Coding vertical (Phase 6.2)
+# These patterns are loaded by SafetyPatternRegistry for YAML-first configuration
+
+version: "1.0"
+vertical: coding
+
+patterns:
+  # Git safety patterns
+  - name: coding_git_force_push
+    pattern: "git\\s+push\\s+.*--force"
+    severity: critical
+    message: "Force push detected - this can overwrite remote history"
+    domains:
+      - coding
+      - all
+    action: block
+
+  - name: coding_git_force_push_short
+    pattern: "git\\s+push\\s+-f"
+    severity: critical
+    message: "Force push (-f) detected - this can overwrite remote history"
+    domains:
+      - coding
+      - all
+    action: block
+
+  - name: coding_git_push_main
+    pattern: "git\\s+push\\s+.*\\b(main|master)\\b"
+    severity: high
+    message: "Direct push to main/master branch - consider using pull request"
+    domains:
+      - coding
+    action: warn
+
+  - name: coding_git_reset_hard
+    pattern: "git\\s+reset\\s+--hard"
+    severity: high
+    message: "Hard reset can discard uncommitted changes permanently"
+    domains:
+      - coding
+    action: warn
+
+  - name: coding_git_clean_force
+    pattern: "git\\s+clean\\s+.*-f"
+    severity: high
+    message: "git clean -f removes untracked files permanently"
+    domains:
+      - coding
+    action: warn
+
+  - name: coding_git_branch_delete_force
+    pattern: "git\\s+branch\\s+-D"
+    severity: medium
+    message: "Force delete branch may lose unmerged commits"
+    domains:
+      - coding
+    action: warn
+
+  # File operation patterns
+  - name: coding_rm_recursive
+    pattern: "rm\\s+-rf?\\s+\\."
+    severity: critical
+    message: "Recursive deletion of current directory is extremely dangerous"
+    domains:
+      - coding
+      - all
+    action: block
+
+  - name: coding_chmod_777
+    pattern: "chmod\\s+777"
+    severity: high
+    message: "chmod 777 makes files world-writable - security risk"
+    domains:
+      - coding
+    action: warn
+
+  - name: coding_env_file_write
+    pattern: ">\\.env|>>\\s*\\.env"
+    severity: high
+    message: "Writing to .env file may expose secrets"
+    domains:
+      - coding
+    action: warn
+
+  # Package manager patterns
+  - name: coding_npm_install_global_sudo
+    pattern: "sudo\\s+npm\\s+install\\s+-g"
+    severity: medium
+    message: "Using sudo with npm global install - consider using nvm or npx"
+    domains:
+      - coding
+    action: warn
+
+  - name: coding_pip_install_unsafe
+    pattern: "pip\\s+install\\s+--trusted-host"
+    severity: high
+    message: "Installing packages from untrusted hosts is a security risk"
+    domains:
+      - coding
+    action: warn
+
+  # Sensitive file access patterns
+  - name: coding_ssh_key_access
+    pattern: "cat\\s+.*\\.ssh/(id_rsa|id_ed25519)"
+    severity: critical
+    message: "Accessing SSH private key - this should not be exposed"
+    domains:
+      - coding
+      - all
+    action: block
+
+  - name: coding_aws_credentials_access
+    pattern: "cat\\s+.*\\.aws/credentials"
+    severity: critical
+    message: "Accessing AWS credentials file - this should not be exposed"
+    domains:
+      - coding
+      - all
+    action: block

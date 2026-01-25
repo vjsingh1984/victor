@@ -1,0 +1,145 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Capability definitions for RAG vertical (Phase 5.2)
+# These definitions are loaded by CapabilityRegistry for YAML-first configuration
+
+version: "1.0"
+
+capabilities:
+  - name: rag_indexing
+    capability_type: mode
+    description: Document indexing and embedding configuration
+    config_schema:
+      type: object
+      properties:
+        chunk_size:
+          type: integer
+          minimum: 100
+          maximum: 2000
+        chunk_overlap:
+          type: integer
+          minimum: 0
+        embedding_dimensions:
+          type: integer
+    default_config:
+      chunk_size: 512
+      chunk_overlap: 50
+      embedding_model: text-embedding-3-small
+      embedding_dimensions: 1536
+      store_backend: lancedb
+    tags:
+      - indexing
+      - chunking
+      - embedding
+
+  - name: rag_retrieval
+    capability_type: mode
+    description: Document retrieval and search configuration
+    config_schema:
+      type: object
+      properties:
+        top_k:
+          type: integer
+          minimum: 1
+          maximum: 100
+        similarity_threshold:
+          type: number
+          minimum: 0
+          maximum: 1
+        search_type:
+          type: string
+          enum: ["semantic", "keyword", "hybrid"]
+    default_config:
+      top_k: 5
+      similarity_threshold: 0.7
+      search_type: hybrid
+      rerank_enabled: true
+      max_context_tokens: 4000
+    dependencies:
+      - rag_indexing
+    tags:
+      - retrieval
+      - search
+      - ranking
+
+  - name: rag_synthesis
+    capability_type: mode
+    description: Answer synthesis and generation settings
+    config_schema:
+      type: object
+      properties:
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+        max_answer_tokens:
+          type: integer
+          minimum: 100
+    default_config:
+      citation_style: inline
+      include_sources: true
+      max_answer_tokens: 2000
+      temperature: 0.3
+      require_verification: true
+    dependencies:
+      - rag_retrieval
+    tags:
+      - synthesis
+      - generation
+      - citations
+
+  - name: rag_safety
+    capability_type: safety
+    description: RAG safety and content filtering
+    config_schema:
+      type: object
+      properties:
+        max_document_size_mb:
+          type: integer
+          minimum: 1
+        allowed_file_types:
+          type: array
+          items:
+            type: string
+    default_config:
+      filter_sensitive_data: true
+      max_document_size_mb: 50
+      allowed_file_types:
+        - pdf
+        - docx
+        - txt
+        - md
+        - py
+        - js
+        - ts
+        - html
+      validate_sources: true
+    tags:
+      - safety
+      - filtering
+      - validation
+
+  - name: rag_query_enhancement
+    capability_type: mode
+    description: Query expansion and decomposition settings
+    default_config:
+      enable_expansion: true
+      enable_decomposition: true
+      max_query_variants: 3
+      use_synonyms: true
+    tags:
+      - query
+      - expansion
+      - decomposition

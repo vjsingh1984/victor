@@ -1,0 +1,102 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Capability definitions for DevOps vertical (Phase 5.2)
+# These definitions are loaded by CapabilityRegistry for YAML-first configuration
+
+version: "1.0"
+
+capabilities:
+  - name: devops_deployment_safety
+    capability_type: safety
+    description: Deployment safety controls for production environments
+    config_schema:
+      type: object
+      properties:
+        require_approval_for_production:
+          type: boolean
+        require_backup_before_deploy:
+          type: boolean
+        enable_rollback:
+          type: boolean
+        protected_environments:
+          type: array
+          items:
+            type: string
+    default_config:
+      require_approval_for_production: true
+      require_backup_before_deploy: true
+      enable_rollback: true
+      protected_environments:
+        - production
+        - staging
+    tags:
+      - safety
+      - deployment
+      - production
+
+  - name: devops_container
+    capability_type: tool
+    description: Container runtime settings for Docker/Podman
+    default_config:
+      runtime: docker
+      default_registry: null
+      security_scan_enabled: true
+      max_image_size_mb: 2000
+    tags:
+      - docker
+      - container
+      - podman
+
+  - name: devops_infrastructure
+    capability_type: tool
+    description: Infrastructure as Code tool configuration
+    default_config:
+      iac_tool: terraform
+      auto_approve_non_destructive: false
+      require_plan_before_apply: true
+      state_backend: null
+    tags:
+      - terraform
+      - iac
+      - infrastructure
+
+  - name: devops_cicd
+    capability_type: tool
+    description: CI/CD pipeline configuration
+    default_config:
+      platform: github_actions
+      run_tests_before_deploy: true
+      require_passing_checks: true
+      enable_security_scan: true
+    tags:
+      - cicd
+      - pipeline
+      - automation
+
+  - name: devops_monitoring
+    capability_type: tool
+    description: Monitoring and observability settings
+    default_config:
+      metrics_backend: prometheus
+      logging_backend: loki
+      alerting_enabled: true
+      dashboard_tool: grafana
+    dependencies:
+      - devops_deployment_safety
+    tags:
+      - monitoring
+      - observability
+      - metrics
+      - logging

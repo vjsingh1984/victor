@@ -360,7 +360,7 @@ class CapabilityRegistry:
 
         # Class with get_definition() classmethod
         if isinstance(loaded, type) and hasattr(loaded, "get_definition"):
-            method = getattr(loaded, "get_definition")
+            method = loaded.get_definition
             if callable(method):
                 result = method()
                 if isinstance(result, CapabilityDefinition):

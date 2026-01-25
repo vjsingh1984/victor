@@ -1,0 +1,117 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Capability definitions for Coding vertical (Phase 5.2)
+# These definitions are loaded by CapabilityRegistry for YAML-first configuration
+
+version: "1.0"
+
+capabilities:
+  - name: coding_git_safety
+    capability_type: safety
+    description: Git safety rules for preventing dangerous operations
+    default_config:
+      block_force_push: true
+      block_main_push: true
+      require_tests_before_commit: false
+      allowed_branches: []
+    tags:
+      - safety
+      - git
+      - version-control
+
+  - name: coding_code_style
+    capability_type: mode
+    description: Code style and formatting configuration
+    config_schema:
+      type: object
+      properties:
+        formatter:
+          type: string
+          enum: ["black", "autopep8", "yapf"]
+        linter:
+          type: string
+          enum: ["ruff", "flake8", "pylint"]
+        max_line_length:
+          type: integer
+          minimum: 80
+          maximum: 200
+        enforce_type_hints:
+          type: boolean
+    default_config:
+      formatter: black
+      linter: ruff
+      max_line_length: 100
+      enforce_type_hints: true
+    tags:
+      - style
+      - formatting
+      - linting
+
+  - name: coding_test_requirements
+    capability_type: mode
+    description: Test configuration and requirements
+    config_schema:
+      type: object
+      properties:
+        min_coverage:
+          type: number
+          minimum: 0
+          maximum: 1
+        framework:
+          type: string
+          enum: ["pytest", "unittest", "nose"]
+    default_config:
+      min_coverage: 0.0
+      required_patterns: []
+      framework: pytest
+      run_on_edit: false
+    tags:
+      - testing
+      - coverage
+      - quality
+
+  - name: coding_language_server
+    capability_type: tool
+    description: Language server protocol configuration
+    default_config:
+      languages:
+        - python
+        - typescript
+        - javascript
+        - rust
+        - go
+      features:
+        hover: true
+        references: true
+        symbols: true
+    tags:
+      - lsp
+      - ide
+      - code-intelligence
+
+  - name: coding_refactoring
+    capability_type: tool
+    description: Refactoring tool configuration
+    default_config:
+      operations:
+        rename: true
+        extract: true
+        inline: true
+      require_tests: true
+    dependencies:
+      - coding_language_server
+    tags:
+      - refactoring
+      - code-transformation

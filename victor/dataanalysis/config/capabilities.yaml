@@ -1,0 +1,150 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Capability definitions for DataAnalysis vertical (Phase 5.2)
+# These definitions are loaded by CapabilityRegistry for YAML-first configuration
+
+version: "1.0"
+
+capabilities:
+  - name: dataanalysis_data_quality
+    capability_type: mode
+    description: Data quality validation and cleaning settings
+    config_schema:
+      type: object
+      properties:
+        min_completeness:
+          type: number
+          minimum: 0
+          maximum: 1
+        max_outlier_ratio:
+          type: number
+          minimum: 0
+          maximum: 1
+        handle_missing:
+          type: string
+          enum: ["drop", "impute", "flag"]
+    default_config:
+      min_completeness: 0.9
+      max_outlier_ratio: 0.05
+      require_type_validation: true
+      handle_missing: impute
+    tags:
+      - quality
+      - validation
+      - data-cleaning
+
+  - name: dataanalysis_visualization_style
+    capability_type: mode
+    description: Visualization and plotting configuration
+    config_schema:
+      type: object
+      properties:
+        backend:
+          type: string
+          enum: ["matplotlib", "plotly", "seaborn"]
+        dpi:
+          type: integer
+          minimum: 72
+          maximum: 300
+        save_format:
+          type: string
+          enum: ["png", "svg", "pdf"]
+    default_config:
+      backend: matplotlib
+      theme: seaborn-v0_8-whitegrid
+      figure_size:
+        - 10
+        - 6
+      dpi: 100
+      save_format: png
+    tags:
+      - visualization
+      - charts
+      - plotting
+
+  - name: dataanalysis_statistical_analysis
+    capability_type: mode
+    description: Statistical analysis and hypothesis testing settings
+    config_schema:
+      type: object
+      properties:
+        significance_level:
+          type: number
+          minimum: 0.001
+          maximum: 0.2
+        confidence_interval:
+          type: number
+          minimum: 0.8
+          maximum: 0.999
+        multiple_testing_correction:
+          type: string
+          enum: ["bonferroni", "fdr", "holm", "none"]
+    default_config:
+      significance_level: 0.05
+      confidence_interval: 0.95
+      multiple_testing_correction: bonferroni
+      effect_size_threshold: 0.2
+    tags:
+      - statistics
+      - hypothesis-testing
+      - analysis
+
+  - name: dataanalysis_ml_pipeline
+    capability_type: tool
+    description: Machine learning pipeline configuration
+    config_schema:
+      type: object
+      properties:
+        framework:
+          type: string
+          enum: ["sklearn", "xgboost", "lightgbm"]
+        cv_folds:
+          type: integer
+          minimum: 2
+          maximum: 20
+        test_size:
+          type: number
+          minimum: 0.1
+          maximum: 0.5
+        tuning_method:
+          type: string
+          enum: ["grid", "random", "bayesian"]
+    default_config:
+      framework: sklearn
+      cv_folds: 5
+      test_size: 0.2
+      random_state: 42
+      hyperparameter_tuning: true
+      tuning_method: grid
+    dependencies:
+      - dataanalysis_data_quality
+    tags:
+      - ml
+      - machine-learning
+      - training
+
+  - name: dataanalysis_data_privacy
+    capability_type: safety
+    description: Data privacy and PII handling settings
+    default_config:
+      anonymize_pii: true
+      pii_columns: []
+      hash_identifiers: true
+      log_access: true
+    tags:
+      - privacy
+      - pii
+      - anonymization
+      - safety

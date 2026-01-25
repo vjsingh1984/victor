@@ -76,6 +76,16 @@ from victor.core.capabilities.handler import (
     CapabilityHandler,
     VerticalContextProtocol,
 )
+from victor.core.capabilities.quality import (
+    QualityCapability,
+    QualityResult,
+    Enforcement,
+)
+from victor.core.capabilities.yaml_loader import (
+    get_vertical_capability_path,
+    register_vertical_capabilities,
+    register_all_vertical_capabilities,
+)
 
 __all__ = [
     # Legacy API (backward compatible)
@@ -91,4 +101,12 @@ __all__ = [
     "validate_capability_yaml",
     "CapabilityHandler",
     "VerticalContextProtocol",
+    # Quality Capability (Phase 8)
+    "QualityCapability",
+    "QualityResult",
+    "Enforcement",
+    # YAML Loader (Phase 5.2)
+    "get_vertical_capability_path",
+    "register_vertical_capabilities",
+    "register_all_vertical_capabilities",
 ]

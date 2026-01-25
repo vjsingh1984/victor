@@ -1,0 +1,156 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Safety patterns for DevOps vertical (Phase 6.2)
+# These patterns are loaded by SafetyPatternRegistry for YAML-first configuration
+
+version: "1.0"
+vertical: devops
+
+patterns:
+  # Kubernetes patterns
+  - name: devops_kubectl_delete_namespace
+    pattern: "kubectl\\s+delete\\s+namespace"
+    severity: critical
+    message: "Deleting Kubernetes namespace removes all resources within it"
+    domains:
+      - devops
+      - all
+    action: block
+
+  - name: devops_kubectl_delete_all
+    pattern: "kubectl\\s+delete\\s+.*--all"
+    severity: critical
+    message: "Deleting all resources in Kubernetes is extremely dangerous"
+    domains:
+      - devops
+    action: block
+
+  - name: devops_kubectl_production
+    pattern: "kubectl\\s+.*-n\\s+(prod|production)"
+    severity: high
+    message: "Operating on production namespace - requires approval"
+    domains:
+      - devops
+    action: warn
+
+  - name: devops_kubectl_force_delete
+    pattern: "kubectl\\s+delete\\s+.*--force"
+    severity: high
+    message: "Force delete can leave resources in inconsistent state"
+    domains:
+      - devops
+    action: warn
+
+  # Docker patterns
+  - name: devops_docker_privileged
+    pattern: "docker\\s+run\\s+.*--privileged"
+    severity: critical
+    message: "Privileged containers have full access to host system"
+    domains:
+      - devops
+    action: block
+
+  - name: devops_docker_system_prune
+    pattern: "docker\\s+system\\s+prune\\s+-a"
+    severity: high
+    message: "Docker system prune -a removes all unused data including images"
+    domains:
+      - devops
+    action: warn
+
+  - name: devops_docker_rm_force
+    pattern: "docker\\s+rm\\s+-f"
+    severity: medium
+    message: "Force removing container may not allow graceful shutdown"
+    domains:
+      - devops
+    action: warn
+
+  - name: devops_docker_host_mount
+    pattern: "docker\\s+run\\s+.*-v\\s+/:/host"
+    severity: critical
+    message: "Mounting root filesystem into container is a security risk"
+    domains:
+      - devops
+      - all
+    action: block
+
+  # Terraform patterns
+  - name: devops_terraform_destroy
+    pattern: "terraform\\s+destroy"
+    severity: critical
+    message: "Terraform destroy will remove all managed infrastructure"
+    domains:
+      - devops
+    action: block
+
+  - name: devops_terraform_apply_auto_approve
+    pattern: "terraform\\s+apply\\s+.*-auto-approve"
+    severity: high
+    message: "Auto-approve skips confirmation - review changes first"
+    domains:
+      - devops
+    action: warn
+
+  - name: devops_terraform_force_unlock
+    pattern: "terraform\\s+force-unlock"
+    severity: high
+    message: "Force unlock may cause state corruption if used improperly"
+    domains:
+      - devops
+    action: warn
+
+  # Cloud provider patterns
+  - name: devops_aws_delete_bucket
+    pattern: "aws\\s+s3\\s+rb\\s+.*--force"
+    severity: critical
+    message: "Force deleting S3 bucket removes all objects within it"
+    domains:
+      - devops
+    action: block
+
+  - name: devops_aws_terminate_instances
+    pattern: "aws\\s+ec2\\s+terminate-instances"
+    severity: high
+    message: "Terminating EC2 instances is irreversible"
+    domains:
+      - devops
+    action: warn
+
+  - name: devops_aws_delete_db
+    pattern: "aws\\s+rds\\s+delete-db"
+    severity: critical
+    message: "Deleting RDS database may result in data loss"
+    domains:
+      - devops
+    action: block
+
+  # Helm patterns
+  - name: devops_helm_uninstall_production
+    pattern: "helm\\s+uninstall\\s+.*-n\\s+(prod|production)"
+    severity: critical
+    message: "Uninstalling Helm release in production namespace"
+    domains:
+      - devops
+    action: block
+
+  # SSH/Remote access patterns
+  - name: devops_ssh_production
+    pattern: "ssh\\s+.*prod"
+    severity: medium
+    message: "SSH access to production server - ensure proper authorization"
+    domains:
+      - devops
+    action: log

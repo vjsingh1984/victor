@@ -1,0 +1,117 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Capability definitions for Research vertical (Phase 5.2)
+# These definitions are loaded by CapabilityRegistry for YAML-first configuration
+
+version: "1.0"
+
+capabilities:
+  - name: research_source_verification
+    capability_type: safety
+    description: Source verification and credibility checking
+    config_schema:
+      type: object
+      properties:
+        min_credibility:
+          type: number
+          minimum: 0
+          maximum: 1
+        min_source_count:
+          type: integer
+          minimum: 1
+    default_config:
+      min_credibility: 0.7
+      min_source_count: 3
+      require_diverse_sources: true
+      validate_urls: true
+    tags:
+      - safety
+      - verification
+      - credibility
+      - sources
+
+  - name: research_citation_management
+    capability_type: tool
+    description: Citation and bibliography formatting
+    default_config:
+      default_style: apa
+      require_urls: true
+      include_authors: true
+      include_dates: true
+    tags:
+      - citation
+      - bibliography
+      - formatting
+
+  - name: research_quality
+    capability_type: mode
+    description: Research quality and coverage standards
+    config_schema:
+      type: object
+      properties:
+        min_coverage_score:
+          type: number
+          minimum: 0
+          maximum: 1
+    default_config:
+      min_coverage_score: 0.75
+      min_source_diversity: 2
+      check_recency: true
+      max_source_age_days: 365
+    dependencies:
+      - research_source_verification
+    tags:
+      - quality
+      - coverage
+      - standards
+
+  - name: research_literature_analysis
+    capability_type: tool
+    description: Academic literature analysis settings
+    default_config:
+      min_relevance_score: 0.6
+      weight_citation_count: true
+      prefer_recent_papers: true
+      recent_paper_years: 5
+    dependencies:
+      - research_source_verification
+    tags:
+      - literature
+      - academic
+      - papers
+      - research
+
+  - name: research_fact_checking
+    capability_type: safety
+    description: Fact verification and evidence tracking
+    config_schema:
+      type: object
+      properties:
+        min_confidence_threshold:
+          type: number
+          minimum: 0
+          maximum: 1
+    default_config:
+      min_confidence_threshold: 0.5
+      require_multiple_sources: true
+      min_source_count_for_claim: 2
+      track_supporting_refuting: true
+    dependencies:
+      - research_source_verification
+    tags:
+      - fact-check
+      - verification
+      - evidence
+      - safety
