@@ -12,6 +12,10 @@ on:
     paths:
       - 'packages/**'  # Only trigger when packages dir exists and has changes
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 # Skip workflow if packages directory doesn't exist (for monorepo migration)
 jobs:
   check-existence:
@@ -24,11 +28,6 @@ jobs:
       - id: check
         run: test -d packages && echo "exists=true" >> $GITHUB_OUTPUT || echo "exists=false" >> $GITHUB_OUTPUT
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-jobs:
   # Test each package in isolation
   test-packages:
     name: Test ${{ matrix.package }} (Python ${{ matrix.python-version }})
