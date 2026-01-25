@@ -171,7 +171,7 @@ class VerticalDeprecationModule:
         self.vertical_name = vertical_name
         self.yaml_path = yaml_path
         self.constant_prefix = constant_prefix
-        self._descriptors: Dict[str, DeprecatedConstantDescriptor] = {}
+        self._descriptors: Dict[str, "DeprecatedConstantDescriptor[Any]"] = {}
         self._config_cache: Optional[Any] = None
 
     def _get_config(self) -> Any:
@@ -194,7 +194,7 @@ class VerticalDeprecationModule:
         suffix: str,
         extractor: str,
         provider_method: str,
-    ) -> DeprecatedConstantDescriptor:
+    ) -> "DeprecatedConstantDescriptor[Any]":
         """Create a descriptor for a specific constant.
 
         Args:
@@ -287,7 +287,7 @@ def create_vertical_deprecation_module(
     constant_prefix: str,
     *,
     include_standard: bool = True,
-    extra_mappings: Optional[Dict[str, tuple]] = None,
+    extra_mappings: Optional[Dict[str, tuple[Any, ...]]] = None,
 ) -> VerticalDeprecationModule:
     """Factory to create deprecated constant descriptors for a vertical.
 

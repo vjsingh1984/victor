@@ -402,7 +402,7 @@ class BaseChunker:
             return self._chunk_text(full_text)
 
         # Convert to chunks with size limits
-        current_chunk = []
+        current_chunk: List[str] = []
         current_size = 0
         pos = 0
 
@@ -471,7 +471,7 @@ class BaseChunker:
                     pos += len(chunk_text)
 
         elif isinstance(data, list):
-            current_batch = []
+            current_batch: List[Any] = []
             current_size = 0
 
             for item in data:

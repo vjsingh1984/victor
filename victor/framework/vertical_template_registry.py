@@ -73,10 +73,10 @@ class VerticalTemplateRegistry:
     _instance: Optional[VerticalTemplateRegistry] = None
     _lock = threading.Lock()
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the registry."""
         self._templates: Dict[str, VerticalTemplate] = {}
-        self._lock = threading.RLock()
+        self._lock: threading.RLock = threading.RLock()
 
     @classmethod
     def get_instance(cls) -> VerticalTemplateRegistry:
@@ -226,9 +226,10 @@ class VerticalTemplateRegistry:
                 and hasattr(template, "parent_template")
                 and template.parent_template
             ):
-                template = self._resolve_inheritance(template)
-                if template is None:
+                resolved = self._resolve_inheritance(template)
+                if resolved is None:
                     return None
+                template = resolved
 
             # Validate loaded template
             errors = template.validate()
@@ -426,7 +427,7 @@ class VerticalTemplateRegistry:
         with self._lock:
             templates = list(self._templates.values())
 
-            categories = {}
+            categories: Dict[str, int] = {}
             for template in templates:
                 cat = template.metadata.category
                 categories[cat] = categories.get(cat, 0) + 1

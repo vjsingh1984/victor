@@ -181,12 +181,6 @@ class ConversationalNode:
         self._history = ConversationHistory(conversation_id=conversation_id)
         self._router = MessageRouter(strategy=self.config.routing_strategy)
 
-    @property
-    def _ctx(self) -> ConversationContext:
-        """Get non-None context (asserts for type checker)."""
-        assert self._context is not None, "Context accessed before initialization"
-        return self._context
-
         # Initialize protocol if present
         if self.protocol:
             assert self._context is not None
@@ -202,14 +196,15 @@ class ConversationalNode:
                 for p in self.participants
             ]
             # Convert context
+            ctx = self._ctx
             protocol_context = ProtocolContext(
-                conversation_id=self._ctx.conversation_id,
+                conversation_id=ctx.conversation_id,
                 participants={},  # Will be populated by protocol
-                shared_state=self._ctx.shared_state,
-                current_turn=self._ctx.current_turn,
-                current_speaker=self._ctx.current_speaker,
-                is_terminated=self._ctx.is_terminated,
-                termination_reason=self._ctx.termination_reason,
+                shared_state=ctx.shared_state,
+                current_turn=ctx.current_turn,
+                current_speaker=ctx.current_speaker,
+                is_terminated=ctx.is_terminated,
+                termination_reason=ctx.termination_reason,
             )
             await self.protocol.initialize(protocol_participants, protocol_context)
 
@@ -217,35 +212,44 @@ class ConversationalNode:
         try:
             result = await self._conversation_loop(orchestrator)
         except asyncio.TimeoutError:
+            ctx = self._ctx
             result = ConversationResult(
                 conversation_id=conversation_id,
                 status=ConversationStatus.TIMED_OUT,
                 outcome="Conversation timed out",
-                total_turns=self._ctx.current_turn,
+                total_turns=ctx.current_turn,
                 duration_seconds=time.time() - start_time,
             )
         except Exception as e:
             logger.exception(f"Conversation failed: {e}")
+            ctx = self._ctx
             result = ConversationResult(
                 conversation_id=conversation_id,
                 status=ConversationStatus.FAILED,
                 outcome=str(e),
-                total_turns=self._ctx.current_turn,
+                total_turns=ctx.current_turn,
                 duration_seconds=time.time() - start_time,
             )
 
         # Update state
         state[self.output_key] = result.to_dict()
         state[f"{self.output_key}_history"] = (
-            await self._history.get_history(self._ctx) if self._history else []
+            self._history.to_dict() if self._history else []
         )
 
         logger.info(
-            f"Conversation '{self.name}' completed: "
-            f"status={result.status.value}, turns={result.total_turns}"
+            f"Conversation '{self.name}' completed "
+            f"(id={conversation_id}, status={result.status.value}, "
+            f"turns={result.total_turns}, duration={result.duration_seconds:.2f}s)"
         )
 
         return state
+
+    @property
+    def _ctx(self) -> ConversationContext:
+        """Get non-None context (asserts for type checker)."""
+        assert self._context is not None, "Context accessed before initialization"
+        return self._context
 
     async def _conversation_loop(
         self,

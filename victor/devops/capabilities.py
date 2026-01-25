@@ -272,6 +272,8 @@ class DevOpsCapabilityProvider(BaseVerticalCapabilityProvider):
         but external names (generated in generate_capabilities_list) use
         shorter names without the suffix.
         """
+        from victor.framework.protocols import CapabilityType
+
         return {
             "deployment_safety": CapabilityDefinition(
                 name="deployment_safety",  # External name: devops_deployment_safety
@@ -368,7 +370,7 @@ class DevOpsCapabilityProvider(BaseVerticalCapabilityProvider):
             # Use definition.name for external name (not the dict key)
             cap_metadata = {
                 "name": f"{self._vertical_name}_{definition.name}",
-                "capability_type": definition.type,
+                "capability_type": definition.type.value if hasattr(definition.type, "value") else str(definition.type),
                 "version": definition.version,
                 "setter": definition.configure_fn,
                 "description": definition.description,
@@ -378,7 +380,10 @@ class DevOpsCapabilityProvider(BaseVerticalCapabilityProvider):
             if definition.get_fn:
                 cap_metadata["getter"] = definition.get_fn
 
-            capability = OrchestratorCapability(**cap_metadata)
+            capability = OrchestratorCapability(
+                capability_type=definition.type,
+                **cap_metadata
+            )
 
             # Get handler functions
             handler = getattr(self, definition.configure_fn, None)

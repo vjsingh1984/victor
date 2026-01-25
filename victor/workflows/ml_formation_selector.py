@@ -341,11 +341,11 @@ class FeatureExtractor:
             Task text content
         """
         if hasattr(task, "content"):
-            return task.content
+            return str(task.content)  # type: ignore[no-any-return]
         elif isinstance(task, str):
             return task
         elif hasattr(task, "data") and "content" in task.data:
-            return task.data["content"]
+            return str(task.data["content"])  # type: ignore[no-any-return]
         else:
             return str(task)
 
@@ -709,9 +709,9 @@ class FeatureExtractor:
             Task ID
         """
         if hasattr(task, "id"):
-            return task.id
+            return str(task.id)  # type: ignore[no-any-return]
         elif hasattr(task, "message_id"):
-            return task.message_id
+            return str(task.message_id)  # type: ignore[no-any-return]
         else:
             # Generate hash-based ID (non-cryptographic, for identification only)
             content = self._get_task_content(task)
@@ -800,9 +800,10 @@ class ModelTrainer:
         # Scale features
         from sklearn.preprocessing import StandardScaler
 
-        self.scaler = StandardScaler()
-        X_train_scaled = self.scaler.fit_transform(X_train)
-        X_test_scaled = self.scaler.transform(X_test)
+        scaler = StandardScaler()
+        X_train_scaled = scaler.fit_transform(X_train)
+        X_test_scaled = scaler.transform(X_test)
+        self.scaler = scaler  # type: ignore[assignment]
 
         # Train model
         start_time = time.time()
@@ -886,13 +887,13 @@ class ModelTrainer:
             warnings.warn("scikit-learn not installed, model will not work", stacklevel=2)
 
             class DummyModel:
-                def fit(self, X, y):
+                def fit(self, X: Any, y: Any) -> "DummyModel":
                     return self
 
-                def predict(self, X):
+                def predict(self, X: Any) -> List[int]:
                     return [0] * len(X)
 
-                def predict_proba(self, X):
+                def predict_proba(self, X: Any) -> Any:
                     import numpy as np
 
                     return np.zeros((len(X), 5))
@@ -933,7 +934,7 @@ class ModelTrainer:
             f1 = accuracy
 
         # Formation distribution
-        formation_counts = {}
+        formation_counts: Dict[str, int] = {}
         for label in y_pred:
             formation = self.FORMATION_LABELS[label]
             formation_counts[formation] = formation_counts.get(formation, 0) + 1
@@ -1085,7 +1086,7 @@ class AdaptiveFormationML:
 
         # Online learning buffer
         self._execution_buffer: List[TrainingExample] = []
-        self._trainer = None
+        self._trainer: Optional[ModelTrainer] = None
 
         # Load model if path provided
         if model_path:
@@ -1099,10 +1100,11 @@ class AdaptiveFormationML:
 
         try:
             self._trainer = ModelTrainer()
-            self._trainer.load_model(self.model_path)
+            if self._trainer is not None:  # Type guard
+                self._trainer.load_model(self.model_path)
 
-            self.model = self._trainer.model
-            self.scaler = self._trainer.scaler
+                self.model = self._trainer.model
+                self.scaler = self._trainer.scaler
 
             logger.info(f"Model loaded from {self.model_path}")
 
@@ -1220,7 +1222,7 @@ class AdaptiveFormationML:
         scores["consensus"] -= features.urgency * 0.4
 
         # Select best
-        formation = max(scores, key=scores.get)
+        formation = max(scores.keys(), key=lambda k: scores[k])  # type: ignore[arg-type]
 
         if return_scores:
             return formation, scores

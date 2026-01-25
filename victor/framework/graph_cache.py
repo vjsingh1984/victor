@@ -49,9 +49,10 @@ from typing import (
     Optional,
     Tuple,
     TypeVar,
+    cast,
 )
 
-from cachetools import TTLCache  # type: ignore[import-untyped]
+from cachetools import TTLCache
 
 if TYPE_CHECKING:
     from victor.framework.graph import (
@@ -92,7 +93,7 @@ class GraphCacheEntry:
     """
 
     graph_hash: str
-    compiled: "CompiledGraph"
+    compiled: "CompiledGraph[Any]"
     created_at: float
     hit_count: int = 0
 
@@ -153,7 +154,7 @@ class CompiledGraphCache:
             self._cache = None
             logger.debug("Compiled graph cache disabled")
 
-    def _compute_graph_hash(self, graph: "StateGraph") -> str:
+    def _compute_graph_hash(self, graph: "StateGraph[Any]") -> str:
         """Compute SHA-256 hash of graph structure.
 
         Hash is based on:
@@ -218,7 +219,7 @@ class CompiledGraphCache:
         hash_str = json.dumps(hash_data, sort_keys=True, default=str)
         return hashlib.sha256(hash_str.encode()).hexdigest()
 
-    def get(self, graph: "StateGraph") -> Optional["CompiledGraph"]:
+    def get(self, graph: "StateGraph[Any]") -> Optional["CompiledGraph[Any]"]:
         """Get cached compiled graph.
 
         Args:
@@ -247,7 +248,7 @@ class CompiledGraphCache:
             logger.debug(f"Graph cache miss: hash={graph_hash[:16]}...")
             return None
 
-    def put(self, graph: "StateGraph", compiled: "CompiledGraph") -> bool:
+    def put(self, graph: "StateGraph[Any]", compiled: "CompiledGraph[Any]") -> bool:
         """Cache a compiled graph.
 
         Args:
@@ -278,10 +279,10 @@ class CompiledGraphCache:
 
     def get_or_compile(
         self,
-        graph: "StateGraph",
+        graph: "StateGraph[Any]",
         checkpointer: Optional["CheckpointerProtocol"] = None,
         **config_kwargs: Any,
-    ) -> "CompiledGraph":
+    ) -> "CompiledGraph[Any]":
         """Get cached compiled graph or compile and cache.
 
         Convenience method that combines get(), compile(), and put() operations.
@@ -310,7 +311,7 @@ class CompiledGraphCache:
 
         return compiled
 
-    def invalidate(self, graph: "StateGraph") -> bool:
+    def invalidate(self, graph: "StateGraph[Any]") -> bool:
         """Invalidate cache entry for a specific graph.
 
         Args:
@@ -363,7 +364,7 @@ class CompiledGraphCache:
             stats = self._stats.copy()
 
             total = stats["hits"] + stats["misses"]
-            stats["hit_rate"] = stats["hits"] / total if total > 0 else 0.0
+            stats["hit_rate"] = int(stats["hits"] / total if total > 0 else 0.0)
 
             if self._cache is not None:
                 stats["current_size"] = len(self._cache)

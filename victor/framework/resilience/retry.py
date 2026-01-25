@@ -219,7 +219,7 @@ class RetryHandler:
                     max_delay=retry_cfg.max_delay,
                     multiplier=retry_cfg.exponential_base,
                     jitter=retry_cfg.jitter_factor,
-                    non_retryable_exceptions=set(retry_cfg.non_retryable_exceptions),
+                    non_retryable_exceptions=list(retry_cfg.non_retryable_exceptions),
                 )
             elif strategy_type == "linear":
                 self._strategy_cache[strategy_type] = LinearBackoffStrategy(

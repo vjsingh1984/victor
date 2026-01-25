@@ -287,7 +287,7 @@ class CollaborationMixin:
         content: str,
         message_type: str = "request",
         timeout: float = 30.0,
-        **metadata,
+        **metadata: Any,
     ) -> Optional[AgentMessage]:
         """Send a collaborative request between members.
 

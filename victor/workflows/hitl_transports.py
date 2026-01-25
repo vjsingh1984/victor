@@ -634,23 +634,23 @@ class SlackTransport(BaseTransport):
                 "type": "actions",
                 "block_id": f"hitl_{request.request_id}",
                 "elements": [
-                    cast(Dict[str, Any], {
+                    {
                         "type": "button",
                         "text": {"type": "plain_text", "text": "✓ Approve"},
                         "style": "primary",
                         "action_id": "approve",
                         "value": request.request_id,
                         "url": urls.get("approve_url"),
-                    }),
-                    cast(Dict[str, Any], {
+                    },
+                    {
                         "type": "button",
                         "text": {"type": "plain_text", "text": "✗ Reject"},
                         "style": "danger",
                         "action_id": "reject",
                         "value": request.request_id,
                         "url": urls.get("reject_url"),
-                    }),
-                ],
+                    },
+                ],  # type: ignore[list-item]
             }
         )
 
@@ -659,12 +659,12 @@ class SlackTransport(BaseTransport):
         blocks.append(
             {
                 "type": "context",
-                "elements": cast(List[Dict[str, Any]], [
+                "elements": [  # type: ignore[dict-item]
                     {
                         "type": "mrkdwn",
                         "text": f"⏱️ Timeout: {request.timeout}s | Request ID: `{req_id_short}...`",
                     }
-                ]),
+                ],
             }
         )
 

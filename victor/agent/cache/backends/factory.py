@@ -190,7 +190,7 @@ class CacheBackendFactory:
             )
 
     @staticmethod
-    def _create_memory_backend(options: Dict[str, Any]) -> "MemoryCacheBackend":
+    def _create_memory_backend(options: Dict[str, Any]) -> ICacheBackend:
         """Create in-memory cache backend.
 
         Args:

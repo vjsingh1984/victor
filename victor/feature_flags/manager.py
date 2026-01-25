@@ -268,12 +268,18 @@ class FeatureFlagManager:
         # Get old value for audit log
         old_value = None
         try:
-            old_value = self._resolver.get(flag_name)
+            if isinstance(self._resolver, ChainedFlagResolver):
+                old_value = self._resolver.get(flag_name)
+            else:
+                old_value = self._resolver.get(flag_name)
         except Exception:
             pass
 
         # Set flag via resolver
-        success = self._resolver.set(flag_name, value)
+        if isinstance(self._resolver, ChainedFlagResolver):
+            success = self._resolver.set(flag_name, value)
+        else:
+            success = self._resolver.set(flag_name, value)
 
         if not success:
             logger.warning(f"Failed to set flag {flag_name}={value}")

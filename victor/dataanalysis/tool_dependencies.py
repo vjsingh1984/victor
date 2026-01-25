@@ -110,8 +110,8 @@ class DataAnalysisToolDependencyProvider(YAMLToolDependencyProvider):
 def _get_deprecated_config() -> "DataAnalysisToolDependencyProvider":
     """Lazily load provider for deprecated constant access."""
     if not hasattr(_get_deprecated_config, "_provider"):
-        _get_deprecated_config._provider = DataAnalysisToolDependencyProvider()  # type: ignore[attr-defined]
-    return _get_deprecated_config._provider  # type: ignore[attr-defined]
+        _get_deprecated_config._provider = DataAnalysisToolDependencyProvider()
+    return _get_deprecated_config._provider
 
 
 def _warn_deprecated(name: str) -> None:
@@ -129,7 +129,12 @@ class _DeprecatedTransitions:
 
     def __getitem__(self, key: str) -> List[Tuple[str, float]]:
         _warn_deprecated("DATA_ANALYSIS_TOOL_TRANSITIONS")
-        return _get_deprecated_config().get_tool_transitions().get(key, [])  # type: ignore[no-any-return]
+        config = _get_deprecated_config()
+        result = config.get_tool_transitions().get(key, [])
+        # Ensure the return type matches List[Tuple[str, float]]
+        if isinstance(result, list):
+            return result  # type: ignore[return-value]
+        return []
 
     def __iter__(self) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_TRANSITIONS")
@@ -185,27 +190,51 @@ class _DeprecatedSequences:
 
     def __getitem__(self, key: str) -> List[str]:
         _warn_deprecated("DATA_ANALYSIS_TOOL_SEQUENCES")
-        return _get_deprecated_config().get_tool_sequences().get(key, [])
+        config = _get_deprecated_config()
+        sequences = config.get_tool_sequences()
+        if isinstance(sequences, dict):
+            return sequences.get(key, [])
+        return []
 
     def __iter__(self) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_SEQUENCES")
-        return iter(_get_deprecated_config().get_tool_sequences())
+        config = _get_deprecated_config()
+        sequences = config.get_tool_sequences()
+        if isinstance(sequences, dict):
+            return iter(sequences)
+        return iter([])
 
     def items(self) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_SEQUENCES")
-        return _get_deprecated_config().get_tool_sequences().items()
+        config = _get_deprecated_config()
+        sequences = config.get_tool_sequences()
+        if isinstance(sequences, dict):
+            return sequences.items()
+        return {}.items()
 
     def keys(self) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_SEQUENCES")
-        return _get_deprecated_config().get_tool_sequences().keys()
+        config = _get_deprecated_config()
+        sequences = config.get_tool_sequences()
+        if isinstance(sequences, dict):
+            return sequences.keys()
+        return {}.keys()
 
     def values(self) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_SEQUENCES")
-        return _get_deprecated_config().get_tool_sequences().values()
+        config = _get_deprecated_config()
+        sequences = config.get_tool_sequences()
+        if isinstance(sequences, dict):
+            return sequences.values()
+        return {}.values()
 
     def get(self, key: str, default: Any = None) -> Any:
         _warn_deprecated("DATA_ANALYSIS_TOOL_SEQUENCES")
-        return _get_deprecated_config().get_tool_sequences().get(key, default)
+        config = _get_deprecated_config()
+        sequences = config.get_tool_sequences()
+        if isinstance(sequences, dict):
+            return sequences.get(key, default)
+        return default
 
 
 class _DeprecatedDependencies:

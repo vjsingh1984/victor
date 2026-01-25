@@ -220,7 +220,7 @@ class AdvancedRAG:
                     chunk_id=result.chunk.id,
                     content=result.chunk.content,
                     score=result.score,
-                    source=result.chunk.source,
+                    source=result.chunk.metadata.get("source", ""),
                     metadata=result.chunk.metadata,
                 )
                 for result in results
@@ -250,7 +250,7 @@ class AdvancedRAG:
                         chunk_id=result.chunk.id,
                         content=result.chunk.content,
                         score=keyword_score,
-                        source=result.chunk.source,
+                        source=result.chunk.metadata.get("source", ""),
                         metadata=result.chunk.metadata,
                     )
                 )
@@ -478,8 +478,9 @@ class AdvancedRAG:
         response = {"answer": answer, "query": query}
 
         if include_sources:
-            response["sources"] = [
+            sources_list: List[Dict[str, Any]] = [
                 {"citation": r.citation, "source": r.source, "score": r.score} for r in results
             ]
+            response["sources"] = sources_list
 
         return response

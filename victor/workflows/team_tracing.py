@@ -309,7 +309,7 @@ class TeamTracer:
     """
 
     _instance: Optional["TeamTracer"] = None
-    _lock = threading.Lock()
+    _lock = threading.RLock()
 
     def __init__(self, enabled: bool = True):
         """Initialize team tracer.

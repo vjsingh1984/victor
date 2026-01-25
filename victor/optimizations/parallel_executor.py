@@ -60,6 +60,7 @@ from typing import (
     Set,
     Tuple,
     Union,
+    cast,
 )
 
 try:
@@ -403,7 +404,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     async def execute(
         self,
-        tasks: List[TaskInput],
+        tasks: List[TaskInput[Any]],
         context: Optional[Dict[str, Any]] = None,
     ) -> ParallelExecutionResult:
         """Execute tasks with adaptive optimization.
@@ -489,7 +490,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     async def _execute_parallel_optimized(
         self,
-        tasks: List[TaskInput],
+        tasks: List[TaskInput[Any]],
         context: Dict[str, Any],
         start_time: float,
     ) -> ParallelExecutionResult:
@@ -520,7 +521,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     async def _execute_sequential_optimized(
         self,
-        tasks: List[TaskInput],
+        tasks: List[TaskInput[Any]],
         context: Dict[str, Any],
         start_time: float,
     ) -> ParallelExecutionResult:
@@ -543,7 +544,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
         for i, task in enumerate(tasks):
             try:
-                coro = self._prepare_task(task, i, context)
+                coro: Awaitable[Any] = self._prepare_task(task, i, context)
                 result = await coro
                 results.append(result)
                 success_count += 1
@@ -577,7 +578,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     async def _execute_with_load_balancing(
         self,
-        tasks: List[TaskInput],
+        tasks: List[TaskInput[Any]],
         context: Dict[str, Any],
     ) -> ParallelExecutionResult:
         """Execute tasks with load balancing across workers.
@@ -606,7 +607,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     async def _execute_with_priority_queue(
         self,
-        tasks: List[TaskInput],
+        tasks: List[TaskInput[Any]],
         context: Dict[str, Any],
     ) -> ParallelExecutionResult:
         """Execute tasks using a priority queue.
@@ -627,7 +628,11 @@ class AdaptiveParallelExecutor(ParallelExecutor):
         for task in tasks:
             if isinstance(task, tuple) and len(task) == 2:
                 priority, task_input = task
-                heappush(priority_queue, TaskWithPriority(priority, task_id, task_input))
+                if isinstance(priority, int) and isinstance(task_input, dict):
+                    heappush(priority_queue, TaskWithPriority(priority, task_id, task_input))
+                else:
+                    # Default priority for malformed tuples
+                    heappush(priority_queue, TaskWithPriority(0, task_id, task))
             else:
                 # Default priority
                 heappush(priority_queue, TaskWithPriority(0, task_id, task))
@@ -640,7 +645,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
         while priority_queue:
             task_with_priority = heappop(priority_queue)
             try:
-                coro = self._prepare_task(
+                coro: Awaitable[Any] = self._prepare_task(
                     task_with_priority.task,
                     task_with_priority.task_id,
                     context,
@@ -654,7 +659,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     async def _execute_with_work_stealing(
         self,
-        tasks: List[TaskInput],
+        tasks: List[TaskInput[Any]],
         context: Dict[str, Any],
     ) -> ParallelExecutionResult:
         """Execute tasks with work stealing.
@@ -669,8 +674,8 @@ class AdaptiveParallelExecutor(ParallelExecutor):
         Returns:
             ParallelExecutionResult
         """
-        task_queue = asyncio.Queue()
-        result_queue = asyncio.Queue()
+        task_queue: asyncio.Queue[Tuple[int, TaskInput[Any]]] = asyncio.Queue()
+        result_queue: asyncio.Queue[Any] = asyncio.Queue()
 
         # Add tasks to queue
         for i, task in enumerate(tasks):
@@ -704,8 +709,8 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     async def _worker(
         self,
-        task_queue: asyncio.Queue,
-        result_queue: asyncio.Queue,
+        task_queue: asyncio.Queue[Tuple[int, TaskInput[Any]]],
+        result_queue: asyncio.Queue[Any],
         context: Dict[str, Any],
         worker_id: int,
     ) -> None:
@@ -722,7 +727,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
                 try:
                     task_id, task = await asyncio.wait_for(task_queue.get(), timeout=0.1)
                     try:
-                        coro = self._prepare_task(task, task_id, context)
+                        coro: Awaitable[Any] = self._prepare_task(task, task_id, context)
                         result = await coro
                         await result_queue.put((task_id, result))
                     except Exception as e:
@@ -763,7 +768,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     def _create_batches(
         self,
-        tasks: List[TaskInput],
+        tasks: List[TaskInput[Any]],
         batch_size: int,
     ) -> List[List[TaskInput]]:
         """Divide tasks into batches.
@@ -800,7 +805,8 @@ class AdaptiveParallelExecutor(ParallelExecutor):
             batch_tasks.append(super().execute(batch, context))
 
         # Execute batches in parallel
-        return await asyncio.gather(*batch_tasks, return_exceptions=True)
+        batch_results_with_exceptions = await asyncio.gather(*batch_tasks, return_exceptions=True)
+        return cast(List[ParallelExecutionResult], batch_results_with_exceptions)
 
     def _aggregate_batch_results(
         self,
@@ -897,7 +903,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     def _calculate_metrics(
         self,
-        tasks: List[TaskInput],
+        tasks: List[TaskInput[Any]],
         result: ParallelExecutionResult,
         start_time: float,
     ) -> None:
@@ -941,7 +947,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     def optimize_parallelism(
         self,
-        tasks: List[TaskInput],
+        tasks: List[TaskInput[Any]],
     ) -> ParallelizationStrategy:
         """Optimize parallelization strategy based on task characteristics.
 
@@ -1006,7 +1012,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
     def balance_load(
         self,
         workers: List[WorkerInfo],
-        tasks: List[TaskInput],
+        tasks: List[TaskInput[Any]],
     ) -> Dict[int, List[int]]:
         """Balance task load across workers based on current state.
 
@@ -1196,7 +1202,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     async def profile_execution(
         self,
-        tasks: List[TaskInput],
+        tasks: List[TaskInput[Any]],
         context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Profile parallel execution with detailed performance analysis.
@@ -1223,7 +1229,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
         resources_before = SystemResourceInfo.collect()
 
         # Execute with profiling enabled
-        result = await self.execute(tasks, context)  # type: ignore
+        result = await self.execute(tasks, context)
 
         # Collect system resources after execution
         resources_after = SystemResourceInfo.collect()
@@ -1301,7 +1307,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     def _create_task_groups(
         self,
-        tasks: List[TaskInput],
+        tasks: List[TaskInput[Any]],
         num_workers: int,
     ) -> List[List[int]]:
         """Create groups of tasks that can execute in parallel.

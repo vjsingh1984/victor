@@ -656,13 +656,13 @@ class HITLExecutor:
         self.handler = handler
         self.mode = mode or HITLMode.CLI
         self.transport_config = transport_config
-        self._transport = None
+        self._transport: Optional[Any] = None  # BaseTransport, avoid circular import
 
         self._pending_requests: Dict[str, asyncio.Event] = {}
         self._responses: Dict[str, HITLResponse] = {}
         self._external_refs: Dict[str, str] = {}  # request_id -> external_ref
 
-    def _get_transport(self) -> Any:
+    def _get_transport(self) -> Optional[Any]:
         """Get or create the transport adapter."""
         if self._transport is None and self.mode not in [
             HITLMode.CLI,
@@ -673,7 +673,7 @@ class HITLExecutor:
         ]:
             from victor.workflows.hitl_transports import get_transport
 
-            self._transport: Any = get_transport(self.mode, self.transport_config)
+            self._transport = get_transport(self.mode, self.transport_config)
         return self._transport
 
     def _should_use_transport(self) -> bool:
@@ -792,7 +792,7 @@ class HITLExecutor:
         logger.info(f"HITL request {request.request_id} sent via {self.mode.value}: {external_ref}")
 
         # Wait for response with polling
-        response = await transport.wait_for_response(
+        response: HITLResponse = await transport.wait_for_response(  # type: ignore[no-any-return]
             request.request_id,
             external_ref,
             timeout=node.timeout,

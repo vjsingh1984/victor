@@ -208,7 +208,7 @@ def example_after_migration() -> None:
 # =============================================================================
 
 
-def migrate_step_1_add_type_hints():
+def migrate_step_1_add_type_hints() -> None:
     """
     STEP 1: Add type hints to constructor dependencies.
 
@@ -225,7 +225,7 @@ def migrate_step_1_add_type_hints():
     pass
 
 
-def migrate_step_2_remove_defaults():
+def migrate_step_2_remove_defaults() -> None:
     """
     STEP 2: Remove default values from required dependencies.
 
@@ -242,7 +242,7 @@ def migrate_step_2_remove_defaults():
     pass
 
 
-def migrate_step_3_register_in_container():
+def migrate_step_3_register_in_container() -> None:
     """
     STEP 3: Register services in DI container.
 
@@ -256,7 +256,7 @@ def migrate_step_3_register_in_container():
     pass
 
 
-def migrate_step_4_update_factory():
+def migrate_step_4_update_factory() -> None:
     """
     STEP 4: Update or remove factory functions.
 
@@ -314,7 +314,7 @@ class AnalyticsServiceV3:
 # =============================================================================
 
 
-def migration_benefits():
+def migration_benefits() -> None:
     """
     Summary of benefits from migrating to DI container:
 

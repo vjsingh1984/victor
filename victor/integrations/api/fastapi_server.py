@@ -1825,7 +1825,7 @@ Respond with just the command to run."""
                     )
 
                 # Cast to proper type for mypy
-                learner_ms: ModelSelectorLearner = learner  # type: ignore[misc]
+                learner_ms: ModelSelectorLearner = learner
 
                 # Get rankings
                 rankings = learner_ms.get_provider_rankings()

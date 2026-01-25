@@ -865,7 +865,8 @@ class DockerDeploymentHandler(DeploymentHandler):
                 if hasattr(docker_module, 'from_env'):
                     self._client = docker.from_env()
                 else:
-                    self._client = docker.DockerClient()
+                    # DockerClient is not directly accessible, use from_env
+                    self._client = docker.from_env()
             except ImportError:
                 raise RuntimeError("docker package not installed. Install with: pip install docker")
         return self._client
@@ -961,10 +962,10 @@ class DockerDeploymentHandler(DeploymentHandler):
         try:
             parsed_result = json.loads(output.decode())
             if isinstance(parsed_result, dict) and "state" in parsed_result:
-                return cast("Dict[str, Any]", parsed_result["state"])
-            return cast("Dict[str, Any]", parsed_result if isinstance(parsed_result, dict) else state)
+                return parsed_result["state"]
+            return parsed_result if isinstance(parsed_result, dict) else state
         except json.JSONDecodeError:
-            return cast("Dict[str, Any]", state)
+            return state
 
     async def cleanup(self) -> None:
         """Stop and remove Docker container."""
@@ -1146,11 +1147,11 @@ class KubernetesDeploymentHandler(DeploymentHandler):
         try:
             parsed_result = json.loads(resp)
             if isinstance(parsed_result, dict) and "state" in parsed_result:
-                return cast("Dict[str, Any]", parsed_result["state"])
-            return cast("Dict[str, Any]", parsed_result if isinstance(parsed_result, dict) else state)
+                return parsed_result["state"]
+            return parsed_result if isinstance(parsed_result, dict) else state
         except json.JSONDecodeError:
             logger.warning(f"Could not parse pod exec output: {resp}")
-            return cast("Dict[str, Any]", state)
+            return state
 
     async def cleanup(self) -> None:
         """Delete Kubernetes pod."""

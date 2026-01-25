@@ -214,7 +214,6 @@ class TeamNodeRunner:
                 result = await coordinator.execute_task(
                     task=node.goal,
                     context=context.get("shared_context", {}),
-                    timeout_seconds=node.timeout_seconds,
                 )
 
                 # Extract metadata from result
@@ -358,11 +357,11 @@ class TeamNodeRunner:
         try:
             role = SubAgentRole(role_str)
         except ValueError:
-            # Fallback to ASSISTANT if role not recognized
+            # Fallback to EXECUTOR if role not recognized
             logger.warning(
-                f"Unknown role '{role_str}' for member '{member_id}', " f"defaulting to 'assistant'"
+                f"Unknown role '{role_str}' for member '{member_id}', " f"defaulting to 'executor'"
             )
-            role = SubAgentRole.ASSISTANT
+            role = SubAgentRole.EXECUTOR
 
         # Add member to coordinator
         coordinator.add_member(
@@ -397,9 +396,10 @@ class TeamNodeRunner:
         try:
             from victor.core.events import ObservabilityBus as EventBus
 
-            bus = EventBus.get_instance()
-            bus.publish(
-                event_type="team.recursion.depth_exceeded",
+            bus = EventBus()
+            await bus.connect()
+            await bus.emit(
+                topic="team.recursion.depth_exceeded",
                 data={
                     "team_id": team_id,
                     "current_depth": recursion_ctx.current_depth,

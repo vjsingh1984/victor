@@ -162,7 +162,7 @@ class DepsManager:
         self,
         package: str,
         directory: Optional[Path] = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Get dependency tree for a package.
 
         Args:
@@ -176,18 +176,19 @@ class DepsManager:
         if not analysis.graph:
             return {}
 
-        def build_tree(pkg_name: str, visited: set[Any]) -> dict:
+        def build_tree(pkg_name: str, visited: set[Any]) -> dict[str, Any]:
             if pkg_name in visited:
                 return {"name": pkg_name, "circular": True}
             visited.add(pkg_name)
 
-            dep = analysis.graph.all_packages.get(pkg_name)
+            dep = analysis.graph.all_packages.get(pkg_name) if analysis.graph else None
             if not dep:
                 return {"name": pkg_name}
 
             children = []
-            for child in analysis.graph.get_dependencies(pkg_name):
-                children.append(build_tree(child, visited.copy()))
+            if analysis.graph:
+                for child in analysis.graph.get_dependencies(pkg_name):
+                    children.append(build_tree(child, visited.copy()))
 
             return {
                 "name": pkg_name,
@@ -380,7 +381,7 @@ class DepsManager:
 
     def _find_dependency_files(self, directory: Path) -> list[Path]:
         """Find all dependency files in directory."""
-        files = []
+        files: list[Path] = []
 
         patterns = [
             "requirements*.txt",
@@ -527,8 +528,14 @@ class DepsManager:
         try:
             url = f"{self.config.pypi_url}/{package}/json"
             with urllib.request.urlopen(url, timeout=5) as response:
-                data = json.loads(response.read())
-                return data.get("info", {}).get("version")
+                data: Any = json.loads(response.read())
+                if isinstance(data, dict):
+                    info = data.get("info")
+                    if isinstance(info, dict):
+                        version = info.get("version")
+                        if isinstance(version, str):
+                            return version
+                return None
         except Exception:
             return None
 
@@ -540,8 +547,14 @@ class DepsManager:
         try:
             url = f"{self.config.npm_registry}/{package}"
             with urllib.request.urlopen(url, timeout=5) as response:
-                data = json.loads(response.read())
-                return data.get("dist-tags", {}).get("latest")
+                data: Any = json.loads(response.read())
+                if isinstance(data, dict):
+                    dist_tags = data.get("dist-tags")
+                    if isinstance(dist_tags, dict):
+                        version = dist_tags.get("latest")
+                        if isinstance(version, str):
+                            return version
+                return None
         except Exception:
             return None
 

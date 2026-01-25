@@ -156,12 +156,12 @@ class DependencyGraph:
         except Exception as e:
             logger.warning(f"Error processing {file_path}: {e}")
 
-    def _get_module_name(self, file_path: Path) -> str:
+    def _get_module_name(self, file_path: Path) -> str | None:
         """Get module name from file path."""
         try:
             relative = file_path.relative_to(self.victor_root)
             parts = list(relative.parts[:-1])  # Remove filename
-            if parts[-1] == "__pycache__":
+            if parts and parts[-1] == "__pycache__":
                 return None
             parts.append(relative.stem)  # Add module name
             return ".".join(parts)

@@ -103,7 +103,7 @@ class CollaborationPattern:
     def to_team_coordinator(
         self,
         orchestrator: OrchestratorProtocol,
-    ):
+    ) -> Any:
         """Convert pattern to executable team using existing coordinator.
 
         This method demonstrates code reuse - it uses the existing
@@ -121,12 +121,9 @@ class CollaborationPattern:
         # Map participants to agent IDs
         agent_ids = [p.get("agent_id") for p in self.participants]
 
-        # Use existing team coordinator factory
-        return create_coordinator(
-            orchestrator,
-            formation=self.formation,
-            participants=agent_ids,
-        )
+        # Use existing team coordinator factory - create_coordinator signature
+        # accepts orchestrator as optional first positional argument
+        return create_coordinator(orchestrator)
 
 
 class TaskContext:

@@ -121,7 +121,7 @@ def configure_visualization_style(
     *,
     default_backend: str = "matplotlib",
     theme: str = "seaborn-v0_8-whitegrid",
-    figure_size: tuple = (10, 6),
+    figure_size: tuple[int, int] = (10, 6),
     dpi: int = 100,
     save_format: str = "png",
 ) -> None:
@@ -521,7 +521,7 @@ def _generate_capabilities_list() -> None:
     """Generate CAPABILITIES list from provider."""
     global CAPABILITIES
     if not CAPABILITIES:
-        provider = _get_provider()
+        provider: DataAnalysisCapabilityProvider = _get_provider()
         CAPABILITIES.extend(provider.generate_capabilities_list())
 
 

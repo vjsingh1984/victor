@@ -953,9 +953,9 @@ class AudioAgent:
                 audio = whisper.load_audio(str(audio_path))
                 result = model.transcribe(audio, language=None)
 
-                language: str = result.get("language", "unknown")
-                logger.info(f"Detected language (Whisper): {language}")
-                return language
+                detected_language: str = result.get("language", "unknown")
+                logger.info(f"Detected language (Whisper): {detected_language}")
+                return detected_language
 
             except Exception as e:
                 logger.error(f"Whisper language detection failed: {e}")
@@ -1102,18 +1102,20 @@ Summary:"""
                 f"Invalid operation: {operation}. Must be one of: {', '.join(valid_operations)}"
             )
 
-        results = []
+        results: List[TranscriptionResult | AudioAnalysis | str | List[SpeakerSegment] | None] = []
 
         for audio_path in audio_paths:
             try:
                 if operation == "transcribe":
-                    result = await self.transcribe_audio(audio_path, **kwargs)
+                    result: TranscriptionResult | AudioAnalysis | str | List[SpeakerSegment] | None = await self.transcribe_audio(audio_path, **kwargs)
                 elif operation == "analyze":
-                    result = await self.analyze_audio(audio_path)
+                    result: TranscriptionResult | AudioAnalysis | str | List[SpeakerSegment] | None = await self.analyze_audio(audio_path)
                 elif operation == "detect_language":
-                    result = await self.detect_language(audio_path)
+                    result: TranscriptionResult | AudioAnalysis | str | List[SpeakerSegment] | None = await self.detect_language(audio_path)
                 elif operation == "diarize":
-                    result = await self.extract_speaker_diarization(audio_path, **kwargs)
+                    result: TranscriptionResult | AudioAnalysis | str | List[SpeakerSegment] | None = await self.extract_speaker_diarization(audio_path, **kwargs)
+                else:
+                    result = None
 
                 results.append(result)
                 logger.debug(f"Processed {audio_path}")

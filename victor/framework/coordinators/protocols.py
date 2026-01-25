@@ -212,7 +212,7 @@ class IGraphExecutor(Protocol):
 
     async def execute(
         self,
-        graph: "CompiledGraph",
+        graph: "CompiledGraph[Any]",
         initial_state: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> "WorkflowExecutionResult":
@@ -230,7 +230,7 @@ class IGraphExecutor(Protocol):
 
     async def stream(
         self,
-        graph: "CompiledGraph",
+        graph: "CompiledGraph[Any]",
         initial_state: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> AsyncIterator["WorkflowEvent"]:

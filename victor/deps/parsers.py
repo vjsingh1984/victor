@@ -255,13 +255,13 @@ class PyprojectParser(BaseDependencyParser):
             name=name,
             version_spec=version_spec,
             source=source,
-            extras=[e.strip() for e in extras],
+            extras=[e.strip() for e in extras] if extras else [],
         )
 
     def _parse_poetry_dep(
         self,
         name: str,
-        spec: any,
+        spec: Any,
         source: str,
         dep_type: DependencyType = DependencyType.RUNTIME,
     ) -> Optional[Dependency]:
@@ -414,7 +414,7 @@ class CargoTomlParser(BaseDependencyParser):
     def _parse_cargo_dep(
         self,
         name: str,
-        spec: any,
+        spec: Any,
         source: str,
         dep_type: DependencyType = DependencyType.RUNTIME,
     ) -> Optional[Dependency]:

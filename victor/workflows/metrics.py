@@ -371,14 +371,15 @@ class WorkflowMetricsCollector:
         metrics = self._workflows[workflow_id]
 
         # Initialize node metrics if needed
-        if node_id not in metrics.node_metrics:
+        if node_id is not None and node_id not in metrics.node_metrics:
             metrics.node_metrics[node_id] = NodeMetrics(node_id=node_id)
 
         # Extract duration from metadata
         duration = chunk.metadata.get("duration_seconds", 0.0)
 
         # Update node metrics
-        metrics.node_metrics[node_id].update(duration=duration, success=True)
+        if node_id is not None:
+            metrics.node_metrics[node_id].update(duration=duration, success=True)
 
     def _on_node_error(self, chunk: WorkflowStreamChunk) -> None:
         """Track node error."""
@@ -391,14 +392,15 @@ class WorkflowMetricsCollector:
         metrics = self._workflows[workflow_id]
 
         # Initialize node metrics if needed
-        if node_id not in metrics.node_metrics:
+        if node_id is not None and node_id not in metrics.node_metrics:
             metrics.node_metrics[node_id] = NodeMetrics(node_id=node_id)
 
         # Extract duration from metadata
         duration = chunk.metadata.get("duration_seconds", 0.0)
 
         # Update node metrics with failure
-        metrics.node_metrics[node_id].update(duration=duration, success=False)
+        if node_id is not None:
+            metrics.node_metrics[node_id].update(duration=duration, success=False)
 
     def _on_tool_call(self, chunk: WorkflowStreamChunk) -> None:
         """Track tool usage."""

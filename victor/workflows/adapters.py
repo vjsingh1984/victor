@@ -45,7 +45,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, TypedDict
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, TypedDict, cast
 
 from victor.workflows.definition import (
     WorkflowDefinition,
@@ -161,7 +161,8 @@ class WorkflowToGraphAdapter:
         from victor.framework.graph import StateGraph, END
 
         # Create StateGraph with workflow state
-        graph = StateGraph(WorkflowState)
+        # Use Dict[str, Any] instead of WorkflowState TypedDict for compatibility
+        graph: StateGraph[Dict[str, Any]] = StateGraph(Dict[str, Any])
 
         # Convert each node - workflow.nodes is a Dict[str, WorkflowNode]
         nodes_list = list(workflow.nodes.values())
@@ -261,7 +262,8 @@ class WorkflowToGraphAdapter:
         # Import here to avoid circular imports
         from victor.framework.graph import StateGraph, END
 
-        graph: StateGraph[WorkflowState] = StateGraph(WorkflowState)
+        # Use Dict[str, Any] for compatibility with StateGraph type constraints
+        graph: StateGraph[Dict[str, Any]] = StateGraph(Dict[str, Any])
 
         # Convert each node with real execution - workflow.nodes is a Dict[str, WorkflowNode]
         nodes_list = list(workflow.nodes.values())
@@ -312,7 +314,10 @@ class WorkflowToGraphAdapter:
                 # Execute the node using the executor
                 # This is a simplified version - production would handle
                 # all the agent orchestration details
-                result = await executor.execute_by_name(node.name, workflow.id, context)
+                result = await executor.execute_by_name(
+                    node.name,
+                    initial_context=context,
+                )
 
                 # Update state with result
                 results = dict(state.get("results", {}))
@@ -405,7 +410,7 @@ class GraphToWorkflowAdapter:
         return WorkflowDefinition(
             name=name,
             description="Adapted from StateGraph",
-            nodes=workflow_nodes,
+            nodes=cast(Dict[str, WorkflowNode], workflow_nodes),
         )
 
 

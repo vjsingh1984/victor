@@ -233,7 +233,7 @@ class TemporalContext:
     period_type: str = "quarters"  # days, weeks, months, quarters, years
     include_end_date: bool = True
 
-    def get_date_range(self) -> tuple[datetime, datetime]:
+    def get_date_range(self) -> tuple["datetime", "datetime"]:
         """Calculate start and end dates based on lookback.
 
         Returns:
@@ -467,7 +467,7 @@ class WorkflowExecutor:
         self.default_timeout = default_timeout
         self._checkpointer = checkpointer
         self._sub_agents: Optional["SubAgentOrchestrator"] = None
-        self._active_executions: Dict[str, asyncio.Task] = {}
+        self._active_executions: Dict[str, asyncio.Task[Any]] = {}
         self._tool_registry = tool_registry
         self._service_registry = service_registry
         self._services_started = False
@@ -480,7 +480,7 @@ class WorkflowExecutor:
 
             self._cache = WorkflowCache(cache_config)
         else:
-            self._cache: Optional["victor.workflows.cache.WorkflowCache"] = None
+            self._cache = None
 
     @property
     def sub_agents(self) -> "SubAgentOrchestrator":
@@ -489,12 +489,9 @@ class WorkflowExecutor:
             from victor.agent.subagents.orchestrator import SubAgentOrchestrator
             from victor.agent.orchestrator import AgentOrchestrator
 
-            # Cast orchestrator to AgentOrchestrator for SubAgentOrchestrator
-            # This is safe because WorkflowAgentProtocol is compatible
-            parent_orchestrator = AgentOrchestrator(None)  # type: ignore[arg-type]
-            if hasattr(self.orchestrator, '_container'):
-                parent_orchestrator = self.orchestrator  # type: ignore[assignment]
-            self._sub_agents = SubAgentOrchestrator(parent_orchestrator)  # type: ignore[arg-type]
+            # Use the orchestrator directly if it has the required interface
+            # SubAgentOrchestrator will adapt to the orchestrator protocol
+            self._sub_agents = SubAgentOrchestrator(self.orchestrator)
         return self._sub_agents
 
     @property
@@ -948,6 +945,15 @@ class WorkflowExecutor:
 
         if retry_result.success:
             logger.debug(f"Node '{node.id}' succeeded after {retry_result.attempts} attempt(s)")
+            # When success is True, result should not be None
+            if retry_result.result is None:
+                # This shouldn't happen, but handle it defensively
+                return NodeResult(
+                    node_id=node.id,
+                    status=ExecutorNodeStatus.FAILED,
+                    error="Retry succeeded but returned None result",
+                    duration_seconds=time.time() - start_time,
+                )
             return retry_result.result
         else:
             logger.warning(
@@ -1187,7 +1193,7 @@ class WorkflowExecutor:
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Process results based on join strategy
-        node_results = []
+        node_results: List[NodeResult] = []
         for r in results:
             if isinstance(r, Exception):
                 error_result = NodeResult(
@@ -1197,9 +1203,18 @@ class WorkflowExecutor:
                 )
                 node_results.append(error_result)
                 context.add_result(error_result)
-            else:
+            elif isinstance(r, NodeResult):
                 node_results.append(r)
                 context.add_result(r)
+            else:
+                # Unexpected result type, convert to error
+                error_result = NodeResult(
+                    node_id="unknown",
+                    status=ExecutorNodeStatus.FAILED,
+                    error=f"Unexpected result type: {type(r)}",
+                )
+                node_results.append(error_result)
+                context.add_result(error_result)
 
         # Determine overall status
         if node.join_strategy == "all":

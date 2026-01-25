@@ -188,11 +188,18 @@ def _create_agent_bridge(container: ServiceContainer) -> "AgentBridge":
     # Create a minimal orchestrator wrapper for the bridge
     class MinimalOrchestrator(OrchestratorProtocol):
         """Minimal orchestrator for service container compatibility."""
-        pass
+        def chat(self, *args: Any, **kwargs: Any) -> Any: ...
+        def stream_chat(self, *args: Any, **kwargs: Any) -> Any: ...
+        def supports_tools(self) -> bool: ...
+        def name(self) -> str: ...
+        @property
+        def messages(self) -> list[Any]: ...
+        @property
+        def tool_calls_used(self) -> int: ...
 
     orchestrator = MinimalOrchestrator()
     config = AgentConfig()
-    agent = Agent(orchestrator, config=config)
+    agent = Agent(orchestrator)  # Agent doesn't accept config parameter
     return AgentBridge(agent, BridgeConfiguration(enable_cqrs=False, enable_observability=False))
 
 
@@ -372,7 +379,7 @@ class FrameworkScope:
         self._scope = container.create_scope()
         self._active = True
 
-    def get_configurator(self) -> "ToolConfigurator":
+    def get_configurator(self) -> Any:
         """Get tool configurator service."""
         from victor.framework.tool_config import ToolConfigurator
         from typing import cast
@@ -380,12 +387,12 @@ class FrameworkScope:
         # Cast to ToolConfigurator protocol since the service implements it
         return cast(ToolConfigurator, service)
 
-    def get_registry(self) -> "EventRegistryService":
+    def get_registry(self) -> Any:
         """Get event registry service."""
         from typing import cast
         return cast(EventRegistryService, self._scope.get(EventRegistryService))
 
-    def get_builder(self) -> "AgentBuilderService":
+    def get_builder(self) -> Any:
         """Get agent builder service.
 
         Returns a new builder instance (transient).
@@ -449,7 +456,7 @@ def configure_framework_services(
     return container
 
 
-def get_tool_configurator(container: Optional[ServiceContainer] = None) -> "ToolConfiguratorService":
+def get_tool_configurator(container: Optional[ServiceContainer] = None) -> Any:
     """Get tool configurator from container.
 
     Args:
@@ -464,7 +471,7 @@ def get_tool_configurator(container: Optional[ServiceContainer] = None) -> "Tool
     return cast(ToolConfiguratorService, container.get(ToolConfiguratorService))
 
 
-def get_event_registry(container: Optional[ServiceContainer] = None) -> "EventRegistryService":
+def get_event_registry(container: Optional[ServiceContainer] = None) -> Any:
     """Get event registry from container.
 
     Args:
@@ -479,7 +486,7 @@ def get_event_registry(container: Optional[ServiceContainer] = None) -> "EventRe
     return cast(EventRegistryService, container.get(EventRegistryService))
 
 
-def create_builder(container: Optional[ServiceContainer] = None) -> "AgentBuilderService":
+def create_builder(container: Optional[ServiceContainer] = None) -> Any:
     """Create new agent builder from container.
 
     Args:

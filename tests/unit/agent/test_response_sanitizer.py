@@ -63,11 +63,19 @@ class TestResponseSanitizer:
         result = sanitizer.sanitize(text)
         assert "<parameter>" not in result
 
-    def test_sanitize_removes_json_tool_calls(self, sanitizer):
-        """Test removal of embedded JSON tool calls."""
+    def test_sanitize_preserves_json_tool_calls(self, sanitizer):
+        """Test that JSON tool calls are preserved (handled by tool_calling module).
+
+        NOTE: This behavior changed - JSON tool calls are now preserved because
+        the tool_calling module (base.py::parse_json_from_content) has robust
+        JSON fallback parsing that handles multiple consecutive JSON objects and
+        trailing metadata. This allows local models that output JSON tool calls
+        in content to work correctly.
+        """
         text = 'Here is the result {"name": "read_file", "arguments": {"path": "test.py"}} done'
         result = sanitizer.sanitize(text)
-        assert '{"name":' not in result
+        # JSON tool calls are now preserved for tool_calling module to handle
+        assert '{"name":' in result
 
     def test_sanitize_handles_empty_string(self, sanitizer):
         """Test empty string handling."""
@@ -169,11 +177,19 @@ class TestResponseSanitizerEdgeCases:
         """Create a ResponseSanitizer instance."""
         return ResponseSanitizer()
 
-    def test_sanitize_removes_json_name_lines(self, sanitizer):
-        """Test removal of lines starting with {"name": (covers line 154)."""
+    def test_sanitize_preserves_json_name_lines(self, sanitizer):
+        """Test that lines starting with {"name": are preserved (handled by tool_calling module).
+
+        NOTE: This behavior changed - JSON tool calls are now preserved because
+        the tool_calling module (base.py::parse_json_from_content) has robust
+        JSON fallback parsing that handles multiple consecutive JSON objects and
+        trailing metadata. This allows local models that output JSON tool calls
+        in content to work correctly.
+        """
         text = 'Some text\n{"name": "tool", "arguments": {}}\nMore text'
         result = sanitizer.sanitize(text)
-        assert '{"name":' not in result
+        # JSON tool calls are now preserved for tool_calling module to handle
+        assert '{"name":' in result
         assert "Some text" in result
         assert "More text" in result
 

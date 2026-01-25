@@ -584,7 +584,8 @@ class DIScope:
         if descriptor.lifetime == ServiceLifetime.SCOPED:
             with self._lock:
                 if service_type not in self._scoped_instances:
-                    self._scoped_instances[service_type] = descriptor.create_instance(self._parent)
+                    instance = descriptor.create_instance(self._parent)
+                    self._scoped_instances[service_type] = cast(T, instance)
                 return self._scoped_instances[service_type]
 
         # Transient - always create new
@@ -612,7 +613,7 @@ class DIScope:
 # =============================================================================
 
 
-def create_container(*registrations: tuple[Type, ServiceLifetime]) -> DIContainer:
+def create_container(*registrations: tuple[type[Any], ServiceLifetime]) -> DIContainer:
     """Create a container with multiple services registered.
 
     Args:

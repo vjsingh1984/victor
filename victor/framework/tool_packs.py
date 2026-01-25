@@ -483,13 +483,15 @@ def create_custom_pack(
             excludes=["edit"],
         )
     """
-    return ToolPack(
+    pack = ToolPack(
         name=name,
         extends=extends,
         tools=additional_tools,
         excludes=excludes or [],
         description=description or f"Custom pack extending {extends}",
     )
+    # Return tools list as expected by the signature
+    return cast("list[str]", pack.tools)
 
 
 # Auto-register default packs on import

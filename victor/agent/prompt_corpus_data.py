@@ -1240,7 +1240,7 @@ GENERAL_CODING_PROMPTS: List[Tuple[str, str]] = [
 # =============================================================================
 
 
-def build_complete_corpus() -> list[tuple[str, str, str]]:
+def build_complete_corpus() -> list[tuple[str, "PromptCategory", str]]:
     """Build the complete corpus with all categories.
 
     Returns:

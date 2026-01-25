@@ -876,8 +876,8 @@ class PromptTemplateLearner(BaseLearner):
         """
         cursor = self.db.cursor()
         timestamp = datetime.now().isoformat()
-        context_key = (vertical.lower(), enrichment_type.lower())
-        sample_count = self._enrichment_sample_counts.get(context_key, 0)
+        context_key_str = f"{vertical.lower()}:{enrichment_type.lower()}"
+        sample_count = self._enrichment_sample_counts.get(context_key_str, 0)
 
         # Get posterior values
         posterior = self._get_enrichment_posterior(vertical, enrichment_type, task_type)
@@ -1030,7 +1030,7 @@ class PromptTemplateLearner(BaseLearner):
             if context not in enrichment_stats:
                 enrichment_stats[context] = {
                     "probability": posterior.mean(),
-                    "sample_count": self._enrichment_sample_counts.get((vertical, etype), 0),
+                    "sample_count": self._enrichment_sample_counts.get(context, 0),
                 }
 
         return {

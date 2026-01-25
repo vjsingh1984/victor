@@ -30,11 +30,8 @@ try:
 except ImportError:
     TEXTUAL_AVAILABLE = False
 
-    class Widget:
-        pass
-
-    class ComposeResult:
-        pass
+    Widget = object  # type: ignore
+    ComposeResult = object  # type: ignore
 
 
 if TEXTUAL_AVAILABLE:
@@ -270,14 +267,17 @@ if TEXTUAL_AVAILABLE:
 
 else:
     # Stubs when Textual is not available
-    class DocumentList:
+    class DocumentListStub:  # Renamed to avoid conflict
         """Stub when Textual is not available."""
 
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args, **kwargs):  # type: ignore
             raise ImportError("Textual required for RAG UI")
 
-    class SearchResults:
+    class SearchResultsStub:  # Renamed to avoid conflict
         """Stub when Textual is not available."""
 
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args, **kwargs):  # type: ignore
             raise ImportError("Textual required for RAG UI")
+
+    DocumentList = DocumentListStub  # type: ignore
+    SearchResults = SearchResultsStub  # type: ignore

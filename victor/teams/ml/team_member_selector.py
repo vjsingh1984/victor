@@ -300,15 +300,15 @@ class TeamMemberSelector:
         features.append(1.0 if member.is_manager else 0.0)
         features.append(int(member.max_delegation_depth))
         features.append(1.0 if member.memory_enabled else 0.0)
-        features.append(int(len(member.expertise)))
-        features.append(int(len(member.backstory)))
+        features.append(float(len(member.expertise)))
+        features.append(float(len(member.backstory)))
 
         # Expertise overlap
         if task_features.required_expertise:
             overlap = len(set(member.expertise) & set(task_features.required_expertise))
-            features.append(int(overlap / len(task_features.required_expertise)))
+            features.append(float(overlap / len(task_features.required_expertise)))
         else:
-            features.append(0)
+            features.append(0.0)
 
         # Role encoding (one-hot)
         roles = ["planner", "researcher", "executor", "reviewer", "tester"]

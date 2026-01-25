@@ -606,7 +606,7 @@ class AlgorithmOptimizer:
             cache.clear()
 
 
-def lru_cache(max_size: int = 128) -> Callable:
+def lru_cache(max_size: int = 128) -> Callable[..., Any]:
     """Decorator for LRU cache function results.
 
     Simpler alternative to functools.lru_cache with more control.
@@ -621,9 +621,9 @@ def lru_cache(max_size: int = 128) -> Callable:
                 return n
             return fibonacci(n - 1) + fibonacci(n - 2)
     """
-    cache = LRUCache(max_size=max_size)
+    cache: TimedCache[Any, Any] = TimedCache(max_age=max_size)
 
-    def decorator(func: Callable[..., Any]) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             key = (args, tuple(sorted(kwargs.items())))

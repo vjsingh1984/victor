@@ -122,7 +122,7 @@ class AdaptiveSemaphore:
         self._adjustment_interval = adjustment_interval
 
         self._semaphore = asyncio.Semaphore(initial_concurrent)
-        self._wait_times: queue.Queue = queue.Queue(maxsize=100)
+        self._wait_times: queue.Queue[float] = queue.Queue(maxsize=100)
         self._last_adjustment = time.time()
 
     async def acquire(self) -> None:
@@ -222,7 +222,7 @@ class LockFreeQueue(Generic[T]):
         Args:
             maxsize: Maximum queue size (0 for unlimited)
         """
-        self._queue: queue.Queue = queue.Queue(maxsize=maxsize)
+        self._queue: queue.Queue[T] = queue.Queue(maxsize=maxsize)
 
     def put(self, item: T, block: bool = True, timeout: Optional[float] = None) -> None:
         """Put item in queue."""
@@ -284,7 +284,7 @@ class ConcurrencyOptimizer:
         stats = optimizer.get_stats()
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize concurrency optimizer."""
         self._thread_pool: Optional[ThreadPoolExecutor] = None
         self._process_pool: Optional[ProcessPoolExecutor] = None
@@ -310,7 +310,8 @@ class ConcurrencyOptimizer:
 
         if max_workers is None:
             # Default to CPU count * 2 for I/O-bound workloads
-            max_workers = os.cpu_count() * 2
+            cpu_count = os.cpu_count() or 1
+            max_workers = cpu_count * 2
 
         # Set global thread pool settings
         # This affects ThreadPoolExecutor default behavior
@@ -332,7 +333,8 @@ class ConcurrencyOptimizer:
             import os
 
             if max_workers is None:
-                max_workers = os.cpu_count() * 2
+                cpu_count = os.cpu_count() or 1
+                max_workers = cpu_count * 2
 
             self._thread_pool = ThreadPoolExecutor(
                 max_workers=max_workers,

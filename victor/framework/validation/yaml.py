@@ -189,7 +189,7 @@ class ValidatorFactory:
         "transforming": TransformingValidator,
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the factory."""
         self._custom_validators: Dict[str, type[ValidatorProtocol]] = {}
 
@@ -255,8 +255,9 @@ class ValidatorFactory:
     ) -> ThresholdValidator:
         """Create a threshold validator."""
         cfg = config.config
+        field_name = config.field_name or ""
         return ThresholdValidator(
-            field=config.field_name,
+            field=field_name,
             min_value=cfg.get("min"),
             max_value=cfg.get("max"),
             min_inclusive=cfg.get("min_inclusive", True),
@@ -270,8 +271,9 @@ class ValidatorFactory:
     ) -> RangeValidator:
         """Create a range validator."""
         cfg = config.config
+        field_name = config.field_name or ""
         return RangeValidator(
-            field=config.field_name,
+            field=field_name,
             min_value=cfg.get("min"),
             max_value=cfg.get("max"),
             exclusive_min=cfg.get("exclusive_min", False),
@@ -285,8 +287,9 @@ class ValidatorFactory:
     ) -> PresenceValidator:
         """Create a presence validator."""
         cfg = config.config
+        field_name = config.field_name or ""
         return PresenceValidator(
-            field=config.field_name,
+            field=field_name,
             required=cfg.get("required", True),
             allow_empty=cfg.get("allow_empty", True),
             check_truthiness=cfg.get("check_truthiness", False),
@@ -299,8 +302,9 @@ class ValidatorFactory:
     ) -> PatternValidator:
         """Create a pattern validator."""
         cfg = config.config
+        field_name = config.field_name or ""
         return PatternValidator(
-            field=config.field_name,
+            field=field_name,
             pattern=cfg.get("pattern"),
             pattern_type=cfg.get("pattern_type"),
             flags=cfg.get("flags", 0),
@@ -313,9 +317,10 @@ class ValidatorFactory:
     ) -> TypeValidator:
         """Create a type validator."""
         cfg = config.config
-        expected_type = cfg.get("expected_type") or cfg.get("type")
+        field_name = config.field_name or ""
+        expected_type = cfg.get("expected_type") or cfg.get("type") or str
         return TypeValidator(
-            field=config.field_name,
+            field=field_name,
             expected_type=expected_type,
             coerce=cfg.get("coerce", False),
             error_code=cfg.get("error_code"),
@@ -327,8 +332,9 @@ class ValidatorFactory:
     ) -> LengthValidator:
         """Create a length validator."""
         cfg = config.config
+        field_name = config.field_name or ""
         return LengthValidator(
-            field=config.field_name,
+            field=field_name,
             min_length=cfg.get("min_length"),
             max_length=cfg.get("max_length"),
             exact_length=cfg.get("exact_length"),
@@ -442,14 +448,14 @@ class ValidatorFactory:
             transform = _trim_transform
         else:
 
-            def _identity_transform(x: Any) -> Any:
-                """Pass through value unchanged."""
-                return x
+            def _strip_transform(x: Any) -> Any:
+                """Strip whitespace from strings."""
+                return x.strip() if isinstance(x, str) else x
 
-            transform = cast(Callable[[Any], Any], _identity_transform)
+            transform: Callable[[Any], Any] = _strip_transform
 
         return TransformingValidator(
-            validator=inner,
+            validator=cast(BaseValidator, inner),
             transform=transform,
             field=config.field_name,
             error_code=cfg.get("error_code"),
@@ -461,7 +467,8 @@ class ValidatorFactory:
     ) -> ValidatorProtocol:
         """Create a custom validator."""
         validator_class = self._custom_validators[config.type]
-        return validator_class.from_config(config)
+        result = validator_class.from_config(config)
+        return cast(ValidatorProtocol, result)
 
 
 # =============================================================================
@@ -598,8 +605,8 @@ class ValidationPipelineBuilder:
             validator_factory: Factory for creating validators
             handler_factory: Factory for creating handlers
         """
-        self._validator_factory = validator_factory or ValidatorFactory()
-        self._handler_factory = handler_factory or HandlerFactory()
+        self._validator_factory: ValidatorFactory = validator_factory or ValidatorFactory()
+        self._handler_factory: HandlerFactory = handler_factory or HandlerFactory()
 
     def from_dict(
         self,

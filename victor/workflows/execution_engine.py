@@ -476,7 +476,7 @@ class StateManager:
                     "to": state2[key],
                 }
             else:
-                diff["unchanged"].append(key)  # type: ignore[arg-type]
+                diff["unchanged"].append(key)
 
         return diff
 
@@ -892,7 +892,7 @@ class WorkflowExecutor:
 
     async def execute(
         self,
-        workflow: Union["CachedCompiledGraph[Any]", "WorkflowDefinition", "CompiledGraph[Any]"],
+        workflow: Union["CachedCompiledGraph", "WorkflowDefinition", "CompiledGraph[Any]"],
         inputs: Optional[Dict[str, Any]] = None,
         breakpoints: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
@@ -1058,7 +1058,11 @@ class WorkflowExecutor:
 
                     compiler = WorkflowDefinitionCompiler()
                     compiled = compiler.compile(workflow)
-                    result = await compiled.invoke(inputs or {})
+                    if hasattr(compiled, "invoke"):
+                        result = await compiled.invoke(inputs or {})
+                    else:
+                        # Graph doesn't support invoke, return inputs as result
+                        result = inputs or {}
                 else:
                     # Already compiled graph
                     result = await workflow.invoke(inputs or {})

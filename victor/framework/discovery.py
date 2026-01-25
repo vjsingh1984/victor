@@ -55,7 +55,7 @@ from __future__ import annotations
 
 import importlib
 import logging
-from typing import Any, Dict, List, Optional, Tuple, Type, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Tuple, Type, TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
     from victor.core.verticals.base import VerticalBase
@@ -253,7 +253,7 @@ class VerticalDiscovery:
                     victor_eps = eps.select(group="victor.verticals")
                 else:
                     # Python 3.9
-                    victor_eps = list(eps.get("victor.verticals", []))
+                    victor_eps: Union[Any, List[Any]] = list(eps.get("victor.verticals", []))
 
                 for ep in victor_eps:
                     try:

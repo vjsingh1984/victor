@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from victor.framework.patterns.types import (
     CollaborationPattern,
@@ -308,7 +308,7 @@ class PatternMiner:
 
         metadata = trace.metadata
         if "parallel_nodes" in metadata:
-            return metadata["parallel_nodes"]
+            return cast("list[list[str]]", metadata["parallel_nodes"])
 
         # Heuristic: look for common prefixes suggesting parallel execution
         current_group = []
@@ -395,7 +395,7 @@ class PatternMiner:
             Pattern name
         """
         # Count roles
-        role_counts = defaultdict(int)
+        role_counts: Dict[str, int] = defaultdict(int)
         for p in participants:
             role_counts[p["role"]] += 1
 

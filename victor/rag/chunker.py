@@ -486,7 +486,7 @@ class DocumentChunker:
             return self._chunk_text(full_text)
 
         # Convert semantic elements to chunks with size limits
-        current_chunk = []
+        current_chunk: List[str] = []
         current_size = 0
         pos = 0
 

@@ -44,7 +44,8 @@ class IsolationConfig:
 class TestIsolationMapper:
     """Tests for IsolationMapper constraint-to-sandbox mapping."""
 
-    def test_vertical_defaults_exist(self):
+    def test_vertical_defaults_exist(self) -> None:
+        """Test all vertical defaults are defined."""
         """Test all vertical defaults are defined."""
         try:
             from victor.workflows.isolation import IsolationMapper
@@ -60,6 +61,7 @@ class TestIsolationMapper:
 
     def test_coding_vertical_default(self):
         """Test coding vertical defaults to process isolation."""
+        """Test coding vertical defaults to process isolation."""
         try:
             from victor.workflows.isolation import IsolationMapper
 
@@ -70,6 +72,7 @@ class TestIsolationMapper:
             pytest.skip("IsolationMapper not available")
 
     def test_devops_vertical_default(self):
+        """Test devops vertical defaults to docker isolation."""
         """Test devops vertical defaults to docker isolation."""
         try:
             from victor.workflows.isolation import IsolationMapper
@@ -83,6 +86,7 @@ class TestIsolationMapper:
 
     def test_research_vertical_default(self):
         """Test research vertical defaults to no isolation."""
+        """Test research vertical defaults to no isolation."""
         try:
             from victor.workflows.isolation import IsolationMapper
 
@@ -93,6 +97,7 @@ class TestIsolationMapper:
             pytest.skip("IsolationMapper not available")
 
     def test_rag_vertical_default(self):
+        """Test RAG vertical defaults to docker with readonly filesystem."""
         """Test RAG vertical defaults to docker with readonly filesystem."""
         try:
             from victor.workflows.isolation import IsolationMapper
@@ -105,6 +110,7 @@ class TestIsolationMapper:
             pytest.skip("IsolationMapper not available")
 
     def test_airgapped_constraints_override(self):
+        """Test airgapped constraints disable network."""
         """Test airgapped constraints disable network."""
         try:
             from victor.workflows.isolation import IsolationMapper
@@ -120,6 +126,7 @@ class TestIsolationMapper:
 
     def test_full_access_constraints(self):
         """Test full access constraints use docker with network."""
+        """Test full access constraints use docker with network."""
         try:
             from victor.workflows.isolation import IsolationMapper
             from victor.workflows.definition import FullAccessConstraints
@@ -134,6 +141,7 @@ class TestIsolationMapper:
 
     def test_compute_only_constraints(self):
         """Test compute-only constraints use process isolation."""
+        """Test compute-only constraints use process isolation."""
         try:
             from victor.workflows.isolation import IsolationMapper
             from victor.workflows.definition import ComputeOnlyConstraints
@@ -146,6 +154,7 @@ class TestIsolationMapper:
             pytest.skip("IsolationMapper or ComputeOnlyConstraints not available")
 
     def test_vertical_override_with_constraints(self):
+        """Test constraints take precedence over vertical defaults."""
         """Test constraints take precedence over vertical defaults."""
         try:
             from victor.workflows.isolation import IsolationMapper
@@ -160,6 +169,7 @@ class TestIsolationMapper:
             pytest.skip("IsolationMapper not available")
 
     def test_unknown_vertical_defaults_to_process(self):
+        """Test unknown vertical falls back to process isolation."""
         """Test unknown vertical falls back to process isolation."""
         try:
             from victor.workflows.isolation import IsolationMapper
@@ -176,6 +186,7 @@ class TestIsolationConfigProperties:
 
     def test_isolation_config_creation(self):
         """Test IsolationConfig can be created with all options."""
+        """Test IsolationConfig can be created with all options."""
         config = IsolationConfig(
             sandbox_type="docker",
             network_allowed=False,
@@ -187,6 +198,7 @@ class TestIsolationConfigProperties:
         assert config.filesystem_readonly is True
 
     def test_isolation_config_defaults(self):
+        """Test IsolationConfig default values."""
         """Test IsolationConfig default values."""
         config = IsolationConfig()
 
@@ -200,6 +212,7 @@ class TestExecutorIsolationIntegration:
 
     @pytest.mark.asyncio
     async def test_executor_selects_docker_for_devops(self):
+        """Test executor uses Docker sandbox for devops vertical."""
         """Test executor uses Docker sandbox for devops vertical."""
         try:
             from victor.workflows.executor import WorkflowExecutor
@@ -218,6 +231,7 @@ class TestExecutorIsolationIntegration:
     @pytest.mark.asyncio
     async def test_executor_selects_process_for_coding(self):
         """Test executor uses process sandbox for coding vertical."""
+        """Test executor uses process sandbox for coding vertical."""
         try:
             from victor.workflows.executor import WorkflowExecutor
             from victor.workflows.isolation import IsolationMapper
@@ -234,6 +248,7 @@ class TestConstraintTypes:
 
     def test_constraint_llm_allowed_flag(self):
         """Test constraint llm_allowed flag is respected."""
+        """Test constraint llm_allowed flag is respected."""
         try:
             from victor.workflows.definition import ComputeOnlyConstraints
 
@@ -243,6 +258,7 @@ class TestConstraintTypes:
             pytest.skip("ComputeOnlyConstraints not available")
 
     def test_constraint_timeout_setting(self):
+        """Test constraint timeout is configurable."""
         """Test constraint timeout is configurable."""
         try:
             from victor.workflows.definition import TaskConstraints
@@ -254,6 +270,7 @@ class TestConstraintTypes:
             pytest.skip("TaskConstraints not available")
 
     def test_constraint_cost_tier_setting(self):
+        """Test constraint cost tier is configurable."""
         """Test constraint cost tier is configurable."""
         try:
             from victor.workflows.definition import TaskConstraints
@@ -269,6 +286,7 @@ class TestSandboxTypeSelection:
     """Test sandbox type selection logic."""
 
     def test_none_sandbox_inline_execution(self):
+        """Test \'none\' sandbox means inline execution."""
         """Test 'none' sandbox means inline execution."""
         config = IsolationConfig(sandbox_type="none")
 
@@ -277,6 +295,7 @@ class TestSandboxTypeSelection:
         assert config.network_allowed is True
 
     def test_process_sandbox_subprocess_execution(self):
+        """Test \'process\' sandbox means subprocess execution."""
         """Test 'process' sandbox means subprocess execution."""
         config = IsolationConfig(sandbox_type="process")
 
@@ -284,6 +303,7 @@ class TestSandboxTypeSelection:
         assert config.sandbox_type == "process"
 
     def test_docker_sandbox_container_execution(self):
+        """Test \'docker\' sandbox means container execution."""
         """Test 'docker' sandbox means container execution."""
         config = IsolationConfig(sandbox_type="docker")
 

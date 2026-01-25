@@ -19,7 +19,8 @@ import re
 from typing import Any, Dict, List, Optional
 
 from victor.framework.enrichment import EnrichmentContext
-from victor.tools.base import BaseTool, CostTier, ToolResult
+from victor.tools.base import BaseTool, ToolResult
+from victor.tools.enums import CostTier
 from victor.rag.enrichment import get_rag_enrichment_strategy
 
 logger = logging.getLogger(__name__)
@@ -139,28 +140,30 @@ class RAGQueryTool(BaseTool):
 
     async def execute(
         self,
-        question: str,
-        k: int = 5,
-        synthesize: bool = True,
-        provider: Optional[str] = None,
-        model: Optional[str] = None,
-        max_context_chars: int = 10240,
-        **kwargs: Any,
+        params: Dict[str, Any],
     ) -> ToolResult:
         """Execute RAG query with optional LLM synthesis.
 
         Args:
-            question: Question to answer
-            k: Number of context chunks
-            synthesize: Whether to use LLM to synthesize answer
-            provider: LLM provider (e.g., 'ollama', 'anthropic')
-            model: Model name for synthesis
-            max_context_chars: Maximum context length
+            params: Parameters dictionary with keys:
+                - question: Question to answer
+                - k: Number of context chunks
+                - synthesize: Whether to use LLM to synthesize answer
+                - provider: LLM provider (e.g., 'ollama', 'anthropic')
+                - model: Model name for synthesis
+                - max_context_chars: Maximum context length
 
         Returns:
             ToolResult with synthesized answer or formatted context
         """
         from victor.rag.document_store import DocumentStore
+
+        question = params.get("question", "")
+        k = params.get("k", 5)
+        synthesize = params.get("synthesize", True)
+        provider = params.get("provider")
+        model = params.get("model")
+        max_context_chars = params.get("max_context_chars", 10240)
 
         try:
             store = self._get_document_store()
@@ -405,7 +408,7 @@ class RAGQueryTool(BaseTool):
             if hasattr(response, "content"):
                 return response.content
             elif hasattr(response, "message"):
-                return response.message.get("content", str(response))
+                return str(response.message.get("content", str(response)))
             else:
                 return str(response)
 
@@ -416,7 +419,7 @@ class RAGQueryTool(BaseTool):
                 f"Retrieved context for your question:\n{context[:1000]}..."
             )
 
-    def _get_document_store(self):
+    def _get_document_store(self) -> Any:
         """Get document store instance."""
         from victor.rag.document_store import DocumentStore
 
@@ -430,7 +433,7 @@ class RAGQueryTool(BaseTool):
         question: str,
         entities: List[Any],
         k: int,
-    ) -> List[Any]:
+    ) -> Any:
         """Search for multiple entities and combine results.
 
         For comparison queries like "Compare Apple and Microsoft revenue",
@@ -554,7 +557,7 @@ class RAGQueryTool(BaseTool):
 
         if sec_docs:
             # Group by ticker
-            by_ticker: Dict[str, list] = {}
+            by_ticker: Dict[str, List[Any]] = {}
             for doc in sec_docs:
                 symbol = doc.metadata.get("symbol", "UNKNOWN")
                 if symbol not in by_ticker:

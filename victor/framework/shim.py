@@ -211,7 +211,8 @@ class FrameworkShim:
 
         logger.debug(f"FrameworkShim created orchestrator: session_id={self._session_id}")
 
-        return self._orchestrator
+        from typing import cast
+        return cast("AgentOrchestrator", self._orchestrator)
 
     def _apply_vertical(self, vertical: Type["VerticalBase"]) -> None:
         """Apply vertical configuration to orchestrator.
@@ -272,7 +273,9 @@ class FrameworkShim:
         )
         if self._orchestrator is not None:
             from typing import cast
-            self._observability.wire_orchestrator(cast(AgentOrchestrator, self._orchestrator))
+            # wire_orchestrator expects AgentOrchestrator but we have OrchestratorProtocol
+            # Use cast since the actual instance should be AgentOrchestrator
+            self._observability.wire_orchestrator(cast(Any, self._orchestrator))
 
             # Store reference on orchestrator for access
             if hasattr(self._orchestrator, 'observability'):
@@ -294,7 +297,8 @@ class FrameworkShim:
         Returns:
             Orchestrator instance, or None if not yet created.
         """
-        return self._orchestrator
+        from typing import cast
+        return cast("AgentOrchestrator", self._orchestrator)
 
     @property
     def observability(self) -> Optional["ObservabilityIntegration"]:

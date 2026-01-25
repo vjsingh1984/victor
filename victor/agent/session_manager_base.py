@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.protocols.agent import IAgentOrchestrator
+    from victor.protocols.ui_agent import UIAgentProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -338,10 +339,9 @@ class TUISessionHandler(BaseSessionHandler):
         try:
             # Import TUI here to avoid circular imports
             from victor.ui.tui import VictorTUI
-            from typing import cast
 
             tui_app = VictorTUI(
-                agent=cast("UIAgentProtocol", agent),
+                agent=agent,
                 provider=config.provider,
                 model=config.model,
                 stream=True,

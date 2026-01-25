@@ -382,7 +382,9 @@ class RetryHandler:
 
     def can_handle(self, result: ValidationResult) -> bool:
         """Can handle if there are issues."""
-        return not result.is_valid or (self.retry_on_warnings and result.warnings)
+        # Return bool, not ValidationResult
+        has_issues = not result.is_valid or (self.retry_on_warnings and result.warnings)
+        return bool(has_issues)
 
     def handle(
         self,

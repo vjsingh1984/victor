@@ -523,7 +523,7 @@ class BaseVerticalCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
 
             capability = OrchestratorCapability(
                 name=name,
-                capability_type=cap_metadata.get("capability_type", "setting"),
+                capability_type=definition.type,
                 version=cap_metadata["version"],
                 setter=cap_metadata["setter"],
                 description=cap_metadata["description"],

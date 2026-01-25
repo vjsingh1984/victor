@@ -81,7 +81,7 @@ class TerraformScanner(IaCScannerProtocol):
 
     async def detect_files(self, root_path: Path) -> list[Path]:
         """Find Terraform files."""
-        files = []
+        files: list[Path] = []
         for pattern in ["**/*.tf", "**/*.tfvars"]:
             files.extend(root_path.glob(pattern))
         # Exclude .terraform directory
@@ -110,7 +110,7 @@ class TerraformScanner(IaCScannerProtocol):
             )
 
         # Parse variables
-        variables = {}
+        variables: Dict[str, Any] = {}
         var_pattern = r'variable\s+"([^"]+)"\s*\{'
         for match in re.finditer(var_pattern, content):
             variables[match.group(1)] = None
@@ -237,7 +237,7 @@ class DockerScanner(IaCScannerProtocol):
 
     async def detect_files(self, root_path: Path) -> list[Path]:
         """Find Dockerfiles."""
-        files = []
+        files: list[Path] = []
         for pattern in ["**/Dockerfile", "**/Dockerfile.*", "**/*.dockerfile"]:
             files.extend(root_path.glob(pattern))
         return files
@@ -387,7 +387,7 @@ class KubernetesScanner(IaCScannerProtocol):
 
     async def detect_files(self, root_path: Path) -> list[Path]:
         """Find Kubernetes manifest files."""
-        files = []
+        files: list[Path] = []
         for pattern in ["**/*.yaml", "**/*.yml"]:
             files.extend(root_path.glob(pattern))
 
@@ -611,7 +611,7 @@ class DockerComposeScanner(IaCScannerProtocol):
             "compose.yml",
             "compose.yaml",
         ]
-        files = []
+        files: list[Path] = []
         for pattern in patterns:
             files.extend(root_path.glob(pattern))
             files.extend(root_path.glob(f"**/{pattern}"))
@@ -703,15 +703,15 @@ class DockerComposeScanner(IaCScannerProtocol):
             # Environment secrets
             environment = props.get("environment", {})
             if isinstance(environment, dict):
-                env_items = environment.items()
+                env_items = list(environment.items())
             elif isinstance(environment, list):
-                env_items = []
+                env_items: list[tuple[str, str]] = []
                 for item in environment:
                     if "=" in item:
                         k, v = item.split("=", 1)
                         env_items.append((k, v))
             else:
-                env_items = []
+                env_items: list[tuple[str, str]] = []
 
             for key, value in env_items:
                 key_upper = key.upper()

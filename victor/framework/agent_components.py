@@ -476,9 +476,12 @@ class AgentBuilder:
             return None
         try:
             from victor.framework.service_provider import ToolConfiguratorService
-            from typing import cast
+            from typing import cast, TYPE_CHECKING
 
-            return cast(ToolConfiguratorService, self._container.get(ToolConfiguratorService.__class__))
+            if TYPE_CHECKING:
+                from victor.framework.service_provider import ToolConfiguratorService as TC
+            # Use type[ToolConfiguratorService] to get the class
+            return cast(ToolConfiguratorService, self._container.get(type[ToolConfiguratorService]))
         except Exception as e:
             logger.debug(f"Could not get ToolConfigurator from container: {e}")
             return None
@@ -495,7 +498,7 @@ class AgentBuilder:
             from victor.framework.service_provider import EventRegistryService
             from typing import cast
 
-            return cast(EventRegistryService, self._container.get(EventRegistryService.__class__))
+            return cast(EventRegistryService, self._container.get(type[EventRegistryService]))
         except Exception as e:
             logger.debug(f"Could not get EventRegistry from container: {e}")
             return None

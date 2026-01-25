@@ -67,8 +67,20 @@ import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import (
+    Any,
+    AsyncIterator,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Set,
+    TYPE_CHECKING,
+)
 from contextlib import asynccontextmanager
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 from victor.workflows.hitl import (
     HITLFallback,
@@ -495,7 +507,7 @@ class SQLiteHITLStore:
         finally:
             conn.close()
 
-    def _row_to_stored_request(self, row) -> StoredRequest:
+    def _row_to_stored_request(self, row: Any) -> StoredRequest:
         """Convert database row to StoredRequest."""
         import json
 
@@ -1059,7 +1071,7 @@ def create_hitl_router(
     store: Optional[HITLStore] = None,
     require_auth: bool = False,
     auth_token: Optional[str] = None,
-):
+) -> Any:  # FastAPI APIRouter
     """Create FastAPI router for HITL endpoints.
 
     Args:
@@ -1080,7 +1092,7 @@ def create_hitl_router(
     hitl_store = store or get_global_store()
     expected_token = auth_token or os.environ.get("HITL_AUTH_TOKEN")
 
-    async def verify_auth(authorization: Optional[str] = Header(None)) -> bool:
+    async def verify_auth(authorization: Optional[str] = Header(None)) -> None:
         """Verify authentication if required."""
         if not require_auth:
             return

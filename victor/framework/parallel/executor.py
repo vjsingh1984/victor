@@ -70,6 +70,7 @@ import time
 from dataclasses import dataclass, field
 from typing import (
     Any,
+    AsyncGenerator,
     Awaitable,
     Callable,
     Coroutine,
@@ -78,6 +79,7 @@ from typing import (
     Optional,
     TypeVar,
     Union,
+    cast,
 )
 
 from victor.framework.parallel.protocols import (
@@ -230,7 +232,7 @@ class ParallelExecutor:
 
     async def execute(
         self,
-        tasks: List[TaskInput],
+        tasks: List["TaskInput[Any]"],
         context: Optional[Dict[str, Any]] = None,
     ) -> ParallelExecutionResult:
         """Execute tasks in parallel.
@@ -261,7 +263,7 @@ class ParallelExecutor:
             )
 
         # Prepare task coroutines
-        coroutines = []
+        coroutines: List[Coroutine[Any, Any, Any]] = []
         for i, task in enumerate(tasks):
             coroutines.append(self._prepare_task(task, i, context))
 
@@ -478,17 +480,22 @@ class ParallelExecutor:
                 success_count += 1
 
         # Apply join strategy
-        should_stop = self._join_strategy.should_stop_on_error()
-        if should_stop and errors:
-            success, final_result, _ = await self._join_strategy.evaluate(
-                [r for r in results if r is not None],
-                errors,
-            )
+        if self._join_strategy is not None:
+            should_stop = self._join_strategy.should_stop_on_error()
+            if should_stop and errors:
+                success, final_result, _ = await self._join_strategy.evaluate(
+                    [r for r in results if r is not None],
+                    errors,
+                )
+            else:
+                success, final_result, _ = await self._join_strategy.evaluate(
+                    results,
+                    errors,
+                )
         else:
-            success, final_result, _ = await self._join_strategy.evaluate(
-                results,
-                errors,
-            )
+            # Default behavior if no join strategy
+            success = len(errors) == 0
+            final_result = results
 
         return ParallelExecutionResult(
             success=success,
@@ -544,10 +551,14 @@ class ParallelExecutor:
                 success_count += 1
 
         # Apply join strategy
-        success, final_result, _ = await self._join_strategy.evaluate(
-            results,
-            errors,
-        )
+        if self._join_strategy is not None:
+            success, final_result, _ = await self._join_strategy.evaluate(
+                results,
+                errors,
+            )
+        else:
+            success = len(errors) == 0
+            final_result = results
 
         return ParallelExecutionResult(
             success=success,
@@ -582,9 +593,9 @@ class ParallelExecutor:
 
     async def execute_stream(
         self,
-        tasks: List[TaskInput],
+        tasks: List["TaskInput[Any]"],
         context: Optional[Dict[str, Any]] = None,
-    ) -> ProgressEvent:
+    ) -> AsyncGenerator[ProgressEvent, None]:
         """Execute tasks in parallel, yielding progress events.
 
         This is a generator that yields events as tasks complete,
@@ -601,7 +612,7 @@ class ParallelExecutor:
         task_futures = []
 
         for i, task in enumerate(tasks):
-            coro = self._prepare_task(task, i, context)
+            coro: Coroutine[Any, Any, Any] = self._prepare_task(task, i, context)
             task_futures.append(asyncio.ensure_future(coro))
 
         # Create tasks for completion tracking
@@ -714,7 +725,7 @@ class ParallelExecutorHandler:
         """
         # Check for config in node attributes
         if hasattr(node, "parallel_config"):
-            return node.parallel_config
+            return cast(ParallelConfig, node.parallel_config)
 
         # Build from individual attributes
         config = ParallelConfig()
@@ -799,7 +810,7 @@ class ParallelExecutorHandler:
 
 
 async def execute_parallel(
-    tasks: List[TaskInput],
+    tasks: List["TaskInput[Any]"],
     context: Optional[Dict[str, Any]] = None,
     join_strategy: JoinStrategy = JoinStrategy.ALL,
     error_strategy: ErrorStrategy = ErrorStrategy.FAIL_FAST,
@@ -840,7 +851,7 @@ async def execute_parallel(
 
 
 async def execute_parallel_with_config(
-    tasks: List[TaskInput],
+    tasks: List["TaskInput[Any]"],
     config: ParallelConfig,
     context: Optional[Dict[str, Any]] = None,
 ) -> ParallelExecutionResult:

@@ -282,7 +282,7 @@ class SwitchingFormation:
 
             if should_switch:
                 old_formation = self.current_formation
-                self.current_formation = new_formation
+                self.current_formation = new_formation  # type: ignore[assignment]
                 self.switch_count += 1
 
                 if self.track_switches:
@@ -1144,7 +1144,7 @@ Rationale: [your reasoning]
                 consensus = 1.0
             else:
                 # Use tiebreaker
-                winner = self._apply_tiebreaker(distribution)
+                winner = self._apply_tiebreaker(distribution)  # type: ignore[arg-type]
                 consensus = distribution.get(winner, 0) / sum(distribution.values())
 
         elif self.voting_method == VotingMethod.WEIGHTED:
@@ -1157,7 +1157,9 @@ Rationale: [your reasoning]
             total_votes = sum(1 for vote in votes if vote.choice == winner)
             consensus = total_votes / len(votes) if votes else 0.0
 
-        return winner, distribution, consensus
+        # Cast distribution to expected type for return
+        distribution_typed: Dict[str, int] = {k: int(v) if v is not None else 0 for k, v in distribution.items()}  # type: ignore[assignment]
+        return winner, distribution_typed, consensus  # type: ignore[return-value]
 
     def _apply_tiebreaker(self, distribution: Dict[str, int]) -> Optional[str]:
         """Apply tiebreaker rule.

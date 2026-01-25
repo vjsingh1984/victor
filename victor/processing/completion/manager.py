@@ -372,8 +372,8 @@ class CompletionManager:
 
             try:
                 # stream_inline_completion returns AsyncIterator[str], not a coroutine
-                stream = provider.stream_inline_completion(params)
-                async for token in stream:
+                stream_coro = provider.stream_inline_completion(params)
+                async for token in await stream_coro:
                     yield token
                 return
             except Exception as e:

@@ -12,7 +12,8 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 if TYPE_CHECKING:
     from victor.framework.prompt_builder import PromptBuilder
 
-from victor.core.verticals.base import StageDefinition, VerticalBase
+from victor.core.verticals.base import VerticalBase
+from victor.core.vertical_types import StageDefinition
 from victor.core.verticals.protocols import (
     ModeConfigProviderProtocol,
     PromptContributorProtocol,
@@ -55,7 +56,7 @@ class ResearchAssistant(VerticalBase):
         - HandlerProvider: Provides workflow compute handlers
     """
 
-    name = "research"
+    name: str = "research"
     description = "Web research, fact-checking, literature synthesis, and report generation"
     version = "0.5.0"
 
@@ -91,7 +92,7 @@ class ResearchAssistant(VerticalBase):
             ]
         )
 
-        return tools
+        return list(tools)
 
     @classmethod
     def get_system_prompt(cls) -> str:
@@ -217,12 +218,18 @@ class ResearchAssistant(VerticalBase):
             Tool dependency provider
         """
 
+        from typing import cast
+
         def _create():
             from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+            from victor.core.verticals.protocols import ToolDependencyProviderProtocol
 
-            return create_vertical_tool_dependency_provider("research")
+            return cast(
+                ToolDependencyProviderProtocol,
+                create_vertical_tool_dependency_provider("research")
+            )
 
-        return cls._get_cached_extension("tool_dependency_provider", _create)
+        return cls._get_cached_extension("tool_dependency_provider", _create)  # type: ignore
 
     @classmethod
     def get_handlers(cls) -> Dict[str, Any]:

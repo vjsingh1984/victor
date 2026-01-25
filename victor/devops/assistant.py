@@ -258,17 +258,17 @@ class DevOpsAssistant(VerticalBase):
         ]
 
     @classmethod
-    def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
+    def get_tool_dependency_provider(cls) -> ToolDependencyProviderProtocol | None:
         """Get DevOps tool dependency provider (cached).
 
         Custom implementation using create_vertical_tool_dependency_provider.
         Auto-generated getter would try to import from victor.devops.tool_dependencies.
 
         Returns:
-            Tool dependency provider
+            Tool dependency provider or None
         """
 
-        def _create():
+        def _create() -> ToolDependencyProviderProtocol:
             from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
 
             return create_vertical_tool_dependency_provider("devops")

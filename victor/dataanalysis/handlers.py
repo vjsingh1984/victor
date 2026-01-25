@@ -246,9 +246,9 @@ class PyCaretHandler(BaseHandler):
         data_key = node.input_mapping.get("data")
         target = node.input_mapping.get("target")
         task = node.input_mapping.get("task", "classification")
-        top_n = node.input_mapping.get("top_n", 3)
-        time_budget = node.input_mapping.get("time_budget", 60)
-        fold = node.input_mapping.get("fold", 5)
+        top_n = int(node.input_mapping.get("top_n", 3))
+        time_budget = int(node.input_mapping.get("time_budget", 60))
+        fold = int(node.input_mapping.get("fold", 5))
         sort_by = node.input_mapping.get("sort_by")  # Metric to sort by
 
         # Check if PyCaret is available
@@ -484,11 +484,11 @@ class AutoSklearnHandler(BaseHandler):
         X_key = node.input_mapping.get("X")
         y_key = node.input_mapping.get("y")
         task = node.input_mapping.get("task", "classification")
-        time_limit = node.input_mapping.get("time_limit", 300)
-        memory_limit = node.input_mapping.get("memory_limit", 3072)  # MB
+        time_limit = int(node.input_mapping.get("time_limit", 300))
+        memory_limit = int(node.input_mapping.get("memory_limit", 3072))  # MB
         metric = node.input_mapping.get("metric")
-        n_jobs = node.input_mapping.get("n_jobs", -1)
-        ensemble_size = node.input_mapping.get("ensemble_size", 50)
+        n_jobs = int(node.input_mapping.get("n_jobs", -1))
+        ensemble_size = int(node.input_mapping.get("ensemble_size", 50))
 
         try:
             import numpy as np
@@ -689,10 +689,10 @@ class RLTrainingHandler(BaseHandler):
         # Extract inputs
         env_id = node.input_mapping.get("env", "CartPole-v1")
         algorithm = node.input_mapping.get("algorithm", "PPO")
-        total_timesteps = node.input_mapping.get("total_timesteps", 10000)
+        total_timesteps = int(node.input_mapping.get("total_timesteps", 10000))
         policy = node.input_mapping.get("policy", "MlpPolicy")
-        learning_rate = node.input_mapping.get("learning_rate", 3e-4)
-        n_eval_episodes = node.input_mapping.get("n_eval_episodes", 10)
+        learning_rate = float(node.input_mapping.get("learning_rate", 3e-4))
+        n_eval_episodes = int(node.input_mapping.get("n_eval_episodes", 10))
         save_path = node.input_mapping.get("save_path")
 
         result = await self._train_rl_agent(

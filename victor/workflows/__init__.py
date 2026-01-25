@@ -168,7 +168,7 @@ class WorkflowCacheManager(_LegacyWorkflowCacheManager):
         self,
         workflow_name: str,
         config: Optional[_LegacyWorkflowCacheConfig] = None,
-    ) -> Optional["WorkflowCache"]:
+    ) -> Optional["_LegacyWorkflowCache"]:
         """Get or create cache for a workflow (package-level behavior)."""
         from victor.workflows.cache import WorkflowCache as CacheImpl
 

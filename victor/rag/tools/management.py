@@ -18,7 +18,8 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from victor.tools.base import BaseTool, CostTier, ToolResult
+from victor.tools.base import BaseTool, ToolResult
+from victor.tools.enums import CostTier
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ class RAGListTool(BaseTool):
     def cost_tier(self) -> CostTier:
         return CostTier.FREE
 
-    async def execute(self, **kwargs: Any) -> ToolResult:
+    async def execute(self, params: Dict[str, Any]) -> ToolResult:
         """List all documents.
 
         Returns:
@@ -133,7 +134,7 @@ class RAGListTool(BaseTool):
                 output=f"Failed to list documents: {str(e)}",
             )
 
-    def _get_document_store(self):
+    def _get_document_store(self) -> Any:
         """Get document store instance."""
         from victor.rag.document_store import DocumentStore
 
@@ -201,7 +202,7 @@ class RAGDeleteTool(BaseTool):
                 output=f"Failed to delete document: {str(e)}",
             )
 
-    def _get_document_store(self):
+    def _get_document_store(self) -> Any:
         """Get document store instance."""
         from victor.rag.document_store import DocumentStore
 
@@ -226,7 +227,7 @@ class RAGStatsTool(BaseTool):
     def cost_tier(self) -> CostTier:
         return CostTier.FREE
 
-    async def execute(self, **kwargs: Any) -> ToolResult:
+    async def execute(self, params: Dict[str, Any]) -> ToolResult:
         """Get store statistics.
 
         Returns:
@@ -243,7 +244,7 @@ class RAGStatsTool(BaseTool):
 
             # Calculate additional stats
             total_chars = sum(len(doc.content) for doc in docs)
-            doc_types = {}
+            doc_types: Dict[str, int] = {}
             for doc in docs:
                 doc_types[doc.doc_type] = doc_types.get(doc.doc_type, 0) + 1
 
@@ -279,7 +280,7 @@ class RAGStatsTool(BaseTool):
                 output=f"Failed to get statistics: {str(e)}",
             )
 
-    def _get_document_store(self):
+    def _get_document_store(self) -> Any:
         """Get document store instance."""
         from victor.rag.document_store import DocumentStore
 

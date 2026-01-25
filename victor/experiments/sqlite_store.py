@@ -74,7 +74,10 @@ class SQLiteStorage:
         if not hasattr(self._local, "conn"):
             self._local.conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
             self._local.conn.row_factory = sqlite3.Row
-        return self._local.conn  # type: ignore[return-value]
+        # Cast to Connection since mypy doesn't understand Row factory
+        import sqlite3
+        conn: sqlite3.Connection = self._local.conn
+        return conn
 
     def _ensure_tables(self) -> None:
         """Create database tables if they don't exist."""

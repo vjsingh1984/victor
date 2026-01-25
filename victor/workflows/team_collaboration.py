@@ -406,7 +406,7 @@ class TeamCommunicationProtocol:
                 responses[recipient_id] = None
                 continue
 
-            async def send_and_log(rec_id, rec):
+            async def send_and_log(rec_id: str, rec: Any) -> tuple[str, Optional[AgentMessage]]:
                 try:
                     response = await rec.receive_message(message)
                     if self._log_messages:
@@ -433,6 +433,8 @@ class TeamCommunicationProtocol:
         results = await asyncio.gather(*tasks, return_exceptions=True)
         for result in results:
             if isinstance(result, Exception):
+                continue
+            if not isinstance(result, tuple) or len(result) != 2:
                 continue
             recipient_id, response = result
             responses[recipient_id] = response
@@ -555,7 +557,7 @@ class TeamCommunicationProtocol:
 
         by_type: Dict[str, int] = {}
         by_sender: Dict[str, int] = {}
-        total_response_time = 0
+        total_response_time: float = 0.0
         response_count = 0
 
         for log in self._communication_log:
@@ -570,7 +572,7 @@ class TeamCommunicationProtocol:
             "by_type": by_type,
             "by_sender": by_sender,
             "avg_response_time_ms": (
-                total_response_time / response_count if response_count > 0 else 0
+                total_response_time / response_count if response_count > 0 else 0.0
             ),
         }
 

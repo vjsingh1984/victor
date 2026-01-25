@@ -44,7 +44,7 @@ import json
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from victor.rag.entity_resolver import EntityInfo
@@ -78,15 +78,13 @@ class EnhancedQuery:
     original: str
     enhanced: str
     technique: EnhancementTechnique
-    variants: List[str] = None
+    variants: List[str] = field(default_factory=list)
     hypothetical_doc: Optional[str] = None
-    metadata: Dict[str, Any] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        if self.variants is None:
-            self.variants = []
-        if self.metadata is None:
-            self.metadata = {}
+        # Already using field default factories, no need to check None
+        pass
 
     def get_all_queries(self) -> List[str]:
         """Get all query variants including enhanced query."""
@@ -181,10 +179,11 @@ class QueryEnhancer:
         self._model = model
         self._temperature = temperature
         self._timeout = timeout
-        self._provider_instance = None
+        self._provider_instance: Any = None
 
-    async def _get_provider(self):
+    async def _get_provider(self) -> Any:
         """Get or create LLM provider instance."""
+
         if self._provider_instance is not None:
             return self._provider_instance
 
@@ -233,10 +232,10 @@ class QueryEnhancer:
             )
 
             if hasattr(response, "content"):
-                return response.content.strip()
+                return cast(str, response.content.strip())
             elif hasattr(response, "message"):
-                return response.message.get("content", "").strip()
-            return str(response).strip()
+                return cast(str, response.message.get("content", "").strip())
+            return cast(str, str(response).strip())
 
         except Exception as e:
             logger.warning(f"LLM call failed: {e}")
@@ -427,7 +426,8 @@ class QueryEnhancer:
             if technique == EnhancementTechnique.REWRITE:
                 result = await self.rewrite_query(query, entities)
                 enhanced_query = result.enhanced
-                all_metadata.update(result.metadata or {})
+                if result.metadata:
+                    all_metadata.update(result.metadata)
 
             elif technique == EnhancementTechnique.HYDE:
                 result = await self.generate_hypothetical_document(query, entities)

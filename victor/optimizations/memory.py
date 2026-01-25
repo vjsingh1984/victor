@@ -160,7 +160,7 @@ class ObjectPool(Generic[T]):
                 "created": self._created,
                 "acquired": self._acquired,
                 "reused": self._reused,
-                "reuse_rate": self._reused / self._acquired if self._acquired > 0 else 0.0,
+                "reuse_rate": float(self._reused / self._acquired if self._acquired > 0 else 0.0),
             }
 
 
@@ -293,7 +293,7 @@ class MemoryProfiler:
                 leaks.append(
                     {
                         "type": "increasing_gc",
-                        "generation": i,
+                        "generation": str(i),
                         "severity": "medium",
                         "message": f"Generation {i} GC collections increased by {last - first}",
                     }
@@ -333,7 +333,7 @@ class MemoryOptimizer:
 
     def __init__(self) -> None:
         """Initialize memory optimizer."""
-        self._pools: Dict[str, ObjectPool] = {}
+        self._pools: Dict[str, ObjectPool[Any]] = {}
         self._profiler: Optional[MemoryProfiler] = None
         self._original_gc_thresholds: Optional[tuple[Any, ...]] = None
 
@@ -449,7 +449,7 @@ class MemoryOptimizer:
         self._pools[name] = pool
         return pool
 
-    def get_pool(self, name: str) -> Optional[ObjectPool]:
+    def get_pool(self, name: str) -> Optional[ObjectPool[Any]]:
         """Get an existing object pool by name.
 
         Args:
@@ -536,7 +536,7 @@ def memory_efficient(maxsize: int = 128) -> Callable[..., Any]:
     """
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
-        pool: Optional[ObjectPool] = None
+        pool: Optional[ObjectPool[T]] = None
 
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> T:

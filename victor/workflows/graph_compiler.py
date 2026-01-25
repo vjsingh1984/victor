@@ -81,13 +81,24 @@ from victor.workflows.context import ExecutionContext, create_execution_context
 from victor.workflows.protocols import NodeRunner, NodeRunnerResult
 
 if TYPE_CHECKING:
-    from victor.workflows.graph_dsl import WorkflowGraph, GraphNode, GraphNodeType, State
+    from victor.workflows.graph_dsl import (
+        WorkflowGraph,
+        GraphNode,
+        GraphNodeType,
+        State,
+    )
     from victor.workflows.definition import WorkflowDefinition, WorkflowNode
     from victor.workflows.node_runners import NodeRunnerRegistry
 
 logger = logging.getLogger(__name__)
 
-S = TypeVar("S")  # State type
+# Use the State-bound TypeVar from graph_dsl or define our own
+if TYPE_CHECKING:
+    from victor.workflows.graph_dsl import State as GraphState
+    S = TypeVar("S", bound=GraphState)
+else:
+    # For runtime, use unbounded TypeVar
+    S = TypeVar("S")
 
 
 # =============================================================================
@@ -414,17 +425,17 @@ class WorkflowGraphCompiler(Generic[S]):
 
             # Convert result back to dict
             if hasattr(result, "to_dict"):
-                return cast(Dict[str, Any], result.to_dict())
+                return result.to_dict()  # type: ignore[no-any-return]
             elif hasattr(result, "__dataclass_fields__"):
                 # Dataclass - convert to dict
                 from dataclasses import asdict
 
-                return cast(Dict[str, Any], asdict(result))
+                return asdict(result)  # type: ignore[no-any-return]
             elif isinstance(result, dict):
-                return cast(Dict[str, Any], result)
+                return result  # type: ignore[return-value]
             else:
                 # Unknown type, return as-is
-                return cast(Dict[str, Any], result)
+                return result  # type: ignore[no-any-return]
 
         return state_converting_wrapper
 

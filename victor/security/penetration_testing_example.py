@@ -89,11 +89,15 @@ async def example_custom_exploit_patterns():
         print(f"Mitigation: {sql_injection_pattern.mitigation}")
 
 
-async def example_report_formats():
+async def example_report_formats() -> None:
     """Generate reports in different formats."""
     from victor.agent.orchestrator import AgentOrchestrator
 
-    agent = AgentOrchestrator()
+    agent = AgentOrchestrator(
+        settings=None,  # type: ignore[arg-type]
+        provider=None,  # type: ignore[arg-type]
+        model=None,  # type: ignore[arg-type]
+    )
     suite = SecurityTestSuite()
 
     # Run audit

@@ -232,7 +232,7 @@ class ExperienceReplayBuffer:
             beta: Importance sampling exponent
         """
         self.capacity = capacity
-        self.buffer: deque[Experience] = deque(maxlen=capacity)
+        self.buffer: deque["Experience[Any]"] = deque(maxlen=capacity)
         self.use_prioritization = use_prioritization
         self.priorities: Optional[np.ndarray] = None
         self.alpha = alpha
@@ -242,7 +242,7 @@ class ExperienceReplayBuffer:
         if use_prioritization:
             self.priorities = np.zeros(capacity, dtype=np.float32)
 
-    def add(self, experience: Experience) -> None:
+    def add(self, experience: "Experience[Any]") -> None:
         """Add experience to buffer.
 
         Args:
@@ -255,7 +255,7 @@ class ExperienceReplayBuffer:
             idx = len(self.buffer) - 1
             self.priorities[idx] = self.max_priority
 
-    def sample(self, batch_size: int) -> List[Experience]:
+    def sample(self, batch_size: int) -> List["Experience[Any]"]:
         """Sample a batch of experiences.
 
         Uses uniform sampling if prioritization is disabled,
@@ -1109,7 +1109,7 @@ class EnhancedRLCoordinator:
         if state not in self.q_table and state not in self.policy:
             self.stats.state_count += 1
 
-        return action  # type: ignore[return-value]
+        return cast("A", action)
 
     def compute_reward(self, outcome: TaskResult) -> float:
         """Compute reward signal from task outcome.

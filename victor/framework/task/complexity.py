@@ -328,7 +328,7 @@ class TaskComplexityService:
         self.use_semantic = use_semantic
         self.semantic_threshold = semantic_threshold
         self.use_rl = use_rl
-        self._semantic_classifier: Optional["TaskTypeClassifier"] = None
+        self._semantic_classifier: Optional[Any] = None  # TaskTypeClassifier if available
         self._rl_learner: Optional[Any] = None
 
         # Compile regex patterns

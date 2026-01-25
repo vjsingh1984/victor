@@ -2622,7 +2622,7 @@ class AgentOrchestrator(
             provider_name=self.provider.name,
             model=self.model,
             tool_budget=self.tool_budget,
-            unified_tracker_config=self.unified_tracker.config if self.unified_tracker else None,
+            unified_tracker_config=self.unified_tracker.config if self.unified_tracker else {},
             task_completion_signals=None,  # Legacy caller doesn't use this
             # Task Completion Detection Enhancement (Phase 2 - Feature Flag Protected)
             task_completion_detector=self._task_completion_detector,  # type: ignore[call-arg]

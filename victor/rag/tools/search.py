@@ -17,7 +17,8 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from victor.tools.base import BaseTool, CostTier, ToolResult
+from victor.tools.base import BaseTool, ToolResult
+from victor.tools.enums import CostTier
 
 logger = logging.getLogger(__name__)
 
@@ -70,24 +71,26 @@ class RAGSearchTool(BaseTool):
 
     async def execute(
         self,
-        query: str,
-        k: int = 10,
-        doc_ids: Optional[List[str]] = None,
-        use_hybrid: bool = True,
-        **kwargs: Any,
+        params: Dict[str, Any],
     ) -> ToolResult:
         """Execute search query.
 
         Args:
-            query: Search query
-            k: Number of results
-            doc_ids: Optional document filter
-            use_hybrid: Use hybrid search
+            params: Parameters dictionary with keys:
+                - query: Search query
+                - k: Number of results
+                - doc_ids: Optional document filter
+                - use_hybrid: Use hybrid search
 
         Returns:
             ToolResult with search results
         """
         from victor.rag.document_store import DocumentStore
+
+        query = params.get("query", "")
+        k = params.get("k", 10)
+        doc_ids = params.get("doc_ids")
+        use_hybrid = params.get("use_hybrid", True)
 
         try:
             store = self._get_document_store()
@@ -135,7 +138,7 @@ class RAGSearchTool(BaseTool):
                 output=f"Search failed: {str(e)}",
             )
 
-    def _get_document_store(self):
+    def _get_document_store(self) -> Any:
         """Get document store instance."""
         from victor.rag.document_store import DocumentStore
 

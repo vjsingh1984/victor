@@ -20,7 +20,8 @@ storage implementations (SQLite, PostgreSQL, etc.) to be used interchangeably.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Protocol, Self
+from typing import Any, Dict, List, Optional, Protocol
+from typing_extensions import Self
 
 from victor.experiments.entities import (
     Artifact,

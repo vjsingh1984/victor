@@ -153,7 +153,7 @@ class FrameworkStrategy(AgentCreationStrategy):
     def supports_verticals(self) -> bool:
         return True
 
-    def _apply_overrides(self, agent: OrchestratorProtocol, context: AgentCreationContext) -> None:
+    def _apply_overrides(self, agent: "AgentOrchestrator", context: AgentCreationContext) -> None:
         """Apply budget, iteration, and mode overrides to agent."""
         if context.tool_budget is not None and hasattr(agent, 'unified_tracker') and agent.unified_tracker is not None:
             agent.unified_tracker.set_tool_budget(context.tool_budget, user_override=True)

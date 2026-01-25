@@ -1158,9 +1158,8 @@ class VerticalIntegrationPipeline:
         # Run post-hooks
         for hook in self._post_hooks:
             try:
-                from typing import cast
-                # Post hooks expect IntegrationResult, not type
-                hook(orchestrator, cast(type(result), result))
+                # Post hooks expect IntegrationResult
+                hook(orchestrator, result)
             except Exception as e:
                 result.add_warning(f"Post-hook error: {e}")
 

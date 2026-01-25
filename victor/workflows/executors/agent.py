@@ -20,11 +20,12 @@ Executes agent nodes by spawning sub-agents with role-specific configurations.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any, Dict, Match
 
 if TYPE_CHECKING:
     from victor.agent.subagents.base import SubAgentRole
-    from victor.workflows.definition import AgentNode, WorkflowState
+    from victor.workflows.definition import AgentNode
+    from victor.workflows.adapters import WorkflowState
     from victor.workflows.compiler_protocols import NodeExecutorProtocol
 
 logger = logging.getLogger(__name__)
@@ -75,7 +76,6 @@ class AgentNodeExecutor:
         """
         from victor.agent.subagents.orchestrator import SubAgentOrchestrator
         from victor.agent.subagents.roles import SubAgentRole
-        from victor.framework.graph import GraphNodeResult
 
         logger.info(f"Executing agent node: {node.id} with role: {node.role}")
 
@@ -180,7 +180,7 @@ class AgentNodeExecutor:
         """
         from victor.agent.subagents.roles import SubAgentRole
 
-        role_map = {
+        role_map: Dict[str, SubAgentRole] = {
             "researcher": SubAgentRole.RESEARCHER,
             "planner": SubAgentRole.PLANNER,
             "executor": SubAgentRole.EXECUTOR,
@@ -195,10 +195,7 @@ class AgentNodeExecutor:
         if role not in role_map:
             raise ValueError(f"Unknown agent role: {role}. Must be one of {list(role_map.keys())}")
 
-        from victor.agent.subagents.base import SubAgentRole
-
-        result: SubAgentRole = role_map[role]
-        return result
+        return role_map[role]
 
     def _substitute_context(self, template: str, context: Dict[str, Any]) -> str:
         """Substitute context variables in template string.
@@ -214,7 +211,7 @@ class AgentNodeExecutor:
 
         pattern = r"\{\{(\w+)\}\}"
 
-        def replace_var(match):
+        def replace_var(match: Any) -> str:
             var_name = match.group(1)
             if var_name in context:
                 value = context[var_name]

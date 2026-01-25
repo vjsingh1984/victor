@@ -53,11 +53,8 @@ except ImportError:
     TEXTUAL_AVAILABLE = False
 
     # Stub classes for when Textual is not available
-    class Widget:
-        pass
-
-    class ComposeResult:
-        pass
+    Widget = object  # type: ignore
+    ComposeResult = object  # type: ignore
 
 
 if TEXTUAL_AVAILABLE:
@@ -260,7 +257,7 @@ if TEXTUAL_AVAILABLE:
                 # Update button states
                 for btn in self.query("Button"):
                     if btn.id and btn.id.startswith("type-"):
-                        btn.variant = "primary" if btn.id == button_id else "default"
+                        setattr(btn, "variant", "primary" if btn.id == button_id else "default")
 
         async def _do_search(self, query: str) -> None:
             """Execute search query."""
@@ -391,11 +388,15 @@ if TEXTUAL_AVAILABLE:
 
             store = DocumentStore()
             await store.initialize()
-            stats = store.get_stats()
+            stats_coro = store.get_stats()
+            if hasattr(stats_coro, "__await__"):
+                stats = await stats_coro
+            else:
+                stats = stats_coro
 
-            self.doc_count = stats.get("total_documents", 0)
-            self.chunk_count = stats.get("total_chunks", 0)
-            self.search_count = stats.get("total_searches", 0)
+            self.doc_count = stats.get("total_documents", 0) if stats else 0
+            self.chunk_count = stats.get("total_chunks", 0) if stats else 0
+            self.search_count = stats.get("total_searches", 0) if stats else 0
             self._update_status()
 
         def _update_status(self) -> None:
@@ -426,10 +427,12 @@ if TEXTUAL_AVAILABLE:
 
 else:
     # Stub when Textual is not available
-    class RAGPanel:
+    class RAGPanelStub:  # Renamed to avoid conflict
         """Stub RAG panel when Textual is not available."""
 
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args, **kwargs):  # type: ignore
             raise ImportError(
                 "Textual is required for RAG UI. " "Install with: pip install textual"
             )
+
+    RAGPanel = RAGPanelStub  # type: ignore

@@ -553,6 +553,7 @@ class LazyComponentLoader:
             raise RuntimeError("Service container not configured")
 
         def factory() -> Any:
+            assert self._container is not None
             return self._container.get(service_type)
 
         self.register_component(key, factory)
@@ -771,7 +772,7 @@ class LazyComponentLoader:
         return dfs(key)
 
 
-def lazy_load(component_key: str):
+def lazy_load(component_key: str) -> Callable[[F], F]:
     """Decorator for lazy-loading component dependencies.
 
     This decorator wraps a function or method to lazily load
@@ -795,7 +796,7 @@ def lazy_load(component_key: str):
         user = get_user(user_id=123)
     """
 
-    def decorator(func):
+    def decorator(func: F) -> F:
         @wraps(func)
         def wrapper(*args, **kwargs):
             # Get loader from first argument if it's self

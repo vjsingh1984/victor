@@ -229,7 +229,7 @@ class EmbeddingCacheManager:
         self._project_embeddings = paths.project_victor_dir / "embeddings"
 
         # Cache category definitions
-        self._categories: Dict[str, Any] = {
+        self._categories: Dict[CacheType, Dict[str, Any]] = {
             CacheType.TOOL: {
                 "name": "Tool Embeddings",
                 "desc": "Semantic tool selection (project-isolated)",
@@ -258,7 +258,7 @@ class EmbeddingCacheManager:
 
     def _scan_cache_files(self, path: Path, pattern: str) -> List[CacheFileInfo]:
         """Scan directory for cache files matching pattern."""
-        files = []
+        files: List[CacheFileInfo] = []
         if not path.exists():
             return files
 
@@ -291,7 +291,7 @@ class EmbeddingCacheManager:
         caches = []
         for cache_type, cat in self._categories.items():
             # Skip tiered cache by default (it's tool results, not embeddings)
-            if cache_type == CacheType.TIERED and not include_tiered:
+            if cache_type is CacheType.TIERED and not include_tiered:
                 continue
             files = self._scan_cache_files(cat["path"], cat["pattern"])
             caches.append(

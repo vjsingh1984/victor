@@ -52,7 +52,7 @@ class DataAnalysisAssistant(VerticalBase):
     version = "0.5.0"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         """Get the list of tools for data analysis tasks.
 
         Uses framework FileOperationsCapability via DI for common file operations

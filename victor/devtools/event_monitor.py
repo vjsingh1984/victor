@@ -201,7 +201,11 @@ class EventMonitor:
 
             # Subscribe to all events
             import asyncio
-            asyncio.create_task(bus.subscribe("*", self._on_observability_event))
+
+            async def _subscribe_wrapper():
+                await bus.subscribe("*", self._on_observability_event)
+
+            asyncio.create_task(_subscribe_wrapper())
             logger.info("Subscribed to ObservabilityBus")
         except ImportError:
             raise

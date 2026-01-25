@@ -183,7 +183,7 @@ class VerticalExtractor:
         # Try to get middleware
         middleware_specs = []
         try:
-            middleware = vertical_class.get_middleware()
+            middleware = vertical_class.get_extensions_by_type("middleware")
             for mw in middleware:
                 middleware_specs.append(
                     MiddlewareSpec(
@@ -338,7 +338,7 @@ def migrate_vertical_to_template(
         logger.error(f"Failed to extract template from {vertical_class.__name__}")
         return False
 
-    registry = VerticalTemplateRegistry()
+    registry: VerticalTemplateRegistry = VerticalTemplateRegistry()
     success = registry.save_to_yaml(template, output_path)
 
     if success:
@@ -354,11 +354,14 @@ def migrate_vertical_to_template(
 # =============================================================================
 
 
-def main_extract(args):
+def main_extract(args) -> int:
     """CLI entry point for extraction.
 
     Args:
         args: Parsed CLI arguments
+
+    Returns:
+        Exit code (0 for success, 1 for failure)
     """
     extractor = VerticalExtractor()
     template = None
@@ -387,7 +390,7 @@ def main_extract(args):
     # Save template
     from victor.framework.vertical_template_registry import VerticalTemplateRegistry
 
-    registry = VerticalTemplateRegistry()
+    registry: VerticalTemplateRegistry = VerticalTemplateRegistry()
 
     # Validate before saving
     if args.validate:
@@ -410,8 +413,12 @@ def main_extract(args):
         return 1
 
 
-def main():
-    """CLI entry point for vertical extraction."""
+def main() -> int:
+    """CLI entry point for vertical extraction.
+
+    Returns:
+        Exit code (0 for success, 1 for failure)
+    """
     import argparse
 
     parser = argparse.ArgumentParser(
@@ -461,7 +468,7 @@ def main():
 if __name__ == "__main__":
     import sys
 
-    sys.exit(main())
+    sys.exit(main() or 0)
 
 
 __all__ = [

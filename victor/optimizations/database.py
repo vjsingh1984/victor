@@ -505,7 +505,7 @@ class DatabaseOptimizer:
 
 def cached_query(
     cache_ttl: int = 300,
-) -> Callable:
+) -> Callable[[Callable[..., T]], Callable[..., Coroutine[Any, Any, T]]]:
     """Decorator for caching database query results.
 
     Args:
@@ -531,7 +531,7 @@ def cached_query(
                     return cast(T, result)
 
             # Execute function
-            result = await func(*args, **kwargs)
+            result: T = await func(*args, **kwargs)
 
             # Cache result
             _cache[key] = (result, time.time())

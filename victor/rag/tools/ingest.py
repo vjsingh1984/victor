@@ -24,7 +24,8 @@ from urllib.parse import urlparse
 
 import aiohttp
 
-from victor.tools.base import BaseTool, CostTier, ToolResult
+from victor.tools.base import BaseTool, ToolResult
+from victor.tools.enums import CostTier
 
 logger = logging.getLogger(__name__)
 
@@ -104,32 +105,34 @@ class RAGIngestTool(BaseTool):
 
     async def execute(
         self,
-        path: Optional[str] = None,
-        url: Optional[str] = None,
-        content: Optional[str] = None,
-        doc_type: str = "text",
-        doc_id: Optional[str] = None,
-        recursive: bool = False,
-        pattern: str = "*",
-        metadata: Optional[Dict[str, Any]] = None,
-        **kwargs: Any,
+        params: Dict[str, Any],
     ) -> ToolResult:
         """Execute document ingestion.
 
         Args:
-            path: Path to document file or directory
-            url: URL to fetch and ingest
-            content: Direct content to ingest
-            doc_type: Document type
-            doc_id: Optional custom ID
-            recursive: Recursively ingest directory contents
-            pattern: Glob pattern for directory ingestion
-            metadata: Optional metadata
+            params: Parameters dictionary with keys:
+                - path: Path to document file or directory
+                - url: URL to fetch and ingest
+                - content: Direct content to ingest
+                - doc_type: Document type
+                - doc_id: Optional custom ID
+                - recursive: Recursively ingest directory contents
+                - pattern: Glob pattern for directory ingestion
+                - metadata: Optional metadata
 
         Returns:
             ToolResult with ingestion status
         """
         from victor.rag.document_store import Document, DocumentStore
+
+        path = params.get("path")
+        url = params.get("url")
+        content = params.get("content")
+        doc_type = params.get("doc_type", "text")
+        doc_id = params.get("doc_id")
+        recursive = params.get("recursive", False)
+        pattern = params.get("pattern", "*")
+        metadata = params.get("metadata")
 
         try:
             # Get or create document store
@@ -445,7 +448,7 @@ class RAGIngestTool(BaseTool):
             output="\n".join(output_lines),
         )
 
-    def _get_document_store(self):
+    def _get_document_store(self) -> Any:
         """Get or create document store instance."""
         from victor.rag.document_store import DocumentStore
 

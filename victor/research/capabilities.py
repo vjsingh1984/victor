@@ -38,7 +38,7 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING, cast
 
 from victor.framework.capabilities.base_vertical_capability_provider import (
     BaseVerticalCapabilityProvider,
@@ -105,14 +105,17 @@ def get_source_verification(orchestrator: Any) -> Dict[str, Any]:
     """
     # SOLID DIP: Read from VerticalContext instead of direct attribute access
     context = orchestrator.vertical_context
-    return context.get_capability_config(
-        "source_verification",
-        {
-            "min_credibility": 0.7,
-            "min_source_count": 3,
-            "require_diverse_sources": True,
-            "validate_urls": True,
-        },
+    return cast(
+        Dict[str, Any],
+        context.get_capability_config(
+            "source_verification",
+            {
+                "min_credibility": 0.7,
+                "min_source_count": 3,
+                "require_diverse_sources": True,
+                "validate_urls": True,
+            },
+        ),
     )
 
 
@@ -157,14 +160,17 @@ def get_citation_config(orchestrator: Any) -> Dict[str, Any]:
     """
     # SOLID DIP: Read from VerticalContext instead of direct attribute access
     context = orchestrator.vertical_context
-    return context.get_capability_config(
-        "citation_management",
-        {
-            "default_style": "apa",
-            "require_urls": True,
-            "include_authors": True,
-            "include_dates": True,
-        },
+    return cast(
+        Dict[str, Any],
+        context.get_capability_config(
+            "citation_management",
+            {
+                "default_style": "apa",
+                "require_urls": True,
+                "include_authors": True,
+                "include_dates": True,
+            },
+        ),
     )
 
 
@@ -212,14 +218,17 @@ def get_research_quality(orchestrator: Any) -> Dict[str, Any]:
     """
     # SOLID DIP: Read from VerticalContext instead of direct attribute access
     context = orchestrator.vertical_context
-    return context.get_capability_config(
-        "research_quality",
-        {
-            "min_coverage_score": 0.75,
-            "min_source_diversity": 2,
-            "check_recency": True,
-            "max_source_age_days": 365,
-        },
+    return cast(
+        Dict[str, Any],
+        context.get_capability_config(
+            "research_quality",
+            {
+                "min_coverage_score": 0.75,
+                "min_source_diversity": 2,
+                "check_recency": True,
+                "max_source_age_days": 365,
+            },
+        ),
     )
 
 
@@ -267,14 +276,17 @@ def get_literature_config(orchestrator: Any) -> Dict[str, Any]:
     """
     # SOLID DIP: Read from VerticalContext instead of direct attribute access
     context = orchestrator.vertical_context
-    return context.get_capability_config(
-        "literature_analysis",
-        {
-            "min_relevance_score": 0.6,
-            "weight_citation_count": True,
-            "prefer_recent_papers": True,
-            "recent_paper_years": 5,
-        },
+    return cast(
+        Dict[str, Any],
+        context.get_capability_config(
+            "literature_analysis",
+            {
+                "min_relevance_score": 0.6,
+                "weight_citation_count": True,
+                "prefer_recent_papers": True,
+                "recent_paper_years": 5,
+            },
+        ),
     )
 
 
@@ -322,14 +334,17 @@ def get_fact_checking_config(orchestrator: Any) -> Dict[str, Any]:
     """
     # SOLID DIP: Read from VerticalContext instead of direct attribute access
     context = orchestrator.vertical_context
-    return context.get_capability_config(
-        "fact_checking",
-        {
-            "min_confidence_threshold": 0.5,
-            "require_multiple_sources": True,
-            "min_source_count_for_claim": 2,
-            "track_supporting_refuting": True,
-        },
+    return cast(
+        Dict[str, Any],
+        context.get_capability_config(
+            "fact_checking",
+            {
+                "min_confidence_threshold": 0.5,
+                "require_multiple_sources": True,
+                "min_source_count_for_claim": 2,
+                "track_supporting_refuting": True,
+            },
+        ),
     )
 
 
@@ -358,7 +373,7 @@ class ResearchCapabilityProvider(BaseVerticalCapabilityProvider):
         config = provider.get_capability_config(orchestrator, "citation_management")
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the research capability provider."""
         super().__init__("research")
 
@@ -505,7 +520,7 @@ class ResearchCapabilityProvider(BaseVerticalCapabilityProvider):
 _provider_instance: Optional[ResearchCapabilityProvider] = None
 
 
-def _get_provider() -> ResearchCapabilityProvider:
+def _get_provider() -> ResearchCapabilityProvider:  # type: ignore
     """Get or create provider instance."""
     global _provider_instance
     if _provider_instance is None:

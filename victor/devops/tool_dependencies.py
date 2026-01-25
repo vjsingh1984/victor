@@ -65,7 +65,7 @@ _YAML_CONFIG_PATH = Path(__file__).parent / "tool_dependencies.yaml"
 _config = None
 
 
-def _get_config():
+def _get_config() -> Any:
     """Get or load the YAML config lazily."""
     global _config
     if _config is None:
@@ -88,7 +88,7 @@ DevOpsToolDependencyProvider = create_vertical_tool_dependency_provider("devops"
 
 
 # Uses canonical ToolNames constants for consistency
-DEVOPS_COMPOSED_PATTERNS: Dict[str, Dict[str, any]] = {
+DEVOPS_COMPOSED_PATTERNS: Dict[str, Dict[str, Any]] = {
     "dockerfile_pipeline": {
         "description": "Create and validate Dockerfile",
         "sequence": [ToolNames.READ, ToolNames.WRITE, ToolNames.DOCKER, ToolNames.SHELL],
@@ -236,7 +236,7 @@ def reset_devops_tool_graph() -> None:
     _devops_tool_graph = None
 
 
-def get_composed_pattern(pattern_name: str) -> Optional[Dict[str, any]]:
+def get_composed_pattern(pattern_name: str) -> Optional[Dict[str, Any]]:
     """Get a composed tool pattern by name.
 
     Args:

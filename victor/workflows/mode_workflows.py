@@ -95,29 +95,35 @@ class ModeWorkflowProvider(WorkflowProviderProtocol):
             from victor.workflows.yaml_loader import load_workflow_from_file
 
             # Load all workflows from the YAML file
-            self._workflows = load_workflow_from_file(str(self._yaml_path))
-            if isinstance(self._workflows, WorkflowDefinition):
+            loaded = load_workflow_from_file(str(self._yaml_path))
+            if isinstance(loaded, WorkflowDefinition):
                 # Single workflow - wrap in dict
-                self._workflows = {self._workflows.name: self._workflows}
+                self._workflows = {loaded.name: loaded}
+            elif isinstance(loaded, dict):
+                self._workflows = loaded
+            else:
+                self._workflows = {}
 
-            logger.debug(f"Loaded {len(self._workflows)} mode workflows")
-            return self._workflows
+            logger.debug(f"Loaded {len(self._workflows) if self._workflows else 0} mode workflows")
+            return self._workflows if self._workflows is not None else {}
 
         except Exception as e:
             logger.warning(f"Failed to load mode workflows: {e}")
             self._workflows = {}
             return self._workflows
 
-    def get_workflows(self) -> Dict[str, Type]:
+    def get_workflows(self) -> Dict[str, Type[Any]]:
         """Get workflow classes for mode-based workflows.
 
         Returns:
             Dict mapping workflow names to WorkflowDefinition instances.
             (Note: Returns WorkflowDefinition instances, not classes, for YAML workflows)
         """
-        return self._load_workflows()
+        workflows = self._load_workflows()
+        # Convert WorkflowDefinition to type for compatibility
+        return {k: type(v) for k, v in workflows.items()}  # type: ignore[return-value]
 
-    def get_auto_workflows(self) -> list:
+    def get_auto_workflows(self) -> List[Any]:
         """Get automatically triggered workflows.
 
         Mode workflows are not auto-triggered; they are explicitly activated
@@ -138,9 +144,9 @@ class ModeWorkflowProvider(WorkflowProviderProtocol):
             WorkflowDefinition or None if not found
         """
         workflows = self._load_workflows()
-        return workflows.get(name)
+        return workflows.get(name) if workflows else None
 
-    def list_workflows(self) -> list:
+    def list_workflows(self) -> List[str]:
         """List available workflow names.
 
         Returns:

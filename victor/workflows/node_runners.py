@@ -67,7 +67,7 @@ from victor.workflows.protocols import NodeRunner, NodeRunnerResult, ProtocolNod
 from victor.workflows.context import ExecutionContext
 
 if TYPE_CHECKING:
-    from victor.agent.subagents import SubAgentManager
+    from victor.agent.subagents import SubAgentOrchestrator
     from victor.tools.registry import ToolRegistry
     from victor.workflows.hitl import HITLExecutor, HITLNode
     from victor.agent.orchestrator import AgentOrchestrator

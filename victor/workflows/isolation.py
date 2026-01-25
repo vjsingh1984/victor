@@ -51,7 +51,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Type
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Type, cast
 
 if TYPE_CHECKING:
     from victor.workflows.definition import ConstraintsProtocol

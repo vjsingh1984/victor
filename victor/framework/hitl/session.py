@@ -215,7 +215,7 @@ class HITLSession:
         self,
         gate: Any,
         context: Optional[Dict[str, Any]] = None,
-        handler: Optional[Callable[..., Awaitable]] = None,
+        handler: Optional[Callable[..., Awaitable[Any]]] = None,
     ) -> GateExecutionResult:
         """Execute a gate within this session.
 
@@ -332,7 +332,7 @@ class HITLSession:
         Returns:
             Summary dictionary
         """
-        gate_counts = {}
+        gate_counts: Dict[str, int] = {}
         for result in self._results:
             gate_counts[result.gate_type] = gate_counts.get(result.gate_type, 0) + 1
 

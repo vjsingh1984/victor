@@ -65,14 +65,14 @@ logger = __import__("logging").getLogger(__name__)
 # =============================================================================
 
 
-def _get_validation_result() -> type[ValidationResult]:  # type: ignore[name-defined]
+def _get_validation_result() -> type[Any]:  # type: ignore[name-defined]
     """Get ValidationResult at runtime to avoid circular import."""
     from victor.framework.validation.pipeline import ValidationResult
 
     return ValidationResult
 
 
-def _get_validation_context() -> type[ValidationContext]:  # type: ignore[name-defined]
+def _get_validation_context() -> type[Any]:  # type: ignore[name-defined]
     """Get ValidationContext at runtime to avoid circular import."""
     from victor.framework.validation.pipeline import ValidationContext
 
@@ -648,7 +648,7 @@ class PatternValidator(BaseValidator):
                 pattern_type = self.PatternType(pattern_type)
             self._pattern = self.PATTERNS[pattern_type]
         else:
-            self._pattern = pattern
+            self._pattern = pattern or ""
 
         self._flags = flags
         self._compiled_pattern: Optional[re.Pattern[str]] = None
@@ -836,8 +836,9 @@ class TypeValidator(BaseValidator):
         # Check type
         if not isinstance(value, self._expected_type):
             if self._coerce:
-                # Try to coerce
-                success, coerced = self._coerce_value(value, self._expected_type)
+                # Try to coerce - handle tuple of types
+                expected_type = self._expected_type[0] if isinstance(self._expected_type, tuple) else self._expected_type
+                success, coerced = self._coerce_value(value, expected_type)
                 if success:
                     # Update the data with coerced value
                     if self._field:

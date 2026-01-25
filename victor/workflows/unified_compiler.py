@@ -1116,6 +1116,9 @@ class NodeExecutorFactory:
                     )
 
                 # Use TeamNodeRunner for proper recursion tracking
+                if orchestrator is None:
+                    raise ValueError(f"Orchestrator is required for team node '{node.id}'")
+
                 runner = TeamNodeRunner(
                     orchestrator=orchestrator,
                     tool_registry=tool_registry,
@@ -1262,7 +1265,7 @@ class CachedCompiledGraph:
         max_recursion_depth: Maximum recursion depth for nested execution (default: 3)
     """
 
-    compiled_graph: "CompiledGraph"
+    compiled_graph: "CompiledGraph[Dict[str, Any]]"
     workflow_name: str
     source_path: Optional[Path] = None
     compiled_at: float = field(default_factory=time.time)
@@ -1282,7 +1285,7 @@ class CachedCompiledGraph:
         thread_id: Optional[str] = None,
         use_cache: bool = True,
         max_recursion_depth: Optional[int] = None,
-    ) -> "GraphExecutionResult":
+    ) -> "GraphExecutionResult[Dict[str, Any]]":
         """Execute the compiled workflow.
 
         Args:
@@ -1344,7 +1347,7 @@ class CachedCompiledGraph:
         config: Optional["GraphConfig"],
         thread_id: Optional[str],
         recursion_ctx: Any,
-    ) -> "GraphExecutionResult":
+    ) -> "GraphExecutionResult[Dict[str, Any]]":
         """Execute compiled graph with recursion context.
 
         Args:
@@ -1533,8 +1536,8 @@ class UnifiedWorkflowCompiler:
         )
 
         # Lazy-loaded compilers
-        self._graph_compiler: Optional["WorkflowGraphCompiler"] = None
-        self._definition_compiler: Optional["WorkflowDefinitionCompiler"] = None
+        self._graph_compiler: Optional["WorkflowGraphCompiler[Dict[str, Any]]"] = None
+        self._definition_compiler: Optional["WorkflowDefinitionCompiler[Dict[str, Any]]"] = None
 
         # Compilation stats
         self._compile_stats = {
@@ -1548,9 +1551,11 @@ class UnifiedWorkflowCompiler:
     def _get_default_tool_registry(self) -> Optional["ToolRegistry"]:
         """Get the default tool registry if available."""
         try:
-            from victor.tools.registry import get_tool_registry
+            from victor.tools.registry import ToolRegistry
+            from victor.core.container import ServiceContainer
 
-            return get_tool_registry()
+            container = ServiceContainer()
+            return container.get(ToolRegistry) if container.has(ToolRegistry) else None
         except Exception:
             return None
 
@@ -1860,7 +1865,7 @@ class UnifiedWorkflowCompiler:
 
     def compile_graph(
         self,
-        graph: "WorkflowGraph",
+        graph: "WorkflowGraph[Dict[str, Any]]",
         name: Optional[str] = None,
         cache_key: Optional[str] = None,
         **kwargs: Any,
@@ -1881,14 +1886,14 @@ class UnifiedWorkflowCompiler:
             cache_key = self._generate_graph_cache_key(graph, name)
 
         self._compile_stats["graph_compiles"] += 1
-        workflow_name = name or getattr(graph, "name", "workflow_graph")
+        workflow_name = name or getattr(graph, "name", "workflow_graph") or "workflow_graph"
 
         # Compile to CompiledGraph
         compiled = self._get_graph_compiler().compile(graph, name)
         return CachedCompiledGraph(
             compiled_graph=compiled,
             workflow_name=workflow_name,
-            cache_key=cache_key,
+            cache_key=cache_key or "",
         )
 
     # =========================================================================
@@ -2025,7 +2030,7 @@ class UnifiedWorkflowCompiler:
 
     def _generate_graph_cache_key(
         self,
-        graph: "WorkflowGraph",
+        graph: "WorkflowGraph[Dict[str, Any]]",
         name: Optional[str],
     ) -> str:
         """Generate cache key for WorkflowGraph compilation."""
@@ -2089,7 +2094,7 @@ async def compile_and_execute(
     initial_state: Optional[Dict[str, Any]] = None,
     workflow_name: Optional[str] = None,
     **kwargs: Any,
-) -> "GraphExecutionResult":
+) -> "GraphExecutionResult[Dict[str, Any]]":
     """Compile and execute a workflow in one step.
 
     Convenience function for one-off execution.

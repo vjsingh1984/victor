@@ -44,7 +44,7 @@ Example:
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, cast
 
 from victor.core.tool_dependency_loader import (
     YAMLToolDependencyProvider,
@@ -109,39 +109,41 @@ class RAGToolDependencyProvider(YAMLToolDependencyProvider):
 # imports the raw data structures directly.
 
 
-def _load_config():
+def _load_config() -> Any:
     """Load and cache the YAML configuration."""
+    from typing import Any
+
     return load_tool_dependency_yaml(_YAML_CONFIG_PATH, canonicalize=True)
 
 
 def _get_transitions() -> Dict[str, List[Tuple[str, float]]]:
     """Get tool transitions from YAML config."""
-    return _load_config().transitions
+    return cast(Dict[str, List[Tuple[str, float]]], _load_config().transitions)
 
 
 def _get_clusters() -> Dict[str, Set[str]]:
     """Get tool clusters from YAML config."""
-    return _load_config().clusters
+    return cast(Dict[str, Set[str]], _load_config().clusters)
 
 
 def _get_sequences() -> Dict[str, List[str]]:
     """Get tool sequences from YAML config."""
-    return _load_config().sequences
+    return cast(Dict[str, List[str]], _load_config().sequences)
 
 
 def _get_dependencies() -> List[ToolDependency]:
     """Get tool dependencies from YAML config."""
-    return _load_config().dependencies
+    return cast(List[ToolDependency], _load_config().dependencies)
 
 
 def _get_required_tools() -> Set[str]:
     """Get required tools from YAML config."""
-    return _load_config().required_tools
+    return cast(Set[str], _load_config().required_tools)
 
 
 def _get_optional_tools() -> Set[str]:
     """Get optional tools from YAML config."""
-    return _load_config().optional_tools
+    return cast(Set[str], _load_config().optional_tools)
 
 
 def _get_composed_patterns() -> Dict[str, Dict[str, Any]]:

@@ -104,16 +104,28 @@ class YAMLWorkflowCoordinator:
         """Get or create workflow executor."""
         if self._executor is None:
             from victor.workflows.executor import WorkflowExecutor
+            from victor.core.protocols import OrchestratorProtocol
 
-            self._executor = WorkflowExecutor()
+            # Create a mock orchestrator for the executor
+            class MockOrchestrator:
+                pass
+
+            orchestrator = MockOrchestrator()
+            self._executor = WorkflowExecutor(orchestrator)  # type: ignore[arg-type]
         return self._executor
 
     def _get_streaming_executor(self) -> "StreamingWorkflowExecutor":
         """Get or create streaming executor."""
         if self._streaming_executor is None:
             from victor.workflows.streaming_executor import StreamingWorkflowExecutor
+            from victor.core.protocols import OrchestratorProtocol
 
-            self._streaming_executor = StreamingWorkflowExecutor()
+            # Create a mock orchestrator for the executor
+            class MockOrchestrator:
+                pass
+
+            orchestrator = MockOrchestrator()
+            self._streaming_executor = StreamingWorkflowExecutor(orchestrator)  # type: ignore[arg-type]
         return self._streaming_executor
 
     def _get_definition_cache(self) -> "WorkflowDefinitionCache":
@@ -220,7 +232,7 @@ class YAMLWorkflowCoordinator:
             workflow_def = result
 
         # Cache the definition
-        cache.put(path, name, config_hash, workflow_def)
+        cache.store(path, name, config_hash, workflow_def)
         logger.debug(f"Cached workflow definition: {name} from {path}")
 
         return workflow_def
@@ -275,7 +287,7 @@ class YAMLWorkflowCoordinator:
 
                 # Handle polymorphic result types (LSP compliance)
                 if hasattr(result, "state"):
-                    final_state = (
+                    final_state: dict[str, Any] = (
                         result.state if isinstance(result.state, dict) else {"result": result.state}
                     )
                     nodes_executed = getattr(result, "node_history", [])
@@ -294,7 +306,9 @@ class YAMLWorkflowCoordinator:
                     success = True
                     error = None
 
-                return WorkflowExecutionResult(
+                # Create WorkflowExecutionResult with proper type
+                from victor.framework.workflow_engine import WorkflowExecutionResult as WER
+                exec_result: WER = WorkflowExecutionResult(
                     success=success,
                     final_state=final_state,
                     nodes_executed=nodes_executed,
@@ -302,6 +316,7 @@ class YAMLWorkflowCoordinator:
                     error=error,
                     hitl_requests=hitl_requests,
                 )
+                return exec_result
             else:
                 # Legacy path: Use old WorkflowExecutor
                 from victor.workflows.executor import WorkflowContext
@@ -317,25 +332,12 @@ class YAMLWorkflowCoordinator:
                 # Create executor
                 executor = self._get_executor()
 
-                # Create context
-                context = WorkflowContext(
-                    workflow=workflow_def,
-                    initial_state=initial_state or {},
-                )
-
                 # Execute
-                result = await executor.execute(context)
+                result = await executor.execute(workflow_def, initial_state or {})
 
                 duration = time.time() - start_time
 
-                return WorkflowExecutionResult(
-                    success=result.success,
-                    final_state=result.final_state,
-                    nodes_executed=result.nodes_executed,
-                    duration_seconds=duration,
-                    error=result.error if not result.success else None,
-                    hitl_requests=hitl_requests,
-                )
+                return result
 
         except Exception as e:
             logger.error(f"YAML workflow execution failed: {e}")
@@ -411,13 +413,13 @@ class YAMLWorkflowCoordinator:
                 executor = self._get_streaming_executor()
 
                 # Create stream context
-                context = WorkflowStreamContext(
-                    workflow=workflow_def,
-                    initial_state=initial_state or {},
+                stream_context = WorkflowStreamContext(
+                    workflow_id=workflow_def.workflow_id,
+                    workflow_name=workflow_def.name,
                 )
 
                 # Stream execution
-                async for chunk in executor.stream(context):
+                async for chunk in executor.astream(stream_context):
                     yield WorkflowEvent(
                         event_type=(
                             chunk.event_type.value

@@ -255,9 +255,9 @@ class RequestBatcher:
         """
         self._max_batch_size = max_batch_size
         self._max_wait_time = max_wait_time
-        self._current_batch: List[Tuple[Dict[str, Any], asyncio.Future]] = []
+        self._current_batch: List[Tuple[Dict[str, Any], asyncio.Future[Any]]] = []
         self._lock = asyncio.Lock()
-        self._timer_task: Optional[asyncio.Task] = None
+        self._timer_task: Optional[asyncio.Task[Any]] = None
 
     async def add_request(
         self,
@@ -271,7 +271,7 @@ class RequestBatcher:
         Returns:
             Future that resolves with response
         """
-        future = asyncio.Future()
+        future: asyncio.Future[Any] = asyncio.Future()
 
         async with self._lock:
             self._current_batch.append((request, future))
@@ -371,7 +371,7 @@ class NetworkOptimizer:
         )
 
         self._client = httpx.AsyncClient(
-            base_url=base_url,
+            base_url=base_url if base_url is not None else "http://localhost",
             headers=headers,
             limits=limits,
             timeout=httpx.Timeout(30.0, connect=10.0),
@@ -459,7 +459,7 @@ class NetworkOptimizer:
 
         # Parse response
         try:
-            response_data = response.json()
+            response_data: Dict[str, Any] = response.json()
         except ValueError:
             response_data = {"text": response.text}
 
@@ -506,6 +506,7 @@ class NetworkOptimizer:
 
         for attempt in range(max_retries):
             try:
+                assert self._client is not None
                 response = await self._client.request(
                     method,
                     url,

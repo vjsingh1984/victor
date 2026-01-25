@@ -134,7 +134,7 @@ class GraphExecutionCoordinator:
                 error = getattr(result, "error", None)
             else:
                 # Backward compatibility: result is the final state dict
-                final_state = result
+                final_state: dict[str, Any] = result
                 nodes_executed = []
                 success = True
                 error = None
@@ -198,9 +198,9 @@ class GraphExecutionCoordinator:
 
                 # Handle polymorphic return type
                 if hasattr(result, "state"):
-                    final_state = result.state
+                    final_state: dict[str, Any] = result.state
                 else:
-                    final_state = result
+                    final_state: dict[str, Any] = result
 
                 yield WorkflowEvent(
                     event_type="complete",
@@ -220,7 +220,7 @@ class GraphExecutionCoordinator:
 
     async def execute_workflow_graph(
         self,
-        graph: "WorkflowGraph[Dict[str, Any]]",
+        graph: "WorkflowGraph[Any]",
         initial_state: Optional[Dict[str, Any]] = None,
         use_node_runners: bool = False,
         **kwargs: Any,
@@ -273,7 +273,7 @@ class GraphExecutionCoordinator:
                 error = getattr(result, "error", None)
             else:
                 # Result is the final state dict
-                final_state = result
+                final_state: dict[str, Any] = result
                 nodes_executed = []
                 success = True
                 error = None

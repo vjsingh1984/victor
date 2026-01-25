@@ -15,7 +15,7 @@ These classes implement the protocols defined in victor.workflows.protocols.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Set, TYPE_CHECKING, Union
 
 from victor.workflows.protocols import (
     ProtocolNodeStatus,
@@ -103,8 +103,8 @@ class WorkflowNode:
         """
         result = self.handler(state, context)
         if isinstance(result, Awaitable):
-            return await result
-        return result  # type: ignore[return-value]
+            return await result  # type: ignore[no-any-return]
+        return result
 
 
 @dataclass

@@ -312,7 +312,7 @@ class ConnectionManager:
 
     def __init__(self) -> None:
         """Initialize connection manager."""
-        self._active_connections: Dict[str, Set[WebSocket]] = defaultdict(set)  # type: ignore
+        self._active_connections: Dict[str, Set[WebSocket]] = defaultdict(set)  # type: ignore[arg-type]
         self._connection_metadata: Dict[WebSocket, Dict[str, Any]] = {}
         self._lock = asyncio.Lock()
 
@@ -540,7 +540,7 @@ class TeamDashboardServer:
         """Setup FastAPI routes."""
 
         @self._app.get("/health")
-        async def health_check():
+        async def health_check() -> Dict[str, Any]:
             """Health check endpoint."""
             return {
                 "status": "healthy",
@@ -552,7 +552,7 @@ class TeamDashboardServer:
             }
 
         @self._app.websocket("/ws/team/{execution_id}")
-        async def websocket_endpoint(websocket: WebSocket, execution_id: str):
+        async def websocket_endpoint(websocket: WebSocket, execution_id: str) -> None:
             """WebSocket endpoint for team execution updates.
 
             Args:
@@ -677,7 +677,11 @@ class TeamDashboardServer:
                 "formation": formation,
                 "member_count": member_count,
                 "recursion_depth": recursion_depth,
-                "start_time": self._execution_states[execution_id].start_time.isoformat(),
+                "start_time": (
+                    self._execution_states[execution_id].start_time.isoformat()
+                    if self._execution_states[execution_id].start_time
+                    else None
+                ),
             },
         )
 
@@ -717,7 +721,7 @@ class TeamDashboardServer:
                 "member_id": member_id,
                 "role": role,
                 "status": state.status.value,
-                "start_time": state.start_time.isoformat(),
+                "start_time": state.start_time.isoformat() if state.start_time else None,
             },
         )
 

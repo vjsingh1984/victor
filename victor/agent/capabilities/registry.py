@@ -35,13 +35,10 @@ import logging
 from typing import Any, Dict, Optional
 
 try:
-    from importlib.metadata import entry_points as import_entry_points_lib
+    from importlib.metadata import entry_points
 except ImportError:
     # Python < 3.8
-    from importlib_metadata import entry_points as import_entry_points_lib
-
-# Alias for backward compatibility
-import_entry_points = import_entry_points_lib
+    from importlib_metadata import entry_points
 
 from victor.agent.capabilities.base import CapabilitySpec
 

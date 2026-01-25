@@ -233,7 +233,7 @@ class TeamTemplate:
         self,
         goal: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
-        **overrides,
+        **overrides: Any,
     ) -> TeamConfig:
         """Convert to executable TeamConfig.
 
@@ -272,7 +272,7 @@ class TeamTemplate:
         node_id: str,
         goal: Optional[str] = None,
         output_key: Optional[str] = None,
-        **overrides,
+        **overrides: Any,
     ) -> "TeamNodeWorkflow":
         """Convert to TeamNodeWorkflow for use in workflows.
 
@@ -776,7 +776,7 @@ def get_template(name: str) -> Optional[TeamTemplate]:
     return registry.get_template(name)
 
 
-def list_templates(**filters) -> List[str]:
+def list_templates(**filters: Any) -> List[str]:
     """List templates with optional filters.
 
     Args:

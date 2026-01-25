@@ -32,7 +32,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type
 if TYPE_CHECKING:
     from victor.framework.prompt_builder import PromptBuilder
 
-from victor.core.verticals.base import StageDefinition, VerticalBase, VerticalConfig
+from victor.core.verticals.base import VerticalBase, VerticalConfig  # StageDefinition is not exported
 from victor.core.verticals.defaults.tool_defaults import (
     COMMON_READONLY_TOOLS,
     merge_required_tools,
@@ -98,9 +98,10 @@ class RAGAssistant(VerticalBase):
         )
     """
 
-    name = "rag"
-    description = "Retrieval-Augmented Generation assistant for document Q&A"
-    version = "0.5.0"
+    # Override class variables from base
+    name: str = "rag"
+    description: str = "Retrieval-Augmented Generation assistant for document Q&A"
+    version: str = "0.5.0"
 
     @classmethod
     def get_tools(cls) -> List[str]:

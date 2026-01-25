@@ -108,7 +108,7 @@ class ContainerOpsHandler(BaseHandler):
         else:
             raise ValueError(f"Unknown operation: {operation}")
 
-        result = await tool_registry.execute("shell", command=cmd, _exec_ctx=None)
+        result = await tool_registry.execute("shell", command=cmd, _exec_ctx={})
 
         # Raise exception if operation failed
         if not result.success:
@@ -157,7 +157,7 @@ class TerraformHandler(BaseHandler):
 
         if workspace:
             result = await tool_registry.execute(
-                "shell", command=f"{self.binary} workspace select {workspace}", _exec_ctx=None
+                "shell", command=f"{self.binary} workspace select {workspace}", _exec_ctx={}
             )
             tool_calls += 1
             if not result.success:
@@ -180,7 +180,7 @@ class TerraformHandler(BaseHandler):
         else:
             raise ValueError(f"Unknown operation: {operation}")
 
-        result = await tool_registry.execute("shell", command=cmd, _exec_ctx=None)
+        result = await tool_registry.execute("shell", command=cmd, _exec_ctx={})
         tool_calls += 1
 
         # Raise exception if operation failed
@@ -249,8 +249,8 @@ class MLOpsHandler(BaseHandler):
         operation = node.input_mapping.get("operation", "register")
         model_name = node.input_mapping.get("model_name", "")
         model_path = node.input_mapping.get("model_path", "")
-        metrics: Dict[str, Any] = node.input_mapping.get("metrics", {})
-        params: Dict[str, Any] = node.input_mapping.get("params", {})
+        metrics: dict[str, Any] | str = node.input_mapping.get("metrics", {})
+        params: dict[str, Any] | str = node.input_mapping.get("params", {})
         experiment_name = node.input_mapping.get("experiment_name", "default")
         stage = node.input_mapping.get("stage", "Staging")
         version = node.input_mapping.get("version", "")

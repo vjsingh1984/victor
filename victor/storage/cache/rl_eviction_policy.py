@@ -104,7 +104,7 @@ class CacheEntryState:
     size_bytes: int = 0
     context_relevance: float = 0.5
 
-    def to_feature_tuple(self) -> tuple:
+    def to_feature_tuple(self) -> Tuple[str, str, str, str, str]:
         """Convert to feature tuple for Q-table lookup.
 
         Returns bucketed/discretized features for manageable state space.
@@ -233,7 +233,7 @@ class RLEvictionPolicy:
         self._q_table: Dict[tuple, Dict[EvictionAction, float]] = {}
 
         # Track recent decisions for feedback
-        self._recent_decisions: Dict[str, Tuple[CacheEntryState, EvictionAction]] = {}
+        self._recent_decisions: Dict[str, Tuple[CacheEntryState, EvictionAction, float]] = {}
         self._max_tracked_decisions = 1000
 
         # Statistics
@@ -270,7 +270,7 @@ class RLEvictionPolicy:
             reason = "Exploration"
         else:
             # Exploit: best Q-value
-            action = max(q_values, key=q_values.get)
+            action = max(q_values.keys(), key=lambda k: q_values[k])
             reason = f"Q-value: {q_values[action]:.2f}"
 
         # Apply cache utilization heuristic
@@ -281,7 +281,7 @@ class RLEvictionPolicy:
                 reason = f"High utilization ({cache_utilization:.0%})"
 
         # Track decision for feedback
-        self._track_decision(state, action)
+        self._track_decision(state, action, q_values[action])
 
         # Calculate confidence
         q_range = max(q_values.values()) - min(q_values.values())
@@ -301,7 +301,7 @@ class RLEvictionPolicy:
             key: Cache key that was hit
         """
         if key in self._recent_decisions:
-            state, action = self._recent_decisions[key]
+            state, action, _ = self._recent_decisions[key]
 
             if action == EvictionAction.KEEP:
                 # Good decision - kept entry that was needed
@@ -316,7 +316,7 @@ class RLEvictionPolicy:
             was_evicted: Whether entry was previously evicted by policy
         """
         if key in self._recent_decisions:
-            state, action = self._recent_decisions[key]
+            state, action, _ = self._recent_decisions[key]
 
             if action == EvictionAction.KEEP:
                 # Entry was kept but still missed (shouldn't happen normally)
@@ -334,7 +334,7 @@ class RLEvictionPolicy:
             key: Cache key that was evicted
         """
         if key in self._recent_decisions:
-            state, action = self._recent_decisions[key]
+            state, action, _ = self._recent_decisions[key]
 
             if action == EvictionAction.EVICT:
                 # Good decision - freed space
@@ -468,14 +468,15 @@ class RLEvictionPolicy:
 
         logger.debug(f"Q-update: {feature_key}:{action.value} {current_q:.3f} -> {new_q:.3f}")
 
-    def _track_decision(self, state: CacheEntryState, action: EvictionAction) -> None:
+    def _track_decision(self, state: CacheEntryState, action: EvictionAction, q_value: float) -> None:
         """Track decision for later feedback.
 
         Args:
             state: Entry state
             action: Decision made
+            q_value: Q-value for this decision
         """
-        self._recent_decisions[state.key] = (state, action)
+        self._recent_decisions[state.key] = (state, action, q_value)
 
         # Limit tracked decisions
         if len(self._recent_decisions) > self._max_tracked_decisions:

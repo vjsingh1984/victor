@@ -38,7 +38,7 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING, cast
 
 from victor.framework.capabilities.base_vertical_capability_provider import (
     BaseVerticalCapabilityProvider,
@@ -105,7 +105,7 @@ def get_indexing_config(orchestrator: Any) -> Dict[str, Any]:
     """
     # SOLID DIP: Read from VerticalContext instead of direct attribute access
     context = orchestrator.vertical_context
-    return context.get_capability_config(
+    config_result = context.get_capability_config(
         "rag_indexing",
         {
             "chunk_size": 512,
@@ -115,6 +115,7 @@ def get_indexing_config(orchestrator: Any) -> Dict[str, Any]:
             "store_backend": "lancedb",
         },
     )
+    return cast(Dict[str, Any], config_result)
 
 
 def configure_retrieval(
@@ -161,7 +162,7 @@ def get_retrieval_config(orchestrator: Any) -> Dict[str, Any]:
     """
     # SOLID DIP: Read from VerticalContext instead of direct attribute access
     context = orchestrator.vertical_context
-    return context.get_capability_config(
+    config_result = context.get_capability_config(
         "rag_retrieval",
         {
             "top_k": 5,
@@ -171,6 +172,7 @@ def get_retrieval_config(orchestrator: Any) -> Dict[str, Any]:
             "max_context_tokens": 4000,
         },
     )
+    return cast(Dict[str, Any], config_result)
 
 
 def configure_synthesis(
@@ -217,7 +219,7 @@ def get_synthesis_config(orchestrator: Any) -> Dict[str, Any]:
     """
     # SOLID DIP: Read from VerticalContext instead of direct attribute access
     context = orchestrator.vertical_context
-    return context.get_capability_config(
+    config_result = context.get_capability_config(
         "rag_synthesis",
         {
             "citation_style": "inline",
@@ -227,6 +229,7 @@ def get_synthesis_config(orchestrator: Any) -> Dict[str, Any]:
             "require_verification": True,
         },
     )
+    return cast(Dict[str, Any], config_result)
 
 
 def configure_safety(
@@ -323,7 +326,7 @@ class RAGCapabilityProvider(BaseVerticalCapabilityProvider):
         config = provider.get_capability_config(orchestrator, "indexing")
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the RAG capability provider."""
         super().__init__("rag")
 
@@ -467,7 +470,11 @@ _provider_instance: Optional[RAGCapabilityProvider] = None
 
 
 def _get_provider() -> RAGCapabilityProvider:
-    """Get or create provider instance."""
+    """Get or create provider instance.
+
+    Returns:
+        RAGCapabilityProvider instance
+    """
     global _provider_instance
     if _provider_instance is None:
         _provider_instance = RAGCapabilityProvider()

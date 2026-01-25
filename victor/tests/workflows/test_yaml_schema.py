@@ -28,7 +28,7 @@ Tests the YAML loader's ability to parse and validate workflow definitions:
 import pytest
 import yaml
 from io import StringIO
-from typing import Dict, Any
+from typing import Dict, Any, cast
 from unittest.mock import patch, MagicMock
 
 
@@ -50,7 +50,12 @@ workflows:
 """
         from victor.workflows.yaml_loader import load_workflow_from_yaml
 
-        workflows = load_workflow_from_yaml(yaml_content)
+        workflows_result = load_workflow_from_yaml(yaml_content)
+        # Handle Union type - convert single workflow to dict
+        if isinstance(workflows_result, dict):
+            workflows = workflows_result
+        else:
+            workflows = {workflows_result.name: workflows_result}
 
         assert "test_workflow" in workflows
         wf = workflows["test_workflow"]
@@ -58,7 +63,7 @@ workflows:
         assert len(wf.nodes) == 1
         assert "start" in wf.nodes
 
-    def test_parse_compute_node(self):
+    def test_parse_compute_node(self) -> None:
         """Test parsing compute node with handler."""
         yaml_content = """
 workflows:
@@ -79,7 +84,12 @@ workflows:
         from victor.workflows.yaml_loader import load_workflow_from_yaml
         from victor.workflows.definition import ComputeNode
 
-        workflows = load_workflow_from_yaml(yaml_content)
+        workflows_result = load_workflow_from_yaml(yaml_content)
+        # Handle Union type - convert single workflow to dict
+        if isinstance(workflows_result, dict):
+            workflows = workflows_result
+        else:
+            workflows = {workflows_result.name: workflows_result}
         wf = workflows["compute_test"]
 
         assert len(wf.nodes) == 1
@@ -88,7 +98,7 @@ workflows:
         assert node.id == "compute_step"
         assert node.handler == "data_transform"
 
-    def test_parse_parallel_node(self):
+    def test_parse_parallel_node(self) -> None:
         """Test parsing parallel execution node."""
         yaml_content = """
 workflows:
@@ -125,7 +135,12 @@ workflows:
         from victor.workflows.yaml_loader import load_workflow_from_yaml
         from victor.workflows.definition import ParallelNode
 
-        workflows = load_workflow_from_yaml(yaml_content)
+        workflows_result = load_workflow_from_yaml(yaml_content)
+        # Handle Union type - convert single workflow to dict
+        if isinstance(workflows_result, dict):
+            workflows = workflows_result
+        else:
+            workflows = {workflows_result.name: workflows_result}
         wf = workflows["parallel_test"]
 
         parallel_node = wf.nodes["parallel_step"]
@@ -155,7 +170,12 @@ workflows:
 """
         from victor.workflows.yaml_loader import load_workflow_from_yaml
 
-        workflows = load_workflow_from_yaml(yaml_content)
+        workflows_result = load_workflow_from_yaml(yaml_content)
+        # Handle Union type - convert single workflow to dict
+        if isinstance(workflows_result, dict):
+            workflows = workflows_result
+        else:
+            workflows = {workflows_result.name: workflows_result}
         wf = workflows["hitl_test"]
 
         hitl_node = wf.nodes["human_review"]
@@ -186,7 +206,12 @@ workflows:
 """
         from victor.workflows.yaml_loader import load_workflow_from_yaml
 
-        workflows = load_workflow_from_yaml(yaml_content)
+        workflows_result = load_workflow_from_yaml(yaml_content)
+        # Handle Union type - convert single workflow to dict
+        if isinstance(workflows_result, dict):
+            workflows = workflows_result
+        else:
+            workflows = {workflows_result.name: workflows_result}
         wf = workflows["meta_test"]
 
         assert wf.metadata.get("vertical") == "dataanalysis"
@@ -216,7 +241,12 @@ workflows:
 """
         from victor.workflows.yaml_loader import load_workflow_from_yaml
 
-        workflows = load_workflow_from_yaml(yaml_content)
+        workflows_result = load_workflow_from_yaml(yaml_content)
+        # Handle Union type - convert single workflow to dict
+        if isinstance(workflows_result, dict):
+            workflows = workflows_result
+        else:
+            workflows = {workflows_result.name: workflows_result}
         wf = workflows["batch_test"]
 
         # batch_config may be stored in metadata or as separate attribute
@@ -250,7 +280,12 @@ workflows:
 """
         from victor.workflows.yaml_loader import load_workflow_from_yaml
 
-        workflows = load_workflow_from_yaml(yaml_content)
+        workflows_result = load_workflow_from_yaml(yaml_content)
+        # Handle Union type - convert single workflow to dict
+        if isinstance(workflows_result, dict):
+            workflows = workflows_result
+        else:
+            workflows = {workflows_result.name: workflows_result}
         wf = workflows["temporal_test"]
 
         # temporal_context may be stored in metadata or as separate attribute
@@ -291,7 +326,12 @@ workflows:
 """
         from victor.workflows.yaml_loader import load_workflow_from_yaml
 
-        workflows = load_workflow_from_yaml(yaml_content)
+        workflows_result = load_workflow_from_yaml(yaml_content)
+        # Handle Union type - convert single workflow to dict
+        if isinstance(workflows_result, dict):
+            workflows = workflows_result
+        else:
+            workflows = {workflows_result.name: workflows_result}
         wf = workflows["ctx_test"]
 
         node1 = wf.nodes["step1"]
@@ -315,7 +355,12 @@ workflows:
 """
         from victor.workflows.yaml_loader import load_workflow_from_yaml
 
-        workflows = load_workflow_from_yaml(yaml_content)
+        workflows_result = load_workflow_from_yaml(yaml_content)
+        # Handle Union type - convert single workflow to dict
+        if isinstance(workflows_result, dict):
+            workflows = workflows_result
+        else:
+            workflows = {workflows_result.name: workflows_result}
         wf = workflows["nested_test"]
 
         node = wf.nodes["analyze"]
@@ -346,7 +391,12 @@ workflows:
 """
         from victor.workflows.yaml_loader import load_workflow_from_yaml
 
-        workflows = load_workflow_from_yaml(yaml_content)
+        workflows_result = load_workflow_from_yaml(yaml_content)
+        # Handle Union type - convert single workflow to dict
+        if isinstance(workflows_result, dict):
+            workflows = workflows_result
+        else:
+            workflows = {workflows_result.name: workflows_result}
         wf = workflows["constraint_test"]
 
         node = wf.nodes["compute_node"]
@@ -378,7 +428,12 @@ workflows:
 """
         from victor.workflows.yaml_loader import load_workflow_from_yaml
 
-        workflows = load_workflow_from_yaml(yaml_content)
+        workflows_result = load_workflow_from_yaml(yaml_content)
+        # Handle Union type - convert single workflow to dict
+        if isinstance(workflows_result, dict):
+            workflows = workflows_result
+        else:
+            workflows = {workflows_result.name: workflows_result}
         wf = workflows["llm_test"]
 
         node = wf.nodes["agent_node"]
@@ -403,7 +458,12 @@ not_workflows:
 
         # When 'workflows' key is missing, it treats the whole dict as workflows
         # but won't find valid workflow definitions (no 'nodes' key)
-        workflows = load_workflow_from_yaml(yaml_content)
+        workflows_result = load_workflow_from_yaml(yaml_content)
+        # Handle Union type - convert single workflow to dict
+        if isinstance(workflows_result, dict):
+            workflows = workflows_result
+        else:
+            workflows = {workflows_result.name: workflows_result}
         # Should return empty dict since no valid workflows
         assert len(workflows) == 0
 
@@ -417,17 +477,24 @@ workflows:
         from victor.workflows.yaml_loader import load_workflow_from_yaml
 
         # Workflow without nodes should be skipped
-        workflows = load_workflow_from_yaml(yaml_content)
+        workflows_result = load_workflow_from_yaml(yaml_content)
+        # Handle Union type - convert single workflow to dict
+        if isinstance(workflows_result, dict):
+            workflows = workflows_result
+        else:
+            workflows = {workflows_result.name: workflows_result}
         # Empty workflow should not be included
         assert (
             "empty_workflow" not in workflows
             or len(
-                workflows.get("empty_workflow", {}).nodes if "empty_workflow" in workflows else {}
+                workflows.get("empty_workflow", cast(Dict[str, Any], {})).nodes
+                if isinstance(workflows.get("empty_workflow"), dict)
+                else workflows.get("empty_workflow", cast(Dict[str, Any], {}))
             )
             == 0
         )
 
-    def test_invalid_node_type(self):
+    def test_invalid_node_type(self) -> None:
         """Test error for invalid node type."""
         yaml_content = """
 workflows:
@@ -443,7 +510,7 @@ workflows:
         with pytest.raises((ValueError, KeyError, YAMLWorkflowError)):
             load_workflow_from_yaml(yaml_content)
 
-    def test_missing_required_agent_fields(self):
+    def test_missing_required_agent_fields(self) -> None:
         """Test behavior when agent fields are missing.
 
         The loader may either raise an error or use defaults.
@@ -461,7 +528,12 @@ workflows:
         from victor.workflows.yaml_loader import load_workflow_from_yaml, YAMLWorkflowError
 
         try:
-            workflows = load_workflow_from_yaml(yaml_content)
+            workflows_result = load_workflow_from_yaml(yaml_content)
+        # Handle Union type - convert single workflow to dict
+        if isinstance(workflows_result, dict):
+            workflows = workflows_result
+        else:
+            workflows = {workflows_result.name: workflows_result}
             # If no error, check that workflow was created with defaults
             if "missing_fields" in workflows:
                 node = workflows["missing_fields"].nodes.get("incomplete")
@@ -498,7 +570,12 @@ workflows:
 """
         from victor.workflows.yaml_loader import load_workflow_from_yaml
 
-        workflows = load_workflow_from_yaml(yaml_content)
+        workflows_result = load_workflow_from_yaml(yaml_content)
+        # Handle Union type - convert single workflow to dict
+        if isinstance(workflows_result, dict):
+            workflows = workflows_result
+        else:
+            workflows = {workflows_result.name: workflows_result}
 
         assert len(workflows) == 2
         assert "workflow_a" in workflows

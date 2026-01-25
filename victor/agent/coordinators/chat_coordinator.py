@@ -1673,6 +1673,46 @@ class ChatCoordinator:
         Returns:
             Tuple of (validated_tool_calls, full_content)
         """
+        # If no native tool calls, try parsing from content (fallback)
+        # This handles models that output JSON tool calls in content instead of using native format
+        if not tool_calls and full_content:
+            orch = self._orch()
+            try:
+                from victor.agent.tool_calling.registry import ToolCallingAdapterRegistry
+
+                adapter = ToolCallingAdapterRegistry.get_adapter(
+                    provider_name=orch.provider.name,
+                    model=orch.model,
+                )
+
+                parse_result = adapter.parse_tool_calls(
+                    content=full_content,
+                    raw_tool_calls=None,
+                )
+
+                if parse_result.tool_calls:
+                    # Convert ToolCall objects to dict format expected by rest of code
+                    tool_calls = []
+                    for tc in parse_result.tool_calls:
+                        tc_dict = {"name": tc.name, "arguments": tc.arguments}
+                        if tc.id:
+                            tc_dict["id"] = tc.id
+                        tool_calls.append(tc_dict)
+
+                    logger.debug(
+                        f"Parsed {len(tool_calls)} tool calls from content via {parse_result.parse_method} "
+                        f"(confidence={parse_result.confidence})"
+                    )
+
+                    # Update full_content to remove parsed tool calls
+                    full_content = parse_result.remaining_content
+
+                    for warning in parse_result.warnings:
+                        logger.warning(f"Tool call parsing warning: {warning}")
+
+            except Exception as e:
+                logger.debug(f"Failed to parse tool calls from content: {e}")
+
         if tool_calls:
             for tc in tool_calls:
                 if tc.get("name"):

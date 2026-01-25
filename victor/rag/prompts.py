@@ -35,47 +35,27 @@ class RAGPromptContributor(PromptContributorProtocol):
         hints = {
             "document_ingestion": TaskTypeHint(
                 task_type="document_ingestion",
-                description="Ingesting documents into the knowledge base",
+                hint="Ingesting documents into the knowledge base",
                 tool_budget=5,
-                recommended_tools=["rag_ingest", "read", "ls"],
-                grounding_rules=[
-                    "Always confirm the file exists before ingestion",
-                    "Report the number of chunks created",
-                    "Suggest relevant document type if not specified",
-                ],
+                priority_tools=["rag_ingest", "read", "ls"],
             ),
             "knowledge_search": TaskTypeHint(
                 task_type="knowledge_search",
-                description="Searching the knowledge base",
+                hint="Searching the knowledge base",
                 tool_budget=3,
-                recommended_tools=["rag_search", "rag_query"],
-                grounding_rules=[
-                    "Use specific search terms",
-                    "Report relevance scores",
-                    "Cite sources in responses",
-                ],
+                priority_tools=["rag_search", "rag_query"],
             ),
             "question_answering": TaskTypeHint(
                 task_type="question_answering",
-                description="Answering questions from the knowledge base",
+                hint="Answering questions from the knowledge base",
                 tool_budget=5,
-                recommended_tools=["rag_query", "rag_search"],
-                grounding_rules=[
-                    "Always search before answering",
-                    "Cite source documents with [N] notation",
-                    "If no relevant context found, say so",
-                    "Don't hallucinate facts not in sources",
-                ],
+                priority_tools=["rag_query", "rag_search"],
             ),
             "knowledge_management": TaskTypeHint(
                 task_type="knowledge_management",
-                description="Managing the knowledge base",
+                hint="Managing the knowledge base",
                 tool_budget=5,
-                recommended_tools=["rag_list", "rag_delete", "rag_stats"],
-                grounding_rules=[
-                    "Confirm before deleting documents",
-                    "Show document details before deletion",
-                ],
+                priority_tools=["rag_list", "rag_delete", "rag_stats"],
             ),
         }
         return StandardTaskHints.merge_with(hints)
