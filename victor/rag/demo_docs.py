@@ -81,7 +81,7 @@ async def ingest_project_docs(
     await store.initialize()
 
     results: Dict[str, int] = {}
-    processed_files: set = set()
+    processed_files: set[str] = set()
 
     for pattern in patterns:
         logger.info(f"Searching for {pattern}...")
@@ -270,7 +270,7 @@ async def ingest_victor_docs() -> Dict[str, int]:
     )
 
 
-def main():
+def main() -> None:
     """Main entry point."""
     parser = argparse.ArgumentParser(
         description="Project Documentation RAG Demo - Ingest and query project docs"

@@ -316,7 +316,7 @@ class SECFilingFetcher:
                 data = await response.json()
 
         # Parse recent filings
-        filings = []
+        filings: List[Dict[str, Any]] = []
         recent = data.get("filings", {}).get("recent", {})
 
         forms = recent.get("form", [])

@@ -161,7 +161,7 @@ class BenchmarkAgent:
         Returns:
             Configured BenchmarkAgent instance
         """
-        from victor.framework import Agent
+        from victor.framework.agent import Agent
 
         config = config or BenchmarkAgentConfig(provider=provider, model=model)
 
@@ -195,7 +195,7 @@ class BenchmarkAgent:
         Returns:
             Configured BenchmarkAgent instance
         """
-        from victor.framework import Agent
+        from victor.framework.agent import Agent
 
         config = config or BenchmarkAgentConfig()
 
@@ -495,7 +495,7 @@ class BenchmarkAgent:
     def _subscribe_to_events(self, trace: ExecutionTrace) -> None:
         """Subscribe to framework events for metrics collection."""
         try:
-            from victor.framework import EventType
+            from victor.framework.events import EventType
 
             def on_event(event: Any) -> None:
                 """Handle framework events."""
@@ -566,7 +566,7 @@ async def create_benchmark_agent(
     provider: str = "anthropic",
     model: Optional[str] = None,
     profile: Optional[str] = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> BenchmarkAgent:
     """Factory function for creating BenchmarkAgent.
 

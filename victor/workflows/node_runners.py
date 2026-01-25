@@ -379,7 +379,7 @@ class ComputeNodeRunner(BaseNodeRunner):
         if tools and self._tool_registry:
             outputs = {}
             for tool_name in tools:
-                tool = self._tool_registry.get_tool(tool_name)
+                tool = self._tool_registry.get(tool_name)
                 if tool:
                     params = self._resolve_inputs(
                         node_config.get("tool_params", {}).get(tool_name, {}),

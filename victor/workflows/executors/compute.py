@@ -23,7 +23,8 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from victor.workflows.definition import ComputeNode, WorkflowState
+    from victor.workflows.definition import ComputeNode
+    from victor.workflows.adapters import WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -64,13 +65,12 @@ class ComputeNodeExecutor:
             Exception: If handler execution fails
         """
         import asyncio
-        from victor.framework.graph import GraphNodeResult
 
         logger.info(f"Executing compute node: {node.id}")
 
         # Step 1: Build params from node.inputs with $ctx. and $state. prefixes
         params = {}
-        if node.inputs:
+        if hasattr(node, 'inputs') and node.inputs:
             for param_name, source in node.inputs.items():
                 # Handle $ctx. prefix (from state)
                 if source.startswith("$ctx."):

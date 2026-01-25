@@ -87,6 +87,7 @@ class WebScraperHandler(BaseHandler):
             "web_fetch",
             url=url,
             selectors=selectors,
+            _exec_ctx=context,  # type: ignore
         )
 
         # Raise exception if tool execution failed

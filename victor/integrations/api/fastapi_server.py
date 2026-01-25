@@ -1889,7 +1889,7 @@ Respond with just the command to run."""
                     )
 
                 # Cast to proper type for mypy
-                learner_ms: ModelSelectorLearner = learner  # type: ignore[misc]
+                learner_ms: ModelSelectorLearner = learner
 
                 available = list(learner_ms._q_table.keys()) if learner_ms._q_table else ["ollama"]
 
@@ -1917,7 +1917,7 @@ Respond with just the command to run."""
                     if provider != recommendation.value:
                         q_val = learner_ms._get_q_value(provider, task_type)
                         alternatives.append({"provider": provider, "q_value": round(q_val, 3)})
-                alternatives.sort(key=lambda x: x["q_value"], reverse=True)
+                alternatives.sort(key=lambda x: x["q_value"] or 0, reverse=True)  # type: ignore[arg-type]
 
                 return JSONResponse(
                     {
@@ -1958,7 +1958,7 @@ Respond with just the command to run."""
                     )
 
                 # Cast to proper type for mypy
-                learner_ms: ModelSelectorLearner = learner  # type: ignore[misc]
+                learner_ms: ModelSelectorLearner = learner
 
                 old_rate = learner_ms.epsilon
                 learner_ms.epsilon = request.rate
@@ -1999,7 +1999,7 @@ Respond with just the command to run."""
                     )
 
                 # Cast to proper type for mypy
-                learner_ms: ModelSelectorLearner = learner  # type: ignore[misc]
+                learner_ms: ModelSelectorLearner = learner
 
                 try:
                     strategy = SelectionStrategy(request.strategy.lower())
