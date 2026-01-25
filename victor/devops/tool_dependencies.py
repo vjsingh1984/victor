@@ -21,16 +21,21 @@ while composed patterns remain in Python for complex logic.
 Uses canonical tool names from ToolNames to ensure consistent naming
 across RL Q-values, workflow patterns, and vertical configurations.
 
-Migration Notes:
-    - Transitions, clusters, sequences, dependencies are now in YAML
-    - Use create_vertical_tool_dependency_provider('devops') for the provider
-    - Composed patterns and graph functions remain in Python for flexibility
+Simplified Usage:
+    - Use DevOpsToolDependencyProvider for vertical tool dependency management
+    - Use DEVOPS_COMPOSED_PATTERNS for pre-defined DevOps workflow patterns
+    - Use get_devops_tool_graph() for tool execution planning and suggestions
+    - reset_devops_tool_graph() clears the cached instance for testing
 
 Example:
     from victor.devops.tool_dependencies import (
+        DevOpsToolDependencyProvider,
         get_devops_tool_graph,
         DEVOPS_COMPOSED_PATTERNS,
     )
+
+    # Get the canonical tool dependency provider
+    provider = DevOpsToolDependencyProvider
 
     # Get tool graph for DevOps workflows
     graph = get_devops_tool_graph()
@@ -40,37 +45,17 @@ Example:
 
     # Plan tool sequence for infrastructure deployment
     plan = graph.plan_for_goal({ToolNames.SHELL, ToolNames.GIT})
+
+    # Access composed patterns
+    dockerfile_pattern = DEVOPS_COMPOSED_PATTERNS["dockerfile_pipeline"]
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
-from victor.core.tool_dependency_loader import (
-    create_vertical_tool_dependency_provider,
-    load_tool_dependency_yaml,
-)
+from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
 from victor.framework.tool_naming import ToolNames
 from victor.tools.tool_graph import ToolExecutionGraph
-
-
-# =============================================================================
-# YAML Configuration Path
-# =============================================================================
-_YAML_CONFIG_PATH = Path(__file__).parent / "tool_dependencies.yaml"
-
-
-# =============================================================================
-# Internal Config Loading
-# =============================================================================
-_config = None
-
-
-def _get_config() -> Any:
-    """Get or load the YAML config lazily."""
-    global _config
-    if _config is None:
-        _config = load_tool_dependency_yaml(_YAML_CONFIG_PATH, canonicalize=False)
-    return _config
 
 
 # =============================================================================
@@ -80,9 +65,6 @@ def _get_config() -> Any:
 DevOpsToolDependencyProvider = create_vertical_tool_dependency_provider("devops")
 
 
-# =============================================================================
-# Composed Tool Patterns
-# =============================================================================
 # These represent higher-level operations composed of multiple tool calls
 # that commonly appear together in DevOps workflows.
 
@@ -194,30 +176,9 @@ def get_devops_tool_graph() -> ToolExecutionGraph:
     if _devops_tool_graph is not None:
         return _devops_tool_graph
 
-    # Use config directly to avoid deprecation warnings internally
-    config = _get_config()
-
-    graph = ToolExecutionGraph(name="devops")
-
-    # Add dependencies
-    for dep in config.dependencies:
-        graph.add_dependency(
-            dep.tool_name,
-            depends_on=dep.depends_on,
-            enables=dep.enables,
-            weight=dep.weight,
-        )
-
-    # Add transitions
-    graph.add_transitions(config.transitions)
-
-    # Add sequences
-    for name, sequence in config.sequences.items():
-        graph.add_sequence(sequence, weight=0.7)
-
-    # Add clusters
-    for name, tools in config.clusters.items():
-        graph.add_cluster(name, tools)
+    # Get base graph from provider
+    provider = DevOpsToolDependencyProvider
+    graph = provider.get_graph()
 
     # Add composed patterns as sequences with higher weights
     for pattern_name, pattern_data in DEVOPS_COMPOSED_PATTERNS.items():
@@ -236,8 +197,8 @@ def reset_devops_tool_graph() -> None:
     _devops_tool_graph = None
 
 
-def get_composed_pattern(pattern_name: str) -> Optional[Dict[str, Any]]:
-    """Get a composed tool pattern by name.
+def get_devops_composed_pattern(pattern_name: str) -> Optional[Dict[str, Any]]:
+    """Get a DevOps composed tool pattern by name.
 
     Args:
         pattern_name: Name of the pattern (e.g., "dockerfile_pipeline")
@@ -246,7 +207,7 @@ def get_composed_pattern(pattern_name: str) -> Optional[Dict[str, Any]]:
         Pattern configuration dict or None if not found
 
     Example:
-        pattern = get_composed_pattern("dockerfile_pipeline")
+        pattern = get_devops_composed_pattern("dockerfile_pipeline")
         if pattern:
             print(f"Sequence: {pattern['sequence']}")
             print(f"Inputs: {pattern['inputs']}")
@@ -254,8 +215,8 @@ def get_composed_pattern(pattern_name: str) -> Optional[Dict[str, Any]]:
     return DEVOPS_COMPOSED_PATTERNS.get(pattern_name)
 
 
-def list_composed_patterns() -> List[str]:
-    """List all available composed tool patterns.
+def list_devops_composed_patterns() -> List[str]:
+    """List all available DevOps composed tool patterns.
 
     Returns:
         List of pattern names
@@ -271,6 +232,6 @@ __all__ = [
     # Graph functions
     "get_devops_tool_graph",
     "reset_devops_tool_graph",
-    "get_composed_pattern",
-    "list_composed_patterns",
+    "get_devops_composed_pattern",
+    "list_devops_composed_patterns",
 ]

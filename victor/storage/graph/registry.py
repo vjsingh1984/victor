@@ -9,19 +9,16 @@ from victor.storage.graph.sqlite_store import SqliteGraphStore
 from victor.storage.graph.memory_store import MemoryGraphStore
 
 if TYPE_CHECKING:
-    from victor.storage.graph.duckdb_store import DuckDBGraphStore
-
-try:
     from victor.storage.graph.duckdb_store import DuckDBGraphStore as _DuckDBGraphStore
-    _duckdb_available: type[_DuckDBGraphStore] | None = _DuckDBGraphStore
-except Exception:
-    _duckdb_available = None
-
-# Type alias for external use
-if TYPE_CHECKING:
-    DuckDBGraphStore = _DuckDBGraphStore
 else:
-    DuckDBGraphStore: Optional[Type[_DuckDBGraphStore]] = _duckdb_available
+    try:
+        from victor.storage.graph.duckdb_store import DuckDBGraphStore as _DuckDBGraphStore
+        _duckdb_available: Optional[type[_DuckDBGraphStore]] = _DuckDBGraphStore
+    except Exception:
+        _duckdb_available = None
+
+    # Type alias for external use
+    DuckDBGraphStore: Optional[type[_DuckDBGraphStore]] = _duckdb_available  # type: ignore[misc]
 
 
 def create_graph_store(

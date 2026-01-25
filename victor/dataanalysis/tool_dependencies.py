@@ -12,295 +12,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Data Analysis Tool Dependencies - YAML-based tool relationships for analysis workflows.
+"""Data Analysis Tool Dependencies - Tool relationships for data analysis workflows.
 
-This module provides the DataAnalysisToolDependencyProvider which loads tool
-dependency configuration from YAML (tool_dependencies.yaml) using the new
-YAML-based configuration system.
+Migrated to YAML-based configuration for declarative tool dependency management.
+Configuration is loaded from tool_dependencies.yaml in this directory.
 
-Migration Notes:
-    - Migrated from hand-coded Python dictionaries to YAML configuration
-    - Uses YAMLToolDependencyProvider from victor.core.tool_dependency_loader
-    - YAML file: victor/dataanalysis/tool_dependencies.yaml
-    - Backward compatibility maintained via deprecated constant exports
+Uses canonical tool names from ToolNames to ensure consistent naming
+across RL Q-values, workflow patterns, and vertical configurations.
 
-Design Principles:
-    - YAML-first: Configuration in declarative YAML, not imperative Python
-    - Canonical Names: Uses canonical tool names for RL Q-value consistency
-    - Backward Compatibility: Deprecated constants still available for migration
+The YAML-based approach provides:
+- Declarative configuration that's easier to read and modify
+- Consistent schema validation via Pydantic
+- Automatic tool name canonicalization
+- Caching for performance
+
+Use the canonical tool dependency provider:
+    from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+    provider = create_vertical_tool_dependency_provider("dataanalysis")
 """
 
-from __future__ import annotations
-
-import logging
-import warnings
 from pathlib import Path
-from typing import Any, TYPE_CHECKING, Dict, List, Set, Tuple
 
-from victor.core.tool_dependency_loader import YAMLToolDependencyProvider
+from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
 
-if TYPE_CHECKING:
-    from victor.core.tool_types import ToolDependency
-
-logger = logging.getLogger(__name__)
-
-# Path to the YAML configuration file
-_YAML_PATH = Path(__file__).parent / "tool_dependencies.yaml"
-
-
-class DataAnalysisToolDependencyProvider(YAMLToolDependencyProvider):
-    """Tool dependency provider for data analysis vertical.
-
-    .. deprecated::
-        Use ``create_vertical_tool_dependency_provider('dataanalysis')`` instead.
-        This class is maintained for backward compatibility.
-
-    Loads configuration from YAML file (tool_dependencies.yaml) using the
-    YAMLToolDependencyProvider base class.
-
-    This provider supports:
-    - Data profiling workflows
-    - Visualization sequences
-    - ML pipeline tool transitions
-    - Statistical analysis patterns
-
-    Example:
-        # Preferred (new code):
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
-        provider = create_vertical_tool_dependency_provider("dataanalysis")
-
-        # Deprecated (backward compatible):
-        >>> provider = DataAnalysisToolDependencyProvider()
-        >>> provider.vertical
-        'dataanalysis'
-        >>> provider.get_required_tools()
-        {'read', 'write', 'shell'}
-    """
-
-    def __init__(self) -> None:
-        """Initialize the provider with YAML configuration.
-
-        Note: canonicalize=False to preserve distinct tool names like 'code_search'
-        which would otherwise be mapped to 'grep' by the alias system. The DataAnalysis
-        vertical uses both 'grep' (keyword) and 'code_search' (semantic) as separate tools.
-
-        .. deprecated::
-            Use ``create_vertical_tool_dependency_provider('dataanalysis')`` instead.
-        """
-        warnings.warn(
-            "DataAnalysisToolDependencyProvider is deprecated. "
-            "Use create_vertical_tool_dependency_provider('dataanalysis') instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        super().__init__(
-            yaml_path=_YAML_PATH,
-            canonicalize=False,  # Preserve 'code_search' as distinct from 'grep'
-        )
-        logger.debug(f"Loaded DataAnalysis tool dependencies from {_YAML_PATH}")
-
-
-# =============================================================================
-# BACKWARD COMPATIBILITY EXPORTS (DEPRECATED)
-# =============================================================================
-# These constants are deprecated and will be removed in a future version.
-# Use DataAnalysisToolDependencyProvider instead to access configuration.
-
-
-def _get_deprecated_config() -> "DataAnalysisToolDependencyProvider":
-    """Lazily load provider for deprecated constant access."""
-    if not hasattr(_get_deprecated_config, "_provider"):
-        _get_deprecated_config._provider = DataAnalysisToolDependencyProvider()  # type: ignore[attr-defined]
-    return _get_deprecated_config._provider  # type: ignore[no-any-return, attr-defined]
-
-
-def _warn_deprecated(name: str) -> None:
-    """Emit deprecation warning for legacy constant access."""
-    warnings.warn(
-        f"{name} is deprecated. Use DataAnalysisToolDependencyProvider instead. "
-        "This constant will be removed in a future version.",
-        DeprecationWarning,
-        stacklevel=3,
-    )
-
-
-class _DeprecatedTransitions:
-    """Lazy loader for deprecated DATA_ANALYSIS_TOOL_TRANSITIONS."""
-
-    def __getitem__(self, key: str) -> List[Tuple[str, float]]:
-        _warn_deprecated("DATA_ANALYSIS_TOOL_TRANSITIONS")
-        config = _get_deprecated_config()
-        result = config.get_tool_transitions().get(key, [])
-        # Ensure the return type matches List[Tuple[str, float]]
-        if isinstance(result, list):
-            return result
-        return []
-
-    def __iter__(self) -> Any:
-        _warn_deprecated("DATA_ANALYSIS_TOOL_TRANSITIONS")
-        return iter(_get_deprecated_config().get_tool_transitions())
-
-    def items(self) -> Any:
-        _warn_deprecated("DATA_ANALYSIS_TOOL_TRANSITIONS")
-        return _get_deprecated_config().get_tool_transitions().items()
-
-    def keys(self) -> Any:
-        _warn_deprecated("DATA_ANALYSIS_TOOL_TRANSITIONS")
-        return _get_deprecated_config().get_tool_transitions().keys()
-
-    def values(self) -> Any:
-        _warn_deprecated("DATA_ANALYSIS_TOOL_TRANSITIONS")
-        return _get_deprecated_config().get_tool_transitions().values()
-
-    def get(self, key: str, default: Any = None) -> Any:
-        _warn_deprecated("DATA_ANALYSIS_TOOL_TRANSITIONS")
-        return _get_deprecated_config().get_tool_transitions().get(key, default)
-
-
-class _DeprecatedClusters:
-    """Lazy loader for deprecated DATA_ANALYSIS_TOOL_CLUSTERS."""
-
-    def __getitem__(self, key: str) -> Set[str]:
-        _warn_deprecated("DATA_ANALYSIS_TOOL_CLUSTERS")
-        return _get_deprecated_config().get_tool_clusters().get(key, set())
-
-    def __iter__(self) -> Any:
-        _warn_deprecated("DATA_ANALYSIS_TOOL_CLUSTERS")
-        return iter(_get_deprecated_config().get_tool_clusters())
-
-    def items(self) -> Any:
-        _warn_deprecated("DATA_ANALYSIS_TOOL_CLUSTERS")
-        return _get_deprecated_config().get_tool_clusters().items()
-
-    def keys(self) -> Any:
-        _warn_deprecated("DATA_ANALYSIS_TOOL_CLUSTERS")
-        return _get_deprecated_config().get_tool_clusters().keys()
-
-    def values(self) -> Any:
-        _warn_deprecated("DATA_ANALYSIS_TOOL_CLUSTERS")
-        return _get_deprecated_config().get_tool_clusters().values()
-
-    def get(self, key: str, default: Any = None) -> Any:
-        _warn_deprecated("DATA_ANALYSIS_TOOL_CLUSTERS")
-        return _get_deprecated_config().get_tool_clusters().get(key, default)
-
-
-class _DeprecatedSequences:
-    """Lazy loader for deprecated DATA_ANALYSIS_TOOL_SEQUENCES."""
-
-    def __getitem__(self, key: str) -> List[str]:
-        _warn_deprecated("DATA_ANALYSIS_TOOL_SEQUENCES")
-        config = _get_deprecated_config()
-        sequences = config.get_tool_sequences()
-        if isinstance(sequences, dict):
-            return sequences.get(key, [])
-        return []
-
-    def __iter__(self) -> Any:
-        _warn_deprecated("DATA_ANALYSIS_TOOL_SEQUENCES")
-        config = _get_deprecated_config()
-        sequences = config.get_tool_sequences()
-        if isinstance(sequences, dict):
-            return iter(sequences)
-        return iter([])
-
-    def items(self) -> Any:
-        _warn_deprecated("DATA_ANALYSIS_TOOL_SEQUENCES")
-        config = _get_deprecated_config()
-        sequences = config.get_tool_sequences()
-        if isinstance(sequences, dict):
-            return sequences.items()
-        return {}.items()
-
-    def keys(self) -> Any:
-        _warn_deprecated("DATA_ANALYSIS_TOOL_SEQUENCES")
-        config = _get_deprecated_config()
-        sequences = config.get_tool_sequences()
-        if isinstance(sequences, dict):
-            return sequences.keys()
-        return {}.keys()
-
-    def values(self) -> Any:
-        _warn_deprecated("DATA_ANALYSIS_TOOL_SEQUENCES")
-        config = _get_deprecated_config()
-        sequences = config.get_tool_sequences()
-        if isinstance(sequences, dict):
-            return sequences.values()
-        return {}.values()
-
-    def get(self, key: str, default: Any = None) -> Any:
-        _warn_deprecated("DATA_ANALYSIS_TOOL_SEQUENCES")
-        config = _get_deprecated_config()
-        sequences = config.get_tool_sequences()
-        if isinstance(sequences, dict):
-            return sequences.get(key, default)
-        return default
-
-
-class _DeprecatedDependencies:
-    """Lazy loader for deprecated DATA_ANALYSIS_TOOL_DEPENDENCIES."""
-
-    def __iter__(self) -> Any:
-        _warn_deprecated("DATA_ANALYSIS_TOOL_DEPENDENCIES")
-        return iter(_get_deprecated_config().get_dependencies())
-
-    def __len__(self) -> int:
-        _warn_deprecated("DATA_ANALYSIS_TOOL_DEPENDENCIES")
-        return len(_get_deprecated_config().get_dependencies())
-
-    def __getitem__(self, index: int) -> "ToolDependency":
-        _warn_deprecated("DATA_ANALYSIS_TOOL_DEPENDENCIES")
-        return _get_deprecated_config().get_dependencies()[index]
-
-
-class _DeprecatedRequiredTools:
-    """Lazy loader for deprecated DATA_ANALYSIS_REQUIRED_TOOLS."""
-
-    def __iter__(self) -> Any:
-        _warn_deprecated("DATA_ANALYSIS_REQUIRED_TOOLS")
-        return iter(_get_deprecated_config().get_required_tools())
-
-    def __len__(self) -> int:
-        _warn_deprecated("DATA_ANALYSIS_REQUIRED_TOOLS")
-        return len(_get_deprecated_config().get_required_tools())
-
-    def __contains__(self, item: Any) -> bool:
-        _warn_deprecated("DATA_ANALYSIS_REQUIRED_TOOLS")
-        return item in _get_deprecated_config().get_required_tools()
-
-
-class _DeprecatedOptionalTools:
-    """Lazy loader for deprecated DATA_ANALYSIS_OPTIONAL_TOOLS."""
-
-    def __iter__(self) -> Any:
-        _warn_deprecated("DATA_ANALYSIS_OPTIONAL_TOOLS")
-        return iter(_get_deprecated_config().get_optional_tools())
-
-    def __len__(self) -> int:
-        _warn_deprecated("DATA_ANALYSIS_OPTIONAL_TOOLS")
-        return len(_get_deprecated_config().get_optional_tools())
-
-    def __contains__(self, item: Any) -> bool:
-        _warn_deprecated("DATA_ANALYSIS_OPTIONAL_TOOLS")
-        return item in _get_deprecated_config().get_optional_tools()
-
-
-# Deprecated constants - provide backward compatibility with deprecation warnings
-DATA_ANALYSIS_TOOL_TRANSITIONS: Dict[str, List[Tuple[str, float]]] = _DeprecatedTransitions()  # type: ignore
-DATA_ANALYSIS_TOOL_CLUSTERS: Dict[str, Set[str]] = _DeprecatedClusters()  # type: ignore
-DATA_ANALYSIS_TOOL_SEQUENCES: Dict[str, List[str]] = _DeprecatedSequences()  # type: ignore
-DATA_ANALYSIS_TOOL_DEPENDENCIES: List["ToolDependency"] = _DeprecatedDependencies()  # type: ignore
-DATA_ANALYSIS_REQUIRED_TOOLS: Set[str] = _DeprecatedRequiredTools()  # type: ignore
-DATA_ANALYSIS_OPTIONAL_TOOLS: Set[str] = _DeprecatedOptionalTools()  # type: ignore
-
+# Create canonical provider for data analysis vertical
+DataAnalysisToolDependencyProvider = create_vertical_tool_dependency_provider("dataanalysis")
 
 __all__ = [
     "DataAnalysisToolDependencyProvider",
-    # Deprecated exports for backward compatibility
-    "DATA_ANALYSIS_TOOL_DEPENDENCIES",
-    "DATA_ANALYSIS_TOOL_TRANSITIONS",
-    "DATA_ANALYSIS_TOOL_CLUSTERS",
-    "DATA_ANALYSIS_TOOL_SEQUENCES",
-    "DATA_ANALYSIS_REQUIRED_TOOLS",
-    "DATA_ANALYSIS_OPTIONAL_TOOLS",
 ]
