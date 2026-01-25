@@ -166,7 +166,7 @@ class WorkflowStreamChunk:
         )
 
 
-def _create_queue() -> asyncio.Queue:
+def _create_queue() -> asyncio.Queue[WorkflowStreamChunk]:
     """Create a new asyncio Queue for chunk streaming."""
     return asyncio.Queue()
 
@@ -211,7 +211,7 @@ class WorkflowStreamContext:
     current_node_id: Optional[str] = None
     is_cancelled: bool = False
     thread_id: Optional[str] = None
-    chunk_queue: asyncio.Queue = field(default_factory=_create_queue)
+    chunk_queue: asyncio.Queue[WorkflowStreamChunk] = field(default_factory=_create_queue)
 
     def get_progress(self) -> float:
         """Calculate workflow progress as a fraction.

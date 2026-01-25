@@ -194,7 +194,7 @@ class TeamCommunicationProtocol:
         self._log_messages = log_messages
         self._communication_log: List[CommunicationLog] = []
         self._message_handlers: Dict[str, List[Any]] = {}  # topic -> subscribers
-        self._pending_requests: Dict[str, asyncio.Future] = {}
+        self._pending_requests: Dict[str, asyncio.Future[AgentMessage]] = {}
 
     async def send_request(
         self,
@@ -203,7 +203,7 @@ class TeamCommunicationProtocol:
         content: str,
         message_type: str = "request",
         timeout: float = 30.0,
-        **metadata,
+        **metadata: Any,
     ) -> Optional[AgentMessage]:
         """Send a direct request and wait for response.
 
@@ -269,7 +269,7 @@ class TeamCommunicationProtocol:
                     )
                 )
 
-            return response
+            return response  # type: ignore[no-any-return]
 
         except asyncio.TimeoutError:
             logger.warning(f"Request from {sender_id} to {recipient_id} timed out")
@@ -299,7 +299,7 @@ class TeamCommunicationProtocol:
         content: str,
         message_type: str = "broadcast",
         exclude_sender: bool = True,
-        **metadata,
+        **metadata: Any,
     ) -> List[Optional[AgentMessage]]:
         """Broadcast message to all team members.
 
@@ -366,7 +366,7 @@ class TeamCommunicationProtocol:
         recipient_ids: List[str],
         content: str,
         message_type: str = "multicast",
-        **metadata,
+        **metadata: Any,
     ) -> Dict[str, Optional[AgentMessage]]:
         """Send message to multiple specific recipients.
 
@@ -406,7 +406,7 @@ class TeamCommunicationProtocol:
                 responses[recipient_id] = None
                 continue
 
-            async def send_and_log(rec_id: str, rec: Any) -> tuple[str, Optional[AgentMessage]]:
+            async def send_and_log(rec_id: str, rec: Any) -> Tuple[str, Optional[AgentMessage]]:
                 try:
                     response = await rec.receive_message(message)
                     if self._log_messages:
