@@ -307,7 +307,7 @@ class ChatCoordinator:
                     "Only explore if absolutely necessary to complete the task.",
                 )
 
-        goals = orch._tool_planner.infer_goals_from_message(user_message)  # type: ignore[attr-defined]
+        goals = orch._tool_planner.infer_goals_from_message(user_message) if orch._tool_planner else []  # type: ignore[union-attr]
 
         # Log all limits for debugging
         logger.info(

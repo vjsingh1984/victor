@@ -166,12 +166,12 @@ class ContextCoordinator:
         # This would integrate with persistence layer in a full implementation
         # For now, return empty context
         logger.info(f"Rebuilding context for session {session_id} using {strategy} strategy")
-        return {
+        return CompactionContext({
             "messages": [],
             "token_count": 0,
             "rebuilt": True,
             "rebuild_strategy": strategy,
-        }
+        })
 
     def estimate_token_count(
         self,
@@ -195,7 +195,7 @@ class ContextCoordinator:
         """
         # Use provided token count if available
         if "token_count" in context:
-            return context["token_count"]
+            return int(context["token_count"])
 
         # Otherwise estimate from messages
         messages = context.get("messages", [])
@@ -222,7 +222,7 @@ class ContextCoordinator:
                 result = await coordinator.compact_context(context, budget)
         """
         token_count = self.estimate_token_count(context)
-        max_tokens = budget.get("max_tokens", 4096)
+        max_tokens = int(budget.get("max_tokens", 4096))
         return token_count <= max_tokens
 
     def add_strategy(
@@ -332,8 +332,8 @@ class BaseCompactionStrategy(ICompactionStrategy):
         Returns:
             True if strategy can be applied, False otherwise
         """
-        token_count = context.get("token_count", 0)
-        max_tokens = budget.get("max_tokens", 4096)
+        token_count = int(context.get("token_count", 0))
+        max_tokens = int(budget.get("max_tokens", 4096))
         return token_count > max_tokens
 
     async def compact(
@@ -417,11 +417,11 @@ class TruncationCompactionStrategy(BaseCompactionStrategy):
         else:
             new_tokens = 0
 
-        compacted_context: CompactionContext = {
+        compacted_context: CompactionContext = CompactionContext({
             **context,
             "messages": compacted_messages,
             "token_count": new_tokens,
-        }
+        })
 
         return CompactionResult(
             compacted_context=compacted_context,
@@ -539,11 +539,11 @@ class SummarizationCompactionStrategy(BaseCompactionStrategy):
         compacted_messages = [summary_message] + recent_messages
         new_tokens = original_tokens - tokens_saved
 
-        compacted_context: CompactionContext = {
+        compacted_context: CompactionContext = CompactionContext({
             **context,
             "messages": compacted_messages,
             "token_count": new_tokens,
-        }
+        })
 
         return CompactionResult(
             compacted_context=compacted_context,
@@ -668,11 +668,11 @@ class SemanticCompactionStrategy(BaseCompactionStrategy):
 
         tokens_saved = original_tokens - new_tokens
 
-        compacted_context: CompactionContext = {
+        compacted_context: CompactionContext = CompactionContext({
             **context,
             "messages": compacted_messages,
             "token_count": new_tokens,
-        }
+        })
 
         return CompactionResult(
             compacted_context=compacted_context,
@@ -771,7 +771,8 @@ class HybridCompactionStrategy(BaseCompactionStrategy):
         context_after_semantic = context
         result = await self._semantic_strategy.compact(context, budget)
 
-        if result.compacted_context.get("token_count", 0) <= max_tokens:
+        compacted_dict = result.compacted_context if hasattr(result.compacted_context, 'get') else {"token_count": 0}
+        if compacted_dict.get("token_count", 0) <= max_tokens:
             result.strategy_used = f"{self._name}_semantic"
             return result
 
@@ -780,7 +781,8 @@ class HybridCompactionStrategy(BaseCompactionStrategy):
         # Step 2: Try summarization
         result = await self._summarization_strategy.compact(context_after_semantic, budget)
 
-        if result.compacted_context.get("token_count", 0) <= max_tokens:
+        compacted_dict = result.compacted_context if hasattr(result.compacted_context, 'get') else {"token_count": 0}
+        if compacted_dict.get("token_count", 0) <= max_tokens:
             result.strategy_used = f"{self._name}_summarization"
             return result
 
@@ -792,15 +794,17 @@ class HybridCompactionStrategy(BaseCompactionStrategy):
         result.strategy_used = f"{self._name}_truncation"
 
         # Calculate total tokens saved
-        final_tokens = result.compacted_context.get("token_count", 0)
+        final_tokens = result.compacted_context if hasattr(result.compacted_context, 'get') else {"token_count": 0}
+        final_token_count = final_tokens.get("token_count", 0)
         total_tokens_saved = original_tokens - final_tokens
 
         # Update metadata to reflect hybrid approach
+        existing_metadata = result.metadata if isinstance(result.metadata, dict) else {}
         result.metadata = {
-            **result.metadata,
+            **existing_metadata,
             "hybrid_steps": ["semantic", "summarization", "truncation"],
             "original_tokens": original_tokens,
-            "final_tokens": final_tokens,
+            "final_tokens": final_token_count,
         }
 
         # Override tokens_saved with total
