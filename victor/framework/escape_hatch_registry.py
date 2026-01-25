@@ -281,12 +281,16 @@ class EscapeHatchRegistry:
 
         if conditions:
             for name, fn in conditions.items():
-                self.register_condition(name, fn, vertical=vertical, replace=replace)
+                # Explicitly cast to avoid protocol confusion
+                cond_fn = cast(ConditionFunction, fn)
+                self.register_condition(name, cond_fn, vertical=vertical, replace=replace)
                 cond_count += 1
 
         if transforms:
             for name, fn in transforms.items():
-                self.register_transform(name, fn, vertical=vertical, replace=replace)
+                # Explicitly cast to avoid protocol confusion
+                transform_fn = cast(TransformFunction, fn)
+                self.register_transform(name, transform_fn, vertical=vertical, replace=replace)
                 trans_count += 1
 
         logger.debug(

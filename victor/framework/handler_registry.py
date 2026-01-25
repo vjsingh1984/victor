@@ -38,7 +38,7 @@ Example:
 import importlib
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 logger = logging.getLogger(__name__)
 
@@ -531,7 +531,7 @@ def handler_decorator(
     vertical: Optional[str] = None,
     description: Optional[str] = None,
     replace: bool = False,
-):
+) -> Callable[[Type[Any]], Type[Any]]:
     """Class decorator for automatic handler registration.
 
     Phase 1.3: Provides decorator-based auto-registration for handlers,
@@ -567,7 +567,7 @@ def handler_decorator(
             pass
     """
 
-    def decorator(cls):
+    def decorator(cls: Type[Any]) -> Type[Any]:
         # Determine vertical (explicit or auto-detect)
         final_vertical = vertical
         if final_vertical is None:

@@ -991,7 +991,7 @@ class EventRegistry:
         self, event: AgentExecutionEvent, target: EventTarget
     ) -> Dict[str, Any]:
         """Fallback conversion for unknown event types."""
-        base = {
+        base: Dict[str, Any] = {
             "timestamp": event.timestamp,
             "metadata": event.metadata.copy() if event.metadata else {},
         }
@@ -1003,10 +1003,11 @@ class EventRegistry:
                 "content": event.content,
             }
         elif target == EventTarget.OBSERVABILITY:
+            metadata_dict: Dict[str, Any] = base["metadata"]
             return {
                 "category": "custom",
                 "name": event.type.value,
-                "data": {"content": event.content, **base["metadata"]},
+                "data": {"content": event.content, **metadata_dict},
                 "priority": "normal",
             }
         return base
