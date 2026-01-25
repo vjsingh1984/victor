@@ -5,12 +5,10 @@ Competitive positioning: Docker Desktop AI, Terraform Assistant, Pulumi AI, K8s 
 
 from typing import Any, ClassVar, Dict, List, Optional, Set, TYPE_CHECKING, cast
 
+from victor.core.vertical_types import StageDefinition
+
 if TYPE_CHECKING:
     from victor.framework.prompt_builder import PromptBuilder
-    from victor.core.vertical_types import StageDefinition
-else:
-    # Runtime fallback - will be defined if imported successfully
-    StageDefinition = None  # type: ignore[misc]
 
 from victor.core.verticals.base import VerticalBase
 from victor.core.verticals.defaults.tool_defaults import (
