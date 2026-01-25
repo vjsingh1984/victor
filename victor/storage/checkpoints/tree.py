@@ -431,7 +431,7 @@ class CheckpointTree:
         Returns:
             List of descendant nodes in breadth-first order
         """
-        descendants = []
+        descendants: List[CheckpointNode] = []
         node = self._nodes.get(checkpoint_id)
 
         if not node:
@@ -488,12 +488,12 @@ class CheckpointTree:
         path = []
 
         # Path from from_checkpoint to common ancestor
-        current = from_checkpoint
-        while current != common_ancestor:
-            node = self._nodes.get(current)
+        curr_node = from_checkpoint
+        while curr_node != common_ancestor:
+            node = self._nodes.get(curr_node)
             if node:
                 path.append(node)
-                current: str = node.parent_id  # type: ignore[assignment]
+                curr_node = node.parent_id if node.parent_id else curr_node
             else:
                 break
 
@@ -503,12 +503,12 @@ class CheckpointTree:
 
         # Path from common ancestor to to_checkpoint (reversed)
         to_path = []
-        current = to_checkpoint
-        while current != common_ancestor:
-            node = self._nodes.get(current)
+        curr_node = to_checkpoint
+        while curr_node != common_ancestor:
+            node = self._nodes.get(curr_node)
             if node:
                 to_path.append(node)
-                current: str = node.parent_id  # type: ignore[assignment]
+                curr_node = node.parent_id if node.parent_id else curr_node
             else:
                 break
         to_path.reverse()
@@ -1113,7 +1113,7 @@ class BranchManager:
         self,
         checkpoint_id: str,
         session_id: str,
-        action_replay: Optional[Callable[[Dict, Dict], Dict]] = None,
+        action_replay: Optional[Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]] = None,
     ) -> List[ReplayStep]:
         """Replay conversation from a checkpoint.
 
@@ -1150,7 +1150,7 @@ class BranchManager:
             data = await self.backend.load_checkpoint(node.checkpoint_id)
 
             # Extract action from state diff
-            action = {}
+            action: Dict[str, Any] = {}
             if prev_state:
                 # Compute what changed
                 tools_before = set(prev_state.get("tool_history", []))

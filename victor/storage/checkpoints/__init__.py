@@ -66,7 +66,7 @@ Usage - Multi-Branch Workflows:
     print(tree.to_ascii())
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from victor.storage.checkpoints.protocol import (
     CheckpointMetadata,
@@ -126,7 +126,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """Lazy import for backends with optional dependencies."""
     if name == "SQLiteCheckpointBackend":
         from victor.storage.checkpoints.backends.sqlite_backend import (

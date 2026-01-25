@@ -18,7 +18,7 @@ SQLiteCheckpointBackend requires aiosqlite (optional dependency).
 MemoryCheckpointBackend works without any additional dependencies.
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 # MemoryCheckpointBackend has no external dependencies - import eagerly
 from victor.storage.checkpoints.backends.memory_backend import MemoryCheckpointBackend
@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 __all__ = ["SQLiteCheckpointBackend", "MemoryCheckpointBackend"]
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """Lazy import for backends with optional dependencies."""
     if name == "SQLiteCheckpointBackend":
         from victor.storage.checkpoints.backends.sqlite_backend import (
