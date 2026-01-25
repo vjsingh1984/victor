@@ -234,7 +234,6 @@ def sample_training_data(tmp_path: Any) -> Any:
 
 
 @pytest.fixture
-def sample_task() -> Any:
 def trained_model_path(tmp_path: Any, sample_training_data: Any) -> Any:
     """Create a trained model for testing."""
     try:

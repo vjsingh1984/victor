@@ -34,7 +34,6 @@ from victor.workflows.recursion import RecursionContext, RecursionDepthError
 
 @pytest.fixture
 def mock_orchestrator() -> Any:
-def mock_orchestrator():
     """Create a mock orchestrator."""
     orchestrator = MagicMock()
     orchestrator.execute_task = AsyncMock(
@@ -47,7 +46,6 @@ def mock_orchestrator():
 
 
 @pytest.fixture
-def mock_orchestrator() -> Any:
 def compiler(mock_orchestrator: Any) -> Any:
     """Create a compiler with mock orchestrator."""
     return UnifiedWorkflowCompiler(

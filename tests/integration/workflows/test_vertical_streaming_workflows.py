@@ -38,7 +38,6 @@ from unittest.mock import MagicMock
 
 @pytest.fixture
 def coding_provider() -> Any:
-def coding_provider():
     """Fixture providing CodingWorkflowProvider."""
     from victor.coding.workflows.provider import CodingWorkflowProvider
 
@@ -46,8 +45,7 @@ def coding_provider():
 
 
 @pytest.fixture
-def coding_provider() -> Any:
-def devops_provider():
+def devops_provider() -> Any:
     """Fixture providing DevOpsWorkflowProvider."""
     from victor.devops.workflows import DevOpsWorkflowProvider
 
@@ -55,8 +53,7 @@ def devops_provider():
 
 
 @pytest.fixture
-def coding_provider() -> Any:
-def research_provider():
+def research_provider() -> Any:
     """Fixture providing ResearchWorkflowProvider."""
     from victor.research.workflows import ResearchWorkflowProvider
 
@@ -64,8 +61,7 @@ def research_provider():
 
 
 @pytest.fixture
-def coding_provider() -> Any:
-def dataanalysis_provider():
+def dataanalysis_provider() -> Any:
     """Fixture providing DataAnalysisWorkflowProvider."""
     from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
 

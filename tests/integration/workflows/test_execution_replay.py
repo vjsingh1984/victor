@@ -50,7 +50,7 @@ def temp_storage_dir(tmp_path: Any) -> Any:
 
 
 @pytest.fixture
-def sample_recording_data():
+def sample_recording_data() -> Any:
     """Sample recording data for testing."""
     return {
         "workflow_name": "test_workflow",

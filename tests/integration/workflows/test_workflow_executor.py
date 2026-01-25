@@ -115,14 +115,12 @@ def create_mock_subagent_orchestrator():
 
 @pytest.fixture
 def mock_orchestrator() -> Any:
-def mock_orchestrator():
     """Fixture providing a mock orchestrator."""
     return create_mock_orchestrator()
 
 
 @pytest.fixture
-def mock_orchestrator() -> Any:
-def simple_workflow():
+def simple_workflow() -> Any:
     """Create a simple linear workflow for testing."""
 
     def step_a(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -150,8 +148,7 @@ def simple_workflow():
 
 
 @pytest.fixture
-def mock_orchestrator() -> Any:
-def conditional_workflow():
+def conditional_workflow() -> Any:
     """Create a workflow with conditional branching."""
 
     def init_value(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -208,8 +205,7 @@ def conditional_workflow():
 
 
 @pytest.fixture
-def mock_orchestrator() -> Any:
-def error_workflow():
+def error_workflow() -> Any:
     """Create a workflow that can fail for error handling tests."""
 
     def maybe_fail(ctx: Dict[str, Any]) -> Dict[str, Any]:

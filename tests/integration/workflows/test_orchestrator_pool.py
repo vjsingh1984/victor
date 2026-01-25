@@ -40,7 +40,6 @@ from victor.workflows.orchestrator_pool import OrchestratorPool
 
 @pytest.fixture
 def mock_settings() -> Any:
-def mock_settings():
     """Create mock settings with test profiles."""
     settings = Mock(spec=Settings)
 
@@ -76,8 +75,7 @@ def mock_settings():
 
 
 @pytest.fixture
-def mock_settings() -> Any:
-def mock_orchestrator():
+def mock_orchestrator() -> Any:
     """Create mock orchestrator."""
     orchestrator = Mock()
     orchestrator.close = Mock()
@@ -85,8 +83,7 @@ def mock_orchestrator():
 
 
 @pytest.fixture
-def mock_settings() -> Any:
-def mock_provider():
+def mock_provider() -> Any:
     """Create mock provider."""
     provider = Mock()
     provider.name = "test_provider"
