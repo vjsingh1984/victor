@@ -21,9 +21,9 @@ from typing import Any, Optional, Dict
 import threading
 
 try:
-    from cachetools import TTLCache
+    from cachetools import TTLCache  # type: ignore[import-untyped]
 except ImportError:
-    TTLCache = None  # type: ignore[misc]
+    TTLCache = None
 import diskcache
 
 from victor.storage.cache.config import CacheConfig

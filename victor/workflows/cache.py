@@ -55,7 +55,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING, Union, cast
 
 try:
-    from cachetools import TTLCache  # type: ignore[import-untyped]
+    from cachetools import TTLCache
 except ImportError:
     # Fallback if cachetools is not installed
     TTLCache = None

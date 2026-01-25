@@ -1062,7 +1062,7 @@ class WorkflowExecutor:
                         result = await compiled.invoke(inputs or {})
                     else:
                         # Graph doesn't support invoke, return inputs as result
-                        result = cast("GraphExecutionResult[Any]", {"inputs": inputs or {}})
+                        result = {"inputs": inputs or {}, "state": {}}  # type: ignore[assignment]
                 else:
                     # Already compiled graph
                     result = await workflow.invoke(inputs or {})  # type: ignore[attr-defined]

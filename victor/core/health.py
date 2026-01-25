@@ -276,12 +276,11 @@ class CallableHealthCheck(BaseHealthCheck):
 
     async def _do_check(self) -> ComponentHealth:
         """Execute the callable."""
-        from victor.observability.events import ComponentHealth
         result = self._check_fn()
         if asyncio.iscoroutine(result):
             coro_result = await result
-            return cast(ComponentHealth, coro_result)
-        return cast(ComponentHealth, result)
+            return coro_result  # type: ignore[no-any-return]
+        return result  # type: ignore[no-any-return]
 
 
 class ProviderHealthCheck(BaseHealthCheck):
