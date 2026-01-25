@@ -465,7 +465,7 @@ class WorkflowGenerationPipeline:
             return refined_result  # type: ignore[no-any-return]
         # If result is a tuple, return it directly
         if isinstance(result, tuple):
-            return result  # type: ignore[no-any-return]
+            return result
         # Otherwise, it should be a RefinementResult, wrap it
         return (schema, result)  # type: ignore[no-any-return]
 
