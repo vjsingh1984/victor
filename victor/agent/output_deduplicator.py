@@ -78,7 +78,7 @@ class DeduplicationStats:
     bytes_saved: int = 0
     unique_hashes: Set[str] = field(default_factory=set)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "total_blocks": self.total_blocks,
@@ -351,7 +351,7 @@ class OutputDeduplicator:
             return result
         return ""
 
-    def get_stats(self) -> dict:
+    def get_stats(self) -> Dict[str, Any]:
         """Get deduplication statistics.
 
         Returns:
@@ -464,6 +464,6 @@ class StreamingDeduplicator:
             return result
         return ""
 
-    def get_stats(self) -> dict:
+    def get_stats(self) -> Dict[str, Any]:
         """Get deduplication statistics."""
         return self._stats.to_dict()

@@ -131,8 +131,8 @@ class ParallelToolExecutor:
         return True
 
     def _extract_file_dependencies(self, tool_calls: List[Dict[str, Any]]) -> Dict[int, Set[int]]:
-        dependencies = {i: set() for i in range(len(tool_calls))}
-        path_writers = {}
+        dependencies: Dict[int, Set[int]] = {i: set() for i in range(len(tool_calls))}
+        path_writers: Dict[str, List[int]] = {}
 
         for i, tc in enumerate(tool_calls):
             name = tc.get("name", "")
@@ -173,8 +173,8 @@ class ParallelToolExecutor:
         # Parallel execution with dependency handling
         dependencies = self._extract_file_dependencies(tool_calls)
         pending = set(range(len(tool_calls)))
-        completed = set()
-        results_by_index = {}
+        completed: Set[int] = set()
+        results_by_index: Dict[int, ToolExecutionResult] = {}
 
         while pending:
             ready = [i for i in pending if not (dependencies[i] - completed)]
@@ -201,7 +201,7 @@ class ParallelToolExecutor:
                     )
                     result.failed_count += 1
                 else:
-                    exec_result = res
+                    exec_result: ToolExecutionResult = res  # type: ignore[assignment]
                     if exec_result.success:
                         result.completed_count += 1
                     else:

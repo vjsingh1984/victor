@@ -191,8 +191,8 @@ class ParameterEnforcer:
         Returns:
             ParameterValidationResult with validation status and any errors
         """
-        missing_required = []
-        type_errors = {}
+        missing_required: List[str] = []
+        type_errors: Dict[str, str] = {}
 
         for name, spec in self.specs.items():
             if spec.required:
@@ -447,7 +447,7 @@ class ParameterEnforcer:
 def enforce_parameters(
     tool_name: str,
     specs: List[ParameterSpec],
-) -> Callable:
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """
     Decorator to enforce parameters on a tool execution function.
 
@@ -471,9 +471,9 @@ def enforce_parameters(
     """
     enforcer = ParameterEnforcer(tool_name=tool_name, parameter_specs=specs)
 
-    def decorator(func: Callable[..., Any]) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(func)
-        def wrapper(*args: Any, context: Optional[Dict[str, Any]] = None, **kwargs: Any):
+        def wrapper(*args: Any, context: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Any:
             # Enforce parameters
             enforced_kwargs = enforcer.enforce(kwargs, context=context)
             return func(*args, **enforced_kwargs)
