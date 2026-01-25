@@ -544,16 +544,16 @@ class TeamMember:
         try:
             from victor.storage.memory.unified import MemoryType
 
-            full_metadata = {"member_id": self.id, "member_name": self.name}
+            full_metadata: Dict[str, Any] = {"member_id": self.id, "member_name": self.name}
             if self.expertise:
-                full_metadata["expertise"] = self.expertise
+                full_metadata["expertise"] = ",".join(self.expertise)
             if metadata:
                 full_metadata.update(metadata)
 
             # Apply TTL from memory config if set
             config = self.get_memory_config()
-            if config.ttl_seconds:
-                full_metadata["ttl_seconds"] = config.ttl_seconds
+            if config.ttl_seconds is not None:
+                full_metadata["ttl_seconds"] = str(config.ttl_seconds)
 
             return await self.memory_coordinator.store(
                 MemoryType.ENTITY,
@@ -564,7 +564,7 @@ class TeamMember:
         except Exception:
             return False
 
-    async def recall(self, query: str, limit: Optional[int] = None) -> list:
+    async def recall(self, query: str, limit: Optional[int] = None) -> List[Any]:
         """Recall memories relevant to a query.
 
         Searches across memory types for relevant discoveries from this
@@ -885,12 +885,12 @@ class TeamMemberAdapter:
         return self.member.id
 
     @property
-    def role(self):
+    def role(self) -> str:
         """Role of this agent."""
         return self.member.role
 
     @property
-    def persona(self):
+    def persona(self) -> Optional[str]:
         """Persona of this member (None for TeamMemberAdapter)."""
         return None
 
@@ -901,7 +901,8 @@ class TeamMemberAdapter:
     async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:
         """Receive and optionally respond to a message."""
         if self.message_handler:
-            return await self.message_handler(message)
+            result = await self.message_handler(message)
+            return result
         return None
 
 

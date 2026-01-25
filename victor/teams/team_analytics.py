@@ -403,13 +403,13 @@ class TeamAnalytics:
 
         # Compute member averages
         for member_id, stats in member_performance.items():
-            stats["success_rate"] = (
+            stats["success_rate"] = int(
                 stats["successes"] / stats["executions"] if stats["executions"] > 0 else 0
             )
-            stats["avg_time"] = (
+            stats["avg_time"] = int(
                 stats["total_time"] / stats["executions"] if stats["executions"] > 0 else 0
             )
-            stats["avg_tool_calls"] = (
+            stats["avg_tool_calls"] = int(
                 stats["total_tool_calls"] / stats["executions"] if stats["executions"] > 0 else 0
             )
 
@@ -476,7 +476,7 @@ class TeamAnalytics:
                 bottlenecks.append(
                     BottleneckInfo(
                         bottleneck_type="high_failure_rate",
-                        severity=failure_rate,
+                        severity=float(failure_rate),
                         affected_members=[member_id],
                         description=f"Member {member_id} fails {failure_rate*100:.1f}% of the time",
                         suggested_fixes=[
@@ -605,7 +605,7 @@ class TeamAnalytics:
         Returns:
             List of (member_id, score) tuples sorted by score
         """
-        member_scores = {}
+        member_scores: Dict[str, float] = {}
 
         if team_id:
             execution_ids = self._team_executions.get(team_id, [])

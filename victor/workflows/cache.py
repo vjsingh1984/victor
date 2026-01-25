@@ -52,9 +52,9 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING, Union
+from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING, Union, cast
 
-from cachetools import TTLCache  # type: ignore[import-untyped]
+from cachetools import TTLCache
 
 if TYPE_CHECKING:
     from victor.workflows.definition import (
@@ -255,10 +255,10 @@ class CascadingInvalidator:
         if isinstance(cache_or_graph, DependencyGraph):
             dep_graph = cache_or_graph
             if graph is not None and not isinstance(graph, DependencyGraph):
-                cache = graph
+                cache = cast(Optional["WorkflowCache"], graph)
         elif isinstance(graph, DependencyGraph):
             dep_graph = graph
-            cache = cache_or_graph
+            cache = cast(Optional["WorkflowCache"], cache_or_graph)
         elif cache_or_graph is None and isinstance(graph, DependencyGraph):
             dep_graph = graph
         else:
@@ -433,7 +433,7 @@ class WorkflowCache:
         self._lock = threading.RLock()
 
         # Statistics tracking
-        self._stats: Dict[str, int] = {
+        self._stats: Dict[str, Any] = {
             "hits": 0,
             "misses": 0,
             "sets": 0,
@@ -665,7 +665,7 @@ class WorkflowCache:
             Dictionary with cache statistics
         """
         with self._lock:
-            stats = self._stats.copy()
+            stats: Dict[str, Any] = self._stats.copy()
 
             total = stats["hits"] + stats["misses"]
             stats["hit_rate"] = stats["hits"] / total if total > 0 else 0.0
@@ -1109,7 +1109,7 @@ class WorkflowDefinitionCache:
             if result is not None:
                 self._stats["hits"] += 1
                 logger.debug(f"Definition cache hit: {workflow_name}")
-                return result
+                return cast("WorkflowDefinition", result)
 
             self._stats["misses"] += 1
             return None
@@ -1192,7 +1192,7 @@ class WorkflowDefinitionCache:
     def get_stats(self) -> Dict[str, Any]:
         """Get cache statistics."""
         with self._lock:
-            stats = self._stats.copy()
+            stats: Dict[str, Any] = self._stats.copy()
             total = stats["hits"] + stats["misses"]
             stats["hit_rate"] = stats["hits"] / total if total > 0 else 0.0
             stats["size"] = len(self._cache) if self._cache else 0

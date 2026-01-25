@@ -335,7 +335,7 @@ class BatchWorkflowExecutor(Generic[T]):
         self.workflow_executor = workflow_executor
         self.config = config or BatchConfig()
         self._cancelled = False
-        self._active_tasks: Dict[str, asyncio.Task] = {}
+        self._active_tasks: Dict[str, asyncio.Task[Any]] = {}
 
     async def execute_batch(
         self,

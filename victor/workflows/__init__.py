@@ -127,15 +127,27 @@ class WorkflowCacheConfig(_LegacyWorkflowCacheConfig):
         enabled: bool = False,
         ttl_seconds: int = 3600,
         max_entries: int = 500,
-        **kwargs: object,
+        persist_to_disk: bool = False,
+        disk_cache_path: Optional[str] = None,
+        cacheable_node_types: Optional[Set[str]] = None,
+        excluded_context_keys: Optional[Set[str]] = None,
     ) -> None:
-        if "max_size" in kwargs and "max_entries" not in kwargs:
-            max_entries = kwargs.pop("max_size")
-        super().__init__(
-            enabled=enabled,
-            ttl_seconds=ttl_seconds,
-            max_entries=max_entries,
-            **kwargs,
+        # Handle dataclass initialization properly
+        self.enabled = enabled
+        self.ttl_seconds = ttl_seconds
+        self.max_size = max_entries
+        self.max_entries = max_entries
+        self.persist_to_disk = persist_to_disk
+        self.disk_cache_path = disk_cache_path
+        self.cacheable_node_types = (
+            cacheable_node_types
+            if cacheable_node_types is not None
+            else {"transform", "condition"}
+        )
+        self.excluded_context_keys = (
+            excluded_context_keys
+            if excluded_context_keys is not None
+            else {"_internal", "_debug", "_timestamps"}
         )
 
 
@@ -156,7 +168,7 @@ class WorkflowCacheManager(_LegacyWorkflowCacheManager):
         self,
         workflow_name: str,
         config: Optional[_LegacyWorkflowCacheConfig] = None,
-    ) -> Optional[WorkflowCache]:
+    ) -> Optional["WorkflowCache"]:
         """Get or create cache for a workflow (package-level behavior)."""
         with self._lock:
             cache = self._caches.get(workflow_name)

@@ -688,7 +688,7 @@ class TeamPredictor:
         formation_scores["consensus"] = consensus_score
 
         # Select best formation
-        best_formation = max(formation_scores, key=formation_scores.get)
+        best_formation = max(formation_scores.keys(), key=lambda k: formation_scores[k])
         best_score = formation_scores[best_formation]
 
         confidence = min(0.85, 0.6 + len(self._historical_records) / 900)

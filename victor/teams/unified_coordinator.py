@@ -88,7 +88,7 @@ class _TeamMemberAdapter:
         self.id = member.id
 
     @property
-    def role(self):
+    def role(self) -> Optional[str]:
         """Expose role from underlying member for formation strategy detection."""
         return getattr(self._member, "role", None)
 

@@ -226,12 +226,8 @@ class TeamLearningSystem:
         self._experiences: Dict[str, TeamExperience] = {}
         self._team_experiences: Dict[str, List[str]] = defaultdict(list)
         self._q_table: Dict[Tuple[str, str], float] = {}  # (team_id, state) -> value
-        self._formation_performance: Dict[str, Dict[str, float]] = defaultdict(
-            lambda: defaultdict(list)
-        )
-        self._member_performance: Dict[str, Dict[str, float]] = defaultdict(
-            lambda: defaultdict(list)
-        )
+        self._formation_performance: Dict[str, Dict[str, List[float]]] = {}
+        self._member_performance: Dict[str, Dict[str, List[float]]] = {}
 
         # Load existing data
         if storage_path and storage_path.exists():
@@ -318,7 +314,7 @@ class TeamLearningSystem:
             efficiency = 1.0 - (tool_calls / budget)
             reward += (efficiency - 0.5) * 0.2
 
-        return max(-1.0, min(1.0, reward))
+        return float(max(-1.0, min(1.0, reward)))
 
     def _update_from_experience(self, experience: TeamExperience) -> None:
         """Update knowledge from experience.
@@ -339,6 +335,12 @@ class TeamLearningSystem:
 
         # Update formation performance
         formation = experience.team_config.formation.value
+        if formation not in self._formation_performance:
+            self._formation_performance[formation] = {}
+        if "rewards" not in self._formation_performance[formation]:
+            self._formation_performance[formation]["rewards"] = []
+        if "success" not in self._formation_performance[formation]:
+            self._formation_performance[formation]["success"] = []
         self._formation_performance[formation]["rewards"].append(experience.reward)
         self._formation_performance[formation]["success"].append(
             experience.result.get("success", False)
@@ -346,6 +348,12 @@ class TeamLearningSystem:
 
         # Update member performance
         for member_id, member_result in experience.result.get("member_results", {}).items():
+            if member_id not in self._member_performance:
+                self._member_performance[member_id] = {}
+            if "rewards" not in self._member_performance[member_id]:
+                self._member_performance[member_id]["rewards"] = []
+            if "success" not in self._member_performance[member_id]:
+                self._member_performance[member_id]["success"] = []
             self._member_performance[member_id]["rewards"].append(experience.reward)
             self._member_performance[member_id]["success"].append(
                 member_result.get("success", False)
@@ -441,7 +449,7 @@ class TeamLearningSystem:
         Returns:
             List of recommendations
         """
-        recommendations = []
+        recommendations: List[str] = []
         experience_ids = self._team_experiences.get(team_id, [])
         experiences = [self._experiences[eid] for eid in experience_ids if eid in self._experiences]
 
@@ -492,7 +500,7 @@ class TeamLearningSystem:
         avg_rewards = {
             formation: np.mean(rewards) for formation, rewards in formation_rewards.items()
         }
-        best_formation = max(avg_rewards, key=avg_rewards.get)
+        best_formation = max(avg_rewards.keys(), key=lambda k: avg_rewards[k])
 
         # Check if current formation is suboptimal
         current_formation = experiences[-1].team_config.formation.value
@@ -539,7 +547,7 @@ class TeamLearningSystem:
         avg_rewards = {member_id: np.mean(rewards) for member_id, rewards in member_rewards.items()}
 
         # Find worst performing member
-        worst_member = min(avg_rewards, key=avg_rewards.get)
+        worst_member = min(avg_rewards.keys(), key=lambda k: avg_rewards[k])
         worst_reward = avg_rewards[worst_member]
 
         if worst_reward > 0:
@@ -635,7 +643,7 @@ class TeamLearningSystem:
         }
 
         if avg_rewards:
-            return max(avg_rewards, key=avg_rewards.get)
+            return max(avg_rewards.keys(), key=lambda k: avg_rewards[k])
 
         return None
 

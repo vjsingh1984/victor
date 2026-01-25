@@ -270,7 +270,7 @@ class TeamOptimizer:
         alternatives = []
 
         # Greedy approach: iteratively add members
-        current_members = []
+        current_members: List["TeamMember"] = []
 
         for _ in range(min(len(available_members), constraints.max_members)):
             # Try adding each remaining member
@@ -300,7 +300,8 @@ class TeamOptimizer:
 
             if best_addition:
                 current_members.append(best_addition)
-                alternatives.append((best_config, best_addition_score))
+                if best_config is not None:
+                    alternatives.append((best_config, best_addition_score))
             else:
                 break
 
@@ -347,7 +348,7 @@ class TeamOptimizer:
             for individual in population:
                 if not constraints.validate(individual):
                     score = -1.0
-                    metrics = {}
+                    metrics: Dict[str, float] = {}
                 else:
                     score, metrics = self._evaluate_config(individual, task, objective, context)
 
@@ -491,7 +492,7 @@ class TeamOptimizer:
         Returns:
             Tuple of (score, metrics)
         """
-        metrics = {}
+        metrics: Dict[str, float] = {}
 
         # Use predictor if available
         if self.predictor:
@@ -508,28 +509,39 @@ class TeamOptimizer:
                 PredictionMetric.QUALITY_SCORE, config, task, context
             )
 
-            metrics["execution_time"] = time_result.predicted_value
-            metrics["success_probability"] = success_result.predicted_value
-            metrics["quality_score"] = quality_result.predicted_value
-            metrics["confidence"] = (
-                time_result.confidence + success_result.confidence + quality_result.confidence
-            ) / 3
+            metrics["execution_time"] = float(time_result.predicted_value)
+            metrics["success_probability"] = float(success_result.predicted_value)
+            metrics["quality_score"] = float(quality_result.predicted_value)
+            metrics["confidence"] = float(
+                (
+                    time_result.confidence
+                    + success_result.confidence
+                    + quality_result.confidence
+                )
+                / 3
+            )
 
         # Calculate score based on objective
         if objective == OptimizationObjective.MINIMIZE_TIME:
-            score = 1.0 / max(1.0, metrics.get("execution_time", 100))
+            exec_time = metrics.get("execution_time", 100)
+            score = 1.0 / max(1.0, float(exec_time))
         elif objective == OptimizationObjective.MAXIMIZE_SUCCESS:
-            score = metrics.get("success_probability", 0.5)
+            success_prob = metrics.get("success_probability", 0.5)
+            score = float(success_prob)
         elif objective == OptimizationObjective.MAXIMIZE_QUALITY:
-            score = metrics.get("quality_score", 0.5)
+            quality = metrics.get("quality_score", 0.5)
+            score = float(quality)
         elif objective == OptimizationObjective.MINIMIZE_COST:
-            score = 1.0 / max(1.0, config.total_tool_budget)
+            score = 1.0 / max(1.0, float(config.total_tool_budget))
         elif objective == OptimizationObjective.BALANCED:
             # Weighted combination
-            time_score = 1.0 / max(1.0, metrics.get("execution_time", 100))
-            success_score = metrics.get("success_probability", 0.5)
-            quality_score = metrics.get("quality_score", 0.5)
-            cost_score = 1.0 / max(1.0, config.total_tool_budget)
+            exec_time = metrics.get("execution_time", 100)
+            time_score = 1.0 / max(1.0, float(exec_time))
+            success_prob = metrics.get("success_probability", 0.5)
+            success_score = float(success_prob)
+            quality = metrics.get("quality_score", 0.5)
+            quality_score = float(quality)
+            cost_score = 1.0 / max(1.0, float(config.total_tool_budget))
 
             score = (
                 time_score * 0.25 + success_score * 0.35 + quality_score * 0.25 + cost_score * 0.15
@@ -538,8 +550,8 @@ class TeamOptimizer:
             score = 0.5
 
         # Apply confidence weighting
-        confidence = metrics.get("confidence", 0.5)
-        adjusted_score = score * (0.5 + confidence * 0.5)
+        conf = metrics.get("confidence", 0.5)
+        adjusted_score = score * (0.5 + float(conf) * 0.5)
 
         return adjusted_score, metrics
 
@@ -629,7 +641,7 @@ class TeamOptimizer:
         Returns:
             Initial population
         """
-        population = []
+        population: List["TeamConfig"] = []
 
         while len(population) < self.population_size:
             config = self._random_config(available_members, constraints)
